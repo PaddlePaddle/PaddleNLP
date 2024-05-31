@@ -143,6 +143,7 @@ from .training_args import TrainingArguments
 from .utils import reshard as reshard_util
 from .utils.helper import (  # nested_truncate,
     broadcast_dp_optimizer,
+    broadcast_moe_optimizer,
     distributed_concat,
     distributed_file,
     distributed_isfile,
@@ -565,7 +566,7 @@ class Trainer:
             )
             self.model.set_state_dict(state_dict)
         else:
-            if resume_from_checkpoint is not None and self.args.dataset_rank == 0:
+            if resume_from_checkpoint is not None and (self.args.dataset_rank == 0 or self.args.use_expert_parallel):
 
                 weights_file = os.path.join(
                     resume_from_checkpoint, _add_variant(weight_name, self.args.weight_name_suffix)
@@ -930,22 +931,17 @@ class Trainer:
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
                     self.timers and self.timers("forward-backward").start()
 
-                dp_enabled = (
-                    self.args.data_parallel_degree > 1 if self.args.use_hybrid_parallel else args.local_rank != -1
-                )
-                forbidden_no_sync = False
                 # stage2 and stage3 should not no_sync, because the is no DDP wrapper and no_sync API
                 # hybrid_parallel (tp or pp or sharding stage 1) should not no_sync
-                if self.args.use_hybrid_parallel:
-                    forbidden_no_sync = True
-
-                availiable_no_sync = dp_enabled and not forbidden_no_sync
-
+                availiable_no_sync = hasattr(model, "no_sync")
                 is_no_sync = (
-                    ((step_control + 1) % args.gradient_accumulation_steps != 0)
-                    and availiable_no_sync
-                    and args._no_sync_in_gradient_accumulation
-                ) or (args.recompute and availiable_no_sync)
+                    (
+                        ((step_control + 1) % args.gradient_accumulation_steps != 0)
+                        and args._no_sync_in_gradient_accumulation
+                    )
+                    or args.recompute
+                    or args.use_expert_parallel
+                ) and availiable_no_sync
                 # sharding
                 # stage1. the same as ddp
                 # stage2. manualy collect gradient on dp group
@@ -965,6 +961,14 @@ class Trainer:
 
                 tr_loss += tr_loss_step
 
+                def fused_allreduce_gradients_no_sync(paramlist, hcg):
+                    paramlist = list(paramlist)
+                    nonmoe_list = [p for p in paramlist if not getattr(p, "no_sync", False)]
+                    moelist = [p for p in paramlist if getattr(p, "no_sync", False)]
+                    if moelist and not self.args.use_expert_parallel:
+                        logger.warning("found `no sync` param when `use_expert_parallel=False`")
+                    fused_allreduce_gradients(nonmoe_list, hcg)
+
                 if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
                     # last step in epoch but step is always smaller than gradient_accumulation_steps
                     steps_in_epoch <= args.gradient_accumulation_steps
@@ -983,12 +987,12 @@ class Trainer:
 
                     # Case 1: Use recompute and dp / sharding stage1,
                     # manualy collect gradient for dp.
-                    if args.recompute and availiable_no_sync:
-                        fused_allreduce_gradients(list(model.parameters()), None)
+                    if (args.recompute or args.use_expert_parallel) and availiable_no_sync:
+                        fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     # Case 2: hack dp with master_grad
-                    if dp_master_grad and not (args.recompute and availiable_no_sync):
-                        fused_allreduce_gradients(list(model.parameters()), None)
+                    elif dp_master_grad:
+                        fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     # Pipeline parallel mode,  handle gradient reduce here to overlap
                     pipeline_parallel_config = (
@@ -1007,8 +1011,7 @@ class Trainer:
                                 self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
 
                             if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
-                                fused_allreduce_gradients(list(parameters_list), self.optimizer._hcg)
-
+                                fused_allreduce_gradients_no_sync(list(parameters_list), self.optimizer._hcg)
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
 
@@ -1028,6 +1031,8 @@ class Trainer:
                     )
                     optimizer_was_run = True
                     if self.do_grad_scaling:
+                        if args.pipeline_parallel_degree > 1:
+                            assert not self.args.use_expert_parallel, "pipeline moe not work under fp16"
                         scale_before = paddle.assign(self.scaler._scale)
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
@@ -2042,7 +2047,6 @@ class Trainer:
 
         model.train()
         inputs = self._prepare_inputs(inputs)
-
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
 
@@ -2053,7 +2057,6 @@ class Trainer:
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
-
         return loss.detach()
 
     def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
@@ -2143,6 +2146,26 @@ class Trainer:
                 # For ckpt integrity
                 paddle.save(self.state.global_step, os.path.join(output_dir, ".model_done"))
 
+    def _filter_moe_no_sync_optimizer_params(self):
+        """
+        filter optimizer params which should not sync
+        """
+        state_dict = self.model.state_dict()
+        optimzier_state_dict = self.optimizer.state_dict()
+        filter_optimzier_state_dict = OrderedDict()
+        param_names_in_master_weights = list(optimzier_state_dict["master_weights"].keys()) if self.args.bf16 else []
+        filter_optimzier_state_dict["master_weights"] = OrderedDict()
+        for k, v in state_dict.items():
+            if getattr(v, "no_sync", False):
+                if v.name in param_names_in_master_weights:
+                    filter_optimzier_state_dict["master_weights"][v.name] = optimzier_state_dict["master_weights"][
+                        v.name
+                    ]
+                for op_k, op_v in optimzier_state_dict.items():
+                    if op_k.startswith(v.name):
+                        filter_optimzier_state_dict[op_k] = op_v
+        return filter_optimzier_state_dict
+
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
         self.runtime_timer.start("checkpoint saving time")
@@ -2165,7 +2188,7 @@ class Trainer:
             optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
 
             if self.args.use_hybrid_parallel:
-                if self.dp_group.rank <= 0:
+                if self.dp_group.rank <= 0 or self.args.use_expert_parallel:
                     os.makedirs(output_dir, exist_ok=True)
                     logger.info("Saving optimizer files.")
                     if self.args.unified_checkpoint:
@@ -2177,12 +2200,18 @@ class Trainer:
                             safe_serialization=True,
                         )
                     else:
-                        self._save_ckpt_func(
-                            self.optimizer.state_dict(),
-                            os.path.join(output_dir, optimizer_name),
-                        )
+                        if self.dp_group.rank > 0:  # this should only work for MoE saving
+                            self._save_ckpt_func(
+                                self._filter_moe_no_sync_optimizer_params(),
+                                os.path.join(output_dir, optimizer_name),
+                            )
+                        else:
+                            self._save_ckpt_func(
+                                self.optimizer.state_dict(),
+                                os.path.join(output_dir, optimizer_name),
+                            )
 
-            if self.args.should_save:
+            if self.args.should_save or self.args.use_expert_parallel:
                 if not self.args.use_hybrid_parallel:
                     logger.info("Saving optimizer files.")
                     if self.args.unified_checkpoint:
@@ -2194,7 +2223,12 @@ class Trainer:
                             safe_serialization=True,
                         )
                     else:
-                        self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                        if self.dp_group.rank > 0:
+                            self._save_ckpt_func(
+                                self._filter_moe_no_sync_optimizer_params(), os.path.join(output_dir, OPTIMIZER_NAME)
+                            )
+                        else:
+                            self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
@@ -2452,7 +2486,7 @@ class Trainer:
                     logger.info("Loading checkpoint, the next checkpoint will be saved as unified checkpoint")
 
             if not use_unified_checkpoint:
-                if self.args.data_parallel_rank == 0:
+                if self.args.data_parallel_rank == 0 or self.args.use_expert_parallel:
                     optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
                     path = os.path.join(checkpoint, optimizer_name)
                     if os.path.isfile(path):
@@ -2476,7 +2510,11 @@ class Trainer:
         # broadcast optimizer state in dp group
         if self.args.local_rank != -1:
             dist.barrier()
-        opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
+        if self.args.use_expert_parallel:
+            opt_state_dict = broadcast_moe_optimizer(opt_state_dict)
+        else:
+            if not self.args.should_load_sharding_stage1_model:
+                opt_state_dict = broadcast_dp_optimizer(opt_state_dict)
 
         if opt_state_dict is not None:
             # Load in optimizer and scheduler states
