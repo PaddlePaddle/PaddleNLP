@@ -564,7 +564,12 @@ class Trainer:
                 base_weight_name=weight_name,
                 model_wrapped=self.model_wrapped,
             )
-            self.model.set_state_dict(state_dict)
+            old_state_dict = self.model.state_dict()
+            new_state_dict = {}
+            for k, v in state_dict.items():
+                if k not in old_state_dict or id(v) != id(old_state_dict[k]):
+                    new_state_dict[k] = v
+            self.model.set_state_dict(new_state_dict)
         else:
             if resume_from_checkpoint is not None and (self.args.dataset_rank == 0 or self.args.use_expert_parallel):
 
