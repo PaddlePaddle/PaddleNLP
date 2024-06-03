@@ -582,7 +582,7 @@ class Trainer:
                         weights_index_file,
                     ]
                 ):
-                    raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+                    raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint} -- {weights_file}")
 
                 logger.info(f"Loading model from {resume_from_checkpoint} .")
 
@@ -2223,7 +2223,7 @@ class Trainer:
                             safe_serialization=True,
                         )
                     else:
-                        if self.dp_group.rank > 0:
+                        if self.args.data_parallel_rank > 0 and self.args.use_expert_parallel:
                             self._save_ckpt_func(
                                 self._filter_moe_no_sync_optimizer_params(), os.path.join(output_dir, OPTIMIZER_NAME)
                             )
@@ -2511,7 +2511,9 @@ class Trainer:
         if self.args.local_rank != -1:
             dist.barrier()
         if self.args.use_expert_parallel:
-            opt_state_dict = broadcast_moe_optimizer(opt_state_dict)
+            opt_state_dict = broadcast_moe_optimizer(
+                opt_state_dict, broadcast_dp=not self.args.should_load_sharding_stage1_model
+            )
         else:
             if not self.args.should_load_sharding_stage1_model:
                 opt_state_dict = broadcast_dp_optimizer(opt_state_dict)

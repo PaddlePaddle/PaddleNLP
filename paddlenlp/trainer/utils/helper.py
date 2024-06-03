@@ -228,7 +228,7 @@ def broadcast_dp_optimizer(state_dict):
     return state_dict
 
 
-def broadcast_moe_optimizer(state_dict):
+def broadcast_moe_optimizer(state_dict, broadcast_dp=True):
 
     try:
         hcg = fleet.get_hybrid_communicate_group()
@@ -270,7 +270,10 @@ def broadcast_moe_optimizer(state_dict):
         base_state_dict.update(buf[2])
         return base_state_dict
 
-    base_state_dict = _broadcast_moe_optimizer_state(state_dict)
+    if broadcast_dp:
+        base_state_dict = broadcast_dp_optimizer(state_dict)
+    else:
+        base_state_dict = _broadcast_moe_optimizer_state(state_dict)
     if data_parallel_rank > 0:
         master_weight = state_dict.pop("master_weights", {})
         base_state_dict.update(state_dict)
