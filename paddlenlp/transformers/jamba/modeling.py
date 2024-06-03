@@ -68,14 +68,9 @@ except ImportError:
 is_fast_path_available = all(
     (selective_state_update, selective_scan_fn, causal_conv1d_fn, causal_conv1d_update, mamba_inner_fn)
 )
-from paddlenlp.utils.log import logger
-
-if is_fast_path_available:
-    logger.info("mamba_ssm_paddle is installed. Using mamba_ssm_paddle!")
-else:
-    logger.warning("mamba_ssm_paddle is not installed. Please install it with `pip install mamba_ssm_paddle`.")
-
 from paddle.amp.auto_cast import amp_global_state
+
+from paddlenlp.utils.log import logger
 
 _flash_supports_window_size = False
 
@@ -88,6 +83,19 @@ else:
     def masked_fill(x, mask, value):
         y = paddle.full(x.shape, value, x.dtype)
         return paddle.where(mask, y, x)
+
+
+def get_triangle_upper_mask(x, mask=None):
+    if mask is not None:
+        return mask
+    # [bsz, n_head, q_len, kv_seq_len]
+    shape = x.shape
+    #  [bsz, 1, q_len, kv_seq_len]
+    shape[1] = 1
+    mask = paddle.full(shape, paddle.finfo(x.dtype).min, dtype=x.dtype)
+    mask = paddle.triu(mask, diagonal=1)
+    mask.stop_gradient = True
+    return mask
 
 
 # Copied from transformers.models.mixtral.modeling_mixtral.load_balancing_loss_func with gate->router
@@ -285,7 +293,10 @@ class HybridMambaAttentionDynamicCache:
         layer_idx = self.transformer_layers[0] if layer_idx not in self.transformer_layers else layer_idx
         if len(self.key_cache) <= layer_idx:
             return 0
-        return self.key_cache[layer_idx].shape[-2]
+        key_val = self.key_cache[layer_idx]
+        if key_val.ndim == 2 and key_val.shape[-1] == 0:
+            return 0
+        return key_val.shape[-2]
 
     def get_max_length(self) -> Optional[int]:
         """Returns the maximum sequence length of the cached states. DynamicCache does not have a maximum length."""
@@ -423,21 +434,8 @@ class JambaAttention(nn.Layer):
         attn_weights = paddle.matmul(query_states, key_states, transpose_y=True) / math.sqrt(self.head_dim)
 
         if attention_mask is None:
-
-            def get_triangle_upper_mask(x, mask=None):
-                if mask is not None:
-                    return mask
-                # [bsz, n_head, q_len, kv_seq_len]
-                shape = x.shape
-                #  [bsz, 1, q_len, kv_seq_len]
-                shape[1] = 1
-                mask = paddle.full(shape, paddle.finfo(x.dtype).min, dtype=x.dtype)
-                mask = paddle.triu(mask, diagonal=1)
-                mask.stop_gradient = True
-                return mask
-
-            attn_weights = attn_weights + get_triangle_upper_mask(attn_weights)
-
+            attention_mask = get_triangle_upper_mask(attn_weights)
+        attn_weights = attn_weights + attention_mask
         # upcast attention to fp32
         attn_weights = nn.functional.softmax(attn_weights, axis=-1, dtype=paddle.float32).cast(query_states.dtype)
         attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
@@ -541,8 +539,8 @@ class JambaFlashAttention2(JambaAttention):
             query_states,
             key_states,
             value_states,
-            attn_mask=None,
-            is_causal=True,
+            attn_mask=attention_mask,
+            is_causal=attention_mask is None,
             dropout_p=dropout_rate,
             training=self.training,
         )
@@ -1086,8 +1084,8 @@ class JambaPretrainedModel(PretrainedModel):
     _no_split_modules = ["JambaAttentionDecoderLayer", "JambaMambaDecoderLayer"]
 
     @classmethod
-    def _get_name_mappings(cls, config: JambaConfig) -> list[StateDictNameMapping]:
-        mappings: list[StateDictNameMapping] = []
+    def _get_name_mappings(cls, config: JambaConfig) -> List[StateDictNameMapping]:
+        mappings: List[StateDictNameMapping] = []
         model_mappings = [
             ["embed_tokens.weight"],
             ["final_layernorm.weight"],
@@ -1338,7 +1336,17 @@ class JambaModel(JambaPretrainedModel):
         if not use_cache and past_key_values is not None:
             past_key_values = None
 
-        causal_mask = None
+        # prepare attention mask with causal mask
+        # bool 4D mask
+        past_length = 0
+        if past_key_values is not None:
+            past_length = past_key_values.get_seq_length()
+        attention_mask = self.get_masks(
+            hidden_states.shape[0], hidden_states.shape[1], past_length, padding_mask=attention_mask
+        )
+        zero = paddle.zeros(attention_mask.shape, dtype=hidden_states.dtype)
+        neg_inf = paddle.full_like(attention_mask, paddle.finfo(hidden_states.dtype).min, dtype=hidden_states.dtype)
+        attention_mask = paddle.where(attention_mask, zero, neg_inf)
 
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
@@ -1352,7 +1360,7 @@ class JambaModel(JambaPretrainedModel):
                 layer_outputs = recompute(
                     decoder_layer.__call__,
                     hidden_states,
-                    causal_mask,
+                    attention_mask,
                     position_ids,
                     past_key_values,
                     output_attentions,
@@ -1363,7 +1371,7 @@ class JambaModel(JambaPretrainedModel):
             else:
                 layer_outputs = decoder_layer(
                     hidden_states,
-                    attention_mask=causal_mask,
+                    attention_mask=attention_mask,
                     position_ids=position_ids,
                     past_key_value=past_key_values,
                     output_attentions=output_attentions,
@@ -1408,6 +1416,34 @@ class JambaModel(JambaPretrainedModel):
             attentions=all_self_attns,
             router_logits=all_router_logits,
         )
+
+    def get_masks(self, batch_size, seq_length, past_length, padding_mask=None):
+        # casual mask
+        casual_mask = paddle.tril(paddle.ones([batch_size, 1, seq_length, seq_length], dtype="bool"))
+        if past_length > 0:
+            casual_mask = paddle.concat(
+                [paddle.ones([batch_size, 1, seq_length, past_length], dtype="bool"), casual_mask], axis=-1
+            )
+
+        # seq_mask
+        if padding_mask is None:
+            padding_mask = paddle.ones((batch_size, 1, seq_length, seq_length + past_length), dtype="bool")
+        if len(padding_mask.shape) == 2:
+            # from Tokenizer
+            padding_mask = (
+                padding_mask.unsqueeze(axis=[1, 2])
+                .expand([batch_size, 1, seq_length, seq_length + past_length])
+                .astype("bool")
+            )
+        elif len(padding_mask.shape) == 3:
+            # [batch_size,tgt_length, src_length] -> [batch_size, 1, tgt_length, src_length]
+            padding_mask = padding_mask.unsqueeze(1).astype("bool")
+        elif len(padding_mask.shape) == 4:
+            padding_mask = padding_mask.astype("bool")
+
+        casual_mask = casual_mask & padding_mask
+
+        return casual_mask
 
 
 # Adapted from transformers.models.mixtral.modeling_mixtral.MixtralForCausalLM with MIXTRAL->JAMBA, Mixtral->Jamba
@@ -1594,15 +1630,13 @@ class JambaForCausalLM(JambaPretrainedModel):
     ):
         empty_past_kv = past_key_values is None
 
-        batch_size, seq_length = input_ids.shape
-
         # Omit tokens covered by past_key_values
         if not empty_past_kv:
             input_ids = input_ids[:, -1].unsqueeze(axis=-1)
         else:
             past_key_values = HybridMambaAttentionDynamicCache(
                 self.config,
-                batch_size,
+                input_ids.shape[0],
                 self.get_input_embeddings().weight.dtype,
             )
 
@@ -1617,13 +1651,25 @@ class JambaForCausalLM(JambaPretrainedModel):
                 "position_ids": None,
                 "past_key_values": past_key_values,
                 "use_cache": kwargs.get("use_cache"),
-                "attention_mask": None,
+                "attention_mask": attention_mask,
                 "output_router_logits": output_router_logits,
                 "num_logits_to_keep": self.config.num_logits_to_keep,
                 "cache_position": None,
             }
         )
         return model_inputs
+
+    @staticmethod
+    def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
+        is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(input_ids == pad_token_id).item()
+        is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
+            (eos_token_id is not None) and (pad_token_id != eos_token_id)
+        )
+        if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
+            attention_mask = (input_ids != pad_token_id).astype(paddle.int64)
+        else:
+            attention_mask = paddle.ones_like(input_ids, dtype=paddle.int64)
+        return attention_mask
 
 
 # Copied from transformers.models.mixtral.modeling_mixtral.MixtralForSequenceClassification with Mixtral->Jamba, MIXTRAL->JAMBA
