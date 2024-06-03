@@ -787,10 +787,6 @@ class TrainingArguments:
         default=False,
         metadata={"help": "whether to run distributed training in auto parallel mode"},
     )
-    tensor_parallel_output: Optional[bool] = field(
-        default=False,
-        metadata={"help": "whether to output logits in distributed status"},
-    )
     use_expert_parallel: Optional[bool] = field(
         default=False,
         metadata={"help": "Enable MoE (Mixture of Experts) expert parallel training"},
