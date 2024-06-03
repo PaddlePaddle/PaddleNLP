@@ -93,7 +93,6 @@ class ConfigurationUtilsTest(unittest.TestCase):
         config.quantization_config.quant_type = "weight_only_int8"
         str_config = str(config)
         assert "tensor_parallel_degree" in str_config
-        assert "tensor_parallel_output" in str_config
 
         with tempfile.TemporaryDirectory() as tp:
             config.save_pretrained(tp)

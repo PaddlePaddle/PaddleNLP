@@ -560,6 +560,7 @@ class PretrainedConfig:
                 self.tensor_parallel_degree > 1
             ), f"senquence-parallel only works in tensor parallel, got tensor parallel degree={self.tensor_parallel_degree}"
 
+        self.chunk_size_feed_forward = kwargs.pop("chunk_size_feed_forward", 0)
         self.return_dict = kwargs.pop("return_dict", False)
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
