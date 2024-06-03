@@ -719,4 +719,8 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                        Whether use flatten_param_grads method in optimizer,
                        only used on NPU devices.(default:False)
 
+  --use_expert_parallel
+                       Whether to enable MoE (Mixture of Experts) expert parallel training.
+                       (default: False)
+
 ```

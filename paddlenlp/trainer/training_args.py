@@ -263,6 +263,8 @@ class TrainingArguments:
               enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
               enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed
               enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap.
+              enable_stage1_broadcast_overlap, overlap stage1 V1 broadcast with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap forward compute and no other sync could be called during the training for broadcast overlap.
+              enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap.
               disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
@@ -647,7 +649,9 @@ class TrainingArguments:
                 "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation\n"
                 "enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed\n"
                 "disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.\n"
-                "enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap"
+                "enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap\n"
+                "enable_stage1_broadcast_overlap, overlap stage1 V1 broadcast with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap forward compute and no other sync could be called during the training for broadcast overlap.\n"
+                "enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap."
             )
         },
     )
@@ -803,6 +807,10 @@ class TrainingArguments:
     enable_auto_parallel: Optional[bool] = field(
         default=False,
         metadata={"help": "whether to run distributed training in auto parallel mode"},
+    )
+    use_expert_parallel: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable MoE (Mixture of Experts) expert parallel training"},
     )
 
     def __post_init__(self):
@@ -1150,6 +1158,8 @@ class TrainingArguments:
                         order = ["dp", "sharding", "pp", "sep", "mp"]
                     else:
                         order = ["dp", "sharding", "pp", "mp"]
+                if self.use_expert_parallel:
+                    order = order[1:-1] + ["dp", "mp"]
 
                 if is_segment_parallel_supported():
                     hybrid_configs = {
@@ -1186,10 +1196,12 @@ class TrainingArguments:
                                 "enable_stage2_overlap",
                                 "split_param",
                                 "disable_stage1_reduce_avg",
+                                "enable_stage1_broadcast_overlap",
+                                "enable_stage1_allgather_overlap",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
-                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap."
+                                    f"accpet config is enable_stage1_tensor_fusion, enable_stage1_overlap, enable_stage2_overlap, split_param, disable_stage1_reduce_avg, enable_stage1_broadcast_overlap, enable_stage1_allgather_overlap."
                                 )
                     if "disable_stage1_reduce_avg" in sharding_parallel_config:
                         assert self.sharding == [
@@ -1235,6 +1247,35 @@ class TrainingArguments:
                             "The logging_steps should be greater than 1 for stage2 overlap, "
                             f"but got logging_steps={self.logging_steps}."
                         )
+                    if "enable_stage1_broadcast_overlap" in sharding_parallel_config:
+                        assert (
+                            ShardingOption.SHARD_OP in self.sharding
+                        ), f"enable_stage1_broadcast_overlap expects sharding=stage1, but got {self.sharding}."
+
+                        assert (
+                            "split_param" not in sharding_parallel_config
+                        ), "split_param should not be set when enable_stage1_broadcast_overlap."
+                        use_casual_mask = os.getenv("USE_CASUAL_MASK", "False")
+                        assert use_casual_mask, "enable_stage1_broadcast_overlap requires USE_CASUAL_MASK=True."
+                        assert self.logging_steps > 1, (
+                            "The logging_steps should be greater than 1 for stage1_broadcast_overlap, "
+                            f"but got logging_steps={self.logging_steps}."
+                        )
+                    if "enable_stage1_allgather_overlap" in sharding_parallel_config:
+                        assert (
+                            ShardingOption.SHARD_OP in self.sharding
+                        ), f"enable_stage1_allgather_overlap expects sharding=stage1, but got {self.sharding}."
+
+                        assert (
+                            "split_param" in sharding_parallel_config
+                        ), "split_param should be set when enable_stage1_allgather_overlap."
+                        use_casual_mask = os.getenv("USE_CASUAL_MASK", "False")
+                        assert use_casual_mask, "enable_stage1_allgather_overlap requires USE_CASUAL_MASK=True."
+                        assert self.logging_steps > 1, (
+                            "The logging_steps should be greater than 1 for enable_stage1_allgather_overlap, "
+                            f"but got logging_steps={self.logging_steps}."
+                        )
+
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
 
@@ -1643,8 +1684,12 @@ class TrainingArguments:
                 name.append(self._format_name("pp", self.pipeline_parallel_rank, self.pipeline_parallel_degree))
             if self.sharding_parallel_degree > 1:
                 name.append(self._format_name("shard", self.sharding_parallel_rank, self.sharding_parallel_degree))
+            if self.use_expert_parallel:
+                name.append(self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree))
             return "_".join(name)
         else:
+            if self.use_expert_parallel:
+                return self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree)
             return None
 
     @property
@@ -1655,12 +1700,16 @@ class TrainingArguments:
                 name.append(self._format_name("tp", self.tensor_parallel_rank, self.tensor_parallel_degree))
             if self.pipeline_parallel_degree > 1:
                 name.append(self._format_name("pp", self.pipeline_parallel_rank, self.pipeline_parallel_degree))
+            if self.use_expert_parallel:
+                name.append(self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree))
             return "_".join(name)
 
         else:
+            if self.use_expert_parallel:
+                return self._format_name("moe", self.data_parallel_rank, self.data_parallel_degree)
             return None
 
-    def sharded_name_suffix(self, shard_id=None, pp_id=None):
+    def sharded_name_suffix(self, shard_id=None, pp_id=None, moe_id=None):
         if self.use_hybrid_parallel:
             name = []
             if self.tensor_parallel_degree > 1:
@@ -1675,8 +1724,17 @@ class TrainingArguments:
                     shard_id = self.sharding_parallel_rank
                 assert isinstance(shard_id, int)
                 name.append(self._format_name("shard", shard_id, self.sharding_parallel_degree))
+            if self.use_expert_parallel:
+                if moe_id is None:
+                    moe_id = self.data_parallel_rank
+                assert isinstance(moe_id, int)
+                name.append(self._format_name("moe", moe_id, self.data_parallel_degree))
             return "_".join(name)
         else:
+            if self.use_expert_parallel:
+                if moe_id is None:
+                    moe_id = self.data_parallel_rank
+                return self._format_name("moe", moe_id, self.data_parallel_degree)
             return None
 
     @property
@@ -1769,9 +1827,9 @@ class TrainingArguments:
                 return True
             elif self.use_hybrid_parallel:
                 # save on dataset rank 0
-                return self.sharding_parallel_rank == 0 and self.data_parallel_rank == 0
+                return self.sharding_parallel_rank == 0 and (self.data_parallel_rank == 0 or self.use_expert_parallel)
             else:
-                return self.process_index == 0
+                return self.process_index == 0 or self.use_expert_parallel
 
     @property
     def _no_sync_in_gradient_accumulation(self):
