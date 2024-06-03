@@ -318,12 +318,13 @@ class ShardingIO:
         node_model_state = reshard_pp(node_model_state)
         return reshard_sharding(node_model_state)
 
-    def manipulate_state_dict_and_config(self, model_to_save, merge_tensor_parallel=False):
+    def manipulate_state_dict_and_config(self, model_to_save, merge_tensor_parallel=False, state_dict=None):
         weight_name_suffix = self.args.sharded_name_suffix()
 
-        state_dict = model_to_save.state_dict()
-        if self.args.should_save_sharding_stage1_model:
-            state_dict = filter_sharded_params(state_dict, self.optimizer, self.sharding_group)
+        if state_dict is None:
+            state_dict = model_to_save.state_dict()
+            if self.args.should_save_sharding_stage1_model:
+                state_dict = filter_sharded_params(state_dict, self.optimizer, self.sharding_group)
 
         config_to_save = None
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
