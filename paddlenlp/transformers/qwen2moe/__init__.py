@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .configuration import QWen2MoEConfig
-from .modeling import QWen2MoEForCausalLM
-from .tokenizer import QWen2MoETokenizer
+from .configuration import *
+from .modeling import *
+from .tokenizer import *
