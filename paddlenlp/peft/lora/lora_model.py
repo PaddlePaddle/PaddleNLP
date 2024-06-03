@@ -55,32 +55,34 @@ try:
 except:
     pass
 
-if get_env_device() == "xpu":
-    try:
-        from paddle_xpu.layers.nn.lora_layers import (
-            XPUColumnParallelLoRALinear,
-            XPUColumnSequenceParallelLoRALinear,
-            XPULoRALinear,
-            XPURowParallelLoRALinear,
-            XPURowSequenceParallelLoRALinear,
-        )
 
-        LoRALinear = XPULoRALinear
-        RowParallelLoRALinear = XPURowParallelLoRALinear
-        RowSequenceParallelLoRALinear = XPURowSequenceParallelLoRALinear
-        ColumnParallelLoRALinear = XPUColumnParallelLoRALinear
-        ColumnSequenceParallelLoRALinear = XPUColumnSequenceParallelLoRALinear
-
-        from .lora_layers import (
-            ColumnParallelLoRAMergedLinear,
-            LoRAConv2D,
-            LoRAMergedLinear,
-        )
-    except:
-        # If paddle_xpu is not installed, just use PaddleNLP's native lora layers
-        pass
-else:
+def get_lora_layers():
     try:
+        if get_env_device() == "xpu":
+            # If paddle_xpu is not installed, just use PaddleNLP's native lora layers
+            from paddle_xpu.layers.nn.lora_layers import (
+                XPUColumnParallelLoRALinear as ColumnParallelLoRALinear,
+            )
+            from paddle_xpu.layers.nn.lora_layers import (
+                XPUColumnSequenceParallelLoRALinear as ColumnSequenceParallelLoRALinear,
+            )
+            from paddle_xpu.layers.nn.lora_layers import XPULoRALinear as LoRALinear
+            from paddle_xpu.layers.nn.lora_layers import (
+                XPURowParallelLoRALinear as RowParallelLoRALinear,
+            )
+            from paddle_xpu.layers.nn.lora_layers import (
+                XPURowSequenceParallelLoRALinear as RowSequenceParallelLoRALinear,
+            )
+
+            from .lora_layers import (
+                ColumnParallelLoRAMergedLinear,
+                LoRAConv2D,
+                LoRAMergedLinear,
+            )
+
+        else:
+            raise ImportError  # Force to use the fallback if not XPU
+    except ImportError:
         from .lora_layers import (
             ColumnParallelLoRALinear,
             ColumnParallelLoRAMergedLinear,
@@ -91,8 +93,28 @@ else:
             RowParallelLoRALinear,
             RowSequenceParallelLoRALinear,
         )
-    except:
-        pass
+
+    return {
+        "ColumnParallelLoRALinear": ColumnParallelLoRALinear,
+        "ColumnParallelLoRAMergedLinear": ColumnParallelLoRAMergedLinear,
+        "ColumnSequenceParallelLoRALinear": ColumnSequenceParallelLoRALinear,
+        "LoRAConv2D": LoRAConv2D,
+        "LoRALinear": LoRALinear,
+        "LoRAMergedLinear": LoRAMergedLinear,
+        "RowParallelLoRALinear": RowParallelLoRALinear,
+        "RowSequenceParallelLoRALinear": RowSequenceParallelLoRALinear,
+    }
+
+
+lora_layers = get_lora_layers()
+ColumnParallelLoRALinear = lora_layers["ColumnParallelLoRALinear"]
+ColumnParallelLoRAMergedLinear = lora_layers["ColumnParallelLoRAMergedLinear"]
+ColumnSequenceParallelLoRALinear = lora_layers["ColumnSequenceParallelLoRALinear"]
+LoRAConv2D = lora_layers["LoRAConv2D"]
+LoRALinear = lora_layers["LoRALinear"]
+LoRAMergedLinear = lora_layers["LoRAMergedLinear"]
+RowParallelLoRALinear = lora_layers["RowParallelLoRALinear"]
+RowSequenceParallelLoRALinear = lora_layers["RowSequenceParallelLoRALinear"]
 
 try:
     from ...quantization.quantization_linear import (
