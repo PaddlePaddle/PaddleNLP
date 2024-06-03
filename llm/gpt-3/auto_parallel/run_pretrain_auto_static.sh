@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export PYTHONPATH="../../../../":$PYTHONPATH
+export GLOG_v=0
+export PYTHONPATH="../../../":$PYTHONPATH
 export TRANSLATOR_DISABLE_NEW_ERROR=0
 export TRANSLATOR_CODE_LEVEL=100
 export FLAGS_call_stack_level=3
@@ -25,10 +26,10 @@ task_name="gpt3_auto_static"
 log_dir="log/$task_name"
 rm -rf $log_dir
 output_dir="output/$task_name"
-input_dir="../../data"
+input_dir="../data"
 
 WORLD_SIZE=8
-GBS=32 # default: 32, debug 4
+GBS=1 # default: 32, debug 4
 MBS=1
 MP=2
 PP=4
@@ -42,12 +43,12 @@ recompute_args="--recompute 1 \
                 --recompute_granularity full \
                 --pp_recompute_interval 1"
 
-use_flash_attention=1
+use_flash_attention=0
 use_fused_linear=1
 enable_linear_fused_grad_add=1
 fuse_attention_qkv=1
 use_fused_dropout_add=1
-use_fast_layer_norm=1
+use_fast_layer_norm=0
 fuse_allreduce_split_to_reducescatter=0
 
 SP=0  # 0 or 1
@@ -64,7 +65,7 @@ MODEL_TYPE="gpt2-medium-en"
 python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir ${log_dir} \
-    ../run_pretrain_auto.py \
+    run_pretrain_auto.py \
     --model_name_or_path "${MODEL_TYPE}" \
     --tokenizer_name_or_path "${MODEL_TYPE}" \
     --input_dir ${input_dir} \
@@ -74,7 +75,7 @@ python -u -m paddle.distributed.launch \
     --per_device_train_batch_size ${MBS} \
     --gradient_accumulation_steps ${ACC_STEPS} \
     --per_device_eval_batch_size 4 \
-    --bf16 1 \
+    --bf16 0 \
     --fp16_opt_level "O2"  \
     --amp_master_grad true \
     --tensor_parallel_degree ${MP} \
