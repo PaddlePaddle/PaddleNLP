@@ -57,8 +57,8 @@ def get_parser():
         "--device",
         type=str,
         default="gpu",
-        choices=["cpu", "eval_pathgpu", "xpu", "npu"],
-        help="select cpu, gpu, xpu devices.",
+        choices=["cpu", "gpu", "xpu", "npu", "gcu"],
+        help="select cpu, gpu, xpu, gcu devices.",
     )
     parser.add_argument(
         "--dtype",
@@ -67,7 +67,12 @@ def get_parser():
         choices=["bfloat16", "float16", "float32"],
         help="set the dtype of model",
     )
-
+    parser.add_argument(
+        "--use_flash_attention",
+        type=bool,
+        default=False,
+        help="Whether to use flash attention",
+    )
     # load autodist name files, eg: bloom-176b
     parser.add_argument("--load_autodist", action="store_true", help="whether load auto-dist wieght file")
 
@@ -317,7 +322,7 @@ def do_generation():
         tensor_parallel_output=False,
         tensor_parallel_degree=args.tensor_parallel_degree,
         tensor_parallel_rank=paddle.distributed.get_rank(),
-        use_flash_attention=False,
+        use_flash_attention=args.use_flash_attention,
         dtype=args.dtype,  # todo enable set dtype to avoid additional mem usage
     )
 
