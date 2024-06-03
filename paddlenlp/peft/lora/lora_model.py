@@ -70,6 +70,12 @@ if get_env_device() == "xpu":
         RowSequenceParallelLoRALinear = XPURowSequenceParallelLoRALinear
         ColumnParallelLoRALinear = XPUColumnParallelLoRALinear
         ColumnSequenceParallelLoRALinear = XPUColumnSequenceParallelLoRALinear
+
+        from .lora_layers import (
+            ColumnParallelLoRAMergedLinear,
+            LoRAConv2D,
+            LoRAMergedLinear,
+        )
     except:
         # If paddle_xpu is not installed, just use PaddleNLP's native lora layers
         pass
