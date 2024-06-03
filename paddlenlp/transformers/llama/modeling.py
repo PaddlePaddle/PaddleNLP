@@ -115,11 +115,15 @@ def _get_interleave(n):
         )
 
 
+def get_use_casual_mask():
+    """Get the value of the 'USE_CASUAL_MASK' environment variable."""
+    return os.getenv("USE_CASUAL_MASK", "False") == "True"
+
+
 def build_alibi_tensor(
     bool_attention_mask: Tensor, num_heads: int, dtype: paddle.dtype, tensor_parallel_degree=1
 ) -> Tensor:
-    attention_mask = bool_attention_mask.astype("float32")
-    batch_size, seq_length = attention_mask.shape[0], attention_mask.shape[-1]
+    batch_size, seq_length = bool_attention_mask.shape[0], bool_attention_mask.shape[-1]
     slopes = paddle.to_tensor(_get_interleave(num_heads), dtype="float32")
     alibi = slopes.unsqueeze(axis=[1, 2]) * paddle.arange(seq_length, dtype="float32").unsqueeze(axis=[0, 1]).expand(
         [num_heads, -1, -1]
@@ -307,7 +311,7 @@ def is_casual_mask(attention_mask):
 
 def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
-    Make causal mask used for self-attention
+    Make casual mask used for self-attention
     """
     batch_size, target_length = input_ids_shape  # target_length: seq_len
 
@@ -419,10 +423,13 @@ class LlamaRotaryEmbedding(nn.Layer):
         return (
             cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
             sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
-            self.cos_sin_table.cast(x.dtype)
-            if self.cos_sin_table is not None and self.cos_sin_table.dtype != x.dtype
-            else self.cos_sin_table,
         )
+
+    def get_fused_cos_sin(self, x, seq_len=None):
+        if self.cos_sin_table is not None and self.cos_sin_table.dtype != x.dtype:
+            return self.cos_sin_table.cast(x.dtype)
+        else:
+            return self.cos_sin_table
 
 
 class LlamaLinearScalingRotaryEmbedding(LlamaRotaryEmbedding):
@@ -482,18 +489,25 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
         if seq_len > self.max_position_embeddings:
-            scale_cos, scale_sin, scale_cos_sin = self._scale_cos_sin(seq_len=seq_len)
+            scale_cos, scale_sin, _ = self._scale_cos_sin(seq_len=seq_len)
         else:
-            scale_cos, scale_sin, scale_cos_sin = self.cos_cached, self.sin_cached, self.cos_sin_table
+            scale_cos, scale_sin = self.cos_cached, self.sin_cached
         cos = scale_cos[:, :seq_len, :, ...]
         sin = scale_sin[:, :seq_len, :, ...]
         return (
             cos.cast(x.dtype) if cos.dtype != x.dtype else cos,
             sin.cast(x.dtype) if sin.dtype != x.dtype else sin,
-            scale_cos_sin.cast(x.dtype)
-            if scale_cos_sin is not None and scale_cos_sin.dtype != x.dtype
-            else scale_cos_sin,
         )
+
+    def get_fused_cos_sin(self, x, seq_len=None):
+        if seq_len > self.max_position_embeddings:
+            _, _, scale_cos_sin = self._scale_cos_sin(seq_len=seq_len)
+        else:
+            scale_cos_sin = self.cos_sin_table
+        if scale_cos_sin is not None and scale_cos_sin.dtype != x.dtype:
+            return scale_cos_sin.cast(x.dtype)
+        else:
+            return scale_cos_sin
 
 
 def rotate_half(x):
@@ -943,7 +957,7 @@ class LlamaAttention(nn.Layer):
                         sin.cast(value_states.dtype) if sin.dtype != value_states.dtype else sin,
                     )
                 else:
-                    cos, sin, _ = self.rotary_emb(value_states, seq_len=kv_seq_len)
+                    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
 
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
@@ -1533,12 +1547,22 @@ class LlamaModel(LlamaPretrainedModel):
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
 
-        attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
-        )  # [bs, 1, seq_len, seq_len]
+        use_casual_mask = get_use_casual_mask()
+
+        if use_casual_mask:
+            attention_mask = None
+        else:
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+            )  # [bs, 1, seq_len, seq_len]
+
         is_casual = False
+
         if self.config.use_flash_attention and get_env_device() != "gcu":
-            is_casual = is_casual_mask(attention_mask)
+            if use_casual_mask:
+                is_casual = True
+            else:
+                is_casual = is_casual_mask(attention_mask)
             if get_env_device() != "npu":
                 if is_casual and alibi is None:
                     attention_mask = None
@@ -1654,8 +1678,11 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
             binary_sequence = paddle.where(
                 masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
             )
-            sum_ = paddle.sum(binary_sequence)
-            loss = 0 if sum_ == 0 else paddle.sum(masked_lm_loss * binary_sequence) / sum_
+            count = paddle.sum(binary_sequence)
+            if count == 0:
+                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            else:
+                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
 
         return loss
 
@@ -1690,10 +1717,17 @@ class LlamaLMHead(nn.Layer):
         else:
             vocab_size = config.vocab_size
 
-        self.weight = self.create_parameter(
-            shape=[config.hidden_size, vocab_size],
-            dtype=paddle.get_default_dtype(),
-        )
+        if vocab_size != config.vocab_size:
+            with get_rng_state_tracker().rng_state():
+                self.weight = self.create_parameter(
+                    shape=[config.hidden_size, vocab_size],
+                    dtype=paddle.get_default_dtype(),
+                )
+        else:
+            self.weight = self.create_parameter(
+                shape=[config.hidden_size, vocab_size],
+                dtype=paddle.get_default_dtype(),
+            )
         # Must set distributed attr for Tensor Parallel !
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
         if self.weight.is_distributed:

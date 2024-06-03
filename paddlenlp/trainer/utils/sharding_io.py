@@ -67,11 +67,14 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
     if reshard_util.get_sharding_strategy(optimizer) == reshard_util.SHARDING_STRATEGY_V1:
         optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizer)
         for (k, v) in state_dict.items():
-            assert v.name in optimizer._param2rank
-            sharded_rank = optimizer._param2rank[v.name]
-            if sharded_rank != sharding_rank:
-                continue
-            filtered_state_dict[k] = v
+            if v.name in optimizer._param2rank:
+                sharded_rank = optimizer._param2rank[v.name]
+                if sharded_rank != sharding_rank:
+                    continue
+                filtered_state_dict[k] = v
+            else:
+                if sharding_rank == 0:
+                    filtered_state_dict[k] = v
     else:
         optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizerV2)
         parameters = optimizer._parameter_list
@@ -352,7 +355,7 @@ class ShardingIO:
             )
             logger.info(
                 "param_names_in_master_weights len:{}, bf16 state_dict len:{}, :{}".format(
-                    len(param_names_in_master_weights), len(state_dict), state_dict
+                    len(param_names_in_master_weights), len(state_dict), state_dict.keys()
                 )
             )
         return state_dict, config_to_save, weight_name_suffix
@@ -444,12 +447,17 @@ class ShardingIO:
 
         master_weights = reshard_util.all_gather_state_dict(master_weights, filter_func, self.sharding_group)
         model_state_dict = self.model.state_dict()
+        logger.info(f"state-dict-keys: {state_dict.keys()}, nums: {len(state_dict.keys())}")
         logger.info("before recover, model_state_dict number: {}".format(len(model_state_dict)))
         for key, param in model_state_dict.items():
             if param.name in master_weights:
                 assert param.shape == master_weights[param.name].shape
-                paddle.assign(master_weights[param.name].cuda(), model_state_dict[key])
-
+                paddle.assign(paddle.cast(master_weights[param.name].cuda(), paddle.bfloat16), model_state_dict[key])
+            elif key in state_dict:
+                logger.info(f"key: {key} is in state_dict, but not in master_weights")
+                paddle.assign(state_dict[key], model_state_dict[key])
+            else:
+                logger.info(f"key: {key} is not in state_dict and master_weights")
         logger.info("after recover, casted model_state_dict number: {}".format(len(model_state_dict)))
         state_dict.update(model_state_dict)
         return state_dict

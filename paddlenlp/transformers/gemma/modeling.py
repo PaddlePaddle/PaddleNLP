@@ -1366,11 +1366,21 @@ class GemmaLMHead(nn.Layer):
         else:
             vocab_size = config.vocab_size
 
-        self.weight = self.create_parameter(
-            shape=[vocab_size, config.hidden_size] if config.tie_word_embeddings else [config.hidden_size, vocab_size],
-            dtype=paddle.get_default_dtype(),
-        )
-
+        if vocab_size != config.vocab_size:
+            with get_rng_state_tracker().rng_state():
+                self.weight = self.create_parameter(
+                    shape=[vocab_size, config.hidden_size]
+                    if config.tie_word_embeddings
+                    else [config.hidden_size, vocab_size],
+                    dtype=paddle.get_default_dtype(),
+                )
+        else:
+            self.weight = self.create_parameter(
+                shape=[vocab_size, config.hidden_size]
+                if config.tie_word_embeddings
+                else [config.hidden_size, vocab_size],
+                dtype=paddle.get_default_dtype(),
+            )
         # Must set distributed attr for Tensor Parallel !
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
         if self.weight.is_distributed:
