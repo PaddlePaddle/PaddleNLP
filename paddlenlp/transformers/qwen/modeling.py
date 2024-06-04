@@ -46,8 +46,18 @@ from paddlenlp.utils.log import logger
 
 from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import linear_utils
+from .. import linear_utils
 from ..model_outputs import ModelOutput
 from .configuration import QWenConfig
+
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        GatherOp,
+        ScatterOp,
+        mark_as_sequence_parallel_parameter,
+    )
+except:
+    pass
 
 __all__ = [
     "QWenBlock",
@@ -132,25 +142,38 @@ class QWenAttention(nn.Layer):
         assert self.projection_size % config.num_attention_heads == 0
         self.hidden_size_per_attention_head = self.projection_size // config.num_attention_heads
 
+        self.sequence_parallel = config.sequence_parallel
+
+        if config.sequence_parallel:
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
+        else:
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
+
         if config.tensor_parallel_degree > 1:
             if config.num_attention_heads % config.tensor_parallel_degree != 0:
                 raise ValueError("num_attention_heads has to be divisible by tensor_parallel_degree")
             self.num_heads = config.num_attention_heads // config.tensor_parallel_degree
-            self.c_attn = mpu.ColumnParallelLinear(
+            self.c_attn = ColumnParallelLinear(
                 config.hidden_size,
                 3 * self.projection_size,
                 has_bias=True,
                 gather_output=False,
             )
-            self.c_proj = mpu.RowParallelLinear(
+            self.o_proj = RowParallelLinear(
                 config.hidden_size,
                 self.projection_size,
-                has_bias=not config.no_bias,
+                has_bias=False,
                 input_is_parallel=True,
             )
         else:
             self.c_attn = nn.Linear(config.hidden_size, 3 * self.projection_size, bias_attr=True)
-            self.c_proj = nn.Linear(config.hidden_size, self.projection_size, bias_attr=not config.no_bias)
+            self.o_proj = nn.Linear(
+                config.hidden_size,
+                self.projection_size,
+                bias_attr=False,
+            )
 
         if config.rotary_pct == 1.0:
             self.rotary_ndims = None
@@ -176,7 +199,7 @@ class QWenAttention(nn.Layer):
 
         self.attn_dropout = nn.Dropout(config.attn_dropout_prob)
 
-    def _attn(self, query, key, value, attention_mask=None):
+    def _attn(self, query, key, value, sequence_parallel=False, attention_mask=None):
         # Support the flash attention and normal attention
         bsz, q_len, num_heads, head_dim = query.shape
         _, kv_seq_len, _, _ = value.shape
@@ -205,6 +228,11 @@ class QWenAttention(nn.Layer):
                     is_causal=attention_mask is None,
                 )
                 attn_weights = None
+
+            if sequence_parallel:
+                attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
+            else:
+                attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
             return attn_output, attn_weights
         else:
             # [bz, sql, nh, hid] ==> [bz, nh, sql hdim]
@@ -230,6 +258,11 @@ class QWenAttention(nn.Layer):
             attn_weights = self.attn_dropout(attn_weights)
             attn_output = paddle.matmul(attn_weights, value)
             attn_output = attn_output.transpose([0, 2, 1, 3])
+
+            if sequence_parallel:
+                attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
+            else:
+                attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
             return attn_output, attn_weights
 
     def _split_heads(self, tensor, num_heads, attn_head_size):
@@ -252,18 +285,26 @@ class QWenAttention(nn.Layer):
         encoder_hidden_states=None,
         encoder_attention_mask=None,
         output_attentions=False,
+        alibi=None,
         use_cache=False,
     ):
         # [bz, sql, hid] ==> [bz, sql, 3*hid]
         mixed_x_layer = self.c_attn(hidden_states)
-        # [bz, sql, 3*hid] ==> [bz, sql, hid]
-        query, key, value = paddle.split(mixed_x_layer, num_or_sections=3, axis=-1)
 
-        # [bz, sql, hid] ==> [bz, sql, nh, hdim]
-        query = self._split_heads(query, self.num_heads, self.head_dim)
-        key = self._split_heads(key, self.num_heads, self.head_dim)
-        value = self._split_heads(value, self.num_heads, self.head_dim)
-        kv_seq_len = hidden_states.shape[1]
+        if self.sequence_parallel:
+            # [bz, sql, hid] ==> [bz, sql, nh, hdim]
+            mixed_x_layer = paddle.reshape_(mixed_x_layer, [-1, self.seq_length, self.num_heads, 3 * self.head_dim])
+            query, key, value = paddle.split(
+                mixed_x_layer, num_or_sections=[self.head_dim, self.head_dim, self.head_dim], axis=-1
+            )
+        else:
+            query, key, value = paddle.split(mixed_x_layer, num_or_sections=3, axis=-1)
+            # [bz, sql, hid] ==> [bz, sql, nh, hdim]
+            query = self._split_heads(query, self.num_heads, self.head_dim)
+            key = self._split_heads(key, self.num_heads, self.head_dim)
+            value = self._split_heads(value, self.num_heads, self.head_dim)
+
+        kv_seq_len = key.shape[-3]
         if layer_past:
             # layer past[0] shape: bs * seq_len * head_num * dim
             kv_seq_len += layer_past[0].shape[1]
@@ -322,17 +363,25 @@ class QWenAttention(nn.Layer):
         has_gradient = not (query.stop_gradient and key.stop_gradient and value.stop_gradient)
         if self.enable_recompute and self.training and has_gradient and self.recompute_granularity == "core_attn":
             attn_output, attn_weight = recompute(
-                self._attn, query, key, value, attention_mask, use_reentrant=self.config.recompute_use_reentrant
+                self._attn,
+                query,
+                key,
+                value,
+                attention_mask,
+                output_attentions,
+                alibi,
+                self.sequence_parallel,
+                use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
-            attn_output, attn_weight = self._attn(query, key, value, attention_mask)
-        context_layer = self._merge_heads(attn_output, self.num_heads, self.head_dim)
+            attn_output, attn_weight = self._attn(query, key, value, self.sequence_parallel, attention_mask)
 
-        attn_output = self.c_proj(context_layer)
+        # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
+        # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
+        attn_output = self.o_proj(attn_output)
         outputs = (attn_output, present)
         if output_attentions:
             outputs += (attn_weight,)
-
         return outputs
 
 
@@ -401,6 +450,7 @@ class QWenMLP(nn.Layer):
 class QWenBlock(nn.Layer):
     def __init__(self, config):
         super().__init__()
+        self.sequence_parallel = config.sequence_parallel
         self.ln_1 = QWenRMSNorm(config)
         self.attn = QWenAttention(config)
         self.ln_2 = QWenRMSNorm(config)
@@ -417,6 +467,8 @@ class QWenBlock(nn.Layer):
         use_cache=False,
         output_attentions=False,
     ):
+        # [bs * seq_len, embed_dim] -> [seq_len * bs / n, embed_dim] (sequence_parallel)
+        residual = hidden_states
         layernorm_output = self.ln_1(hidden_states)
 
         attn_outputs = self.attn(
@@ -431,7 +483,6 @@ class QWenBlock(nn.Layer):
 
         outputs = attn_outputs[1:]
 
-        residual = hidden_states
         layernorm_input = attn_output + residual
 
         layernorm_output = self.ln_2(layernorm_input)
@@ -448,7 +499,6 @@ class QWenBlock(nn.Layer):
         # remove empty tuple for pipeline parallel
         if type(outputs) is tuple and len(outputs) == 1:
             outputs = outputs[0]
-
         return outputs
 
 
@@ -604,6 +654,7 @@ class QWenModel(QWenPretrainedModel):
         self.embed_dim = config.hidden_size
         self.enable_recompute = False
         self.recompute_granularity = config.recompute_granularity
+        self.sequence_parallel = config.sequence_parallel
 
         if config.tensor_parallel_degree > 1:
             self.wte = mpu.VocabParallelEmbedding(
@@ -705,6 +756,9 @@ class QWenModel(QWenPretrainedModel):
         output_hidden_states=None,
         return_dict=None,
     ):
+        if self.sequence_parallel and use_cache:
+            raise ValueError("We currently only support sequence parallel without cache.")
+
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -731,6 +785,14 @@ class QWenModel(QWenPretrainedModel):
         encoder_attention_mask = None
         if inputs_embeds is None:
             inputs_embeds = self.wte(input_ids)
+
+        if self.sequence_parallel:
+            # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
+            bs, seq_len, hidden_size = inputs_embeds.shape
+            inputs_embeds = paddle.reshape_(inputs_embeds, [bs * seq_len, hidden_size])
+            # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
+            inputs_embeds = ScatterOp.apply(inputs_embeds)
+
         hidden_states = inputs_embeds
 
         # bool 4D mask
@@ -741,9 +803,6 @@ class QWenModel(QWenPretrainedModel):
         attention_mask = paddle.where(attention_mask, zero, neg_inf)
 
         hidden_states = self.drop(hidden_states)
-        output_shape = input_shape + [
-            hidden_states.shape[-1],
-        ]
 
         if self.enable_recompute and self.training:
             if use_cache:
@@ -794,7 +853,7 @@ class QWenModel(QWenPretrainedModel):
                 all_self_attentions = all_self_attentions + (outputs[1],)
 
         hidden_states = self.ln_f(hidden_states)
-        hidden_states = hidden_states.reshape(output_shape)
+
         # Add last hidden state
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
@@ -836,6 +895,11 @@ class QWenLMHead(nn.Layer):
             self.weight.split_axis = 1
 
     def forward(self, hidden_states, tensor_parallel_output=None):
+        if self.config.sequence_parallel:
+            hidden_states = GatherOp.apply(hidden_states)
+            seq_length = self.config.seq_length
+            hidden_states = paddle.reshape_(hidden_states, [-1, seq_length, self.config.hidden_size])
+
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
@@ -1091,6 +1155,8 @@ class QWenRMSNorm(nn.Layer):
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(1.0),
         )
+        if config.sequence_parallel:
+            mark_as_sequence_parallel_parameter(self.weight)
 
     def _norm(self, x):
         return x * paddle.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
