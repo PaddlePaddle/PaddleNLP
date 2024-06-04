@@ -386,7 +386,7 @@ class ImageProcessingMixin(object):
         else:
             return image_processor
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self, *args, **kwargs) -> Dict[str, Any]:
         """
         Serializes this instance to a Python dictionary.
 
