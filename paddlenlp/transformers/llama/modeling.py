@@ -1567,7 +1567,7 @@ class LlamaModel(LlamaPretrainedModel):
                 if is_casual and alibi is None:
                     attention_mask = None
             else:
-                attention_mask = attention_mask.astype("bool")
+                attention_mask = None if attention_mask is None else attention_mask.astype("bool")
         hidden_states = inputs_embeds
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
