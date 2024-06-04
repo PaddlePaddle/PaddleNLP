@@ -25,14 +25,10 @@ fi
 install_requirements() {
     python -m pip install -r requirements.txt
     python -m pip install -r requirements-dev.txt
+    python -m pip install -r tests/requirements.txt
     python -m pip install -r paddlenlp/experimental/autonlp/requirements.txt 
     python -m pip uninstall paddlepaddle -y
     python -m pip install --no-cache-dir ${paddle}
-    python -m pip install sacremoses
-    python -m pip install parameterized
-    python -m pip install loguru==0.6.0
-    python -m pip install h5py
-    python -m pip install paddleslim
 
     python setup.py bdist_wheel
     python -m pip install  dist/p****.whl
@@ -47,6 +43,7 @@ set_env() {
     export NVIDIA_TF32_OVERRIDE=0 
     export FLAGS_cudnn_deterministic=1
     export HF_ENDPOINT=https://hf-mirror.com
+    export FLAGS_use_cuda_managed_memory=true
 }
 
 install_requirements

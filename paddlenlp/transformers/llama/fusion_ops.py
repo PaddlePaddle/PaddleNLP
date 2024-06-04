@@ -41,7 +41,7 @@ try:
 except ImportError:
     fused_rotary_position_embedding = None
 try:
-    if get_env_device() == "npu":
+    if get_env_device() in ["npu", "gcu"]:
         from paddle.base import core
 
         for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
@@ -53,13 +53,20 @@ except:
 
 
 def fusion_rope(query_states, key_states, value_states, hidden_states, position_ids, past_key_value, rotary_emb):
-    assert past_key_value is None, "fuse rotary not support cache kv for now"
+    if get_env_device() != "gcu":
+        assert past_key_value is None, "fuse rotary not support cache kv for now"
     batch_size, seq_length, num_heads, head_dim = query_states.shape
     _, kv_seq_len, num_key_value_heads, _ = key_states.shape
-    cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
+    if get_env_device() != "gcu":
+        cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
     if get_env_device() == "npu":
         query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
         key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
+    elif get_env_device() == "gcu":
+        cos_sin = rotary_emb.get_fused_cos_sin(value_states, seq_len=kv_seq_len)
+        query_states, key_states = core.eager._run_custom_op(
+            "fused_rotary_embedding_gcu", query_states, key_states, cos_sin, position_ids, True
+        )
     else:
         # paddle version > 2.6 or develop support q and k/v with different num_heads
         paddle_version = float(paddle.__version__[:3])
@@ -103,6 +110,8 @@ def rms_norm_fused(x_in, w, eps):
 def fusion_rms_norm(hidden_states, weight, variance_epsilon):
     if get_env_device() == "npu":
         return core.eager._run_custom_op("rms_norm_npu", hidden_states, weight, variance_epsilon)[0]
+    elif get_env_device() == "gcu":
+        return core.eager._run_custom_op("rms_norm_gcu", hidden_states, weight, variance_epsilon)[0]
     elif get_env_device() == "xpu":
         try:
             import paddle_xpu_nn  # noqa: F821
@@ -157,6 +166,17 @@ def fusion_flash_attention(
                 True,
                 False,
                 npu_is_casual,
+            )[0]
+        elif get_env_device() == "gcu":
+            attn_output = core.eager._run_custom_op(
+                "fused_sdp_flash_attention_gcu",
+                query_states,
+                key_states,
+                value_states,
+                attention_mask,
+                0.0,
+                attention_mask is None,
+                True,
             )[0]
         else:
             attn_output = F.scaled_dot_product_attention(

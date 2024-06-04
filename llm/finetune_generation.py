@@ -51,6 +51,9 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.utils.log import logger
 
+# Fine-tune Environment Variables to support sharding stage1 overlap optimization.
+os.environ["USE_CASUAL_MASK"] = "False"
+
 
 def add_start_docstrings(*docstr):
     def docstring_decorator(fn):
@@ -137,6 +140,43 @@ def main():
         weight_double_quant_block_size=model_args.weight_double_quant_block_size,
     )
 
+    model_config = AutoConfig.from_pretrained(
+        model_args.model_name_or_path,
+        tensor_parallel_output=training_args.tensor_parallel_output,
+        tensor_parallel_degree=training_args.tensor_parallel_degree,
+        tensor_parallel_rank=training_args.tensor_parallel_rank,
+        dtype=dtype,
+        from_aistudio=model_args.from_aistudio,
+        quantization_config=quantization_config,
+    )
+    if hasattr(model_config, "use_flash_attention"):
+        model_config.use_flash_attention = model_args.use_flash_attention
+
+    model_config.use_fused_rms_norm = model_args.use_fused_rms_norm
+    model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
+    model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
+    model_config.recompute_granularity = model_args.recompute_granularity
+    model_config.virtual_pp_degree = model_args.virtual_pp_degree
+    model_config.sequence_parallel = model_args.sequence_parallel
+    model_config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
+    model_config.use_fused_rope = model_args.use_fused_rope
+
+    model_config.no_recompute_layers = model_args.no_recompute_layers
+    model_config.pp_recompute_interval = model_args.pp_recompute_interval
+    model_config.recompute_use_reentrant = model_args.recompute_use_reentrant
+    model_config.use_recompute = training_args.recompute
+
+    model_config.tensor_parallel_degree = training_args.tensor_parallel_degree
+    model_config.tensor_parallel_rank = training_args.tensor_parallel_rank
+
+    # Config for model using dropout, such as GPT.
+    model_config.hidden_dropout_prob = model_args.hidden_dropout_prob
+    model_config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
+
+    model_config.sep_parallel_degree = training_args.sep_parallel_degree
+    model_config.tensor_parallel_output = training_args.tensor_parallel_output
+    model_config.seq_length = data_args.max_length
+
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
@@ -145,63 +185,13 @@ def main():
         if not training_args.autotuner_benchmark:
             model = AutoModelForCausalLMPipe.from_pretrained(
                 model_args.model_name_or_path,
-                tensor_parallel_output=training_args.tensor_parallel_output,
-                tensor_parallel_degree=training_args.tensor_parallel_degree,
-                tensor_parallel_rank=training_args.tensor_parallel_rank,
-                use_flash_attention=model_args.use_flash_attention,
-                dtype=dtype,
+                config=model_config,
                 from_aistudio=model_args.from_aistudio,
-                quantization_config=quantization_config,
             )
         else:
             # NOTE(gongenlei): new add autotuner_benchmark
-            model_config = AutoConfig.from_pretrained(
-                model_args.model_name_or_path,
-                tensor_parallel_output=training_args.tensor_parallel_output,
-                tensor_parallel_degree=training_args.tensor_parallel_degree,
-                tensor_parallel_rank=training_args.tensor_parallel_rank,
-                dtype=dtype,
-                from_aistudio=model_args.from_aistudio,
-                quantization_config=quantization_config,
-            )
             model = AutoModelForCausalLMPipe.from_config(model_config, dtype=dtype)
     else:
-        model_config = AutoConfig.from_pretrained(
-            model_args.model_name_or_path,
-            tensor_parallel_output=training_args.tensor_parallel_output,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
-            tensor_parallel_rank=training_args.tensor_parallel_rank,
-            dtype=dtype,
-            from_aistudio=model_args.from_aistudio,
-            quantization_config=quantization_config,
-        )
-        if hasattr(model_config, "use_flash_attention"):
-            model_config.use_flash_attention = model_args.use_flash_attention
-
-        model_config.use_fused_rms_norm = model_args.use_fused_rms_norm
-        model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
-        model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
-        model_config.recompute_granularity = model_args.recompute_granularity
-        model_config.virtual_pp_degree = model_args.virtual_pp_degree
-        model_config.sequence_parallel = model_args.sequence_parallel
-        model_config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
-        model_config.use_fused_rope = model_args.use_fused_rope
-
-        model_config.no_recompute_layers = model_args.no_recompute_layers
-        model_config.pp_recompute_interval = model_args.pp_recompute_interval
-        model_config.recompute_use_reentrant = model_args.recompute_use_reentrant
-        model_config.use_recompute = training_args.recompute
-
-        model_config.tensor_parallel_degree = training_args.tensor_parallel_degree
-        model_config.tensor_parallel_rank = training_args.tensor_parallel_rank
-
-        # Config for model using dropout, such as GPT.
-        model_config.hidden_dropout_prob = model_args.hidden_dropout_prob
-        model_config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
-
-        model_config.sep_parallel_degree = training_args.sep_parallel_degree
-        model_config.tensor_parallel_output = True
-        model_config.seq_length = data_args.max_length
         if not training_args.autotuner_benchmark:
             model = AutoModelForCausalLM.from_pretrained(
                 model_args.model_name_or_path,
