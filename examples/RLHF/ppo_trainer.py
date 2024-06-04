@@ -16,6 +16,7 @@ import copy
 import itertools
 import math
 import os
+import sys
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -30,7 +31,6 @@ from comm_utils import (  # noqa
     offload_tensor_to_cpu,
     reload_tensor_to_gpu,
 )
-from data import DummyDataset, PromptOnlyBatch
 from infer_utils import InferEvalModel, infer_guard
 from models.ppo_model_utils import (
     RLHFPPOMixedLoss,
@@ -114,7 +114,7 @@ class StepTrainer(Trainer):
         if getattr(self, "loss_cls", None) and self.criterion is None:
             self.criterion = self.create_criterion()
 
-        self.use_fusemt = getattr(args, "use_fusemt", True)
+        self.use_fusemt = getattr(args, "use_fusemt", False)
         # ablout 4s slower than infer generation without ema
         self.use_ema = getattr(args, "use_ema", False)
         self.shard_ema = getattr(args, "shard_ema", False)
@@ -534,8 +534,9 @@ class enable(paddle.no_grad.__mro__[1]):
             else:
                 reload_tensor_to_gpu(obj.state_dict())
         # offload_tensor_to_cpu/reload_tensor_to_gpu use non-blocking copy
+        # maybe overlap with compute later
         if len(self.objs) > 0:
-            paddle.device.cuda.synchronize()
+            paddle.device.synchronize()
 
     def __exit__(self, *args):
         for obj in self.objs:
@@ -544,8 +545,9 @@ class enable(paddle.no_grad.__mro__[1]):
             else:
                 offload_tensor_to_cpu(obj.state_dict())
         # offload_tensor_to_cpu/reload_tensor_to_gpu use non-blocking copy
+        # maybe overlap with compute later
         if len(self.objs) > 0:
-            paddle.device.cuda.synchronize()
+            paddle.device.synchronize()
 
 
 class PolicyTrainer(StepTrainer):
@@ -633,6 +635,17 @@ class PPOMetric:
             return out_metrics
 
 
+def data_dispatch(fun):
+    def _impl(self, data):
+        gp = getattr(self.policy_trainer, "_data_trans_group", None)
+        data = data_group_split(data, group=gp)
+        data = fun(self, data)
+        data = data_group_merge(data, group=gp)
+        return data
+
+    return _impl
+
+
 class PPOTrainer(Trainer):
     def __init__(
         self,
@@ -679,6 +692,7 @@ class PPOTrainer(Trainer):
         self.eval_dataset = eval_dataset
 
         (policy_model, reference_model, reward_model, value_model, policy_model_eval, value_model_eval) = model
+        self._model_config = policy_model.config  # use this to change flash attention dynamicly
         self._policy_model_eval = policy_model_eval
         self._value_model_eval = value_model_eval
 
@@ -864,9 +878,9 @@ class PPOTrainer(Trainer):
                 seq = self.actor_model.generate(
                     input_ids=inputs["input_ids"],
                     attention_mask=inputs["attention_mask"],
-                    # position_ids=inputs["position_ids"]
-                    # if "position_ids" in inputs
-                    # else make_position_ids(inputs["attention_mask"]),
+                    position_ids=inputs["position_ids"]
+                    if "position_ids" in inputs
+                    else make_position_ids(inputs["attention_mask"]),
                     generation_config=self.generation_config,
                     synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
                 )[0]
@@ -991,15 +1005,11 @@ class PPOTrainer(Trainer):
         return policy_model, value_model
 
     def get_epoch_iterator(self):
-        # TODO(guosheng): support iter dataset
-        num_prompt_only_batches = len(self.prompt_only_dataloader)
-        num_ptx_batches = len(self.ptx_dataloader)
-        num_ptx_replicas = (num_prompt_only_batches + num_ptx_batches - 1) // num_ptx_batches
 
         def gen_epoch_data():
             for prompt_only_batch, ptx_batch in zip(
-                self.prompt_only_dataloader,
-                itertools.chain.from_iterable([self.ptx_dataloader] * num_ptx_replicas),
+                    self.prompt_only_dataloader,
+                    itertools.cycle(self.ptx_dataloader),
             ):
                 # generate batches
                 self.set_eval()
@@ -1025,31 +1035,44 @@ class PPOTrainer(Trainer):
             def __iter__(self):
                 return gen_epoch_data()
 
+            def __len__(self):
+                return len(self.prompt_only_dataloader) * (
+                    self.args.update_iters *
+                    self.args.per_device_prompt_batch_size *
+                    self.args.num_return_sequences //
+                    self.args.per_device_train_batch_size)
+
         return EpochIterator()
 
     def init_train_num(self: Trainer, train_dataloader: DataLoader):
         args = self.args
 
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
-
-        len_dataloader = len(train_dataloader)
-        num_train_sub_steps = (
-            len_dataloader
-            * self.args.update_iters
-            * self.args.per_device_prompt_batch_size
-            * self.args.num_return_sequences
-            // self.args.per_device_train_batch_size
-        )
-        num_update_steps_per_epoch = num_train_sub_steps // args.gradient_accumulation_steps
-        if args.max_steps > 0:
-            max_steps = args.max_steps
-            num_train_epochs = args.max_steps // num_update_steps_per_epoch + int(
-                args.max_steps % num_update_steps_per_epoch > 0
-            )
+        len_dataloader = None
+        if not self._is_iterable_dataset(self.train_dataset):
+            len_dataloader = len(train_dataloader)
+            num_train_sub_steps = (len_dataloader * self.args.update_iters *
+                                   self.args.per_device_prompt_batch_size *
+                                   self.args.num_return_sequences //
+                                   self.args.per_device_train_batch_size)
+            num_update_steps_per_epoch = num_train_sub_steps // args.gradient_accumulation_steps
+            num_examples = len(self.train_dataset)
+            if args.max_steps > 0:
+                max_steps = args.max_steps
+                num_train_epochs = args.max_steps // num_update_steps_per_epoch + int(
+                    args.max_steps % num_update_steps_per_epoch > 0
+                )
+            else:
+                max_steps = int(num_update_steps_per_epoch * args.num_train_epochs)
+                num_train_epochs = math.ceil(args.num_train_epochs)
+            num_train_samples = total_train_batch_size * max_steps
         else:
-            max_steps = int(num_update_steps_per_epoch * args.num_train_epochs)
-            num_train_epochs = math.ceil(args.num_train_epochs)
-        num_examples = num_train_samples = total_train_batch_size * max_steps
+            assert args.max_steps > 0
+            max_steps = args.max_steps
+            num_train_epochs = sys.maxsize
+            num_update_steps_per_epoch = args.max_steps
+            num_examples = total_train_batch_size * args.max_steps
+            num_train_samples = args.max_steps * total_train_batch_size
 
         return (
             total_train_batch_size,
@@ -1093,17 +1116,21 @@ class PPOTrainer(Trainer):
 
         if self.use_ptx:
             with guard_set_args(
-                args,
+                    args,
                 {
-                    "per_device_train_batch_size": self.args.per_device_prompt_batch_size
-                    * self.args.num_return_sequences
+                    "per_device_train_batch_size":
+                    1 if getattr(self.ptx_dataset, "is_intokens", False) else
+                    self.args.per_device_prompt_batch_size *
+                    self.args.num_return_sequences
                 },
             ), guard_set_args(
-                self, {"train_dataset": self.ptx_dataset, "data_collator": self.ptx_dataset.get_collator(shift=True)}
-            ):
+                    self, {
+                        "train_dataset": self.ptx_dataset,
+                        "data_collator": self.ptx_dataset.get_collator()
+                    }):
                 self.ptx_dataloader = self.get_train_dataloader()
         else:
-            self.ptx_dataloader = DataLoader(DummyDataset(len(self.prompt_only_dataloader)))
+            self.ptx_dataloader = range(100)
         (
             total_train_batch_size,
             len_dataloader,
@@ -1168,9 +1195,9 @@ class PPOTrainer(Trainer):
                 # TODO(guosheng): make rl_step/ptx_step run with autocast_smart_context_manager
                 logger.info("Doing rl step...")
                 self.timers and self.timers("rl_step").start()
-                with self.enable(self.policy_trainer.optimizer):
+                with self.enable(self.actor_model, self.policy_trainer.optimizer):
                     # with self.enable(self.value_trainer.optimizer):
-                    with self.enable():
+                    with self.enable():  # put value optimizer guard in rl_step
                         rl_info = self.rl_step(rl_batch)
                     paddle.device.cuda.empty_cache()
                     self.timers and self.timers("rl_step").stop()
@@ -1178,7 +1205,11 @@ class PPOTrainer(Trainer):
                     if self.use_ptx:
                         logger.info("Doing ptx step...")
                         self.timers and self.timers("ptx_step").start()
-                        ptx_info = self.ptx_step(ptx_batch)
+                        with guard_set_args(self._model_config, {
+                                # "set_attn_func": True,
+                                # "use_flash_attention": True
+                        }):
+                            ptx_info = self.ptx_step(ptx_batch)
                         rl_info.update(ptx_info)
                         self.timers and self.timers("ptx_step").stop()
                 paddle.device.cuda.empty_cache()
@@ -1195,6 +1226,8 @@ class PPOTrainer(Trainer):
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
                 self._maybe_log_save_evaluate(rl_info, None, epoch, ignore_keys_for_eval, inputs=inputs)
                 self._print_timer()
+                if self.control.should_epoch_stop or self.control.should_training_stop:
+                    break
 
             if step < 0:
                 logger.warning(
@@ -1266,11 +1299,19 @@ class PPOTrainer(Trainer):
             max=self.clip_range_score,
         )
         # TODO(guosheng): use scatter_add/put_along_axis
-        batch_size = log_probs.shape[0]
-        for i in range(batch_size):
-            end_index = sequence_mask[i].nonzero()[-1]
-            # rewards[i, end_index] += reward_clip[i]
-            rewards[i, end_index] = rewards[i, end_index] + reward_clip[i]
+        index = paddle.cumsum(sequence_mask.cast(paddle.int64),
+                              axis=-1).argmax(-1, keepdim=True)
+        rewards = paddle.put_along_axis(rewards,
+                                        index,
+                                        reward_clip.unsqueeze(axis=-1),
+                                        axis=-1,
+                                        reduce="add")
+        # batch_size = log_probs.shape[0]
+        # for i in range(batch_size):
+        #     # print("="*20, sequence_mask[i])
+        #     end_index = sequence_mask[i].nonzero()[-1]
+        #     # rewards[i, end_index] += reward_clip[i]
+        #     rewards[i, end_index] = rewards[i, end_index] + reward_clip[i]
 
         return rewards
 
@@ -1334,7 +1375,7 @@ class PPOTrainer(Trainer):
             "reward_returns": reward_returns,
             "sequence_mask": sequence_mask,
         }
-        with self.enable(self.value_trainer.optimizer):
+        with self.enable(self.reward_critic_model, self.value_trainer.optimizer):
             reward_critic_loss = self.value_trainer.full_training_step(**value_trainer_inputs)
 
         policy_trainer_inputs = {
@@ -1383,10 +1424,10 @@ class PPOTrainer(Trainer):
         # are property
         enable_map = {
             # maybe use `model: (pattern, enable_method, disable_method)``
-            self.actor_model: "eval",
-            self.reward_critic_model: "eval",
-            self.reference_model: "reward",
-            self.reward_model: "reward",
+            self.actor_model: "train_model",
+            self.reward_critic_model: "train_model",
+            self.reference_model: "freeze_model",
+            self.reward_model: "freeze_model",
             self.policy_trainer.optimizer: "optimizer",
             self.value_trainer.optimizer: "optimizer",
         }
@@ -1397,8 +1438,6 @@ class PPOTrainer(Trainer):
         if getattr(self.value_trainer, "_inner_eval_model", None) is not None:
             enable_map.pop(self.reward_critic_model)
         objs = [arg for arg in args if enable_map.get(arg, "") in self.args.offload_level]
-        # print("=" * 20, "enable", self.args.offload_level, len(objs),
-        #       [arg for arg in args if enable_map.get(arg, "")])
         return enable(*objs)
 
     def split_ptx_micro_batches(
@@ -1418,23 +1457,23 @@ class PPOTrainer(Trainer):
             micro_batches.append(micro_batch)
         return micro_batches
 
-    @staticmethod
-    def data_dispatch(fun):
-        def _impl(self, data):
-            gp = getattr(self.policy_trainer, "_data_trans_group", None)
-            data = data_group_split(data, group=gp)
-            data = fun(self, data)
-            data = data_group_merge(data, group=gp)
-            return data
+    # @staticmethod
+    # def data_dispatch(fun):
+    #     def _impl(self, data):
+    #         gp = getattr(self.policy_trainer, "_data_trans_group", None)
+    #         data = data_group_split(data, group=gp)
+    #         data = fun(self, data)
+    #         data = data_group_merge(data, group=gp)
+    #         return data
 
-        return _impl
+    #     return _impl
 
     @paddle.no_grad()
-    @data_dispatch
+    @data_dispatch  # 3.10 static methods are now callable as regular functions.
     def split_rl_micro_batches(
         self,
-        prompt_only_batch: PromptOnlyBatch,
-    ) -> List[PromptOnlyBatch]:
+        prompt_only_batch: Dict,
+    ) -> List[Dict]:
         """Split a batch of RL samples into micro-batches."""
         total_batch_size = prompt_only_batch["input_ids"].shape[0]
         micro_batch_size = self.args.per_device_train_batch_size
@@ -1481,7 +1520,7 @@ class PPOTrainer(Trainer):
         return micro_batches
 
     @paddle.no_grad()
-    def generate(self, prompt_only_batch: PromptOnlyBatch) -> List[Dict[str, Any]]:
+    def generate(self, prompt_only_batch: Dict) -> List[Dict[str, Any]]:
         """Rollout a batch of experiences."""
         input_ids = prompt_only_batch["input_ids"]
         attention_mask = prompt_only_batch["attention_mask"]
@@ -1555,7 +1594,7 @@ class PPOTrainer(Trainer):
             reward_attention_mask = reward_tokenize_output["attention_mask"]
             reward_position_ids = make_position_ids(reward_attention_mask)
         else:
-            # for text in self.tokenizer.batch_decode(input_ids, skip_special_tokens=True):
+            # for text in self.tokenizer.batch_decode(input_ids, skip_special_tokens=False):
             #     print(text)
             reward_input_ids = input_ids
             reward_attention_mask = attention_mask

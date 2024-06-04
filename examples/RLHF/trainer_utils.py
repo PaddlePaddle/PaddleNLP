@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
 import inspect
 import os
 import time
@@ -494,7 +495,7 @@ class PipeEvalModel(GenerationMixin):
 
     def train(self):
         self.model.train()
-    
+
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)

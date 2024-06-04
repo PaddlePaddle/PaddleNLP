@@ -204,7 +204,7 @@ class ScoreModelMixin:
                 end_score.append(scores[i, end_index])  # size = (D,)
             end_score = paddle.stack(end_score, axis=0)  # size = (B, D)
 
-        if self.training:
+        if self.training and self.do_normalize:
 
             if dist.is_initialized():
                 gathered_end_score_list = []

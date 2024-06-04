@@ -15,6 +15,7 @@
 import copy
 import os
 import sys
+import types
 
 # os.environ["http_proxy"] = "http://10.162.37.16:8128"
 # os.environ["https_proxy"] = "http://10.162.37.16:8128"
@@ -37,6 +38,7 @@ os.environ["no_proxy"] = "localhost,bcebos.com"
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, Tuple
+from functools import partial
 
 import paddle
 from data import PromptOnlyDataset, SupervisedDataset, parse_dataset
@@ -82,8 +84,8 @@ class TrainingArguments(TrainingArguments):
         default=0.0,
         metadata={"help": "The coefficient for the ptx loss."},
     )
-    update_iters: float = field(
-        default=0.0,
+    update_iters: int = field(
+        default=1,
         metadata={"help": "The number of repeated updates on a generated batch."},
     )
     critic_learning_rate: float = field(
@@ -114,12 +116,12 @@ class TrainingArguments(TrainingArguments):
         default=1.0,
         metadata={"help": "The value used to module the next token probabilities."},
     )
-    top_k: int = field(
-        default=1,
-        metadata={"help": "top_k"},
-    )
+    # top_k: int = field(
+    #     default=1,
+    #     metadata={"help": "top_k"},
+    # )
     top_p: float = field(
-        default=1.0,
+        default=0.8,
         metadata={
             "help": "If set to float < 1, only the smallest set of most probable tokens with probabilities that add up to`top_p` or higher are kept for generation."
         },
@@ -146,6 +148,12 @@ class TrainingArguments(TrainingArguments):
     offload_level: str = field(
         default="",
         metadata={"help": "Offload model, optional for: eval, reward, optimizer, train_model"},
+    )
+    use_fusemt: bool = field(
+        default=True,
+        metadata={
+            "help": "use inference model to speedup in rollout generation"
+        },
     )
 
     # save_generation_output: bool = field(
@@ -475,6 +483,10 @@ def main():
         if data_args.ptx_datasets is not None
         else None
     )
+    if ptx_ds is not None:
+        # PretrainingCriterion requires shifted inputs and labels
+        ptx_ds.get_collator = types.MethodType(
+            partial(ptx_ds.get_collator.__func__, shift=True), ptx_ds)
 
     # offload
     # cleanup actor_eval_model, reward_critic_eval_model

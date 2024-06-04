@@ -43,15 +43,15 @@
     "do_eval": true,
     "disable_tqdm": true,
     "save_total_limit": 1,
-    "sharding_parallel_degree": 2,
+    "sharding_parallel_degree": 4,
     "sharding": "stage1",
     "tensor_parallel_degree": 2,
-    "pipeline_parallel_degree": 2,
+    "pipeline_parallel_degree": 1,
     "pipeline_parallel_config": "disable_p2p_cache_shape",
     "max_grad_norm": 1.0, 
     "adam_beta1": 0.9,
     "adam_beta2": 0.95,
     "dataloader_drop_last": false,
-    "eval_mode": "tensor_parallel",
-    "offload_level": "reward"
+    "eval_mode": "",
+    "offload_level": "freeze_model"
 }

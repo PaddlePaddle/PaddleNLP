@@ -221,7 +221,7 @@ GLOG_minloglevel=2 python -u -m paddle.distributed.launch ppo_main.py ./ppo_conf
 此外为了支持更高性、更大规模的 RLHF 训练提供了以下特殊参数配置，可以按需使用：
 - `use_fusemt`：安装 paddlenlp_ops 后将在 rollout 生成时开启生成加速（开启流水线并行时不支持生成加速），通过此设置可以禁用生成加速。
 - `eval_mode`：支持为空或者设置为 "single"、"tensor_parallel"；通常可以在使用流水线并行训练时设置为"tensor_parallel"，以此在 rollout 生成阶段使用非流水线并行模型并进行生成加速。
-- `offload_level`：支持设置为"reward"、"optimizer"或者同时使用(空格分隔），用于在不同阶段 model/optimizer 使用结束后及时 offload 并在下次使用时 reload 相应参数权重以节省显存。
+- `offload_level`：支持设置为"freeze_model"、"optimizer"、"train_model"或者同时使用(空格分隔），分别指示 reward+reference 两个冻结模型、actor+critic 两个训练模型的优化器状态和模型参数的 offload/reload，用于在不同阶段 model/optimizer 使用结束后及时 offload 并在下次使用时 reload 相应参数权重以节省显存。
 
 另外注意，在使用流水线并行时（pipeline_parallel_degree大于1）建议将 `dataloader_drop_last` 设置为 true, 以此避免不同batch size带来的问题。
 
