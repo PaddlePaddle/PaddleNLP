@@ -1,4 +1,5 @@
 # KTO Authors: Kawin Ethayarajh, Winnie Xu, Niklas Muennighoff, Dan Jurafsky, and Douwe Kiela
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2024 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
