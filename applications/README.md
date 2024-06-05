@@ -34,15 +34,9 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 | 场景任务   | Pipelines版本地址 | 可定制版本地址 | Notebook |
 | :--------------- | ------- | ------- | ------- |
 | **检索**| [字面+语义检索](../pipelines/examples/semantic-search) | [语义检索](./neural_search) | [基于Pipelines搭建检索系统](https://aistudio.baidu.com/aistudio/projectdetail/4442670)<br>[二次开发语义检索](https://aistudio.baidu.com/aistudio/projectdetail/3351784) |
-| **问答** | [FAQ问答](../pipelines/examples/FAQ/)<br>[无监督检索式问答](../pipelines/examples/unsupervised-question-answering)<br>[有监督检索式问答](../pipelines/examples/question-answering) | [FAQ问答](./question_answering/supervised_qa)<br>[无监督检索式问答](./question_answering/unsupervised_qa) | [基于Pipelines搭建FAQ问答系统](https://aistudio.baidu.com/aistudio/projectdetail/4465498)<br>[基于Pipelines搭建抽取式问答系统](https://aistudio.baidu.com/aistudio/projectdetail/4442857)<br>[FAQ政务问答](https://aistudio.baidu.com/aistudio/projectdetail/3678873)<br>[FAQ保险问答](https://aistudio.baidu.com/aistudio/projectdetail/3882519) |
+| **问答** | [FAQ问答](../pipelines/examples/FAQ/)<br>[有监督检索式问答](../pipelines/examples/question-answering) | [FAQ问答](./question_answering/supervised_qa) | [基于Pipelines搭建FAQ问答系统](https://aistudio.baidu.com/aistudio/projectdetail/4465498)<br>[基于Pipelines搭建抽取式问答系统](https://aistudio.baidu.com/aistudio/projectdetail/4442857)<br>[FAQ政务问答](https://aistudio.baidu.com/aistudio/projectdetail/3678873)<br>[FAQ保险问答](https://aistudio.baidu.com/aistudio/projectdetail/3882519) |
 | **文本分类**| 暂无 | [文本分类](./text_classification)  | [对话意图识别](https://aistudio.baidu.com/aistudio/projectdetail/2017202)<br>[法律文本多标签分类](https://aistudio.baidu.com/aistudio/projectdetail/3996601)<br>[层次分类](https://aistudio.baidu.com/aistudio/projectdetail/4568985) |
-| **通用文本分类** | 暂无 | [通用文本分类](./zero_shot_text_classification) |  |
 | **通用信息抽取** | 暂无 | [通用信息抽取](./information_extraction) | [UIE快速体验](https://aistudio.baidu.com/aistudio/projectdetail/3914778)<br>[UIE微调实体抽取](https://aistudio.baidu.com/aistudio/projectdetail/4038499)<br>[UIE微调关系抽取](https://aistudio.baidu.com/aistudio/projectdetail/4371345)<br>[UIE-X快速体验](https://aistudio.baidu.com/aistudio/projectdetail/5017442)<br>[UIE-X微调](https://aistudio.baidu.com/aistudio/projectdetail/5261592) |
-| **情感分析**  | [情感分析](../pipelines/examples/sentiment_analysis)  | [情感分析](./sentiment_analysis) |  [情感分析](https://aistudio.baidu.com/aistudio/projectdetail/5318177)|
-| **文档智能**  | [文档抽取问答](../pipelines/examples/document-intelligence) |  [跨模态文档问答](./document_intelligence/doc_vqa)| [文档抽取问答](https://aistudio.baidu.com/aistudio/projectdetail/4881278)<br>[汽车说明书问答](https://aistudio.baidu.com/aistudio/projectdetail/4049663)  |
-| **文生图**  | [文生图系统](../pipelines/examples/text_to_image)  | 可参考[PPDiffusers](../ppdiffusers) |   |
-| **语音指令解析**  | 暂无 | [语音指令解析](./speech_cmd_analysis) | [语音指令解析](https://aistudio.baidu.com/aistudio/projectdetail/4399703) |
-| **文本摘要**  | 暂无 | [文本摘要](./text_summarization) | [文本摘要](https://aistudio.baidu.com/aistudio/projectdetail/4903667) |
 
 ## 3、典型范例介绍
 
@@ -81,18 +75,6 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 
 详细使用说明请参考[智能问答系统](./question_answering)与[文档智能问答](./document_intelligence/doc_vqa)。
 
-#### 📚 通用文本分类
-
-- 基于“任务架构统一、通用能力共享”的通用文本分类技术 UTC，实了良好的零/少样本迁移能力，实现大一统诸多任务的开放域分类，可支持情感分析、意图识别、语义匹配、蕴含推理等各种可转换为分类问题的 NLU 任务。
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/213347595-e9c08bd1-3d32-4519-9a52-31fb69b841e8.png" width="60%" length="60%">
-</div>
-
-<br>
-
-详细使用说明请参考[通用文本分类](./zero_shot_text_classification)，更多：[文章解读](https://mp.weixin.qq.com/s/VV-nYv4y1r7oipJnURRL5w)。
-
 
 #### 🗂 文本分类
 
@@ -106,25 +88,3 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 <br>
 
 详细使用说明请参考[文本分类](./text_classification)，更多：[文章解读](https://mp.weixin.qq.com/s/tas7yM8vapxwtlJt-MRZdg)。
-
-#### 💌 评论观点抽取与情感分析
-
-- 经典方案：基于情感知识增强预训练模型SKEP，两阶段式抽取和分类，首先通过序列标注的方式定位属性词和观点词，然后进行属性集情感分类；
-- 前沿方案：基于UIE的情感分析方案采用 Prompt Learning 的方式进行情感信息抽取，精度更高。支持语句级和属性级情感分析，解决同义属性聚合、隐性观点抽取难点，并提供可视化分析能力。
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/35913314/200259473-434888f7-c0ac-4253-ab23-ede1628e6ba2.png" width="60%" length="60%">
-</div>
-<br>
-
-详细使用说明请参考[情感分析](./sentiment_analysis)，更多：[文章解读](https://mp.weixin.qq.com/s/QAHjIRG9zxpYfM6YPRQ-9w)。
-
-#### 🎙️ 智能语音指令解析
-
-- 集成了[PaddleSpeech](https://github.com/PaddlePaddle/PaddleSpeech)和[百度开放平台](https://ai.baidu.com/)的语音识别和[UIE](./model_zoo/uie)通用信息抽取等技术，打造智能一体化的语音指令解析系统范例，该方案可应用于智能语音填单、智能语音交互、智能语音检索等场景，提高人机交互效率。
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/16698950/168589100-a6c6f346-97bb-47b2-ac26-8d50e71fddc5.png" width="400">
-</div>
-
-详细使用说明请参考[智能语音指令解析](./applications/speech_cmd_analysis)。
