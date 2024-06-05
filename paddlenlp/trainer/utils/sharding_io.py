@@ -470,14 +470,6 @@ class ShardingIO:
         with open(meta_path, "r") as handle:
             model_dist_meta = json.load(handle)
         assert "parallel_config" in model_dist_meta
-
-        sharding_metas = model_dist_meta["sharding_metas"]
-        for key, meta in sharding_metas.items():
-            mapping = meta.get("structure_name_mapping", {})
-            for sub_key in mapping:
-                if isinstance(mapping[sub_key], (list, tuple)):
-                    mapping[sub_key] = mapping[sub_key][0]
-
         return model_dist_meta
 
     def _load_distributed_strategy(self, dir):
@@ -545,13 +537,18 @@ class ShardingIO:
             pp_overlap = unwrap_optimizer(self.optimizer, DygraphShardingOptimizerV2).pp_overlap
 
         model = self.model
-        structure_name_mapping = {k: (v.name, v.shape, int(v.dtype)) for (k, v) in model.state_dict().items()}
+        structure_name_mapping = {}
+        param_meta = {}
+        for k, v in model.state_dict().items():
+            structure_name_mapping[k] = v.name
+            param_meta[k] = (v.shape, int(v.dtype))
 
         sharding_metas = {}
         sharding_meta = {}
 
         sharding_meta["param2rank"] = param2rank
         sharding_meta["structure_name_mapping"] = structure_name_mapping
+        sharding_meta["param_meta"] = param_meta
         sharding_meta["sharding_strategy"] = sharding_strategy
         sharding_meta["enable_overlap"] = pp_overlap
         suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
