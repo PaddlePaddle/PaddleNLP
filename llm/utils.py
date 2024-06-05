@@ -161,7 +161,7 @@ def get_lora_target_modules(model):
             ".*w2.*",
             ".*w3.*",
         ]
-    elif model.base_model_prefix == "qwen2moe":
+    elif model.base_model_prefix == "qwen2_moe":
         target_modules = [
             ".*q_proj.*",
             ".*k_proj.*",

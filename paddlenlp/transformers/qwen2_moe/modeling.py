@@ -871,7 +871,7 @@ class Qwen2MoeDecoderLayer(nn.Layer):
 
 class Qwen2MoePretrainedModel(PretrainedModel):
     config_class = Qwen2MoeConfig
-    base_model_prefix = "qwen2moe"
+    base_model_prefix = "qwen2_moe"
     _keys_to_ignore_on_load_unexpected = [r"self_attn.rotary_emb.inv_freq"]
 
     @classmethod
@@ -915,7 +915,7 @@ class Qwen2MoePretrainedModel(PretrainedModel):
         if "Qwen2MoeModel" not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
-                mapping[1] = "qwen2moe." + mapping[1]
+                mapping[1] = "qwen2_moe." + mapping[1]
             model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
@@ -1020,7 +1020,7 @@ class Qwen2MoePretrainedModel(PretrainedModel):
                                 mean=0.0,
                                 std=self.config.initializer_range
                                 if hasattr(self.config, "initializer_range")
-                                else self.qwen2moe.config.initializer_range,
+                                else self.qwen2_moe.config.initializer_range,
                                 shape=layer.weight.shape,
                             )
                         )
@@ -1030,7 +1030,7 @@ class Qwen2MoePretrainedModel(PretrainedModel):
                             mean=0.0,
                             std=self.config.initializer_range
                             if hasattr(self.config, "initializer_range")
-                            else self.qwen2moe.config.initializer_range,
+                            else self.qwen2_moe.config.initializer_range,
                             shape=layer.weight.shape,
                         )
                     )
@@ -1381,7 +1381,7 @@ class Qwen2MoeForCausalLM(Qwen2MoePretrainedModel):
         super().__init__(config)
         self.config = config
 
-        self.qwen2moe = Qwen2MoeModel(config)
+        self.qwen2_moe = Qwen2MoeModel(config)
         self.lm_head = Qwen2MoeLMHead(config)
         self.criterion = Qwen2MoePretrainingCriterion(config)
         self.router_aux_loss_coef = config.router_aux_loss_coef
@@ -1394,10 +1394,10 @@ class Qwen2MoeForCausalLM(Qwen2MoePretrainedModel):
             logger.warning("We do not support sliding window attention for now.")
 
     def get_input_embeddings(self):
-        return self.qwen2moe.embed_tokens
+        return self.qwen2_moe.embed_tokens
 
     def set_input_embeddings(self, value):
-        self.qwen2moe.embed_tokens = value
+        self.qwen2_moe.embed_tokens = value
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -1406,10 +1406,10 @@ class Qwen2MoeForCausalLM(Qwen2MoePretrainedModel):
         self.lm_head = new_embeddings
 
     def set_decoder(self, decoder):
-        self.qwen2moe = decoder
+        self.qwen2_moe = decoder
 
     def get_decoder(self):
-        return self.qwen2moe
+        return self.qwen2_moe
 
     def prepare_inputs_for_generation(
         self,
@@ -1498,7 +1498,7 @@ class Qwen2MoeForCausalLM(Qwen2MoePretrainedModel):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
-        outputs = self.qwen2moe(
+        outputs = self.qwen2_moe(
             input_ids=input_ids,  # [bs, seq_len]
             position_ids=position_ids,
             attention_mask=attention_mask,
