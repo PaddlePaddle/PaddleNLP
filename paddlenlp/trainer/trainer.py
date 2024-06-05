@@ -40,7 +40,11 @@ import paddle.distributed as dist
 import paddle.nn as nn
 from packaging import version
 from paddle import framework
-from paddle.base import core
+
+try:
+    from paddle.base import core
+except:
+    core = None
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.hybrid_parallel_optimizer import (
     HybridParallelOptimizer,
