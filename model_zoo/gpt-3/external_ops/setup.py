@@ -37,69 +37,97 @@ def change_pwd():
 
 def setup_fast_ln():
     from paddle.utils.cpp_extension import CUDAExtension, setup
+    from paddle.device import is_compiled_with_rocm
 
-    gencode_flags = get_gencode_flags()
-    change_pwd()
-    setup(
-        name="fast_ln",
-        ext_modules=CUDAExtension(
-            sources=[
-                "fast_ln/ln_api.cpp",
-                "fast_ln/ln_bwd_semi_cuda_kernel.cu",
-                "fast_ln/ln_fwd_cuda_kernel.cu",
-            ],
-            extra_compile_args={
-                "cxx": ["-O3"],
-                "nvcc": [
-                    "-O3",
-                    "-U__CUDA_NO_HALF_OPERATORS__",
-                    "-U__CUDA_NO_HALF_CONVERSIONS__",
-                    "-U__CUDA_NO_BFLOAT16_OPERATORS__",
-                    "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                    "-U__CUDA_NO_BFLOAT162_OPERATORS__",
-                    "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-                    "-I./apex/contrib/csrc/layer_norm/",
-                    "--expt-relaxed-constexpr",
-                    "--expt-extended-lambda",
-                    "--use_fast_math",
-                ]
-                + gencode_flags,
-            },
-        ),
-    )
+    if(is_compiled_with_rocm()):
+        print("The 'fasl_ln' feature  is temporarily not supported on the ROCm platform !!!")
+    else:
+        gencode_flags = get_gencode_flags()
+        change_pwd()
+        setup(
+            name="fast_ln",
+            ext_modules=CUDAExtension(
+                sources=[
+                    "fast_ln/ln_api.cpp",
+                    "fast_ln/ln_bwd_semi_cuda_kernel.cu",
+                    "fast_ln/ln_fwd_cuda_kernel.cu",
+                ],
+                extra_compile_args={
+                    "cxx": ["-O3"],
+                    "nvcc": [
+                        "-O3",
+                        "-U__CUDA_NO_HALF_OPERATORS__",
+                        "-U__CUDA_NO_HALF_CONVERSIONS__",
+                        "-U__CUDA_NO_BFLOAT16_OPERATORS__",
+                        "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+                        "-U__CUDA_NO_BFLOAT162_OPERATORS__",
+                        "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+                        "-I./apex/contrib/csrc/layer_norm/",
+                        "--expt-relaxed-constexpr",
+                        "--expt-extended-lambda",
+                        "--use_fast_math",
+                    ]
+                    + gencode_flags,
+                },
+            ),
+        )
 
 
 def setup_fused_ln():
     from paddle.utils.cpp_extension import CUDAExtension, setup
+    from paddle.device import is_compiled_with_rocm
 
     gencode_flags = get_gencode_flags()
     change_pwd()
-    setup(
-        name="fused_ln",
-        ext_modules=CUDAExtension(
-            sources=[
-                "fused_ln/layer_norm_cuda.cu",
-            ],
-            extra_compile_args={
-                "cxx": ["-O3"],
-                "nvcc": [
-                    "-O3",
-                    "-U__CUDA_NO_HALF_OPERATORS__",
-                    "-U__CUDA_NO_HALF_CONVERSIONS__",
-                    "-U__CUDA_NO_BFLOAT16_OPERATORS__",
-                    "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                    "-U__CUDA_NO_BFLOAT162_OPERATORS__",
-                    "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-                    "-I./apex/contrib/csrc/layer_norm/",
-                    "--expt-relaxed-constexpr",
-                    "--expt-extended-lambda",
-                    "--use_fast_math",
-                    "-maxrregcount=50",
-                ]
-                + gencode_flags,
-            },
-        ),
-    )
+    if(is_compiled_with_rocm()):
+        setup(
+            name="fused_ln",
+            ext_modules=CUDAExtension(
+                sources=[
+                    "fused_ln/layer_norm_cuda.cu",
+                ],
+                extra_compile_args={
+                    "cxx": ["-O3"],
+                    "hipcc": [
+                        "-O3",
+                        "-U__CUDA_NO_HALF_OPERATORS__",
+                        "-U__CUDA_NO_HALF_CONVERSIONS__",
+                        "-U__CUDA_NO_BFLOAT16_OPERATORS__",
+                        "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+                        "-U__CUDA_NO_BFLOAT162_OPERATORS__",
+                        "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+                        "-DPADDLE_WITH_HIP",
+                    ]
+                },
+            ),
+        )
+    else:
+        setup(
+            name="fused_ln",
+            ext_modules=CUDAExtension(
+                sources=[
+                    "fused_ln/layer_norm_cuda.cu",
+                ],
+                extra_compile_args={
+                    "cxx": ["-O3"],
+                    "nvcc": [
+                        "-O3",
+                        "-U__CUDA_NO_HALF_OPERATORS__",
+                        "-U__CUDA_NO_HALF_CONVERSIONS__",
+                        "-U__CUDA_NO_BFLOAT16_OPERATORS__",
+                        "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+                        "-U__CUDA_NO_BFLOAT162_OPERATORS__",
+                        "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+                        "-I./apex/contrib/csrc/layer_norm/",
+                        "--expt-relaxed-constexpr",
+                        "--expt-extended-lambda",
+                        "--use_fast_math",
+                        "-maxrregcount=50",
+                    ]
+                    + gencode_flags,
+                },
+            ),
+        )
 
 
 run(setup_fast_ln)
