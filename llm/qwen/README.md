@@ -5,21 +5,40 @@
 [通义千问（Qwen）](https://arxiv.org/abs/2205.01068) 是阿里云研发的通义千问大模型系列的模型, 有 70 亿和 140 亿两个规模。Qwen是基于Transformer的大语言模型, 在超大规模的预训练数据上进行训练得到。预训练数据类型多样，覆盖广泛，包括大量网络文本、专业书籍、代码等。
 
 **支持模型权重:**
-| Model             |
-|-------------------|
-| qwen/qwen-7b      |
-| qwen/qwen-7b-chat |
-| qwen/qwen-14b     |
-| qwen/qwen-14b-chat|
-| qwen/qwen-72b     |
-| qwen/qwen-72b-chat|
+| Model              |
+|--------------------|
+| qwen/qwen-7b       |
+| qwen/qwen-7b-chat  |
+| qwen/qwen-14b      |
+| qwen/qwen-14b-chat |
+| qwen/qwen-72b      |
+| qwen/qwen-72b-chat |
 
-[通义千问（Qwen1.5-MoE）](https://qwenlm.github.io/blog/qwen-moe/) 是阿里云研发的通义千问MoE模型。Qwen1.5-MoE基于Transformer架构，采用了专家混合（MoE）架构，这些模型通过密集型语言模型升级改造而来。例如，Qwen1.5-MoE-A2.7B就是从Qwen-1.8B升级改造而来的。它总共有143亿个参数，但在运行时仅激活27亿个参数，却实现了与Qwen1.5-7B相近的性能，而训练资源仅为其25%。
+
+
+[通义千问（Qwen1.5）](https://qwenlm.github.io/blog/qwen1.5/) 是阿里云研发的通义千问系列模型升级版。Qwen1.5包括0.5B、1.8B、4B、7B、14B、32B、72B、110B和MoE共计9个不同规模的Base和Chat模型。
 
 **支持模型权重:**
-| Model (qwen-1.5)       |
-|------------------------|
-| qwen/qwen1.5-moe-a2.7b |
+| Model (qwen-1.5)            |
+|-----------------------------|
+| Qwen/Qwen1.5-0.5B           |
+| Qwen/Qwen1.5-0.5B-Chat      |
+| Qwen/Qwen1.5-1.8B           |
+| Qwen/Qwen1.5-1.8B-Chat      |
+| Qwen/Qwen1.5-4B             |
+| Qwen/Qwen1.5-4B-Chat        |
+| Qwen/Qwen1.5-7B             |
+| Qwen/Qwen1.5-7B-Chat        |
+| Qwen/Qwen1.5-14B            |
+| Qwen/Qwen1.5-14B-Chat       |
+| Qwen/Qwen1.5-32B            |
+| Qwen/Qwen1.5-32B-Chat       |
+| Qwen/Qwen1.5-72B            |
+| Qwen/Qwen1.5-72B-Chat       |
+| Qwen/Qwen1.5-110B           |
+| Qwen/Qwen1.5-110B-Chat      |
+| Qwen/Qwen1.5-MoE-A2.7B      |
+| Qwen/Qwen1.5-MoE-A2.7B-Chat |
 
 ## 2. 模型精调
 请参考[LLM全流程工具介绍](../README.md)
