@@ -2453,7 +2453,8 @@ class Trainer:
 
                 if self.args.should_save_sharding_stage1_model:
                     state_dict, _, _ = self.sharding_io.manipulate_state_dict_and_config(
-                        unwrap_model(self.model), merge_tensor_parallel=False, state_dict=state_dict)
+                        unwrap_model(self.model), merge_tensor_parallel=False, state_dict=state_dict
+                    )
                     variant = _add_variant(PADDLE_WEIGHTS_NAME, self.args.sharded_name_suffix())
                 else:
                     variant = _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)
