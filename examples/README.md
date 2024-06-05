@@ -4,6 +4,8 @@ PaddleNLP旨在提供覆盖从研究到产业应用的丰富示例，助力开�
 
 PaddleNLP provides rich application examples covering mainstream NLP task to help developers accelerate problem solving.
 
+**注意** 部分内容在PaddleNLP 3.0以后不再进行维护，更多历史内容请参考[PaddleNLP 2.8](../slm/README.md)。
+
 ## NLP 基础技术 (NLP Basic Technique)
 
 | 目录 Folder  | 任务 Task    |
