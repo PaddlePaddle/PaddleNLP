@@ -23,7 +23,8 @@ if [ ! -d "unittest_logs" ];then
 fi
 
 install_requirements() {
-    apt install -y zlib-devel # fix for ci environment
+    apt install -y zlib-devel # fix for ci environment 
+    yum install -y zlib-devel # fix for ci environment
     python -m pip config --user set global.index http://pip.baidu-int.com/search/
     python -m pip config --user set global.index-url http://pip.baidu-int.com/simple
     python -m pip config --user set global.trusted-host pip.baidu-int.com
