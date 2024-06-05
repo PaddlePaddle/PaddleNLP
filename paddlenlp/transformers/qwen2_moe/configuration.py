@@ -12,19 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Qwen2MoE model configuration"""
+""" Qwen2Moe model configuration"""
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = [
-    "QWen2MoEConfig",
+    "Qwen2MoeConfig",
 ]
 
 
-class QWen2MoEConfig(PretrainedConfig):
+class Qwen2MoeConfig(PretrainedConfig):
     r"""
-    This is the configuration class to store the configuration of a [`QWen2MoEModel`]. It is used to instantiate a
-    Qwen2MoE model according to the specified arguments, defining the model architecture. Instantiating a configuration
+    This is the configuration class to store the configuration of a [`Qwen2MoeModel`]. It is used to instantiate a
+    Qwen2Moe model according to the specified arguments, defining the model architecture. Instantiating a configuration
     with the defaults will yield a similar configuration to that of
     Qwen1.5-MoE-A2.7B" [Qwen/Qwen1.5-MoE-A2.7B"](https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B").
 
@@ -34,8 +34,8 @@ class QWen2MoEConfig(PretrainedConfig):
 
     Args:
         vocab_size (`int`, *optional*, defaults to 151936):
-            Vocabulary size of the Qwen2MoE model. Defines the number of different tokens that can be represented by the
-            `inputs_ids` passed when calling [`QWen2MoEModel`]
+            Vocabulary size of the Qwen2Moe model. Defines the number of different tokens that can be represented by the
+            `inputs_ids` passed when calling [`Qwen2MoeModel`]
         hidden_size (`int`, *optional*, defaults to 2048):
             Dimension of the hidden representations.
         intermediate_size (`int`, *optional*, defaults to 5632):
@@ -93,13 +93,13 @@ class QWen2MoEConfig(PretrainedConfig):
             The aux loss factor for the total loss.
 
     ```python
-    >>> from paddlenlp.transformers import QWen2MoEModel, QWen2MoEConfig
+    >>> from paddlenlp.transformers import Qwen2MoeModel, Qwen2MoeConfig
 
-    >>> # Initializing a Qwen2MoE style configuration
-    >>> configuration = QWen2MoEConfig()
+    >>> # Initializing a Qwen2Moe style configuration
+    >>> configuration = Qwen2MoeConfig()
 
     >>> # Initializing a model from the Qwen1.5-MoE-A2.7B" style configuration
-    >>> model = QWen2MoEModel(configuration)
+    >>> model = Qwen2MoeModel(configuration)
 
     >>> # Accessing the model configuration
     >>> configuration = model.config
