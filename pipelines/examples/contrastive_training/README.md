@@ -114,21 +114,6 @@ python evaluation/benchmarks.py --model_type bert \
 是一个大规模文本嵌入评测基准，包含了丰富的向量检索评估任务和数据集。
 本仓库主要面向其中的中英文检索任务（Retrieval），并以SciFact数据集作为主要示例。
 
-使用评估脚本`evaluation/mteb/eval_mteb.py`：
-- `base_model_name_or_path`: 模型名称或路径
-- `output_folder`: 结果文件存储路径
-- `task_name`：任务（数据集）名称，如SciFact
-- `task_split`：测试查询集合，如test或dev
-- `query_instruction`：查询前添加的提示文本，如'query: '或None
-- `document_instruction`：文档前添加的提示文本，如'passage: '或None
-- `pooling_method`：获取表示的方式，last表示取最后token，mean表示取平均，cls表示取`[CLS]`token \
-- `max_seq_length`: 最大序列长度
-- `eval_batch_size`: 模型预测的批次大小（单个GPU）
-- `pad_token`：设置padding的token，可取unk_token、eos_token或pad_token
-- `padding_side`：设置padding的位置，可取left或right
-- `add_bos_token`：是否添加起始符，0表示不添加，1表示添加
-- `add_eos_token`：是否添加结束符，0表示不添加，1表示添加
-
 评估RepLLaMA向量检索模型（[repllama-v1-7b-lora-passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage)）：
 ```
 export CUDA_VISIBLE_DEVICES=0
@@ -185,6 +170,21 @@ python evaluation/mteb/eval_mteb.py \
 'ndcg_at_100': 0.77511,
 'ndcg_at_1000': 0.77939
 ```
+
+可支持配置的参数：
+- `base_model_name_or_path`: 模型名称或路径
+- `output_folder`: 结果文件存储路径
+- `task_name`：任务（数据集）名称，如SciFact
+- `task_split`：测试查询集合，如test或dev
+- `query_instruction`：查询前添加的提示文本，如'query: '或None
+- `document_instruction`：文档前添加的提示文本，如'passage: '或None
+- `pooling_method`：获取表示的方式，last表示取最后token，mean表示取平均，cls表示取`[CLS]`token
+- `max_seq_length`: 最大序列长度
+- `eval_batch_size`: 模型预测的批次大小（单个GPU）
+- `pad_token`：设置padding的token，可取unk_token、eos_token或pad_token
+- `padding_side`：设置padding的位置，可取left或right
+- `add_bos_token`：是否添加起始符，0表示不添加，1表示添加
+- `add_eos_token`：是否添加结束符，0表示不添加，1表示添加
 
 
 ## Reference
