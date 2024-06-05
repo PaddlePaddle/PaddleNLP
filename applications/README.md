@@ -1,5 +1,7 @@
 # 产业级端到端系统范例
 
+**注意** 部分内容在PaddleNLP 3.0以后不再进行维护，更多历史内容请参考[PaddleNLP 2.8](https://github.com/PaddlePaddle/PaddleNLP/blob/release/2.8/applications/README.md)分支版本。
+
 ## 1、简介
 
 PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 NLP 任务上丰富的[应用示例](../examples)，满足了大量开发者的学习科研与基础应用需求。
