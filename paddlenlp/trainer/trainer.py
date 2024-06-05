@@ -81,6 +81,7 @@ try:
     from ..quantization.quantization_linear import QuantizationLinear
 except:
     QuantizationLinear = None
+from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
 from ..transformers.model_utils import (
     PretrainedModel,
     _add_variant,
@@ -764,6 +765,8 @@ class Trainer:
                 trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
                 if self.args.sep_parallel_degree > 0:
                     trainable_numel = trainable_numel // self.args.sep_parallel_degree
+                if self.args.context_parallel_degree > 0:
+                    trainable_numel = trainable_numel // self.args.context_parallel_degree
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
                 logger.debug(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
@@ -898,6 +901,8 @@ class Trainer:
             for step, inputs in enumerate(epoch_iterator):
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
+                if self.args.use_hybrid_parallel and self.args.context_parallel_degree > 1:
+                    inputs = split_inputs_sequence_dim_load_balance(inputs)
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
@@ -1783,6 +1788,7 @@ class Trainer:
         in_sharding_parallel_mode = self.sharding is not None
         in_tensor_parallel_mode = self.args.tensor_parallel_degree > 1
         in_sep_parallel_mode = self.args.sep_parallel_degree > 1
+        in_cp_parallel_mode = self.args.context_parallel_degree > 1
 
         # Multi-gpu training
         if (
@@ -1793,6 +1799,7 @@ class Trainer:
                 or in_sharding_parallel_mode
                 or in_tensor_parallel_mode
                 or in_sep_parallel_mode
+                or in_cp_parallel_mode
             )
         ):
             model = paddle.DataParallel(model)
@@ -1919,7 +1926,7 @@ class Trainer:
         if (
             not in_pipeline_parallel_mode
             and not in_sharding_parallel_mode
-            and (in_tensor_parallel_mode or in_sep_parallel_mode)
+            and (in_tensor_parallel_mode or in_sep_parallel_mode or in_cp_parallel_mode)
         ):
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
