@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tokenization classes for QWen2."""
+"""Tokenization classes for Qwen2."""
 
 import json
 import os
@@ -29,7 +29,7 @@ VOCAB_FILES_NAMES = {
     "merges_file": "merges.txt",
 }
 
-__all__ = ["QWen2MoETokenizer"]
+__all__ = ["Qwen2Tokenizer"]
 
 MAX_MODEL_INPUT_SIZES = {"qwen/qwen-tokenizer": 32768}
 
@@ -75,7 +75,7 @@ def get_pairs(word):
     return pairs
 
 
-class QWen2MoETokenizer(PretrainedTokenizer):
+class Qwen2Tokenizer(PretrainedTokenizer):
     """
     Construct a Qwen2 tokenizer. Based on byte-level Byte-Pair-Encoding.
 

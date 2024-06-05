@@ -21,13 +21,13 @@ from paddle.distributed.fleet.utils import recompute
 from ...utils.tools import get_env_device
 from ..model_utils import PipelinePretrainedModel
 from .modeling import (
-    QWen2Config,
-    QWen2DecoderLayer,
-    QWen2LMHead,
-    QWen2Model,
-    QWen2PretrainedModel,
-    QWen2PretrainingCriterion,
-    QWen2RMSNorm,
+    Qwen2Config,
+    Qwen2DecoderLayer,
+    Qwen2LMHead,
+    Qwen2Model,
+    Qwen2PretrainedModel,
+    Qwen2PretrainingCriterion,
+    Qwen2RMSNorm,
 )
 
 __all__ = [
@@ -71,10 +71,10 @@ def return_args(hidden_states, attention_mask=None, position_ids=None):
     return ret
 
 
-class QWen2EmbeddingPipe(nn.Layer):
+class Qwen2EmbeddingPipe(nn.Layer):
     """Extends QWenEmbeddings to forward attention_mask through the pipeline."""
 
-    def __init__(self, config: QWen2Config):
+    def __init__(self, config: Qwen2Config):
         super().__init__()
         self.hidden_size = config.hidden_size
         if config.tensor_parallel_degree > 1:
@@ -109,7 +109,7 @@ class QWen2EmbeddingPipe(nn.Layer):
         batch_size, seq_length = input_ids.shape
 
         if attention_mask is not None:
-            attention_mask = QWen2Model._prepare_decoder_attention_mask(
+            attention_mask = Qwen2Model._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), 0, input_embeds.dtype
             )
             attention_mask.stop_gradient = True
@@ -122,7 +122,7 @@ class QWen2EmbeddingPipe(nn.Layer):
         return return_args(input_embeds, attention_mask, position_ids)
 
 
-class QWen2DecoderLayerPipe(QWen2DecoderLayer):
+class Qwen2DecoderLayerPipe(Qwen2DecoderLayer):
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
 
@@ -144,10 +144,10 @@ class QWen2DecoderLayerPipe(QWen2DecoderLayer):
         return return_args(hidden_states, attention_mask, position_ids)
 
 
-class QWen2RMSNormPipe(QWen2RMSNorm):
-    def __init__(self, config: QWen2Config):
+class Qwen2RMSNormPipe(Qwen2RMSNorm):
+    def __init__(self, config: Qwen2Config):
         super().__init__()
-        self.norm = QWen2RMSNorm(config)
+        self.norm = Qwen2RMSNorm(config)
 
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
@@ -161,15 +161,15 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     sequence of layers including embedding, transformer layers, and output.
     """
 
-    config_class = QWen2Config
+    config_class = Qwen2Config
 
-    _get_tensor_parallel_mappings = QWen2PretrainedModel._get_tensor_parallel_mappings
-    _init_weights = QWen2PretrainedModel._init_weights
-    _keys_to_ignore_on_load_unexpected = QWen2PretrainedModel._keys_to_ignore_on_load_unexpected
+    _get_tensor_parallel_mappings = Qwen2PretrainedModel._get_tensor_parallel_mappings
+    _init_weights = Qwen2PretrainedModel._init_weights
+    _keys_to_ignore_on_load_unexpected = Qwen2PretrainedModel._keys_to_ignore_on_load_unexpected
 
     # DONOT Add base_model_prefix !!!!
 
-    def __init__(self, config: QWen2Config):
+    def __init__(self, config: Qwen2Config):
         self.config = config
 
         self.use_recompute = self.config.use_recompute
@@ -192,14 +192,14 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
 
-        self.add_sequential_layer(LayerDesc(QWen2EmbeddingPipe, config=config), "qwen2")
+        self.add_sequential_layer(LayerDesc(Qwen2EmbeddingPipe, config=config), "qwen2")
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
-                LayerDesc(QWen2DecoderLayerPipe, config=config, layerwise_recompute=i not in self.no_recompute_layers),
+                LayerDesc(Qwen2DecoderLayerPipe, config=config, layerwise_recompute=i not in self.no_recompute_layers),
                 f"qwen2.layers.{i}",
             )
-        self.add_sequential_layer(LayerDesc(QWen2RMSNormPipe, config=config), "norm")
-        self.add_sequential_layer(LayerDesc(QWen2LMHead, config=config), "lm_head")
+        self.add_sequential_layer(LayerDesc(Qwen2RMSNormPipe, config=config), "norm")
+        self.add_sequential_layer(LayerDesc(Qwen2LMHead, config=config), "lm_head")
 
         recompute_interval = 0
         if self.use_recompute and self.recompute_granularity == "full":
@@ -208,14 +208,14 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             ), "pp recompute interval should smaller than num layers of each pp chunk"
             recompute_interval = self.config.pp_recompute_interval
 
-        seg_method = "layer:QWen2DecoderLayer"
+        seg_method = "layer:Qwen2DecoderLayer"
         if config.num_hidden_layers % get_hcg().topology().get_dim_size("pipe") != 0:
             seg_method = "uniform"
 
         PipelineLayer.__init__(
             self,
             layers=self.get_sequential_layers(),
-            loss_fn=QWen2PretrainingCriterion(config),
+            loss_fn=Qwen2PretrainingCriterion(config),
             topology=get_hcg().topology(),
             seg_method=seg_method,
             recompute_interval=recompute_interval,

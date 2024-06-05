@@ -17,11 +17,11 @@
 from ..configuration_utils import PretrainedConfig
 
 __all__ = [
-    "QWen2Config",
+    "Qwen2Config",
 ]
 
 
-class QWen2Config(PretrainedConfig):
+class Qwen2Config(PretrainedConfig):
     r"""
     This is the configuration class to store the configuration of a [`Qwen2Model`]. It is used to instantiate a
     Qwen2 model according to the specified arguments, defining the model architecture. Instantiating a configuration
@@ -107,13 +107,19 @@ class QWen2Config(PretrainedConfig):
         use_cache=True,
         use_recompute=False,
         recompute_granularity="full",
+        pp_recompute_interval=1,
         no_recompute_layers=None,
+        fuse_attention_qkv=False,
+        fuse_attention_ffn=False,
         use_flash_attention=False,
-        tie_word_embeddings=False,
-        rope_theta=10000.0,
+        use_fused_rms_norm=False,
+        use_fused_rope=False,
         tensor_parallel_output=True,
         sequence_parallel=False,
         fuse_sequence_parallel_allreduce=False,
+        virtual_pp_degree=1,
+        tie_word_embeddings=False,
+        rope_theta=10000.0,
         pad_token_id=0,
         bos_token_id=151643,
         eos_token_id=151643,
@@ -121,6 +127,8 @@ class QWen2Config(PretrainedConfig):
         sliding_window=4096,
         max_window_layers=28,
         attention_dropout=0.0,
+        rope_scaling_factor=1.0,
+        rope_scaling_type=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -146,13 +154,23 @@ class QWen2Config(PretrainedConfig):
         self.rope_theta = rope_theta
         self.attention_dropout = attention_dropout
 
+        self.use_cache = use_cache
         self.use_recompute = use_recompute
         self.recompute_granularity = recompute_granularity
         self.no_recompute_layers = no_recompute_layers
+        self.pp_recompute_interval = pp_recompute_interval
+        self.fuse_attention_qkv = fuse_attention_qkv
         self.use_flash_attention = use_flash_attention
+        self.fuse_attention_ffn = fuse_attention_ffn
+        self.use_fused_rms_norm = use_fused_rms_norm
         self.tensor_parallel_output = tensor_parallel_output
         self.sequence_parallel = sequence_parallel
         self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
+        self.virtual_pp_degree = virtual_pp_degree
+
+        self.use_fused_rope = use_fused_rope
+        self.rope_scaling_factor = rope_scaling_factor
+        self.rope_scaling_type = rope_scaling_type
 
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id

@@ -294,6 +294,7 @@ from .deberta.configuration import *
 from .deberta_v2.modeling import *
 from .deberta_v2.tokenizer import *
 from .deberta_v2.configuration import *
+from .qwen2 import *
 from .qwen2moe import *
 
 # For faster tokenizer

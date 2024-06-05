@@ -17,7 +17,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Paddle QWen2 model."""
+"""Paddle Qwen2 model."""
 
 import math
 import warnings
@@ -48,7 +48,7 @@ from ..model_outputs import (
     TokenClassifierOutput,
 )
 from ..model_utils import PretrainedModel, register_base_model
-from .configuration import QWen2Config
+from .configuration import Qwen2Config
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -62,10 +62,10 @@ except:
 
 
 __all__ = [
-    "QWen2Model",
-    "QWen2PretrainedModel",
-    "QWen2ForCausalLM",
-    "QWen2PretrainingCriterion",
+    "Qwen2Model",
+    "Qwen2PretrainedModel",
+    "Qwen2ForCausalLM",
+    "Qwen2PretrainingCriterion",
 ]
 
 
@@ -269,10 +269,10 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     return expanded_mask
 
 
-class QWen2RMSNorm(nn.Layer):
-    def __init__(self, config: QWen2Config):
+class Qwen2RMSNorm(nn.Layer):
+    def __init__(self, config: Qwen2Config):
         """
-        QWen2RMSNorm is equivalent to T5LayerNorm
+        Qwen2RMSNorm is equivalent to T5LayerNorm
         """
         super().__init__()
         self.hidden_size = config.hidden_size
@@ -303,7 +303,7 @@ class QWen2RMSNorm(nn.Layer):
         return hidden_states * self.weight
 
 
-class QWen2RotaryEmbedding(nn.Layer):
+class Qwen2RotaryEmbedding(nn.Layer):
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
         super().__init__()
         self.dim = dim
@@ -347,7 +347,7 @@ def rotate_half(x):
 
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     if position_ids is None:
-        # Note: Only for QWen2MoEForCausalLMPipe model pretraining
+        # Note: Only for Qwen2MoEForCausalLMPipe model pretraining
         cos = cos[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
         sin = sin[:, : q.shape[1], :, :]  # [bs, seq_len, 1, dim]
     else:
@@ -360,13 +360,12 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     return q_embed, k_embed
 
 
-class QWen2MLP(nn.Layer):
-    def __init__(self, config, is_shared=False):
+class Qwen2MLP(nn.Layer):
+    def __init__(self, config: Qwen2Config, is_shared=False):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.intermediate_size = (
-            config.moe_intermediate_size if not is_shared else config.shared_expert_intermediate_size
-        )
+        self.intermediate_size = config.intermediate_size
+
         self.tensor_parallel_degree = config.tensor_parallel_degree
 
         if config.sequence_parallel:
@@ -419,13 +418,13 @@ def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
     return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_dim])
 
 
-class QWen2Attention(nn.Layer):
+class Qwen2Attention(nn.Layer):
     """
     Multi-headed attention from 'Attention Is All You Need' paper. Modified to use sliding window attention: Longformer
     and "Generating Long Sequences with Sparse Transformers".
     """
 
-    def __init__(self, config: QWen2Config, layerwise_recompute: bool = True):
+    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = True):
         super().__init__()
 
         self.config = config
@@ -493,7 +492,7 @@ class QWen2Attention(nn.Layer):
             self.v_proj = nn.Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
             self.o_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=False)
 
-        self.rotary_emb = QWen2RotaryEmbedding(
+        self.rotary_emb = Qwen2RotaryEmbedding(
             self.head_dim,
             max_position_embeddings=self.max_position_embeddings,
             base=self.rope_theta,
@@ -614,15 +613,15 @@ class QWen2Attention(nn.Layer):
         return outputs
 
 
-class QWen2DecoderLayer(nn.Layer):
-    def __init__(self, config: QWen2Config, layerwise_recompute: bool = False):
+class Qwen2DecoderLayer(nn.Layer):
+    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = False):
         super().__init__()
         self.hidden_size = config.hidden_size
-        self.self_attn = QWen2Attention(config, layerwise_recompute)
+        self.self_attn = Qwen2Attention(config, layerwise_recompute)
 
-        self.mlp = QWen2MLP(config)
-        self.input_layernorm = QWen2RMSNorm(config)
-        self.post_attention_layernorm = QWen2RMSNorm(config)
+        self.mlp = Qwen2MLP(config)
+        self.input_layernorm = Qwen2RMSNorm(config)
+        self.post_attention_layernorm = Qwen2RMSNorm(config)
 
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
@@ -721,13 +720,13 @@ class QWen2DecoderLayer(nn.Layer):
         return outputs
 
 
-class QWen2PretrainedModel(PretrainedModel):
-    config_class = QWen2Config
+class Qwen2PretrainedModel(PretrainedModel):
+    config_class = Qwen2Config
     base_model_prefix = "qwen2"
     _keys_to_ignore_on_load_unexpected = [r"self_attn.rotary_emb.inv_freq"]
 
     @classmethod
-    def _get_name_mappings(cls, config: QWen2Config) -> list[StateDictNameMapping]:
+    def _get_name_mappings(cls, config: Qwen2Config) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
             ["embed_tokens.weight"],
@@ -742,6 +741,9 @@ class QWen2PretrainedModel(PretrainedModel):
                 [f"layers.{layer_index}.self_attn.k_proj.bias", None],
                 [f"layers.{layer_index}.self_attn.v_proj.bias", None],
                 [f"layers.{layer_index}.self_attn.o_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.mlp.up_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.mlp.gate_proj.weight", None, "transpose"],
+                [f"layers.{layer_index}.mlp.down_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.rotary_emb.inv_freq"],
                 [f"layers.{layer_index}.input_layernorm.weight"],
                 [f"layers.{layer_index}.post_attention_layernorm.weight"],
@@ -749,8 +751,8 @@ class QWen2PretrainedModel(PretrainedModel):
             model_mappings.extend(layer_mappings)
 
         init_name_mappings(mappings=model_mappings)
-        # base-model prefix "QWen2MoEModel"
-        if "QWen2Model" not in config.architectures:
+        # base-model prefix "Qwen2MoEModel"
+        if "Qwen2Model" not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
                 mapping[1] = "qwen2." + mapping[1]
@@ -760,7 +762,7 @@ class QWen2PretrainedModel(PretrainedModel):
         return mappings
 
     @classmethod
-    def _get_tensor_parallel_mappings(cls, config: QWen2Config, is_split=True):
+    def _get_tensor_parallel_mappings(cls, config: Qwen2Config, is_split=True):
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
         fn = split_or_merge_func(
@@ -818,7 +820,7 @@ class QWen2PretrainedModel(PretrainedModel):
                 mpu.VocabParallelEmbedding,
                 mpu.ColumnParallelLinear,
                 mpu.RowParallelLinear,
-                QWen2LMHead,
+                Qwen2LMHead,
                 ColumnSequenceParallelLinear,
                 RowSequenceParallelLinear,
             ),
@@ -833,7 +835,7 @@ class QWen2PretrainedModel(PretrainedModel):
                                 mean=0.0,
                                 std=self.config.initializer_range
                                 if hasattr(self.config, "initializer_range")
-                                else self.qwen2moe.config.initializer_range,
+                                else self.qwen2.config.initializer_range,
                                 shape=layer.weight.shape,
                             )
                         )
@@ -843,7 +845,7 @@ class QWen2PretrainedModel(PretrainedModel):
                             mean=0.0,
                             std=self.config.initializer_range
                             if hasattr(self.config, "initializer_range")
-                            else self.qwen2moe.config.initializer_range,
+                            else self.qwen2.config.initializer_range,
                             shape=layer.weight.shape,
                         )
                     )
@@ -853,24 +855,24 @@ class QWen2PretrainedModel(PretrainedModel):
         # sublayer is init first
         # scale RowParallelLinear weight
         with paddle.no_grad():
-            if isinstance(layer, QWen2MLP):
+            if isinstance(layer, Qwen2MLP):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.down_proj.weight.scale_(factor)
-            if isinstance(layer, QWen2Attention):
+            if isinstance(layer, Qwen2Attention):
                 factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
                 layer.o_proj.weight.scale_(factor)
 
 
 @register_base_model
-class QWen2Model(QWen2PretrainedModel):
+class Qwen2Model(Qwen2PretrainedModel):
     """
-    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`QWen2DecoderLayer`]
+    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`Qwen2DecoderLayer`]
 
     Args:
-        config: QWen2Config
+        config: Qwen2Config
     """
 
-    def __init__(self, config: QWen2Config):
+    def __init__(self, config: Qwen2Config):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
@@ -896,11 +898,11 @@ class QWen2Model(QWen2PretrainedModel):
 
         self.layers = nn.LayerList(
             [
-                QWen2DecoderLayer(config, layerwise_recompute=layer_idx not in self.no_recompute_layers)
+                Qwen2DecoderLayer(config, layerwise_recompute=layer_idx not in self.no_recompute_layers)
                 for layer_idx in range(config.num_hidden_layers)
             ]
         )
-        self.norm = QWen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.norm = Qwen2RMSNorm(config)
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1100,14 +1102,14 @@ class QWen2Model(QWen2PretrainedModel):
         )
 
 
-class QWen2PretrainingCriterion(nn.Layer):
+class Qwen2PretrainingCriterion(nn.Layer):
     """
     Criterion for Mixtral.
     It calculates the final loss.
     """
 
-    def __init__(self, config):
-        super(QWen2PretrainingCriterion, self).__init__()
+    def __init__(self, config: Qwen2Config):
+        super(Qwen2PretrainingCriterion, self).__init__()
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
         self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
@@ -1135,9 +1137,9 @@ class QWen2PretrainingCriterion(nn.Layer):
         return loss
 
 
-class QWen2LMHead(nn.Layer):
-    def __init__(self, config: QWen2Config):
-        super(QWen2LMHead, self).__init__()
+class Qwen2LMHead(nn.Layer):
+    def __init__(self, config: Qwen2Config):
+        super(Qwen2LMHead, self).__init__()
         self.config = config
         if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             vocab_size = config.vocab_size // config.tensor_parallel_degree
@@ -1166,15 +1168,15 @@ class QWen2LMHead(nn.Layer):
         return logits
 
 
-class QWen2ForCausalLM(QWen2PretrainedModel):
+class Qwen2ForCausalLM(Qwen2PretrainedModel):
     enable_to_static_method = True
     _tied_weights_keys = ["lm_head.weight"]
 
-    def __init__(self, config: QWen2Config):
+    def __init__(self, config: Qwen2Config):
         super().__init__(config)
-        self.qwen2 = QWen2Model(config)
-        self.lm_head = QWen2LMHead(config)
-        self.criterion = QWen2PretrainingCriterion(config)
+        self.qwen2 = Qwen2Model(config)
+        self.lm_head = Qwen2LMHead(config)
+        self.criterion = Qwen2PretrainingCriterion(config)
         self.vocab_size = config.vocab_size
 
     def get_input_embeddings(self):
@@ -1283,9 +1285,9 @@ class QWen2ForCausalLM(QWen2PretrainedModel):
         Example:
 
         ```python
-        >>> from transformers import AutoTokenizer, QWen2ForCausalLM
+        >>> from transformers import AutoTokenizer, Qwen2ForCausalLM
 
-        >>> model = QWen2ForCausalLM.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
+        >>> model = Qwen2ForCausalLM.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
         >>> tokenizer = AutoTokenizer.from_pretrained(PATH_TO_CONVERTED_TOKENIZER)
 
         >>> prompt = "Hey, are you conscious? Can you talk to me?"
@@ -1343,11 +1345,11 @@ class QWen2ForCausalLM(QWen2PretrainedModel):
         )
 
 
-class QWen2ForSequenceClassification(QWen2PretrainedModel):
-    def __init__(self, config: QWen2Config):
+class Qwen2ForSequenceClassification(Qwen2PretrainedModel):
+    def __init__(self, config: Qwen2Config):
         super().__init__(config)
         self.num_labels = config.num_labels
-        self.qwen2 = QWen2Model(config)
+        self.qwen2 = Qwen2Model(config)
         self.score = nn.Linear(config.hidden_size, self.num_labels, bias=False)
 
     def get_input_embeddings(self):
@@ -1447,12 +1449,12 @@ class QWen2ForSequenceClassification(QWen2PretrainedModel):
         )
 
 
-# Copied from transformers.models.llama.modeling_llama.LlamaForTokenClassification with Llama->QWen2, LLAMA->QWEN2
-class QWen2ForTokenClassification(QWen2PretrainedModel):
-    def __init__(self, config: QWen2Config):
+# Copied from transformers.models.llama.modeling_llama.LlamaForTokenClassification with Llama->Qwen2, LLAMA->QWEN2
+class Qwen2ForTokenClassification(Qwen2PretrainedModel):
+    def __init__(self, config: Qwen2Config):
         super().__init__(config)
         self.num_labels = config.num_labels
-        self.qwen2 = QWen2Model(config)
+        self.qwen2 = Qwen2Model(config)
         if getattr(config, "classifier_dropout", None) is not None:
             classifier_dropout = config.classifier_dropout
         elif getattr(config, "hidden_dropout", None) is not None:

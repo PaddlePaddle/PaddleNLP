@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from ..qwen2.tokenizer import *
 from .configuration import *
 from .modeling import *
-from .tokenizer import *
