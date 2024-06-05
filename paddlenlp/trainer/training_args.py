@@ -266,6 +266,7 @@ class TrainingArguments:
               enable_stage1_broadcast_overlap, overlap stage1 V1 broadcast with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap forward compute and no other sync could be called during the training for broadcast overlap.
               enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap.
               disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.
+              enable_release_graHEADds, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -1198,6 +1199,7 @@ class TrainingArguments:
                                 "disable_stage1_reduce_avg",
                                 "enable_stage1_broadcast_overlap",
                                 "enable_stage1_allgather_overlap",
+                                "enable_release_grads",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
@@ -1217,6 +1219,9 @@ class TrainingArguments:
                     try:
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
+
+                        if "enable_release_grads" in sharding_parallel_config:
+                            strategy.hybrid_configs["sharding_configs"].release_gradients = True
 
                         if self.pipeline_parallel_degree == 1:
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
@@ -1671,7 +1676,7 @@ class TrainingArguments:
             return 0
 
     def _format_name(self, prefix, rank, degree):
-        size = max(2, len(str(degree)))
+        size = 2
         return f"{prefix}{rank:0>{size}d}"
 
     @property
