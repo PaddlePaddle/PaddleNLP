@@ -19,7 +19,6 @@
 import collections
 import contextlib
 import copy
-import ctypes
 import inspect
 import math
 import multiprocessing
@@ -191,8 +190,7 @@ async_save_queue = []
 g_cpu_optimizer_state_dict = {}
 
 
-def _save_func(obj, path, saved_signal_path, protocol, shared_value):
-    shared_value.value = 1
+def _save_func(obj, path, saved_signal_path, protocol):
     paddle.save(obj, path, protocol)
     # dump savd_siganl
     with open(saved_signal_path, mode="w+") as f:
@@ -236,22 +234,25 @@ def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol
             g_cpu_optimizer_state_dict[k] = copy.deepcopy(v)
         else:
             g_cpu_optimizer_state_dict[k] = v.pin_memory()
-        paddle.device.cuda.synchronize()
+        paddle.device.synchronize()
     clear_async_save_task_queue()
-    shared_value = multiprocessing.Value(ctypes.c_int, 0)
+
+    attempt = 0
     ctx = multiprocessing.get_context("spawn")
-    p = ctx.Process(
-        target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol, shared_value)
-    )
-    p.start()
-    while shared_value.value == 0:
-        time.sleep(0.05)
-        if not p.is_alive():
-            logger.error("create new process error, retry")
-            p = ctx.Process(
-                target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol, shared_value)
-            )
+
+    def start_process():
+        nonlocal attempt
+        try:
+            p = ctx.Process(target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol))
             p.start()
+            return p
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed with error: {e}")
+            attempt += 1
+            time.sleep(1)
+            return start_process()
+
+    p = start_process()
     async_save_queue.append(p)
 
 
@@ -1402,7 +1403,7 @@ class Trainer:
         metrics = None
         if self.control.should_evaluate:
             if isinstance(self.optimizer, GroupShardedOptimizerStage2) and self.optimizer._broadcast_overlap:
-                paddle.device.cuda.synchronize()
+                paddle.device.synchronize()
 
             if isinstance(self.eval_dataset, dict):
                 for eval_dataset_name, eval_dataset in self.eval_dataset.items():
@@ -1416,7 +1417,7 @@ class Trainer:
 
         if self.control.should_save:
             if isinstance(self.optimizer, GroupShardedOptimizerStage2) and self.optimizer._broadcast_overlap:
-                paddle.device.cuda.synchronize()
+                paddle.device.synchronize()
 
             self._save_checkpoint(model, metrics=metrics)
             logger.info(f"{self.runtime_timer.log()}")
