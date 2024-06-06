@@ -2281,7 +2281,6 @@ class Trainer:
         self.runtime_timer.start("checkpoint saving time")
 
         if self.args.use_async_save:
-            # paddle.clear_async_save_task_queue()
             clear_async_save_task_queue()
 
         # Save model checkpoint
@@ -2304,12 +2303,9 @@ class Trainer:
             saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
 
             if self.args.use_hybrid_parallel:
-                if self.args.use_expert_parallel:
-                    self._save_ckpt_func(
-                        self._filter_moe_no_sync_optimizer_params(),
-                        os.path.join(output_dir, optimizer_name),
-                    )
-                elif self.dp_group.rank <= 0:
+                if self.dp_group.rank <= 0 or self.args.use_expert_parallel:
+                    os.makedirs(output_dir, exist_ok=True)
+                    logger.info("Saving optimizer files.")
                     if self.args.unified_checkpoint:
                         save_unified_optimizer(
                             self.args,
@@ -2319,19 +2315,25 @@ class Trainer:
                             safe_serialization=True,
                         )
                     else:
-                        state_dict = self.optimizer.state_dict()
-                        save_path = os.path.join(output_dir, optimizer_name)
-                        if self.args.use_async_save:
-                            assert not strtobool(os.getenv("FLAG_LLM_PDC", "False")), "Dont support FLAG_LLM_PDC"
-                            async_save_optimizer(
-                                state_dict,
-                                save_path,
-                                saved_signal_path=saved_signal_path,
+                        if self.dp_group.rank > 0:  # this should only work for MoE saving
+                            self._save_ckpt_func(
+                                self._filter_moe_no_sync_optimizer_params(),
+                                os.path.join(output_dir, optimizer_name),
                             )
                         else:
-                            self._save_ckpt_func(state_dict, save_path)
-                            with open(saved_signal_path, mode="w+") as f:
-                                f.write("1")
+                            state_dict = self.optimizer.state_dict()
+                            save_path = os.path.join(output_dir, optimizer_name)
+                            if self.args.use_async_save:
+                                assert not strtobool(os.getenv("FLAG_LLM_PDC", "False")), "Dont support FLAG_LLM_PDC"
+                                async_save_optimizer(
+                                    state_dict,
+                                    save_path,
+                                    saved_signal_path=saved_signal_path,
+                                )
+                            else:
+                                self._save_ckpt_func(state_dict, save_path)
+                                with open(saved_signal_path, mode="w+") as f:
+                                    f.write("1")
 
             if self.args.should_save or self.args.use_expert_parallel:
                 if not self.args.use_hybrid_parallel:
