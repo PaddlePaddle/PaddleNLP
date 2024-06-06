@@ -196,10 +196,6 @@ class ModelArguments:
             "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
         },
     )
-    sequence_parallel: bool = field(
-        default=False,
-        metadata={"help": "whether to use sequence parallel"},
-    )
     fuse_sequence_parallel_allreduce: bool = field(
         default=False,
         metadata={"help": "whether to use fuse sequence parallel allreduce"},
@@ -403,7 +399,7 @@ def main():
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
+        from llama.fused_layers import mock_layers
 
         mock_layers()
 
@@ -471,7 +467,6 @@ def main():
     config.fuse_attention_ffn = model_args.fuse_attention_ffn
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
-    config.sequence_parallel = model_args.sequence_parallel
     config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
     config.use_fused_rope = model_args.use_fused_rope
 
@@ -479,6 +474,7 @@ def main():
     config.pp_recompute_interval = model_args.pp_recompute_interval
     config.recompute_use_reentrant = model_args.recompute_use_reentrant
     config.use_recompute = training_args.recompute
+    config.sequence_parallel = training_args.sequence_parallel
 
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
@@ -542,7 +538,7 @@ def main():
     else:
         model = model_class.from_config(config, dtype=dtype)
 
-    if model_args.sequence_parallel:
+    if training_args.sequence_parallel:
         register_sequence_parallel_allreduce_hooks(
             model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
         )
