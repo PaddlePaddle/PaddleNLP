@@ -18,8 +18,11 @@
 
 import collections
 import contextlib
+import copy
+import ctypes
 import inspect
 import math
+import multiprocessing
 import os
 import random
 import re
@@ -183,6 +186,73 @@ except:
 
 
 __all__ = ["Trainer"]
+
+async_save_queue = []
+g_cpu_optimizer_state_dict = {}
+
+
+def _save_func(obj, path, saved_signal_path, protocol, shared_value):
+    shared_value.value = 1
+    paddle.save(obj, path, protocol)
+    # dump savd_siganl
+    with open(saved_signal_path, mode="w+") as f:
+        f.write("1")
+
+
+def check_exitcode(task):
+    exitcode = task.exitcode
+    if exitcode != 0:
+        print(f"Error: save ckpt process failed with exitcode {exitcode}!!!")
+
+
+def clear_async_save_task_queue():
+    """
+    wait until all async save task to be done.
+    """
+    while len(async_save_queue) > 0:
+        task = async_save_queue.pop()
+        if task and task.is_alive():
+            task.join(timeout=60)
+            if task.is_alive():
+                logger.error("Error: save ckpt process timeout!!!")
+                async_save_queue.append(task)
+            else:
+                check_exitcode(task)
+        else:
+            check_exitcode(task)
+
+
+def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol=4):
+    global g_cpu_optimizer_state_dict
+    g_cpu_optimizer_state_dict.clear()
+    for k, v in optimizer_state_dict.items():
+        if k == "master_weights":
+            g_cpu_optimizer_state_dict[k] = {}
+            for kk, vv in v.items():
+                tensor_name = vv.name
+                g_cpu_optimizer_state_dict[k][kk] = vv.pin_memory()
+                g_cpu_optimizer_state_dict[k][kk].name = tensor_name
+        elif k == "LR_Scheduler":
+            g_cpu_optimizer_state_dict[k] = copy.deepcopy(v)
+        else:
+            g_cpu_optimizer_state_dict[k] = v.pin_memory()
+        paddle.device.cuda.synchronize()
+    clear_async_save_task_queue()
+    shared_value = multiprocessing.Value(ctypes.c_int, 0)
+    ctx = multiprocessing.get_context("spawn")
+    p = ctx.Process(
+        target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol, shared_value)
+    )
+    p.start()
+    while shared_value.value == 0:
+        time.sleep(0.05)
+        if not p.is_alive():
+            logger.error("create new process error, retry")
+            p = ctx.Process(
+                target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol, shared_value)
+            )
+            p.start()
+    async_save_queue.append(p)
 
 
 class Trainer:
@@ -2208,6 +2278,11 @@ class Trainer:
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
         self.runtime_timer.start("checkpoint saving time")
+
+        if self.args.use_async_save:
+            # paddle.clear_async_save_task_queue()
+            clear_async_save_task_queue()
+
         # Save model checkpoint
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
 
@@ -2225,11 +2300,15 @@ class Trainer:
         # only save model state dict, ignore optimizer and scheduler
         if not self.args.ignore_save_lr_and_optim:
             optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+            saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
 
             if self.args.use_hybrid_parallel:
-                if self.dp_group.rank <= 0 or self.args.use_expert_parallel:
-                    os.makedirs(output_dir, exist_ok=True)
-                    logger.info("Saving optimizer files.")
+                if self.args.use_expert_parallel:
+                    self._save_ckpt_func(
+                        self._filter_moe_no_sync_optimizer_params(),
+                        os.path.join(output_dir, optimizer_name),
+                    )
+                elif self.dp_group.rank <= 0:
                     if self.args.unified_checkpoint:
                         save_unified_optimizer(
                             self.args,
@@ -2239,16 +2318,19 @@ class Trainer:
                             safe_serialization=True,
                         )
                     else:
-                        if self.dp_group.rank > 0:  # this should only work for MoE saving
-                            self._save_ckpt_func(
-                                self._filter_moe_no_sync_optimizer_params(),
-                                os.path.join(output_dir, optimizer_name),
+                        state_dict = self.optimizer.state_dict()
+                        save_path = os.path.join(output_dir, optimizer_name)
+                        if self.args.use_async_save:
+                            assert not strtobool(os.getenv("FLAG_LLM_PDC", "False")), "Dont support FLAG_LLM_PDC"
+                            async_save_optimizer(
+                                state_dict,
+                                save_path,
+                                saved_signal_path=saved_signal_path,
                             )
                         else:
-                            self._save_ckpt_func(
-                                self.optimizer.state_dict(),
-                                os.path.join(output_dir, optimizer_name),
-                            )
+                            self._save_ckpt_func(state_dict, save_path)
+                            with open(saved_signal_path, mode="w+") as f:
+                                f.write("1")
 
             if self.args.should_save or self.args.use_expert_parallel:
                 if not self.args.use_hybrid_parallel:
