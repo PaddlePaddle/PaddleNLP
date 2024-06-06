@@ -495,7 +495,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         num_key_value_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
                     ),
                     axis=-1,
-                )
+                ).transpose(1, 0)
             else:
                 unfused_state_dict = {}
                 unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
@@ -523,7 +523,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     )
                 )  # reshape(3, self.num_attention_heself.hidden_sizeads // self.config.tensor_parallel_degree, head_size, )
             if "llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx) in state_dict.keys():
-                ffn1_weight_tensor = np.concatenate(
+                concated_ffn1_weight = np.concatenate(
                     split_fn(state_dict["llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx)]), axis=-1
                 )
             else:
