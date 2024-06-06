@@ -525,8 +525,6 @@ class QWenPretrainedModel(PretrainedModel):
             base_actions = {
                 # Column Linear
                 "lm_head.weight": partial(fn, is_column=True),
-                "qwen.h.0.mlp.w2.weight": partial(fn, is_column=True),
-                "qwen.h.0.mlp.w1.weight": partial(fn, is_column=True),
                 "qwen.h.0.attn.c_attn.weight": partial(fn, is_column=True, is_naive_3fuse=True),
                 "qwen.h.0.attn.c_attn.bias": partial(fn, is_column=True, is_naive_3fuse=True),
                 # Row Linear
@@ -534,6 +532,15 @@ class QWenPretrainedModel(PretrainedModel):
                 "qwen.h.0.mlp.c_proj.weight": partial(fn, is_column=False),
                 "qwen.h.0.attn.c_proj.weight": partial(fn, is_column=False),
             }
+
+            if config.fuse_attention_ffn:
+                base_actions["layers.0.mlp.gate_up_fused_proj.weight"] = partial(
+                    fn, is_column=True, is_naive_2fuse=True
+                )
+            else:
+                base_actions["qwen.h.0.mlp.w2.weight"] = partial(fn, is_column=True)
+                base_actions["qwen.h.0.mlp.w1.weight"] = partial(fn, is_column=True)
+
             for key, action in base_actions.items():
                 if "h.0." in key:
                     for i in range(num_hidden_layers):
@@ -569,8 +576,8 @@ class QWenPretrainedModel(PretrainedModel):
                     f"h.{layer_index}.attn.c_attn.bias",
                 ],
                 [
-                    f"h.{layer_index}.attn.c_proj.weight",
-                    f"h.{layer_index}.attn.c_proj.weight",
+                    f"h.{layer_index}.attn.o_proj.weight",
+                    f"h.{layer_index}.attn.o_proj.weight",
                     "transpose",
                 ],
                 [
