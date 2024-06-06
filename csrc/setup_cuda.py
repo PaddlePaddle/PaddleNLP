@@ -65,6 +65,7 @@ setup(
             "./generation/rebuild_padding.cu",
             "./generation/transpose_removing_padding.cu",
             "./generation/write_cache_kv.cu",
+            "./generation/erase_cache_kv.cu",
             "./generation/encode_rotary_qk.cu",
             "./generation/get_padding_offset_v2.cu",
             "./generation/rebuild_padding_v2.cu",
