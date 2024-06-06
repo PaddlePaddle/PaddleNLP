@@ -47,6 +47,7 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
 from paddlenlp.transformers import LlamaConfig, LlamaPretrainedModel
+from paddlenlp.transformers.conversion_utils import split_param_func
 from paddlenlp.transformers.llama.modeling import LlamaLMHead
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -473,48 +474,66 @@ class LlamaInferenceModel(LlamaPretrainedModel):
     def set_state_dict(self, state_dict):
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
+        split_fn = split_param_func()
 
-        self.embed_tokens.weight.set_value(paddle.to_tensor(state_dict["llama.embed_tokens.weight"]))
-        self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"], dtype=self.norm.weight.dtype))
+        self.embed_tokens.weight.set_value(
+            paddle.to_tensor(state_dict["llama.embed_tokens.weight"]).cast(self.embed_tokens.weight.dtype)
+        )
+        self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"]).cast(self.norm.weight.dtype))
 
         for idx in range(self.config.num_hidden_layers):
             logger.info(f"set state for layer {idx}")
 
             if self.use_weight_only:
                 logger.info("weight only is enabled")
-            unfused_state_dict = {}
-            unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
-                "llama.layers.{}.self_attn.q_proj.weight".format(idx)
-            ]
-            unfused_state_dict["self_attn.k_proj.weight"] = state_dict[
-                "llama.layers.{}.self_attn.k_proj.weight".format(idx)
-            ]
-            unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
-                "llama.layers.{}.self_attn.v_proj.weight".format(idx)
-            ]
-
-            concated_qkv_weight = (
-                np.concatenate(
-                    [
-                        unfused_state_dict["self_attn.q_proj.weight"],
-                        unfused_state_dict["self_attn.k_proj.weight"],
-                        unfused_state_dict["self_attn.v_proj.weight"],
-                    ],
+            if "llama.layers.{}.self_attn.qkv_proj.weight".format(idx) in state_dict.keys():
+                concated_qkv_weight = np.concatenate(
+                    split_fn(
+                        state_dict["llama.layers.{}.self_attn.qkv_proj.weight".format(idx)],
+                        is_qkv=True,
+                        num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                        num_key_value_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                    ),
                     axis=-1,
                 )
-                .transpose(1, 0)
-                .reshape(
-                    3 * (self.num_attention_heads // self.config.tensor_parallel_degree) * (head_size),
-                    self.hidden_size,
+            else:
+                unfused_state_dict = {}
+                unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
+                    "llama.layers.{}.self_attn.q_proj.weight".format(idx)
+                ]
+                unfused_state_dict["self_attn.k_proj.weight"] = state_dict[
+                    "llama.layers.{}.self_attn.k_proj.weight".format(idx)
+                ]
+                unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
+                    "llama.layers.{}.self_attn.v_proj.weight".format(idx)
+                ]
+                concated_qkv_weight = (
+                    np.concatenate(
+                        [
+                            unfused_state_dict["self_attn.q_proj.weight"],
+                            unfused_state_dict["self_attn.k_proj.weight"],
+                            unfused_state_dict["self_attn.v_proj.weight"],
+                        ],
+                        axis=-1,
+                    )
+                    .transpose(1, 0)
+                    .reshape(
+                        3 * (self.num_attention_heads // self.config.tensor_parallel_degree) * (head_size),
+                        self.hidden_size,
+                    )
+                )  # reshape(3, self.num_attention_heself.hidden_sizeads // self.config.tensor_parallel_degree, head_size, )
+            if "llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx) in state_dict.keys():
+                ffn1_weight_tensor = np.concatenate(
+                    split_fn(state_dict["llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx)]), axis=-1
                 )
-            )  # reshape(3, self.num_attention_heself.hidden_sizeads // self.config.tensor_parallel_degree, head_size, )
-
-            unfused_state_dict["mlp.gate_proj.weight"] = state_dict["llama.layers.{}.mlp.gate_proj.weight".format(idx)]
-            unfused_state_dict["mlp.up_proj.weight"] = state_dict["llama.layers.{}.mlp.up_proj.weight".format(idx)]
-
-            concated_ffn1_weight = np.concatenate(
-                [unfused_state_dict["mlp.gate_proj.weight"], unfused_state_dict["mlp.up_proj.weight"]], axis=-1
-            )
+            else:
+                unfused_state_dict["mlp.gate_proj.weight"] = state_dict[
+                    "llama.layers.{}.mlp.gate_proj.weight".format(idx)
+                ]
+                unfused_state_dict["mlp.up_proj.weight"] = state_dict["llama.layers.{}.mlp.up_proj.weight".format(idx)]
+                concated_ffn1_weight = np.concatenate(
+                    [unfused_state_dict["mlp.gate_proj.weight"], unfused_state_dict["mlp.up_proj.weight"]], axis=-1
+                )
             ffn1_weight_tensor = paddle.to_tensor(concated_ffn1_weight)
 
             qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight)
@@ -534,7 +553,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     paddle.cast(paddle.to_tensor(concated_qkv_weight), "int8")
                 )
             else:
-                self.transformer_block.qkv_weights[idx].set_value(qkv_weight_tensor)
+                self.transformer_block.qkv_weights[idx].set_value(
+                    qkv_weight_tensor.cast(self.transformer_block.qkv_weights[idx].dtype)
+                )
 
             linear_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)])
             if self.use_weight_only:
@@ -556,7 +577,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     )
                 )
             else:
-                self.transformer_block.linear_weights[idx].set_value(linear_weight_tensor)
+                self.transformer_block.linear_weights[idx].set_value(
+                    linear_weight_tensor.cast(self.transformer_block.linear_weights[idx].dtype)
+                )
 
             if self.use_weight_only:
                 ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
@@ -572,7 +595,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     paddle.cast(paddle.to_tensor(concated_ffn1_weight).transpose((1, 0)), "int8")
                 )
             else:
-                self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight_tensor)
+                self.transformer_block.ffn1_weights[idx].set_value(
+                    ffn1_weight_tensor.cast(self.transformer_block.ffn1_weights[idx].dtype)
+                )
 
             ffn2_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
             if self.use_weight_only:
@@ -594,7 +619,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     )
                 )
             else:
-                self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
+                self.transformer_block.ffn2_weights[idx].set_value(
+                    ffn2_weight_tensor.cast(self.transformer_block.ffn2_weights[idx].dtype)
+                )
 
             if self.quant_type == "a8w8":
                 if self.shift_smooth_all_linears:
@@ -660,16 +687,14 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         )
 
             self.transformer_block.ln_scales[idx].set_value(
-                paddle.to_tensor(
-                    state_dict["llama.layers.{}.input_layernorm.weight".format(idx)],
-                    dtype=self.transformer_block.ln_scales[idx].dtype,
+                paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.weight".format(idx)]).cast(
+                    self.transformer_block.ln_scales[idx].dtype
                 )
             )
 
             self.transformer_block.ffn_ln_scales[idx].set_value(
-                paddle.to_tensor(
-                    state_dict["llama.layers.{}.post_attention_layernorm.weight".format(idx)],
-                    dtype=self.transformer_block.ffn_ln_scales[idx].dtype,
+                paddle.to_tensor(state_dict["llama.layers.{}.post_attention_layernorm.weight".format(idx)]).cast(
+                    self.transformer_block.ffn_ln_scales[idx].dtype
                 )
             )
 
@@ -1264,7 +1289,9 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         if "lm_head.weight" in state_dict:
-            self.lm_head.weight.set_value(state_dict["lm_head.weight"])
+            self.lm_head.weight.set_value(
+                paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
+            )
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
 
