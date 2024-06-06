@@ -326,8 +326,17 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                     if self.use_weight_only:
                         qkv_weight_tensor = paddle.transpose(qkv_weight_tensor, perm=[1, 0])
                         qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
-                            qkv_weight_tensor, algo=self.quant_algo
+                            qkv_weight_tensor.cuda(), algo=self.quant_algo
                         )
+                        a = qkv_quanted_weight_tensor.shape
+                        qkv_quanted_weight_tensor = qkv_quanted_weight_tensor.reshape([a[1], a[0]])
+                        qkv_quanted_weight_tensor = qkv_quanted_weight_tensor.transpose([1, 0]).contiguous()
+                        qkv_quanted_weight_tensor = (qkv_quanted_weight_tensor.astype("int32") + 128).astype("uint8")
+
+
+                        qkv_quanted_weight_tensor = qkv_quanted_weight_tensor.cpu()
+                        qkv_weight_scale_tensor = qkv_weight_scale_tensor.cpu()
+
                         self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
                         self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
                     else:
@@ -349,8 +358,17 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                     linear_weight_tensor = paddle.to_tensor(v)
                     if self.use_weight_only:
                         linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
-                            linear_weight_tensor, algo=self.quant_algo
+                            linear_weight_tensor.cuda(), algo=self.quant_algo
                         )
+                        a = linear_quanted_weight_tensor.shape
+                        linear_quanted_weight_tensor = linear_quanted_weight_tensor.reshape([a[1], a[0]])
+                        linear_quanted_weight_tensor = linear_quanted_weight_tensor.transpose([1, 0]).contiguous()
+                        linear_quanted_weight_tensor = (linear_quanted_weight_tensor.astype("int32") + 128).astype("uint8")
+
+
+                        linear_quanted_weight_tensor = linear_quanted_weight_tensor.cpu()
+                        linear_weight_scale_tensor = linear_weight_scale_tensor.cpu()
+
                         self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
                         self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
                     else:
@@ -365,8 +383,16 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                     ffn1_weight_tensor = paddle.to_tensor(v)
                     if self.use_weight_only:
                         ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
-                            ffn1_weight_tensor, algo=self.quant_algo
+                            ffn1_weight_tensor.cuda(), algo=self.quant_algo
                         )
+                        a = ffn1_quanted_weight_tensor.shape
+                        ffn1_quanted_weight_tensor = ffn1_quanted_weight_tensor.reshape([a[1], a[0]])
+                        ffn1_quanted_weight_tensor = ffn1_quanted_weight_tensor.transpose([1, 0]).contiguous()
+                        ffn1_quanted_weight_tensor = (ffn1_quanted_weight_tensor.astype("int32") + 128).astype("uint8")
+
+
+                        ffn1_quanted_weight_tensor = ffn1_quanted_weight_tensor.cpu()
+                        ffn1_weight_scale_tensor = ffn1_weight_scale_tensor.cpu()
                         self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
                         self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
                     else:
@@ -377,8 +403,17 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                     ffn2_weight_tensor = paddle.to_tensor(v)
                     if self.use_weight_only:
                         ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
-                            ffn2_weight_tensor, algo=self.quant_algo
+                            ffn2_weight_tensor.cuda(), algo=self.quant_algo
                         )
+                        
+                        a = ffn2_quanted_weight_tensor.shape
+                        ffn2_quanted_weight_tensor = ffn2_quanted_weight_tensor.reshape([a[1], a[0]])
+                        ffn2_quanted_weight_tensor = ffn2_quanted_weight_tensor.transpose([1, 0]).contiguous()
+                        ffn2_quanted_weight_tensor = (ffn2_quanted_weight_tensor.astype("int32") + 128).astype("uint8")
+
+
+                        ffn2_quanted_weight_tensor = ffn2_quanted_weight_tensor.cpu()
+                        ffn2_weight_scale_tensor = ffn2_weight_scale_tensor.cpu()
                         self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
                         self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
                     else:

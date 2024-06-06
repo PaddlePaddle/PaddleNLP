@@ -29,6 +29,7 @@ from paddle.nn.quant import weight_only_linear
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
+
 if is_paddlenlp_ops_available():
     from paddlenlp_ops import (
         dequant_int8,
@@ -975,10 +976,12 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             self._add_parameter(ffn2_weight_scale)
 
     def get_weight_create_dype(self):
-        return "int8"  # If use weightonly int4, params dtype is int8, and one of the dimension will be half.
+        return "uint8"  # If use weightonly int4, params dtype is int8, and one of the dimension will be half.
 
     def init_weight_shape(self, config):
         super().init_weight_shape(config)
+
+        self.qkv_weight_shape = [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim, self.embed_dim]
 
         self.linear_weight_shape = [self.embed_dim, self.num_heads * self.head_dim]
         self.ffn1_weight_shape = (
@@ -988,6 +991,13 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         )
         self.ffn2_weight_shape = [self.embed_dim, self.dim_feedforward]
 
+        # def haha(a):
+        #     return [a[1], a[0]]
+        # self.qkv_weight_shape = haha(self.qkv_weight_shape)
+        # self.linear_weight_shape = haha(self.linear_weight_shape)
+        # self.ffn1_weight_shape = haha(self.ffn1_weight_shape)
+        # self.ffn2_weight_shape = haha(self.ffn2_weight_shape)
+
         if config.weight_only_quant_bits == 4:
             self.qkv_weight_shape[0] //= 2
             self.linear_weight_shape[0] //= 2
@@ -995,6 +1005,19 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             self.ffn2_weight_shape[0] //= 2
 
     def compute_qkv_linear(self, ln_out, i):
+
+        if (isinstance(ln_out, tuple)):
+            tmp = ln_out[0].shape[-1]
+            ln_out = ln_out[0].reshape([-1,tmp])
+        else:
+            tmp = ln_out.shape[-1]
+            ln_out = ln_out.reshape([-1,tmp])
+        
+        a = paddle.incubate.tt.weight_only_int8(ln_out, self.qkv_weights[i], self.qkv_weights_scale[i], 
+                                                self.qkv_biases[i], bool_trans_w=True)
+        #a = triton_wint8(ln_out, self.qkv_weights[i], self.qkv_weights_scale[i], self.qkv_biases[i], bool_trans_w=True)
+        return a
+
         return weight_only_linear(
             ln_out,
             weight=self.qkv_weights[i],
@@ -1004,6 +1027,12 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         )
 
     def compute_out_linear(self, fmha_out, i):
+        a = paddle.incubate.tt.weight_only_int8(fmha_out, self.linear_weights[i], self.linear_weights_scale[i], 
+                                                None, bool_trans_w=True)
+        #a = triton_wint8(fmha_out, self.linear_weights[i], self.linear_weights_scale[i], None, bool_trans_w=True)
+        return a
+
+
         return weight_only_linear(
             fmha_out,
             weight=self.linear_weights[i],
@@ -1012,6 +1041,12 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         )
 
     def compute_ffn1(self, tmp_out, i):
+
+        a = paddle.incubate.tt.weight_only_int8(tmp_out, self.ffn1_weights[i], self.ffn1_weights_scale[i],
+                                                None, bool_trans_w=True)
+        #a = triton_wint8(tmp_out, self.ffn1_weights[i], self.ffn1_weights_scale[i], None, bool_trans_w=True)
+        return a
+
         return weight_only_linear(
             tmp_out,
             weight=self.ffn1_weights[i],
@@ -1020,6 +1055,12 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         )
 
     def compute_ffn2(self, ffn1_out, i):
+
+        a = paddle.incubate.tt.weight_only_int8(ffn1_out, self.ffn2_weights[i], self.ffn2_weights_scale[i],
+                                                None, bool_trans_w=True)
+        #a = triton_wint8(ffn1_out, self.ffn2_weights[i], self.ffn2_weights_scale[i], None, bool_trans_w=True)
+        return a
+
         return weight_only_linear(
             ffn1_out,
             weight=self.ffn2_weights[i],
@@ -1505,3 +1546,71 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
         return out_linear_out
+
+
+if __name__ == '__main__':
+
+    M = 4
+    K = 4096*4
+    N = 4096
+    activation = paddle.randn((M, K), dtype=paddle.float16)
+    original_weight = paddle.randn((K, N), dtype=paddle.float16)
+    from paddle.nn.quant import weight_quantize
+    perm_qweight, scale = weight_quantize(original_weight, algo="weight_only_int8")
+    bias = paddle.rand((N,), dtype=paddle.float16) * 10
+
+    no_perum_qweight = original_weight / scale.reshape([1, N])
+    no_perum_qweight = paddle.round(no_perum_qweight)
+    no_perum_qweight = paddle.clip(no_perum_qweight, min=-127, max=127)
+    no_perum_qweight = no_perum_qweight.astype("int8")
+
+    for i in range(100):
+        paddle_output = weight_only_linear(activation, 
+                                        perm_qweight,
+                                        bias,
+                                        scale,
+                                        "int8",)
+
+    # 下面是triton的计算代码
+    no_perum_qweight = no_perum_qweight.transpose([1,0]).contiguous()
+
+    import datetime
+    import time
+
+    warm_up_times = 5
+    repeat_times = 10
+
+    for i in range(100):
+        triton_output = matmul_dequantize_int8_s2(
+            activation,
+            no_perum_qweight,
+            scale,
+            bias, bool_trans_w=True)
+
+    paddle.device.cuda.synchronize()
+    starttime = datetime.datetime.now()
+    
+    for i in range(100):
+        triton_output = matmul_dequantize_int8_s2(
+            activation,
+            no_perum_qweight,
+            scale,
+            bias, bool_trans_w=True)
+    
+    paddle.device.cuda.synchronize()
+    endtime = datetime.datetime.now()
+    duringtime = endtime - starttime
+    time_ms = duringtime.seconds * 1000 + duringtime.microseconds / 1000.0
+    print("The whoel end to end time : ", time_ms, "ms")
+
+    no_perum_qweight = no_perum_qweight.transpose([1,0]).contiguous()
+
+    a = no_perum_qweight.astype("float16") * scale.reshape([1, N])
+    baseline = paddle.matmul(activation, a)
+    baseline += bias
+
+    print("triton_output", paddle.max(paddle.abs(triton_output - baseline)))
+    #print("triton_output", triton_output)
+    #print("baseline", baseline)
+
+
