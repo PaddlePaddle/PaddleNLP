@@ -46,7 +46,6 @@ from paddlenlp.utils.log import logger
 
 from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import linear_utils
-from .. import linear_utils
 from ..model_outputs import ModelOutput
 from .configuration import QWenConfig
 
