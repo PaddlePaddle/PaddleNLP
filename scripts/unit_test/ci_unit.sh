@@ -51,4 +51,4 @@ set_env() {
 
 install_requirements
 set_env
-pytest -v -n 8 --durations 20 --cov paddlenlp --cov-report xml:coverage.xml
+pytest -v -n 8 --durations 20

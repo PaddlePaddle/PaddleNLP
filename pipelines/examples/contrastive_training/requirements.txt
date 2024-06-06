@@ -1,5 +1,6 @@
 paddlenlp>2.6.1
 datasets
 torch==2.0.1
-mteb[beir]
+mteb
+beir
 typer==0.9.0
