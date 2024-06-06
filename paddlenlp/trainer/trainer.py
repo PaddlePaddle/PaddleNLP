@@ -81,6 +81,7 @@ try:
     from ..quantization.quantization_linear import QuantizationLinear
 except:
     QuantizationLinear = None
+from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
 from ..transformers.model_utils import (
     PretrainedModel,
     _add_variant,
@@ -404,7 +405,7 @@ class Trainer:
                 models=model,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
-                excluded_layers=QuantizationLinear,
+                excluded_layers=[QuantizationLinear] + self._decorate_exclude_layers(model),
             )
         # for pipeline mode and pure tensor parallel
         if self.args.pipeline_parallel_degree > 1 or (self.args.tensor_parallel_degree > 1 and self.sharding is None):
@@ -764,6 +765,8 @@ class Trainer:
                 trainable_numel = int(trainable_numel_tensor.item()) // self.args.dataset_world_size
                 if self.args.sep_parallel_degree > 0:
                     trainable_numel = trainable_numel // self.args.sep_parallel_degree
+                if self.args.context_parallel_degree > 0:
+                    trainable_numel = trainable_numel // self.args.context_parallel_degree
                 # the numel is roughly, because the tensor parallel still hold own bias or layer_norm weight without splited
                 # so, the trainable numel is a little bigger than real.
                 logger.debug(f"  Number of trainable parameters = {trainable_numel:,} (all devices, roughly)")
@@ -898,6 +901,8 @@ class Trainer:
             for step, inputs in enumerate(epoch_iterator):
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
+                if self.args.use_hybrid_parallel and self.args.context_parallel_degree > 1:
+                    inputs = split_inputs_sequence_dim_load_balance(inputs)
                 self.timers and self.timers("read-data").stop()
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
@@ -998,8 +1003,14 @@ class Trainer:
                     pipeline_parallel_config = (
                         set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
                     )
+                    sharding_parallel_config = (
+                        set(args.sharding_parallel_config.split(" ")) if args.sharding_parallel_degree > 1 else set()
+                    )
                     enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
-                    enable_release_grads = "enable_release_grads" in pipeline_parallel_config
+                    enable_release_grads = (
+                        "enable_release_grads" in pipeline_parallel_config
+                        or "enable_release_grads" in sharding_parallel_config
+                    )
 
                     # Case 3: Pipeline parallel mode, overlap with dp
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
@@ -1058,11 +1069,12 @@ class Trainer:
                     if optimizer_was_run:
                         self.lr_scheduler.step()
 
-                    if enable_release_grads and args.pipeline_parallel_degree > 1:
+                    if enable_release_grads:
                         self.optimizer.clear_grad(set_to_zero=False)
-                        for _, buffers in model._chunk_2_comm_buffers.items():
-                            for buffer in buffers:
-                                buffer._clear_grad_storage()
+                        if args.pipeline_parallel_degree > 1:
+                            for _, buffers in model._chunk_2_comm_buffers.items():
+                                for buffer in buffers:
+                                    buffer._clear_grad_storage()
                     else:
                         self.optimizer.clear_grad()
 
@@ -1728,6 +1740,17 @@ class Trainer:
         except (NameError, AttributeError, TypeError):  # no dataset or length, estimate by length of dataloader
             return len(dataloader) * self.args.per_device_train_batch_size
 
+    def _decorate_exclude_layers(self, model: nn.Layer):
+        """
+        Exclude layers from the model for paddle.amp.decorate.
+        Args:
+            model (`nn.Layer`): The model to exclude layers from.
+        Returns:
+            A list of excluded layers.
+        """
+        exclude_layers = []
+        return exclude_layers
+
     def _wrap_model(self, model, training=True):
 
         # train/eval could be run multiple-times - if already wrapped, don't re-wrap it again
@@ -1747,7 +1770,7 @@ class Trainer:
                 optimizers=self.optimizer,
                 level=self.args.fp16_opt_level,
                 dtype=self.amp_dtype,
-                excluded_layers=QuantizationLinear,
+                excluded_layers=[QuantizationLinear] + self._decorate_exclude_layers(model),
             )
 
             if self.optimizer is None:
@@ -1765,6 +1788,7 @@ class Trainer:
         in_sharding_parallel_mode = self.sharding is not None
         in_tensor_parallel_mode = self.args.tensor_parallel_degree > 1
         in_sep_parallel_mode = self.args.sep_parallel_degree > 1
+        in_cp_parallel_mode = self.args.context_parallel_degree > 1
 
         # Multi-gpu training
         if (
@@ -1775,6 +1799,7 @@ class Trainer:
                 or in_sharding_parallel_mode
                 or in_tensor_parallel_mode
                 or in_sep_parallel_mode
+                or in_cp_parallel_mode
             )
         ):
             model = paddle.DataParallel(model)
@@ -1901,7 +1926,7 @@ class Trainer:
         if (
             not in_pipeline_parallel_mode
             and not in_sharding_parallel_mode
-            and (in_tensor_parallel_mode or in_sep_parallel_mode)
+            and (in_tensor_parallel_mode or in_sep_parallel_mode or in_cp_parallel_mode)
         ):
             if self.args.amp_master_grad:
                 mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
