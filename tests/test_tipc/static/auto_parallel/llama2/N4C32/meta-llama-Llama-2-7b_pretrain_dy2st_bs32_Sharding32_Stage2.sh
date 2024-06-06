@@ -13,10 +13,10 @@
 # limitations under the License.
 
 param="model_item=meta-llama-Llama-2-7b_pretrain_dy2st "
-param+="run_mode=Sharding_Stage1 "
-param+="device_num=N1C8 "
-param+="global_batch_size=8 "
-param+="nnodes=1 "
+param+="run_mode=Sharding_Stage2 "
+param+="device_num=N4C32 "
+param+="global_batch_size=32 "
+param+="nnodes=4 "
 param+="model_type=llama2_7b "
 
 cd ./tests
