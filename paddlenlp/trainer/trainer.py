@@ -1795,17 +1795,8 @@ class Trainer:
         in_cp_parallel_mode = self.args.context_parallel_degree > 1
 
         # Multi-gpu training
-        if (
-            self.args.world_size > 1
-            and not self.args.use_hybrid_parallel
-            or not (
-                in_pipeline_parallel_mode
-                or in_sharding_parallel_mode
-                or in_tensor_parallel_mode
-                or in_sep_parallel_mode
-                or in_cp_parallel_mode
-            )
-        ):
+        if self.args.world_size > 1 and (not self.args.use_hybrid_parallel):
+            # MOE use DDP to broadcaset parameters.
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
 
