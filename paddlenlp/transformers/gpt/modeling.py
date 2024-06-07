@@ -133,8 +133,8 @@ def seed_guard_context(name=None):
         # todo fix it
         #  ValueError: Length of gpu state list should be equal to the gpu device count
         #  /usr/local/lib/python3.10/dist-packages/paddle/incubate/framework/random.py:119: ValueError
-        return contextlib.nullcontext()
-        # return get_rng_state_tracker().rng_state(name)
+        # return contextlib.nullcontext()
+        return get_rng_state_tracker().rng_state(name)
     else:
         return contextlib.nullcontext()
 
