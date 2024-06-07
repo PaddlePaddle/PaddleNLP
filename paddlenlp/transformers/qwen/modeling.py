@@ -160,7 +160,7 @@ class QWenAttention(nn.Layer):
                 has_bias=True,
                 gather_output=False,
             )
-            self.o_proj = RowParallelLinear(
+            self.c_proj = RowParallelLinear(
                 config.hidden_size,
                 self.projection_size,
                 has_bias=False,
@@ -168,10 +168,10 @@ class QWenAttention(nn.Layer):
             )
         else:
             self.c_attn = nn.Linear(config.hidden_size, 3 * self.projection_size, bias_attr=True)
-            self.o_proj = nn.Linear(
+            self.c_proj = nn.Linear(
                 config.hidden_size,
                 self.projection_size,
-                bias_attr=False,
+                bias_attr=not config.no_bias,
             )
 
         if config.rotary_pct == 1.0:
@@ -377,7 +377,7 @@ class QWenAttention(nn.Layer):
 
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
-        attn_output = self.o_proj(attn_output)
+        attn_output = self.c_proj(attn_output)
         outputs = (attn_output, present)
         if output_attentions:
             outputs += (attn_weight,)
@@ -576,8 +576,8 @@ class QWenPretrainedModel(PretrainedModel):
                     f"h.{layer_index}.attn.c_attn.bias",
                 ],
                 [
-                    f"h.{layer_index}.attn.o_proj.weight",
-                    f"h.{layer_index}.attn.o_proj.weight",
+                    f"h.{layer_index}.attn.c_proj.weight",
+                    f"h.{layer_index}.attn.c_proj.weight",
                     "transpose",
                 ],
                 [
