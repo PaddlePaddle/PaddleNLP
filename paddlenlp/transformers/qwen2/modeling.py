@@ -772,7 +772,7 @@ class Qwen2PretrainedModel(PretrainedModel):
             num_attention_heads=config.num_attention_heads,
         )
 
-        def get_tensor_parallel_split_mappings(num_layers, num_experts):
+        def get_tensor_parallel_split_mappings(num_layers):
             final_actions = {}
 
             base_actions = {
@@ -796,6 +796,10 @@ class Qwen2PretrainedModel(PretrainedModel):
                 base_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
                 base_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
 
+            base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.mlp.down_proj.weight"] = partial(fn, is_column=False)
+
             for key, action in base_actions.items():
                 if "layers.0." in key:
                     for i in range(num_layers):
@@ -804,7 +808,7 @@ class Qwen2PretrainedModel(PretrainedModel):
 
             return final_actions
 
-        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers, config.num_experts)
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
         return mappings
 
