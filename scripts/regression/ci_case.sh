@@ -1112,4 +1112,15 @@ else
 fi
 
 }
+ring_flash_attention(){
+cd ${nlp_dir}
+echo "test ring_flash_attention, cudaid1:${cudaid1}, cudaid2:${cudaid2}"
+if [[ ${cudaid1} != ${cudaid2} ]]; then
+    time (python -m paddle.distributed.launch tests/transformers/test_ring_flash_attention.py >${log_path}/ring_flash_attention) >>${log_path}/ring_flash_attention 2>&1
+    print_info $? ring_flash_attention
+else
+    echo "only one gpu:${cudaid1} is set, skip test"
+fi
+
+}
 $1
