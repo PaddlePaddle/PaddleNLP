@@ -18,6 +18,7 @@
 
 import collections
 import contextlib
+import gc
 import inspect
 import math
 import os
@@ -164,6 +165,7 @@ OPTIMIZER_NAME = "optimizer.pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
 
+gc_interval = 100
 
 if is_datasets_available():
     import datasets
@@ -1066,6 +1068,10 @@ class Trainer:
                     )
 
                     self.state.global_step += 1
+
+                    if self.state.global_step % gc_interval == 0:
+                        gc.collect()
+
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
