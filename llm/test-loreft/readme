@@ -1,0 +1,12 @@
+# Reft-Loreft  
+
+## 1. 训练emojy对话机器人
+    python train_emoj.py
+
+## 2. 推理
+    python predict_emoj.py
+
+## 3. 干预方法：loreft + 数据集： commonse + 模型： llama2-7b
+    python train.py
+
+    

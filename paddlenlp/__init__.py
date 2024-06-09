@@ -43,6 +43,7 @@ from . import (
     metrics,
     ops,
     peft,
+    reft,
     prompt,
     quantization,
     seq2vec,
