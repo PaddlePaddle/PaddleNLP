@@ -16,8 +16,6 @@
 # This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers
 
-import collections
-import copy
 import os
 from typing import Any, Optional
 
@@ -27,6 +25,11 @@ import paddle.distributed as dist
 from paddle.distributed import fleet
 
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.nested import (
+    nested_broadcast_tensor,
+    nested_empty_tensor,
+    nested_reduce_tensor,
+)
 
 __all__ = [
     "distributed_concat",
@@ -180,52 +183,6 @@ def distributed_file(filename):
         return filename
 
 
-TensorHolder = collections.namedtuple("TensorHolder", ["shape", "dtype", "name"])
-
-
-def nested_reduce_tensor(tensor):
-    if isinstance(tensor, dict):
-        # copy tensor since it will be inplace modified dict
-        tensor = copy.copy(tensor)
-        for key in list(tensor.keys()):
-            tensor[key] = nested_reduce_tensor(tensor[key])
-    if isinstance(tensor, (tuple, list)):
-        return type(tensor)(nested_reduce_tensor(t) for t in tensor)
-
-    if isinstance(tensor, paddle.Tensor):
-        return TensorHolder(tensor.shape, tensor.dtype, tensor.name)
-
-    return tensor
-
-
-def nested_empty_tensor(tensor):
-    if isinstance(tensor, dict):
-        for key in list(tensor.keys()):
-            tensor[key] = nested_empty_tensor(tensor[key])
-    if isinstance(tensor, list):
-        return type(tensor)(nested_empty_tensor(t) for t in tensor)
-
-    # TensorHolder is tuple
-    if isinstance(tensor, TensorHolder):
-        t = paddle.empty(tensor.shape, dtype=tensor.dtype, name=tensor.name)
-        t.name = tensor.name
-        return t
-
-    return tensor
-
-
-def nested_broadcast_tensor(tensor, src=0, group=None):
-    if isinstance(tensor, dict):
-        for key in list(tensor.keys()):
-            tensor[key] = nested_broadcast_tensor(tensor[key], src=src, group=group)
-    if isinstance(tensor, list):
-        return type(tensor)(nested_broadcast_tensor(t, src=src, group=group) for t in tensor)
-
-    if isinstance(tensor, paddle.Tensor):
-        paddle.distributed.broadcast(tensor, src=src, group=group, sync_op=True)
-    return tensor
-
-
 def broadcast_dp_optimizer(state_dict):
     if paddle.distributed.get_world_size() <= 1:
         return state_dict
@@ -268,4 +225,63 @@ def broadcast_dp_optimizer(state_dict):
 
     state_dict = nested_broadcast_tensor(state_dict, src=src_rank, group=dp_group)
 
+    return state_dict
+
+
+def broadcast_moe_optimizer(state_dict, broadcast_dp=True):
+
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        dp_group = hcg.get_data_parallel_group()
+        src_rank = hcg.get_data_parallel_group_src_rank()
+        data_parallel_rank = hcg.get_data_parallel_rank()
+        # Don't broadcast optimizer for dp rank is 1.
+        if dp_group.nranks <= 1:
+            return state_dict
+    except:
+        dp_group = None
+        src_rank = 0
+        data_parallel_rank = 0
+
+    def _broadcast_moe_optimizer_state(state_dict):
+        # boardcast_keys
+        base_state_dict = {"master_weights": {}}
+        buf = [
+            {i: j.shape for i, j in state_dict.items() if i not in ["master_weights", "LR_Scheduler"]},
+            {i: j.shape for i, j in state_dict["master_weights"].items()},
+            {"LR_Scheduler": state_dict.get("LR_Scheduler", {})},
+        ]
+
+        dist.broadcast_object_list(buf, src=src_rank, group=dp_group)
+        # logger.info(f"moe-optimizer-gather-keys{buf}")
+        for k, s in buf[0].items():
+            v = state_dict.get(k, paddle.zeros(s, "float32")).cuda()
+            v.name = k
+            # k = k.replace("_fp32_master_0", "")
+            dist.broadcast(v, src=src_rank, group=dp_group)
+            logger.info(f"broadcast moe optimizer {k} from {src_rank}")
+            base_state_dict[k] = v.cpu()
+        for k, s in buf[1].items():
+            v = state_dict["master_weights"].get(k, paddle.zeros(s, "float32")).cuda()
+            v.name = k
+            dist.broadcast(v, src=src_rank, group=dp_group)
+            logger.info(f"broadcast moe optimizer-master_weights {k} from {src_rank}")
+            base_state_dict["master_weights"][k] = v.cpu()
+        base_state_dict.update(buf[2])
+        return base_state_dict
+
+    if broadcast_dp:
+        base_state_dict = broadcast_dp_optimizer(state_dict)
+    else:
+        base_state_dict = _broadcast_moe_optimizer_state(state_dict)
+    if data_parallel_rank > 0:
+        master_weight = state_dict.pop("master_weights", {})
+        base_state_dict.update(state_dict)
+        if master_weight:
+            if "master_weights" in base_state_dict:
+                base_state_dict["master_weights"].update(master_weight)
+            else:
+                base_state_dict["master_weights"] = master_weight
+        state_dict = base_state_dict
+        del base_state_dict
     return state_dict

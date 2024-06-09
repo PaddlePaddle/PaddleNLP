@@ -161,6 +161,7 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     config_class = GPTConfig
 
     _get_tensor_parallel_mappings = GPTPretrainedModel._get_tensor_parallel_mappings
+    _get_fuse_or_split_param_mappings = GPTPretrainedModel._get_fuse_or_split_param_mappings
     _init_weights = GPTPretrainedModel._init_weights
 
     pretrained_init_configuration = GPTPretrainedModel.pretrained_init_configuration

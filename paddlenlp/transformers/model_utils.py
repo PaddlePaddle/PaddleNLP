@@ -109,9 +109,11 @@ def unwrap_optimizer(optimizer, optimizer_instances=()):
 
 if is_safetensors_available():
 
-    from safetensors import safe_open
+    # from safetensors import safe_open
     from safetensors.numpy import load_file as safe_load_file
     from safetensors.numpy import save_file as safe_save_file
+
+    from paddlenlp.utils.safetensors import fast_safe_open as safe_open
 
 
 def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
@@ -313,7 +315,7 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 
 
 def load_state_dict(
-    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None
+    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None, device="cpu"
 ):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
@@ -346,11 +348,16 @@ def load_state_dict(
                         weight = tensor_parallel_split_mapping[key](py_safe_slice_)
                     else:
                         weight = py_safe_slice_[:]
+                    if device == "expected":
+                        with device_guard():
+                            weight = paddle.Tensor(weight, zero_copy=True)
+                        weight = weight._copy_to(paddle.framework._current_expected_place(), False)
                     state_dict[key] = weight
 
-            for k in list(state_dict.keys()):
-                with device_guard():
-                    state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+            if device == "cpu":
+                for k in list(state_dict.keys()):
+                    with device_guard():
+                        state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
 
             return state_dict
 
@@ -672,8 +679,10 @@ def load_sharded_checkpoint(model, folder, variant=None, strict=True, prefer_saf
     return missing_keys, unexpected_keys
 
 
-def faster_set_state_dict(model, state_dict):
+def faster_set_state_dict(model, state_dict, strict_dtype=True):
     # the state_dict will be destroied.
+    unused_keys = set(state_dict.keys())
+    unset_keys = set(model.state_dict().keys())
     with paddle.no_grad():
         for k, v in model.state_dict().items():
             if k in state_dict:
@@ -683,8 +692,10 @@ def faster_set_state_dict(model, state_dict):
                         f"faster_set_state_dict need state dict with paddle.Tensor, but got {type(v_new)}"
                     )
                 # 2. cast param / Tensor to dtype
+                #
                 if v.dtype != v_new.dtype:
-                    raise ValueError(f"for key: {k}, expect dtype {v.dtype}, but got {v_new.dtype}")
+                    if strict_dtype or (not v.is_floating_point() or not v_new.is_floating_point()):
+                        raise ValueError(f"for key: {k}, expect dtype {v.dtype}, but got {v_new.dtype}")
                 # check shape
                 if list(v.shape) != list(v_new.shape):
                     raise ValueError(f"for key: {k}, expect shape {v.shape}, but got {v_new.shape}")
@@ -700,9 +711,22 @@ def faster_set_state_dict(model, state_dict):
                 else:
                     new_t = v_new
 
+                if not strict_dtype and v.dtype != new_t.dtype:
+                    new_t = new_t.astype(v.dtype)
+
                 # 4. share Tensor to origin param / Tensor
                 src_tensor = new_t.value().get_tensor()
                 dst_tensor._share_data_with(src_tensor)
+                unset_keys.remove(k)
+                unused_keys.remove(k)
+
+    error_msgs = []
+    # if len(unset_keys) > 0:
+    #    error_msgs.append(f"Those weight of model is not initialized: {list(unset_keys)}")
+    if len(unused_keys) > 0:
+        error_msgs.append(f"Those state dict keys are not using in model: {list(unused_keys)}")
+
+    return error_msgs
 
 
 def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
@@ -734,9 +758,8 @@ def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
     def is_0d_or_1d(tensor):
         return len(tensor.shape) == 0 or list(tensor.shape) == [1]
 
-    expected_place = paddle.framework._current_expected_place()
     for key, value in model_to_load.state_dict().items():
-        if key in state_dict:
+        if key in list(state_dict.keys()):
             if isinstance(state_dict[key], np.ndarray):
                 raise ValueError(
                     "convert_state_dict_dtype expected paddle.Tensor not numpy.ndarray, plase convert numpy.ndarray to paddle.Tensor"
@@ -744,12 +767,7 @@ def _convert_state_dict_dtype_and_shape(state_dict, model_to_load):
             # confirm parameter cast is executed on the same device as model
             # TODO: cast(FP32 -> FP16) has diff on different devices, need to fix it
             if state_dict[key].is_floating_point() and state_dict[key].dtype != value.dtype:
-                value_pop = state_dict.pop(key)
-                value_new_place = (
-                    value_pop if value_pop.place == expected_place else value_pop._copy_to(expected_place, False)
-                )
-                state_dict[key] = paddle.cast(value_new_place, value.dtype)._copy_to(value_pop.place, False)
-                del value_new_place
+                state_dict[key] = paddle.cast(state_dict.pop(key), value.dtype)
             # unified 0d and 1d tensor
             if is_0d_or_1d(value) and is_0d_or_1d(state_dict[key]):
                 if list(value.shape) != list(state_dict[key].shape):
@@ -779,7 +797,7 @@ def _load_state_dict_into_meta_model(
 
     dtype = convert_np_dtype_to_dtype_(dtype)
     error_msgs = []
-
+    model_state_dict = model.state_dict()
     for param_name, param in state_dict.items():
         # First part of the test is always true as loaded_state_dict_keys always contains state_dict keys.
         if param_name not in loaded_state_dict_keys or param_name not in expected_keys:
@@ -814,7 +832,7 @@ def _load_state_dict_into_meta_model(
             if old_param is not None:
                 param = param.astype(dtype=old_param.dtype)
         with paddle.no_grad():
-            model.state_dict()[param_name].get_tensor()._share_data_with(param.value().get_tensor())
+            model_state_dict[param_name].get_tensor()._share_data_with(param.value().get_tensor())
             param.value().get_tensor()._clear()
     return error_msgs
 
@@ -1822,6 +1840,25 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         del state_dict[checkpoint_key]
             return mismatched_keys
 
+        def _fuse_or_split_keys(
+            state_dict, config, loaded_keys, pre_tensor_parallel_split=False, resume_state_dict=None
+        ):
+            if resume_state_dict is not None:
+                state_dict.update(resume_state_dict)
+
+            before_fuse_keys = list(state_dict.keys())
+            if pre_tensor_parallel_split:
+                tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
+            else:
+                tp_actions = None
+            state_dict, resume_state_dict = cls.convert_fuse_and_split(config, state_dict, tp_actions)
+            after_fuse_keys = list(state_dict.keys())
+
+            fused_keys = list(set(before_fuse_keys) - set(after_fuse_keys))
+            new_keys = list(set(after_fuse_keys) - set(before_fuse_keys))
+
+            return state_dict, resume_state_dict, fused_keys, new_keys
+
         if state_dict is not None:
             # DONT Hold tensor parallel here, only hold afer load state dict.
             # Whole checkpoint
@@ -1830,6 +1867,16 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
 
             state_dict = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
+
+            # have loaded all state_dict, no resume state_dict
+            state_dict, _, fused_keys, new_keys = _fuse_or_split_keys(
+                state_dict,
+                config,
+                loaded_keys,
+                pre_tensor_parallel_split=True if config.tensor_parallel_degree > 1 else False,
+            )
+            missing_keys = list(set(missing_keys) - set(new_keys))
+            unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
 
             mismatched_keys = _find_mismatched_keys(
                 state_dict,
@@ -1862,7 +1909,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             error_msgs = []
             mismatched_keys = []
-
+            resume_state_dict = {}
             if len(resolved_archive_file) > 1:
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
@@ -1871,17 +1918,46 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if (
                     shard_file.endswith(".safetensors")
                     and config.tensor_parallel_degree > 1
-                    and "tp" not in shard_file
+                    and "tp" not in os.path.split(shard_file)[-1]
                 ):
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
-                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
+                    tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys, ignore_error=True)
                 # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
+                filter_dict_keys = set(expected_keys)
+                fuse_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=True)
+                split_actions, _ = cls.get_fuse_or_split_param_convert_actions(config, loaded_keys, is_fuse=False)
+                for k in list(fuse_actions.keys()):
+                    need_add_except_key = k[-1] in expected_keys
+                    if need_add_except_key:
+                        filter_dict_keys |= set(k[:-1])
+                for k in list(split_actions.keys()):
+                    need_add_except_key = False
+                    for item in k[:-1]:
+                        if item in expected_keys:
+                            need_add_except_key = True
+                            break
+                    if need_add_except_key:
+                        filter_dict_keys.add(k[-1])
+
+                if config.quantization_config.is_weight_quantize():
+                    filter_dict_keys = None
+
                 state_dict = load_state_dict(
-                    shard_file,
-                    tp_actions if pre_tensor_parallel_split else None,
-                    None if config.quantization_config.is_weight_quantize() else set(expected_keys),
+                    shard_file, tp_actions if pre_tensor_parallel_split else None, filter_dict_keys
                 )
+
+                # convert for fusing or splitting weights
+                state_dict, resume_state_dict, fused_keys, new_keys = _fuse_or_split_keys(
+                    state_dict,
+                    config,
+                    loaded_keys,
+                    pre_tensor_parallel_split=pre_tensor_parallel_split,
+                    resume_state_dict=resume_state_dict,
+                )
+                missing_keys = list(set(missing_keys) - set(new_keys))
+                unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
+
                 if config.quantization_config.is_weight_quantize():
                     state_dict = convert_to_quantize_state_dict(
                         state_dict,

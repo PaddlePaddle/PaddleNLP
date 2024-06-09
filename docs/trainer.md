@@ -521,6 +521,20 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance.
                         Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported.
 
+  --tensor_parallel_config
+                        对于张量并行,一些选项会影响训练性能,这里将一些选项配置集中管理,以str形式传入配置.
+                        支持如下选项:
+                            enable_delay_scale_loss : 在优化器阶段做梯度累加，将所有梯度除以累加次数，而不是直接对loss除以累加次数。
+                            sync_param : 在优化器阶段使用broadcast同步所有is_distributed=False的参数
+                            sync_grad : 在优化器阶段使用broadcast同步所有is_distributed=False的梯度
+                            sync_moment : 在优化器阶段使用broadcast同步所有is_distributed=False的momentum
+
+                        Some additional config it highly affect the usage of tensor parallel, we provide some option to config it.
+                        following config is support:
+                            enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
+                            sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
+                            sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
+                            sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.
 
   --pipeline_parallel_degree
                         流水线并行是Megatron论文针对多层Transformer结构提出的按层划分方法.
@@ -549,7 +563,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         following config is support:
                           disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape.
                           disable_partial_send_recv, optmize send speed for tensor parallel.
-                          enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
+                          enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
                           enable_dp_comm_overlap, fuse data parallel gradient communication.
 
   --data_parallel_config
@@ -562,7 +576,15 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         following config is support:
                             enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in data_parallel, which improve the performance. ONLY supported for auto mode now.
                             gradient_sync_after_accumulate, move gradient sync operations from backward into optimizer step when gradient accumulate enabling, which reduce the sync times to improve performance, but will increase the memory usage. ONLY supported for auto mode now.
-
+  --context_parallel_degree
+                        上下文并行是将训练数据在序列维度进行切分的并行方法。
+                        该方法使用Ring FlashAttention来保障切分后Attention结果的正确性。通过环状通信和迭代更新来得到完整的注意力分数。
+                        默认值-1, 表示不启用上下文并行,
+                        (`int`, 可选, 默认为 `-1`)
+                        (注: 该方法需要修改模型结构, 目前支持LLAMA)
+                        (注: 该方法对通信开销较大, 建议只有在序列长度超长时, 如1024k, 时才使用)
+                        Context parallelism is a parallel method that segments training data in the sequence dimension.
+                        This method uses Ring FlashAttention to ensure the correctness of the Attention result after segmentation. The complete attention score is obtained through ring communication and iterative updates.
   --recompute
                         是否使用重计算训练。可以节省显存。
                         重新计算前向过程以获取梯度，减少中间变量显存.
@@ -704,5 +726,9 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                        是否在优化器中使用flatten_param_grads策略，该策略将素有参数摊平后输入Optimizer更新。目前该策略仅在NPU设备上生效。（可选，默认为False）
                        Whether use flatten_param_grads method in optimizer,
                        only used on NPU devices.(default:False)
+
+  --use_expert_parallel
+                       Whether to enable MoE (Mixture of Experts) expert parallel training.
+                       (default: False)
 
 ```

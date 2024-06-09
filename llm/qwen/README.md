@@ -11,6 +11,9 @@
 | qwen/qwen-7b-chat |
 | qwen/qwen-14b     |
 | qwen/qwen-14b-chat|
+| qwen/qwen-72b     |
+| qwen/qwen-72b-chat|
+| qwen/qwen1.5-moe-a2.7b|
 
 ## 2. 模型精调
 请参考[LLM全流程工具介绍](../README.md)

@@ -398,6 +398,14 @@ def do_train(args):
                     next_sentence_labels,
                     masked_lm_scale,
                 ) = batch
+                input_ids = input_ids.cuda(blocking=False)
+                segment_ids = segment_ids.cuda(blocking=False)
+                input_mask = input_mask.cuda(blocking=False)
+                masked_lm_positions = masked_lm_positions.cuda(blocking=False)
+                masked_lm_labels = masked_lm_labels.cuda(blocking=False)
+                next_sentence_labels = next_sentence_labels.cuda(blocking=False)
+                masked_lm_scale = masked_lm_scale.cuda(blocking=False)
+
                 with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=["layer_norm", "softmax", "gelu", "fused_attention", "fused_feedforward"],
@@ -424,6 +432,10 @@ def do_train(args):
                     optimizer.step()
                 lr_scheduler.step()
                 optimizer.clear_grad()
+
+                # NOTE: For accurate data statistics, please open the comments below，especially when args.logging_steps==1.
+                # if global_step % args.logging_steps == 0:
+                #     loss = loss.numpy()
                 total_samples += args.batch_size
                 train_run_cost = time.time() - batch_start
                 train_cost_avg.record(train_run_cost)

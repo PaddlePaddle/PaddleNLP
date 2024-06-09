@@ -57,8 +57,8 @@ def get_parser():
         "--device",
         type=str,
         default="gpu",
-        choices=["cpu", "eval_pathgpu", "xpu", "npu"],
-        help="select cpu, gpu, xpu devices.",
+        choices=["cpu", "gpu", "xpu", "npu", "gcu"],
+        help="select cpu, gpu, xpu, gcu devices.",
     )
     parser.add_argument(
         "--dtype",
@@ -67,7 +67,12 @@ def get_parser():
         choices=["bfloat16", "float16", "float32"],
         help="set the dtype of model",
     )
-
+    parser.add_argument(
+        "--use_flash_attention",
+        type=bool,
+        default=False,
+        help="Whether to use flash attention",
+    )
     # load autodist name files, eg: bloom-176b
     parser.add_argument("--load_autodist", action="store_true", help="whether load auto-dist wieght file")
 
@@ -244,7 +249,8 @@ def get_tokens(tokenizer, text, strict=True):
     last_token = text.split()[-1]
     start_idx = text.rfind(last_token)
     beginning_tokens = tokenizer(text[:start_idx].strip())["input_ids"]
-    last_token = tokenizer(" " + last_token)["input_ids"]
+    all_tokens = tokenizer(text.strip())["input_ids"]
+    last_token = all_tokens[len(beginning_tokens) :]
     return beginning_tokens, last_token
 
 
@@ -271,7 +277,7 @@ def create_eval_dataset(args):
         with open(args.eval_path, "r") as f:
             for line in f.readlines():
                 text = json.loads(line)["text"]
-                tokens, labels = get_tokens(tokenizer, text, strict=False)
+                tokens, labels = get_tokens(tokenizer, text, strict=True)
                 tokenized_data.append(tokens)
                 tokenized_label.append(labels)
         val_dataset = Lambada_Eval_Dataset(tokenized_data, tokenized_label, seq_len, tokenizer.pad_token_id)
@@ -316,49 +322,40 @@ def do_generation():
         tensor_parallel_output=False,
         tensor_parallel_degree=args.tensor_parallel_degree,
         tensor_parallel_rank=paddle.distributed.get_rank(),
-        use_flash_attention=False,
+        use_flash_attention=args.use_flash_attention,
         dtype=args.dtype,  # todo enable set dtype to avoid additional mem usage
     )
 
     model.eval()
-    args.use_pure_fp16 = False
-
     total_score = 0
     score_name = "loss" if not args.cloze_eval else "number correct"
-    args.use_pure_fp16 = False
     eval_data_loader = create_eval_dataset(args)
     with paddle.no_grad():
         for step, batch in enumerate(eval_data_loader):
 
             tokens, loss_mask = batch[:2]
             labels = batch[-1]
-            with paddle.amp.auto_cast(args.use_pure_fp16):
-                if args.model_type == "bloom":
-                    preds = model(tokens).detach()
-                else:
-                    preds = model(tokens)[0].detach()
-                # print(preds)
+            preds = model(tokens, return_dict=True).logits.detach()
+            # cast preds to float32 to keep high-precision
+            preds = preds.astype(paddle.float32)
 
-                # cast preds to float32 to keep high-precision
-                preds = preds.astype(paddle.float32)
+            if not args.cloze_eval:
+                masked_lm_loss = paddle.nn.functional.cross_entropy(preds, labels, reduction="none")
+                loss = paddle.sum(masked_lm_loss * loss_mask)
+                total_score += float(loss) / (args.num_tokenized_tokens - 1)
+            else:
+                outputs = paddle.argmax(preds, -1)
+                acc = paddle.cast(outputs == labels, "float32")
+                acc = paddle.where(paddle.cast(loss_mask, "bool"), acc, paddle.ones_like(acc))
+                acc = paddle.sum(paddle.prod(acc, -1))
+                total_score += float(acc)
 
-                if not args.cloze_eval:
-                    masked_lm_loss = paddle.nn.functional.cross_entropy(preds, labels, reduction="none")
-                    loss = paddle.sum(masked_lm_loss * loss_mask)
-                    total_score += float(loss) / (args.num_tokenized_tokens - 1)
-                else:
-                    outputs = paddle.argmax(preds, -1)
-                    acc = paddle.cast(outputs == labels, "float32")
-                    acc = paddle.where(paddle.cast(loss_mask, "bool"), acc, paddle.ones_like(acc))
-                    acc = paddle.sum(paddle.prod(acc, -1))
-                    total_score += float(acc)
-
-                if step % args.logging_steps == 0:
-                    logger.info(
-                        "step %d, batch: %d, %s: %f, speed: %.2f step/s"
-                        % (step, step, score_name, total_score, args.logging_steps / (time.time() - tic_eval))
-                    )
-                    tic_eval = time.time()
+            if step % args.logging_steps == 0:
+                logger.info(
+                    "step %d, batch: %d, %s: %f, speed: %.2f step/s"
+                    % (step, step, score_name, total_score, args.logging_steps / (time.time() - tic_eval))
+                )
+                tic_eval = time.time()
 
     if not args.cloze_eval:
         total_loss = float(total_score)
