@@ -576,7 +576,15 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         following config is support:
                             enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in data_parallel, which improve the performance. ONLY supported for auto mode now.
                             gradient_sync_after_accumulate, move gradient sync operations from backward into optimizer step when gradient accumulate enabling, which reduce the sync times to improve performance, but will increase the memory usage. ONLY supported for auto mode now.
-
+  --context_parallel_degree
+                        上下文并行是将训练数据在序列维度进行切分的并行方法。
+                        该方法使用Ring FlashAttention来保障切分后Attention结果的正确性。通过环状通信和迭代更新来得到完整的注意力分数。
+                        默认值-1, 表示不启用上下文并行,
+                        (`int`, 可选, 默认为 `-1`)
+                        (注: 该方法需要修改模型结构, 目前支持LLAMA)
+                        (注: 该方法对通信开销较大, 建议只有在序列长度超长时, 如1024k, 时才使用)
+                        Context parallelism is a parallel method that segments training data in the sequence dimension.
+                        This method uses Ring FlashAttention to ensure the correctness of the Attention result after segmentation. The complete attention score is obtained through ring communication and iterative updates.
   --recompute
                         是否使用重计算训练。可以节省显存。
                         重新计算前向过程以获取梯度，减少中间变量显存.
