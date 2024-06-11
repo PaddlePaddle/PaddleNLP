@@ -41,7 +41,6 @@ from paddlenlp.utils.log import logger
 
 
 def compute_metrics(eval_preds):
-
     flattened_preds = np.array(eval_preds.predictions).flatten()
     flattened_labels = np.array(eval_preds.label_ids).flatten()
     filtered_preds = flattened_preds[flattened_labels != -100]
@@ -157,9 +156,21 @@ def get_lora_target_modules(model):
             ".*k_proj.*",
             ".*v_proj.*",
             ".*o_proj.*",
+            # ".*gate.*", # TODO(DrownFish19): Does the gate weight require training?
             ".*w1.*",
             ".*w2.*",
             ".*w3.*",
+        ]
+    elif model.base_model_prefix == "qwen2_moe":
+        target_modules = [
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*o_proj.*",
+            # ".*gate.*", # TODO(DrownFish19): Does the gate weight require training?
+            ".*gate_proj.*",
+            ".*up_proj.*",
+            ".*down_proj.*",
         ]
     else:
         raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}.")
