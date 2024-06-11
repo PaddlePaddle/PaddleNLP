@@ -27,7 +27,7 @@ from paddle.distributed import fleet
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
 
-from paddlenlp.datasets import InTokensIterableDataset
+from paddlenlp.datasets import ZeroPaddingIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
 from paddlenlp.transformers import (
@@ -177,7 +177,7 @@ def get_lora_target_modules(model):
     return target_modules
 
 
-class InTokensIterDatasetCallback(TrainerCallback):
+class ZeroPaddingIterDatasetCallback(TrainerCallback):
     """
     A [`TrainerCallback`] that handles early stopping.
 
@@ -185,19 +185,19 @@ class InTokensIterDatasetCallback(TrainerCallback):
 
     def on_step_end(self, args, state, control, **kwargs):
         train_dataloader = kwargs["train_dataloader"]
-        if isinstance(train_dataloader.dataset, InTokensIterableDataset):
+        if isinstance(train_dataloader.dataset, ZeroPaddingIterableDataset):
             dataset = train_dataloader.dataset
         elif isinstance(train_dataloader.dataset, IterableDatasetShard) and isinstance(
-            train_dataloader.dataset.dataset, InTokensIterableDataset
+            train_dataloader.dataset.dataset, ZeroPaddingIterableDataset
         ):
             dataset = train_dataloader.dataset.dataset
         else:
             raise ValueError(
-                "Unexpected dataset format: InTokensIterDatasetCallback expectes `paddlenlp.datasets.InTokensIterableDataset`"
+                "Unexpected dataset format: ZeroPaddingIterDatasetCallback expectes `paddlenlp.datasets.ZeroPaddingIterableDataset`"
             )
         if state.trial_params is None:
             state.trial_params = {}
-        state.trial_params["intokens_global_step"] = dataset.intokens_global_step
+        state.trial_params["zero_padding_global_step"] = dataset.zero_padding_global_step
 
 
 class CausalLMTrainer(Trainer):

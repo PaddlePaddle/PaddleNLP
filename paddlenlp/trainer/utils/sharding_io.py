@@ -321,12 +321,13 @@ class ShardingIO:
         node_model_state = reshard_pp(node_model_state)
         return reshard_sharding(node_model_state)
 
-    def manipulate_state_dict_and_config(self, model_to_save, merge_tensor_parallel=False):
+    def manipulate_state_dict_and_config(self, model_to_save, merge_tensor_parallel=False, state_dict=None):
         weight_name_suffix = self.args.sharded_name_suffix()
 
-        state_dict = model_to_save.state_dict()
-        if self.args.should_save_sharding_stage1_model:
-            state_dict = filter_sharded_params(state_dict, self.optimizer, self.sharding_group)
+        if state_dict is None:
+            state_dict = model_to_save.state_dict()
+            if self.args.should_save_sharding_stage1_model:
+                state_dict = filter_sharded_params(state_dict, self.optimizer, self.sharding_group)
 
         config_to_save = None
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
@@ -384,7 +385,7 @@ class ShardingIO:
 
         path = os.path.join(dir, MODEL_META_NAME)
         with open(path, "w") as f:
-            json.dump(model_meta, f, indent=4)
+            json.dump(model_meta, f)
 
     def _get_distributed_strategy(self):
         pp_degree = 1
@@ -544,13 +545,18 @@ class ShardingIO:
             pp_overlap = unwrap_optimizer(self.optimizer, DygraphShardingOptimizerV2).pp_overlap
 
         model = self.model
-        structure_name_mapping = {k: v.name for (k, v) in model.state_dict().items()}
+        structure_name_mapping = {}
+        param_meta = {}
+        for k, v in model.state_dict().items():
+            structure_name_mapping[k] = v.name
+            param_meta[k] = (v.shape, int(v.dtype))
 
         sharding_metas = {}
         sharding_meta = {}
 
         sharding_meta["param2rank"] = param2rank
         sharding_meta["structure_name_mapping"] = structure_name_mapping
+        sharding_meta["param_meta"] = param_meta
         sharding_meta["sharding_strategy"] = sharding_strategy
         sharding_meta["enable_overlap"] = pp_overlap
         suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
