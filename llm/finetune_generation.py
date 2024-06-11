@@ -49,6 +49,7 @@ from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
     AutoTokenizer,
     Llama3Tokenizer,
     LlamaTokenizer,
@@ -174,12 +175,11 @@ def main():
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
-        from paddlenlp.transformers import AutoModelForCausalLMPipe
 
         model_class = AutoModelForCausalLMPipe
 
     if not training_args.autotuner_benchmark:
-        model = AutoModelForCausalLM.from_pretrained(
+        model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,
             from_aistudio=model_args.from_aistudio,
