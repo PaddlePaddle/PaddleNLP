@@ -135,3 +135,12 @@ class ChatGLMConfig(PretrainedConfig):
         self.long_sequence_strategy_name = long_sequence_strategy_name
         self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
         self.use_long_sequence_strategies = use_long_sequence_strategies
+
+        self.register_nonsaveable_keys(
+            [
+                "long_sequence_strategy_type",
+                "long_sequence_strategy_name",
+                "long_sequence_init_args",
+                "use_long_sequence_strategies",
+            ]
+        )
