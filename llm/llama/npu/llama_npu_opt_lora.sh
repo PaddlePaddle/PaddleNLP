@@ -34,7 +34,7 @@ python -u  -m paddle.distributed.launch \
     --log_dir "./lora_bf16_llama_N1C8" \
     ../../finetune_generation.py \
     --device "npu" \
-    --model_name_or_path "meta-llama/Llama-2-13b" \
+    --model_name_or_path "meta-llama/Llama-2-13b-chat" \
     --dataset_name_or_path "data/" \
     --output_dir "./output/lora_bf16_llama_N1C8" \
     --per_device_train_batch_size 2 \

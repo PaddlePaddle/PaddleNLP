@@ -271,6 +271,7 @@ class LlmMetaConfig:
         ),
         # sep_parallel
         ("sep_parallel_degree", int, 1, "sep_parallel_degree"),
+        ("context_parallel_degree", int, 1, "context_parallel_degree"),
         ("sequence_parallel", bool, False, "Whether to use sequence parallel"),
         ("fuse_sequence_parallel_allreduce", bool, False, "Whether to use fuse sequence parallel allreduce"),
     ]
