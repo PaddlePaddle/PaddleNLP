@@ -41,7 +41,7 @@
 | Qwen/Qwen1.5-MoE-A2.7B-Chat |
 
 
-[通义千问（Qwen2）](https://qwenlm.github.io/blog/qwen1.5/) 是阿里云研发的通义千问系列模型升级版。Qwen1.5包括0.5B、1.8B、4B、7B、14B、32B、72B、110B和MoE共计9个不同规模的Base和Chat模型。
+[通义千问（Qwen2）](https://qwenlm.github.io/blog/qwen1.5/) 是阿里云研发的通义千问系列模型升级版。Qwen2包括0.5B、1.5B、7B、72B和MoE共计5个不同规模的Base和Chat模型。
 **支持模型权重:**
 | Model (qwen2)                |
 |------------------------------|
