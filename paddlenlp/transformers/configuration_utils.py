@@ -541,7 +541,14 @@ class PretrainedConfig:
     def __getattribute__(self, key):
         if key != "attribute_map" and key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
-        return super().__getattribute__(key)
+        if key == "__dict__":
+            # Fix for rewrite to_dict method, pop from calling self.__dict__
+            ret = super().__getattribute__(key)
+            if "_nonsavable_keys" in ret:
+                del ret["_nonsavable_keys"]
+            return ret
+        else:
+            return super().__getattribute__(key)
 
     def __getitem__(self, key):
         return getattr(self, key, None)
@@ -1046,8 +1053,6 @@ class PretrainedConfig:
             output["model_type"] = self.__class__.model_type
         if "_auto_class" in output:
             del output["_auto_class"]
-        if "_nonsavable_keys" in output:
-            del output["_nonsavable_keys"]
 
         # PaddleNLP version when serializing the model
         output["paddlenlp_version"] = __version__
@@ -1060,7 +1065,8 @@ class PretrainedConfig:
 
             output[key] = value
 
-        if saving_file:
+        # Fix for rewrited from_pretrained method, hasattr
+        if saving_file and hasattr(self, "_nonsavable_keys"):
             for key in list(output.keys()):
                 if key in self._nonsavable_keys:
                     output.pop(key)
