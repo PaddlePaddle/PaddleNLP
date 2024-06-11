@@ -1005,11 +1005,10 @@ class PPOTrainer(Trainer):
         return policy_model, value_model
 
     def get_epoch_iterator(self):
-
         def gen_epoch_data():
             for prompt_only_batch, ptx_batch in zip(
-                    self.prompt_only_dataloader,
-                    itertools.cycle(self.ptx_dataloader),
+                self.prompt_only_dataloader,
+                itertools.cycle(self.ptx_dataloader),
             ):
                 # generate batches
                 self.set_eval()
@@ -1037,10 +1036,11 @@ class PPOTrainer(Trainer):
 
             def __len__(self):
                 return len(self.prompt_only_dataloader) * (
-                    self.args.update_iters *
-                    self.args.per_device_prompt_batch_size *
-                    self.args.num_return_sequences //
-                    self.args.per_device_train_batch_size)
+                    self.args.update_iters
+                    * self.args.per_device_prompt_batch_size
+                    * self.args.num_return_sequences
+                    // self.args.per_device_train_batch_size
+                )
 
         return EpochIterator()
 
@@ -1051,10 +1051,13 @@ class PPOTrainer(Trainer):
         len_dataloader = None
         if not self._is_iterable_dataset(self.train_dataset):
             len_dataloader = len(train_dataloader)
-            num_train_sub_steps = (len_dataloader * self.args.update_iters *
-                                   self.args.per_device_prompt_batch_size *
-                                   self.args.num_return_sequences //
-                                   self.args.per_device_train_batch_size)
+            num_train_sub_steps = (
+                len_dataloader
+                * self.args.update_iters
+                * self.args.per_device_prompt_batch_size
+                * self.args.num_return_sequences
+                // self.args.per_device_train_batch_size
+            )
             num_update_steps_per_epoch = num_train_sub_steps // args.gradient_accumulation_steps
             num_examples = len(self.train_dataset)
             if args.max_steps > 0:
@@ -1116,18 +1119,15 @@ class PPOTrainer(Trainer):
 
         if self.use_ptx:
             with guard_set_args(
-                    args,
+                args,
                 {
-                    "per_device_train_batch_size":
-                    1 if getattr(self.ptx_dataset, "is_intokens", False) else
-                    self.args.per_device_prompt_batch_size *
-                    self.args.num_return_sequences
+                    "per_device_train_batch_size": 1
+                    if getattr(self.ptx_dataset, "is_intokens", False)
+                    else self.args.per_device_prompt_batch_size * self.args.num_return_sequences
                 },
             ), guard_set_args(
-                    self, {
-                        "train_dataset": self.ptx_dataset,
-                        "data_collator": self.ptx_dataset.get_collator()
-                    }):
+                self, {"train_dataset": self.ptx_dataset, "data_collator": self.ptx_dataset.get_collator()}
+            ):
                 self.ptx_dataloader = self.get_train_dataloader()
         else:
             self.ptx_dataloader = range(100)
@@ -1205,10 +1205,13 @@ class PPOTrainer(Trainer):
                     if self.use_ptx:
                         logger.info("Doing ptx step...")
                         self.timers and self.timers("ptx_step").start()
-                        with guard_set_args(self._model_config, {
+                        with guard_set_args(
+                            self._model_config,
+                            {
                                 # "set_attn_func": True,
                                 # "use_flash_attention": True
-                        }):
+                            },
+                        ):
                             ptx_info = self.ptx_step(ptx_batch)
                         rl_info.update(ptx_info)
                         self.timers and self.timers("ptx_step").stop()
@@ -1299,13 +1302,8 @@ class PPOTrainer(Trainer):
             max=self.clip_range_score,
         )
         # TODO(guosheng): use scatter_add/put_along_axis
-        index = paddle.cumsum(sequence_mask.cast(paddle.int64),
-                              axis=-1).argmax(-1, keepdim=True)
-        rewards = paddle.put_along_axis(rewards,
-                                        index,
-                                        reward_clip.unsqueeze(axis=-1),
-                                        axis=-1,
-                                        reduce="add")
+        index = paddle.cumsum(sequence_mask.cast(paddle.int64), axis=-1).argmax(-1, keepdim=True)
+        rewards = paddle.put_along_axis(rewards, index, reward_clip.unsqueeze(axis=-1), axis=-1, reduce="add")
         # batch_size = log_probs.shape[0]
         # for i in range(batch_size):
         #     # print("="*20, sequence_mask[i])
