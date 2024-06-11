@@ -94,6 +94,10 @@ class ConfigurationUtilsTest(unittest.TestCase):
         str_config = str(config)
         assert "tensor_parallel_degree" in str_config
 
+        config.test_nonsave = "test"
+        config.test_nonsave_2 = "test"
+        config.register_nonsaveable_keys(["test_nonsave"])
+
         with tempfile.TemporaryDirectory() as tp:
             config.save_pretrained(tp)
             import json
@@ -106,6 +110,8 @@ class ConfigurationUtilsTest(unittest.TestCase):
             assert (
                 "quantization_config" in loaded_config and "quant_type" in loaded_config["quantization_config"]
             ), "missing quantization_config"
+            assert "test_nonsave" not in loaded_config
+            assert "test_nonsave_2" in loaded_config
 
     def test_parse_config_and_model_with_single_config(self):
         config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)

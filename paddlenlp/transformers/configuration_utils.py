@@ -231,6 +231,7 @@ def set_expected_keys(config, llm_meta, kwargs):
 def llmmetaclass(cls):
     # https://github.com/python/cpython/blob/2b091b9aa9a6ca5e2a34654dde909c5bdfc52fa8/Lib/dataclasses.py#L970C31-L970C46
     llm_meta = LlmMetaConfig._get_all_meta()
+
     for name, datatype, default_value, comment in llm_meta:
         if not hasattr(cls, name):
             value = field(
@@ -555,6 +556,8 @@ class PretrainedConfig:
         kwargs = attribute_map(self, kwargs=kwargs)
         kwargs.pop("transformers_version", None)
         llm_meta = LlmMetaConfig._get_defaults()
+        self._nonsavable_keys = LlmMetaConfig._get_nonsavable_keys()
+
         kwargs = set_expected_keys(self, llm_meta, kwargs)
         if self.sequence_parallel:
             assert (
@@ -1022,18 +1025,14 @@ class PretrainedConfig:
 
         return serializable_config_dict
 
-    def register_nonsaveable_keys(self):
+    def register_nonsaveable_keys(self, keys):
         # Save: not save it in any case
         # Print: show it if non defalut value
-        # if saving: pop(keys) else: pass
-        # nonsavable_keys = LlmMetaConfig._get_nonsavable_keys()
-        pass
-
-    def register_nonsaveable_default_keys(self):
-        # Save: not save it for defalut value
-        # Print: show it if non defalut value
-
-        pass
+        if type(keys) == list or type(keys) == tuple:
+            for key in keys:
+                self._nonsavable_keys.add(key)
+        else:
+            self._nonsavable_keys.add(keys)
 
     def to_dict(self, saving_file=False) -> Dict[str, Any]:
         """
@@ -1047,6 +1046,8 @@ class PretrainedConfig:
             output["model_type"] = self.__class__.model_type
         if "_auto_class" in output:
             del output["_auto_class"]
+        if "_nonsavable_keys" in output:
+            del output["_nonsavable_keys"]
 
         # PaddleNLP version when serializing the model
         output["paddlenlp_version"] = __version__
@@ -1060,9 +1061,8 @@ class PretrainedConfig:
             output[key] = value
 
         if saving_file:
-            nonsavable_keys = LlmMetaConfig._get_nonsavable_keys()
             for key in list(output.keys()):
-                if key in nonsavable_keys:
+                if key in self._nonsavable_keys:
                     output.pop(key)
 
         if hasattr(self, "quantization_config"):
@@ -1093,6 +1093,7 @@ class PretrainedConfig:
             config_dict = self.to_diff_dict(saving_file=saving_file)
         else:
             config_dict = self.to_dict(saving_file=saving_file)
+
         return json.dumps(config_dict, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
     def to_json_file(self, json_file_path: Union[str, os.PathLike], use_diff: bool = True, saving_file=True):
