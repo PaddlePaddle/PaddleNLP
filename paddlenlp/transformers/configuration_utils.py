@@ -544,6 +544,7 @@ class PretrainedConfig:
         if key == "__dict__":
             # Fix for rewrite to_dict method, pop from calling self.__dict__
             ret = super().__getattribute__(key)
+            ret = copy.deepcopy(ret)
             if "_nonsavable_keys" in ret:
                 del ret["_nonsavable_keys"]
             return ret
