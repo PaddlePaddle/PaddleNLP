@@ -569,7 +569,12 @@ class Trainer:
                 base_weight_name=weight_name,
                 model_wrapped=self.model_wrapped,
             )
-            self.model.set_state_dict(state_dict)
+            old_state_dict = self.model.state_dict()
+            new_state_dict = {}
+            for k, v in state_dict.items():
+                if k not in old_state_dict or id(v) != id(old_state_dict[k]):
+                    new_state_dict[k] = v
+            self.model.set_state_dict(new_state_dict)
         else:
             if resume_from_checkpoint is not None and (self.args.dataset_rank == 0 or self.args.use_expert_parallel):
 
@@ -891,7 +896,8 @@ class Trainer:
 
             npu_accelerate_plugin(self.optimizer)
 
-        self.timers and self.timers("read-data").start()
+        if self.args.ignore_data_skip:
+            self.timers and self.timers("read-data").start()
 
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
@@ -907,7 +913,9 @@ class Trainer:
                     inputs = split_inputs_sequence_dim(inputs)
                 if self.args.use_hybrid_parallel and self.args.context_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim_load_balance(inputs)
-                self.timers and self.timers("read-data").stop()
+                if self.args.ignore_data_skip:
+                    self.timers and self.timers("read-data").stop()
+
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
 
@@ -1098,7 +1106,9 @@ class Trainer:
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
-                self.timers and self.timers("read-data").start()
+
+                if self.args.ignore_data_skip:
+                    self.timers and self.timers("read-data").start()
 
             if step < 0:
                 logger.warning(
@@ -2462,10 +2472,15 @@ class Trainer:
                 if state_dict is None:
                     state_dict = self.model.state_dict()
 
-                self._save_ckpt_func(
-                    state_dict,
-                    os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)),
-                )
+                if self.args.should_save_sharding_stage1_model:
+                    state_dict, _, _ = self.sharding_io.manipulate_state_dict_and_config(
+                        unwrap_model(self.model), merge_tensor_parallel=False, state_dict=state_dict
+                    )
+                    variant = _add_variant(PADDLE_WEIGHTS_NAME, self.args.sharded_name_suffix())
+                else:
+                    variant = _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)
+
+                self._save_ckpt_func(state_dict, os.path.join(output_dir, variant))
         else:
             if isinstance(self.model, PretrainedModel) and self.args.should_save_sharding_stage1_model:
                 config_to_save = None
