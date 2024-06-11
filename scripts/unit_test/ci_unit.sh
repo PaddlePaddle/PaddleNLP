@@ -30,10 +30,10 @@ install_requirements() {
     python -m pip install -r requirements-dev.txt
     python -m pip install -r tests/requirements.txt
     python -m pip install -r paddlenlp/experimental/autonlp/requirements.txt 
-    python -m pip uninstall paddlepaddle -y
+    python -m pip uninstall paddlepaddle paddlepaddle_gpu -y
     python -m pip install --no-cache-dir ${paddle}
 
-    python setup.py bdist_wheel
+    python setup.py bdist_wheel > /dev/null
     python -m pip install  dist/p****.whl
     cd csrc/
     python setup_cuda.py install
@@ -51,4 +51,8 @@ set_env() {
 
 install_requirements
 set_env
-pytest -v -n 8 --durations 20 --cov paddlenlp --cov-report xml:coverage.xml
+pytest -v -n 8 \
+  --dist loadgroup \
+  --retries 1 --retry-delay 1 \
+  --timeout 200 --durations 20 \
+  --cov paddlenlp --cov-report xml:coverage.xml

@@ -10,10 +10,7 @@ exclude = ['.flake8']
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q --dist loadgroup"
-retries = 0
-retry_delay = 0.5
-timeout = 200
+addopts = "-ra -q "
 pythonpath = ["."]
 testpaths = [
     "tests/data",
@@ -25,7 +22,7 @@ testpaths = [
     "tests/layers",
     "tests/metrics",
     "tests/ops",
-    # "tests/trainer",
+    "tests/trainer",
     "tests/transformers",
     "tests/peft",
     "tests/prompt",

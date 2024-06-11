@@ -43,6 +43,8 @@ class QWenConfig(PretrainedConfig):
         use_flash_attention=False,
         use_fused_rms_norm=False,
         use_fused_rope=False,
+        fuse_attention_ffn=False,
+        sequence_parallel=False,
         intermediate_size=22016,
         tensor_parallel_output=True,
         no_bias=True,
@@ -77,6 +79,8 @@ class QWenConfig(PretrainedConfig):
         self.use_flash_attention = use_flash_attention
         self.use_fused_rms_norm = use_fused_rms_norm
         self.use_fused_rope = use_fused_rope
+        self.fuse_attention_ffn = fuse_attention_ffn
+        self.sequence_parallel = sequence_parallel
         self.no_bias = no_bias
 
         self.long_sequence_strategy_type = long_sequence_strategy_type
