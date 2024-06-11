@@ -81,7 +81,7 @@ from ..data import (
     DistDataLoader,
     default_data_collator,
 )
-from ..peft import LoRAModel, PrefixModelForCausalLM, VeRAModel
+from ..peft import LoRAModel, PrefixModelForCausalLM
 
 try:
     from ..quantization.quantization_linear import QuantizationLinear
@@ -2514,7 +2514,7 @@ class Trainer:
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
         # peft model
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM) or isinstance(self.model, VeRAModel):
+        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,

@@ -14,5 +14,5 @@
 
 from .lora import LoRAConfig, LoRAModel
 from .prefix import PrefixConfig, PrefixModelForCausalLM
-from .vera import VeRAConfig, VeRAModel
+
 

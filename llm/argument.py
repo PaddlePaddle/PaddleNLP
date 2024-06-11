@@ -199,7 +199,7 @@ class ModelArgument:
     pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
 
     # vera related parameters
-    vera: bool = field(default=False, metadata={"help": "Whether to use vera technique"})
+    # vera: bool = field(default=False, metadata={"help": "Whether to use vera technique"})
 
 
     # prefix tuning related parameters
