@@ -51,4 +51,8 @@ set_env() {
 
 install_requirements
 set_env
-pytest -v -n 8 --timeout 200 --durations 20 --cov paddlenlp --cov-report xml:coverage.xml
+pytest -v -n 8 \
+  --dist loadgroup \
+  --retries 1 --retry-delay 1 \
+  --timeout 200 --durations 20 \
+  --cov paddlenlp --cov-report xml:coverage.xml
