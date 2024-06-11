@@ -65,7 +65,12 @@ void InvokeTransposeRemovePadding(const T* input_data,
                                   const int head_dim,
                                   const int token_num,
                                   const int* padding_offset,
-                                  cudaStream_t cu_stream) {
+#ifdef PADDLE_WITH_HIP
+                                  hipStream_t cu_stream
+#else
+                                  cudaStream_t cu_stream
+#endif
+                                  ) {
   // [batch_size, num_head, max_len_this_time, head_dim] -> [token_num, num_head,
   // head_dim]
   constexpr int VEC_16B = 16;

@@ -14,8 +14,13 @@
 
 #include "helper.h"
 
+#ifdef PADDLE_WITH_HIP
+constexpr int32_t WARP_SIZE = 64; 
+constexpr int32_t HALF_WARP = 32; 
+#else
 constexpr int32_t WARP_SIZE = 32; 
 constexpr int32_t HALF_WARP = 16; 
+#endif
 constexpr float QUANT_MAX_BOUND = 127.0;
 constexpr float QUANT_MIN_BOUND = -127.0;
 
@@ -47,7 +52,7 @@ struct MaxFunc{
 template<>
 struct MaxFunc<half>{
   __device__ half operator()(half a, half b){
-#if __CUDA_ARCH__ >= 800
+#if (__CUDA_ARCH__ >= 800) || defined(PADDLE_WITH_HIP)
     return __hmax(a, b); 
 #else
     return max(static_cast<float>(a), static_cast<float>(b));
@@ -55,6 +60,14 @@ struct MaxFunc<half>{
   }
 }; 
 
+#ifdef PADDLE_WITH_HIP
+template<>
+struct MaxFunc<hip_bfloat16>{
+  __device__ hip_bfloat16 operator()(hip_bfloat16 a, hip_bfloat16 b){
+    return static_cast<hip_bfloat16>(max(static_cast<float>(a), static_cast<float>(b)));
+  }
+}; 
+#else
 template<>
 struct MaxFunc<__nv_bfloat16>{
   __device__ __nv_bfloat16 operator()(__nv_bfloat16 a, __nv_bfloat16 b){
@@ -65,6 +78,7 @@ struct MaxFunc<__nv_bfloat16>{
 #endif
   }
 }; 
+#endif
 
 template<typename T>
 struct AbsFunc{
@@ -76,7 +90,7 @@ struct AbsFunc{
 template<>
 struct AbsFunc<half>{
   __device__ half operator()(half x){
-  #if __CUDA_ARCH__ >= 800
+  #if (__CUDA_ARCH__ >= 800) || defined(PADDLE_WITH_HIP)
     return __habs(x); 
   #else
     return abs(static_cast<float>(x));
@@ -84,6 +98,14 @@ struct AbsFunc<half>{
   }
 }; 
 
+#ifdef PADDLE_WITH_HIP
+template<>
+struct AbsFunc<hip_bfloat16>{
+  __device__ hip_bfloat16 operator()(hip_bfloat16 x) {
+    return static_cast<hip_bfloat16>(abs(static_cast<float>(x)));
+  }
+}; 
+#else
 template<>
 struct AbsFunc<__nv_bfloat16>{
   __device__ __nv_bfloat16 operator()(__nv_bfloat16 x){
@@ -94,6 +116,7 @@ struct AbsFunc<__nv_bfloat16>{
   #endif
   }
 }; 
+#endif
 
 template <typename T, typename Vec, int VecSize>
 __inline__ __device__ T LocalReduceMax(Vec& vec) {
@@ -109,7 +132,11 @@ template <typename T>
 __inline__ __device__ T WarpReduceAbsMax(T val, unsigned lane_mask) {
   #pragma unroll
   for (int mask = HALF_WARP; mask > 0; mask >>= 1){
+#ifdef PADDLE_WITH_HIP
+    val = MaxFunc<T>()(val, static_cast<T>(__shfl_xor(static_cast<float>(val), mask, WARP_SIZE)));
+#else
     val = MaxFunc<T>()(val, __shfl_xor_sync(lane_mask, val, mask, WARP_SIZE));
+#endif
   }
   return val;
 }
@@ -147,7 +174,7 @@ __global__ void write_cache_k_int8_kernel(const T* k, const int64_t num_head, co
     InVec abs_max_vec;
 #pragma unroll
     for (int i = 0; i < VecSize; ++i) {
-      abs_max_vec[i] = 0.0f;
+      abs_max_vec[i] = static_cast<T>(0.0f);
     }
 
     T local_abs_max;
@@ -205,7 +232,7 @@ __global__ void write_cache_v_int8_kernel(const T* v, const int64_t num_head, co
     InVec abs_max_vec;
   #pragma unroll
     for (int i = 0; i < VecSize; ++i) {
-      abs_max_vec[i] = 0.0f;
+      abs_max_vec[i] = static_cast<T>(0.0f);
     }
 
     T local_abs_max;
