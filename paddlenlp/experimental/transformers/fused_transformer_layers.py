@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import paddle
 import paddle.distributed as dist
-from paddle.framework import LayerHelper, in_dynamic_mode, core
+from paddle.framework import LayerHelper, core, in_dynamic_mode
 from paddle.incubate.nn.functional import (
     fused_layer_norm,
     fused_rms_norm,
@@ -28,14 +28,14 @@ from paddle.nn.quant import weight_only_linear
 
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
-from paddlenlp_ops import rebuild_padding_v2
-
 
 if not is_paddlenlp_ops_available():
     logger.warning(
         "The paddlenlp_ops package is not installed. you can read the docs and install it by hand, "
         "you can refer to: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
     )
+
+from paddlenlp_ops import rebuild_padding_v2
 
 if core.is_compiled_with_cuda():
     from paddlenlp_ops import (
@@ -1350,8 +1350,8 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__(config)
         if not core.is_compiled_with_cuda():
-            self.cache_k_per_batch_maxs = paddle.full(shape=[10, 6], fill_value=0, dtype='float32')
-            self.cache_v_per_batch_maxs = paddle.full(shape=[10, 6], fill_value=0, dtype='float32')
+            self.cache_k_per_batch_maxs = paddle.full(shape=[10, 6], fill_value=0, dtype="float32")
+            self.cache_v_per_batch_maxs = paddle.full(shape=[10, 6], fill_value=0, dtype="float32")
 
     def compute_attn(
         self,

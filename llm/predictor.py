@@ -652,7 +652,7 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
             config.enable_custom_device(predictor_args.device, device_id)
         elif predictor_args.device == "xpu":
             raise ValueError(
-                "you should export xpu static model with --block_attn flag and use predictor with --block_attn too" 
+                "you should export xpu static model with --block_attn flag and use predictor with --block_attn too"
                 "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/inference.md"
             )
         else:
@@ -925,7 +925,9 @@ class BlockInferencePredictorMixin:
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
         for i, text in enumerate(source):
-            add_special_tokens = self.tokenizer.chat_template is None or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)) 
+            add_special_tokens = self.tokenizer.chat_template is None or isinstance(
+                self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)
+            )
             add_special_tokens = add_special_tokens if not self.benchmark else False
             tokens = self.tokenizer(
                 text,
@@ -1087,10 +1089,9 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
             config.set_xpu_device_id(device_id)
             xpu_config = paddle.inference.XpuConfig()
             xpu_config.device_id = device_id
-            xpu_config.l3_size = 63*1024*1024
-            xpu_config.l3_autotune_size = 63*1024*1024
+            xpu_config.l3_size = 63 * 1024 * 1024
+            xpu_config.l3_autotune_size = 63 * 1024 * 1024
             config.set_xpu_config(xpu_config)
-            config.enable_new_executor()
         else:
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
             config.enable_use_gpu(100, device_id)
@@ -1348,7 +1349,7 @@ def create_predictor(
                 else:
                     if predictor_args.device == "xpu":
                         raise ValueError(
-                            "you should run xpu dynamic model with --block_attn flag" 
+                            "you should run xpu dynamic model with --block_attn flag"
                             "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/inference.md"
                         )
                     from paddlenlp.experimental.transformers import (
@@ -1608,7 +1609,9 @@ def predict():
 
 def benchmark(predictor, predictor_args, model_args):
     # Just construct a simple benchmark input. We pad input to the src_length.
-    benchmark_texts = [predictor.tokenizer.pad_token * predictor_args.src_length for _ in range(predictor_args.batch_size)]
+    benchmark_texts = [
+        predictor.tokenizer.pad_token * predictor_args.src_length for _ in range(predictor_args.batch_size)
+    ]
 
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
