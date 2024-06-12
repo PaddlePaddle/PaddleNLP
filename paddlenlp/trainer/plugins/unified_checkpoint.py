@@ -365,6 +365,10 @@ def unified_checkpoint_into_shards(
         weights_name = SAFE_WEIGHTS_NAME if safe_serialization else PADDLE_WEIGHTS_NAME
 
     shard_file = get_sharded_file_name(args, weights_name)
+    # renumerize shard_file name for expert_parallel.
+    if args.use_expert_parallel:
+        shard_file = rename_shard_file(args, shard_file, weights_name)
+
     for key, weight in state_dict.items():
         index_weight_file[key] = shard_file
         total_size += weight.numel().item() * dtype_byte_size(weight.dtype)
@@ -1559,13 +1563,14 @@ def distributed_send_recv(
 def get_sharded_file_name(args, file_name, is_optimizer=False):
     if not is_optimizer:
         if args.use_expert_parallel:
+            sd_degree = args.sharding_parallel_degree if args.sharding_parallel_degree > 1 else 1
             shard_file = file_name.replace(
                 ".pdparams",
-                f"-{args.logical_process_index+1:05d}-of-{args.world_size:05d}.pdparams",
+                f"-{args.logical_process_index+1:05d}-of-{args.world_size//sd_degree:05d}.pdparams",
             )
             shard_file = shard_file.replace(
                 ".safetensors",
-                f"-{args.logical_process_index + 1:05d}-of-{args.world_size:05d}.safetensors",
+                f"-{args.logical_process_index + 1:05d}-of-{args.world_size//sd_degree:05d}.safetensors",
             )
         else:
             shard_file = file_name.replace(
@@ -1687,6 +1692,45 @@ def gather_sharded_object(index_file, total_size, is_optimizer=False, use_expert
             total_size_list = flatten_list(sharding_total_size_list)
 
     return index_file_list, total_size_list
+
+
+def rename_shard_file(args, shard_file, file_name):
+    """rename shard file when using expert_parallel."""
+    assert args.use_expert_parallel, "only expert_parallel need to use this function"
+
+    shard_file_list = []
+
+    hcg = fleet.get_hybrid_communicate_group()
+    tp_group = hcg.get_model_parallel_group()
+    pp_group = hcg.get_pipe_parallel_group()
+    data_group = hcg.get_data_parallel_group()
+
+    if tp_group.nranks > 1:
+        dist.all_gather_object(shard_file_list, shard_file, tp_group)
+    if pp_group.nranks > 1:
+        pp_shard_file_list = []
+        dist.all_gather_object(
+            pp_shard_file_list, shard_file_list if len(shard_file_list) > 0 else shard_file, pp_group
+        )
+        shard_file_list = flatten_list(pp_shard_file_list)
+    if data_group.nranks > 1:
+        data_shard_file_list = []
+        dist.all_gather_object(
+            data_shard_file_list, shard_file_list if len(shard_file_list) > 0 else shard_file, data_group
+        )
+        shard_file_list = flatten_list(data_shard_file_list)
+
+    new_index = shard_file_list.index(shard_file)
+    sd_degree = args.sharding_parallel_degree if args.sharding_parallel_degree > 1 else 1
+    shard_file = file_name.replace(
+        ".pdparams",
+        f"-{new_index + 1:05d}-of-{args.world_size//sd_degree:05d}.pdparams",
+    )
+    shard_file = shard_file.replace(
+        ".safetensors",
+        f"-{new_index + 1:05d}-of-{args.world_size//sd_degree:05d}.safetensors",
+    )
+    return shard_file
 
 
 def generate_base_static_name(vname):
