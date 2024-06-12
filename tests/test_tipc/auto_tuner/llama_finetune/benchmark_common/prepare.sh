@@ -34,7 +34,7 @@ else
   rank=$PADDLE_TRAINER_ID
   echo $master_ip $rank
   if [ $rank == 0 ]; then
-    net=$(netstat -anp | grep 2379 | grep "LISTEN")
+    net=$(netstat -anp | grep :2379 | grep "LISTEN")
     if [ ${#net} == 0 ]; then
         apt-get install -y --allow-downgrades etcd
         nohup etcd -data-dir ~/data.etcd -advertise-client-urls  http://0.0.0.0:2379 -listen-client-urls http://0.0.0.0:2379 &
