@@ -891,10 +891,6 @@ class PPOTrainer(Trainer):
                     generation_config=self.generation_config,
                     synced_gpus=ShardingOption.FULL_SHARD in self.policy_trainer.args.sharding,
                 )[0]
-                attention_mask = paddle.logical_and(
-                    seq != self.tokenizer.pad_token_id,
-                    seq != self.tokenizer.unk_token_id,
-                )
                 if self.reward_tokenizer is not self.tokenizer:
                     reward_tokenize_output = batch_retokenize(
                         input_ids=seq,
@@ -904,15 +900,21 @@ class PPOTrainer(Trainer):
                         device=self.args.device,
                     )
                     reward_input_ids = reward_tokenize_output["input_ids"]
-                    reward_attention_mask = reward_tokenize_output["attention_mask"]
                 else:
                     reward_input_ids = seq
-                    reward_attention_mask = attention_mask
+                reward_attention_mask = make_attention_mask(
+                    seq,
+                    pad_id=self.reward_tokenizer.pad_token_id,
+                    unk_id=self.reward_tokenizer.unk_token_id,
+                    causal_mask=False,
+                )
+                reward_position_ids = make_position_ids(reward_attention_mask)
 
                 # unify PP with others since PP always return tuple
                 reward_score = self.reward_model(
                     reward_input_ids,
                     attention_mask=reward_attention_mask,
+                    position_ids=reward_position_ids,
                     # return_dict=True,
                 )[
                     1
@@ -1604,7 +1606,12 @@ class PPOTrainer(Trainer):
                 skip_special_tokens=True,
             )
             reward_input_ids = reward_tokenize_output["input_ids"]
-            reward_attention_mask = reward_tokenize_output["attention_mask"]
+            reward_attention_mask = make_attention_mask(
+                reward_input_ids,
+                pad_id=self.reward_tokenizer.pad_token_id,
+                unk_id=self.reward_tokenizer.unk_token_id,
+                causal_mask=False,
+            )
             reward_position_ids = make_position_ids(reward_attention_mask)
         else:
             # for text in self.tokenizer.batch_decode(input_ids, skip_special_tokens=False):
