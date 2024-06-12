@@ -1202,14 +1202,7 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
         return self.qwen2
 
     def prepare_inputs_for_generation(
-        self,
-        input_ids,
-        use_cache=False,
-        past_key_values=None,
-        attention_mask=None,
-        inputs_embeds=None,
-        output_router_logits=False,
-        **kwargs
+        self, input_ids, use_cache=False, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
     ):
         batch_size, seq_length = input_ids.shape
         position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
@@ -1230,7 +1223,6 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
                 "past_key_values": past_key_values,
                 "use_cache": use_cache,
                 "attention_mask": attention_mask,
-                "output_router_logits": output_router_logits,
             }
         )
         return model_inputs
