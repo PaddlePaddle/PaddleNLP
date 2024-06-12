@@ -133,8 +133,8 @@ def seed_guard_context(name=None):
         # todo fix it
         #  ValueError: Length of gpu state list should be equal to the gpu device count
         #  /usr/local/lib/python3.10/dist-packages/paddle/incubate/framework/random.py:119: ValueError
-        return contextlib.nullcontext()
-        # return get_rng_state_tracker().rng_state(name)
+        # return contextlib.nullcontext()
+        return get_rng_state_tracker().rng_state(name)
     else:
         return contextlib.nullcontext()
 
@@ -1439,10 +1439,17 @@ class GPTLMHead(nn.Layer):
             else:
                 vocab_size = config.vocab_size
 
-            self.weight = self.create_parameter(
-                shape=[vocab_size, config.hidden_size],
-                dtype=paddle.get_default_dtype(),
-            )
+            if vocab_size != config.vocab_size:
+                with get_rng_state_tracker().rng_state():
+                    self.weight = self.create_parameter(
+                        shape=[vocab_size, config.hidden_size],
+                        dtype=paddle.get_default_dtype(),
+                    )
+            else:
+                self.weight = self.create_parameter(
+                    shape=[vocab_size, config.hidden_size],
+                    dtype=paddle.get_default_dtype(),
+                )
             # Must set distributed attr for Tensor Parallel !
             self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
             if self.weight.is_distributed:

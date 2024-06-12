@@ -48,6 +48,9 @@ from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
 
+# Pretaining Environment Variables to support sharding stage1 overlap optimization.
+os.environ["USE_CASUAL_MASK"] = "True"
+
 
 def add_start_docstrings(*docstr):
     def docstring_decorator(fn):
@@ -485,11 +488,15 @@ def main():
     config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
 
     config.sep_parallel_degree = training_args.sep_parallel_degree
+    config.context_parallel_degree = training_args.context_parallel_degree
     if config.sequence_parallel:
         assert config.tensor_parallel_degree > 1, "tensor_parallel_degree must be larger than 1 for sequence parallel."
     assert (
         config.num_attention_heads % config.sep_parallel_degree == 0
     ), f"num_attention_heads:{config.num_attention_heads} must be divisible by sep_parallel_degree {config.sep_parallel_degree}"
+    assert (
+        config.seq_length % config.context_parallel_degree == 0
+    ), f"seq_length:{config.seq_length} must be divisible by context_parallel_degree {config.context_parallel_degree}"
 
     if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
         try:

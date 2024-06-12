@@ -118,6 +118,8 @@ MAPPING_NAMES = OrderedDict(
         ("Bloom", "bloom"),
         ("QWen", "qwen"),
         ("Mixtral", "mixtral"),
+        ("Qwen2", "qwen2"),
+        ("Qwen2Moe", "qwen2_moe"),
         ("Gemma", "gemma"),
     ]
 )
@@ -215,15 +217,20 @@ class _BaseAutoModelClass:
         else:
             init_class = config.pop("init_class", None)
         init_class = init_class[:-5] if init_class is not None and init_class.endswith("Model") else init_class
+
+        # Sort the MAPPING_NAMES to reorder the model class names with longest-first rule
+        # thus the names with same prefix can be correctly inferred
+        # such as QWen and QWen2MOE, QWen2MOE is the longest prefix of QWen2MOEModel
         model_name = None
+        SORTED_MAPPING_NAMES = dict(sorted(MAPPING_NAMES.items(), key=lambda x: len(x[0]), reverse=True))
         if init_class:
-            for model_flag, name in MAPPING_NAMES.items():
+            for model_flag, name in SORTED_MAPPING_NAMES.items():
                 if model_flag in init_class:
                     model_name = model_flag + "Model"
                     break
         else:
             # From pretrained_model_name_or_path
-            for model_flag, name in MAPPING_NAMES.items():
+            for model_flag, name in SORTED_MAPPING_NAMES.items():
                 if name in pretrained_model_name_or_path.lower():
                     model_name = model_flag + "Model"
                     break
