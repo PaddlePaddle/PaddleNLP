@@ -42,6 +42,7 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
 from paddlenlp.transformers import LlamaConfig, LlamaPretrainedModel
+from paddlenlp.transformers.conversion_utils import split_param_func
 from paddlenlp.transformers.llama.modeling import LlamaLMHead
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
