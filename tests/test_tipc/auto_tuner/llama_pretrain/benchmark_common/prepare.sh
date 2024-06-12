@@ -24,11 +24,11 @@ cd ../../../llm/llama
 python -m pip install tool_helpers
 
 rm -rf data && mkdir data
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx
 
-mv llama_openwebtext_100k_ids.npy ./data
-mv llama_openwebtext_100k_idx.npz ./data
+mv llama_openwebtext_100k.bin ./data
+mv llama_openwebtext_100k.idx ./data
 
 # mv autoconfig
 rm -rf autoconfig
