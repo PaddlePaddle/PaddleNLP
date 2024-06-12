@@ -532,6 +532,9 @@ class PretrainedConfig:
 
     _auto_class: Optional[str] = None
 
+    # Fix me, it is global for all config
+    _nonsavable_keys = set()
+
     def __setattr__(self, key, value):
         if key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
@@ -541,15 +544,7 @@ class PretrainedConfig:
     def __getattribute__(self, key):
         if key != "attribute_map" and key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
-        if key == "__dict__":
-            # Fix for rewrite to_dict method, pop from calling self.__dict__
-            ret = super().__getattribute__(key)
-            ret = copy.deepcopy(ret)
-            if "_nonsavable_keys" in ret:
-                del ret["_nonsavable_keys"]
-            return ret
-        else:
-            return super().__getattribute__(key)
+        return super().__getattribute__(key)
 
     def __getitem__(self, key):
         return getattr(self, key, None)
@@ -564,7 +559,7 @@ class PretrainedConfig:
         kwargs = attribute_map(self, kwargs=kwargs)
         kwargs.pop("transformers_version", None)
         llm_meta = LlmMetaConfig._get_defaults()
-        self._nonsavable_keys = LlmMetaConfig._get_nonsavable_keys()
+        self._nonsavable_keys.update(LlmMetaConfig._get_nonsavable_keys())
 
         kwargs = set_expected_keys(self, llm_meta, kwargs)
         if self.sequence_parallel:
