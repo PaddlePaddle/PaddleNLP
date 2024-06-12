@@ -100,6 +100,12 @@ def create_loss(loss_cls, config, extra_args, merge_labels=None):
 
 @paddle.no_grad()
 def make_position_ids(attention_mask, source=None):
+    if len(attention_mask.shape) == 4:  # causal mask
+        position_ids_p1 = attention_mask.cast(paddle.int64).sum(-1)
+        position_ids = position_ids_p1 - 1
+        position_ids = paddle.where(position_ids == -1, position_ids_p1, position_ids)
+        return position_ids[:, 0, :]
+    assert len(attention_mask.shape) == 2  # padding mask
     attention_mask_bool = attention_mask
     attention_mask = attention_mask.cast(paddle.int64)
     position_ids = attention_mask.cumsum(-1) - 1
@@ -119,6 +125,27 @@ def make_position_ids(attention_mask, source=None):
         return position_ids
     position_ids = paddle.where(position_ids == -1, attention_mask, position_ids)
     return position_ids
+
+
+@paddle.no_grad()
+def make_attention_mask(input_ids, pad_id, unk_id=None, past_key_values_length=0, causal_mask=True):
+    attention_mask = input_ids != pad_id
+    if unk_id is not None and pad_id != unk_id:
+        attention_mask = paddle.logical_and(attention_mask, input_ids != unk_id)
+    if not causal_mask:
+        return attention_mask
+
+    batch_size, target_length = input_ids.shape  # target_length: seq_len
+    mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
+    if past_key_values_length > 0:
+        # [tgt_len, tgt_len + past_len]
+        mask = paddle.concat([paddle.ones([target_length, past_key_values_length], dtype="bool"), mask], axis=-1)
+    # [bs, 1, tgt_len, tgt_len + past_len]
+    causal_mask = mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
+
+    attention_mask = attention_mask[:, None, None, :]
+    expanded_attn_mask = attention_mask & causal_mask
+    return expanded_attn_mask
 
 
 def gather_log_probabilities(logits: paddle.Tensor, labels: paddle.Tensor) -> paddle.Tensor:

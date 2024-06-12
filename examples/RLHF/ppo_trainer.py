@@ -37,6 +37,7 @@ from models.ppo_model_utils import (
     RLHFValueLoss,
     create_loss,
     gather_log_probabilities,
+    make_attention_mask,
     make_position_ids,
 )
 from paddle.distributed import fleet
@@ -569,21 +570,27 @@ class ValueTrainer(StepTrainer):
 
 
 class PPOMetric:
-    metric_names = [
-        "train/" + name
-        for name in [
-            "actor_loss",
-            "ptx_loss",
-            "reward_critic_loss",
-            "reward",
-            "kl_divergence",
-            "mean_generated_length",
-            "max_generated_length",
+    def set_metric_meta(self, use_ptx=True):
+        self.metric_names = [
+            "train/" + name
+            for name in [
+                "actor_loss",
+                "ptx_loss",
+                "reward_critic_loss",
+                "reward",
+                "kl_divergence",
+                "mean_generated_length",
+                "max_generated_length",
+            ]
         ]
-    ]
-    metric_ops = ["mean", "mean", "mean", "mean", "mean", "mean", "max"]
 
-    def __init__(self, freq, use_stack=True):
+        self.metric_ops = ["mean", "mean", "mean", "mean", "mean", "mean", "max"]
+        if not use_ptx:
+            self.metric_names.pop(1)
+            self.metric_ops.pop(1)
+
+    def __init__(self, freq, use_stack=True, use_ptx=True):
+        self.set_metric_meta(use_ptx=use_ptx)
         self.freq = freq
         self.counter = 0
         self.use_stack = use_stack
@@ -1005,11 +1012,10 @@ class PPOTrainer(Trainer):
         return policy_model, value_model
 
     def get_epoch_iterator(self):
-
         def gen_epoch_data():
             for prompt_only_batch, ptx_batch in zip(
-                    self.prompt_only_dataloader,
-                    itertools.cycle(self.ptx_dataloader),
+                self.prompt_only_dataloader,
+                itertools.cycle(self.ptx_dataloader),
             ):
                 # generate batches
                 self.set_eval()
@@ -1037,10 +1043,11 @@ class PPOTrainer(Trainer):
 
             def __len__(self):
                 return len(self.prompt_only_dataloader) * (
-                    self.args.update_iters *
-                    self.args.per_device_prompt_batch_size *
-                    self.args.num_return_sequences //
-                    self.args.per_device_train_batch_size)
+                    self.args.update_iters
+                    * self.args.per_device_prompt_batch_size
+                    * self.args.num_return_sequences
+                    // self.args.per_device_train_batch_size
+                )
 
         return EpochIterator()
 
@@ -1051,10 +1058,13 @@ class PPOTrainer(Trainer):
         len_dataloader = None
         if not self._is_iterable_dataset(self.train_dataset):
             len_dataloader = len(train_dataloader)
-            num_train_sub_steps = (len_dataloader * self.args.update_iters *
-                                   self.args.per_device_prompt_batch_size *
-                                   self.args.num_return_sequences //
-                                   self.args.per_device_train_batch_size)
+            num_train_sub_steps = (
+                len_dataloader
+                * self.args.update_iters
+                * self.args.per_device_prompt_batch_size
+                * self.args.num_return_sequences
+                // self.args.per_device_train_batch_size
+            )
             num_update_steps_per_epoch = num_train_sub_steps // args.gradient_accumulation_steps
             num_examples = len(self.train_dataset)
             if args.max_steps > 0:
@@ -1116,18 +1126,15 @@ class PPOTrainer(Trainer):
 
         if self.use_ptx:
             with guard_set_args(
-                    args,
+                args,
                 {
-                    "per_device_train_batch_size":
-                    1 if getattr(self.ptx_dataset, "is_intokens", False) else
-                    self.args.per_device_prompt_batch_size *
-                    self.args.num_return_sequences
+                    "per_device_train_batch_size": 1
+                    if getattr(self.ptx_dataset, "is_intokens", False)
+                    else self.args.per_device_prompt_batch_size * self.args.num_return_sequences
                 },
             ), guard_set_args(
-                    self, {
-                        "train_dataset": self.ptx_dataset,
-                        "data_collator": self.ptx_dataset.get_collator()
-                    }):
+                self, {"train_dataset": self.ptx_dataset, "data_collator": self.ptx_dataset.get_collator()}
+            ):
                 self.ptx_dataloader = self.get_train_dataloader()
         else:
             self.ptx_dataloader = range(100)
@@ -1173,7 +1180,7 @@ class PPOTrainer(Trainer):
         self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
 
         self._globalstep_last_logged = self.state.global_step
-        metric = PPOMetric(freq=self.args.logging_steps)
+        metric = PPOMetric(freq=self.args.logging_steps, use_ptx=self.use_ptx)
 
         start_time = time.time()
         self._globalstep_last_start_time = start_time
@@ -1205,10 +1212,13 @@ class PPOTrainer(Trainer):
                     if self.use_ptx:
                         logger.info("Doing ptx step...")
                         self.timers and self.timers("ptx_step").start()
-                        with guard_set_args(self._model_config, {
+                        with guard_set_args(
+                            self._model_config,
+                            {
                                 # "set_attn_func": True,
                                 # "use_flash_attention": True
-                        }):
+                            },
+                        ):
                             ptx_info = self.ptx_step(ptx_batch)
                         rl_info.update(ptx_info)
                         self.timers and self.timers("ptx_step").stop()
@@ -1299,13 +1309,8 @@ class PPOTrainer(Trainer):
             max=self.clip_range_score,
         )
         # TODO(guosheng): use scatter_add/put_along_axis
-        index = paddle.cumsum(sequence_mask.cast(paddle.int64),
-                              axis=-1).argmax(-1, keepdim=True)
-        rewards = paddle.put_along_axis(rewards,
-                                        index,
-                                        reward_clip.unsqueeze(axis=-1),
-                                        axis=-1,
-                                        reduce="add")
+        index = paddle.cumsum(sequence_mask.cast(paddle.int64), axis=-1).argmax(-1, keepdim=True)
+        rewards = paddle.put_along_axis(rewards, index, reward_clip.unsqueeze(axis=-1), axis=-1, reduce="add")
         # batch_size = log_probs.shape[0]
         # for i in range(batch_size):
         #     # print("="*20, sequence_mask[i])
@@ -1544,10 +1549,18 @@ class PPOTrainer(Trainer):
             {
                 "prompt": input_ids,
                 "input_ids": seq,  # "sequence":
-                "attention_mask": paddle.logical_and(
-                    seq != self.tokenizer.pad_token_id,
-                    seq != self.tokenizer.unk_token_id,
+                "attention_mask": make_attention_mask(
+                    seq,
+                    pad_id=self.tokenizer.pad_token_id,
+                    unk_id=self.tokenizer.unk_token_id,
+                    causal_mask=False,
                 ),
+                # "sequence_mask": make_attention_mask(
+                #     seq,
+                #     pad_id=self.tokenizer.pad_token_id,
+                #     unk_id=self.tokenizer.unk_token_id,
+                #     causal_mask=False,
+                # ),
             }
             for seq in sequences
         ]
@@ -1724,6 +1737,9 @@ class PPOTrainer(Trainer):
         """
         prompt = rl_batch["prompt"]  # length: src
         attention_mask = rl_batch["attention_mask"]  # length: src + tgt
+        if len(attention_mask.shape) == 4:
+            # use padding mask instead of causal mask
+            attention_mask = rl_batch["sequence_mask"]  # length: src + tgt
         old_log_probs = rl_batch["log_probs"]  # length: src + tgt -1
         ref_log_probs = rl_batch["ref_log_probs"]  # length: src + tgt -1
         rewards = rl_batch["rewards"]  # length: 1
