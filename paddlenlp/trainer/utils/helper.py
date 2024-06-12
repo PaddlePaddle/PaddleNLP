@@ -29,7 +29,6 @@ from paddlenlp.utils.nested import (
     nested_broadcast_tensor,
     nested_empty_tensor,
     nested_reduce_tensor,
-    nested_broadcast_tensor_with_empty,
 )
 
 __all__ = [

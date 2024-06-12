@@ -37,8 +37,8 @@ os.environ["no_proxy"] = "localhost,bcebos.com"
 # os.environ["https_proxy"] = "agent.baidu.com:8118"
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Tuple
 from functools import partial
+from typing import Any, Dict, Tuple
 
 import paddle
 from data import PromptOnlyDataset, SupervisedDataset, parse_dataset
@@ -151,9 +151,7 @@ class TrainingArguments(TrainingArguments):
     )
     use_fusemt: bool = field(
         default=True,
-        metadata={
-            "help": "use inference model to speedup in rollout generation"
-        },
+        metadata={"help": "use inference model to speedup in rollout generation"},
     )
 
     # save_generation_output: bool = field(
@@ -485,8 +483,7 @@ def main():
     )
     if ptx_ds is not None:
         # PretrainingCriterion requires shifted inputs and labels
-        ptx_ds.get_collator = types.MethodType(
-            partial(ptx_ds.get_collator.__func__, shift=True), ptx_ds)
+        ptx_ds.get_collator = types.MethodType(partial(ptx_ds.get_collator.__func__, shift=True), ptx_ds)
 
     # offload
     # cleanup actor_eval_model, reward_critic_eval_model
