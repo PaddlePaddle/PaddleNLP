@@ -19,7 +19,7 @@ auto_log_file=./autoconfig/${model_name}_auto_tuner.log
 
 log="./llama7b_pretrain_auto_tuner.log"
 launch_best_cfg=$(sed -n "s/.*Launch best cfg: \(.*\)}/\1/p" "$auto_log_file")
-cfg_max_mem_usage=$(echo "$launch_best_cfg" | awk -F"max_mem_usage': " '{print $2}' | awk -F, '{print $1}')
+cfg_max_mem_usage=$(echo "$launch_best_cfg" | awk -F"\"max_mem_usage\":" '{print $2}' | awk -F, '{print $1}')
 
 buffer=$(sed -n 's/.*"buffer":\([^,}]*\).*/\1/p' $autoconfig_json_file | awk '{print $1}')
 max_mem_usage=$(sed -n 's/.*"max_mem_usage":\([^,}]*\).*/\1/p' $autoconfig_json_file | awk '{print $1}')

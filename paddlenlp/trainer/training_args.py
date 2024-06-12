@@ -777,6 +777,10 @@ class TrainingArguments:
         default=True,
         metadata={"help": "Whether use lazy data processing."},
     )
+    use_async_save: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to use async_save instead of paddle.save."},
+    )
     skip_profile_timer: Optional[bool] = field(
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl."},
@@ -1529,7 +1533,7 @@ class TrainingArguments:
             if world_size > 1:
                 if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
                     if self.unified_checkpoint:
-                        self.use_hybrid_parallel = True
+                        # DP use hybrid group
                         strategy = fleet.DistributedStrategy()
                         fleet.init(is_collective=True, strategy=strategy)
                     else:

@@ -18,8 +18,10 @@
 
 import collections
 import contextlib
+import copy
 import inspect
 import math
+import multiprocessing
 import os
 import random
 import re
@@ -187,6 +189,75 @@ except:
 
 
 __all__ = ["Trainer"]
+
+async_save_queue = []
+g_cpu_optimizer_state_dict = {}
+
+
+def _save_func(obj, path, saved_signal_path, protocol):
+    paddle.save(obj, path, protocol)
+    # dump savd_siganl
+    with open(saved_signal_path, mode="w+") as f:
+        f.write("1")
+
+
+def check_exitcode(task):
+    exitcode = task.exitcode
+    if exitcode != 0:
+        print(f"Error: save ckpt process failed with exitcode {exitcode}!!!")
+
+
+def clear_async_save_task_queue():
+    """
+    wait until all async save task to be done.
+    """
+    while len(async_save_queue) > 0:
+        task = async_save_queue.pop()
+        if task and task.is_alive():
+            task.join(timeout=60)
+            if task.is_alive():
+                logger.error("Error: save ckpt process timeout!!!")
+                async_save_queue.append(task)
+            else:
+                check_exitcode(task)
+        else:
+            check_exitcode(task)
+
+
+def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol=4):
+    global g_cpu_optimizer_state_dict
+    g_cpu_optimizer_state_dict.clear()
+    for k, v in optimizer_state_dict.items():
+        if k == "master_weights":
+            g_cpu_optimizer_state_dict[k] = {}
+            for kk, vv in v.items():
+                tensor_name = vv.name
+                g_cpu_optimizer_state_dict[k][kk] = vv.pin_memory()
+                g_cpu_optimizer_state_dict[k][kk].name = tensor_name
+        elif k == "LR_Scheduler":
+            g_cpu_optimizer_state_dict[k] = copy.deepcopy(v)
+        else:
+            g_cpu_optimizer_state_dict[k] = v.pin_memory()
+        paddle.device.synchronize()
+    clear_async_save_task_queue()
+
+    attempt = 0
+    ctx = multiprocessing.get_context("spawn")
+
+    def start_process():
+        nonlocal attempt
+        try:
+            p = ctx.Process(target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol))
+            p.start()
+            return p
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed with error: {e}")
+            attempt += 1
+            time.sleep(1)
+            return start_process()
+
+    p = start_process()
+    async_save_queue.append(p)
 
 
 class Trainer:
@@ -569,7 +640,12 @@ class Trainer:
                 base_weight_name=weight_name,
                 model_wrapped=self.model_wrapped,
             )
-            self.model.set_state_dict(state_dict)
+            old_state_dict = self.model.state_dict()
+            new_state_dict = {}
+            for k, v in state_dict.items():
+                if k not in old_state_dict or id(v) != id(old_state_dict[k]):
+                    new_state_dict[k] = v
+            self.model.set_state_dict(new_state_dict)
         else:
             if resume_from_checkpoint is not None and (self.args.dataset_rank == 0 or self.args.use_expert_parallel):
 
@@ -891,7 +967,8 @@ class Trainer:
 
             npu_accelerate_plugin(self.optimizer)
 
-        self.timers and self.timers("read-data").start()
+        if self.args.ignore_data_skip:
+            self.timers and self.timers("read-data").start()
 
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
@@ -907,7 +984,9 @@ class Trainer:
                     inputs = split_inputs_sequence_dim(inputs)
                 if self.args.use_hybrid_parallel and self.args.context_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim_load_balance(inputs)
-                self.timers and self.timers("read-data").stop()
+                if self.args.ignore_data_skip:
+                    self.timers and self.timers("read-data").stop()
+
                 os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
                 self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
 
@@ -1098,7 +1177,9 @@ class Trainer:
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
-                self.timers and self.timers("read-data").start()
+
+                if self.args.ignore_data_skip:
+                    self.timers and self.timers("read-data").start()
 
             if step < 0:
                 logger.warning(
@@ -1336,7 +1417,7 @@ class Trainer:
         metrics = None
         if self.control.should_evaluate:
             if isinstance(self.optimizer, GroupShardedOptimizerStage2) and self.optimizer._broadcast_overlap:
-                paddle.device.cuda.synchronize()
+                paddle.device.synchronize()
 
             if isinstance(self.eval_dataset, dict):
                 for eval_dataset_name, eval_dataset in self.eval_dataset.items():
@@ -1350,7 +1431,7 @@ class Trainer:
 
         if self.control.should_save:
             if isinstance(self.optimizer, GroupShardedOptimizerStage2) and self.optimizer._broadcast_overlap:
-                paddle.device.cuda.synchronize()
+                paddle.device.synchronize()
 
             self._save_checkpoint(model, metrics=metrics)
             logger.info(f"{self.runtime_timer.log()}")
@@ -1795,17 +1876,8 @@ class Trainer:
         in_cp_parallel_mode = self.args.context_parallel_degree > 1
 
         # Multi-gpu training
-        if (
-            self.args.world_size > 1
-            and not self.args.use_hybrid_parallel
-            or not (
-                in_pipeline_parallel_mode
-                or in_sharding_parallel_mode
-                or in_tensor_parallel_mode
-                or in_sep_parallel_mode
-                or in_cp_parallel_mode
-            )
-        ):
+        if self.args.world_size > 1 and (not self.args.use_hybrid_parallel):
+            # MOE use DDP to broadcaset parameters.
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
 
@@ -2212,6 +2284,10 @@ class Trainer:
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
         self.runtime_timer.start("checkpoint saving time")
+
+        if self.args.use_async_save:
+            clear_async_save_task_queue()
+
         # Save model checkpoint
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
 
@@ -2229,6 +2305,7 @@ class Trainer:
         # only save model state dict, ignore optimizer and scheduler
         if not self.args.ignore_save_lr_and_optim:
             optimizer_name = _add_variant(OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+            saved_signal_path = os.path.join(output_dir, f"saved_signal_{dist.get_rank()}")
 
             if self.args.use_hybrid_parallel:
                 if self.dp_group.rank <= 0 or self.args.use_expert_parallel:
@@ -2249,10 +2326,19 @@ class Trainer:
                                 os.path.join(output_dir, optimizer_name),
                             )
                         else:
-                            self._save_ckpt_func(
-                                self.optimizer.state_dict(),
-                                os.path.join(output_dir, optimizer_name),
-                            )
+                            state_dict = self.optimizer.state_dict()
+                            save_path = os.path.join(output_dir, optimizer_name)
+                            if self.args.use_async_save:
+                                assert not strtobool(os.getenv("FLAG_LLM_PDC", "False")), "Dont support FLAG_LLM_PDC"
+                                async_save_optimizer(
+                                    state_dict,
+                                    save_path,
+                                    saved_signal_path=saved_signal_path,
+                                )
+                            else:
+                                self._save_ckpt_func(state_dict, save_path)
+                                with open(saved_signal_path, mode="w+") as f:
+                                    f.write("1")
 
             if self.args.should_save or self.args.use_expert_parallel:
                 if not self.args.use_hybrid_parallel:
@@ -2471,10 +2557,15 @@ class Trainer:
                 if state_dict is None:
                     state_dict = self.model.state_dict()
 
-                self._save_ckpt_func(
-                    state_dict,
-                    os.path.join(output_dir, _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)),
-                )
+                if self.args.should_save_sharding_stage1_model:
+                    state_dict, _, _ = self.sharding_io.manipulate_state_dict_and_config(
+                        unwrap_model(self.model), merge_tensor_parallel=False, state_dict=state_dict
+                    )
+                    variant = _add_variant(PADDLE_WEIGHTS_NAME, self.args.sharded_name_suffix())
+                else:
+                    variant = _add_variant(PADDLE_WEIGHTS_NAME, self.args.weight_name_suffix)
+
+                self._save_ckpt_func(state_dict, os.path.join(output_dir, variant))
         else:
             if isinstance(self.model, PretrainedModel) and self.args.should_save_sharding_stage1_model:
                 config_to_save = None

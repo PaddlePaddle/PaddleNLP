@@ -837,7 +837,7 @@ class QWenLMHead(nn.Layer):
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         if tensor_parallel_output is None:
-            tensor_parallel_output = self.config.tensor_parallel_output
+            tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
         logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
@@ -995,13 +995,7 @@ class QWenForCausalLM(QWenPretrainedModel):
         )
         hidden_states = transformer_outputs[0]
 
-        # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is togather with ParallelCrossEntropy
-        tensor_parallel_output = (
-            self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
-        )
-
-        lm_logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        lm_logits = self.lm_head(hidden_states)
 
         loss = None
         if labels is not None:
