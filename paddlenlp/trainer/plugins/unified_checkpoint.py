@@ -369,7 +369,9 @@ def unified_checkpoint_into_shards(
         index_weight_file[key] = shard_file
         total_size += weight.numel().item() * dtype_byte_size(weight.dtype)
 
-    index_file_list, total_size_list = gather_sharded_object(index_weight_file, total_size)
+    index_file_list, total_size_list = gather_sharded_object(
+        index_weight_file, total_size, use_expert_parallel=args.use_expert_parallel
+    )
     sharded_index = get_sharded_index(
         index_file_list,
         total_size_list,
@@ -692,12 +694,18 @@ def unified_optimizer_into_shards(
             total_master_weight_size += weight.numel().item() * dtype_byte_size(weight.dtype)
 
     index_optimizer_filelist, total_optim_size_list = gather_sharded_object(
-        index_optimizer_file, total_optim_size, is_optimizer=True
+        index_optimizer_file,
+        total_optim_size,
+        is_optimizer=True,
+        use_expert_parallel=args.use_expert_parallel,
     )
     sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
     if master_weights is not None:
         index_master_weight_filelist, total_master_weight_size_list = gather_sharded_object(
-            index_master_weight_file, total_master_weight_size, is_optimizer=True
+            index_master_weight_file,
+            total_master_weight_size,
+            is_optimizer=True,
+            use_expert_parallel=args.use_expert_parallel,
         )
         sharded_master_weight_index = get_sharded_index(index_master_weight_filelist, total_master_weight_size_list)
 
@@ -1550,14 +1558,24 @@ def distributed_send_recv(
 
 def get_sharded_file_name(args, file_name, is_optimizer=False):
     if not is_optimizer:
-        shard_file = file_name.replace(
-            ".pdparams",
-            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.pdparams",
-        )
-        shard_file = shard_file.replace(
-            ".safetensors",
-            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.safetensors",
-        )
+        if args.use_expert_parallel:
+            shard_file = file_name.replace(
+                ".pdparams",
+                f"-{args.logical_process_index+1:05d}-of-{args.world_size:05d}.pdparams",
+            )
+            shard_file = shard_file.replace(
+                ".safetensors",
+                f"-{args.logical_process_index + 1:05d}-of-{args.world_size:05d}.safetensors",
+            )
+        else:
+            shard_file = file_name.replace(
+                ".pdparams",
+                f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.pdparams",
+            )
+            shard_file = shard_file.replace(
+                ".safetensors",
+                f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.safetensors",
+            )
     else:
         hcg = fleet.get_hybrid_communicate_group()
         dp_group = hcg.get_data_parallel_group()
@@ -1613,7 +1631,7 @@ def reduce_master_weights_status(has_master_weights=False):
     return data.item() > 0
 
 
-def gather_sharded_object(index_file, total_size, is_optimizer=False):
+def gather_sharded_object(index_file, total_size, is_optimizer=False, use_expert_parallel=False):
 
     index_file_list, total_size_list = [], []
 
@@ -1647,6 +1665,17 @@ def gather_sharded_object(index_file, total_size, is_optimizer=False):
     if len(index_file_list) == 0 and len(total_size_list) == 0:
         index_file_list = [index_file]
         total_size_list = [total_size]
+
+    if use_expert_parallel:
+        data_group = hcg.get_data_parallel_group()
+        if data_group.nranks > 1:
+            data_index_file_list = []
+            data_total_size_list = []
+            dist.all_gather_object(data_index_file_list, index_file_list, data_group)
+            dist.all_gather_object(data_total_size_list, total_size_list, data_group)
+            index_file_list = flatten_list(data_index_file_list)
+            total_size_list = flatten_list(data_total_size_list)
+
     if is_optimizer:
         sharding_group = hcg.get_sharding_parallel_group()
         if sharding_group.nranks > 1:
@@ -1734,7 +1763,9 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
 def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
+    dp_group = hcg.get_data_parallel_group()
     tp_rank = tp_group.rank
+    dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
 
     # filter actions for pipeline mode
     if hcg.get_pipe_parallel_group().nranks > 1:
@@ -1752,6 +1783,9 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
                 continue
             key = filter_keys[i]
             tensor = state_dict[key]
+            # When using expert parallel, there's no need to save tensors with `no_sync=False` when dp_rank > 0.
+            if dp_rank > 0 and not getattr(tensor, "no_sync", False):
+                continue
             if key in tp_actions:
                 ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
                 action = tp_actions.pop(key)
