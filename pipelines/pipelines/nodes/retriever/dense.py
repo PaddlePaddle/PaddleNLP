@@ -85,7 +85,6 @@ class DensePassageRetriever(BaseRetriever):
                 |                          query_embedding_model="model_directory/question-encoder",
                 |                          passage_embedding_model="model_directory/context-encoder")
                 ```
-
         :param document_store: An instance of DocumentStore from which to retrieve documents.
         :param query_embedding_model: Local path or remote name of question encoder checkpoint. The format equals the
                                       one used by paddlenlp transformers' models
@@ -163,7 +162,6 @@ class DensePassageRetriever(BaseRetriever):
                 "feature_extraction",
                 model=query_embedding_model,
                 batch_size=self.batch_size,
-                _static_mode=True,
                 return_tensors="np",
                 max_len=max_seq_len_query,
                 output_emb_size=output_emb_size,
@@ -176,7 +174,6 @@ class DensePassageRetriever(BaseRetriever):
                 "feature_extraction",
                 model=passage_embedding_model,
                 batch_size=self.batch_size,
-                _static_mode=True,
                 return_tensors="np",
                 max_len=max_seq_len_passage,
                 output_emb_size=output_emb_size,

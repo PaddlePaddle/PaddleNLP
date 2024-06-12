@@ -30,6 +30,7 @@ from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
     _load_state_dict_into_model,
+    faster_set_state_dict,
     get_parameter_dtype,
     load_state_dict,
     unwrap_model,
@@ -62,11 +63,13 @@ from paddlenlp.utils.env import (
     SAFE_WEIGHTS_NAME,
 )
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.nested import nested_copy, nested_copy_place
 
 if is_safetensors_available():
-    from safetensors import safe_open
+    # from safetensors import safe_open
     from safetensors.numpy import save_file as safe_save_file
 
+    from paddlenlp.utils.safetensors import fast_safe_open as safe_open
 
 FP32_MASTER = "fp32_master_0"
 optimizer_scalar_name = [
@@ -88,6 +91,11 @@ __all__ = [
 ]
 
 async_save_queue = []
+
+
+DEST_PLACE = paddle.CPUPlace()
+if paddle.device.is_compiled_with_cuda():
+    DEST_PLACE = paddle.CUDAPinnedPlace()
 
 
 class UnifiedCheckpointOption(ExplicitEnum):
@@ -195,7 +203,6 @@ def load_unified_checkpoint(args, model, optimizer, resume_from_checkpoint: str,
     Returns:
         None
     """
-
     if paddle.distributed.get_world_size() <= 1:
         load_single_card_checkpoint(args, model, resume_from_checkpoint)
         return
@@ -221,12 +228,15 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
         pretrained_model_name_or_path=resume_from_checkpoint,
         index_filename=os.path.join(resume_from_checkpoint, index_filename),
     )
-
     loaded_keys = sharded_metadata["all_checkpoint_keys"]
 
     model_state_dict = get_expected_state_dict(model)
     expected_keys = set(list(model_state_dict.keys()))
     missing_keys = expected_keys - set(loaded_keys)
+
+    use_fast_set = True
+    if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
+        use_fast_set = False
 
     if len(missing_keys) > 0:
         raise ValueError(f"missing_keys: {missing_keys}")
@@ -265,7 +275,9 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
             else:
                 tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
         # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-        state_dict = load_state_dict(shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys)
+        state_dict = load_state_dict(
+            shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys, device="expected"
+        )
 
         if not pre_tensor_parallel_split:
             # Since we load all keys but we only need one of pipeline stages
@@ -278,11 +290,14 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
                 None, model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
             )
 
-        error_msgs += _load_state_dict_into_model(model, state_dict, "")
+        if use_fast_set:
+            error_msgs += faster_set_state_dict(model, state_dict, strict_dtype=False)
+        else:
+            error_msgs += _load_state_dict_into_model(model, state_dict, "")
 
         # force memory release
         del state_dict
-        gc.collect()
+        # gc.collect()
 
     if len(error_msgs) > 0:
         error_msg = "\n\t".join(error_msgs)
@@ -336,6 +351,7 @@ def unified_checkpoint_into_shards(
             tp_actions = model_to_save.get_tensor_parallel_convert_actions(
                 model_to_save.config, state_dict.keys(), is_split=False, ignore_error=True
             )
+        logger.info("Unified model tensor parallel weights in shards")
         state_dict = merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys)
 
     # build index json file
@@ -489,6 +505,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
     # This should always be a list but, just to be sure.
     if not isinstance(resolved_archive_file, list):
         resolved_archive_file = [resolved_archive_file]
+
     if len(resolved_archive_file) > 1:
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
 
@@ -536,10 +553,10 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
                         tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)
 
                     # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-                    state_dict = load_state_dict(shard_file, tp_actions, expected_keys)
+                    state_dict = load_state_dict(shard_file, tp_actions, expected_keys, device="expected")
                 else:
                     # for pipeline model, we don't need to use tp_actions
-                    state_dict = load_state_dict(shard_file, None, expected_keys)
+                    state_dict = load_state_dict(shard_file, None, expected_keys, device="expected")
 
             returned_state_dict.update(state_dict)
             # force memory release
@@ -552,7 +569,6 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         state_dict_master_weight = load_resolved_archive_file(
             resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weights=True
         )
-
     # rename optimizer param
     for key in list(state_dict_optim.keys()):
         key_name = key.split("/")
@@ -561,13 +577,13 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
         else:
             key_name = "_".join([static_name, key_name[1]])
-        returned_optim_state_dict[key_name] = state_dict_optim[key]
+        returned_optim_state_dict[key_name] = state_dict_optim.pop(key)
         returned_optim_state_dict[key_name].name = key_name
 
     if has_master_weights:
         for key in list(state_dict_master_weight.keys()):
             static_name = struct2static_name_mappings[key]
-            returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight[key]
+            returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight.pop(key)
             returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, FP32_MASTER])
 
     returned_optim_state_dict = nested_copy_place(
@@ -639,6 +655,7 @@ def unified_optimizer_into_shards(
             tp_actions = model.get_tensor_parallel_convert_actions(
                 model.config, model_keys, is_split=False, ignore_error=True
             )
+        logger.info("Unified optimizer tensor parallel in shards")
         optim_state_dict = merge_tensor_parallel_for_optimizer(
             optim_state_dict,
             tp_actions,
@@ -647,6 +664,7 @@ def unified_optimizer_into_shards(
         paddle.device.cuda.empty_cache()
 
         if master_weights is not None:
+            logger.info("Unified master weight tensor parallel in shards")
             master_weights = merge_tensor_parallel_for_optimizer(
                 master_weights,
                 tp_actions,
@@ -702,7 +720,6 @@ def unified_optimizer_into_shards(
 def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization=False):
     index_filename = select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization, local=False)
     index_filename = os.path.join(resume_from_checkpoint, index_filename)
-
     # Find index json file and distribute this file in global group.
     if distributed_isfile(index_filename):
         distributed_file(index_filename)
@@ -902,6 +919,8 @@ def save_single_card_checkpoint(args, model_to_save, output_dir):
         sharded_index_json["type"] = "lora"
     elif isinstance(model_to_save, PrefixModelForCausalLM):
         sharded_index_json["type"] = "ptuning"
+
+    os.makedirs(output_dir, exist_ok=True)
     path = os.path.join(output_dir, index_filename)
     with open(path, "w") as f:
         json.dump(sharded_index_json, f, indent=4)
@@ -911,6 +930,13 @@ def save_single_card_checkpoint(args, model_to_save, output_dir):
 
     if isinstance(model_to_save, PrefixModelForCausalLM):
         save_prefix_past_key_value(model_to_save, output_dir)
+        model_to_save.prefix_config.save_pretrained(output_dir)
+    if isinstance(model_to_save, LoRAModel):
+        model_to_save.lora_config.save_pretrained(output_dir)
+
+    config_to_save = save_config(model_to_save)
+    config_to_save.architectures = [model_to_save.__class__.__name__]
+    config_to_save.save_pretrained(output_dir)
 
 
 def save_single_card_optimizer(args, model, optimizer, output_dir):
@@ -1003,6 +1029,11 @@ def get_expected_state_dict(model_to_save):
         state_dict = model_to_save.get_trainable_state_dict()
     elif isinstance(model_to_save, PrefixModelForCausalLM):
         state_dict = model_to_save.prefix_encoder.state_dict()
+
+    if hasattr(model_to_save, "_tied_weights_keys") and model_to_save._tied_weights_keys is not None:
+        for key in model_to_save._tied_weights_keys:
+            if key in state_dict:
+                state_dict.pop(key)
     return state_dict
 
 
@@ -1590,7 +1621,9 @@ def gather_sharded_object(index_file, total_size, is_optimizer=False):
     tp_group = hcg.get_model_parallel_group()
     pp_group = hcg.get_pipe_parallel_group()
 
-    logger.info("Unified checkpoint generating sharded_index json files.")
+    logger.info(
+        f"Unified checkpoint: generating sharded_index json files for {'optimizer or master weight' if is_optimizer else 'model weight'}."
+    )
 
     if tp_group.nranks > 1:
         dist.all_gather_object(index_file_list, index_file, tp_group)
@@ -1699,8 +1732,6 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
 
 
 def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
-    logger.info("Unified checkpoint merge tensor parallel in shards")
-
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
     tp_rank = tp_group.rank
@@ -1726,7 +1757,7 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
                 action = tp_actions.pop(key)
                 tensor = action(ret) if is_dst else None
             else:
-                tensor = tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None
+                tensor = tensor._copy_to(DEST_PLACE, False) if is_dst else None
 
             if is_dst:
                 state_dict_to_save[key] = tensor
@@ -1739,8 +1770,7 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
 
 
 def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys):
-    logger.info("Unified optimizer tensor parallel in shards")
-
+    # Core function for UC
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
     tp_rank = tp_group.rank
@@ -1758,15 +1788,13 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys)
             if model_key in tp_actions:
                 # for example: beta1, beta2
                 if tensor.numel().item() == 1:
-                    tensor = (
-                        tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None
-                    )  # Need broadcast when loaded
+                    tensor = tensor._copy_to(DEST_PLACE, False) if is_dst else None  # Need broadcast when loaded
                 else:
                     ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
                     action = tp_actions[model_key]
                     tensor = action(ret) if is_dst else None
             else:
-                tensor = tensor._copy_to(paddle.CPUPlace(), False) if is_dst else None
+                tensor = tensor._copy_to(DEST_PLACE, False) if is_dst else None
 
             if is_dst:
                 state_dict_to_save[filter_keys[i]] = tensor
@@ -1860,26 +1888,6 @@ def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
         if typename in optimizer_non_scaler_name and key_base in tp_actions:
             new_actions[key] = tp_actions[key_base]
     return new_actions
-
-
-def nested_copy(inputs):
-    if isinstance(inputs, dict):
-        outputs = {}
-        for key in list(inputs.keys()):
-            outputs[key] = nested_copy(inputs[key])
-        return outputs
-    return inputs
-
-
-def nested_copy_place(inputs, place=None, blocking=False):
-    if isinstance(inputs, dict):
-        outputs = {}
-        for key in list(inputs.keys()):
-            outputs[key] = nested_copy_place(inputs[key], place, blocking)
-        return outputs
-    if isinstance(inputs, paddle.Tensor):
-        inputs = inputs if inputs.place == place else inputs._copy_to(place, blocking)
-    return inputs
 
 
 def flatten_list(nested_list):

@@ -27,7 +27,10 @@ target_lists_for_gpt=(
 
 target_lists_for_llama=(
     "llm/llama/auto_parallel"
+    "paddlenlp/trainer/auto_trainer.py"
     "paddlenlp/transformers/llama/modeling_auto_static.py"
+    "paddlenlp/transformers/llama/modeling_auto.py"
+    "paddlenlp/transformers/llama/modeling.py"
     "scripts/distribute"
 )
 
@@ -41,24 +44,32 @@ install_paddle(){
 }
 
 install_paddlenlp(){
-    echo -e "\033[31m ---- Install paddlenlp  \033"
-    cd ${nlp_dir}
+    echo -e "\033[31m ---- Install paddlenlp by set PYTHONPATH  \033"
+    export PYTHONPATH=${nlp_dir}:$PYTHONPATH
     sed -i -e "s/paddlenlp/#paddlenlp/g" model_zoo/gpt-3/requirements.txt
-    export http_proxy=${proxy} && export https_proxy=${proxy}
-    python -m pip uninstall paddlenlp -y
-    rm -rf build/ && rm -rf paddlenlp.egg-info/ && rm -rf dist/
-    python -m pip install --ignore-installed -r requirements.txt
+    # export http_proxy=${proxy} && export https_proxy=${proxy}
+    # python -m pip uninstall paddlenlp -y
+    # rm -rf build/ && rm -rf paddlenlp.egg-info/ && rm -rf dist/
+    # python -m pip install --ignore-installed -r requirements.txt
+    # python -m pip install --ignore-installed -r requirements-dev.txt
+    # python setup.py install
+    # python setup.py build_ext
+    # python setup.py bdist_wheel
+    # unset http_proxy && unset https_proxy
+    # cd -
+    # python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
+}
+
+install_external_ops(){
+    echo -e "\033[31m ---- Install extern_ops  \033"
+    export PYTHONPATH=${nlp_dir}:$PYTHONPATH
+    cd ${nlp_dir}/model_zoo/gpt-3/external_ops
     python setup.py install
-    python setup.py build_ext
-    python setup.py bdist_wheel
-    unset http_proxy && unset https_proxy
-    cd -
-    python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
+    python -c "import fused_ln;";
 }
 ####################################
 get_diff_TO_case(){
 cd ${nlp_dir}
-export FLAGS_paddlenlp=0
 for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
     arr_file_name=(${file_name//// })
     dir1=${arr_file_name[0]}
@@ -67,9 +78,6 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
     dir4=${arr_file_name[3]}
     file_item=$dir1/$dir2/$dir3/$dir4
     echo "file_name:"${file_name}, "path:"${file_item}
-    if [[ ${dir1} =~ "paddlenlp" ]];then
-	    export FLAGS_paddlenlp=1
-    fi
     if [ ! -f ${file_name} ];then # 针对pr删掉文件
         continue
     elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
@@ -126,10 +134,11 @@ if [[ ${#case_list[*]} -ne 0 ]];then
 
     # Install paddle
     install_paddle
-    if [[ FLAGS_paddlenlp -eq 1 ]] || [[ $(contain_case llama_auto ${case_list[@]}; echo $?) -eq 1 ]];then
-        # 安装本地paddlenlp
-        install_paddlenlp
-    fi
+    # Install paddlenlp
+    install_paddlenlp
+    # Install external_ops
+    install_external_ops
+    
     case_num=1
     export FLAGS_install_deps=0
     export FLAGS_download_data=""
@@ -147,6 +156,13 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         export FLAGS_install_deps=1
         export FLAGS_download_data="gpt ""$FLAGS_download_data"
         let case_num++
+
+        echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_auto \033"
+        bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh llm_gpt_case_list_auto $FLAGS_install_deps $FLAGS_download_data
+        print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` gpt-3_auto
+        export FLAGS_install_deps=1
+        export FLAGS_download_data="gpt ""$FLAGS_download_data"
+        let case_num++        
     fi
     if [[ $(contain_case gpt-3_dygraph ${case_list[@]}; echo $?) -eq 1 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_dygraph \033"

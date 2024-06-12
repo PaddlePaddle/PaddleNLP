@@ -147,6 +147,7 @@ class LlamaConfig(PretrainedConfig):
         num_key_value_heads=None,
         initializer_range=0.02,
         rms_norm_eps=1e-6,
+        rope_theta=10000.0,
         use_cache=True,
         use_recompute=False,
         recompute_granularity="full",
@@ -168,6 +169,10 @@ class LlamaConfig(PretrainedConfig):
         alibi=False,
         rope_scaling_factor=1.0,
         rope_scaling_type=None,
+        long_sequence_strategy_type=None,
+        long_sequence_strategy_name=None,
+        long_sequence_init_args=None,
+        use_long_sequence_strategies=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -184,6 +189,7 @@ class LlamaConfig(PretrainedConfig):
 
         self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
+        self.rope_theta = rope_theta
 
         self.use_cache = use_cache
         self.use_recompute = use_recompute
@@ -207,6 +213,11 @@ class LlamaConfig(PretrainedConfig):
         self.use_fused_rope = use_fused_rope
         self.rope_scaling_factor = rope_scaling_factor
         self.rope_scaling_type = rope_scaling_type
+
+        self.long_sequence_strategy_type = long_sequence_strategy_type
+        self.long_sequence_strategy_name = long_sequence_strategy_name
+        self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
+        self.use_long_sequence_strategies = use_long_sequence_strategies
 
         super().__init__(
             pad_token_id=pad_token_id,

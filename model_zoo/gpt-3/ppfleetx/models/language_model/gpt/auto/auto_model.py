@@ -735,8 +735,8 @@ class GPTModelAuto(nn.Layer):
         if position_ids is None:
             past_length = 0
             if cache is not None:
-                past_length = paddle.shape(attention_mask)[-1] - 1
-            position_ids = paddle.arange(past_length, paddle.shape(input_ids)[-1] + past_length, dtype=input_ids.dtype)
+                past_length = attention_mask.shape[-1] - 1
+            position_ids = paddle.arange(past_length, input_ids.shape[-1] + past_length, dtype=input_ids.dtype)
             position_ids = position_ids.unsqueeze(0)
             position_ids = paddle.expand_as(position_ids, input_ids)
 
@@ -753,7 +753,7 @@ class GPTModelAuto(nn.Layer):
         if not self.fused_softmax_with_triangular or not paddle.is_compiled_with_cuda():
             # TODO, use registered buffer
             causal_mask = paddle.tensor.triu(
-                paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])) * -1e4, diagonal=1
+                paddle.ones((input_ids.shape[-1], input_ids.shape[-1])) * -1e4, diagonal=1
             )
             if attention_mask is not None:
                 if len(attention_mask.shape) == 2:
@@ -933,7 +933,7 @@ class GPTForGenerationAuto(nn.Layer):
     def update_scores_for_generation(self, scores, next_scores, length, unfinished_flag):
         # update scores
 
-        unfinished_scores = (scores * length + next_scores) / (length + 1)
+        unfinished_scores = (scores * length.astype(scores.dtype) + next_scores) / (length.astype(scores.dtype) + 1)
         scores = paddle.where(unfinished_flag, unfinished_scores, scores)
         return scores
 
@@ -972,7 +972,7 @@ class GPTForGenerationAuto(nn.Layer):
 
     def expand_inputs_for_generation(self, input_ids, expand_size, attention_mask=None, **model_kwargs):
 
-        index = paddle.tile(paddle.arange(paddle.shape(input_ids)[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
+        index = paddle.tile(paddle.arange(input_ids.shape[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
 
         input_ids = paddle.gather(input_ids, index)
 
@@ -1109,11 +1109,11 @@ class GPTForGenerationAuto(nn.Layer):
             probs = paddle.where(condition, paddle.full_like(probs, 0.0), probs)
             return probs
 
-        batch_size, cur_len = paddle.shape(input_ids)
+        batch_size, cur_len = input_ids.shape
         # used for compute on gpu, avoid memcpy D2H
         cur_len_gpu = paddle.full([1], cur_len, dtype="int64")
 
-        origin_len = paddle.shape(input_ids)[1]
+        origin_len = input_ids.shape[1]
         # used for compute on gpu, avoid memcpy D2H
         origin_len_gpu = paddle.full([1], origin_len, dtype="int64")
 
@@ -1167,7 +1167,7 @@ class GPTForGenerationAuto(nn.Layer):
                         raise ImportError(
                             "please install ppfleetx_ops by 'cd ppfleetx/ops && python setup_cuda.py install'!"
                         )
-                    top_ps_tensor = paddle.full(shape=[paddle.shape(probs)[0]], fill_value=top_p, dtype=probs.dtype)
+                    top_ps_tensor = paddle.full(shape=[probs.shape[0]], fill_value=top_p, dtype=probs.dtype)
                     # TODO fake random seed here
                     # Users should set the random seed dynamically when inference
                     _, next_tokens = topp_sampling(probs, top_ps_tensor, random_seed=100)
@@ -1299,7 +1299,7 @@ class GPTForGenerationAuto(nn.Layer):
 
         if model_kwargs.get("position_ids", None) is None:
             model_kwargs["position_ids"] = paddle.arange(
-                0, paddle.shape(model_kwargs["attention_mask"])[-1], dtype=input_ids.dtype
+                0, model_kwargs["attention_mask"].shape[-1], dtype=input_ids.dtype
             ).unsqueeze(0)
 
         self.is_encoder_decoder = False

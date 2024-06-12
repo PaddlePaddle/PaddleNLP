@@ -142,7 +142,7 @@ def scaled_dot_product_attention(
     query_states, key_states, value_states, attention_mask, output_attentions, config, is_causal=True
 ):
 
-    bsz, q_len, num_heads, _ = paddle.shape(query_states)
+    bsz, q_len, num_heads, _ = query_states.shape
     head_dim = config.hidden_size // config.num_attention_heads
     _, kv_seq_len, _, _ = value_states.shape
 
@@ -1054,7 +1054,7 @@ class Ernie35Model(Ernie35PretrainedModel):
         seq_length_with_past = seq_length
         cache_length = 0
         if past_key_values[0] is not None:
-            cache_length = paddle.shape(past_key_values[0][0])[1]
+            cache_length = past_key_values[0][0].shape[1]
             seq_length_with_past += cache_length
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids).astype(self.embed_tokens.weight.dtype)
@@ -1181,17 +1181,35 @@ class Ernie35LMHead(nn.Layer):
         else:
             vocab_size = config.vocab_size
 
-        self.weight = self.create_parameter(
-            shape=[vocab_size, config.hidden_size] if config.tie_word_embeddings else [config.hidden_size, vocab_size],
-            dtype=paddle.get_default_dtype(),
-        )
-        if config.weight_share_add_bias and config.use_bias:
-            self.bias = self.create_parameter(
-                shape=[vocab_size],
+        if vocab_size != config.vocab_size:
+            with get_rng_state_tracker().rng_state():
+                self.weight = self.create_parameter(
+                    shape=[vocab_size, config.hidden_size]
+                    if config.tie_word_embeddings
+                    else [config.hidden_size, vocab_size],
+                    dtype=paddle.get_default_dtype(),
+                )
+                if config.weight_share_add_bias and config.use_bias:
+                    self.bias = self.create_parameter(
+                        shape=[vocab_size],
+                        dtype=paddle.get_default_dtype(),
+                    )
+                else:
+                    self.bias = None
+        else:
+            self.weight = self.create_parameter(
+                shape=[vocab_size, config.hidden_size]
+                if config.tie_word_embeddings
+                else [config.hidden_size, vocab_size],
                 dtype=paddle.get_default_dtype(),
             )
-        else:
-            self.bias = None
+            if config.weight_share_add_bias and config.use_bias:
+                self.bias = self.create_parameter(
+                    shape=[vocab_size],
+                    dtype=paddle.get_default_dtype(),
+                )
+            else:
+                self.bias = None
 
         # Must set distributed attr for Tensor Parallel !
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False

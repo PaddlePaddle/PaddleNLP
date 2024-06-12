@@ -33,8 +33,12 @@ all_P0case_dic=(["waybill_ie"]=3 ["msra_ner"]=15 ["glue"]=2 ["bert"]=2 ["skep"]=
 ["ernie-ctm"]=5 ["distilbert"]=5  ["transformer"]=5 ["pet"]=5 ["efl"]=5 ["p-tuning"]=5 ["ernie-doc"]=20 ["transformer-xl"]=5 \
 ["question_matching"]=5 ["ernie-csc"]=5 ["nptag"]=5 ["ernie-m"]=5 ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5 \
 ["fast_generation"]=10 ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5 ["ernie-health"]=5 ["llm"]=5 \
-["ernie"]=2 ["ernie_m"]=5 ["ernie_layout"]=5 ["ernie_csc"]=5 ["ernie_ctm"]=5 ["ernie_doc"]=20 ["ernie_health"]=5 ["segment_parallel_utils"]=5)
+["ernie"]=2 ["ernie_m"]=5 ["ernie_layout"]=5 ["ernie_csc"]=5 ["ernie_ctm"]=5 ["ernie_doc"]=20 ["ernie_health"]=5 ["segment_parallel_utils"]=5 ["ring_flash_attention"]=5)
 ####################################
+
+python -m pip config --user set global.index http://pip.baidu-int.com/search/
+python -m pip config --user set global.index-url http://pip.baidu-int.com/simple
+python -m pip config --user set global.trusted-host pip.baidu-int.com
 # Insatll paddlepaddle-gpu
 install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
@@ -55,6 +59,7 @@ nlp_build (){
     rm -rf dist/
 
     python -m pip install -r requirements.txt
+    python -m pip install -r requirements-dev.txt
     python setup.py bdist_wheel
     # python -m pip install --ignore-installed  dist/p****.whl
 }
