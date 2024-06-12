@@ -163,7 +163,7 @@ class QWenAttention(nn.Layer):
             self.c_proj = RowParallelLinear(
                 config.hidden_size,
                 self.projection_size,
-                has_bias=False,
+                has_bias=not config.no_bias,
                 input_is_parallel=True,
             )
         else:
