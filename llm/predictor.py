@@ -650,6 +650,11 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         if predictor_args.device in paddle.device.get_all_custom_device_type():
             device_id = int(os.environ.get("FLAGS_selected_{}s".format(predictor_args.device), 0))
             config.enable_custom_device(predictor_args.device, device_id)
+        elif predictor_args.device == "xpu":
+            raise ValueError(
+                "you should export xpu static model with --block_attn flag and use predictor with --block_attn too" 
+                "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/inference.md"
+            )
         else:
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
             config.enable_use_gpu(100, device_id)
@@ -1076,6 +1081,16 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
         if predictor_args.device in paddle.device.get_all_custom_device_type():
             device_id = int(os.environ.get("FLAGS_selected_{}s".format(predictor_args.device), 0))
             config.enable_custom_device(predictor_args.device, device_id)
+        elif predictor_args.device == "xpu":
+            config.enable_xpu()
+            device_id = int(os.environ.get("FLAGS_selected_xpus", 0))
+            config.set_xpu_device_id(device_id)
+            xpu_config = paddle.inference.XpuConfig()
+            xpu_config.device_id = device_id
+            xpu_config.l3_size = 63*1024*1024
+            xpu_config.l3_autotune_size = 63*1024*1024
+            config.set_xpu_config(xpu_config)
+            config.enable_new_executor()
         else:
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
             config.enable_use_gpu(100, device_id)
@@ -1331,6 +1346,11 @@ def create_predictor(
                         tensor_parallel_rank=tensor_parallel_rank,
                     )
                 else:
+                    if predictor_args.device == "xpu":
+                        raise ValueError(
+                            "you should run xpu dynamic model with --block_attn flag" 
+                            "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/inference.md"
+                        )
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMInferenceModel as LlamaInferenceModel,
                     )
