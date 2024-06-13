@@ -19,22 +19,19 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed.fleet.layers.mpu import mp_ops
-from paddle.distributed.fleet.meta_parallel import (
-    ColumnParallelLinear,
-    RowParallelLinear,
-)
+
 
 
 class VeRALinear(nn.Linear):
-    # LoRA implemented in a dense layer
+    # VeRA implemented in a dense layer
     def __init__(
         self,
         base_linear_module: paddle.nn.layer.common.Linear,
         in_features: int,
         out_features: int,
         r: int = 0,
-        lora_alpha: int = 1,
-        lora_dropout: float = 0.0,
+        vera_alpha: int = 1,
+        vera_dropout: float = 0.0,
         merge_weights: bool = True,
         pissa_init : bool = False,
         **kwargs
@@ -45,18 +42,18 @@ class VeRALinear(nn.Linear):
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")
         self.r = r
-        self.lora_alpha = lora_alpha
+        self.vera_alpha = vera_alpha
         # Optional dropout
-        if lora_dropout > 0.0:
-            self.lora_dropout = nn.Dropout(p=lora_dropout)
+        if vera_dropout > 0.0:
+            self.vera_dropout = nn.Dropout(p=vera_dropout)
         else:
-            self.lora_dropout = lambda x: x
+            self.vera_dropout = lambda x: x
         # Mark the weight as unmerged
         self.merged = False
         self.merge_weights = merge_weights
 
         if pissa_init:
-            assert self.lora_alpha == self.r, "pissa方法要求lora_alpha==r,scaling=1"
+            assert self.vera_alpha == self.r, "pissa method requires vera_alpha=r, scaling=1"
             self.scaling = 1.0
             self.lora_A = self.create_parameter(
                 shape=[in_features, r],
@@ -84,7 +81,7 @@ class VeRALinear(nn.Linear):
                 is_bias=False,
                 default_initializer=nn.initializer.Constant(value=0.0),
             )
-        self.scaling = self.lora_alpha / self.r
+        self.scaling = self.vera_alpha / self.r
         
         self.vera_b = self.create_parameter(
                 shape=[out_features],
@@ -102,17 +99,12 @@ class VeRALinear(nn.Linear):
 
         # Freezing the pre-trained weight matrix and bias vector
         self.weight.stop_gradient = True
-        # self.bias.stop_gradient = True
+
         
 
     def pissa_init(self, r):
-        # print('分解前的矩阵', self.weight[0])
-        print('svd start')
         weight = self.weight
         dtype = weight.dtype
-        # device = weight.device
-        
-        # print('before svd weight', weight)
 
         if dtype != paddle.float32:
             weight = weight.astype(paddle.float32)
@@ -125,29 +117,12 @@ class VeRALinear(nn.Linear):
         
         lora_A = (Ur @ paddle.diag(paddle.sqrt(Sr)))
         lora_B = (paddle.diag(paddle.sqrt(Sr)) @ Vhr)
-        # print(lora_A.shape)
-        # print(lora_B.shape)
+
         self.lora_A.set_value(lora_A.astype(dtype))
         self.lora_B.set_value(lora_B.astype(dtype))
         res = weight.data - lora_A @ lora_B
         weight = res.astype(dtype)
         self.weight.set_value(weight) 
-        
-        
-        # print('after svd weight', weight)
-
-        # print('after svd lora_A', lora_A)
-
-        
-        # print('svd分解得到的A', lora_A[0])
-        # print('after loraa weight', self.lora_A[0])
-        # print('=' * 100)
-        # print('svd分解得到的B', lora_B[0])
-        # print('after lorab weight', self.lora_B[0])
-        # print('=' * 100)
-        # print('svd分解得到的残差', res[0])
-        # print('after self weight', self.weight[0])
-
         
 
     def train(self):
@@ -173,10 +148,10 @@ class VeRALinear(nn.Linear):
     def forward(self, input: paddle.Tensor, *args, **kwargs):
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if not self.merged:
-            # result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
+            # result += (self.vera_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
             diag_b = paddle.diag(self.vera_b)
             diag_d = paddle.diag(self.vera_d)
-            result += (self.lora_dropout(input) @ self.lora_A @ diag_d @ self.lora_B @ diag_b) * self.scaling
+            result += (self.vera_dropout(input) @ self.lora_A @ diag_d @ self.lora_B @ diag_b) * self.scaling
         return result
 
     def extra_repr(self):

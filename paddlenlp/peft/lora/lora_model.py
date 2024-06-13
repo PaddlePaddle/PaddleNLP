@@ -604,18 +604,8 @@ class LoRAModel(nn.Layer):
             raise ValueError(
                 f"LoRA strategy only supports paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear or paddlenlp.transformers.sequence_utils. {module}({module_name} {type(module).__name__}) is not supported。"
             )
-        if getattr(lora_module, "quant_weight", None) is not None:
-            lora_module.quant_weight = module.quant_weight
-            if getattr(lora_module, "quant_scale", None) is not None:
-                lora_module.quant_scale = module.quant_scale
-            if getattr(lora_module, "qquant_scale", None) is not None:
-                lora_module.qquant_scale = module.qquant_scale
-            if getattr(lora_module, "double_quant_scale", None) is not None:
-                lora_module.double_quant_scale = module.double_quant_scale
-            if getattr(lora_module, "quant_sacle_offset", None) is not None:
-                lora_module.quant_sacle_offset = module.quant_sacle_offset
-        else:
-            lora_module.weight = module.weight
+
+        lora_module.weight = module.weight
         if module.bias is not None:
             lora_module.bias = module.bias
         setattr(parent_module, attribute_chain[-1], lora_module)

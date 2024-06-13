@@ -49,15 +49,15 @@ class VeRAConfig:
             "For example, ['q', 'v'] or '.*decoder.*(SelfAttention|EncDecAttention).*(q|v)$' "
         },
     )
-    lora_alpha: int = field(default=8, metadata={"help": "Lora alpha"})
-    lora_dropout: float = field(default=0.0, metadata={"help": "Lora dropout"})
+    vera_alpha: int = field(default=8, metadata={"help": "Lora alpha"})
+    vera_dropout: float = field(default=0.0, metadata={"help": "Lora dropout"})
     merge_weights: bool = field(
         default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
     )
     trainable_bias: Optional[str] = field(
         default=None, metadata={"help": "Define trainable bias parameters for the Lora model."}
     )
-    enable_lora_list: Optional[Union[List[bool], List[Optional[List[bool]]]]] = field(
+    enable_vera_list: Optional[Union[List[bool], List[Optional[List[bool]]]]] = field(
         default=None,
         metadata={
             "help": "Provides fine-grained control over `MergedLoRALinear`. If None, `LoRALinear` is used instead."
