@@ -96,7 +96,7 @@ class LlamaEmbeddingPipe(nn.Layer):
         self.config = config
         self.sequence_parallel = config.sequence_parallel
         self.hidden_size = config.hidden_size
-        if config.tensor_parallel_degree > 1:
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
                 config.hidden_size,
@@ -183,15 +183,25 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
             if attention_mask is not None or alibi is not None:
                 hidden_states = recompute(
-                    super().forward, hidden_states, attention_mask=attention_mask, alibi=alibi, use_reentrant=False
+                    super().forward,
+                    hidden_states,
+                    position_ids=position_ids,
+                    attention_mask=attention_mask,
+                    alibi=alibi,
+                    use_reentrant=False,
                 )
             else:
                 # for pretrain
                 hidden_states = recompute(
-                    super().forward, hidden_states, use_reentrant=self.config.recompute_use_reentrant
+                    super().forward,
+                    hidden_states,
+                    position_ids=position_ids,
+                    use_reentrant=self.config.recompute_use_reentrant,
                 )
         else:
-            hidden_states = super().forward(hidden_states, attention_mask=attention_mask, alibi=alibi)
+            hidden_states = super().forward(
+                hidden_states, position_ids=position_ids, attention_mask=attention_mask, alibi=alibi
+            )
 
         return return_args(hidden_states, attention_mask, position_ids, alibi)
 
@@ -252,7 +262,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 f"llama.layers.{i}",
             )
         self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config), "llama")
-        self.add_sequential_layer(LayerDesc(LlamaLMHead, config=config), "lm_head")
+        self.add_head(config)
 
         recompute_interval = 0
 
@@ -263,7 +273,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         PipelineLayer.__init__(
             self,
             layers=self.get_sequential_layers(),
-            loss_fn=LlamaPretrainingCriterion(config),
+            loss_fn=self.get_loss_fn(config),
             topology=get_hcg().topology(),
             seg_method=seg_method,
             recompute_interval=recompute_interval,
@@ -278,3 +288,9 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.apply(self._init_weights)
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)
+
+    def add_head(self, config):
+        self.add_sequential_layer(LayerDesc(LlamaLMHead, config=config), "lm_head")
+
+    def get_loss_fn(self, config):
+        return LlamaPretrainingCriterion(config)

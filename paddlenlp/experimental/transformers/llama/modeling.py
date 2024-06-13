@@ -122,7 +122,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.quant_type
             )
 
-        if config.tensor_parallel_degree > 1:
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
                 self.vocab_size,
                 self.hidden_size,
