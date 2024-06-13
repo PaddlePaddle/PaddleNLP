@@ -20,8 +20,11 @@ import sys
 import tempfile
 
 import paddle
+from filelock import FileLock
 
 from tests.testing_utils import argv_context_guard, load_test_config
+
+lock = FileLock(".predictor_lock_guard.txt.lock")
 
 
 class LLMTest:
@@ -56,6 +59,7 @@ class LLMTest:
                 result.append(data["output"])
         return result
 
+    @lock
     def run_predictor(self, config_params=None):
         if config_params is None:
             config_params = {}
