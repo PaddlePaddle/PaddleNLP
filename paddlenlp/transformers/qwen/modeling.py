@@ -269,12 +269,6 @@ class QWenAttention(nn.Layer):
         tensor = tensor.reshape(new_shape)
         return tensor
 
-    def _merge_heads(self, tensor, num_heads, attn_head_size):
-        new_shape = tensor.shape[:-2] + [
-            num_heads * attn_head_size,
-        ]
-        return tensor.reshape(new_shape)
-
     def forward(
         self,
         hidden_states,
@@ -284,7 +278,6 @@ class QWenAttention(nn.Layer):
         encoder_hidden_states=None,
         encoder_attention_mask=None,
         output_attentions=False,
-        alibi=None,
         use_cache=False,
     ):
         # [bz, sql, hid] ==> [bz, sql, 3*hid]
@@ -366,10 +359,8 @@ class QWenAttention(nn.Layer):
                 query,
                 key,
                 value,
-                attention_mask,
-                output_attentions,
-                alibi,
                 self.sequence_parallel,
+                attention_mask,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
