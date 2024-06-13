@@ -23,7 +23,7 @@ Build and setup XPU custom ops for ERNIE Bot.
 from paddle.utils.cpp_extension import CppExtension, setup
 
 setup(
-    name="custom_setup_ops",
+    name="paddlenlp_ops",
     ext_modules=[
         CppExtension(
             sources=[
