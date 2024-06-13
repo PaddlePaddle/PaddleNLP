@@ -11,7 +11,7 @@
     "sharding": "stage1",
     "sharding_parallel_config": "split_param enable_stage1_overlap enable_stage1_allgather_overlap",
     "tensor_parallel_config": "enable_delay_scale_loss enable_mp_async_allreduce enable_mp_skip_c_identity enable_mp_fused_linear_param_grad_add",
-    "pipeline_parallel_config": "enable_delay_scale_loss enable_sharding_comm_overlap enable_release_grads",
+    "pipeline_parallel_config": "enable_delay_scale_loss enable_sharding_comm_overlap",
     "virtual_pp_degree": 5,
     "sequence_parallel": 0,   
     "use_flash_attention": true,
