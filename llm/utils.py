@@ -150,6 +150,16 @@ def get_lora_target_modules(model):
             ".*mlp.w2.*",
             ".*mlp.c_proj.*",
         ]
+    elif model.base_model_prefix == "qwen2":
+        target_modules = [
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*o_proj.*",
+            ".*gate_proj.*",
+            ".*down_proj.*",
+            ".*up_proj.*",
+        ]
     elif model.base_model_prefix == "mixtral":
         target_modules = [
             ".*q_proj.*",

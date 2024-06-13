@@ -22,6 +22,7 @@ from typing import Optional, Tuple
 
 import regex as re
 
+from ...utils.log import logger
 from .. import AddedToken, PretrainedTokenizer
 
 VOCAB_FILES_NAMES = {
@@ -31,7 +32,7 @@ VOCAB_FILES_NAMES = {
 
 __all__ = ["Qwen2Tokenizer"]
 
-MAX_MODEL_INPUT_SIZES = {"qwen/qwen-tokenizer": 32768}
+MAX_MODEL_INPUT_SIZES = {"__internal_testing__/tiny-random-qwen2": 32768}
 
 PRETOKENIZE_REGEX = r"""(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+"""
 
@@ -130,6 +131,12 @@ class Qwen2Tokenizer(PretrainedTokenizer):
     model_input_names = ["input_ids", "attention_mask"]
     max_model_input_sizes = MAX_MODEL_INPUT_SIZES
 
+    pretrained_resource_files_map = {
+        "vocab_file": {
+            "__internal_testing__/tiny-random-qwen2": "https://bj.bcebos.com/paddlenlp/models/community/qwen2/vocab.json",
+        },
+    }
+
     def __init__(
         self,
         vocab_file,
@@ -143,7 +150,6 @@ class Qwen2Tokenizer(PretrainedTokenizer):
         split_special_tokens=False,
         **kwargs,
     ):
-        super().__init__(**kwargs)
         # Qwen vocab does not contain control tokens; added tokens need to be special
         bos_token = (
             AddedToken(bos_token, lstrip=False, rstrip=False, special=True, normalized=False)
@@ -188,14 +194,10 @@ class Qwen2Tokenizer(PretrainedTokenizer):
 
         self.pat = re.compile(PRETOKENIZE_REGEX)
 
-        # if kwargs.get("add_prefix_space", False):
-        #     logger.warning_once(
-        #         f"{self.__class__.__name} does not support `add_prefix_space`, setting it to True has no effect."
-        #     )
-        self.bos_token_id = kwargs["bos_token_id"] if "bos_token_id" in kwargs else None
-        self.eos_token_id = kwargs["eos_token_id"] if "eos_token_id" in kwargs else None
-        self.unk_token_id = kwargs["unk_token_id"] if "unk_token_id" in kwargs else None
-        self.pad_token_id = kwargs["pad_token_id"] if "pad_token_id" in kwargs else None
+        if kwargs.get("add_prefix_space", False):
+            logger.warning_once(
+                f"{self.__class__.__name} does not support `add_prefix_space`, setting it to True has no effect."
+            )
 
         super().__init__(
             errors=errors,
@@ -300,9 +302,9 @@ class Qwen2Tokenizer(PretrainedTokenizer):
         )
 
     def save_vocabulary(self, save_directory: str, filename_prefix: Optional[str] = None) -> Tuple[str]:
-        # if not os.path.isdir(save_directory):
-        #     logger.error(f"Vocabulary path ({save_directory}) should be a directory")
-        #     return
+        if not os.path.isdir(save_directory):
+            logger.error(f"Vocabulary path ({save_directory}) should be a directory")
+            return
         vocab_file = os.path.join(
             save_directory, (filename_prefix + "-" if filename_prefix else "") + VOCAB_FILES_NAMES["vocab_file"]
         )
@@ -318,10 +320,10 @@ class Qwen2Tokenizer(PretrainedTokenizer):
             writer.write("#version: 0.2\n")
             for bpe_tokens, token_index in sorted(self.bpe_ranks.items(), key=lambda kv: kv[1]):
                 if index != token_index:
-                    # logger.warning(
-                    #     f"Saving vocabulary to {merge_file}: BPE merge indices are not consecutive."
-                    #     " Please check that the tokenizer is not corrupted!"
-                    # )
+                    logger.warning(
+                        f"Saving vocabulary to {merge_file}: BPE merge indices are not consecutive."
+                        " Please check that the tokenizer is not corrupted!"
+                    )
                     index = token_index
                 writer.write(" ".join(bpe_tokens) + "\n")
                 index += 1

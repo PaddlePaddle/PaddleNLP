@@ -67,6 +67,8 @@ __all__ = [
     "Qwen2PretrainedModel",
     "Qwen2ForCausalLM",
     "Qwen2PretrainingCriterion",
+    "Qwen2ForSequenceClassification",
+    "Qwen2ForTokenClassification",
 ]
 
 
@@ -112,7 +114,7 @@ def assign_kv_heads(num_kv_heads: int, num_gpus: int):
     return assignment_list
 
 
-def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
+def parallel_matmul(x: Tensor, y: Tensor, transpose_y=True, tensor_parallel_output=True):
     is_fleet_init = True
     tensor_parallel_degree = 1
     try:
@@ -130,7 +132,7 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
     if is_fleet_init and tensor_parallel_degree > 1 and y_is_distributed:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, y, transpose_y=False)
+        logits = paddle.matmul(input_parallel, y, transpose_y=transpose_y)
 
         if tensor_parallel_output:
             return logits
@@ -138,7 +140,7 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
-        logits = paddle.matmul(x, y, transpose_y=False)
+        logits = paddle.matmul(x, y, transpose_y=transpose_y)
         return logits
 
 
@@ -1143,7 +1145,7 @@ class Qwen2PretrainingCriterion(nn.Layer):
 
 
 class Qwen2LMHead(nn.Layer):
-    def __init__(self, config: Qwen2Config):
+    def __init__(self, config: Qwen2Config, embedding_weights=None):
         super(Qwen2LMHead, self).__init__()
         self.config = config
         if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
@@ -1151,10 +1153,22 @@ class Qwen2LMHead(nn.Layer):
         else:
             vocab_size = config.vocab_size
 
-        self.weight = self.create_parameter(
-            shape=[config.hidden_size, vocab_size],
-            dtype=paddle.get_default_dtype(),
-        )
+        if embedding_weights is not None:
+            self.weight = embedding_weights
+        else:
+            # TODO: modify for Tensor Parallel
+            if vocab_size != config.vocab_size:
+                with get_rng_state_tracker().rng_state():
+                    self.weight = self.create_parameter(
+                        shape=[vocab_size, config.hidden_size],
+                        dtype=paddle.get_default_dtype(),
+                    )
+            else:
+                self.weight = self.create_parameter(
+                    shape=[vocab_size, config.hidden_size],
+                    dtype=paddle.get_default_dtype(),
+                )
+
         # Must set distributed attr for Tensor Parallel !
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
         if self.weight.is_distributed:
@@ -1169,7 +1183,9 @@ class Qwen2LMHead(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
+        logits = parallel_matmul(
+            hidden_states, self.weight, transpose_y=True, tensor_parallel_output=tensor_parallel_output
+        )
         return logits
 
 
@@ -1180,7 +1196,11 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
     def __init__(self, config: Qwen2Config):
         super().__init__(config)
         self.qwen2 = Qwen2Model(config)
-        self.lm_head = Qwen2LMHead(config)
+        if config.tie_word_embeddings:
+            self.lm_head = Qwen2LMHead(config, embedding_weights=self.qwen2.embed_tokens.weight)
+            self.tie_weights()
+        else:
+            self.lm_head = Qwen2LMHead(config)
         self.criterion = Qwen2PretrainingCriterion(config)
         self.vocab_size = config.vocab_size
 
@@ -1250,10 +1270,18 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
             model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[..., -1:] + 1], axis=-1)
 
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
+            # TODO: support attention mask for other models
             attention_mask = model_kwargs["attention_mask"]
-            model_kwargs["attention_mask"] = paddle.concat(
-                [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
-            )
+            if len(attention_mask.shape) == 2:
+                model_kwargs["attention_mask"] = paddle.concat(
+                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)],
+                    axis=-1,
+                )
+            elif len(attention_mask.shape) == 4:
+                model_kwargs["attention_mask"] = paddle.concat(
+                    [attention_mask, paddle.ones([*attention_mask.shape[:3], 1], dtype=attention_mask.dtype)],
+                    axis=-1,
+                )[:, :, -1:, :]
 
         return model_kwargs
 
@@ -1347,7 +1375,7 @@ class Qwen2ForSequenceClassification(Qwen2PretrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.qwen2 = Qwen2Model(config)
-        self.score = nn.Linear(config.hidden_size, self.num_labels, bias=False)
+        self.score = nn.Linear(config.hidden_size, self.num_labels, bias_attr=False)
 
     def get_input_embeddings(self):
         return self.qwen2.embed_tokens
@@ -1402,17 +1430,17 @@ class Qwen2ForSequenceClassification(Qwen2PretrainedModel):
         else:
             if input_ids is not None:
                 # if no pad token found, use modulo instead of reverse indexing for ONNX compatibility
-                sequence_lengths = paddle.eq(input_ids, self.config.pad_token_id).int().argmax(-1) - 1
+                sequence_lengths = paddle.equal(input_ids, self.config.pad_token_id).astype("int32").argmax(-1) - 1
                 sequence_lengths = sequence_lengths % input_ids.shape[-1]
-                sequence_lengths = sequence_lengths.to(logits.device)
+                sequence_lengths = sequence_lengths
             else:
                 sequence_lengths = -1
 
-        pooled_logits = logits[paddle.arange(batch_size, device=logits.device), sequence_lengths]
+        # pooled_logits = logits[paddle.arange(batch_size), sequence_lengths]
+        pooled_logits = logits.gather_nd(paddle.stack([paddle.arange(logits.shape[0]), sequence_lengths], axis=-1))
 
         loss = None
         if labels is not None:
-            labels = labels.to(logits.device)
             if self.config.problem_type is None:
                 if self.num_labels == 1:
                     self.config.problem_type = "regression"

@@ -31,6 +31,8 @@ from .testing_utils import LLMTest
     [
         ["llama"],
         ["qwen"],
+        ["qwen2"],
+        ["qwen2_moe"],
         ["gpt"],
     ],
 )
