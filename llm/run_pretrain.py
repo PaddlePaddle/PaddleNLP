@@ -20,7 +20,6 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 import paddle
-from paddle.io.reader import use_pinned_memory
 
 from paddlenlp.data.causal_dataset import (
     build_train_valid_test_datasets,
@@ -505,6 +504,8 @@ def main():
             "enable_stage1_allgather_overlap" in training_args.sharding_parallel_config
             or "enable_stage1_broadcast_overlap" in training_args.sharding_parallel_config
         ):
+            from paddle.io.reader import use_pinned_memory
+
             use_pinned_memory(False)
 
     if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
