@@ -759,7 +759,8 @@ class Qwen2PretrainedModel(PretrainedModel):
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
                 mapping[1] = "qwen2." + mapping[1]
-            model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
+            if not config.tie_word_embeddings:
+                model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
@@ -779,11 +780,14 @@ class Qwen2PretrainedModel(PretrainedModel):
             final_actions = {}
 
             base_actions = {
-                "lm_head.weight": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
             }
+            if config.tie_word_embeddings:
+                base_actions["lm_head.weight"] = partial(fn, is_column=False)
+            else:
+                base_actions["lm_head.weight"] = partial(fn, is_column=True)
 
             if not config.vocab_size % config.tensor_parallel_degree == 0:
                 base_actions.pop("lm_head.weight")
@@ -1153,19 +1157,21 @@ class Qwen2LMHead(nn.Layer):
         else:
             vocab_size = config.vocab_size
 
+        self.transpose_y = False
         if embedding_weights is not None:
+            self.transpose_y = True
             self.weight = embedding_weights
         else:
-            # TODO: modify for Tensor Parallel
+            self.transpose_y = False
             if vocab_size != config.vocab_size:
                 with get_rng_state_tracker().rng_state():
                     self.weight = self.create_parameter(
-                        shape=[vocab_size, config.hidden_size],
+                        shape=[config.hidden_size, vocab_size],
                         dtype=paddle.get_default_dtype(),
                     )
             else:
                 self.weight = self.create_parameter(
-                    shape=[vocab_size, config.hidden_size],
+                    shape=[config.hidden_size, vocab_size],
                     dtype=paddle.get_default_dtype(),
                 )
 
@@ -1184,7 +1190,7 @@ class Qwen2LMHead(nn.Layer):
             tensor_parallel_output = self.config.tensor_parallel_output
 
         logits = parallel_matmul(
-            hidden_states, self.weight, transpose_y=True, tensor_parallel_output=tensor_parallel_output
+            hidden_states, self.weight, transpose_y=self.transpose_y, tensor_parallel_output=tensor_parallel_output
         )
         return logits
 
