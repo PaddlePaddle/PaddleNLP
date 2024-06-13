@@ -32,6 +32,7 @@ from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_chec
 from paddlenlp.transformers import AutoConfig, AutoTokenizer, LlamaTokenizer
 from paddlenlp.utils.log import logger
 
+
 @dataclass
 class TrainingArguments(TrainingArguments):
     loss_type: Literal["token-wise", "sequence-wise"] = field(

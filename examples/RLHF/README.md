@@ -1,6 +1,6 @@
 # RLHF PPO
 
-提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例。其中 PPO 代码实现细节参考了 [PKU-Alignment/safe-rlhf](https://github.com/PKU-Alignment/safe-rlhf)（PKU Beaver） 中的 PPO 实现，支持reward normalization、pretraining loss等常用的 PPO 稳定训练策略；示例使用 PKU-Alignment/safe-rlhf 提供的部分数据集和模型。后续将持续完善扩展，支持更好效果、更低成本、更高性能、更大规模的 RLHF 能力。
+提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。其中 PPO 代码实现细节参考了 [PKU-Alignment/safe-rlhf](https://github.com/PKU-Alignment/safe-rlhf)（PKU Beaver） 中的 PPO 实现，支持reward normalization、pretraining loss等常用的 PPO 稳定训练策略；示例使用 PKU-Alignment/safe-rlhf 提供的部分数据集和模型。后续将持续完善扩展，支持更好效果、更低成本、更高性能、更大规模的 RLHF 能力。
 
 ## 快速开始
 
@@ -14,6 +14,9 @@
 ├── ppo_main.py                  # RLHF训练脚本
 ├── ppo_config.json              # RLHF训练配置文件
 ├── ppo_trainer.py               # RLHF训练执行器py脚本
+├── ppo_config.json              # RLHF训练配置文件
+├── trainer_utils.py             # Trainer补丁及工具py脚本
+├── infer_utils.py               # 生成加速工具py脚本
 ├── data                         # 数据集相关目录
 │ └── base.py                    # 数据集基类及工具py文件
 │ └── alpaca.py                  # alpaca(raw)数据集py文件
@@ -24,6 +27,10 @@
 ├── models                       # 模型相关目录
 │ └── score_model_utils.py       # score model基类及工具py文件
 │ └── score_model.py             # score model模型定义py文件
+│ └── ppo_model_utils.py         # PPO loss等模型策略py文件
+│ └── pp_model_utils.py          # 流水线并行补丁及工具py文件
+│ └── model_pp.py                # 流水线并行模型py文件
+│ └── infer_model_utils.py       # 预测加速模型补丁及工具py文件
 └── README.md
 ```
 
@@ -31,9 +38,9 @@
 
 - Python >= 3.10
 - PaddlePaddle >= 2.6.0
-- PaddleNLP >= 2.6.0
+- PaddleNLP 最新版本
 
-此外还需要安装以下依赖：`pip install rich`
+如需使用生成加速功能，需要安装 [paddlenlp_ops](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/csrc) ，请使用 `git clone https://github.com/PaddlePaddle/PaddleNLP.git` 克隆 PaddleNLP 代码库并且将 PaddleNLP/llm 目录的路径加入 PYTHONPATH（后续将进行完善）。安装 paddlenlp_ops 后训练时将直接开启生成加速（开启流水线并行时不支持生成加速），否则使用原生动态图进行生成。
 
 ### 数据准备
 
@@ -184,7 +191,8 @@ python -u -m paddle.distributed.launch reward_main.py ./reward_config.json
 RLHF 阶段需要 actor model、reference model、critic model、reward model 四个模型；actor-model/reference-model 使用 SFT 模型进行 initialize/frozen；critic-model/reward-model 使用 reward 模型进行 initialize/frozen (另外注意若 SFT 使用 LoRA 请先将 LoRA 权重合并）。这里使用 PKU-Alignment/PKU-SafeRLHF 提供的 SFT 模型（[PKU-Alignment/alpaca-7b-reproduced](https://huggingface.co/PKU-Alignment/alpaca-7b-reproduced)）和 reward 模型（[PKU-Alignment/beaver-7b-v1.0-reward](https://huggingface.co/PKU-Alignment/beaver-7b-v1.0-reward)，注意该模型只关注 helpful 未考量 harmless）作为示例，使用 `ppo_main.py` 脚本根据 `ppo_config.json` 进行 RLHF 训练。
 
 ```
-python -u -m paddle.distributed.launch ppo_main.py ./ppo_config.json
+# 类型提升 warning 暂时通过 loglevel 屏蔽，待后续修复
+GLOG_minloglevel=2 python -u -m paddle.distributed.launch ppo_main.py ./ppo_config.json
 ```
 
 `ppo_config.json` 中的绝大部分参数释义同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，不再赘述，重点给出以下参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
@@ -210,7 +218,15 @@ python -u -m paddle.distributed.launch ppo_main.py ./ppo_config.json
 
 另外所有 [`TrainingArguments` 支持参数配置](https://paddlenlp.readthedocs.io/zh/latest/trainer.html#trainingarguments)将为 actor-model 和 critic-model 的训练复用（如`sharding_stage`），除单独提供了 `critic_learning_rate/critic_weight_decay/critic_lr_scheduler_type/critic_warmup_ratio/critic_recompute` 这些参数支持为 critic-model 训练单独指定相应配置。actor-model 和 critic-model 的 checkpoints 将分别保存在 `outpt_dir` 所指定目录的 policy 和 value 文件夹下。
 
-当前示例中所用数据及规模 RLHF 训练基于 sharding stage3 使用 NVIDIA A100 80G 4卡/8卡训练验证。
+此外为了支持更高性、更大规模的 RLHF 训练提供了以下特殊参数配置，可以按需使用：
+- `use_fusemt`：安装 paddlenlp_ops 后将在 rollout 生成时开启生成加速（开启流水线并行时不支持生成加速），通过此设置可以禁用生成加速。
+- `eval_mode`：支持为空或者设置为 "single"、"tensor_parallel"；通常可以在使用流水线并行训练时设置为"tensor_parallel"，以此在 rollout 生成阶段使用非流水线并行模型并进行生成加速。
+- `offload_level`：支持设置为"freeze_model"、"optimizer"、"train_model"或者同时使用(空格分隔），分别指示 reward+reference 两个冻结模型、actor+critic 两个训练模型的优化器状态和模型参数的 offload/reload，用于在不同阶段 model/optimizer 使用结束后及时 offload 并在下次使用时 reload 相应参数权重以节省显存。
+
+另外注意，在使用流水线并行时（pipeline_parallel_degree大于1）建议将 `dataloader_drop_last` 设置为 true, 以此避免不同batch size带来的问题。
+
+
+
 
 ### 推理
 
