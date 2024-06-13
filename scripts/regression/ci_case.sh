@@ -47,22 +47,6 @@ else
 fi
 }
 # case list
-# 1 waybill_ie (无可控参数，数据集外置)
-waybill_ie(){
-cd ${nlp_dir}/examples/information_extraction/waybill_ie/
-export CUDA_VISIBLE_DEVICES=${cudaid1}
-# BiGRU +CRF star training
-time (
-python download.py --data_dir ./waybill_ie
-python run_bigru_crf.py >${log_path}/waybill_ie_bigru_crf) >>${log_path}/waybill_ie_bigru_crf 2>&1
-print_info $? waybill_ie_bigru_crf
-# ERNIE +RF star training
-time (python run_ernie.py >${log_path}/waybill_ie_ernie) >>${log_path}/waybill_ie_ernie 2>&1
-print_info $? waybill_ie_ernie
-# ERNIE +CRF star training
-time (python run_ernie_crf.py >${log_path}/waybill_ie_ernie_crf) >>${log_path}/waybill_ie_ernie_crf 2>&1
-print_info $? waybill_ie_ernie_crf
-}
 # 2 msra_ner （不可控，内置）
 msra_ner(){
 cd ${nlp_dir}/examples/information_extraction/msra_ner/

@@ -28,7 +28,7 @@ export APIcase_list=()
 declare -A Normal_dic
 declare -A all_P0case_dic
 declare -A Build_list
-all_P0case_dic=(["waybill_ie"]=3 ["msra_ner"]=15 ["glue"]=2 ["bert"]=2 ["skep"]=10 ["bigbird"]=2 ["electra"]=2  ["gpt"]=2 ["ernie-1.0"]=2 ["xlnet"]=2 \
+all_P0case_dic=("msra_ner"]=15 ["glue"]=2 ["bert"]=2 ["skep"]=10 ["bigbird"]=2 ["electra"]=2  ["gpt"]=2 ["ernie-1.0"]=2 ["xlnet"]=2 \
 ["ofa"]=2 ["albert"]=2   ["SQuAD"]=20 ["lexical_analysis"]=5 ["seq2seq"]=5 ["word_embedding"]=5 \
 ["ernie-ctm"]=5 ["distilbert"]=5  ["transformer"]=5 ["pet"]=5 ["efl"]=5 ["p-tuning"]=5 ["ernie-doc"]=20 ["transformer-xl"]=5 \
 ["question_matching"]=5 ["ernie-csc"]=5 ["nptag"]=5 ["ernie-m"]=5 ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5 \
