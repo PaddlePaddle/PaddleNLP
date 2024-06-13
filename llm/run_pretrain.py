@@ -403,10 +403,6 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    print("--888--" * 100)
-    print("training_args:", training_args)
-    print("--888--" * 100)
-
     if training_args.enable_linear_fused_grad_add:
         from fused_layers import mock_layers
 
