@@ -50,13 +50,7 @@ class PretrainTest(LLMTest, unittest.TestCase):
         shutil.rmtree(self.dataset_dir)
 
     def test_pretrain(self):
-
-        pretrain_flag = False
-        for key, value in sys.modules.items():
-            if "run_pretrain" in key:
-                pretrain_flag = True
-                break
-        if pretrain_flag:
+        if "run_pretrain" in sys.modules.keys():
             del sys.modules["run_pretrain"]
 
         # Run pretrain
