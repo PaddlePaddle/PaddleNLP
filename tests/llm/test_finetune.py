@@ -18,11 +18,12 @@ import unittest
 
 from parameterized import parameterized_class
 
-from tests.testing_utils import argv_context_guard, load_test_config
+from tests.testing_utils import argv_context_guard, load_test_config, require_gpu
 
 from .testing_utils import LLMTest
 
 
+@require_gpu(1)
 @parameterized_class(
     ["model_dir"],
     [["llama"], ["chatglm"], ["bloom"], ["chatglm2"], ["qwen"], ["baichuan"]],

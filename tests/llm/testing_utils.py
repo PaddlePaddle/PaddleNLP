@@ -21,10 +21,9 @@ import tempfile
 
 import paddle
 
-from tests.testing_utils import argv_context_guard, load_test_config, require_gpu
+from tests.testing_utils import argv_context_guard, load_test_config
 
 
-@require_gpu(1)
 class LLMTest:
     config_path: str = None
     data_dir = "./tests/fixtures/llm/data/"
