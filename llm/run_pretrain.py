@@ -79,6 +79,12 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
+    pre_alloc_memory: float = field(
+        default=0.0,
+        metadata={
+            "help": "Pre-allocate one specific-capacity empty tensor and release it for avoiding memory fragmentation."
+        },
+    )
 
     # NOTE(gongenlei): new add autotuner_benchmark
     autotuner_benchmark: bool = field(
@@ -393,6 +399,20 @@ class PretrainingTrainer(Trainer):
         )
 
 
+def pre_alloc_memory(training_args):
+    if training_args.device == "gpu" and training_args.pre_alloc_memory > 0:
+        prop = paddle.device.cuda.get_device_properties()
+        if prop.total_memory < training_args.pre_alloc_memory * 1024 * 1024 * 1024:
+            logger.warning(f"Invalid value for `pre_alloc_memory`, so pre-allocating just failed.")
+        else:
+            logger.warning(
+                f"Pre-allocating a tensor whose memory capacity is {training_args.pre_alloc_memory} GB and then release it."
+            )
+            memory_size = int(training_args.pre_alloc_memory * 1024 * 1024 * 1024)
+            x = paddle.empty([memory_size], dtype=paddle.uint8)
+            del x
+
+
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
     # Support format as "args.json --arg1 value1 --arg2 value2.”
@@ -415,6 +435,7 @@ def main():
 
     paddle.set_device(training_args.device)
     set_seed(seed=training_args.seed)
+    pre_alloc_memory(training_args)
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
