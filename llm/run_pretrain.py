@@ -47,6 +47,7 @@ from paddlenlp.transformers import (
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
+from paddle.io.reader import use_pinned_memory
 
 # Pretaining Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "True"
@@ -634,4 +635,5 @@ def main():
 
 
 if __name__ == "__main__":
+    use_pinned_memory(False)
     main()
