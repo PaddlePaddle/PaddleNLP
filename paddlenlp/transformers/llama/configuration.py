@@ -197,14 +197,6 @@ class LlamaConfig(PretrainedConfig):
             tie_word_embeddings=tie_word_embeddings,
             **kwargs,
         )
-        self.register_nonsaveable_keys(
-            [
-                "long_sequence_strategy_type",
-                "long_sequence_strategy_name",
-                "long_sequence_init_args",
-                "use_long_sequence_strategies",
-            ]
-        )
 
     @property
     def rope(self):
