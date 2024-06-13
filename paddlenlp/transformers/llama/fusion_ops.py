@@ -146,10 +146,10 @@ def fusion_flash_attention(
     attention_mask,
     output_attentions,
     alibi=None,
+    attn_mask_start_row_indices=None,
     sequence_parallel=False,
     reshard_layer=None,
     npu_is_casual=False,
-    attn_mask_start_row_indices=None,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape

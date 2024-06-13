@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 from typing import Any
 
 import paddle
 from paddle import nn
 
+import paddlenlp
 from paddlenlp.transformers import (
     LlamaConfig,
     LlamaModel,
@@ -88,6 +91,7 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
         return self.get_score(
             hidden_states,
             attention_mask=attention_mask,
+            position_ids=position_ids,
             return_dict=return_dict,
         )
 
@@ -131,3 +135,6 @@ class LlamaModelForScore(ScoreModelMixin, LlamaPretrainedModel):
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
+
+
+paddlenlp.transformers.LlamaModelForScore = LlamaModelForScore

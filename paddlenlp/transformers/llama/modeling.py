@@ -371,8 +371,9 @@ class LlamaRMSNorm(nn.Layer):
 
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
-                hidden_states = hidden_states.astype("float32")
-                variance = hidden_states.pow(2).mean(-1, keepdim=True)
+                # hidden_states = hidden_states.astype("float32")
+                # variance = hidden_states.pow(2).mean(-1, keepdim=True)
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
                 hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
         else:
             hidden_states = hidden_states.astype("float32")
@@ -1683,7 +1684,11 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         super(LlamaPretrainingCriterion, self).__init__()
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
-        self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
+        self.enable_parallel_cross_entropy = (
+            config.tensor_parallel_degree > 1
+            and config.vocab_size % config.tensor_parallel_degree == 0
+            and config.tensor_parallel_output
+        )
 
         if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
             self.loss_func = mpu.ParallelCrossEntropy(ignore_index=self.ignore_index)

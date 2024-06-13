@@ -19,7 +19,6 @@ import paddle
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
-from paddlenlp_ops import get_padding_offset, get_padding_offset_v2
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
@@ -219,6 +218,8 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
+        from paddlenlp_ops import get_padding_offset
+
         ids_remove_padding, cum_offsets, padding_offset = get_padding_offset(
             input_ids, cum_offsets_now, token_num, seq_lens_this_time
         )
@@ -592,6 +593,8 @@ class BloomBlockInferenceModel(BloomModelInferenceModel):
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
+        from paddlenlp_ops import get_padding_offset_v2
+
         ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
             input_ids, cum_offsets_now, token_num, seq_lens_this_time
         )
