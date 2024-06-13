@@ -16,26 +16,6 @@ import copy
 import os
 import sys
 import types
-
-# os.environ["http_proxy"] = "http://10.162.37.16:8128"
-# os.environ["https_proxy"] = "http://10.162.37.16:8128"
-# os.environ["no_proxy"] = "localhost,bcebos.com"
-# launch would unset http_proxy
-# export https_proxy=http://172.19.57.45:3128
-
-# os.environ["http_proxy"] = "http://172.19.56.199:3128"
-# os.environ["https_proxy"] = "http://172.19.56.199:3128"
-
-# os.environ["http_proxy"] = "http://172.19.57.45:3128"
-# os.environ["https_proxy"] = "http://172.19.57.45:3128"
-
-os.environ["http_proxy"] = "http://10.162.37.16:8128"
-os.environ["https_proxy"] = "http://10.162.37.16:8128"
-os.environ["no_proxy"] = "localhost,bcebos.com"
-
-# os.environ["http_proxy"] = "agent.baidu.com:8118"
-# os.environ["https_proxy"] = "agent.baidu.com:8118"
-
 from dataclasses import dataclass, field
 from functools import partial
 from typing import Any, Dict, Tuple
