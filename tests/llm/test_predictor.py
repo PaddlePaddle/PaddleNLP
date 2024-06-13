@@ -20,7 +20,6 @@ import paddle
 import pytest
 from parameterized import parameterized_class
 
-from paddlenlp.experimental.transformers import QWenForQWenVLInferenceModel
 from paddlenlp.transformers import (  # ChatGLMForCausalLM,
     AutoConfig,
     AutoTokenizer,
@@ -348,6 +347,8 @@ class QWenVLTest(LLMTest, unittest.TestCase):
 
         paddle.set_default_dtype("float16")
         # need to use dtype guard
+        from paddlenlp.experimental.transformers import QWenForQWenVLInferenceModel
+
         model = QWenForQWenVLInferenceModel.from_pretrained(self.output_dir, config=config, dtype="float16")
 
         batch = 1

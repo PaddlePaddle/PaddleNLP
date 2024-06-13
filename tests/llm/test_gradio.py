@@ -26,6 +26,7 @@ import pytest
 import requests
 
 from paddlenlp.transformers import LlamaTokenizer
+from tests.testing_utils import require_gpu
 
 
 def is_port_in_use(port):
@@ -38,6 +39,7 @@ def is_port_in_use(port):
             return True
 
 
+@require_gpu(1)
 class UITest(unittest.TestCase):
     def setUp(self):
         # start web ui
