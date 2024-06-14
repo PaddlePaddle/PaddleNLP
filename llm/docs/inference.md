@@ -83,7 +83,10 @@ PaddleNLP 针对于Transformer 系列编写了高性能自定义算子，提升�
 
 ```shell
 git clone https://github.com/PaddlePaddle/PaddleNLP
+#GPU设备安装自定义算子
 cd ./paddlenlp/csrc && python setup_cuda.py install
+#XPU设备安装自定义算子
+cd ./paddlenlp/csrc/xpu/src && sh cmake_build.sh 
 ```
 
 ### 2.3 关闭BlockAttention的高性能推理
@@ -163,6 +166,9 @@ python predictor.py  --model_name_or_path ./inference --inference_model --quant_
 # 动态图模型推理命令参考
 python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn
 
+# XPU设备动态图模型推理命令参考
+python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --device xpu
+
 # Weight Only Int8 动态图推理参考
 python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --quant_type weight_only_int8 --block_attn
 
@@ -179,6 +185,9 @@ python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_
 # 动转静命令参考
 python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn
 
+# XPU设备动转静命令参考
+python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn --device xpu
+
 # Weight Only Int8 动转静命令参考
 python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --quant_type weight_only_int8 --block_attn
 
@@ -193,6 +202,9 @@ python export_model.py  --model_name_or_path meta-llama/Llama-2-7b-chat --infere
 ```shell
 # 静态图推理命令参考
 python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn
+
+# XPU设备静态图推理命令参考
+python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn --device xpu
 
 # Weight Only Int8 静态图推理命令参考
 python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --quant_type weight_only_int8 --block_attn
