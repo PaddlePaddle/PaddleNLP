@@ -1,0 +1,103 @@
+Global:
+  device: gpu
+  seed: 1024
+
+  global_batch_size: 
+  local_batch_size: 1
+  micro_batch_size: 1
+
+
+Engine:
+  max_steps: 500000
+  num_train_epochs: 1
+  accumulate_steps:
+  logging_freq: 1
+  eval_freq: 500
+  eval_iters: 10
+  test_iters:
+  mix_precision:
+    enable: True
+    dtype: "float16"
+    level: "O2"
+    scale_loss: 32768.0
+    custom_black_list: ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"]
+    custom_white_list: ["lookup_table", "lookup_table_v2"]
+  save_load:
+    save_steps: 1000
+    save_epoch: 1
+    output_dir: ./output
+    ckpt_dir:
+
+
+Model:
+  module: "GPTModule"
+  name: "GPT"
+  vocab_size_divisible_unit: 128
+  fused_linear: False
+  fuse_attn_qkv: True
+  scale_qk_by_layer_num: True
+  sequence_parallel: False
+  use_flash_attn: False
+  fused_softmax_with_triangular: True
+
+
+Data:
+  Train:
+    dataset:
+      name: GPTDataset
+      input_dir: ./data/
+      split: [969, 30, 1]
+      max_seq_len: 1024
+    sampler:
+      name: GPTBatchSampler
+      shuffle: False
+      drop_last: True
+    loader:
+      num_workers: 1
+      return_list: False
+      collate_fn: gpt_collate_fn
+  
+  Eval:
+    dataset:
+      name: GPTDataset
+      input_dir: ./data/
+      split: [969, 30, 1]
+      max_seq_len: 1024
+    sampler:
+      name: GPTBatchSampler
+      shuffle: False
+      drop_last: True
+    loader:
+      num_workers: 1
+      return_list: False
+      collate_fn: gpt_collate_fn
+
+
+Optimizer:
+  name: FusedAdamW
+  weight_decay: 0.01
+  beta1: 0.9
+  beta2: 0.999
+  epsilon: 1.0e-8
+  lr:
+    name: CosineAnnealingWithWarmupDecay
+    decay_steps: 360000
+    warmup_rate: 0.01
+    max_lr: 5.0e-5
+    min_lr: 1.0e-5
+    use_increments: True
+  grad_clip:
+    name: "ClipGradByGlobalNorm"
+    clip_norm: 1.0
+  tensor_fusion: False
+
+
+Profiler:
+  enable: False
+  scheduler: [1, 5]
+  profiler_log: profiler_log
+  detailed: False
+
+
+Distributed:
+  fuse_sequence_parallel_allreduce: False

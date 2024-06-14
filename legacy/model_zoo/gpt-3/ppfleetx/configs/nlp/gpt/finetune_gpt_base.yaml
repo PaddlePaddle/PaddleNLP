@@ -1,0 +1,29 @@
+Global:
+  device: gpu
+  seed: 42
+
+  global_batch_size: 
+  local_batch_size: 1
+  micro_batch_size: 1
+  
+Engine:
+  run_mode: epoch
+  max_steps: -1
+  eval_freq: 1
+  eval_iters: -1
+  test_iters: -1
+  save_load:
+    save_steps: -1
+    save_epoch: 1
+    output_dir: ./output
+    ckpt_dir:
+
+
+Profiler:
+  enable: False
+  scheduler: [1, 5]
+  profiler_log: profiler_log
+  detailed: False
+
+Model:
+  use_flash_attn: False

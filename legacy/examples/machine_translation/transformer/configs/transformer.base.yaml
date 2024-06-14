@@ -1,0 +1,138 @@
+# The frequency to save trained models when training.
+save_step: 10000
+# The frequency to fetch and print output when training.
+print_step: 100
+# Path of the checkpoint, to resume the previous training
+init_from_checkpoint: ""
+# Path of the pretrain model, to better solve the current task
+init_from_pretrain_model: ""
+# Path of trained parameter, to make prediction
+init_from_params: "./trained_models/step_final/"
+# The directory for saving model
+save_model: "trained_models"
+# The directory for saving inference model 
+inference_model_dir: "infer_model"
+# Set seed for CE or debug
+random_seed: None
+# The file to output the translation results of predict_file to.
+output_file: "predict.txt"
+# The <bos>, <eos> and <unk> tokens in the dictionary.
+special_token: ["<s>", "<e>", "<unk>"]
+# The data type of input ids. 
+input_dtype: "int64"
+
+# Device to use. 
+device: "gpu"
+
+# Args for reader, see reader.py for details
+# The translation task to process.
+task_name: "de-en"
+src_lang: "en"
+trg_lang: "de"
+pool_size: 200000
+sort_type: "global"
+batch_size: 4096
+infer_batch_size: 8
+shuffle_batch: True
+# Data shuffle only works when sort_type is pool or none
+shuffle: True
+# shuffle_seed must be set when shuffle is True and using multi-cards to train. 
+# Otherwise, the number of batches cannot be guaranteed. 
+shuffle_seed: 128
+# For Dataloader num_workers
+num_workers: 0
+
+# Hyparams for training:
+# The number of epoches for training
+epoch: 30
+
+# The hyper parameters for Adam optimizer.
+# This static learning_rate will be applied to the LearningRateScheduler
+# derived learning rate the to get the final learning rate.
+learning_rate: 2.0
+beta1: 0.9
+beta2: 0.997
+eps: 1e-9
+# The parameters for learning rate scheduling.
+warmup_steps: 4000
+# The weight used to mix up the ground-truth distribution and the fixed
+# uniform distribution in label smoothing when training.
+# Set this as zero if label smoothing is not wanted.
+label_smooth_eps: 0.1
+
+# Hyparams for generation:
+# The parameters for beam search.
+# Indicating the strategy of beam search. It can be 'v1' or 'v2'. 'v2' would
+# select the top `beam_size * 2` beams and process the top `beam_size` alive
+# and finish beams in them separately, while 'v1' would only select the top
+# `beam_size` beams and mix up the alive and finish beams. 'v2' always
+# searchs more and get better results, since the alive beams would
+# always be `beam_size` while the number of alive beams in `v1` might
+# decrease when meeting the end token. However, 'v2' always generates
+# longer results thus might do more calculation and be slower.
+beam_search_version: "v1"
+beam_size: 4
+max_out_len: 256
+# Indicating whether max_out_len in configurations is the length relative to
+# that of source text. Only works in `v2` temporarily.
+use_rel_len: False
+# The power number in length penalty calculation. Only works in `v2` temporarily.
+# Please refer to GNMT <https://arxiv.org/pdf/1609.08144.pdf>.
+alpha: 0.6
+# Refer to `A Simple, Fast Diverse Decoding Algorithm for Neural Generation
+# <https://arxiv.org/abs/1611.08562>`_ for details. Bigger `diversity_rate`
+# would lead to more diversity. if `diversity_rate == 0` is equivalent to naive
+# BeamSearch. **NOTE**: Only works when using FastGeneration temporarily.
+diversity_rate: 0.0
+# The number of decoded sentences to output.
+n_best: 1
+
+# Hyparams for model:
+# These following five vocabularies related configurations will be set
+# automatically according to the passed vocabulary path and special tokens.
+# Size of source word dictionary.
+src_vocab_size: 10000
+# Size of target word dictionay
+trg_vocab_size: 10000
+# Used to pad vocab size to be multiple of pad_factor.
+pad_factor: 8
+# Used to pad sequence length to be multiple of pad_seq.
+pad_seq: 1
+# Used to make batch size to be multiple of bsz_multi.
+bsz_multi: 8
+# Index for <bos> token
+bos_idx: 0
+# Index for <eos> token
+eos_idx: 1
+# Index for <unk> token
+unk_idx: 2
+# Max length of sequences deciding the size of position encoding table.
+max_length: 256
+# The dimension for word embeddings, which is also the last dimension of
+# the input and output of multi-head attention, position-wise feed-forward
+# networks, encoder and decoder.
+d_model: 512
+# Size of the hidden layer in position-wise feed-forward networks.
+d_inner_hid: 2048
+# Number of head used in multi-head attention.
+n_head: 8
+# Number of sub-layers to be stacked in the encoder and decoder.
+n_layer: 6
+# Dropout rates.
+dropout: 0.1
+# The flag indicating whether to share embedding and softmax weights.
+# Vocabularies in source and target should be same for weight sharing.
+weight_sharing: True
+# Whether to apply pre-normalization or not. 
+normalize_before: True
+
+# Mixed precision training
+use_amp: False
+use_pure_fp16: False
+scale_loss: 128.0
+
+# Maximum iteration for training. 
+max_iter: None
+
+# enable to static ? 
+to_static: False

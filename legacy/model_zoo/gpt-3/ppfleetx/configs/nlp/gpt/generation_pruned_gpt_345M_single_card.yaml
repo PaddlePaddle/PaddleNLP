@@ -1,0 +1,19 @@
+_base_: ./pretrain_gpt_345M_single_card.yaml
+
+Model:
+  module: GPTGenerationModule
+
+Compress:
+  Prune:
+    enable: True
+    criterion: l1_norm
+    ratio: 0.125
+
+Generation:
+  top_k: 50
+  top_p: 0.75
+  temperature: 1.0
+  min_dec_len: 1
+  max_dec_len: 200
+  num_return_sequences: 1
+  decode_strategy: "sampling"

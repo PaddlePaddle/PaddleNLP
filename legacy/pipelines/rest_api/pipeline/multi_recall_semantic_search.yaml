@@ -1,0 +1,81 @@
+version: '1.1.0'
+
+components:    # define all the building-blocks for Pipeline
+  - name: DocumentStore
+    type: ElasticsearchDocumentStore  # consider using Milvus2DocumentStore or WeaviateDocumentStore for scaling to large number of documents
+    params:
+      host: localhost
+      port: 9200
+      index: dureader_robust_query_encoder
+      embedding_dim: 312
+      search_fields: ['content', 'name']
+  - name: BMRetriever
+    type: BM25Retriever
+    params:
+      document_store: DocumentStore    # params can reference other components defined in the YAML
+      top_k: 10
+  - name: DenseRetriever
+    type: DensePassageRetriever
+    params:
+      document_store: DocumentStore    # params can reference other components defined in the YAML
+      top_k: 10
+      query_embedding_model: rocketqa-zh-nano-query-encoder
+      passage_embedding_model: rocketqa-zh-nano-para-encoder
+      embed_title: False
+  - name: Ranker       # custom-name for the component; helpful for visualization & debugging
+    type: ErnieRanker    # pipelines Class name for the component
+    params:
+      model_name_or_path: rocketqa-nano-cross-encoder
+      top_k: 3
+  - name: JoinResults
+    type: JoinDocuments
+    params:
+      join_mode: concatenate
+  - name: TextFileConverter
+    type: TextConverter
+  - name: ImageFileConverter
+    type: ImageToTextConverter
+  - name: PDFFileConverter
+    type: PDFToTextConverter
+  - name: DocxFileConverter
+    type: DocxToTextConverter
+  - name: Preprocessor
+    type: PreProcessor
+    params:
+      split_by: word
+      split_length: 1000
+  - name: FileTypeClassifier
+    type: FileTypeClassifier
+
+pipelines:
+  - name: query  
+    type: Query
+    nodes:
+      - name: BMRetriever
+        inputs: [Query]
+      - name: DenseRetriever
+        inputs: [Query]
+      - name: JoinResults
+        inputs: [BMRetriever, DenseRetriever] # Two path recall including dpr and BM25
+      - name: Ranker
+        inputs: [JoinResults]
+
+  - name: indexing
+    type: Indexing
+    nodes:
+      - name: FileTypeClassifier
+        inputs: [File]
+      - name: TextFileConverter
+        inputs: [FileTypeClassifier.output_1]
+      - name: PDFFileConverter
+        inputs: [FileTypeClassifier.output_2]
+      - name: DocxFileConverter
+        inputs: [FileTypeClassifier.output_4]
+      - name: ImageFileConverter
+        inputs: [FileTypeClassifier.output_6]
+      - name: Preprocessor
+        inputs: [PDFFileConverter, TextFileConverter, DocxFileConverter, ImageFileConverter]
+      - name: DenseRetriever
+        inputs: [Preprocessor]
+      - name: DocumentStore
+        inputs: [DenseRetriever]

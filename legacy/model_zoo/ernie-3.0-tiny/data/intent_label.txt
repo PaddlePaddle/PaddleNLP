@@ -1,0 +1,11 @@
+OTHERS
+music.play
+music.pause
+music.prev
+music.next
+navigation.navigation
+navigation.open
+navigation.start_navigation
+navigation.cancel_navigation
+phone_call.make_a_phone_call
+phone_call.cancel

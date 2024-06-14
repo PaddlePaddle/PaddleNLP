@@ -1,0 +1,26 @@
+_base_: ./pretrain_gpt_345M_single_card.yaml
+
+Model:
+  module: GPTGenerationModule
+
+Generation:
+  top_k: 50
+  top_p: 0.75
+  temperature: 1.0
+  min_dec_len: 1
+  max_dec_len: 200
+  num_return_sequences: 1
+  decode_strategy: "sampling"
+  use_topp_sampling: True
+  inference: True
+
+Compress:
+  pretrained:
+  Quantization:
+    enable: True
+    weight_quantize_type: 'abs_max'
+    activation_quantize_type: 'moving_average_abs_max'
+    weight_bits: 8
+    activation_bits: 8
+    quantizable_layer_type: ['Linear', 'ColumnParallelLinear', 'RowParallelLinear']
+    onnx_format: True

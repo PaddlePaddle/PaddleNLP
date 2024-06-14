@@ -1,0 +1,11 @@
+pymilvus>=2.1.0
+pandas
+paddlenlp>=2.1.1    
+paddlepaddle-gpu>=2.2.3
+hnswlib>=0.5.2
+numpy>=1.17.2
+visualdl>=2.2.2
+paddle-serving-app>=0.7.0        
+paddle-serving-client>=0.7.0        
+paddle-serving-server-gpu>=0.7.0.post102
+pybind11

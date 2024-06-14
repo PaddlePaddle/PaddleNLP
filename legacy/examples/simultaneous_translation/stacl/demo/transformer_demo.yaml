@@ -1,0 +1,51 @@
+# path of trained parameter, to make prediction
+init_from_params: ""
+# The path of vocabulary file of source language.
+src_vocab_fpath: "nist.20k.zh.vocab"
+# The path of vocabulary file of target language.
+trg_vocab_fpath: "nist.10k.en.vocab"
+# The <bos>, <eos> and <unk> tokens in the dictionary.
+special_token: [ "<s>", "<e>", "<unk>" ]
+
+# Use which device to train or predict(cpu,gpu,xpu)
+device: cpu
+
+# Hyparams for generation:
+max_out_len: 256
+# the number of decoded sentences to output.
+n_best: 1
+
+# Hyparams for model:
+# These following five vocabularies related configurations will be set
+# automatically according to the passed vocabulary path and special tokens.
+# size of source word dictionary.
+src_vocab_size: 10000
+# size of target word dictionay
+trg_vocab_size: 10000
+# index for <bos> token
+bos_idx: 0
+# index for <eos> token
+eos_idx: 1
+# index for <unk> token
+unk_idx: 2
+# max length of sequences deciding the size of position encoding table.
+max_length: 256
+# the dimension for word embeddings, which is also the last dimension of
+# the input and output of multi-head attention, position-wise feed-forward
+# networks, encoder and decoder.
+d_model: 512
+# size of the hidden layer in position-wise feed-forward networks.
+d_inner_hid: 2048
+# number of head used in multi-head attention.
+n_head: 8
+# number of sub-layers to be stacked in the encoder and decoder.
+n_layer: 6
+# dropout rates.
+dropout: 0.1
+# the flag indicating whether to share embedding and softmax weights.
+# vocabularies in source and target should be same for weight sharing.
+weight_sharing: False
+# Wait-k policy
+waitk: -1
+# Source bpe dict for tokenizer
+src_bpe_dict: 2M.zh2en.dict4bpe.zh

@@ -1,0 +1,43 @@
+backend: "fastdeploy"
+max_batch_size: 64
+input [
+    {
+      name: "input_ids"
+      data_type: TYPE_INT64
+      dims: [ -1 ]
+    },
+    {
+      name: "token_type_ids"
+      data_type: TYPE_INT64
+      dims: [ -1 ]
+    }
+]
+output [
+    {
+      name: "linear_75.tmp_1"
+      data_type: TYPE_FP32
+      dims: [ 2 ]
+    }
+]
+
+instance_group [
+  {
+      # 创建1个实例
+      count: 1
+      # 使用CPU推理(KIND_CPU、KIND_GPU)
+      kind: KIND_GPU
+  }
+]
+
+optimization {
+  execution_accelerators {
+    cpu_execution_accelerator : [
+      {
+        # use openvino backend
+        name: "paddle"
+        parameters { key: "cpu_threads" value: "5" }
+      }
+    ]
+  }
+}
+

@@ -1,0 +1,5 @@
+tabulate
+importlib_metadata
+nltk
+visualdl
+paddlenlp

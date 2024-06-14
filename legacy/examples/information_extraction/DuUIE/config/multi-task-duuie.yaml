@@ -1,0 +1,172 @@
+T1:
+  name: DUIE_LIFE_SPO
+  path: data/duuie_pre/DUIE_LIFE_SPO
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-rel-boundary-F1
+
+T2:
+  name: DUIE_ORG_SPO
+  path: data/duuie_pre/DUIE_ORG_SPO
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-rel-boundary-F1
+
+T3:
+  name: 体育竞赛
+  path: data/duuie_pre/体育竞赛
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+T4:
+  name: 灾害意外
+  path: data/duuie_pre/灾害意外
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+T5:
+  name: CONV-ASA
+  path: data/duuie_pre/CONV-ASA
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-rel-strict-F1
+
+T6:
+  name: MSRA
+  path: data/duuie_pre/MSRA
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-ent-F1
+
+T7:
+  name: PEOPLE_DAILY
+  path: data/duuie_pre/PEOPLE_DAILY
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-ent-F1
+
+T8:
+  name: 金融信息_中标
+  path: data/duuie_pre/金融信息_中标
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+
+T9:
+  name: 金融信息_企业融资
+  path: data/duuie_pre/金融信息_企业融资
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+
+T10:
+  name: 金融信息_股份回购
+  path: data/duuie_pre/金融信息_股份回购
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+
+T11:
+  name: 金融信息_中标
+  path: data/duuie_pre/金融信息_中标
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+
+T12:
+  name: 金融信息_高管变动
+  path: data/duuie_pre/金融信息_高管变动
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+
+T13:
+  name: 金融信息_亏损
+  path: data/duuie_pre/金融信息_亏损
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+T14:
+  name: 金融信息_公司上市
+  path: data/duuie_pre/金融信息_公司上市
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+T15:
+  name: 金融信息_被约谈
+  path: data/duuie_pre/金融信息_被约谈
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+T16:
+  name: 金融信息_企业收购
+  path: data/duuie_pre/金融信息_企业收购
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+T17:
+  name: 金融信息_股东减持
+  path: data/duuie_pre/金融信息_股东减持
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+T18:
+  name: 金融信息_解除质押
+  path: data/duuie_pre/金融信息_解除质押
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+T19:
+  name: 金融信息_企业破产
+  path: data/duuie_pre/金融信息_企业破产
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+T20:
+  name: 金融信息_股东增持
+  path: data/duuie_pre/金融信息_股东增持
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1
+
+T21:
+  name: 金融信息_质押
+  path: data/duuie_pre/金融信息_质押
+  sel2record: longer_first_zh
+  eval_match_mode: set
+  metrics:
+    - string-evt-role-F1

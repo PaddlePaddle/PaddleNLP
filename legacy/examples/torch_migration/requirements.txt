@@ -1,0 +1,5 @@
+paddlepaddle-gpu==2.2.0
+torch>=1.7
+transformers
+paddlenlp
+git+https://github.com/WenmuZhou/reprod_log.git

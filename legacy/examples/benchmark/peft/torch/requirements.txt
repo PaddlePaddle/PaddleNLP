@@ -1,0 +1,8 @@
+deepspeed==0.9.4
+datasets==2.12.0
+transformers==4.30.2
+peft @ git+https://github.com/huggingface/peft.git
+torch==2.0.1
+sentencepiece
+bitsandbytes==0.39.0
+# CUDA VERSION 11.7

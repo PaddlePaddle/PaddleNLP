@@ -1,0 +1,70 @@
+# Default Args for all dataset 
+# You can overwrite the configs in each dataset.
+DefaultArgs:
+    learning_rate: 0.00003
+    num_train_epochs: 3
+    max_seq_length: 128
+    weight_decay: 0.01
+# Datasets which used for sequence classfication
+SequenceClassification:
+    afqmc: 
+        num_train_epochs: 1
+        learning_rate: 0.00003
+        max_seq_length: 128
+        per_device_train_batch_size: 16 
+        per_device_eval_batch_size: 32
+    tnews:
+        num_train_epochs: 3
+        learning_rate: 0.00005
+        max_seq_length: 128
+        per_device_train_batch_size: 32 
+        per_device_eval_batch_size: 32
+    iflytek:
+        num_train_epochs: 3
+        learning_rate: 0.00005
+        max_seq_length: 128
+        per_device_train_batch_size: 16 
+        per_device_eval_batch_size: 16
+    ocnli:
+        num_train_epochs: 6
+        learning_rate: 0.00005
+        max_seq_length: 128
+        per_device_train_batch_size: 64 
+        per_device_eval_batch_size: 64
+    cmnli: 
+        num_train_epochs: 4
+        learning_rate: 0.00002
+        max_seq_length: 128
+        per_device_train_batch_size: 32 
+        per_device_eval_batch_size: 32
+    cluewsc2020: 
+        num_train_epochs: 50
+        learning_rate: 0.00003
+        max_seq_length: 128
+        per_device_train_batch_size: 16 
+        per_device_eval_batch_size: 16
+    csl:
+        num_train_epochs: 8
+        learning_rate: 0.00005
+        max_seq_length: 256
+        per_device_train_batch_size: 64 
+        per_device_eval_batch_size: 64
+
+# Datasets which used for token classfication
+TokenClassification:
+    msra_ner:
+            learning_rate: 0.00005
+            max_seq_length: 128 
+            num_train_epochs: 1
+            per_device_train_batch_size: 8 
+            per_device_eval_batch_size: 16
+
+# Datasets which used for question answersing
+QuestionAnswering:
+    cmrc2018:
+            learning_rate: 0.00005
+            max_seq_length: 512 
+            num_train_epochs: 1
+            per_device_train_batch_size: 8 
+            per_device_eval_batch_size: 12
+

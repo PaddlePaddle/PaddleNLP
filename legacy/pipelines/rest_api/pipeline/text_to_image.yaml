@@ -1,0 +1,16 @@
+version: '1.1.0'
+
+components:
+  - name: TextToImageGenerator
+    params:
+          ak: 
+          sk: 
+    type: ErnieTextToImageGenerator
+pipelines:
+  - name: query
+    type: Query
+    nodes:
+      - name: TextToImageGenerator
+        inputs: [Query]
+      
+    
