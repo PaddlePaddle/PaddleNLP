@@ -49,10 +49,12 @@ from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
     AutoTokenizer,
     Llama3Tokenizer,
     LlamaTokenizer,
 )
+from paddlenlp.transformers.configuration_utils import LlmMetaConfig, llmmetaclass
 from paddlenlp.utils.log import logger
 
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
@@ -68,6 +70,7 @@ def add_start_docstrings(*docstr):
 
 
 @dataclass
+@llmmetaclass
 @add_start_docstrings(TrainingArguments.__doc__)
 class FinetuneArguments(TrainingArguments):
     decay_steps: int = field(
@@ -146,65 +149,45 @@ def main():
 
     model_config = AutoConfig.from_pretrained(
         model_args.model_name_or_path,
-        tensor_parallel_output=training_args.tensor_parallel_output,
-        tensor_parallel_degree=training_args.tensor_parallel_degree,
-        tensor_parallel_rank=training_args.tensor_parallel_rank,
         dtype=dtype,
         from_aistudio=model_args.from_aistudio,
         quantization_config=quantization_config,
     )
-    if hasattr(model_config, "use_flash_attention"):
-        model_config.use_flash_attention = model_args.use_flash_attention
 
-    model_config.use_fused_rms_norm = model_args.use_fused_rms_norm
-    model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
-    model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
-    model_config.recompute_granularity = model_args.recompute_granularity
-    model_config.virtual_pp_degree = model_args.virtual_pp_degree
-    model_config.sequence_parallel = model_args.sequence_parallel
-    model_config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
-    model_config.use_fused_rope = model_args.use_fused_rope
-
-    model_config.no_recompute_layers = model_args.no_recompute_layers
-    model_config.pp_recompute_interval = model_args.pp_recompute_interval
-    model_config.recompute_use_reentrant = model_args.recompute_use_reentrant
-    model_config.use_recompute = training_args.recompute
-
-    model_config.tensor_parallel_degree = training_args.tensor_parallel_degree
-    model_config.tensor_parallel_rank = training_args.tensor_parallel_rank
+    LlmMetaConfig.set_llm_config(model_config, training_args)
 
     # Config for model using dropout, such as GPT.
-    model_config.hidden_dropout_prob = model_args.hidden_dropout_prob
-    model_config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
+    if hasattr(model_config, "hidden_dropout_prob"):
+        model_config.hidden_dropout_prob = model_args.hidden_dropout_prob
+    if hasattr(model_config, "attention_probs_dropout_prob"):
+        model_config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
 
-    model_config.sep_parallel_degree = training_args.sep_parallel_degree
-    model_config.tensor_parallel_output = training_args.tensor_parallel_output
+    if model_args.fuse_attention_qkv is not None:
+        model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
+    if model_args.fuse_attention_ffn is not None:
+        model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
+
     model_config.seq_length = data_args.max_length
 
+    print("Final model config:", model_config)
+
+    model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
-        from paddlenlp.transformers import AutoModelForCausalLMPipe
 
-        if not training_args.autotuner_benchmark:
-            model = AutoModelForCausalLMPipe.from_pretrained(
-                model_args.model_name_or_path,
-                config=model_config,
-                from_aistudio=model_args.from_aistudio,
-            )
-        else:
-            # NOTE(gongenlei): new add autotuner_benchmark
-            model = AutoModelForCausalLMPipe.from_config(model_config, dtype=dtype)
+        model_class = AutoModelForCausalLMPipe
+
+    if not training_args.autotuner_benchmark:
+        model = model_class.from_pretrained(
+            model_args.model_name_or_path,
+            config=model_config,
+            from_aistudio=model_args.from_aistudio,
+        )
     else:
-        if not training_args.autotuner_benchmark:
-            model = AutoModelForCausalLM.from_pretrained(
-                model_args.model_name_or_path,
-                config=model_config,
-                from_aistudio=model_args.from_aistudio,
-            )
-        else:
-            # NOTE(gongenlei): new add autotuner_benchmark
-            model = AutoModelForCausalLM.from_config(model_config, dtype=dtype)
+        # NOTE(gongenlei): new add autotuner_benchmark
+        model = model_class.from_config(model_config, dtype=dtype)
+
     if training_args.do_train and model_args.neftune:
         # Inspired by https://github.com/neelsjain/NEFTune
         if hasattr(model, "get_input_embeddings"):

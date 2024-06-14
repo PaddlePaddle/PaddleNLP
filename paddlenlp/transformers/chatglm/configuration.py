@@ -102,7 +102,6 @@ class ChatGLMConfig(PretrainedConfig):
         attention_scale=True,
         activation="gelu",
         num_image_tokens=0,
-        use_flash_attention=False,
         long_sequence_strategy_type=None,
         long_sequence_strategy_name=None,
         long_sequence_init_args=None,
@@ -131,7 +130,7 @@ class ChatGLMConfig(PretrainedConfig):
         self.attention_scale = attention_scale
         self.activation = activation
         self.num_image_tokens = num_image_tokens
-        self.use_flash_attention = use_flash_attention
+
         self.long_sequence_strategy_type = long_sequence_strategy_type
         self.long_sequence_strategy_name = long_sequence_strategy_name
         self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
