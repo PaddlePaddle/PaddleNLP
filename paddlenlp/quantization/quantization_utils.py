@@ -35,9 +35,20 @@ except:
     qlora_weight_quantize = None
 
 
-def replace_with_quantization_linear(model, quantization_config, name_prefix="", llm_int8_threshold=6.0):
+def replace_with_quantization_linear(
+    model, quantization_config, name_prefix="", llm_int8_threshold=6.0, quantization_config_dict=None
+):
     quantization_linear_list = []
     for name, child in model.named_children():
+        if quantization_config_dict is None:
+            weight_quantize_algo = quantization_config.weight_quantize_algo
+        else:
+            key = name_prefix + name
+            if key not in quantization_config_dict.keys():
+                weight_quantize_algo = quantization_config.weight_quantize_algo
+            else:
+                weight_quantize_algo = quantization_config_dict[key]
+
         if isinstance(child, nn.Linear):
             if child.bias is None:
                 bias_attr = False
@@ -47,7 +58,7 @@ def replace_with_quantization_linear(model, quantization_config, name_prefix="",
             model._sub_layers[name] = QuantizationLinear(
                 child.weight.shape[0],
                 child.weight.shape[1],
-                quantization_config.weight_quantize_algo,
+                weight_quantize_algo,
                 child._dtype,
                 bias_attr=bias_attr,
                 llm_int8_threshold=llm_int8_threshold,
@@ -65,7 +76,7 @@ def replace_with_quantization_linear(model, quantization_config, name_prefix="",
             model._sub_layers[name] = ColumnParallelQuantizationLinear(
                 child.weight.shape[0],
                 child.weight.shape[1] * child.world_size,
-                quantization_config.weight_quantize_algo,
+                weight_quantize_algo,
                 child._dtype,
                 bias_attr=bias_attr,
                 gather_output=child.gather_output,
@@ -81,7 +92,7 @@ def replace_with_quantization_linear(model, quantization_config, name_prefix="",
             model._sub_layers[name] = RowParallelQuantizationLinear(
                 child.weight.shape[0] * child.world_size,
                 child.weight.shape[1],
-                quantization_config.weight_quantize_algo,
+                weight_quantize_algo,
                 child._dtype,
                 bias_attr=bias_attr,
                 input_is_parallel=child.input_is_parallel,
@@ -91,7 +102,7 @@ def replace_with_quantization_linear(model, quantization_config, name_prefix="",
             quantization_linear_list.append(name_prefix + name)
         else:
             quantization_linear_list += replace_with_quantization_linear(
-                child, quantization_config, name_prefix + name + ".", llm_int8_threshold
+                child, quantization_config, name_prefix + name + ".", llm_int8_threshold, quantization_config_dict
             )
 
     gc.collect()
@@ -154,19 +165,39 @@ def convert_to_quantize_state_dict_without_check(state_dict, quantization_linear
     return state_dict
 
 
-def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quantization_config, dtype):
-    if quantization_config.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8"]:
-        return convert_to_quantize_state_dict_with_check(
-            state_dict, quantization_linear_list, quantization_config.weight_quantize_algo, dtype
+def convert_to_quantize_state_dict(
+    state_dict, quantization_linear_list, quantization_config, dtype, quantization_config_dict=None
+):
+    if quantization_config_dict is not None:
+        weight_only_int8_quantization_linear_list = [
+            key
+            for key in quantization_config_dict.keys()
+            if quantization_config_dict[key] in ["weight_only_int8", "weight_only_int4", "llm.int8"]
+        ]
+        state_dict = convert_to_quantize_state_dict_with_check(
+            state_dict, weight_only_int8_quantization_linear_list, "weight_only_int8", dtype
         )
-    elif quantization_config.weight_quantize_algo in ["fp4", "nf4"]:
+
+        nf4_quantization_linear_list = [
+            key for key in quantization_config_dict.keys() if quantization_config_dict[key] in ["fp4", "nf4"]
+        ]
+        quantization_config.weight_quantize_algo = "nf4"
         return convert_to_quantize_state_dict_without_check(
-            state_dict, quantization_linear_list, quantization_config, dtype
+            state_dict, nf4_quantization_linear_list, quantization_config, dtype
         )
     else:
-        raise NotImplementedError(
-            f"Please check the quantization_config.weight_quantize_algo: {quantization_config.weight_quantize_algo}"
-        )
+        if quantization_config.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8"]:
+            return convert_to_quantize_state_dict_with_check(
+                state_dict, quantization_linear_list, quantization_config.weight_quantize_algo, dtype
+            )
+        elif quantization_config.weight_quantize_algo in ["fp4", "nf4"]:
+            return convert_to_quantize_state_dict_without_check(
+                state_dict, quantization_linear_list, quantization_config, dtype
+            )
+        else:
+            raise NotImplementedError(
+                f"Please check the quantization_config.weight_quantize_algo: {quantization_config.weight_quantize_algo}"
+            )
 
 
 def update_loaded_state_dict_keys(state_dict, quantization_linear_list, quantization_config):

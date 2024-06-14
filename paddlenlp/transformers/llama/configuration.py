@@ -155,6 +155,8 @@ class LlamaConfig(PretrainedConfig):
         long_sequence_strategy_name=None,
         long_sequence_init_args=None,
         use_long_sequence_strategies=False,
+        qconfig_path=None,
+        lqlora_state_dict_path=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -189,6 +191,8 @@ class LlamaConfig(PretrainedConfig):
         self.long_sequence_strategy_name = long_sequence_strategy_name
         self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
         self.use_long_sequence_strategies = use_long_sequence_strategies
+        self.qconfig_path = qconfig_path
+        self.lqlora_state_dict_path = lqlora_state_dict_path
 
         super().__init__(
             pad_token_id=pad_token_id,

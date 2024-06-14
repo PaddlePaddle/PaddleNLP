@@ -108,6 +108,10 @@ def main():
             "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
         )
 
+    if model_args.weight_quantize_algo is not None and model_args.weight_quantize_algo == "lqlora":
+        if model_args.qconfig_path is None or model_args.lqlora_state_dict_path is None:
+            raise ValueError("If use lqlora, qconfig_path and lqlora_state_dict_path is necessary.")
+
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
     logger.warning(
@@ -152,6 +156,8 @@ def main():
         dtype=dtype,
         from_aistudio=model_args.from_aistudio,
         quantization_config=quantization_config,
+        qconfig_path=model_args.qconfig_path,
+        lqlora_state_dict_path=model_args.lqlora_state_dict_path,
     )
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
@@ -460,6 +466,7 @@ def main():
                 do_qat=quant_args.do_qat,
                 base_model_name_or_path=model_args.model_name_or_path,
                 use_quick_lora=model_args.use_quick_lora,
+                lqlora_state_dict_path=model_args.lqlora_state_dict_path,
             )
             model = LoRAModel(model, lora_config)
         else:
