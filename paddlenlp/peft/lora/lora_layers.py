@@ -409,7 +409,8 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
 
         if not self.merged:
             input_mp = self.lora_dropout(input_mp)
-            if MC2RowSeqParallelCoreLinear is None:
+            # TODO(@gexiao): temporary workaround for deterministic calculation
+            if True or MC2RowSeqParallelCoreLinear is None:
                 input_mp = input_mp @ self.lora_A
                 input_mp = ReduceScatterOp.apply(input_mp)
             else:
@@ -530,7 +531,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
                 result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
             else:
                 res_mp = MC2ColumnParallelCoreLinear.apply(input, self.weight, self.model_parallel_group)
-                result_mp = res_mp + self.bias
+                result_mp = (res_mp + self.bias) if self.bias is not None else res_mp
 
             if not self.merged:
                 input_a = self.lora_dropout(input) @ self.lora_A
@@ -651,7 +652,8 @@ class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear):
 
         if not self.merged:
             input_a = self.lora_dropout(x) @ self.lora_A
-            if MC2ColumnSeqParallelCoreLinear is None:
+            # TODO(@gexiao): temporary workaround for deterministic calculation
+            if True or MC2ColumnSeqParallelCoreLinear is None:
                 input_a = AllGatherOp.apply(input_a)
                 delta_mp = (input_a @ self.lora_B) * self.scaling
             else:

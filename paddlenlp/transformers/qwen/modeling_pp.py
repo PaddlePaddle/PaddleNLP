@@ -138,7 +138,7 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     def __init__(self, config):
         self.config = config
 
-        self.use_recompute = self.config.use_recompute
+        self.recompute = self.config.recompute
         self.recompute_granularity = self.config.recompute_granularity
         self.pp_recompute_interval = self.config.pp_recompute_interval
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
@@ -168,7 +168,7 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.add_sequential_layer(LayerDesc(QWenLMHead, config=config), "lm_head")
 
         recompute_interval = 0
-        if self.use_recompute and self.recompute_granularity == "full":
+        if self.recompute and self.recompute_granularity == "full":
             assert self.config.pp_recompute_interval <= config.num_hidden_layers // (
                 virtual_pp_degree * get_hcg().topology().get_dim_size("pipe")
             ), "pp recompute interval should smaller than num layers of each pp chunk"

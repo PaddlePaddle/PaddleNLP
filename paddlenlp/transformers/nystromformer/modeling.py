@@ -392,7 +392,7 @@ class NystromformerEncoder(nn.Layer):
         super(NystromformerEncoder, self).__init__()
         self.config = config
         self.layer = nn.LayerList([NystromformerLayer(config) for _ in range(config.num_hidden_layers)])
-        # The parameter output_attentions in forward shoule set to be False when self.use_recompute = True.
+        # The parameter output_attentions in forward shoule set to be False when self.recompute = True.
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
 

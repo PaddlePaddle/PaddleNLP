@@ -1,0 +1,50 @@
+#include "xpu/kernel/cluster.h"
+namespace xpu2 {
+namespace plugin {
+
+__global__ void set_value_by_flags_and_idx(const bool* stop_flags,
+                                           int64_t* pre_ids_all,
+                                           const int64_t* input_ids,
+                                           const int* seq_lens_encoder,
+                                           const int* seq_lens_decoder,
+                                           const int64_t* step_idx,
+                                           int bs,
+                                           int length,
+                                           int length_input_ids) {
+  int ncores = core_num();
+  int cid = core_id();
+  int tid = cluster_num() * cid + cluster_id();
+  int nthreads = cluster_num() * ncores;
+
+  bool stop_flags_now;
+  int64_t input_ids_now;
+  int seq_len_enc;
+  int seq_len_dec;
+  int64_t step_idx_now;
+  for (int i = tid; i < bs; i += nthreads) {
+    GM2LM_ASYNC(stop_flags + i, (void*)&(stop_flags_now), sizeof(bool));
+    GM2LM_ASYNC(seq_lens_encoder + i, (void*)&(seq_len_enc), sizeof(int));
+    GM2LM_ASYNC(seq_lens_decoder + i, (void*)&(seq_len_dec), sizeof(int));
+    GM2LM(step_idx + i, (void*)&(step_idx_now), sizeof(int64_t));
+    if (!stop_flags_now && step_idx_now >= 0 &&
+        (seq_len_dec != 0 || seq_len_enc != 0)) {
+      if (seq_len_dec == 0) {
+        // encoder, get last token accord to seq_lens_encoder
+        GM2LM(input_ids + i * length_input_ids + seq_len_enc - 1,
+              (void*)&(input_ids_now),
+              sizeof(int64_t));
+      } else {
+        // decoder, get first token
+        GM2LM(input_ids + i * length_input_ids,
+              (void*)&(input_ids_now),
+              sizeof(int64_t));
+      }
+      LM2GM((void*)&(input_ids_now),
+            pre_ids_all + i * length + step_idx_now,
+            sizeof(int64_t));
+    }
+  }
+}
+
+}  // namespace plugin
+}  // namespace xpu2

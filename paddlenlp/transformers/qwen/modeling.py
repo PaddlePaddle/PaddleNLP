@@ -22,8 +22,19 @@ import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
+from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import try_import
+
+try:
+    from paddle.incubate.nn.functional import swiglu
+except ImportError:
+
+    def swiglu(x, y=None):
+        if y is None:
+            x, y = paddle.chunk(x, chunks=2, axis=-1)
+        return F.silu(x) * y
+
 
 from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
 from paddlenlp.transformers.model_outputs import (
@@ -34,6 +45,7 @@ from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils.log import logger
 
 from ...utils.converter import StateDictNameMapping, init_name_mappings
+from .. import linear_utils
 from ..model_outputs import ModelOutput
 from .configuration import QWenConfig
 
@@ -328,37 +340,60 @@ class QWenMLP(nn.Layer):
     def __init__(self, config):
         super().__init__()
         ff_dim_in = config.intermediate_size // 2
+        self.fuse_attention_ffn = config.fuse_attention_ffn
+
+        if config.sequence_parallel:
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
+        else:
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
+
         if config.tensor_parallel_degree > 1:
-            self.w1 = mpu.ColumnParallelLinear(
-                config.hidden_size,
-                ff_dim_in,
-                gather_output=False,
-                has_bias=False,
-            )
-            self.w2 = mpu.ColumnParallelLinear(
-                config.hidden_size,
-                ff_dim_in,
-                gather_output=False,
-                has_bias=False,
-            )
-            self.c_proj = mpu.RowParallelLinear(
+            if self.fuse_attention_ffn:
+                self.gate_up_fused_proj = ColumnParallelLinear(
+                    config.hidden_size,
+                    ff_dim_in * 2,
+                    gather_output=False,
+                    has_bias=False,
+                )
+            else:
+                self.w1 = ColumnParallelLinear(
+                    config.hidden_size,
+                    ff_dim_in,
+                    gather_output=False,
+                    has_bias=False,
+                )
+                self.w2 = ColumnParallelLinear(
+                    config.hidden_size,
+                    ff_dim_in,
+                    gather_output=False,
+                    has_bias=False,
+                )
+            self.c_proj = RowParallelLinear(
                 ff_dim_in,
                 config.hidden_size,
                 input_is_parallel=True,
                 has_bias=False,
             )
         else:
-            self.w1 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
-            self.w2 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
+            if self.fuse_attention_ffn:
+                self.gate_up_fused_proj = nn.Linear(config.hidden_size, ff_dim_in * 2, bias_attr=not config.no_bias)
+            else:
+                self.w1 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
+                self.w2 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
             self.c_proj = nn.Linear(ff_dim_in, config.hidden_size, bias_attr=not config.no_bias)
 
     def forward(self, hidden_states):
         # up
-        a1 = self.w1(hidden_states)
-        # gate
-        a2 = self.w2(hidden_states)
-        intermediate_parallel = a1 * F.silu(a2)
-        # down
+        # a1 = self.w1(hidden_states)
+        # # gate
+        # a2 = self.w2(hidden_states)
+        # intermediate_parallel = a1 * F.silu(a2)
+        if self.fuse_attention_ffn:
+            intermediate_parallel = swiglu(self.gate_up_fused_proj(hidden_states))
+        else:
+            intermediate_parallel = swiglu(self.w2(hidden_states), self.w1(hidden_states))
         output = self.c_proj(intermediate_parallel)
         return output
 
@@ -784,10 +819,17 @@ class QWenLMHead(nn.Layer):
         else:
             vocab_size = config.vocab_size
 
-        self.weight = self.create_parameter(
-            shape=[config.hidden_size, vocab_size],
-            dtype=paddle.get_default_dtype(),
-        )
+        if vocab_size != config.vocab_size:
+            with get_rng_state_tracker().rng_state():
+                self.weight = self.create_parameter(
+                    shape=[config.hidden_size, vocab_size],
+                    dtype=paddle.get_default_dtype(),
+                )
+        else:
+            self.weight = self.create_parameter(
+                shape=[config.hidden_size, vocab_size],
+                dtype=paddle.get_default_dtype(),
+            )
         # Must set distributed attr for Tensor Parallel !
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
         if self.weight.is_distributed:
@@ -795,7 +837,7 @@ class QWenLMHead(nn.Layer):
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         if tensor_parallel_output is None:
-            tensor_parallel_output = self.config.tensor_parallel_output
+            tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
         logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
@@ -953,13 +995,7 @@ class QWenForCausalLM(QWenPretrainedModel):
         )
         hidden_states = transformer_outputs[0]
 
-        # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is togather with ParallelCrossEntropy
-        tensor_parallel_output = (
-            self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
-        )
-
-        lm_logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        lm_logits = self.lm_head(hidden_states)
 
         loss = None
         if labels is not None:

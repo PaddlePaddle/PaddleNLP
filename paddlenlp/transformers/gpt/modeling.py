@@ -126,7 +126,14 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, transpose_y=True, tensor
 
 
 def seed_guard_context(name=None):
-    if name in get_rng_state_tracker().states_:
+    if (
+        not isinstance(paddle.base.framework._current_expected_place(), paddle.core.CPUPlace)
+        and name in get_rng_state_tracker().states_
+    ):
+        # todo fix it
+        #  ValueError: Length of gpu state list should be equal to the gpu device count
+        #  /usr/local/lib/python3.10/dist-packages/paddle/incubate/framework/random.py:119: ValueError
+        # return contextlib.nullcontext()
         return get_rng_state_tracker().rng_state(name)
     else:
         return contextlib.nullcontext()
@@ -845,6 +852,49 @@ class GPTPretrainedModel(PretrainedModel):
         return mappings
 
     @classmethod
+    def _get_fuse_or_split_param_mappings(cls, config: GPTConfig, is_fuse=False):
+        # return parameter fuse utils
+        from paddlenlp.transformers.conversion_utils import split_or_fuse_func
+
+        fn = split_or_fuse_func(is_fuse=is_fuse)
+
+        # last key is fused key, other keys are to be fused.
+        fuse_qkv_keys = (
+            "decoder.layers.0.self_attn.q_proj.weight",
+            "decoder.layers.0.self_attn.k_proj.weight",
+            "decoder.layers.0.self_attn.v_proj.weight",
+            "decoder.layers.0.self_attn.qkv_proj.weight",
+        )
+        fuse_qkv_bias_keys = (
+            "decoder.layers.0.self_attn.q_proj.bias",
+            "decoder.layers.0.self_attn.k_proj.bias",
+            "decoder.layers.0.self_attn.v_proj.bias",
+            "decoder.layers.0.self_attn.qkv_proj.bias",
+        )
+        num_heads = config.num_attention_heads
+        num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
+        fuse_attention_qkv = getattr(config, "fuse_attention_qkv", False)
+
+        final_actions = {}
+        if is_fuse:
+            if fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    for keys in [fuse_qkv_keys, fuse_qkv_bias_keys]:
+                        new_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in keys])
+                        final_actions[new_keys] = partial(
+                            fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
+        else:
+            if not fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    for keys in [fuse_qkv_keys, fuse_qkv_bias_keys]:
+                        new_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in keys])
+                        final_actions[new_keys] = partial(
+                            fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
+        return final_actions
+
+    @classmethod
     def _get_name_mappings(cls, config: GPTConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
@@ -1389,10 +1439,17 @@ class GPTLMHead(nn.Layer):
             else:
                 vocab_size = config.vocab_size
 
-            self.weight = self.create_parameter(
-                shape=[vocab_size, config.hidden_size],
-                dtype=paddle.get_default_dtype(),
-            )
+            if vocab_size != config.vocab_size:
+                with get_rng_state_tracker().rng_state():
+                    self.weight = self.create_parameter(
+                        shape=[vocab_size, config.hidden_size],
+                        dtype=paddle.get_default_dtype(),
+                    )
+            else:
+                self.weight = self.create_parameter(
+                    shape=[vocab_size, config.hidden_size],
+                    dtype=paddle.get_default_dtype(),
+                )
             # Must set distributed attr for Tensor Parallel !
             self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
             if self.weight.is_distributed:

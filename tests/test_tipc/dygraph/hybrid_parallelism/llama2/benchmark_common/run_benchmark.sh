@@ -28,7 +28,6 @@ function _set_params(){
     master_ip=${ip_lists[0]}
     nnodes=${nnodes:-1}
 
-    is_large_model=True
     base_batch_size=${global_batch_size}
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
@@ -36,7 +35,8 @@ function _set_params(){
     skip_steps=10                  # (必选)解析日志，跳过模型前几个性能不稳定的step
     keyword="interval_tokens_per_second_per_device:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
-
+    model_mode=5                   # 获取ips数据及单位，仅跳过skip_steps后计算均值，单位保持token/s不变
+    
     # 以下为通用执行命令，无特殊可不用修改
     model_name=${model_item}_bs${global_batch_size}_${fp_item}_${run_mode}  # (必填) 且格式不要改动,与竞品名称对齐
     device=${CUDA_VISIBLE_DEVICES//,/ }
@@ -104,6 +104,10 @@ function _train(){
     else
         distributed_args="--master $master_ip:36677 --nnodes $nnodes ${PADDLE_RANK_OPTION} --run_mode=collective"
     fi
+
+    echo "==========System Env============="
+    env
+    echo "================================="
 
     # 以下为通用执行命令，无特殊可不用修改
     case ${device_num} in

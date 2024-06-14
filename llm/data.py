@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from __future__ import annotations
 
 import numpy as np
 
@@ -44,11 +43,21 @@ def get_convert_example(model):
 
     if base_model_prefix == "chatglm":
         return convert_example_chatglm
-    elif base_model_prefix in ["chatglm_v2", "llama", "bloom", "opt", "qwen", "mixtral", "gemma"]:
+    elif base_model_prefix in [
+        "chatglm_v2",
+        "llama",
+        "bloom",
+        "opt",
+        "qwen",
+        "mixtral",
+        "gemma",
+        "qwen2",
+        "qwen2_moe",
+    ]:
         return convert_example_common
     else:
         raise ValueError(
-            f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama, qwen, mixtral, gemma"
+            f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama, qwen, mixtral, gemma, qwen2, qwen2_moe",
         )
 
 
@@ -90,7 +99,7 @@ def tokenize_example(tokenizer, example, data_args):
     return tokenized_source, tokenized_target_input_ids
 
 
-def tokenize_rounds_example(tokenizer, example, data_args):
+def tokenize_rounds_example(tokenizer, example, data_args, **kwargs):
     """tokenize multi-rounds examples with chat_template.json
 
     Args:
@@ -117,7 +126,7 @@ def tokenize_rounds_example(tokenizer, example, data_args):
 
     # 1. only tokenize input_ids
     conversation_result: list[tuple[list[int], list[int]]] = tokenizer.encode_chat_inputs(
-        conversations, context_data=context_data
+        conversations, context_data=context_data, **kwargs
     )
     system_ids = conversation_result.pop("system", []) or []
 
@@ -163,9 +172,9 @@ def tokenize_rounds_example(tokenizer, example, data_args):
     return tokenized_source, labels
 
 
-def convert_example_common(example, tokenizer, data_args, is_test=True, intokens=False):
+def convert_example_common(example, tokenizer, data_args, is_test=True, zero_padding=False):
     if tokenizer.chat_template is not None:
-        return convert_rounds_example_common(example, tokenizer, data_args, is_test, intokens)
+        return convert_rounds_example_common(example, tokenizer, data_args, is_test, zero_padding)
 
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
     if is_test:
@@ -183,13 +192,13 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, intokens
         features = {"input_ids": input_ids, "labels": labels}
         if "position_ids" in tokenized_source:
             features["position_ids"] = list(range(seq_length))
-        if intokens:
+        if zero_padding:
             features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
 
         return features
 
 
-def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, intokens=False):
+def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, zero_padding=False):
     """convert multi-rounds conversation example
 
     Args:
@@ -197,7 +206,7 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, i
         tokenizer (PretrainedTokenizer): the instance of tokenizer
         data_args (DataArgument): data argument for data preprocessing
         is_test (bool, optional): whether is testing stage. Defaults to True.
-        intokens (bool, optional): whether use in_tokens. Defaults to False.
+        zero_padding (bool, optional): whether use in_tokens. Defaults to False.
 
     Returns:
         dict[str, np.ndarray]: the features of example
@@ -216,7 +225,7 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, i
 
     seq_length = len(input_ids)
     features = {"input_ids": input_ids, "labels": labels}
-    if intokens:
+    if zero_padding:
         features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
 
     if "position_ids" in rounds_inputs:
@@ -226,7 +235,7 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, i
     return rounds_inputs
 
 
-def convert_example_chatglm(example, tokenizer, data_args, is_test=True, intokens=False):
+def convert_example_chatglm(example, tokenizer, data_args, is_test=True, zero_padding=False):
     if tokenizer.chat_template is not None:
         # chatglm only support single-round finetune
         example = convert_multi_rounds_to_single_round(example, tokenizer)
@@ -249,7 +258,7 @@ def convert_example_chatglm(example, tokenizer, data_args, is_test=True, intoken
             "labels": labels,
         }
 
-        if intokens:
+        if zero_padding:
             seq_length = len(input_ids)
             # attention_mask
             attention_mask = np.tri(seq_length, seq_length, dtype=bool)

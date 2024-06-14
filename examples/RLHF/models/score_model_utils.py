@@ -49,9 +49,10 @@ class AutoModelForScore(_BaseAutoModelClass):
     _score_module_name: str = "models.score_model"
 
     @classmethod
-    def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path):
-        with io.open(config_file_path, encoding="utf-8") as f:
-            config = json.load(f)
+    def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path, config=None):
+        if config is None:
+            with io.open(config_file_path, encoding="utf-8") as f:
+                config = json.load(f)
 
         # Get class name corresponds to this configuration
         if is_standard_config(config):
@@ -167,25 +168,53 @@ class ScoreModelMixin:
     def get_score(
         self,
         hidden_state: paddle.Tensor,  # size = (B, L, E)
-        attention_mask: paddle.Tensor,  # size = (B, L)
+        attention_mask: paddle.Tensor | None = None,  # size = (B, L)
+        position_ids: paddle.Tensor | None = None,  # size = (B, L)
         return_dict: bool | None = None,
     ) -> ScoreModelOutput:
         """Forward pass of the score model."""
         scores = self.score_head(hidden_state)  # size = (B, L, D)
 
-        end_score = []
-        for i in range(hidden_state.shape[0]):
-            end_index = attention_mask[i].nonzero()[-1].item()
-            end_score.append(scores[i, end_index])  # size = (D,)
-        end_score = paddle.stack(end_score, axis=0)  # size = (B, D)
+        if position_ids is not None:
+            first_pos = paddle.arange(hidden_state.shape[0]).unsqueeze(-1)
+            # Take left padding into account, which has 0s in left and max_len
+            # in right.
+            left_pad_mask = position_ids == 0
+            # position_ids = paddle.where(
+            #     left_pad_mask, position_ids, position_ids + left_pad_mask.sum(-1, keepdim=True) - 1
+            # )
+            # the above limits right padding must not be 0s, the following suits
+            # to both left and right padding with 0s
+            left_pad_num = (
+                paddle.where(left_pad_mask, position_ids.shape[-1] + 100, position_ids).argmin(axis=-1, keepdim=True)
+                - 1
+            )
+            position_ids = left_pad_num + position_ids
+            second_pos = paddle.max(position_ids, axis=-1, keepdim=True)
+            end_pos = paddle.stack([first_pos, second_pos], axis=-1).squeeze(1)
+            end_score = scores.gather_nd(end_pos)
+        else:
+            # attention_mask passed from pipeline pre-stage is shaped (bs, 1, seq_len, seq_len)
+            assert attention_mask is not None and len(attention_mask.shape) == 2
+            end_score = []
+            end_pos = []
+            for i in range(hidden_state.shape[0]):
+                end_index = attention_mask[i].nonzero()[-1].item()
+                end_pos.append((i, end_index))
+                end_score.append(scores[i, end_index])  # size = (D,)
+            end_score = paddle.stack(end_score, axis=0)  # size = (B, D)
 
-        if self.training:
+        if self.training and self.do_normalize:
 
             if dist.is_initialized():
-                # TODO(guosheng): maybe only need nodes in data parallel group
-                # when support hybird dist parallel.
-                gathered_end_score_list = [paddle.zeros_like(end_score) for _ in range(dist.get_world_size())]
-                dist.all_gather(gathered_end_score_list, end_score)
+                gathered_end_score_list = []
+                try:
+                    # gather among data parallel group
+                    hcg = dist.fleet.get_hybrid_communicate_group()
+                    group = hcg.get_sharding_parallel_group()
+                    dist.all_gather(gathered_end_score_list, end_score, group)
+                except:
+                    dist.all_gather(gathered_end_score_list, end_score)
                 gathered_end_score = paddle.concat(gathered_end_score_list, axis=0)
                 self.normalizer.update(gathered_end_score)
             else:

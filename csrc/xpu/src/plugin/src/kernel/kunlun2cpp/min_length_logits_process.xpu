@@ -1,0 +1,73 @@
+#include "xpu/kernel/cluster.h"
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/cluster_primitive.h"
+
+namespace xpu2 {
+namespace plugin {
+
+template <typename T>
+inline __device__ void update_logit(_global_ptr_ T* logits) {
+  __local__ T min_value = -1e10;
+  mfence_lm();
+  LM2GM((void*)&(min_value), logits, sizeof(T));
+}
+
+template <>
+inline __device__ void update_logit<float16>(
+    _global_ptr_ float16* logits) {
+  __local__ short min_value = 0xFBFF;
+  mfence_lm();
+  LM2GM((void*)&(min_value), logits, sizeof(float16));
+}
+
+template <typename T>
+__global__ void min_length_logits_process(T* logits,
+                                          const int64_t* cur_len,
+                                          const int64_t* min_len,
+                                          const int64_t* eos_token_id,
+                                          const int64_t bs,
+                                          const int64_t length,
+                                          const int64_t length_id,
+                                          const int64_t end_length) {
+  int ncores = core_num();
+  int cid = core_id();
+  int tid = cluster_num() * cid + cluster_id();
+  int nthreads = cluster_num() * ncores;
+
+  int64_t cur_len_now;
+  int64_t min_len_now;
+  int64_t eos_token_id_now;
+  int64_t bi;
+  int64_t end_num;
+  __simd__ float float32logits_now[32];
+
+  for (int64_t i = tid; i < bs * end_length; i += nthreads) {
+    bi = i / end_length;
+    end_num = i % end_length;
+    mfence_lm();
+    GM2LM_ASYNC(cur_len + bi, (void*)&(cur_len_now), sizeof(int64_t));
+    GM2LM_ASYNC(min_len + bi, (void*)&(min_len_now), sizeof(int64_t));
+    mfence();
+    if (cur_len_now >= 0 && cur_len_now < min_len_now) {
+      GM2LM(
+          eos_token_id + end_num, (void*)&(eos_token_id_now), sizeof(int64_t));
+      update_logit(logits + bi * length + eos_token_id_now);
+    }
+  }
+}
+
+#define _XPU_DEF__UPDATE_LOGITS_REPEAT_TIMES_(DATA_TYPE)         \
+  template __global__ void min_length_logits_process<DATA_TYPE>( \
+      DATA_TYPE * logits,                                        \
+      const int64_t* cur_len,                                    \
+      const int64_t* min_len,                                    \
+      const int64_t* eos_token_id,                               \
+      const int64_t bs,                                          \
+      const int64_t length,                                      \
+      const int64_t length_id,                                   \
+      const int64_t end_length);
+_XPU_DEF__UPDATE_LOGITS_REPEAT_TIMES_(float);
+_XPU_DEF__UPDATE_LOGITS_REPEAT_TIMES_(float16);
+
+}  // namespace plugin
+}  // namespace xpu2
