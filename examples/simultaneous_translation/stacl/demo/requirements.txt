@@ -1,5 +1,0 @@
-attrdict==2.0.1
-PyYAML==5.4.1
-subword-nmt==0.3.7
-jieba==0.42.1
-websocket-client==1.0.1
