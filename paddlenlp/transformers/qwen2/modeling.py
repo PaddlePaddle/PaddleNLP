@@ -293,12 +293,10 @@ class Qwen2RMSNorm(nn.Layer):
     def forward(self, hidden_states):
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
-                hidden_states = hidden_states.astype("float32")
-                variance = hidden_states.pow(2).mean(-1, keepdim=True)
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
                 hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
         else:
-            hidden_states = hidden_states.astype("float32")
-            variance = hidden_states.pow(2).mean(-1, keepdim=True)
+            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
@@ -482,12 +480,8 @@ class Qwen2Attention(nn.Layer):
 
         if config.tensor_parallel_degree > 1:
             self.q_proj = ColumnParallelLinear(self.hidden_size, self.hidden_size, has_bias=True, gather_output=False)
-            self.k_proj = ColumnParallelLinear(
-                self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
-            )
-            self.v_proj = ColumnParallelLinear(
-                self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
-            )
+            self.k_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False)  # fmt:skip
+            self.v_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False)  # fmt:skip
             self.o_proj = RowParallelLinear(self.hidden_size, self.hidden_size, has_bias=False, input_is_parallel=True)
         else:
             self.q_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=True)
@@ -991,12 +985,10 @@ class Qwen2Model(Qwen2PretrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
-        )
-        use_cache = use_cache if use_cache is not None else self.config.use_cache
 
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states  # fmt:skip
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # retrieve input_ids and inputs_embeds
@@ -1020,6 +1012,7 @@ class Qwen2Model(Qwen2PretrainedModel):
             cache_length = past_key_values[0][0].shape[1]
             seq_length_with_past += cache_length
         if inputs_embeds is None:
+            # [bs, seq_len, dim]
             inputs_embeds = self.embed_tokens(input_ids)
 
         if self.sequence_parallel:
@@ -1178,7 +1171,8 @@ class Qwen2LMHead(nn.Layer):
         # Must set distributed attr for Tensor Parallel !
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
         if self.weight.is_distributed:
-            self.weight.split_axis = 1
+            # for tie_word_embeddings
+            self.weight.split_axis = 0 if self.transpose_y else 1
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         if self.config.sequence_parallel:

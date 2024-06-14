@@ -150,6 +150,11 @@ class Qwen2Tokenizer(PretrainedTokenizer):
         split_special_tokens=False,
         **kwargs,
     ):
+
+        if unk_token is None:
+            logger.info("The `unk_token` parameter needs to be defined: we use `eos_token` by default.")
+            unk_token = eos_token
+
         # Qwen vocab does not contain control tokens; added tokens need to be special
         bos_token = (
             AddedToken(bos_token, lstrip=False, rstrip=False, special=True, normalized=False)
