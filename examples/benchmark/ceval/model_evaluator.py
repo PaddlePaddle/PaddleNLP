@@ -20,18 +20,33 @@ import re
 import numpy as np
 import paddle
 from evaluator import Evaluator
+from paddleslim.quant.observers import (
+    AbsMaxChannelWiseWeightObserver,
+    AVGObserver,
+    GroupWiseWeightObserver,
+)
+from paddleslim.quant.observers.groupwise import GroupWiseWeightObserverLayer
 from tqdm import tqdm
 
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 class ModelEvaluator(Evaluator):
-    def __init__(self, choices, k, model_name_or_path, temperature=0.2):
+    def __init__(self, choices, k, model_name_or_path, temperature=0.2, dtype='float32',tensor_parallel_degree=1):
         super().__init__(choices, model_name_or_path, k)
         self.model_name_or_path = model_name_or_path
+        self.tensor_parallel_degree = tensor_parallel_degree
+        model_name_or_path=model_name_or_path
+        print(model_name_or_path)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name_or_path, dtype="float16")
+        if self.tensor_parallel_degree >1:
+            self.model = AutoModelForCausalLM.from_pretrained(model_name_or_path, dtype=dtype, low_cpu_mem_usage=True,tensor_parallel_output=False,
+            tensor_parallel_degree=self.tensor_parallel_degree,
+            tensor_parallel_rank=paddle.distributed.get_rank(),)
+        else:
+            self.model = AutoModelForCausalLM.from_pretrained(model_name_or_path, dtype=dtype, low_cpu_mem_usage=True)
         self.model.eval()
+        
         self.generation_config = dict(
             temperature=temperature,
             top_k=40,
@@ -117,6 +132,104 @@ class ModelEvaluator(Evaluator):
             test_df.to_csv(os.path.join(save_result_dir, f"{subject_name}_test.csv"))
 
         return correct_ratio, all_answers
+
+    def prepare_ptq(self, quant_bits=8, args=args):
+        from paddle.distributed.fleet.meta_parallel import (
+            ColumnParallelLinear,
+            RowParallelLinear,
+        )
+        from paddle.quantization import PTQ, QAT, QuantConfig
+        from paddleslim.quant.advanced import (
+            EMASampler,
+            MultiStepSampler,
+            PieceWiseSearch,
+            Shift,
+            Smooth,
+        )
+        from paddleslim.quant.layers import (
+            QuantizedColumnParallelLinear,
+            QuantizedRowParallelLinear,
+        )
+        from paddleslim.quant.observers import (
+            AbsMaxChannelWiseWeightObserver,
+            AbsmaxObserver,
+            AVGObserver,
+            KLObserver,
+        )
+        print(f"\n=======Prepare PTQ=======")
+        print("Quant bits:", quant_bits)
+        self.model.eval()            
+
+        q_config = QuantConfig(activation=None, weight=None)
+        if quant_bits == 8:
+            act_quanter = AbsmaxObserver()
+        else:
+            act_quanter = None
+        if args.do_awq:
+            weight_quanter = GroupWiseWeightObserver(quant_bits=quant_bits)
+        else:
+            weight_quanter =  AbsMaxChannelWiseWeightObserver(quant_bits=quant_bits)
+        q_config.add_qat_layer_mapping(ColumnParallelLinear, QuantizedColumnParallelLinear)
+        q_config.add_qat_layer_mapping(RowParallelLinear, QuantizedRowParallelLinear)
+        q_config.add_type_config(
+            [paddle.nn.Linear, ColumnParallelLinear, RowParallelLinear], activation=act_quanter, weight=weight_quanter
+        )
+
+        self.ptq = PTQ(q_config)
+        self.model = self.ptq.quantize(self.model, inplace=True)
+        print(f"\n=======Prepare Done=======")
+
+    def ptq_subject(
+        self,
+        subject_name,
+        test_df,
+        dev_df=None,
+        few_shot=False,
+        cot=False,
+        save_result_dir=None,
+        with_prompt=False,
+        constrained_decoding=False,
+        do_test=False,
+        start_iters=0,
+        target_iters=0,
+    ):
+        current_iters = start_iters
+
+        if save_result_dir:
+            result = []
+            score = []
+        if few_shot:
+            history = self.generate_few_shot_prompt(subject_name, dev_df, cot=cot)
+        else:
+            history = ""
+        answers = ["NA"] * len(test_df) if do_test is True else list(test_df["answer"])
+        for row_index, row in tqdm(test_df.iterrows(), total=len(test_df)):
+            question = self.format_example(row, include_answer=False, cot=cot, with_prompt=with_prompt)
+            instruction = history + question
+            inputs = self.tokenizer(instruction, return_tensors="pd")
+            batch_size, length = inputs.input_ids.shape
+            if constrained_decoding is True:
+                # batch_size is 1, take the last logits as the logits for next token prediction
+                with paddle.no_grad():
+                    logits = self.model(**inputs)[0][0, -1, :]
+                choices_logits = logits[[self.A_id, self.B_id, self.C_id, self.D_id]].numpy()
+                assert not (np.any(np.isinf(choices_logits)) or np.any(np.isnan(choices_logits)))
+                ans = {0: "A", 1: "B", 2: "C", 3: "D"}[np.argmax(choices_logits)]
+                response = self.tokenizer.decode([logits.argmax(-1).item()])
+            else:
+                generation_output = self.model.generate(
+                    **inputs,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    **self.generation_config,
+                )
+                response = self.tokenizer.decode(generation_output[0][0, length:], skip_special_tokens=True)
+            current_iters += 1
+            if current_iters == target_iters:
+                break
+            if current_iters % 5 == 0:
+                print("[PTQ] Iteration {} of {}".format(current_iters, target_iters))
+        return current_iters
 
     def format_example(self, line, include_answer=True, cot=False, with_prompt=False):
         example = line["question"]
