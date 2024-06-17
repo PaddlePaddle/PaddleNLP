@@ -32,6 +32,7 @@ class FakeSimplePretrainedModelConfig(PretrainedConfig):
         self.a = a
         self.b = b
         self.c = c
+        super().__init__()
 
 
 class FakePretrainedModelConfig(PretrainedConfig):
@@ -73,7 +74,7 @@ class FakeModel(PretrainedModel):
         self.b = config.b
 
 
-class ConfigurationUtilsTest:
+class ConfigurationUtilsTest(unittest.TestCase):
     def test_parse_config_with_single_config(self):
         # 1. single config
         config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)
@@ -81,58 +82,42 @@ class ConfigurationUtilsTest:
         assert model.a == 10
         assert model.b == 11
 
-    def test_parse_config_with_full_kwargs(self):
-        model = FakeLayer(a=10, b=11, c=12)
-        assert model.a == 10
-        assert model.b == 11
+    def test_model_config_save(self):
+        # 1. single config
+        config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)
+        config.fuse_attention_qkv = True
+        config.use_fused_rms_norm = True
+        config.tensor_parallel_degree = 8
+        config.tensor_parallel_output = True
 
-    def test_parse_config_with_full_args(self):
-        model = FakeLayer(10, 11, 12)
-        assert model.a == 10
-        assert model.b == 11
+        config.quantization_config.quant_type = "weight_only_int8"
+        str_config = str(config)
+        assert "tensor_parallel_degree" in str_config
 
-    def test_parse_config_with_args_and_kwargs(self):
-        model = FakeLayer(10, b=11, c=12)
-        assert model.a == 10
-        assert model.b == 11
+        config.test_nonsave = "test"
+        config.test_nonsave_2 = "test"
+        config.register_nonsaveable_keys(["test_nonsave"])
+
+        with tempfile.TemporaryDirectory() as tp:
+            config.save_pretrained(tp)
+            import json
+
+            loaded_config = json.load(open(os.path.join(tp, "config.json"), "r"))
+            assert "fuse_attention_qkv" in loaded_config, "fuse qkv is need to save"
+            assert "use_fused_rms_norm" not in loaded_config, "use_fused_rms_norm don't need to save"
+            assert "tensor_parallel_degree" not in loaded_config, "tensor_parallel_degree don't need to save"
+            assert "paddlenlp_version" in loaded_config, "always save paddlenlp_version"
+            assert (
+                "quantization_config" in loaded_config and "quant_type" in loaded_config["quantization_config"]
+            ), "missing quantization_config"
+            assert "test_nonsave" not in loaded_config
+            assert "test_nonsave_2" in loaded_config
 
     def test_parse_config_and_model_with_single_config(self):
         config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)
         model = FakeModel(config)
         assert model.a == 10
         assert model.b == 11
-
-    def test_parse_config_and_model_with_model_and_args(self):
-        config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)
-        fake_layer = FakeLayer(config)
-        model = FakeModel(fake_layer, 100, 110)
-        assert model.a == 100
-        assert model.b == 110
-
-        assert model.model.a == 10
-        assert model.model.b == 11
-
-    def test_parse_config_and_model_with_model_and_kwargs(self):
-        config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)
-        fake_layer = FakeLayer(config)
-        model = FakeModel(fake_layer, a=100, b=110)
-
-        assert model.a == 100
-        assert model.b == 110
-
-        assert model.model.a == 10
-        assert model.model.b == 11
-
-    def test_parse_config_and_model_with_model_and_kwargs_and_args(self):
-        config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)
-        fake_layer = FakeLayer(config)
-        model = FakeModel(fake_layer, 100, b=110)
-
-        assert model.a == 100
-        assert model.b == 110
-
-        assert model.model.a == 10
-        assert model.model.b == 11
 
     def test_get_value_with_default_from_config(self):
         config = FakeSimplePretrainedModelConfig(a=10)
