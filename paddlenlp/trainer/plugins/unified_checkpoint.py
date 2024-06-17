@@ -581,7 +581,10 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         key_name = key.split("/")
         static_name = struct2static_name_mappings[key_name[0]]
         if has_master_weights:
-            key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
+            if model_state_dict[key_name[0]].dtype != core.VarDesc.VarType.FP32:
+                key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
+            else:
+                key_name = "_".join([static_name, key_name[1]])
         else:
             key_name = "_".join([static_name, key_name[1]])
         returned_optim_state_dict[key_name] = state_dict_optim.pop(key)
@@ -972,8 +975,11 @@ def save_single_card_optimizer(args, model, optimizer, output_dir):
 
     static2struct_name_mappings = {}
     state_dict = get_expected_state_dict(model)
+    fp32_weight = {}
     for k, v in state_dict.items():
         static2struct_name_mappings[v.name] = k
+        if master_weights is not None and v.dtype == core.VarDesc.VarType.FP32:
+            fp32_weight[k] = v
 
     # rename optimizer param
     for key in list(optim_state_dict.keys()):
@@ -983,6 +989,7 @@ def save_single_card_optimizer(args, model, optimizer, output_dir):
     if master_weights is not None:
         for key in list(master_weights.keys()):
             master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
+        master_weights.update(fp32_weight)
 
     # save index json
     index_optimizer_file, index_master_weight_file = {}, {}
@@ -1444,7 +1451,10 @@ def load_single_card_optimizer(args, model, optimizer, resume_from_checkpoint: s
         key_name = key.split("/")
         static_name = struct2static_name_mappings[key_name[0]]
         if has_master_weights:
-            key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
+            if model_state_dict[key_name[0]].dtype != core.VarDesc.VarType.FP32:
+                key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
+            else:
+                key_name = "_".join([static_name, key_name[1]])
         else:
             key_name = "_".join([static_name, key_name[1]])
         returned_optim_state_dict[key_name] = state_dict_optim.pop(key)
