@@ -30,10 +30,8 @@ def get_model_list():
         "bert",
         "skep",
         "bigbird",
-        "electra",
         "gpt",
         "ernie",
-        "xlnet",
         "ofa",
         "albert",
         "squad",
@@ -47,10 +45,6 @@ def get_model_list():
         "stacl",
         "transformer",
         "simbert",
-        "ernie-doc",
-        "transformer-xl",
-        "ernie-m",
-        "plato-xl",
         "pointer_summarizer",
         "question_matching",
         "few_shot",
@@ -81,7 +75,6 @@ def get_model_list():
         "minilmv2",
         "wordtag",
         "simcse",
-        "ernie-gen",
         "distill_lstm",
         "DuReader-robust",
         "ernie_matching",
@@ -93,37 +86,26 @@ def get_model_list():
         "efl",
         "doc",
         "couplet",
-        "rnnlm",
         "pp-minilm",
         "dgu",
         "mpnet",
         "textcnn",
         "p-tuning",
         "SQuAD",
-        "elmo",
         "plato-2",
         "pretrained_models",
         "sentiment_analysis",
-        "ernie-health",
         "gpt-3",
     ]
     examples_second_list = ["model_interpretation", "semantic_indexing", "lexical_analysis", "word_embedding"]
 
-    model_list = os.listdir("model_zoo")
-    examples_list = os.listdir("examples/")
-    app_list = os.listdir("applications/")
+    model_list = os.listdir("legacy/model_zoo")
+    app_list = os.listdir("legacy/applications/")
 
     # remove model_list README
     model_list.remove("README.md")
-    examples_list.remove("README.md")
     model_list.extend(app_list)
     model_list.extend(examples_second_list)
-    for examples_model_list in examples_list:
-        if examples_model_list not in examples_second_list:
-            examples_model = os.listdir("examples/" + examples_model_list)
-            if "README.md" in examples_model:
-                examples_model.remove("README.md")
-            model_list.extend(examples_model)
 
     all_examples_dict = set(sorted(model_list))
     no_test_models = []
