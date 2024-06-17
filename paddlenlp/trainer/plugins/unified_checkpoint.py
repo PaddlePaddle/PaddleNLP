@@ -215,7 +215,7 @@ def load_unified_checkpoint(args, model, optimizer, resume_from_checkpoint: str,
         load_unified_checkpoint_dynamically(args, model, optimizer, resume_from_checkpoint, safe_serialization)
         return
 
-    if args.dataset_rank == 0:
+    if args.dataset_rank == 0 or args.use_expert_parallel:
         load_unified_checkpoint_locally(args, model, resume_from_checkpoint, safe_serialization)
 
 
@@ -477,7 +477,7 @@ def load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_
         )
         return returned_optim_state_dict
 
-    if args.data_parallel_rank == 0:
+    if args.data_parallel_rank == 0 or args.use_expert_parallel:
         returned_optim_state_dict = load_unified_optimizer_locally(
             args, model, optimizer, resume_from_checkpoint, safe_serialization
         )
@@ -636,7 +636,7 @@ def unified_optimizer_into_shards(
     for k, v in state_dict.items():
         static2struct_name_mappings[v.name] = k
         if master_weights is not None and v.dtype == core.VarDesc.VarType.FP32:
-            if args.dataset_rank > 0:  # deal with different dataset rank, is this right?
+            if args.dataset_rank > 0:  # deal with different dataset rank.
                 continue
             fp32_weight[k] = v
 
@@ -772,15 +772,20 @@ def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serializa
 
     # To decide whether to load the checkpoint locally, or need to dynamically send tensors across machines.
     local_resume = True
-    if args.dataset_rank == 0:
+    if args.dataset_rank == 0 or args.use_expert_parallel:
         hcg = fleet.get_hybrid_communicate_group()
         tp_group = hcg.get_model_parallel_group()
         pp_group = hcg.get_pipe_parallel_group()
+        dp_group = hcg.get_data_parallel_group()
+        dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
 
         need_files = set()
         state_dict = get_expected_state_dict(model)
         for key in state_dict.keys():
             filename = index["weight_map"][key]
+            # When using expert parallel, there's no need to check tensors with `no_sync=False` when dp_rank > 0.
+            if args.use_expert_parallel and dp_rank > 0 and not getattr(state_dict[key], "no_sync", False):
+                continue
             need_files.add(filename)
         diff_filelist = list(need_files.difference(set(existed_files)))
         num_diff = paddle.to_tensor([len(diff_filelist)])
@@ -788,6 +793,8 @@ def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serializa
             dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=tp_group)
         if pp_group.nranks > 1:
             dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=pp_group)
+        if args.use_expert_parallel and dp_group.nranks > 1:
+            dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=dp_group)
         if num_diff.item() == 0:
             local_resume = True
         else:
@@ -840,8 +847,10 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
     pp_group = hcg.get_pipe_parallel_group()
+    dp_group = hcg.get_data_parallel_group()
     sharding_group = hcg.get_sharding_parallel_group()
     sharding_rank = sharding_group.rank
+    dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
     struct2static_name_mappings = {k: v.name for k, v in model.state_dict().items()}
     if sharding_group.nranks > 1:
         param2rank = optimizer._param2rank
@@ -866,15 +875,20 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
     def check_dynamic_load(args, weight_map, existed_files, is_master_weights=False, typename_set=None):
         # To decide whether to load the checkpoint locally, or need to dynamically distribute the checkpoint.
         local_resume = True
-        if args.data_parallel_rank == 0:
+        if args.data_parallel_rank == 0 or args.use_expert_parallel:
             need_files = set()
             state_dict = get_expected_state_dict(model)
+
             for key in state_dict.keys():
                 if sharding_group.nranks > 1:
                     static_name = struct2static_name_mappings.get(key, None)
                     param_rank = param2rank.get(static_name, None)
                     if param_rank != sharding_rank:
                         continue
+
+                # When using expert parallel, there's no need to check tensors with `no_sync=False` when dp_rank > 0.
+                if args.use_expert_parallel and dp_rank > 0 and not getattr(state_dict[key], "no_sync", False):
+                    continue
 
                 if not is_master_weights:
                     for type_name in typename_set:
@@ -893,6 +907,8 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
                 dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=pp_group)
             if sharding_group.nranks > 1:
                 dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=sharding_group)
+            if args.use_expert_parallel and dp_group.nranks > 1:
+                dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=dp_group)
 
             if num_diff.item() == 0:
                 local_resume = True
