@@ -4,7 +4,7 @@
     "ptx_datasets": "alpaca",
     "actor_model_name_or_path": "PKU-Alignment/alpaca-7b-reproduced",
     "reward_model_name_or_path": "PKU-Alignment/beaver-7b-v1.0-reward",
-    "output_dir": "/root/paddlejob/workspace/guosheng/ckpts/ppo-reshard-sd38",
+    "output_dir": "checkpoints/llm_ppo",
     "max_length": 512,
     "top_p": 0.8,
     "temperature": 1.0,
