@@ -61,6 +61,9 @@ class LLMTest:
 
     @lock
     def run_predictor(self, config_params=None):
+        if "predictor" in sys.modules.keys():
+            del sys.modules["predictor"]
+
         if config_params is None:
             config_params = {}
 
@@ -80,6 +83,9 @@ class LLMTest:
         if not predict_config["inference_model"]:
             return
 
+        if "export_model" in sys.modules.keys():
+            del sys.modules["export_model"]
+
         # to static
         self.disable_static()
         config = load_test_config(self.config_path, "inference-to-static")
@@ -91,6 +97,8 @@ class LLMTest:
 
             main()
 
+        if "predictor" in sys.modules.keys():
+            del sys.modules["predictor"]
         # inference
         self.disable_static()
         config = load_test_config(self.config_path, "inference-infer")
