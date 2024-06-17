@@ -260,22 +260,13 @@ class GPTConfig(PretrainedConfig):
         eol_token_id: int = 3,
         num_partitions: int = 1,
         normalize_before: bool = True,
-        recompute_granularity: str = "full",
         scale_qk_coeff: float = 1.0,
-        tensor_parallel_degree: int = 1,
-        tensor_parallel_output: bool = True,
         output_attentions: bool = False,
         ignore_index: int = 0,
-        use_flash_attention: bool = False,
-        use_fused_dropout_add: bool = False,
         use_fast_layer_norm: bool = False,
-        use_fused_linear: bool = False,
         fuse_attention_qkv: bool = False,
         fuse_attention_ffn: bool = False,
         fused_softmax_with_triangular: bool = False,
-        virtual_pp_degree: int = 1,
-        sequence_parallel=False,
-        fuse_sequence_parallel_allreduce=False,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -300,25 +291,13 @@ class GPTConfig(PretrainedConfig):
 
         self.fuse_attention_qkv = fuse_attention_qkv
         self.fuse_attention_ffn = fuse_attention_ffn
-        self.use_flash_attention = use_flash_attention
 
         self.num_partitions = num_partitions
         self.normalize_before = normalize_before
-        self.recompute_granularity = recompute_granularity
         self.scale_qk_coeff = scale_qk_coeff
-        self.tensor_parallel_degree = tensor_parallel_degree
-        self.tensor_parallel_output = tensor_parallel_output
+
         self.output_attentions = output_attentions
         self.ignore_index = ignore_index
-        self.use_fast_layer_norm = use_fast_layer_norm
-        self.use_fused_linear = use_fused_linear
-        self.use_fused_dropout_add = use_fused_dropout_add
-        self.fused_softmax_with_triangular = fused_softmax_with_triangular
-        self.virtual_pp_degree = virtual_pp_degree
-        self.sequence_parallel = sequence_parallel
-        self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
 
-        if self.sequence_parallel:
-            assert (
-                self.tensor_parallel_degree > 1
-            ), f"senquence-parallel only works in mp, got mp={self.tensor_parallel_degree}"
+        self.use_fast_layer_norm = use_fast_layer_norm
+        self.fused_softmax_with_triangular = fused_softmax_with_triangular

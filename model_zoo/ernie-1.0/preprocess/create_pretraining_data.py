@@ -103,7 +103,7 @@ def get_args():
     group.add_argument("--append_eos", action="store_true", help="Append an <eos> token to the end of a document.")
     group.add_argument("--log_interval", type=int, default=100, help="Interval between progress updates")
     group.add_argument("--workers", type=int, default=1, help="Number of worker processes to launch")
-    group.add_argument("--max_doc_num", type=int, default=sys.maxsize, help="Number of worker processes to launch")
+    group.add_argument("--max_doc_num", type=int, default=sys.maxsize, help="Stop when reach max_doc_num.")
     group.add_argument(
         "--max_repeated_len", type=int, default=100, help="The maximum length of the repeated characters to keep"
     )

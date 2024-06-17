@@ -186,8 +186,8 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
         os.environ.update(environment_variables)
 
         files = [
-            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy",
-            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx",
         ]
         self.prepare_inputs_data(pretrain_arguments["input_dir"], files)
 
@@ -651,8 +651,8 @@ class TestPaddleCheckpointOnN1C2Reset(TestMultipleGpus):
         os.environ.update(environment_variables)
 
         files = [
-            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy",
-            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx",
         ]
         self.prepare_inputs_data(pretrain_arguments["input_dir"], files)
 
@@ -693,8 +693,8 @@ class TestUnifiedCheckpointOnN1C2Reset(TestMultipleGpus):
         os.environ.update(environment_variables)
 
         files = [
-            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy",
-            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx",
         ]
         self.prepare_inputs_data(pretrain_arguments["input_dir"], files)
 
