@@ -151,7 +151,7 @@ class TestTensorParallel(TestMultipleGpus):
 
 if __name__ == "__main__":
     _test_llama()
-    # _test_chatglm()
-    # _test_bloom()
-    # _test_gemma()
-    # _test_qwen2()
+    _test_chatglm()
+    _test_bloom()
+    _test_gemma()
+    _test_qwen2()
