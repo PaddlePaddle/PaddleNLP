@@ -4,15 +4,6 @@
 
 本目录下提供 `seq_cls_infer.py` 快速完成在 CPU/GPU 的中文情感分类任务的 Python 部署示例。
 
-## 依赖安装
-
-直接执行以下命令安装部署示例的依赖。
-
-```bash
-# 安装 fast_tokenizer 以及 GPU 版本 fastdeploy
-pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
-```
-
 ## 快速开始
 
 以下示例展示如何基于 FastDeploy 库完成 ERNIE 1.0 模型在 ChnSenticorp 数据集上进行文本分类任务的 Python 预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照 [ERNIE 1.0 训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/ernie-1.0/finetune/tmp/export`（用户可按实际情况设置）。

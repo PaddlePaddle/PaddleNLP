@@ -47,12 +47,6 @@ def parse_arguments():
     parser.add_argument("--log_interval", type=int, default=10, help="The interval of logging.")
     parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument(
-        "--use_fast",
-        type=distutils.util.strtobool,
-        default=False,
-        help="Whether to use fast_tokenizer to accelarate the tokenization.",
-    )
-    parser.add_argument(
         "--encode_type",
         type=str,
         default="text",

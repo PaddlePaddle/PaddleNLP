@@ -4,17 +4,6 @@
 
 本目录下分别提供 `seq_cls_infer.py` 以及 `token_cls_infer.py` 快速完成在 CPU/GPU 的文本分类任务以及序列标注任务的 Python 部署示例。
 
-## 依赖安装
-
-直接执行以下命令安装部署示例的依赖。
-
-```bash
-
-# 安装fast_tokenizer以及GPU版本fastdeploy
-pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
-
-```
-
 ## 文本分类任务
 
 ### 快速开始

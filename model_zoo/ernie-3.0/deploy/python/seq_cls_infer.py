@@ -45,12 +45,6 @@ def parse_arguments():
     parser.add_argument("--max_length", type=int, default=128, help="The max length of sequence.")
     parser.add_argument("--log_interval", type=int, default=10, help="The interval of logging.")
     parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
-    parser.add_argument(
-        "--use_fast",
-        type=distutils.util.strtobool,
-        default=True,
-        help="Whether to use fast_tokenizer to accelarate the tokenization.",
-    )
     return parser.parse_args()
 
 
@@ -65,7 +59,7 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir, use_fast=args.use_fast)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
         self.runtime = self.create_fd_runtime(args)
         self.batch_size = args.batch_size
         self.max_length = args.max_length
