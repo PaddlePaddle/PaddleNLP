@@ -8,8 +8,8 @@
 
 ```
 .
-├── PPO
-│   ├── comm_utils.py
+├── PPO                          # PPO 训练相关目录
+│   ├── comm_utils.py            # 通信相关工具py文件
 │   ├── data                     # 数据集相关目录
 │   │   ├── alpaca.py            # alpaca(raw)数据集py文件
 │   │   ├── base.py              # 数据集基类及工具py文件
@@ -30,12 +30,12 @@
 │   │   └── score_model_utils.py # score model基类及工具py文件
 │   ├── ppo_main.py              # RLHF训练脚本
 │   ├── ppo_trainer.py           # RLHF训练执行器py脚本
-│   ├── tests
+│   ├── tests                    # 测试相关目录
 │   │   ├── run_model.py
 │   │   └── test_export.py
 │   └── trainer_utils.py         # Trainer补丁及工具py脚本
 ├── README.md
-└── RM
+└── RM                           # Reward Model 训练相关目录
     ├── models -> ../PPO/models
     ├── reward_main.py            # reward model训练脚本
     └── reward_trainer.py         # reward训练执行器py脚本
