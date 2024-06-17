@@ -28,7 +28,6 @@ python seq_cls_infer.py --model_dir ../tmp/chnsenticorp_v2/export/ --device gpu 
 运行完成后返回的结果如下：
 
 ```bash
-[2023-02-26 13:38:46,370] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.fast_tokenizer.ErnieFastTokenizer'> to load '../../finetune/tmp/chnsenticorp_v2/export/'.
 [INFO] fastdeploy/runtime/runtime.cc(266)::CreatePaddleBackend  Runtime initialized with Backend::PDINFER in Device::GPU.
 Batch id: 0, example id: 0, sentence: 这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般, label: negative, negative prob: 0.9999, positive prob: 0.0001.
 Batch id: 1, example id: 0, sentence: 怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片！开始还怀疑是不是赠送的个别现象，可是后来发现每张DVD后面都有！真不知道生产商怎么想的，我想看的是猫和老鼠，不是米老鼠！如果厂家是想赠送的话，那就全套米老鼠和唐老鸭都赠送，只在每张DVD后面添加一集算什么？？简直是画蛇添足！！, label: negative, negative prob: 0.9998, positive prob: 0.0002.
@@ -48,7 +47,6 @@ Batch id: 2, example id: 0, sentence: 还稍微重了点，可能是硬盘大的
 |--cpu_threads | 当使用cpu推理时，指定推理的cpu线程数，默认为1。|
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
-|--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
 
 ## FastDeploy 高阶用法
 

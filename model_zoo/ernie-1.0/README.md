@@ -653,7 +653,6 @@ python deploy/seq_cls_infer.py --model_dir tmp/chnsenticorp_v2/export/ --device 
 
 运行后预测结果打印如下：
 ```text
-[2023-03-01 08:25:31,352] [    INFO] - We are using <class 'paddlenlp.transformers.ernie.fast_tokenizer.ErnieFastTokenizer'> to load '../tmp/chnsenticorp_v2/export/'.
 WARNING: Logging before InitGoogleLogging() is written to STDERR
 W0301 08:25:37.617117 58742 analysis_config.cc:958] It is detected that mkldnn and memory_optimize_pass are enabled at the same time, but they are not supported yet. Currently, memory_optimize_pass is explicitly disabled
 [INFO] fastdeploy/runtime/runtime.cc(266)::CreatePaddleBackend    Runtime initialized with Backend::PDINFER in Device::CPU.

@@ -28,7 +28,6 @@ python seq_cls_infer.py --model_dir ../../infer_model/ --device gpu --backend pa
 运行完成后返回的结果如下：
 
 ```bash
-[2023-03-02 08:30:03,877] [    INFO] - We are using <class 'paddlenlp.transformers.bert.fast_tokenizer.BertFastTokenizer'> to load '../../infer_model/'.
 [INFO] fastdeploy/runtime/runtime.cc(266)::CreatePaddleBackend    Runtime initialized with Backend::PDINFER in Device::GPU.
 Batch id: 0, example id: 0, sentence1: against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting, label: positive, negative prob: 0.0003, positive prob: 0.9997.
 Batch id: 1, example id: 0, sentence1: the situation in a well-balanced fashion, label: positive, negative prob: 0.0002, positive prob: 0.9998.
@@ -49,7 +48,6 @@ Batch id: 4, example id: 0, sentence1: this new jangle of noise , mayhem and stu
 |--cpu_threads | 当使用cpu推理时，指定推理的cpu线程数，默认为1。|
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
-|--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
 
 ## FastDeploy 高阶用法
 

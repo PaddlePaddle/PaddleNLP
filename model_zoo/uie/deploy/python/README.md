@@ -79,7 +79,6 @@ python infer.py --model_dir ../../checkpoint/model_best --device gpu
 |--cpu_threads | 当使用cpu推理时，指定推理的cpu线程数，默认为1。|
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
-|--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
 
 ## FastDeploy 高阶用法
 

@@ -54,14 +54,6 @@ pip install paddle-serving-server-gpu==0.8.3.post112 -i https://pypi.tuna.tsingh
 - 默认开启国内清华镜像源来加速下载，如果您使用 HTTP 代理可以关闭(-i https://pypi.tuna.tsinghua.edu.cn/simple)
 - 更多wheel包请参考[serving官网文档](https://github.com/PaddlePaddle/Serving/blob/develop/doc/Latest_Packages_CN.md)
 
-### 安装FastTokenizer文本处理加速库（可选）
-> 重要提示：由于FastTokenizer长时间未得到维护，因此可能会遇到训练（基于Python实现的tokenizer）与部署（基于C++实现的tokenizer）阶段分词不一致的问题。为了确保稳定性和一致性，我们建议避免安装该库。
-
-如果想要安装fast_tokenizer，以获得更高的文本处理效率，从而显著提升服务性能。您可以通过以下命令进行安装：
-```shell
-pip install fast-tokenizer-python
-```
-
 
 ## 模型转换
 

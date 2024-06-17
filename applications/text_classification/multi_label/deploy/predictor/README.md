@@ -20,13 +20,6 @@ python -m pip install onnxruntime-gpu onnx onnxconverter-common==1.9.0 paddle2on
 python -m pip install onnxruntime
 ```
 
-安装FastTokenizer文本处理加速库（可选）
-> 重要提示：由于FastTokenizer长时间未得到维护，因此可能会遇到训练（基于Python实现的tokenizer）与部署（基于C++实现的tokenizer）阶段分词不一致的问题。为了确保稳定性和一致性，我们建议避免安装该库。
-
-如果想要安装fast_tokenizer，以获得更高的文本处理效率，从而显著提升服务性能。您可以通过以下命令进行安装：
-```shell
-pip install fast-tokenizer-python
-```
 ## 基于GPU部署推理样例
 
 请使用如下命令进行部署
