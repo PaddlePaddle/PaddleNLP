@@ -96,7 +96,7 @@ class ConfigurationUtilsTest(unittest.TestCase):
 
         config.test_nonsave = "test"
         config.test_nonsave_2 = "test"
-        config.register_nonsaveable_keys(["test_nonsave"])
+        config.register_unsavable_keys(["test_nonsave"])
 
         with tempfile.TemporaryDirectory() as tp:
             config.save_pretrained(tp)
