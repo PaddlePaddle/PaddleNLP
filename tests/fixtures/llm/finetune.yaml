@@ -43,8 +43,6 @@ finetune:
       model_name_or_path: __internal_testing__/tiny-fused-baichuan
     qwen2:
       model_name_or_path: __internal_testing__/tiny-random-qwen2
-    qwen2moe:
-      model_name_or_path: __internal_testing__/tiny-random-qwen2moe
 
 inference-predict:
   default:
