@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 import json
 import os
 import re
@@ -1109,8 +1110,14 @@ class PretrainedConfig:
                 If set to `True`, only the difference between the config instance and the default `PretrainedConfig()`
                 is serialized to JSON file.
         """
+        spec = inspect.getfullargspec(self.to_json_string)
+        has_saving_file_arg = 'saving_file' in spec.args or spec.varkw
         with open(json_file_path, "w", encoding="utf-8") as writer:
-            writer.write(self.to_json_string(use_diff=use_diff, saving_file=saving_file))
+            if has_saving_file_arg:
+                s = self.to_json_string(use_diff=use_diff, saving_file=saving_file)
+            else:
+                s = self.to_json_string(use_diff=use_diff)
+            writer.write(s)
 
     def update(self, config_dict: Dict[str, Any]):
         """
