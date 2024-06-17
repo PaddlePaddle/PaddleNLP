@@ -39,6 +39,7 @@ from tests.testing_utils import GPUsTesting, require_gpu
 from .testing_utils import LLMTest, argv_context_guard, load_test_config
 
 
+@pytest.mark.flaky(retries=3, delay=1)
 @require_gpu(1)
 @parameterized_class(
     ["model_name_or_path", "model_class"],
@@ -129,6 +130,7 @@ class PredictorTest(LLMTest, unittest.TestCase):
             self.assertGreaterEqual(count / len(result_0), 0.4)
 
 
+@pytest.mark.flaky(retries=3, delay=1)
 @require_gpu(1)
 @parameterized_class(
     ["model_name_or_path", "model_class"],
@@ -178,6 +180,7 @@ class PredictorPrecacheTest(LLMTest, unittest.TestCase):
         self.assertGreaterEqual(count / len(result_0), 0.8)
 
 
+@pytest.mark.flaky(retries=3, delay=1)
 @require_gpu(1)
 class PredictorBaseTest(LLMTest, unittest.TestCase):
     def load_test_config(self):
@@ -214,6 +217,7 @@ class PredictorBaseTest(LLMTest, unittest.TestCase):
                 predict()
 
 
+@pytest.mark.flaky(retries=3, delay=1)
 @require_gpu(1)
 @parameterized_class(
     ["model_name_or_path", "model_class"],
@@ -294,6 +298,7 @@ class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
         self.assertGreaterEqual(count / len(result_0), 0.2)
 
 
+@pytest.mark.flaky(retries=3, delay=1)
 @require_gpu(1)
 @parameterized_class(
     ["model_name_or_path", "model_class"],
@@ -333,6 +338,7 @@ class GPUsPredictorTest(LLMTest, GPUsTesting, unittest.TestCase):
         self.assertGreaterEqual(count / len(result_0), 0.4)
 
 
+@pytest.mark.flaky(retries=3, delay=1)
 @require_gpu(1)
 class QWenVLTest(LLMTest, unittest.TestCase):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"

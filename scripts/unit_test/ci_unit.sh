@@ -54,5 +54,5 @@ set_env
 pytest -v -n 8 \
   --dist loadgroup \
   --retries 1 --retry-delay 1 \
-  --timeout 240 --durations 20 \
+  --timeout 200 --durations 20 \
   --cov paddlenlp --cov-report xml:coverage.xml
