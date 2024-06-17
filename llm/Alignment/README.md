@@ -1,4 +1,4 @@
-# RLHF PPO
+# Alignment
 
 提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。其中 PPO 代码实现细节参考了 [PKU-Alignment/safe-rlhf](https://github.com/PKU-Alignment/safe-rlhf)（PKU Beaver） 中的 PPO 实现，支持reward normalization、pretraining loss等常用的 PPO 稳定训练策略；示例使用 PKU-Alignment/safe-rlhf 提供的部分数据集和模型。后续将持续完善扩展，支持更好效果、更低成本、更高性能、更大规模的 RLHF 能力。
 
