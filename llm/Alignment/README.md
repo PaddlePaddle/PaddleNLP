@@ -175,7 +175,8 @@ PPO 完整的训练过程包括以下 3 个阶段，如下图所示（来自[Dee
 使用 `reward_main.py` 脚本根据 `reward_config.json` 训练奖励模型
 
 ```
-python -u -m paddle.distributed.launch reward_main.py ./reward_config.json
+cd RM
+python -u -m paddle.distributed.launch reward_main.py ../../config/llama/rm.json
 ```
 
 `reward_config.json` 中的绝大部分参数释义同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，不再赘述；稍有区别的是 `train_datasets`/`eval_datasets` 分别使用数据集定义注册时的`NAME`属性给出训练和验证集。另外对于奖励模型训练有以下特殊参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
@@ -192,7 +193,8 @@ RLHF 阶段需要 actor model、reference model、critic model、reward model �
 
 ```
 # 类型提升 warning 暂时通过 loglevel 屏蔽，待后续修复
-GLOG_minloglevel=2 python -u -m paddle.distributed.launch ppo_main.py ./ppo_config.json
+cd PPO
+PYTHONPATH=../../ GLOG_minloglevel=2 python -u -m paddle.distributed.launch ppo_main.py ../../config/llama/ppo.json
 ```
 
 `ppo_config.json` 中的绝大部分参数释义同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，不再赘述，重点给出以下参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
