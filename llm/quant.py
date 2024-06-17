@@ -197,17 +197,20 @@ def apply_ptq(quant_args, trainer, ptq_dataloader):
     else:
         raise ValueError("weight_quant_method should be one of ['abs_max_channel_wise', 'groupwise']")
 
-    if quant_args.quant_type == "a8w8":
-        activation = AVGObserver(quant_bits=8)
-        weight = weight_observer(quant_bits=8)
+    if quant_args.quant_type == "a8w8(int)":
+        activation = AVGObserver(quant_bits=8) #INT8
+        weight = weight_observer(quant_bits=8) #INT8
+    if quant_args.quant_type == "a8w8(fp)":
+        activation = AbsmaxObserver(quant_bits=(4,3)) #FP8
+        weight = AbsmaxObserver(quant_bits=(4,3)) #FP8
     elif quant_args.quant_type == "weight_only_int4":
         activation = None
-        weight = weight_observer(quant_bits=4)
+        weight = weight_observer(quant_bits=4) #INT4
     elif quant_args.quant_type == "weight_only_int8":
         activation = None
-        weight = weight_observer(quant_bits=8)
+        weight = weight_observer(quant_bits=8) #INT8
     else:
-        raise ValueError("quant_type should be one of ['a8w8', 'weight_only_int4', 'weight_only_int8']")
+        raise ValueError("quant_type should be one of ['a8w8(int)', 'a8w8(fp)' 'weight_only_int4', 'weight_only_int8']")
 
     q_config.add_qat_layer_mapping(ColumnParallelLinear, QuantizedColumnParallelLinear)
     q_config.add_qat_layer_mapping(RowParallelLinear, QuantizedRowParallelLinear)
