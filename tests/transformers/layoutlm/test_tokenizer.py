@@ -28,7 +28,6 @@ from ...transformers.test_tokenizer_common import (
 class LayoutLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = LayoutLMTokenizer
-    test_fast_tokenizer = False
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = False
