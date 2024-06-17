@@ -1,5 +1,7 @@
 # PLATO-2
 
+> **注意** 部分内容在PaddleNLP 3.0以后不再进行维护，更多历史内容请参考[PaddleNLP 2.8](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/examples/dialogue)。
+
 ## 模型简介
 
 构建高质量的开放领域（Open-Domain）的对话机器人，使得它能用自然语言与人自由地交流，这一直是自然语言处理领域终极目标之一。

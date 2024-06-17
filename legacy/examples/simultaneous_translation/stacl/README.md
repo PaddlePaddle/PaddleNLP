@@ -133,13 +133,13 @@ perl mosesdecoder/scripts/generic/multi-bleu.perl newstest2017.tok.en < predict.
 
 ## 模型下载（更新中）
 我们提供基于NIST（中->英，共2M中英句对）预训练模型，供大家下载，下载后需解压使用。
-| Wait-k策略     | 模型连接     | 4-ref BLEU on NIST 2008|
-| ------------ | --------------- |---------|
-| Wait-1 | [下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_w1.tar.gz) |30.94|
-| Wait-3   |[下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_w3.tar.gz) |34.24 |
-| Wait-5   |[下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_w5.tar.gz) |36.30 |
-| Wait-7   |[下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_w7.tar.gz) |37.84 |
-| Wait_-1(整句模型)   |[下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_sent.tar.gz) |41.41 |
+| Wait-k策略        | 模型连接                                                                        | 4-ref BLEU on NIST 2008 |
+|-------------------|---------------------------------------------------------------------------------|-------------------------|
+| Wait-1            | [下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_w1.tar.gz)   | 30.94                   |
+| Wait-3            | [下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_w3.tar.gz)   | 34.24                   |
+| Wait-5            | [下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_w5.tar.gz)   | 36.30                   |
+| Wait-7            | [下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_w7.tar.gz)   | 37.84                   |
+| Wait_-1(整句模型) | [下载](https://bj.bcebos.com/paddlenlp/models/stacl/nist_zhen_full_sent.tar.gz) | 41.41                   |
 词表下载：[source vocab](https://bj.bcebos.com/paddlenlp/models/stacl/nist.20k.zh.vocab) ，[target vocab](https://bj.bcebos.com/paddlenlp/models/stacl/nist.10k.en.vocab)
 
 ## Demo展示

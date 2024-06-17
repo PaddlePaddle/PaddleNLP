@@ -1,5 +1,7 @@
 # 对话通用理解模型 (DGU, Dialogue General Understanding)
 
+> **注意** 部分内容在PaddleNLP 3.0以后不再进行维护，更多历史内容请参考[PaddleNLP 2.8](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/examples/dialogue)。
+
 ## 模型简介
 
 对话系统 (Dialogue System) 常常需要根据应用场景的变化去解决多种多样的任务。任务的多样性（意图识别、槽填充、行为识别、状态追踪等等），以及领域训练数据的稀少，给Dialogue System的研究和应用带来了巨大的困难和挑战，要使得Dialogue System得到更好的发展，需要开发一个通用的对话理解模型。为此，我们给出了基于BERT的对话通用理解模型 (DGU: Dialogue General Understanding)，通过实验表明，使用base-model (BERT)并结合常见的学习范式，就可以在几乎全部对话理解任务上取得比肩甚至超越各个领域业内最好的模型的效果，展现了学习一个通用对话理解模型的巨大潜力。

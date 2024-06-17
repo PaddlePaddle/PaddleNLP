@@ -135,7 +135,7 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
              P0case_list[${#P0case_list[*]}]=fast_generation
         fi
         Build_list[${dir1}]="paddlenlp" # 影响编包
-    elif [[ ${dir1} =~ "legacy/examples" ]];then # 模型升级
+    elif [[ ${dir1} =~ "examples" ]];then # 模型升级
         if [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${!all_P0case_dic[*]} =~ ${dir3} ]];then
