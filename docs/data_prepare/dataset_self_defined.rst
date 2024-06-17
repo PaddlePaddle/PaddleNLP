@@ -9,8 +9,6 @@
 
 从本地文件创建数据集时，我们 **推荐** 根据本地数据集的格式给出读取function并传入 :func:`load_dataset` 中创建数据集。
 
-以 `waybill_ie <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/waybill_ie>`__ 快递单信息抽取任务中的数据为例：
-
 .. code-block::
 
     from paddlenlp.datasets import load_dataset
