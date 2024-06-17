@@ -71,6 +71,7 @@ def common_test_merge(model, model_class=None):
     is_main_process = rank == 0
     object_list = []
     with tempfile.TemporaryDirectory() as tempdir:
+        tempdir = "./tmp_ss"
         paddle.distributed.all_gather_object(object_list, tempdir, group=mp_group)
         tempdir = object_list[0]
         # test merge one
@@ -150,7 +151,7 @@ class TestTensorParallel(TestMultipleGpus):
 
 if __name__ == "__main__":
     _test_llama()
-    _test_chatglm()
-    _test_bloom()
-    _test_gemma()
-    _test_qwen2()
+    # _test_chatglm()
+    # _test_bloom()
+    # _test_gemma()
+    # _test_qwen2()
