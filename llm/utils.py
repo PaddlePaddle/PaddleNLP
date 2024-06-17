@@ -67,7 +67,7 @@ def get_prefix_tuning_params(model):
         num_hidden_layers = model.config.num_layers
         hidden_size = model.config.hidden_size
         postprocess_past_key_value = chatglm_postprocess_past_key_value
-        multi_query_group_num = model.config.multi_query_group_num
+        multi_query_group_num = model.config.multi_query_group_num  # num_key_value_heads
     elif model.base_model_prefix == "bloom":
         from paddlenlp.peft.prefix import bloom_postprocess_past_key_value
 
@@ -92,6 +92,14 @@ def get_prefix_tuning_params(model):
         hidden_size = model.config.hidden_size
         postprocess_past_key_value = qwen_postprocess_past_key_value
         multi_query_group_num = None
+    elif model.base_model_prefix == "qwen2":
+        from paddlenlp.peft.prefix import qwen_postprocess_past_key_value
+
+        num_attention_heads = model.config.num_attention_heads
+        num_hidden_layers = model.config.num_hidden_layers
+        hidden_size = model.config.hidden_size
+        postprocess_past_key_value = qwen_postprocess_past_key_value
+        multi_query_group_num = model.config.num_key_value_heads  # num_key_value_heads
     else:
         raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}. ")
     return dict(
