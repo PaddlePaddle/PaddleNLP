@@ -8,30 +8,37 @@
 
 ```
 .
-├── reward_main.py               # reward model训练脚本
-├── reward_config.json           # reward model训练配置文件
-├── reward_trainer.py            # reward训练执行器py脚本
-├── ppo_main.py                  # RLHF训练脚本
-├── ppo_config.json              # RLHF训练配置文件
-├── ppo_trainer.py               # RLHF训练执行器py脚本
-├── ppo_config.json              # RLHF训练配置文件
-├── trainer_utils.py             # Trainer补丁及工具py脚本
-├── infer_utils.py               # 生成加速工具py脚本
-├── data                         # 数据集相关目录
-│ └── base.py                    # 数据集基类及工具py文件
-│ └── alpaca.py                  # alpaca(raw)数据集py文件
-│ └── safe_rlhf.py               # safe_rlhf(raw)数据集py文件
-│ └── preference.py              # 偏好数据集py文件
-│ └── prompt_only.py             # prompt only数据集py文件
-│ └── supervised.py              # supervised数据集py文件
-├── models                       # 模型相关目录
-│ └── score_model_utils.py       # score model基类及工具py文件
-│ └── score_model.py             # score model模型定义py文件
-│ └── ppo_model_utils.py         # PPO loss等模型策略py文件
-│ └── pp_model_utils.py          # 流水线并行补丁及工具py文件
-│ └── model_pp.py                # 流水线并行模型py文件
-│ └── infer_model_utils.py       # 预测加速模型补丁及工具py文件
-└── README.md
+├── PPO
+│   ├── comm_utils.py
+│   ├── data                     # 数据集相关目录
+│   │   ├── alpaca.py            # alpaca(raw)数据集py文件
+│   │   ├── base.py              # 数据集基类及工具py文件
+│   │   ├── __init__.py
+│   │   ├── preference.py        # 偏好数据集py文件
+│   │   ├── prompt_only.py       # prompt only数据集py文件
+│   │   ├── safe_rlhf.py         # safe_rlhf(raw)数据集py文件
+│   │   └── supervised.py        # supervised数据集py文件
+│   ├── infer_utils.py           # 生成加速工具py脚本
+│   ├── models                   # 模型相关目录
+│   │   ├── infer_model_utils.py # 预测加速模型补丁及工具py文件
+│   │   ├── __init__.py
+│   │   ├── model_pp.py          # 流水线并行模型py文件
+│   │   ├── pp_model_utils.py    # 流水线并行补丁及工具py文件
+│   │   ├── ppo_model.py         # PPO 相关模型实现
+│   │   ├── ppo_model_utils.py   # PPO loss等模型策略py文件
+│   │   ├── score_model.py       # score model模型定义py文件
+│   │   └── score_model_utils.py # score model基类及工具py文件
+│   ├── ppo_main.py              # RLHF训练脚本
+│   ├── ppo_trainer.py           # RLHF训练执行器py脚本
+│   ├── tests
+│   │   ├── run_model.py
+│   │   └── test_export.py
+│   └── trainer_utils.py         # Trainer补丁及工具py脚本
+├── README.md
+└── RM
+    ├── models -> ../PPO/models
+    ├── reward_main.py            # reward model训练脚本
+    └── reward_trainer.py         # reward训练执行器py脚本
 ```
 
 ### 环境准备
@@ -172,14 +179,14 @@ PPO 完整的训练过程包括以下 3 个阶段，如下图所示（来自[Dee
 
 2. Reward Model Fine-Tuning
 
-使用 `reward_main.py` 脚本根据 `reward_config.json` 训练奖励模型
+使用 `reward_main.py` 脚本根据 `rm.json` 训练奖励模型
 
 ```
 cd RM
 python -u -m paddle.distributed.launch reward_main.py ../../config/llama/rm.json
 ```
 
-`reward_config.json` 中的绝大部分参数释义同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，不再赘述；稍有区别的是 `train_datasets`/`eval_datasets` 分别使用数据集定义注册时的`NAME`属性给出训练和验证集。另外对于奖励模型训练有以下特殊参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
+`rm.json` 中的绝大部分参数释义同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，不再赘述；稍有区别的是 `train_datasets`/`eval_datasets` 分别使用数据集定义注册时的`NAME`属性给出训练和验证集。另外对于奖励模型训练有以下特殊参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
 
 - `normalize_score_during_training`：是否在训练过程中对奖励进行 normalize，默认为 `False`。
 - `normalizer_type`：使用 normalizer 时计算 mean、var 的方式，可选`"RunningMeanStd", "ExponentialMovingAverage"`。
@@ -189,7 +196,7 @@ python -u -m paddle.distributed.launch reward_main.py ../../config/llama/rm.json
 
 3. RLHF：
 
-RLHF 阶段需要 actor model、reference model、critic model、reward model 四个模型；actor-model/reference-model 使用 SFT 模型进行 initialize/frozen；critic-model/reward-model 使用 reward 模型进行 initialize/frozen (另外注意若 SFT 使用 LoRA 请先将 LoRA 权重合并）。这里使用 PKU-Alignment/PKU-SafeRLHF 提供的 SFT 模型（[PKU-Alignment/alpaca-7b-reproduced](https://huggingface.co/PKU-Alignment/alpaca-7b-reproduced)）和 reward 模型（[PKU-Alignment/beaver-7b-v1.0-reward](https://huggingface.co/PKU-Alignment/beaver-7b-v1.0-reward)，注意该模型只关注 helpful 未考量 harmless）作为示例，使用 `ppo_main.py` 脚本根据 `ppo_config.json` 进行 RLHF 训练。
+RLHF 阶段需要 actor model、reference model、critic model、reward model 四个模型；actor-model/reference-model 使用 SFT 模型进行 initialize/frozen；critic-model/reward-model 使用 reward 模型进行 initialize/frozen (另外注意若 SFT 使用 LoRA 请先将 LoRA 权重合并）。这里使用 PKU-Alignment/PKU-SafeRLHF 提供的 SFT 模型（[PKU-Alignment/alpaca-7b-reproduced](https://huggingface.co/PKU-Alignment/alpaca-7b-reproduced)）和 reward 模型（[PKU-Alignment/beaver-7b-v1.0-reward](https://huggingface.co/PKU-Alignment/beaver-7b-v1.0-reward)，注意该模型只关注 helpful 未考量 harmless）作为示例，使用 `ppo_main.py` 脚本根据 `ppo.json` 进行 RLHF 训练。
 
 ```
 # 类型提升 warning 暂时通过 loglevel 屏蔽，待后续修复
@@ -197,7 +204,7 @@ cd PPO
 PYTHONPATH=../../ GLOG_minloglevel=2 python -u -m paddle.distributed.launch ppo_main.py ../../config/llama/ppo.json
 ```
 
-`ppo_config.json` 中的绝大部分参数释义同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，不再赘述，重点给出以下参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
+`ppo.json` 中的绝大部分参数释义同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，不再赘述，重点给出以下参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
 
 - `train_datasets`：使用数据集定义注册时的`NAME`属性给出训练集。
 - `eval_datasets`：使用数据集定义注册时的`NAME`属性给出验证集。
