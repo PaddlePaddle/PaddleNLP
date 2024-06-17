@@ -3,15 +3,6 @@
 ## 摘要
 大规模语言模型显示出很有前景的文本生成能力，但用户无法轻松控制生成文本的特定方面。我们发布了CTRL，一个包含 16.3 亿个参数的条件转换器语言模型，经过训练以调节控制样式、内容和特定任务行为的控制代码。 控制代码源自与原始文本自然共同出现的结构，保留了无监督学习的优势，同时对文本生成提供了更明确的控制。 这些代码还允许CTRL预测训练数据的哪些部分最有可能给定序列。 这提供了一种通过基于模型的来源归因分析大量数据的潜在方法。 我们在 https://github.com/salesforce/ctrl 上发布了多个全尺寸、预训练版本的CTRL。
 
-## 文本生成测试
-```sh
-python demo.py
-```
-模型生成使用到的参数释义如下：
-- `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。
-- `max_predict_len` 表示最大生成的句子长度。
-- `repetition_penalty` 表示生成重复token的惩罚参数，详细信息可查看[这篇论文](https://arxiv.org/pdf/1909.05858.pdf)。
-
 ## 生成结果样例
 
 ```
@@ -57,3 +48,5 @@ output text: And sleep till the morning of life is come.
  In sorrow
 ==================================================
 ```
+
+使用请[参考](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/examples/text_generation/ctrl)

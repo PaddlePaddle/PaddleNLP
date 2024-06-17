@@ -26,38 +26,5 @@ rouge_l_precision: 0.3371 with confidence interval (0.3348, 0.3396)
 
 ```
 
-## Prerequisites:
-* The code is tested on Python 3.7.1 and Paddle 2.0.0
-* Training takes around 1s/iter on a single Tesla V100 (\~28 hours to train 100k iters)
-* Decoding the entire test set takes 2-3 hours
 
-## Data Preprocessing:
-1) Follow data generation instruction from https://github.com/abisee/cnn-dailymail **but place the *make_datafiles_json.py* script provided in this repo into https://github.com/abisee/cnn-dailymail and run *make_datafiles_json.py* instead of *make_datafiles.py* to minimize package dependencies.**
-2) place the output folder *finished_files_json/* as a subfolder in this repo
-3) You might need to change some paths and parameters in *config.py*
-
-
-## How to run training:
-* To train the model from start:
-```
-python train.py
-```
-* To continue training using a previously trained model:
-```
-python train.py -m path/to/model/dir/
-```
-
-## Set up ROUGE
-* You need to setup [pyrouge](https://github.com/andersjo/pyrouge) to get the rouge score
-* Also see [this tutorial](https://poojithansl7.wordpress.com/2018/08/04/setting-up-rouge/) to set up rouge and pyrouge.
-
-
-## How to decode & evaluate:
-* To decode using a previously trained model:
-```
-python decode.py path/to/model/dir/
-```
-* If you already have the summaries generated using *decode.py* and only needs to run rouge evaluation:
-```
-python rouge_eval.py path/to/decoded/dir/
-```
+[detail in](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/examples/text_summarization/pointer_summarizer)
