@@ -710,7 +710,7 @@ def main():
                 tr_loss = float(0)
 
             if training_args.save_steps > 0 and global_step % training_args.save_steps == 0:
-                paddle.device.cuda.synchronize()
+                paddle.device.synchronize()
                 checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{global_step}"
                 run_dir = training_args.output_dir
                 output_dir = os.path.join(run_dir, checkpoint_folder)

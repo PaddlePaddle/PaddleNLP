@@ -65,10 +65,10 @@ def profile(batch_size, total_step=50, warmup_step=10, rank=0):
         def _impl(*args, **kwargs):
             for i in range(total_step):
                 if i == warmup_step:
-                    paddle.device.cuda.synchronize()
+                    paddle.device.synchronize()
                     start_time = time.time()
                 out = func(*args, **kwargs)
-            paddle.device.cuda.synchronize()
+            paddle.device.synchronize()
             end_time = time.time()
             if rank is None or get_ft_para_conf().rank == rank:
                 time_interval = end_time - start_time
