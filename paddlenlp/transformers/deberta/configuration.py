@@ -38,7 +38,6 @@ DEBERTA_PRETRAINED_INIT_CONFIGURATION = {
         "num_hidden_layers": 12,
         "output_hidden_states": True,
         "pad_token_id": 0,
-        "paddlenlp_version": None,
         "pos_att_type": ["c2p", "p2c"],
         "position_biased_input": False,
         "relative_attention": True,
