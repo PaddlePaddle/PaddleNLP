@@ -126,7 +126,9 @@ class ShardingIO:
     def set_optimizer(self, optimizer):
         self.optimizer = optimizer
 
-    def load_state_dict_from_checkpoint_with_reshard(self, checkpoint, base_weight_name, model_wrapped, opt_state_dict=None):
+    def load_state_dict_from_checkpoint_with_reshard(
+        self, checkpoint, base_weight_name, model_wrapped, opt_state_dict=None
+    ):
         """load state_dict from_checkpoint with reshard, Only load model state dict.
         Args:
             checkpoint (str): The directory of the checkpoint.
