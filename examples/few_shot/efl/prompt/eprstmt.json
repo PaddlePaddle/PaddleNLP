@@ -1,8 +1,0 @@
-{
-    "template": [
-        {"text": "这表达了{'text': 'candidate_label'}的情感。{'text':'sentence'}"}
-    ],
-    "verbalizer": [
-        {"Negative": "不满意", "Positive": "满意"}
-    ]
-}
