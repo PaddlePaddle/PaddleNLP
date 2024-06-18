@@ -4,15 +4,6 @@
 
 本目录下提供 `infer.py` 快速完成在 CPU/GPU 的通用文本分类任务的 Python 部署示例。
 
-## 依赖安装
-
-直接执行以下命令安装部署示例的依赖。
-
-```bash
-# 安装 fast_tokenizer 以及 GPU 版本 fastdeploy
-pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
-```
-
 ## 快速开始
 
 以下示例展示如何基于 FastDeploy 库完成 UIE 模型进行信息抽取任务的 Python 预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照 [UIE 训练文档](../../README.md)导出得到的部署模型，其模型目录为 `model_zoo/uie/checkpoint/model_best`（用户可按实际情况设置）。
@@ -79,7 +70,6 @@ python infer.py --model_dir ../../checkpoint/model_best --device gpu
 |--cpu_threads | 当使用cpu推理时，指定推理的cpu线程数，默认为1。|
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
-|--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
 
 ## FastDeploy 高阶用法
 

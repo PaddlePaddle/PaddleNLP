@@ -31,11 +31,6 @@ parser.add_argument("--dataset_name", default="wikipedia", type=str, required=Fa
 parser.add_argument(
     "--dataset_config_name", default="20200501.en", type=str, required=False, help="dataset config name"
 )
-parser.add_argument(
-    "--use_slow_tokenizer",
-    action="store_true",
-    help="If passed, will use a slow tokenizer (not backed by the 🤗 Tokenizers library).",
-)
 parser.add_argument("--tokenizer_name", default="roberta-base", type=str, required=False, help="tokenizer name")
 parser.add_argument(
     "--max_seq_length",
@@ -66,7 +61,7 @@ def main(args):
 
     # Load pretrained tokenizer
     if args.tokenizer_name:
-        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name, use_fast=not args.use_slow_tokenizer)
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
 
     # First we tokenize all the texts.
     column_names = raw_datasets["train"].column_names

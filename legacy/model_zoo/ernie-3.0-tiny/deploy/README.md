@@ -14,8 +14,6 @@
 
 目前 ERNIE 3.0 Tiny 模型已提供基于 FastDeploy 的云边端的部署示例，在服务端上的 GPU 硬件上，支持`Paddle Inference`、`ONNX Runtime`、`Paddle TensorRT`以及`TensorRT`后端，在CPU上支持`Paddle Inference`、`ONNX Runtime`以及`OpenVINO`后端；在移动端上支持`Paddle Lite`后端。多硬件、多推理引擎后端的支持可以满足开发者不同的部署需求。
 
-为了提供 ERNIE 3.0 Tiny 高性能端到端部署能力，我们使用 [FastTokenizer](../../../fast_tokenizer/README.md) 工具完成高效分词，大大提升端到端预测性能。针对 ERNIE 3.0 Tiny 模型，FastTokenizer 集成了Google提出的 [Fast WordPiece Tokenization](https://arxiv.org/pdf/2012.15524.pdf) 快速分词算法，可大幅提升分词效率。在 ERNIE 3.0 Tiny 性能测试中，使用 FastTokenizer 可提升端到端性能 **3.56倍** 。我们在 [Python部署](python/README.md) 文档更全面地展示使用 FastTokenizer 的加速能力。
-
 本部署示例是车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务，详细可看[ERNIE 3.0 Tiny介绍](../README.md)。
 
 
