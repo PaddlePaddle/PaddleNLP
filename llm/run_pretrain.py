@@ -20,12 +20,14 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import paddle
+from utils import get_lora_target_modules
 
 from paddlenlp.data.causal_dataset import (
     build_train_valid_test_datasets,
     check_data_split,
     print_rank_0,
 )
+from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
@@ -179,6 +181,20 @@ class ModelArguments:
     num_hidden_layers: Optional[int] = field(
         default=None,
         metadata={"help": "num_hidden_layers."},
+    )
+
+    # vocab_extend
+    use_vocab_extend: Optional[bool] = field(
+        default=False,
+        metadata={"help": "whether to use vocab extend strategy."},
+    )
+    lora_rank: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    lora_alpha: int = field(default=8, metadata={"help": "lora_alpha"})
+    lora_trainable: str = field(default=None, metadata={"help": "lora_trainable."})
+    modules_to_save: str = field(default=None, metadata={"help": "modules_to_save."})
+    lora_dropout: float = field(
+        default=0.0,
+        metadata={"help": "lora dropout."},
     )
 
 
@@ -499,6 +515,31 @@ def main():
 
     if training_args.recompute:
         model.recompute_enable()
+
+    if model_args.use_vocab_extend:
+        logger.info("Init new lora model")
+        modules_to_save = model_args.modules_to_save
+        if modules_to_save is not None:
+            modules_to_save = modules_to_save.split(",")
+        lora_rank = model_args.lora_rank
+        lora_dropout = model_args.lora_dropout
+        lora_alpha = model_args.lora_alpha
+        target_modules = get_lora_target_modules(model)
+        logger.info(f"target_modules: {target_modules}")
+        logger.info(f"lora_rank: {lora_rank}")
+        lora_config = LoRAConfig(
+            target_modules=target_modules,
+            r=lora_rank,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            merge_weights=False,
+            tensor_parallel_degree=training_args.tensor_parallel_degree,
+            dtype=dtype,
+            trainable_modules=modules_to_save,
+        )
+        model = LoRAModel(model, lora_config)
+        model.mark_only_lora_as_trainable()
+        model.print_trainable_parameters()
 
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:

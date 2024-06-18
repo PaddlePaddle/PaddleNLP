@@ -41,6 +41,7 @@ def parse_arguments():
     parser.add_argument(
         "--lora_path", default=None, required=True, help="The directory of LoRA parameters. Default to None"
     )
+    parser.add_argument("--use_vocab_extend", default=False, help="Whether to use vocab_extend")
     parser.add_argument(
         "--merge_lora_model_path",
         default=None,
@@ -83,7 +84,7 @@ def merge():
 
     lora_config = LoRAConfig.from_pretrained(args.lora_path)
     if lora_config.base_model_name_or_path is None:
-        if args.model_name_or_path is not None:
+        if args.model_name_or_path is None:
             raise ValueError("We can not find a valid model_name_or_path.")
         else:
             lora_config.base_model_name_or_path = args.model_name_or_path
@@ -137,6 +138,31 @@ def merge():
             if "quant" in key:
                 del model_state_dict[key]
         model.model.config.quantization_config = QuantizationConfig()
+    if args.use_vocab_extend:
+        LORA_FILE_NAME = "lora_model_state.pdparams"
+        vocab_extend_state_dict = paddle.load(os.path.join(args.lora_path, LORA_FILE_NAME))
+        for key, value in vocab_extend_state_dict.items():
+            if "embed_tokens" in key:
+                model_state_dict[key] = vocab_extend_state_dict[key]
+                model.base_model.config["vocab_size"] = vocab_extend_state_dict[key].shape[0]
+                model.vocab_size = vocab_extend_state_dict[key].shape[0]
+                with paddle.no_grad():
+                    new_token_embeddings = paddle.nn.Embedding(
+                        vocab_extend_state_dict[key].shape[0], vocab_extend_state_dict[key].shape[1]
+                    )
+                    if new_token_embeddings.weight.dtype != model.get_input_embeddings().weight.dtype:
+                        new_token_embeddings.to(dtype=model.get_input_embeddings().weight.dtype)
+                    new_token_embeddings.weight[:, :] = value[:, :]
+                model.set_input_embeddings(new_token_embeddings)
+            if "lm_head" in key:
+                model_state_dict[key] = vocab_extend_state_dict[key]
+                with paddle.no_grad():
+                    new_lm_head_weight = paddle.create_parameter(
+                        shape=[vocab_extend_state_dict[key].shape[0], vocab_extend_state_dict[key].shape[1]],
+                        dtype=model.lm_head.weight.dtype,
+                    )
+                    new_lm_head_weight[:, :] = value[:, :]
+                model.lm_head.weight = new_lm_head_weight
     model.model.save_pretrained(args.merge_lora_model_path, state_dict=model_state_dict)
 
     tokenizer = AutoTokenizer.from_pretrained(lora_config.base_model_name_or_path)
