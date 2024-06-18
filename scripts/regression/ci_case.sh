@@ -224,7 +224,7 @@ ernie(){
     #data process
     cd ${nlp_dir}/model_zoo/ernie-1.0/
 
-    if [ ! -d "data_ernie_3.0" ];then
+    if [ -d "data_ernie_3.0" ];then
         rm -rf data_ernie_3.0
     fi
 
