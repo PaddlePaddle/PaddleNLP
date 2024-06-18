@@ -4,16 +4,6 @@
 
 本目录下分别提供 `seq_cls_infer.py` 快速完成在 CPU/GPU 的文本分类任务的 Python 部署示例。
 
-## 依赖安装
-
-直接执行以下命令安装部署示例的依赖。
-
-```bash
-
-# 安装 fast_tokenizer 以及 GPU 版本 fastdeploy
-pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
-
-```
 
 ## 快速开始
 
@@ -34,7 +24,6 @@ python seq_cls_infer.py --model_dir ../../finetuned_models/export/model --device
 
 ```bash
 
-[2023-02-24 08:54:42,574] [    INFO] - We are using <class 'paddlenlp.transformers.ernie_m.fast_tokenizer.ErnieMFastTokenizer'> to load 'export/'.
 [INFO] fastdeploy/runtime/runtime.cc(309)::CreatePaddleBackend    Runtime initialized with Backend::PDINFER in Device::GPU.
 Batch id:0, example id:0, sentence1:"他们告诉我，呃，我最后会被叫到一个人那里去见面。", sentence2:"我从来没有被告知任何与任何人会面。", label:contradiction, similarity:0.9975
 Batch id:1, example id:0, sentence1:"他们告诉我，呃，我最后会被叫到一个人那里去见面。", sentence2:"我被告知将有一个人被叫进来与我见面。", label:entailment, similarity:0.9866
@@ -54,7 +43,6 @@ Batch id:2, example id:0, sentence1:"他们告诉我，呃，我最后会被叫�
 |--cpu_threads | 当使用cpu推理时，指定推理的cpu线程数，默认为1。|
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
-|--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
 
 ## FastDeploy 高阶用法
 

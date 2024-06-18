@@ -59,12 +59,7 @@ def parse_arguments():
         "--cpu_threads", type=int, default=1, help="The number of threads to execute inference in cpu device."
     )
     parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Use FP16 mode")
-    parser.add_argument(
-        "--use_fast",
-        type=distutils.util.strtobool,
-        default=True,
-        help="Whether to use fast_tokenizer to accelarate the tokenization.",
-    )
+
     return parser.parse_args()
 
 
@@ -77,7 +72,7 @@ class UIEPredictor(object):
             print(">>> [InferBackend] The device must be cpu or gpu, but your device is set to:", type(args.device))
             exit(0)
 
-        self._tokenizer = AutoTokenizer.from_pretrained(args.model_dir, use_fast=args.use_fast)
+        self._tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
         self._position_prob = args.position_prob
         self.max_length = args.max_length
         self._batch_size = args.batch_size

@@ -20,7 +20,7 @@
 
 - **ERNIE 3.0 Tiny** 百度 ERNIE 使用 ERNIE-Tiny 系列的知识蒸馏技术，将 ERNIE 3.0 Titan 大模型的能力传递给小模型，产出并开源了易于部署的 ERNIE 3.0 Tiny 系列预训练模型，刷新了中文小模型的 SOTA 成绩。在这些较少参数量的 ERNIE 3.0 Tiny 系列模型中，有一部分可以直接部署在 CPU 上。
 
-- **端上语义理解压缩方案** 在语义理解任务中使用 ERNIE 3.0 Tiny 微调的基础上，我们建议进一步使用包含模型裁剪、量化训练、Embedding 量化等策略的压缩方案，在保持模型精度不降的情况下，可将模型体积减小为原来的 7.8%，达到 5.4 MB，内存占用也随之大幅减小。再经过 [⚡️FastDeploy](https://github.com/PaddlePaddle/FastDeploy) 部署工具和 [FastTokenizer](../../fast_tokenizer/README.md) 对分词阶段的加速，**端到端推理性能**也有显著提升，从而将 ERNIE 3.0 Tiny 模型成功部署至 **📱端侧**。由于端侧部署对内存占用的要求比服务端更高，因此该方案也同样适用于 🖥服务端部署。
+- **端上语义理解压缩方案** 在语义理解任务中使用 ERNIE 3.0 Tiny 微调的基础上，我们建议进一步使用包含模型裁剪、量化训练、Embedding 量化等策略的压缩方案，在保持模型精度不降的情况下，可将模型体积减小为原来的 7.8%，达到 5.4 MB，内存占用也随之大幅减小。再经过 [⚡️FastDeploy](https://github.com/PaddlePaddle/FastDeploy) 部署工具，**端到端推理性能**也有显著提升，从而将 ERNIE 3.0 Tiny 模型成功部署至 **📱端侧**。由于端侧部署对内存占用的要求比服务端更高，因此该方案也同样适用于 🖥服务端部署。
 
 <a name="模型介绍"></a>
 
@@ -609,7 +609,7 @@ python run_train.py \
 <a name="FastDeploy部署"></a>
 
 ## ⚡️FastDeplopy 部署
-能够将深度学习模型部署到性能较低的端侧本身是比较困难的工作，因此在前面我们对小模型做了大量的优化，在精度不降的情况下将 69 MB 的模型压缩至 5.4 MB，但是如果想更好地满足业务上线要求，还需要有部署工具对性能有更多优化。在这里，PaddlePadde 提供了易用高效的云边端推理部署工具 ⚡️FastDeploy，它的 [Paddle Lite](https://github.com/PaddlePaddle/Paddle-Lite) 后端基于算子融合和常量折叠进行了深度模型优化，使得模型推理速度可有大幅度提升；它所集成的 FastTokenizer 库能够对分词阶段进行加速，在麒麟 985 芯片上单条文本的分词的推理时延低于 0.1 毫秒；
+能够将深度学习模型部署到性能较低的端侧本身是比较困难的工作，因此在前面我们对小模型做了大量的优化，在精度不降的情况下将 69 MB 的模型压缩至 5.4 MB，但是如果想更好地满足业务上线要求，还需要有部署工具对性能有更多优化。在这里，PaddlePadde 提供了易用高效的云边端推理部署工具 ⚡️FastDeploy，它的 [Paddle Lite](https://github.com/PaddlePaddle/Paddle-Lite) 后端基于算子融合和常量折叠进行了深度模型优化，使得模型推理速度可有大幅度提升；在麒麟 985 芯片上单条文本的分词的推理时延低于 0.1 毫秒；
 
 因此，本项目基于 FastDeploy 部署工具，完成了 ERNIE 3.0 Tiny 端侧和服务端的高效部署，请参考 [ERNIE 3.0 Tiny 部署文档](deploy/README.md)。以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充联合模型使用 FastDeploy 部署在 Android App 上推理的效果展示：
 
@@ -618,7 +618,6 @@ python run_train.py \
 </p>
 
 想要更多了解 FastDeploy 可参考 [FastDeploy 仓库](https://github.com/PaddlePaddle/FastDeploy)。FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署工具，提供开箱即用的部署体验。它为 NLP 任务提供了一整套完整的部署 Pipeline，提供 ERNIE 3.0 Tiny 模型从文本预处理、推理引擎 Runtime 以及后处理三个阶段所需要的接口模块，开发者可以基于这些接口模块在云、边、端上部署各类常见的 NLP 任务，如文本分类、序列标注、信息抽取等：
-- 在文本预处理阶段，FastDeploy 使用 PaddleNLP 提供的简单易用的高效分词工具 [FastTokenizer](../../fast_tokenizer/README.md) 完成文本预处理，开发者只需调用几行代码就能完成分词阶段开发。在麒麟 985 芯片上单条文本的分词延时低于 0.1 毫秒，将本项目模型部署在 GPU 上时，使用 FastTokenizer 工具可使端到端性能提升 **3.56倍**；
 - 在 Runtime 阶段，FastDeploy 集成多款硬件以及推理引擎后端，开发者可以设置 `fastdeploy::RuntimeOption` 以完成在不同硬件以及使用不同的推理引擎进行部署。目前，FastDeploy 支持的后端引擎有：
     - 端侧： `Paddle Lite`；
     - 服务端 GPU： `Paddle Inference`、`ONNX Runtime`、`Paddle TensorRT` 以及 `TensorRT`；
@@ -629,7 +628,7 @@ python run_train.py \
 
 ### 性能结论
 
-使用 FastDeploy 将压缩后的模型部署在华为 nova 7 Pro （麒麟 985 芯片）上，选用 Paddle Lite 作为后端进行测试，得到不同推理精度下的模型效果、端到端时延（包括前后处理）、内存占用（包括加载 FastTokenizer 库）的数据如下：
+使用 FastDeploy 将压缩后的模型部署在华为 nova 7 Pro （麒麟 985 芯片）上，选用 Paddle Lite 作为后端进行测试，得到不同推理精度下的模型效果、端到端时延（包括前后处理）、内存占用的数据如下：
 
 | 模型                                | 模型精度(acc.)   | 推理精度      | 端到端时延(ms)   | 内存占用 Pss (MB)  | 模型体积(MB)     |
 |-----------------------------------|--------------|-----------|-------------|----------------|--------------|

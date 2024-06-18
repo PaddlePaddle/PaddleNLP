@@ -4,14 +4,6 @@
 
 本目录下提供 `infer.py` 快速完成在 CPU/GPU 的通用文本分类任务的 Python 部署示例。
 
-## 依赖安装
-
-直接执行以下命令安装部署示例的依赖。
-
-```bash
-# 安装 fast_tokenizer 以及 GPU 版本 fastdeploy
-pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
-```
 
 ## 快速开始
 
