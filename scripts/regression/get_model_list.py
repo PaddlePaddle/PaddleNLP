@@ -20,92 +20,74 @@ def get_model_list():
     """
     get model list from
     <https://github.com/PaddlePaddle/PaddleNLP/model_zoo/>
-    <https://github.com/PaddlePaddle/PaddleNLP/examples/>
+    <https://github.com/PaddlePaddle/PaddleNLP/legacy/examples/>
     """
 
     CI_MODEL_LIST = [
-        "waybill_ie",
-        "msra_ner",
-        "glue",
-        "bert",
-        "skep",
-        "bigbird",
-        "gpt",
-        "ernie",
-        "ofa",
-        "albert",
-        "squad",
-        "tinybert",
-        "lexical_analysis",
-        "seq2seq",
-        "pretrained_models",
-        "word_embedding",
-        "ernie-ctm",
-        "distilbert",
-        "stacl",
-        "transformer",
-        "simbert",
-        "pointer_summarizer",
-        "question_matching",
-        "few_shot",
-        "unimo-text",
-        "ernie-csc",
-        "nptag",
-        "ofa",
-        "transformer",
-        "DuIE",
-        "tcn",
-        "word_embedding",
-        "unified_transformer",
-        "lic2021_baseline",
-        "vae-seq2seq",
-        "msra_ner",
-        "simbert",
-        "clue",
-        "pet",
-        "bert",
-        "ernie-ctm",
-        "DuReader-yesno",
-        "nptag",
-        "semantic_indexing",
-        "seq2seq",
-        "pointer_summarizer",
-        "bigbird",
-        "unimo-text",
-        "minilmv2",
-        "wordtag",
-        "simcse",
-        "distill_lstm",
-        "DuReader-robust",
-        "ernie_matching",
-        "rnn",
-        "ernie-1.0",
-        "stacl",
-        "erniesage",
         "DuEE",
-        "efl",
-        "doc",
-        "couplet",
-        "pp-minilm",
-        "dgu",
-        "mpnet",
-        "textcnn",
-        "p-tuning",
+        "DuReader-robust",
+        "DuReader-yesno",
         "SQuAD",
-        "plato-2",
-        "pretrained_models",
-        "sentiment_analysis",
+        "albert",
+        "bert",
+        "bigbird",
+        "clue",
+        "couplet",
+        "doc",
+        "elmo",
+        "ernie",
+        "ernie-1.0",
+        "ernie-csc",
+        "ernie_matching",
+        "few_shot",
+        "glue",
+        "gpt",
         "gpt-3",
+        "lexical_analysis",
+        "minilmv2",
+        "mpnet",
+        "msra_ner",
+        "msra_ner",
+        "ofa",
+        "pointer_summarizer",
+        "pp-minilm",
+        "pretrained_models",
+        "question_matching",
+        "rnn",
+        "semantic_indexing",
+        "sentiment_analysis",
+        "simbert",
+        "simbert",
+        "simcse",
+        "skep",
+        "squad",
+        "stacl",
+        "stacl",
+        "tcn",
+        "tinybert",
+        "transformer",
+        "unimo-text",
+        "vae-seq2seq",
+        "word_embedding",
     ]
     examples_second_list = ["model_interpretation", "semantic_indexing", "lexical_analysis", "word_embedding"]
 
     model_list = os.listdir("legacy/model_zoo")
-    app_list = os.listdir("legacy/applications/")
+    model_list = os.listdir("model_zoo")
+    examples_list = os.listdir("legacy/examples/")
+    app_list = os.listdir("applications/")
 
     # remove model_list README
     model_list.remove("README.md")
+    examples_list.remove("README.md")
     model_list.extend(app_list)
     model_list.extend(examples_second_list)
+    for examples_model_list in examples_list:
+        if examples_model_list not in examples_second_list:
+            examples_model = os.listdir("examples/" + examples_model_list)
+            if "README.md" in examples_model:
+                examples_model.remove("README.md")
+            model_list.extend(examples_model)
 
     all_examples_dict = set(sorted(model_list))
     no_test_models = []
