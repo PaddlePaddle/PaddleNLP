@@ -17,8 +17,9 @@ from collections import OrderedDict
 import numpy as np
 import paddle
 import torch
-from paddlenlp.transformers import BertForPretraining as PDBertForMaskedLM
 from transformers import BertForMaskedLM as PTBertForMaskedLM
+
+from paddlenlp.transformers import BertForPretraining as PDBertForMaskedLM
 
 
 def convert_pytorch_checkpoint_to_paddle(

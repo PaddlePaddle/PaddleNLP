@@ -20,14 +20,14 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 """
- FAISS-based index components for dense retriver
+ FAISS-based index components for dense retriever
 """
 
-import os
-import time
 import logging
+import os
 import pickle
-from typing import List, Tuple, Iterator
+import time
+from typing import Iterator, List, Tuple
 
 import faiss
 import numpy as np
@@ -143,7 +143,7 @@ class DenseHNSWFlatIndexer(DenseIndexer):
         super(DenseHNSWFlatIndexer, self).__init__(buffer_size=buffer_size)
 
         # IndexHNSWFlat supports L2 similarity only
-        # so we have to apply DOT -> L2 similairy space conversion with the help of an extra dimension
+        # so we have to apply DOT -> L2 similarity space conversion with the help of an extra dimension
         index = faiss.IndexHNSWFlat(vector_sz + 1, store_n)
         index.hnsw.efSearch = ef_search
         index.hnsw.efConstruction = ef_construction

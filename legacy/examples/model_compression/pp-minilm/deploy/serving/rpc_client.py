@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle_serving_server.pipeline import PipelineClient
 import numpy as np
+from paddle_serving_server.pipeline import PipelineClient
 
 client = PipelineClient()
 client.connect(["127.0.0.1:8091"])

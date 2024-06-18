@@ -16,9 +16,10 @@
 # limitations under the License.
 
 import logging
-from typing import Optional, Union, List
+from typing import List, Optional, Union
 
 from paddle import Tensor
+
 from paddlenlp.transformers import BertTokenizer
 
 logger = logging.getLogger(__name__)

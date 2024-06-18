@@ -12,22 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import os
 import time
-
-import argparse
 from pprint import pprint
-import numpy as np
-import yaml
-from attrdict import AttrDict
 
+import numpy as np
 import paddle
 import paddle.distributed as dist
-from paddlenlp.utils.log import logger
-
 import reader
-from model import SimultaneousTransformer, CrossEntropyCriterion
+import yaml
+from attrdict import AttrDict
+from model import CrossEntropyCriterion, SimultaneousTransformer
 from utils.record import AverageStatistical
+
+from paddlenlp.utils.log import logger
 
 
 def parse_args():

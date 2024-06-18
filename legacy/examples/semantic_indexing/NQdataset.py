@@ -86,7 +86,7 @@ class NQdataSetForDPR(Dataset):
     def __getitem__(self, index):
         json_sample_data = self.data[index]
         r = BiEncoderSample()
-        r.query = self._porcess_query(json_sample_data["question"])
+        r.query = self._process_query(json_sample_data["question"])
 
         positive_ctxs = json_sample_data["positive_ctxs"]
 
@@ -106,7 +106,7 @@ class NQdataSetForDPR(Dataset):
 
         return r
 
-    def _porcess_query(self, query):
+    def _process_query(self, query):
         query = normalize_question(query)
 
         if self.query_special_suffix and not query.endswith(self.query_special_suffix):

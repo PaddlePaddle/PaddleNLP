@@ -46,12 +46,12 @@ class SemanticIndexHardestNeg(SemanticIndexBase):
 
         pos_sim = paddle.max(cosine_sim, axis=-1)
 
-        # subtract 10000 from all diagnal elements of cosine_sim
-        mask_socre = paddle.full(
+        # subtract 10000 from all diagonal elements of cosine_sim
+        mask_score = paddle.full(
             shape=[query_cls_embedding.shape[0]], fill_value=10000, dtype=paddle.get_default_dtype()
         )
-        tmp_cosin_sim = cosine_sim - paddle.diag(mask_socre)
-        hardest_negative_sim = paddle.max(tmp_cosin_sim, axis=-1)
+        tmp_cosine_sim = cosine_sim - paddle.diag(mask_score)
+        hardest_negative_sim = paddle.max(tmp_cosine_sim, axis=-1)
 
         labels = paddle.full(shape=[query_cls_embedding.shape[0]], fill_value=1.0, dtype="float32")
 

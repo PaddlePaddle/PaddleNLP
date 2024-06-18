@@ -13,8 +13,10 @@
 # limitations under the License.
 
 from functools import partial
+
 from paddle.io import DataLoader
-from paddlenlp.data import Vocab, Pad
+
+from paddlenlp.data import Pad, Vocab
 from paddlenlp.data.sampler import SamplerHelper
 from paddlenlp.datasets import load_dataset
 

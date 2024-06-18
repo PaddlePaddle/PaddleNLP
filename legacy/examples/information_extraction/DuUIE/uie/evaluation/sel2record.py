@@ -15,16 +15,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, List, Dict
-from collections import defaultdict, OrderedDict, Counter
-import os
-import numpy
-import logging
-import re
 import json
+import logging
+import os
+import re
+from collections import Counter, OrderedDict, defaultdict
+from typing import Dict, List, Tuple
+
+import numpy
 from nltk.tree import ParentedTree
-from uie.evaluation.constants import span_start, type_start, type_end, null_span, offset_map_strategy
-from uie.evaluation.scorer import EntityScorer, RelationScorer, EventScorer
+from uie.evaluation.constants import (
+    null_span,
+    offset_map_strategy,
+    span_start,
+    type_end,
+    type_start,
+)
+from uie.evaluation.scorer import EntityScorer, EventScorer, RelationScorer
 
 logger = logging.getLogger("__main__")
 

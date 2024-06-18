@@ -12,16 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
+import os
 from pprint import pprint
-import yaml
-from attrdict import AttrDict
 
 import paddle
-from paddlenlp.transformers import position_encoding_init
 import reader
+import yaml
+from attrdict import AttrDict
 from model import SimultaneousTransformer
+
+from paddlenlp.transformers import position_encoding_init
 
 
 def parse_args():

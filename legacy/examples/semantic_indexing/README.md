@@ -7,21 +7,21 @@
 我们基于 ERNIE1.0 热启，分别采用 [In-batch negatives](https://arxiv.org/abs/2004.04906) 策略和 HardestNeg 策略开源了 [batch_neg_v1.0](https://bj.bcebos.com/paddlenlp/models/semantic_index/batch_neg_v1.0.tar) 和 [hardest_neg_v1.0](https://bj.bcebos.com/paddlenlp/models/semantic_index/hardest_neg_v1.0.tar) 模型，相比 Baseline 模型效果有显著提升:
 
 ## 效果评估
-|  模型 |  Recall@10 | Recall@50  |策略简要说明|
-| ------------ | ------------ | ------------ |--------- |
-|  Baseline |  46.99 |  60.84 | 标准 pair-wise 训练范式，通过随机采样产生负样本|
-|  [In-batch negatives](https://arxiv.org/abs/2004.04906) | 51.20(**+4.21**)  | 67.24(**+6.4**)  | 在 Batch 内同时使用 batch_size 个负样本进行训练|
-|  HardestNeg | 50.22(**+3.23**) |  65.17(**+4.33**) |<div style="width: 340pt"> 在 Batch 内先挖掘最难负样本，然后进行 pair-wise 训练</div>|
+| 模型                                                   | Recall@10        | Recall@50        | 策略简要说明                                                                          |
+|--------------------------------------------------------|------------------|------------------|---------------------------------------------------------------------------------------|
+| Baseline                                               | 46.99            | 60.84            | 标准 pair-wise 训练范式，通过随机采样产生负样本                                       |
+| [In-batch negatives](https://arxiv.org/abs/2004.04906) | 51.20(**+4.21**) | 67.24(**+6.4**)  | 在 Batch 内同时使用 batch_size 个负样本进行训练                                       |
+| HardestNeg                                             | 50.22(**+3.23**) | 65.17(**+4.33**) | <div style="width: 340pt"> 在 Batch 内先挖掘最难负样本，然后进行 pair-wise 训练</div> |
 
 
 ## 语义索引预训练模型下载
 以下模型结构参数为:
 `TrasformerLayer:12, Hidden:768, Heads:12, OutputEmbSize: 256`
 
-|Model|训练参数配置|硬件|MD5|
-| ------------ | ------------ | ------------ |-----------|
-|[batch_neg_v1.0](https://bj.bcebos.com/paddlenlp/models/semantic_index/batch_neg_v1.0.tar)|<div style="width: 150pt">margin:0.2 scale:30 epoch:3 lr:5E-5 bs:128 max_len:64 </div>|<div style="width: 100pt">单卡v100-16g</div>|da1bb1487bd3fd6a53b8ef95c278f3e6|
-|[hardest_neg_v1.0](https://bj.bcebos.com/paddlenlp/models/semantic_index/hardest_neg_v1.0.tar)|margin:0.2 epoch:3 lr:5E-5 bs:128 max_len:64 |单卡v100-16g|b535d890110ea608c8562c525a0b84b5|
+| Model                                                                                          | 训练参数配置                                                                           | 硬件                                         | MD5                              |
+|------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|----------------------------------------------|----------------------------------|
+| [batch_neg_v1.0](https://bj.bcebos.com/paddlenlp/models/semantic_index/batch_neg_v1.0.tar)     | <div style="width: 150pt">margin:0.2 scale:30 epoch:3 lr:5E-5 bs:128 max_len:64 </div> | <div style="width: 100pt">单卡v100-16g</div> | da1bb1487bd3fd6a53b8ef95c278f3e6 |
+| [hardest_neg_v1.0](https://bj.bcebos.com/paddlenlp/models/semantic_index/hardest_neg_v1.0.tar) | margin:0.2 epoch:3 lr:5E-5 bs:128 max_len:64                                           | 单卡v100-16g                                 | b535d890110ea608c8562c525a0b84b5 |
 
 
 ## 数据准备
@@ -47,11 +47,11 @@
 
 
 ### 数据下载
-|数据|描述|数量|MD5|
-| ------------ | ------------ | ------------ | -------- |
-|<div style="width: 180pt">[训练集(semantic_pair_train.tsv)](https://bj.bcebos.com/paddlenlp/models/semantic_index/semantic_pair_train.tsv)</div>|<div style="width: 220pt">每行为语义相似的文本 Pair 构成的训练集</div>|222546|590286f695200160350cc5838cb34f00|
-|[评估集(same_semantic.tsv)](https://bj.bcebos.com/paddlenlp/models/semantic_index/same_semantic.tsv)|每行为语义相似文本 Pair 构成的评估集|10255|86ec1fd5234d944177574372dcf780c5|
-|[召回库(corpus_file）](https://bj.bcebos.com/paddlenlp/models/semantic_index/corpus_file)|每行为单条文本构成的召回库|313714|a3fbc3421b5aeb939809876fc7beeaa8|
+| 数据                                                                                                                                             | 描述                                                                   | 数量   | MD5                              |
+|--------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|--------|----------------------------------|
+| <div style="width: 180pt">[训练集(semantic_pair_train.tsv)](https://bj.bcebos.com/paddlenlp/models/semantic_index/semantic_pair_train.tsv)</div> | <div style="width: 220pt">每行为语义相似的文本 Pair 构成的训练集</div> | 222546 | 590286f695200160350cc5838cb34f00 |
+| [评估集(same_semantic.tsv)](https://bj.bcebos.com/paddlenlp/models/semantic_index/same_semantic.tsv)                                             | 每行为语义相似文本 Pair 构成的评估集                                   | 10255  | 86ec1fd5234d944177574372dcf780c5 |
+| [召回库(corpus_file）](https://bj.bcebos.com/paddlenlp/models/semantic_index/corpus_file)                                                        | 每行为单条文本构成的召回库                                             | 313714 | a3fbc3421b5aeb939809876fc7beeaa8 |
 
 
 ## 项目依赖:
@@ -242,17 +242,17 @@ python -u -m paddle.distributed.launch --gpus "0" \
 
 详细性能评测数据如下表:
 
-| batch size | max_seq_len | Paddle 前向(ms)|FT FP32(ms)  | FT FP16(ms) |Speedup(FT FP32/Paddle)|Speedup(FT FP16/Paddle)|
-| ---------- | ----------- | ------------------- | ------------------- |------------------ |------------------ |------------------ |
-| 16         | 16          | 23.56  |  5.40 | 5.38 | 4.36| 4.38|
-| 16         | 32          | 22.34  |  8.11  | 5.57|2.75|4.01|
-| 16         | 64          | 22.79   | 14.84  |5.39|1.54|4.23|
-| 32         | 16          | 23.41      | 8.16   |5.30|2.87|4.42|
-| 32         | 32          | 22.67      | 14.84   |6.21|1.53|3.65|
-| 32         | 64          | 33.49 | 28.53   |6.05|1.17|5.54|
-| 64         | 16          | 22.60  | 14.81   |5.59|1.53|4.04|
-| 64         | 32          | 33.52  | 28.22   |6.24|1.19|5.37|
-| 64         | 64          | 62.62  | 55.25   |11.55|1.13|5.42|
+| batch size | max_seq_len | Paddle 前向(ms) | FT FP32(ms) | FT FP16(ms) | Speedup(FT FP32/Paddle) | Speedup(FT FP16/Paddle) |
+|------------|-------------|-----------------|-------------|-------------|-------------------------|-------------------------|
+| 16         | 16          | 23.56           | 5.40        | 5.38        | 4.36                    | 4.38                    |
+| 16         | 32          | 22.34           | 8.11        | 5.57        | 2.75                    | 4.01                    |
+| 16         | 64          | 22.79           | 14.84       | 5.39        | 1.54                    | 4.23                    |
+| 32         | 16          | 23.41           | 8.16        | 5.30        | 2.87                    | 4.42                    |
+| 32         | 32          | 22.67           | 14.84       | 6.21        | 1.53                    | 3.65                    |
+| 32         | 64          | 33.49           | 28.53       | 6.05        | 1.17                    | 5.54                    |
+| 64         | 16          | 22.60           | 14.81       | 5.59        | 1.53                    | 4.04                    |
+| 64         | 32          | 33.52           | 28.22       | 6.24        | 1.19                    | 5.37                    |
+| 64         | 64          | 62.62           | 55.25       | 11.55       | 1.13                    | 5.42                    |
 
 Note: 测试环境如下
 ```

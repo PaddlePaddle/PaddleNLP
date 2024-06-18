@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
- Set of utilities for Q&A results validation tasks - Retriver passage validation and Reader predicted answer validation
+ Set of utilities for Q&A results validation tasks - Retriever passage validation and Reader predicted answer validation
 """
 
 import collections
@@ -21,7 +21,8 @@ import string
 import unicodedata
 from functools import partial
 from multiprocessing import Pool as ProcessPool
-from typing import Tuple, List, Dict
+from typing import Dict, List, Tuple
+
 import regex as re
 from tokenizers import SimpleTokenizer
 

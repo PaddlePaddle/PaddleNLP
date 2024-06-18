@@ -14,8 +14,9 @@
 
 # coding=UTF-8
 
-import numpy as np
 import hnswlib
+import numpy as np
+
 from paddlenlp.utils.log import logger
 
 

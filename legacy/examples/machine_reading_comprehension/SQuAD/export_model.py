@@ -16,7 +16,6 @@ import argparse
 import os
 
 import paddle
-
 from run_squad import MODEL_CLASSES
 
 

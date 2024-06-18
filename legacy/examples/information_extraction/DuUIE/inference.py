@@ -16,16 +16,16 @@
 # limitations under the License.
 
 import json
-import os
 import math
-from tqdm import tqdm
+import os
 
 import paddle
+from tqdm import tqdm
+from uie.evaluation.sel2record import MapConfig, RecordSchema, SEL2Record
+from uie.seq2struct.t5_bert_tokenizer import T5BertTokenizer
+
 from paddlenlp.data import Pad
 from paddlenlp.transformers import T5ForConditionalGeneration
-
-from uie.evaluation.sel2record import RecordSchema, MapConfig, SEL2Record
-from uie.seq2struct.t5_bert_tokenizer import T5BertTokenizer
 
 special_to_remove = {"<pad>", "</s>"}
 

@@ -116,6 +116,6 @@ if __name__ == "__main__":
     if args.use_fp16:
         convert_to_fp16(model.ptm.encoder)
 
-    cosin_sim = predict(model, valid_data_loader)
-    for idx, cosine in enumerate(cosin_sim):
+    cosine_sim = predict(model, valid_data_loader)
+    for idx, cosine in enumerate(cosine_sim):
         print("{}".format(cosine))

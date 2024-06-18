@@ -16,10 +16,10 @@ import random
 from functools import partial
 
 import numpy as np
-
 import paddle
 import paddle.distributed as dist
-from paddle.io import DataLoader, DistributedBatchSampler, BatchSampler
+from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
+
 from paddlenlp.data import Pad
 
 

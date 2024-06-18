@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from transformers import BertModel
 import torch
+from transformers import BertModel
 
 hf_model = BertModel.from_pretrained("bert-base-uncased")
 hf_model.eval()

@@ -16,11 +16,12 @@
 # limitations under the License.
 
 import copy
-from typing import List, Dict
-from collections import defaultdict
-import yaml
 import json
 import os
+from collections import defaultdict
+from typing import Dict, List
+
+import yaml
 from uie.evaluation.sel2record import RecordSchema, merge_schema
 
 
