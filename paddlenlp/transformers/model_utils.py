@@ -1687,8 +1687,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model: PretrainedModel,
         state_dict: Dict[str, Tensor],
         loaded_keys: List[str],
-        resolved_archive_file: Union[str, List],
-        pretrained_model_name_or_path,
+        resolved_archive_file: Union[str, List] = [],
+        pretrained_model_name_or_path=None,
         config=None,
         ignore_mismatched_sizes=False,
         low_cpu_mem_usage=False,
@@ -1743,7 +1743,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 quantization_linear_list = [".".join([prefix, s]) for s in quantization_linear_list]
 
         # Weight quantization if not yet quantized & update loaded_keys
-        if config.quantization_config.is_weight_quantize():
+        if hasattr(config, "quantization_config") and config.quantization_config.is_weight_quantize():
             try:
                 from ..quantization.quantization_utils import (
                     convert_to_quantize_state_dict,
@@ -1873,7 +1873,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 state_dict,
                 config,
                 loaded_keys,
-                pre_tensor_parallel_split=True if config.tensor_parallel_degree > 1 else False,
+                pre_tensor_parallel_split=True if config is not None and config.tensor_parallel_degree > 1 else False,
             )
             missing_keys = list(set(missing_keys) - set(new_keys))
             unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
@@ -1887,7 +1887,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 ignore_mismatched_sizes,
             )
 
-            if config.quantization_config.is_weight_quantize():
+            if hasattr(config, "quantization_config") and config.quantization_config.is_weight_quantize():
                 error_msgs = _load_state_dict_into_meta_model(
                     model_to_load,
                     state_dict,
