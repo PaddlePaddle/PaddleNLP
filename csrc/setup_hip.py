@@ -46,6 +46,7 @@ setup(
             "cxx": ["-O3"],
             "hipcc": [
                 "-O3",
+                "--gpu-max-threads-per-block=1024",
                 "-U__HIP_NO_HALF_OPERATORS__",
                 "-U__HIP_NO_HALF_CONVERSIONS__",
                 "-U__HIP_NO_BFLOAT16_OPERATORS__",
