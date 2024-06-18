@@ -2,7 +2,7 @@
 
 在部署前，参考 [FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md) 安装 FastDeploy Python SDK。
 
-本目录下分别提供 `infer_demo.py` 快速完成在 CPU/GPU 的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的 Python 部署示例，并展示使用 FastTokenizer 后，端到端预测性能的 Benchmark。
+本目录下分别提供 `infer_demo.py` 快速完成在 CPU/GPU 的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的 Python 部署示例，并展示端到端预测性能的 Benchmark。
 
 
 ## 依赖安装
@@ -11,8 +11,8 @@
 
 ```bash
 
-# 安装fast_tokenizer以及GPU版本fastdeploy
-pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
+# 安装GPU版本fastdeploy
+pip install fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
 
 ```
 
@@ -86,7 +86,6 @@ No. 2 text = 到信阳市汽车配件城
 |--batch_size |最大可测的 batch size，默认为 1|
 |--max_length |最大序列长度，默认为 128|
 |--use_trt_fp16 | 是否使用 FP16 模式进行推理。使用 TensorRT 和 Paddle TensorRT 后端时可开启，默认为 False |
-|--use_fast| 是否使用 FastTokenizer 加速分词阶段。默认为 True|
 |--model_prefix| 模型文件前缀。前缀会分别与'.pdmodel'和'.pdiparams'拼接得到模型文件名和参数文件名。默认为 'infer_model'|
 
 ## FastDeploy 高阶用法
@@ -188,9 +187,6 @@ FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以�
 </table>
 
 ## 性能 Benchmark
-
-在 Python 端上，以往会使用纯 Python 实现的 Tokenizer 进行分词，在处理大规模文本下往往会显得十分低效。为了解决这个问题，我们使用 PaddleNLP 的 FastTokenizer 工具，该工具使用 C++ 实现，并集成了 Google 提出的 [Fast WordPiece Tokenization](https://arxiv.org/pdf/2012.15524.pdf) 快速分词算法，可以大大提升分词阶段性能。开发者安装 FastTokenizer 后，可以使用 PaddleNLP 提供的 `AutoTokenizer.from_pretrained` 加载 Tokenizer，并通过传入 `use_fast=True` 的参数使用 FastTokenizer。下面对比使用 FastTokenizer 前后，FP32 模型与量化 INT8 模型在 GPU 上使用 Paddle Inference 以及 Paddle TensorRT 后端预测的预测性能。
-
 ### 实验环境
 
 <table>
@@ -233,13 +229,6 @@ batch size = 32，max length = 16。
     <td align=center> PostProcess延时（ms） </td>
   </tr>
   <tr>
-    <td align=center> FastTokenizer </td>
-    <td align=center> 2.5047 </td>
-    <td align=center> 0.9702 </td>
-    <td align=center> 1.1807 </td>
-    <td align=center> 0.3538 </td>
-  </tr>
-  <tr>
     <td align=center> Python Tokenizer </td>
     <td align=center> 8.9028 </td>
     <td align=center> 0.9987 </td>
@@ -261,13 +250,6 @@ batch size = 32，max length = 16。
     <td align=center> PostProcess延时（ms） </td>
   </tr>
   <tr>
-    <td align=center> FastTokenizer </td>
-    <td align=center> 2.5707 </td>
-    <td align=center> 1.0858 </td>
-    <td align=center> 1.1233 </td>
-    <td align=center> 0.3616 </td>
-  </tr>
-  <tr>
     <td align=center> Python Tokenizer </td>
     <td align=center> 9.2509 </td>
     <td align=center> 1.0543 </td>
@@ -275,8 +257,6 @@ batch size = 32，max length = 16。
     <td align=center> 0.3559 </td>
   </tr>
 </table>
-
-**结论**：在此 ERNIE 3.0 Tiny 模型部署场景下，使用 FastTokenizer 可以大大加速分词阶段，分词阶段性能加速比为 `6.39x~6.98x`，端到端性能加速比为 `3.56x~3.59x` 。
 
 ## 相关文档
 

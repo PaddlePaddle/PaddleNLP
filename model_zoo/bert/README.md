@@ -273,7 +273,6 @@ python deploy/python/seq_cls_infer.py --model_dir infer_model/ --device gpu --ba
 运行后预测结果打印如下：
 
 ```bash
-[2023-03-02 08:30:03,877] [    INFO] - We are using <class 'paddlenlp.transformers.bert.fast_tokenizer.BertFastTokenizer'> to load '../../infer_model/'.
 [INFO] fastdeploy/runtime/runtime.cc(266)::CreatePaddleBackend	Runtime initialized with Backend::PDINFER in Device::GPU.
 Batch id: 0, example id: 0, sentence1: against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting, label: positive, negative prob: 0.0003, positive prob: 0.9997.
 Batch id: 1, example id: 0, sentence1: the situation in a well-balanced fashion, label: positive, negative prob: 0.0002, positive prob: 0.9998.

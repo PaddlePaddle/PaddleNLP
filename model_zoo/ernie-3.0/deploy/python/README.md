@@ -4,17 +4,6 @@
 
 本目录下分别提供 `seq_cls_infer.py` 以及 `token_cls_infer.py` 快速完成在 CPU/GPU 的文本分类任务以及序列标注任务的 Python 部署示例。
 
-## 依赖安装
-
-直接执行以下命令安装部署示例的依赖。
-
-```bash
-
-# 安装fast_tokenizer以及GPU版本fastdeploy
-pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html
-
-```
-
 ## 文本分类任务
 
 ### 快速开始
@@ -76,7 +65,6 @@ Batch id:1, example id:0, sentence1:花呗支持高铁票支付吗, sentence2:�
 |--device | 运行的设备，可选范围: ['cpu', 'gpu']，默认为'cpu' |
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
-|--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
 
 ## 序列标注任务
 
@@ -162,7 +150,6 @@ entity: 姚明   label: PER   pos: [10, 11]
 |--device | 运行的设备，可选范围: ['cpu', 'gpu']，默认为'cpu' |
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
-|--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
 |--model_prefix| 模型文件前缀。前缀会分别与'.pdmodel'和'.pdiparams'拼接得到模型文件名和参数文件名。默认为 'model'|
 
 
