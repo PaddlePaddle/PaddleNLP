@@ -104,7 +104,7 @@ class UNIMOEmbeddings(nn.Layer):
                 if input_ids is not None:
                     num_pad = paddle.sum((input_ids == self.pad_token_id).astype("float32"), axis=-1, keepdim=True)
                     position_ids = F.relu(
-                        paddle.expand_as(paddle.arange(end=inputs_shape[1], dtype="int64"), inputs_shape) - num_pad
+                        paddle.expand_as(paddle.arange(end=inputs_shape[1], dtype="float32"), inputs_shape) - num_pad
                     ).astype("int64")
                 else:
                     logger.warning(
@@ -462,6 +462,7 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
     def prepare_fast_entry(self, kwargs):
         from paddlenlp.ops import FasterMIRO, FasterUNIMOText
 
+        decoding_lib = kwargs.get("decoding_lib", None)
         use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
         decode_strategy = kwargs.get("decode_strategy")
         if decode_strategy == "sampling" and kwargs.get("top_k") != 0 and kwargs.get("top_p") != 1:
@@ -480,9 +481,9 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
             )
 
         if getattr(self.encoder, "norm", None) is None:
-            self._fast_entry = FasterUNIMOText(self, use_fp16_decoding=use_fp16_decoding).forward
+            self._fast_entry = FasterUNIMOText(self, use_fp16_decoding=use_fp16_decoding, decoding_lib=decoding_lib).forward
         else:
-            self._fast_entry = FasterMIRO(self, use_fp16_decoding=use_fp16_decoding).forward
+            self._fast_entry = FasterMIRO(self, use_fp16_decoding=use_fp16_decoding, decoding_lib=decoding_lib).forward
         return self._fast_entry
 
     def adjust_logits_during_generation(self, logits):
