@@ -35,11 +35,16 @@ def calculate_effective_tokens(training_args, train_dataset, max_seq_len):
             * sharding_parallel_degree
             * data_parallel_degree
         )
-        for i, data in enumerate(train_dataset):
-            if i == total_batch:
-                break
-            total_effective_tokens += len(data["input_ids"])
+
         total_tokens = total_batch * max_seq_len
+
+        i = 0
+        while True:
+            for data in train_dataset:
+                total_effective_tokens += len(data["input_ids"])
+                i += 1
+                if i == total_batch:
+                    return total_effective_tokens, total_tokens
     else:
         for i, data in enumerate(train_dataset):
             total_effective_tokens += len(data["input_ids"])
