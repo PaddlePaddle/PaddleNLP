@@ -80,7 +80,6 @@ Learnt by ERNIE：[mask] [mask] [mask] 是黑龙江的省会，国际 [mask] [ma
 ├── run_gb512_s1m_static.sh
 ├── run_gb512_s1m_trainer.sh
 ├── run_pretrain.py         训练启动python脚本
-├── run_pretrain_static.py
 └── run_pretrain_trainer.py
 ```
 
