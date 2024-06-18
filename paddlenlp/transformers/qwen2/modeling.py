@@ -508,8 +508,6 @@ class Qwen2Attention(nn.Layer):
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
 
-        batch_size, seq_len, _ = hidden_states.shape
-
         query_states = self.q_proj(hidden_states)
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
@@ -613,6 +611,7 @@ class Qwen2Attention(nn.Layer):
 class Qwen2DecoderLayer(nn.Layer):
     def __init__(self, config: Qwen2Config, layerwise_recompute: bool = False):
         super().__init__()
+        self.config = config
         self.hidden_size = config.hidden_size
         self.self_attn = Qwen2Attention(config, layerwise_recompute)
 
@@ -1142,7 +1141,7 @@ class Qwen2PretrainingCriterion(nn.Layer):
 
 
 class Qwen2LMHead(nn.Layer):
-    def __init__(self, config: Qwen2Config, embedding_weights=None):
+    def __init__(self, config: Qwen2Config, embedding_weights=None, transpose_y=False):
         super(Qwen2LMHead, self).__init__()
         self.config = config
         if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
@@ -1150,12 +1149,16 @@ class Qwen2LMHead(nn.Layer):
         else:
             vocab_size = config.vocab_size
 
-        self.transpose_y = False
-        if embedding_weights is not None:
-            self.transpose_y = True
-            self.weight = embedding_weights
+        self.transpose_y = transpose_y
+        if transpose_y:
+            if embedding_weights is not None:
+                self.weight = embedding_weights
+            else:
+                self.weight = self.create_parameter(
+                    shape=[vocab_size, config.hidden_size],
+                    dtype=paddle.get_default_dtype(),
+                )
         else:
-            self.transpose_y = False
             if vocab_size != config.vocab_size:
                 with get_rng_state_tracker().rng_state():
                     self.weight = self.create_parameter(
@@ -1197,7 +1200,7 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
         super().__init__(config)
         self.qwen2 = Qwen2Model(config)
         if config.tie_word_embeddings:
-            self.lm_head = Qwen2LMHead(config, embedding_weights=self.qwen2.embed_tokens.weight)
+            self.lm_head = Qwen2LMHead(config, embedding_weights=self.qwen2.embed_tokens.weight, transpose_y=True)
             self.tie_weights()
         else:
             self.lm_head = Qwen2LMHead(config)

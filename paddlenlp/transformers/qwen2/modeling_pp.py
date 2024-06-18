@@ -15,7 +15,11 @@
 import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
-from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer
+from paddle.distributed.fleet.meta_parallel import (
+    LayerDesc,
+    PipelineLayer,
+    SharedLayerDesc,
+)
 from paddle.distributed.fleet.utils import recompute
 
 from ...utils.tools import get_env_device
@@ -31,7 +35,7 @@ from .modeling import (
 )
 
 __all__ = [
-    "QWenForCausalLMPipe",
+    "Qwen2ForCausalLMPipe",
 ]
 
 
@@ -71,13 +75,22 @@ def return_args(hidden_states, attention_mask=None, position_ids=None):
     return ret
 
 
+def get_attr(layer, name):
+    if getattr(layer, name, None) is not None:
+        return getattr(layer, name, None)
+    else:
+        return get_attr(layer._layer, name)
+
+
 class Qwen2EmbeddingPipe(nn.Layer):
     """Extends QWenEmbeddings to forward attention_mask through the pipeline."""
 
     def __init__(self, config: Qwen2Config):
-        super().__init__()
+        super(Qwen2EmbeddingPipe, self).__init__()
+        self.config = config
+        self.sequence_parallel = config.sequence_parallel
         self.hidden_size = config.hidden_size
-        if config.tensor_parallel_degree > 1:
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
                 config.hidden_size,
@@ -85,6 +98,10 @@ class Qwen2EmbeddingPipe(nn.Layer):
             )
         else:
             self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
+
+    @property
+    def embedding_weight(self):
+        return get_attr(self.embed_tokens, "weight")
 
     def forward(self, args):
         """_summary_
@@ -97,7 +114,7 @@ class Qwen2EmbeddingPipe(nn.Layer):
         """
         input_ids, attention_mask, position_ids = parse_args(args)
         input_embeds = self.embed_tokens(input_ids)
-        if self.sequence_parallel:
+        if self.config.sequence_parallel:
             from paddlenlp.transformers import ScatterOp
 
             # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
@@ -144,8 +161,8 @@ class Qwen2DecoderLayerPipe(Qwen2DecoderLayer):
         return return_args(hidden_states, attention_mask, position_ids)
 
 
-class Qwen2RMSNormPipe(Qwen2RMSNorm):
-    def __init__(self, config: Qwen2Config):
+class Qwen2RMSNormPipe(nn.Layer):
+    def __init__(self, config):
         super().__init__()
         self.norm = Qwen2RMSNorm(config)
 
@@ -154,7 +171,16 @@ class Qwen2RMSNormPipe(Qwen2RMSNorm):
         return self.norm(hidden_states)
 
 
-class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
+class Qwen2LMHeadPipe(Qwen2LMHead):
+    def __init__(self, config, transpose_y=False):
+        super(Qwen2LMHeadPipe, self).__init__(config, transpose_y=transpose_y)
+
+    @property
+    def embedding_weight(self):
+        return get_attr(self, "weight")
+
+
+class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     """QWenForPretraining adapted for pipeline parallelism.
 
     The largest change is flattening the QWenModel class so we can express it as a
@@ -192,14 +218,36 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
 
-        self.add_sequential_layer(LayerDesc(Qwen2EmbeddingPipe, config=config), "qwen2")
+        if config.tie_word_embeddings:
+            self.add_sequential_layer(
+                SharedLayerDesc(
+                    "qwen2_shared_weight", Qwen2EmbeddingPipe, shared_weight_attr="embedding_weight", config=config
+                ),
+                "qwen2",
+            )
+        else:
+            self.add_sequential_layer(LayerDesc(Qwen2EmbeddingPipe, config=config), "qwen2")
+
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
                 LayerDesc(Qwen2DecoderLayerPipe, config=config, layerwise_recompute=i not in self.no_recompute_layers),
                 f"qwen2.layers.{i}",
             )
-        self.add_sequential_layer(LayerDesc(Qwen2RMSNormPipe, config=config), "norm")
-        self.add_sequential_layer(LayerDesc(Qwen2LMHead, config=config), "lm_head")
+        self.add_sequential_layer(LayerDesc(Qwen2RMSNormPipe, config=config), "qwen2")
+
+        if config.tie_word_embeddings:
+            self.add_sequential_layer(
+                SharedLayerDesc(
+                    "qwen2_shared_weight",
+                    Qwen2LMHeadPipe,
+                    shared_weight_attr="embedding_weight",
+                    config=config,
+                    **{"transpose_y": True},
+                ),
+                "lm_head",
+            )
+        else:
+            self.add_sequential_layer(LayerDesc(Qwen2LMHeadPipe, config=config), "lm_head")
 
         recompute_interval = 0
         if self.use_recompute and self.recompute_granularity == "full":
