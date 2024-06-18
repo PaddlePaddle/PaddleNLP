@@ -63,7 +63,7 @@ class InferBackend(object):
         )
         infer_model_dir = model_path_prefix.rsplit("/", 1)[0]
         float_onnx_file = os.path.join(infer_model_dir, "model.onnx")
-        with open(float_onnx_file, "wb", encoding="utf-8") as f:
+        with open(float_onnx_file, "wb") as f:
             f.write(onnx_model)
 
         if device == "gpu":
