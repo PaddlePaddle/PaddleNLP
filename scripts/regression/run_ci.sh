@@ -79,18 +79,6 @@ upload (){
         echo -e "\033[35m ---- build ${GIT_PR_ID} paddlenlp  \033[0m"
         build_pr_path=${nlp_dir}
         nlp_build ${build_pr_path}
-    elif [ $1 == "pipelines" ];then
-        echo -e "\033[35m ---- build latest pipelines  \033[0m"
-        build_dev_path=/workspace/PaddleNLP_dev/$1
-        nlp_build ${build_dev_path}
-        pipe_version=$(python -c "from pipelines import __version__; print(__version__)")
-        cp $build_dev_path/dist/p****.whl ${PPNLP_HOME}/upload/
-    elif [ $1 == "ppdiffusers" ];then
-        echo -e "\033[35m ---- build latest ppdiffusers  \033[0m"
-        build_dev_path=/workspace/PaddleNLP_dev/$1
-        nlp_build ${build_dev_path}
-        pipe_version=$(python -c "from ppdiffusers import __version__; print(__version__)")
-        cp $build_dev_path/dist/pa****.whl ${PPNLP_HOME}/upload/
     fi
 }
 ####################################
