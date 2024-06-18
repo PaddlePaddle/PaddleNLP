@@ -146,7 +146,7 @@ def fusion_flash_attention(
     attention_mask,
     output_attentions,
     alibi=None,
-    attn_mask_start_row_indices=None,
+    attn_mask_startend_row_indices=None,
     sequence_parallel=False,
     reshard_layer=None,
     npu_is_casual=False,
@@ -209,13 +209,13 @@ def fusion_flash_attention(
                     is_causal=True,
                 )
             else:
-                if attn_mask_start_row_indices is not None:
+                if attn_mask_startend_row_indices is not None:
                     assert alibi is None, "flash_attention_with_sparse_mask not support alibi"
                     attn_output = F.flash_attention_with_sparse_mask(
                         query_states,
                         key_states,
                         value_states,
-                        attn_mask_start_row_indices=attn_mask_start_row_indices,
+                        attn_mask_start_row_indices=attn_mask_startend_row_indices,
                         is_causal=True,
                     )
                 else:
