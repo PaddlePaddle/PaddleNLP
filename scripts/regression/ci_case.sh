@@ -223,11 +223,17 @@ electra(){
 ernie(){
     #data process
     cd ${nlp_dir}/model_zoo/ernie-1.0/
+
+    if [ ! -d "data_ernie_3.0" ];then
+        rm -rf data_ernie_3.0
+    fi
+
     mkdir data_ernie_3.0 
     cd data_ernie_3.0
     wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_ids.npy
     wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_200g_sample_ernie-3.0-base-zh_idx.npz
     cd ../
+
     # pretrain_trainer
     python -u -m paddle.distributed.launch \
         --log_dir "output/trainer_log" \
