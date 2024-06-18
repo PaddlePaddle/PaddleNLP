@@ -65,12 +65,18 @@ def doccano2SA(doccano_file, save_ext_dir, save_cls_dir, splits=[0.8, 0.9], is_s
     # start to label for ext and cls data
     for line in raw_examples:
         items = json.loads(line)
-        text, label_terms = items["data"], items["label"]
+        # modi by wty
+        #text, label_terms = items["data"], items["label"]
+        text, label_terms = items["text"], items["entities"]
         # label ext data with label_terms
         ext_label = ["O"] * len(text)
         aspect_mapper = {}
         for label_term in label_terms:
-            start, end, tag = label_term
+            # start, end, tag = label_term
+            # modi by wty 20240202
+            tag = label_term["label"]
+            start = label_term["start_offset"]
+            end = label_term["end_offset"]
             label_ext_with_label_term(ext_label, start, end, tag)
             if tag == "Pos-Aspect":
                 aspect_mapper[text[start:end]] = "1"
