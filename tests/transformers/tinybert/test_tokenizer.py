@@ -23,7 +23,6 @@ from paddlenlp.transformers.bert.tokenizer import (
     _is_punctuation,
     _is_whitespace,
 )
-from paddlenlp.transformers.tinybert.fast_tokenizer import TinyBertFastTokenizer
 from paddlenlp.transformers.tinybert.tokenizer import TinyBertTokenizer
 
 from ...testing_utils import slow
@@ -33,7 +32,6 @@ from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 class TinyBertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = TinyBertTokenizer
-    fast_tokenizer_class = TinyBertFastTokenizer
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = True
@@ -74,41 +72,6 @@ class TinyBertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         tokens = tokenizer.tokenize("UNwant\u00E9d,running")
         self.assertListEqual(tokens, ["un", "##want", "##ed", ",", "runn", "##ing"])
         self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [9, 6, 7, 12, 10, 11])
-
-    def test_fast_and_python_full_tokenizer(self):
-        if not self.test_fast_tokenizer:
-            return
-
-        tokenizer = self.get_tokenizer()
-        tokenizer_fast = self.get_fast_tokenizer()
-
-        sequence = "UNwant\u00E9d,running"
-        tokens = tokenizer.tokenize(sequence)
-        tokens_fast = tokenizer_fast.tokenize(sequence)
-        self.assertListEqual(tokens, tokens_fast)
-
-        ids = tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
-        ids_fast = tokenizer_fast.encode(sequence, add_special_tokens=False)["input_ids"]
-        self.assertListEqual(ids, ids_fast)
-
-        ids = tokenizer.encode(sequence)["input_ids"]
-        ids_fast = tokenizer_fast.encode(sequence)["input_ids"]
-        self.assertListEqual(ids, ids_fast)
-
-        tokenizer = self.get_tokenizer(do_lower_case=True)
-        tokenizer_fast = self.get_fast_tokenizer(do_lower_case=True)
-
-        tokens = tokenizer.tokenize(sequence)
-        tokens_fast = tokenizer_fast.tokenize(sequence)
-        self.assertListEqual(tokens, tokens_fast)
-
-        ids = tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
-        ids_fast = tokenizer_fast.encode(sequence, add_special_tokens=False)["input_ids"]
-        self.assertListEqual(ids, ids_fast)
-
-        ids = tokenizer.encode(sequence)["input_ids"]
-        ids_fast = tokenizer_fast.encode(sequence)["input_ids"]
-        self.assertListEqual(ids, ids_fast)
 
     def test_chinese(self):
         tokenizer = BasicTokenizer()
@@ -241,17 +204,9 @@ class TinyBertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
                 tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
-                tokenizer_fast = self.fast_tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 sentence = f"A, naïve {tokenizer.mask_token} AllenNLP sentence."
                 tokens = tokenizer.encode(
-                    sentence,
-                    return_attention_mask=False,
-                    return_token_type_ids=False,
-                    return_offsets_mapping=True,
-                    add_special_tokens=True,
-                )
-                tokens_fast = tokenizer_fast.encode(
                     sentence,
                     return_attention_mask=False,
                     return_token_type_ids=False,
@@ -295,11 +250,7 @@ class TinyBertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 self.assertEqual(
                     [e[1] for e in expected_results], tokenizer.convert_ids_to_tokens(tokens["input_ids"])
                 )
-                self.assertEqual(
-                    [e[1] for e in expected_results], tokenizer_fast.convert_ids_to_tokens(tokens_fast["input_ids"])
-                )
                 self.assertEqual([e[0] for e in expected_results], tokens["offset_mapping"])
-                self.assertEqual([e[0] for e in expected_results], tokens_fast["offset_mapping"])
 
     def test_change_tokenize_chinese_chars(self):
         list_of_commun_chinese_char = ["的", "人", "有"]
@@ -309,21 +260,15 @@ class TinyBertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
                 kwargs["tokenize_chinese_chars"] = True
                 tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
-                tokenizer_fast = self.fast_tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 ids_without_spe_char_p = tokenizer.encode(
                     text_with_chinese_char, return_token_type_ids=None, add_special_tokens=False
                 )["input_ids"]
-                ids_without_spe_char_fast = tokenizer_fast.encode(
-                    text_with_chinese_char, return_token_type_ids=None, add_special_tokens=False
-                )["input_ids"]
 
                 tokens_without_spe_char_p = tokenizer.convert_ids_to_tokens(ids_without_spe_char_p)
-                tokens_without_spe_char_fast = tokenizer_fast.convert_ids_to_tokens(ids_without_spe_char_fast)
 
                 # it is expected that each Chinese character is not preceded by "##"
                 self.assertListEqual(tokens_without_spe_char_p, list_of_commun_chinese_char)
-                self.assertListEqual(tokens_without_spe_char_fast, list_of_commun_chinese_char)
 
                 # not yet supported in bert tokenizer
                 """

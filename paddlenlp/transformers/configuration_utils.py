@@ -65,24 +65,6 @@ def custom_object_save(obj, folder, config=None):
         module_name = obj.__class__.__module__
         last_module = module_name.split(".")[-1]
         full_name = f"{last_module}.{obj.__class__.__name__}"
-        # Special handling for tokenizers
-        if "Tokenizer" in full_name:
-            slow_tokenizer_class = None
-            fast_tokenizer_class = None
-            if obj.__class__.__name__.endswith("Fast"):
-                # Fast tokenizer: we have the fast tokenizer class and we may have the slow one has an attribute.
-                fast_tokenizer_class = f"{last_module}.{obj.__class__.__name__}"
-                if getattr(obj, "slow_tokenizer_class", None) is not None:
-                    slow_tokenizer = getattr(obj, "slow_tokenizer_class")
-                    slow_tok_module_name = slow_tokenizer.__module__
-                    last_slow_tok_module = slow_tok_module_name.split(".")[-1]
-                    slow_tokenizer_class = f"{last_slow_tok_module}.{slow_tokenizer.__name__}"
-            else:
-                # Slow tokenizer: no way to have the fast class
-                slow_tokenizer_class = f"{last_module}.{obj.__class__.__name__}"
-
-            full_name = (slow_tokenizer_class, fast_tokenizer_class)
-
         if isinstance(_config, dict):
             auto_map = _config.get("auto_map", {})
             auto_map[obj._auto_class] = full_name

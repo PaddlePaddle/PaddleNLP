@@ -47,12 +47,6 @@ def parse_arguments():
     parser.add_argument("--max_length", type=int, default=16, help="The max length of sequence.")
     parser.add_argument("--cpu_num_threads", type=int, default=1, help="The number of threads when inferring on cpu.")
     parser.add_argument("--use_trt_fp16", type=strtobool, default=False, help="Wheter to use FP16 mode")
-    parser.add_argument(
-        "--use_fast",
-        type=strtobool,
-        default=True,
-        help="Whether to use fast_tokenizer to accelarate the tokenization.",
-    )
     return parser.parse_args()
 
 
@@ -67,7 +61,7 @@ def batchify_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir, use_fast=args.use_fast)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
         self.runtime = self.create_fd_runtime(args)
         self.batch_size = args.batch_size
         self.max_length = args.max_length

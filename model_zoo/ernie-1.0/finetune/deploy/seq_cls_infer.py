@@ -49,12 +49,6 @@ def parse_arguments():
     parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument("--cpu_threads", type=int, default=1, help="Number of threads to predict when using cpu.")
     parser.add_argument("--device_id", type=int, default=0, help="Select which gpu device to train model.")
-    parser.add_argument(
-        "--use_fast",
-        type=distutils.util.strtobool,
-        default=True,
-        help="Whether to use fast_tokenizer to accelarate the tokenization.",
-    )
     return parser.parse_args()
 
 
@@ -69,7 +63,7 @@ def batchfy_text(texts, batch_size):
 
 class Predictor(object):
     def __init__(self, args):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir, use_fast=args.use_fast)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir)
         self.runtime = self.create_fd_runtime(args)
         self.batch_size = args.batch_size
         self.max_length = args.max_length

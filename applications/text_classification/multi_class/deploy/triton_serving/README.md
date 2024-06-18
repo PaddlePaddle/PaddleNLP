@@ -48,16 +48,6 @@ python3 -m pip install paddlepaddle-gpu paddlenlp -i https://mirror.baidu.com/py
 3. 更多关于PaddleNLP安装的详细教程请查看[Installation](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/get_started/installation.rst)。
 
 
-### 安装FastTokenizer文本处理加速库（可选）
-
-> 重要提示：由于FastTokenizer长时间未得到维护，因此可能会遇到训练（基于Python实现的tokenizer）与部署（基于C++实现的tokenizer）阶段分词不一致的问题。为了确保稳定性和一致性，我们建议避免安装该库。
-
-如果想要安装fast_tokenizer，以获得更高的文本处理效率，从而显著提升服务性能。您可以通过以下命令进行安装：
-```shell
-python3 -m pip install fast-tokenizer-python
-```
-
-
 ## 模型获取和转换
 
 使用Triton做服务化部署时，选择ONNX Runtime后端运行需要先将模型转换成ONNX格式。使用Paddle2ONNX将Paddle静态图模型转换为ONNX模型格式的命令如下，以下命令成功运行后，将会在当前目录下生成model.onnx模型文件。
