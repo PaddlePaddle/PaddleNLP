@@ -35,6 +35,7 @@ from paddlenlp.transformers import (
     ChatGLMv2Tokenizer,
     LlamaForCausalLMPipe,
     PretrainedConfig,
+    Qwen2ForCausalLMPipe,
 )
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
@@ -158,7 +159,7 @@ def get_lora_target_modules(model):
             ".*mlp.w2.*",
             ".*mlp.c_proj.*",
         ]
-    elif model.base_model_prefix == "qwen2":
+    elif model.base_model_prefix == "qwen2" or isinstance(model, Qwen2ForCausalLMPipe):
         target_modules = [
             ".*q_proj.*",
             ".*k_proj.*",

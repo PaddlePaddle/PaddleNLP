@@ -148,15 +148,22 @@ class Qwen2DecoderLayerPipe(Qwen2DecoderLayer):
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
             if attention_mask is not None:
                 hidden_states = recompute(
-                    super().forward, hidden_states, attention_mask=attention_mask, use_reentrant=False
+                    super().forward,
+                    hidden_states,
+                    position_ids=position_ids,
+                    attention_mask=attention_mask,
+                    use_reentrant=False,
                 )
             else:
                 # for pretrain
                 hidden_states = recompute(
-                    super().forward, hidden_states, use_reentrant=self.config.recompute_use_reentrant
+                    super().forward,
+                    hidden_states,
+                    position_ids=position_ids,
+                    use_reentrant=self.config.recompute_use_reentrant,
                 )
         else:
-            hidden_states = super().forward(hidden_states, attention_mask=attention_mask)
+            hidden_states = super().forward(hidden_states, position_ids=position_ids, attention_mask=attention_mask)
 
         return return_args(hidden_states, attention_mask, position_ids)
 
@@ -198,7 +205,9 @@ class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     def __init__(self, config: Qwen2Config):
         self.config = config
 
-        self.use_recompute = self.config.use_recompute
+        # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
+        # Enable_recompute defaults to False and is controlled by Trainer
+        self.enable_recompute = False
         self.recompute_granularity = self.config.recompute_granularity
         self.pp_recompute_interval = self.config.pp_recompute_interval
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
@@ -250,7 +259,7 @@ class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             self.add_sequential_layer(LayerDesc(Qwen2LMHeadPipe, config=config), "lm_head")
 
         recompute_interval = 0
-        if self.use_recompute and self.recompute_granularity == "full":
+        if self.enable_recompute and self.recompute_granularity == "full":
             assert self.config.pp_recompute_interval <= config.num_hidden_layers // (
                 virtual_pp_degree * get_hcg().topology().get_dim_size("pipe")
             ), "pp recompute interval should smaller than num layers of each pp chunk"
