@@ -143,7 +143,7 @@ class LlamaEmbeddingPipe(nn.Layer):
         alibi = None
         if self.config.alibi:
             assert (
-                attn_mask_startend_row_indices is not None
+                attn_mask_startend_row_indices is None
             ), "alibi and attn_mask_startend_row_indices can not be set at same time"
             # embed positions
             mask = (
@@ -168,7 +168,7 @@ class LlamaEmbeddingPipe(nn.Layer):
 
         if attention_mask is not None:
             assert (
-                attn_mask_startend_row_indices is not None
+                attn_mask_startend_row_indices is None
             ), "attention_mask and attn_mask_startend_row_indices can not be set at same time"
             attention_mask = LlamaModel._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), 0, input_embeds.dtype
