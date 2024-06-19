@@ -1092,6 +1092,8 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
             xpu_config.l3_size = 63 * 1024 * 1024
             xpu_config.l3_autotune_size = 63 * 1024 * 1024
             config.set_xpu_config(xpu_config)
+            config.switch_ir_optim(True)
+            config.enable_memory_optim()
         else:
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
             config.enable_use_gpu(100, device_id)

@@ -38,9 +38,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "bos_token_id": 1,
         "eos_token_id": 2,
         "pad_token_id": 0,
-        "use_cache": False,
-        "use_recompute": False,
-        "use_flash_attention": False,
     },
     "__internal_testing__/tiny-random-llama": {
         "architectures": ["LlamaForCausalLM"],
@@ -56,9 +53,6 @@ LLAMA_PRETRAINED_INIT_CONFIGURATION = {
         "bos_token_id": 1,
         "eos_token_id": 2,
         "pad_token_id": 0,
-        "use_cache": False,
-        "use_recompute": False,
-        "use_flash_attention": False,
     },
 }
 
@@ -101,7 +95,6 @@ class LlamaConfig(PretrainedConfig):
             relevant if `config.is_decoder=True`.
         tie_word_embeddings(`bool`, *optional*, defaults to `False`):
             Whether to tie weight embeddings
-        use_fused_rope(`bool`, *optional*, defaults to False):
             Enable rope fusion or not.
         num_key_value_heads (`int`, *optional*):
             This is the number of key_value heads that should be used to implement Grouped Query Attention. If
@@ -149,19 +142,8 @@ class LlamaConfig(PretrainedConfig):
         rms_norm_eps=1e-6,
         rope_theta=10000.0,
         use_cache=True,
-        use_recompute=False,
-        recompute_granularity="full",
-        pp_recompute_interval=1,
-        no_recompute_layers=None,
         fuse_attention_qkv=False,
         fuse_attention_ffn=False,
-        use_flash_attention=False,
-        use_fused_rms_norm=False,
-        use_fused_rope=False,
-        tensor_parallel_output=True,
-        sequence_parallel=False,
-        fuse_sequence_parallel_allreduce=False,
-        virtual_pp_degree=1,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
@@ -192,25 +174,14 @@ class LlamaConfig(PretrainedConfig):
         self.rope_theta = rope_theta
 
         self.use_cache = use_cache
-        self.use_recompute = use_recompute
-        self.recompute_granularity = recompute_granularity
-        self.no_recompute_layers = no_recompute_layers
-        self.pp_recompute_interval = pp_recompute_interval
         self.fuse_attention_qkv = fuse_attention_qkv
-        self.use_flash_attention = use_flash_attention
         self.fuse_attention_ffn = fuse_attention_ffn
-        self.use_fused_rms_norm = use_fused_rms_norm
-        self.tensor_parallel_output = tensor_parallel_output
-        self.sequence_parallel = sequence_parallel
-        self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
-        self.virtual_pp_degree = virtual_pp_degree
 
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
         self.alibi = alibi
 
-        self.use_fused_rope = use_fused_rope
         self.rope_scaling_factor = rope_scaling_factor
         self.rope_scaling_type = rope_scaling_type
 
@@ -224,7 +195,6 @@ class LlamaConfig(PretrainedConfig):
             bos_token_id=bos_token_id,
             eos_token_id=eos_token_id,
             tie_word_embeddings=tie_word_embeddings,
-            tensor_parallel_output=tensor_parallel_output,
             **kwargs,
         )
 
