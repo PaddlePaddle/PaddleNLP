@@ -14,20 +14,18 @@
 import json
 import os
 import sys
-from dataclasses import dataclass, field
 from functools import partial
-from typing import Optional
 
 import paddle
-from argument import (
+from utils.argument import (
     DataArgument,
     GenerateArgument,
     ModelArgument,
     QuantArgument,
     TrainingArguments,
 )
-from data import get_convert_example
-from utils import (
+from utils.data import get_convert_example
+from utils.utils import (
     CausalLMTrainer,
     ZeroPaddingIterDatasetCallback,
     compute_metrics,
@@ -54,44 +52,16 @@ from paddlenlp.transformers import (
     Llama3Tokenizer,
     LlamaTokenizer,
 )
-from paddlenlp.transformers.configuration_utils import LlmMetaConfig, llmmetaclass
+from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.utils.log import logger
 
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "False"
 
 
-def add_start_docstrings(*docstr):
-    def docstring_decorator(fn):
-        fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
-        return fn
-
-    return docstring_decorator
-
-
-@dataclass
-@llmmetaclass
-@add_start_docstrings(TrainingArguments.__doc__)
-class FinetuneArguments(TrainingArguments):
-    decay_steps: int = field(
-        default=0,
-        metadata={"help": "The steps use to control the learing rate."},
-    )
-    tensor_parallel_output: Optional[bool] = field(
-        default=False,
-        metadata={"help": "whether to output logits in distributed status"},
-    )
-
-
-def read_local_dataset(path):
-    with open(path, "r", encoding="utf-8") as fp:
-        for line in fp:
-            yield json.loads(line.strip())
-
-
 def main():
     # Arguments
-    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, FinetuneArguments))
+    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
     # Support format as "args.json --arg1 value1 --arg2 value2.”
     # In case of conflict, command line arguments take precedence.
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
@@ -161,6 +131,8 @@ def main():
         model_config.hidden_dropout_prob = model_args.hidden_dropout_prob
     if hasattr(model_config, "attention_probs_dropout_prob"):
         model_config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
+    if hasattr(model_config, "ignore_index"):
+        model_config.ignore_index = -100
 
     if model_args.fuse_attention_qkv is not None:
         model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -169,7 +141,7 @@ def main():
 
     model_config.seq_length = data_args.max_length
 
-    print("Final model config:", model_config)
+    logger.info(f"Final model config: {model_config}")
 
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
@@ -584,7 +556,7 @@ def main():
 
     # QAT
     if quant_args.do_qat:
-        from quant import create_qat_model
+        from utils.quant import create_qat_model
 
         trainer.model = create_qat_model(quant_args, trainer.model, dtype)
         train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
@@ -599,7 +571,7 @@ def main():
             raise NotImplementedError(
                 "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
             )
-        from quant import (
+        from utils.quant import (
             apply_autoclip,
             apply_ptq,
             apply_shift,
@@ -635,7 +607,7 @@ def main():
             raise NotImplementedError(
                 "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
             )
-        from quant import apply_gptq
+        from utils.quant import apply_gptq
 
         ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
         apply_gptq(quant_args, trainer, ptq_dataloader)

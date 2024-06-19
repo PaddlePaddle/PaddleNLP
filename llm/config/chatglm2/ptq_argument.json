@@ -1,0 +1,23 @@
+{
+    "model_name_or_path": "./checkpoints/sft_ckpts",
+    "per_device_train_batch_size": 8,
+    "per_device_eval_batch_size": 8,
+    "eval_accumulation_steps":16,
+    "src_length": 1024,
+    "max_length": 2048,
+    "fp16": true,
+    "fp16_opt_level": "O2",
+    "dataset_name_or_path": "./data",
+    "output_dir": "./checkpoints/ptq_ckpts",
+    "do_eval": true,
+    "eval_with_do_generation": false,
+    "do_ptq": true,
+    "ptq_step": 16,
+    "unified_checkpoint": true,
+    "smooth": true,
+    "smooth_step": 16,
+    "smooth_all_linears": true,
+    "smooth_piecewise_search": true,
+    "smooth_k_piece": 3,
+    "smooth_search_piece": true
+  }
