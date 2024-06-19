@@ -218,7 +218,7 @@ class TestChatTemplateTruncation(unittest.TestCase):
         system = tokenizer.chat_template.render_system()
         system_ids = tokenizer.encode(system, add_special_tokens=False)["input_ids"]
 
-        from data import tokenize_rounds_example
+        from utils.data import tokenize_rounds_example
 
         fake_data_args = self.DataArg(len(system_ids) + 5, src_length=len(system_ids) + 5)
 
@@ -244,7 +244,7 @@ class TestChatTemplateTruncation(unittest.TestCase):
         all_sentence_ids = tokenizer(all_sentence, add_special_tokens=False)["input_ids"]
 
         # get the max_length of conversation
-        from data import tokenize_rounds_example
+        from utils.data import tokenize_rounds_example
 
         fake_data_args = self.DataArg(1024)
         example = {"src": ["你好", "今天吃啥"], "tgt": ["您好，我是个人人工智能助手", "你可以选择不同的菜系"]}
@@ -342,7 +342,7 @@ class TemplateIntegrationTest(unittest.TestCase):
             self.tokenizer.init_chat_template(error_jinja)
 
     def test_train_format(self):
-        from data import tokenize_rounds_example
+        from utils.data import tokenize_rounds_example
 
         fake_data_args = self.DataArg(50, src_length=50)
         example = {"src": ["你好"], "tgt": ["您好，我是个人人工智能助手"]}
@@ -360,7 +360,7 @@ class TemplateIntegrationTest(unittest.TestCase):
         self.assertNotEqual(tgt_id[tgt_idx], -100)
 
     def test_train_format_multi(self):
-        from data import tokenize_rounds_example
+        from utils.data import tokenize_rounds_example
 
         fake_data_args = self.DataArg(50, src_length=50)
         example = {"src": ["用户Round 1", "用户Round 2"], "tgt": ["回答Round 1", "回答Round 2"]}

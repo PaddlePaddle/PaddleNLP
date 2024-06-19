@@ -36,14 +36,14 @@
 ...
 ```
 
-其次就是将构造好的`chat_template.json`文件传入到 `llm/finetune_generation.py` 模块当中：
+其次就是将构造好的`chat_template.json`文件传入到 `llm/run_finetune.py` 模块当中：
 
 * 使用模型自带chat-template
 
 > 并不是所有的模型支持chat-template，PaddleNLP 正在全力支持，可根据是否有下载 `chat_template.json` 文件来判断该模型是否支持 chat-template。
 
 ```shell
-python finetune_generation.py ... --model_name_or_path qwen/qwen-7b-chat --chat_template qwen/qwen-7b-chat
+python run_finetune.py ... --model_name_or_path qwen/qwen-7b-chat --chat_template qwen/qwen-7b-chat
 ```
 
 此时当 `chat_template` 参数和 `model_name_or_path` 参数一致时，此时将默认使用模型自带的chat_template.json` 文件。
@@ -51,7 +51,7 @@ python finetune_generation.py ... --model_name_or_path qwen/qwen-7b-chat --chat_
 * 使用自定义 chat-template
 
 ```shell
-python finetune_generation.py ... --chat_template ./qwen_14b_chat_template.json
+python run_finetune.py ... --chat_template ./qwen_14b_chat_template.json
 ```
 
 1. 当 `chat_template` 参数和 `model_name_or_path` 参数一致时，此时将默认使用模型自带的 `chat_template.json` 文件。

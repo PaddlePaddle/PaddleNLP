@@ -8,7 +8,7 @@
 
 ```
 .
-├── PPO                          # PPO 训练相关目录
+├── ppo                          # PPO 训练相关目录
 │   ├── comm_utils.py            # 通信相关工具py文件
 │   ├── data                     # 数据集相关目录
 │   │   ├── alpaca.py            # alpaca(raw)数据集py文件
@@ -28,16 +28,16 @@
 │   │   ├── ppo_model_utils.py   # PPO loss等模型策略py文件
 │   │   ├── score_model.py       # score model模型定义py文件
 │   │   └── score_model_utils.py # score model基类及工具py文件
-│   ├── ppo_main.py              # RLHF训练脚本
+│   ├── run_ppo.py              # RLHF训练脚本
 │   ├── ppo_trainer.py           # RLHF训练执行器py脚本
 │   ├── tests                    # 测试相关目录
 │   │   ├── run_model.py
 │   │   └── test_export.py
 │   └── trainer_utils.py         # Trainer补丁及工具py脚本
 ├── README.md
-└── RM                           # Reward Model 训练相关目录
-    ├── models -> ../PPO/models
-    ├── reward_main.py            # reward model训练脚本
+└── rm                         # Reward Model 训练相关目录
+    ├── models -> ../ppo/models
+    ├── run_reward.py            # reward model训练脚本
     └── reward_trainer.py         # reward训练执行器py脚本
 ```
 
@@ -179,14 +179,14 @@ PPO 完整的训练过程包括以下 3 个阶段，如下图所示（来自[Dee
 
 2. Reward Model Fine-Tuning
 
-使用 `reward_main.py` 脚本根据 `rm.json` 训练奖励模型
+使用 `run_reward.py` 脚本根据 `rm_argument.json` 训练奖励模型
 
 ```
-cd RM
-python -u -m paddle.distributed.launch reward_main.py ../../config/llama/rm.json
+cd rm
+python -u -m paddle.distributed.launch run_reward.py ../../config/llama/rm_argument.json
 ```
 
-`rm.json` 中的绝大部分参数释义同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，不再赘述；稍有区别的是 `train_datasets`/`eval_datasets` 分别使用数据集定义注册时的`NAME`属性给出训练和验证集。另外对于奖励模型训练有以下特殊参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
+`rm_argument.json` 中的绝大部分参数释义同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，不再赘述；稍有区别的是 `train_datasets`/`eval_datasets` 分别使用数据集定义注册时的`NAME`属性给出训练和验证集。另外对于奖励模型训练有以下特殊参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
 
 - `normalize_score_during_training`：是否在训练过程中对奖励进行 normalize，默认为 `False`。
 - `normalizer_type`：使用 normalizer 时计算 mean、var 的方式，可选`"RunningMeanStd", "ExponentialMovingAverage"`。
@@ -196,15 +196,15 @@ python -u -m paddle.distributed.launch reward_main.py ../../config/llama/rm.json
 
 3. RLHF：
 
-RLHF 阶段需要 actor model、reference model、critic model、reward model 四个模型；actor-model/reference-model 使用 SFT 模型进行 initialize/frozen；critic-model/reward-model 使用 reward 模型进行 initialize/frozen (另外注意若 SFT 使用 LoRA 请先将 LoRA 权重合并）。这里使用 PKU-Alignment/PKU-SafeRLHF 提供的 SFT 模型（[PKU-Alignment/alpaca-7b-reproduced](https://huggingface.co/PKU-Alignment/alpaca-7b-reproduced)）和 reward 模型（[PKU-Alignment/beaver-7b-v1.0-reward](https://huggingface.co/PKU-Alignment/beaver-7b-v1.0-reward)，注意该模型只关注 helpful 未考量 harmless）作为示例，使用 `ppo_main.py` 脚本根据 `ppo.json` 进行 RLHF 训练。
+RLHF 阶段需要 actor model、reference model、critic model、reward model 四个模型；actor-model/reference-model 使用 SFT 模型进行 initialize/frozen；critic-model/reward-model 使用 reward 模型进行 initialize/frozen (另外注意若 SFT 使用 LoRA 请先将 LoRA 权重合并)。这里使用 PKU-Alignment/PKU-SafeRLHF 提供的 SFT 模型（[PKU-Alignment/alpaca-7b-reproduced](https://huggingface.co/PKU-Alignment/alpaca-7b-reproduced)）和 reward 模型（[PKU-Alignment/beaver-7b-v1.0-reward](https://huggingface.co/PKU-Alignment/beaver-7b-v1.0-reward)，注意该模型只关注 helpful 未考量 harmless）作为示例，使用 `run_ppo.py` 脚本根据 `ppo_argument.json` 进行 RLHF 训练。
 
 ```
 # 类型提升 warning 暂时通过 loglevel 屏蔽，待后续修复
-cd PPO
-PYTHONPATH=../../ GLOG_minloglevel=2 python -u -m paddle.distributed.launch ppo_main.py ../../config/llama/ppo.json
+cd ppo
+PYTHONPATH=../../ GLOG_minloglevel=2 python -u -m paddle.distributed.launch run_ppo.py ../../config/llama/ppo_argument.json
 ```
 
-`ppo.json` 中的绝大部分参数释义同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，不再赘述，重点给出以下参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
+`ppo_argument.json` 中的绝大部分参数释义同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，不再赘述，重点给出以下参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
 
 - `train_datasets`：使用数据集定义注册时的`NAME`属性给出训练集。
 - `eval_datasets`：使用数据集定义注册时的`NAME`属性给出验证集。
@@ -230,7 +230,7 @@ PYTHONPATH=../../ GLOG_minloglevel=2 python -u -m paddle.distributed.launch ppo_
 此外为了支持更高性、更大规模的 RLHF 训练提供了以下特殊参数配置，可以按需使用：
 - `use_fusemt`：安装 paddlenlp_ops 后将在 rollout 生成时开启生成加速（开启流水线并行时不支持生成加速），通过此设置可以禁用生成加速。
 - `eval_mode`：支持为空或者设置为 "single"、"tensor_parallel"；通常可以在使用流水线并行训练时设置为"tensor_parallel"，以此在 rollout 生成阶段使用非流水线并行模型并进行生成加速。
-- `offload_level`：支持设置为"freeze_model"、"optimizer"、"train_model"或者同时使用(空格分隔），分别指示 reward+reference 两个冻结模型、actor+critic 两个训练模型的优化器状态和模型参数的 offload/reload，用于在不同阶段 model/optimizer 使用结束后及时 offload 并在下次使用时 reload 相应参数权重以节省显存。
+- `offload_level`：支持设置为"freeze_model"、"optimizer"、"train_model"或者同时使用(空格分隔)，分别指示 reward+reference 两个冻结模型、actor+critic 两个训练模型的优化器状态和模型参数的 offload/reload，用于在不同阶段 model/optimizer 使用结束后及时 offload 并在下次使用时 reload 相应参数权重以节省显存。
 
 另外注意，在使用流水线并行时（pipeline_parallel_degree大于1）建议将 `dataloader_drop_last` 设置为 true, 以此避免不同batch size带来的问题。
 

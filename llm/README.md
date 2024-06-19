@@ -134,19 +134,19 @@ tar -zxvf AdvertiseGen.tar.gz
 **全参精调：SFT**
 ```bash
 # SFT启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" finetune_generation.py ./config/llama/sft_argument.json
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py ./config/llama/sft_argument.json
 ```
 
 **LoRA**
 ```bash
 # LoRA启动命令参考
-python  finetune_generation.py ./config/llama/lora_argument.json
+python  run_finetune.py ./config/llama/lora_argument.json
 ```
 
 **Prefix Tuning**
 ```bash
 # Prefix Tuning启动命令参考
-python  finetune_generation.py ./config/llama/pt_argument.json
+python  run_finetune.py ./config/llama/pt_argument.json
 ```
 
 更多大模型精调分布式使用文档、训练细节和效果请参见[大模型精调教程](./docs/finetune.md)。
@@ -188,7 +188,7 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 **全参DPO**
 ```bash
 # DPO启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./dpo/dpo_train.py ./config/llama/dpo_argument.json
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
 
 ### 4. 量化
@@ -211,10 +211,10 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./dpo/dpo_train
 
 ```
 # PTQ 量化启动命令参考
-python  finetune_generation.py ./config/llama/ptq_argument.json
+python  run_finetune.py ./config/llama/ptq_argument.json
 
 # GPTQ 量化启动命令参考
-python  finetune_generation.py ./config/llama/ptq_argument.json
+python  run_finetune.py ./config/llama/ptq_argument.json
 ```
 
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。

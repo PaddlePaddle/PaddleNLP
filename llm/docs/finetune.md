@@ -70,7 +70,7 @@ git clone 代码到本地，即可开始。
 SFT（Supervised Fine-Tuning）模型全参微调依托飞桨提出的[4D混合分布式并行](https://ai.baidu.com/forum/topic/show/987996)能力，支持使用Trainer API轻松切换数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（目前仅支持Llama）等多种分布式训练策略。
 
 ```
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" finetune_generation.py ./config/llama/sft_argument.json
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py ./config/llama/sft_argument.json
 ```
 
 1. `zero_padding`设为True有助于提高训练效率。建议将`per_device_train_batch_size`设为1，使用`gradient_accumulation_steps`控制batch size，适当调整`max_length`取值。
@@ -81,10 +81,10 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" finetune_genera
 
 ```
 # 单卡训练
-python  finetune_generation.py ./config/llama/lora_argument.json
+python  run_finetune.py ./config/llama/lora_argument.json
 
 # 张量并行分布式训练
-python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  finetune_generation.py ./config/llama/lora_argument.json
+python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.py ./config/llama/lora_argument.json
 ```
 
 **Note:**
@@ -100,10 +100,10 @@ python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  finetune_gene
 
 ```
 # 单卡训练
-python  finetune_generation.py ./llama/pt_argument.json
+python  run_finetune.py ./llama/pt_argument.json
 
 # 张量并行分布式训练
-python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  finetune_generation.py ./llama/pt_argument.json
+python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.py ./llama/pt_argument.json
 ```
 
 **Note:**
