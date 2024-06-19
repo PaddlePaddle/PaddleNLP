@@ -1,0 +1,14 @@
+{
+    "template": [
+        {"text": "{'text':'content_pre'}({'text': 'idiom'}){'text': 'content_post'}{'mask'}"},
+        {"text": "{'text':'content_pre'}({'text': 'idiom'}){'text': 'content_post'}成语{'text':'idiom'}用在这个句子中{'mask'}合适。"},
+        {"text": "选一个合适的词语填在括号里，你会选“{'text': 'idiom'}”吗？{'mask'}。“{'text':'content_pre'}(){'text': 'content_post'}”"},
+        {"text": "下边句中成语[{'text':'idiom'}]的理解正确吗？{'mask'}{'mask'}。“{'text':'content_pre'}({'text': 'idiom'}){'text': 'content_post'}”"}
+    ],
+    "verbalizer": [
+        {"0": "否", "1": "是"},
+        {"0": "不", "1": "很"},
+        {"0": "不", "1": "会"},
+        {"0": "错误", "1": "正确"}
+    ]
+}
