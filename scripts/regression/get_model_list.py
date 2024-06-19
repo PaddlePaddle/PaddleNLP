@@ -34,15 +34,10 @@ def get_model_list():
         "clue",
         "couplet",
         "doc",
-        "electra",
         "elmo",
         "ernie",
         "ernie-1.0",
         "ernie-csc",
-        "ernie-doc",
-        "ernie-gen",
-        "ernie-health",
-        "ernie-m",
         "ernie_matching",
         "few_shot",
         "glue",
@@ -59,7 +54,6 @@ def get_model_list():
         "pretrained_models",
         "question_matching",
         "rnn",
-        "rnnlm",
         "semantic_indexing",
         "sentiment_analysis",
         "simbert",
@@ -72,14 +66,13 @@ def get_model_list():
         "tcn",
         "tinybert",
         "transformer",
-        "transformer-xl",
         "unimo-text",
         "vae-seq2seq",
         "word_embedding",
-        "xlnet",
     ]
     examples_second_list = ["model_interpretation", "semantic_indexing", "lexical_analysis", "word_embedding"]
 
+    model_list = os.listdir("legacy/model_zoo")
     model_list = os.listdir("model_zoo")
     examples_list = os.listdir("legacy/examples/")
     app_list = os.listdir("applications/")
