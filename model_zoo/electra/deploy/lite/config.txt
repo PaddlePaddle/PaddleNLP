@@ -1,6 +1,0 @@
-lite_model_file ./electra-deploy-lite.nb # path of model relative to executable file
-label_file ./sst2_label.txt              # path of label description file
-predict_file_bin ./predict_input.bin     # path of data in binary
-predict_file_txt ./predict_input.txt     # path of data in text
-predict_num 10                           # number of data to predict, automatic generation and no need config
-predict_length 39                        # sequence length of each data, automatic generation and no need config

@@ -157,9 +157,9 @@ class ModelArgument:
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
 
     continue_training: bool = field(
-        default=False,
+        default=True,
         metadata={
-            "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
+            "help": "Whether to train from existing paddlenlp model weights. If set True, the model_name_or_path argument must exist in the paddlenlp models."
         },
     )
     weight_quantize_algo: str = field(

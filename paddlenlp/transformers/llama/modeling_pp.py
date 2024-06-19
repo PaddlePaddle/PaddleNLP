@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import OrderedDict
+
 import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
@@ -47,18 +49,23 @@ __all__ = [
 
 def parse_args(args):
     if isinstance(args, tuple):
-        if len(args) == 4:
-            hidden_states, attention_mask, position_ids, alibi = args
-        if len(args) == 3:
-            hidden_states, attention_mask, position_ids = args
+        if len(args) == 5:
+            hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, alibi = args
+        elif len(args) == 4:
+            hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids = args
+            alibi = None
+        elif len(args) == 3:
+            hidden_states, attention_mask, attn_mask_startend_row_indices = args
+            position_ids = None
             alibi = None
         elif len(args) == 2:
             hidden_states, attention_mask = args
+            attn_mask_startend_row_indices = None
             position_ids = None
             alibi = None
     else:
         hidden_states = args
-        attention_mask, position_ids, alibi = None, None, None
+        attention_mask, attn_mask_startend_row_indices, position_ids, alibi = None, None, None, None
 
     if position_ids is not None:
         position_ids.stop_gradient = True
@@ -66,17 +73,24 @@ def parse_args(args):
     if attention_mask is not None:
         attention_mask.stop_gradient = True
 
+    if attn_mask_startend_row_indices is not None:
+        attn_mask_startend_row_indices.stop_gradient = True
+
     if alibi is not None:
         alibi.stop_gradient = True
 
-    return hidden_states, attention_mask, position_ids, alibi
+    return hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, alibi
 
 
-def return_args(hidden_states, attention_mask=None, position_ids=None, alibi=None):
+def return_args(
+    hidden_states, attention_mask=None, attn_mask_startend_row_indices=None, position_ids=None, alibi=None
+):
     ret = (hidden_states,)
 
     if attention_mask is not None:
         ret += (attention_mask.clone(),)
+    if attn_mask_startend_row_indices is not None:
+        ret += (attn_mask_startend_row_indices.clone(),)
     if position_ids is not None:
         ret += (position_ids.clone(),)
     if alibi is not None:
@@ -114,7 +128,7 @@ class LlamaEmbeddingPipe(nn.Layer):
         Returns:
             _type_: _description_
         """
-        input_ids, attention_mask, position_ids, alibi = parse_args(args)
+        input_ids, attention_mask, attn_mask_startend_row_indices, position_ids, alibi = parse_args(args)
         input_embeds = self.embed_tokens(input_ids)
         if self.sequence_parallel:
             from paddlenlp.transformers import ScatterOp
@@ -128,6 +142,9 @@ class LlamaEmbeddingPipe(nn.Layer):
         batch_size, seq_length = input_ids.shape
         alibi = None
         if self.config.alibi:
+            assert (
+                attn_mask_startend_row_indices is None
+            ), "alibi and attn_mask_startend_row_indices can not be set at same time"
             # embed positions
             mask = (
                 attention_mask
@@ -150,6 +167,9 @@ class LlamaEmbeddingPipe(nn.Layer):
             alibi.stop_gradient = True
 
         if attention_mask is not None:
+            assert (
+                attn_mask_startend_row_indices is None
+            ), "attention_mask and attn_mask_startend_row_indices can not be set at same time"
             attention_mask = LlamaModel._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), 0, input_embeds.dtype
             )
@@ -166,28 +186,30 @@ class LlamaEmbeddingPipe(nn.Layer):
             )
             attention_mask.stop_gradient = True
 
-        return return_args(input_embeds, attention_mask, position_ids, alibi)
+        return return_args(input_embeds, attention_mask, attn_mask_startend_row_indices, position_ids, alibi)
 
 
 class LlamaDecoderLayerPipe(LlamaDecoderLayer):
     def forward(self, args):
-        hidden_states, attention_mask, position_ids, alibi = parse_args(args)
+        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, alibi = parse_args(args)
         # we can't distinguish
         # hidden_states, attention_mask, position_ids or
         # hidden_states, attention_mask, alibi
+
         if self.config.alibi and alibi is None and position_ids is not None:
             alibi = position_ids
             position_ids = None
 
         has_gradient = not hidden_states.stop_gradient
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
-            if attention_mask is not None or alibi is not None:
+            if attention_mask is not None or alibi is not None or attn_mask_startend_row_indices is not None:
                 hidden_states = recompute(
                     super().forward,
                     hidden_states,
                     position_ids=position_ids,
                     attention_mask=attention_mask,
                     alibi=alibi,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                     use_reentrant=False,
                 )
             else:
@@ -196,14 +218,19 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
                     super().forward,
                     hidden_states,
                     position_ids=position_ids,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                     use_reentrant=self.config.recompute_use_reentrant,
                 )
         else:
             hidden_states = super().forward(
-                hidden_states, position_ids=position_ids, attention_mask=attention_mask, alibi=alibi
+                hidden_states,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                alibi=alibi,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             )
 
-        return return_args(hidden_states, attention_mask, position_ids, alibi)
+        return return_args(hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, alibi)
 
 
 class LlamaRMSNormPipe(nn.Layer):
@@ -212,7 +239,7 @@ class LlamaRMSNormPipe(nn.Layer):
         self.norm = LlamaRMSNorm(config)
 
     def forward(self, args):
-        hidden_states, attention_mask, position_ids, alibi = parse_args(args)
+        hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, alibi = parse_args(args)
         return self.norm(hidden_states)
 
 
@@ -231,6 +258,31 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     _keys_to_ignore_on_load_unexpected = LlamaPretrainedModel._keys_to_ignore_on_load_unexpected
 
     # DONOT Add base_model_prefix !!!!
+
+    @classmethod
+    def _prepare_pipeline_inputs_func(cls, inputs):
+
+        first_stage_keys = ["input_ids", "attention_mask", "attn_mask_startend_row_indices", "position_ids"]
+        last_stage_keys = ["labels"]
+
+        def get_expected_keys(inputs, keys):
+            ret = tuple([inputs.pop(k) if k in inputs else None for k in keys])
+            if len(ret) == 1:
+                ret = ret[0]
+            return ret
+
+        if type(inputs) is dict or type(inputs) is OrderedDict:
+            return [
+                get_expected_keys(inputs, first_stage_keys),
+                get_expected_keys(inputs, last_stage_keys),
+            ]
+
+        keys = list(inputs[0].keys())
+        inputs_batch = {key: [data.pop(key) for data in inputs] for key in keys}
+        return [
+            get_expected_keys(inputs_batch, first_stage_keys),
+            get_expected_keys(inputs_batch, last_stage_keys),
+        ]
 
     def __init__(self, config):
         self.config = config

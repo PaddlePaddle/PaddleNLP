@@ -150,7 +150,7 @@ def main():
 
         model_class = AutoModelForCausalLMPipe
 
-    if not training_args.autotuner_benchmark:
+    if model_args.continue_training and not training_args.autotuner_benchmark:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             config=model_config,

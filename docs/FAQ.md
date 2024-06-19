@@ -61,7 +61,6 @@
 **A:** 通过使用PaddleNLP提供的 `load_dataset`，  `MapDataset` 和 `IterDataset` ，可以方便的自定义属于自己的数据集哦，也欢迎您贡献数据集到PaddleNLP repo。
 
 从本地文件创建数据集时，我们 **推荐** 根据本地数据集的格式给出读取function并传入 `load_dataset()` 中创建数据集。
-以[waybill_ie](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/waybill_ie)快递单信息抽取任务中的数据为例：
 
 ```python
 from paddlenlp.datasets import load_dataset
@@ -368,12 +367,12 @@ model.set_state_dict(paddle.load("xxx_para"))
    动转静，即将动态图的模型转为可用于部署的静态图模型。
    动态图接口更加易用，python 风格的交互式编程体验，对于模型开发更为友好，而静态图相比于动态图在性能方面有更绝对的优势。因此动转静提供了这样的桥梁，同时兼顾开发成本和性能。
    可以参考官方文档 [动态图转静态图文档](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/guides/04_dygraph_to_static/index_cn.html)，使用 `paddle.jit.to_static` 完成动转静。
-   另外，在 PaddleNLP 我们也提供了导出静态图模型的例子，可以参考 [waybill_ie 模型导出](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/waybill_ie/#%E6%A8%A1%E5%9E%8B%E5%AF%BC%E5%87%BA)。
+   另外，在 PaddleNLP 我们也提供了导出静态图模型的例子。
 
 （2）借助Paddle Inference部署
 
    动转静之后保存下来的模型可以借助Paddle Inference完成高性能推理部署。Paddle Inference内置高性能的CPU/GPU Kernel，结合细粒度OP横向纵向融合等策略，并集成 TensorRT 实现模型推理的性能提升。具体可以参考文档 [Paddle Inference 简介](https://paddleinference.paddlepaddle.org.cn/master/product_introduction/inference_intro.html)。
-   为便于初次上手的用户更易理解 NLP 模型如何使用Paddle Inference，PaddleNLP 也提供了对应的例子以供参考，可以参考 [/PaddleNLP/examples](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/) 下的deploy目录，如[基于ERNIE的命名实体识别模型部署](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/waybill_ie/deploy/python)。
+   为便于初次上手的用户更易理解 NLP 模型如何使用Paddle Inference，PaddleNLP 也提供了对应的例子以供参考，可以参考 [/PaddleNLP/examples](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/) 下的deploy目录。
 
 <a name="5-2"></a>
 
