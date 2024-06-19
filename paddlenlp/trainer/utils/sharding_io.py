@@ -126,7 +126,9 @@ class ShardingIO:
     def set_optimizer(self, optimizer):
         self.optimizer = optimizer
 
-    def load_state_dict_from_checkpoint_with_reshard(self, checkpoint, base_weight_name, model_wrapped):
+    def load_state_dict_from_checkpoint_with_reshard(
+        self, checkpoint, base_weight_name, model_wrapped, opt_state_dict=None
+    ):
         """load state_dict from_checkpoint with reshard, Only load model state dict.
         Args:
             checkpoint (str): The directory of the checkpoint.
@@ -180,7 +182,7 @@ class ShardingIO:
         state_dict = reshard_util.all_gather_state_dict(state_dict, filter_func, self.sharding_group)
 
         if self.args.bf16:
-            state_dict = self._recover_params_from_master_weights(state_dict)
+            state_dict = self._recover_params_from_master_weights(state_dict, opt_state_dict=opt_state_dict)
 
         return state_dict
 
@@ -413,9 +415,10 @@ class ShardingIO:
         }
         return parallel_config
 
-    def _recover_params_from_master_weights(self, state_dict):
-        opt_state_dict = self.optimizer.state_dict()
-        assert "master_weights" in opt_state_dict
+    def _recover_params_from_master_weights(self, state_dict, opt_state_dict=None):
+        if opt_state_dict is None:
+            opt_state_dict = self.optimizer.state_dict()
+        assert "master_weights" in opt_state_dict, opt_state_dict.keys()
         master_weights = opt_state_dict["master_weights"]
         tmp = OrderedDict()
         (master_weights, tmp) = (tmp, master_weights)
