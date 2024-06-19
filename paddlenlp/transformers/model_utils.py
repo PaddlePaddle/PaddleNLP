@@ -1860,14 +1860,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             return state_dict, resume_state_dict, fused_keys, new_keys
 
         if state_dict is not None:
-            # DONT Hold tensor parallel here, only hold afer load state dict.
-            # Whole checkpoint
-            # For model parallel if FastGeneration
-            # To avoid recursive import temporarily.
-            import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
-
-            state_dict = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
-
             # have loaded all state_dict, no resume state_dict
             state_dict, _, fused_keys, new_keys = _fuse_or_split_keys(
                 state_dict,
