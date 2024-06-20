@@ -22,6 +22,7 @@ import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
 from paddle.distributed import fleet
+from paddle.profiler.utils import switch_job_schedule_profiler
 from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
@@ -296,6 +297,10 @@ class AutoTrainer(Trainer):
                     steps_trained_progress_bar = None
 
                 inputs_list = self._split_batches_for_accumulation(inputs)
+                if self.args.to_static:
+                    schedule_start_step = self.args.get("job_schedule_profiler_start", -1)
+                    schedule_end_step = self.args.get("job_schedule_profiler_end", -1)
+                    switch_job_schedule_profiler(model, step, schedule_start_step, schedule_end_step)
 
                 for inputs in inputs_list:
                     if step_control % args.gradient_accumulation_steps == 0:
