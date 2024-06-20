@@ -16,11 +16,11 @@ python -m pip install -r ../requirements.txt
 python -m pip install -r ../requirements-dev.txt
 
 # install fused_ln custom ops
-cd ../model_zoo/gpt-3/external_ops/
+cd ../legacy/model_zoo/gpt-3/external_ops/
 python setup.py install
 
 # install tool_helpers
-cd ../../../llm/llama
+cd ../../../../llm/llama
 python -m pip install tool_helpers
 
 # download data
