@@ -41,6 +41,7 @@ class QWenConfig(PretrainedConfig):
         use_logn_attn=True,
         intermediate_size=22016,
         tensor_parallel_output=True,
+        sequence_parallel=False,
         fuse_sequence_parallel_allreduce=False,
         no_bias=True,
         tie_word_embeddings=False,
