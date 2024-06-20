@@ -314,7 +314,7 @@ def main():
         train_ds = train_ds.skip(consumed_samples)
 
     if training_args.pipeline_parallel_degree > 1:
-        from data import convert_example_common
+        from utils.data import convert_example_common
 
         trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
     else:

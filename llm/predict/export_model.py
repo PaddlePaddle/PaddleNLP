@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 
 import paddle
 from paddle.distributed import fleet
-from predictor import ModelArgument, PredictorArgument, create_predictor
+from predict.predictor import ModelArgument, PredictorArgument, create_predictor
 from tqdm import tqdm
 from utils.utils import generate_rank_mapping, get_infer_model_path
 

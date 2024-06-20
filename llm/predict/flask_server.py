@@ -22,7 +22,12 @@ from time import sleep
 
 import requests
 from filelock import FileLock
-from predictor import BasePredictor, ModelArgument, PredictorArgument, create_predictor
+from predict.predictor import (
+    BasePredictor,
+    ModelArgument,
+    PredictorArgument,
+    create_predictor,
+)
 
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.utils.log import logger

@@ -47,7 +47,7 @@ class TrainingArguments(TrainingArguments):
         metadata={"help": "whether to output logits in distributed status"},
     )
     unified_checkpoint: bool = field(
-        default=True,
+        default=False,
         metadata={"help": "Unify hybrid parallel checkpoint."},
     )
     unified_checkpoint_config: Optional[str] = field(
