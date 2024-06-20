@@ -111,7 +111,6 @@ from ..utils.env import (
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
 from .argparser import strtobool
-from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import RuntimeTimer, get_timers, set_timers
 from .plugins.unified_checkpoint import (
     load_unified_checkpoint,
@@ -417,7 +416,7 @@ class Trainer:
                 model, PipelineLayer
             ), "Only support pipeline parallel mode when model is PipelineLayer!!!"
 
-        default_callbacks = DEFAULT_CALLBACKS + get_reporting_integration_callbacks(self.args.report_to)
+        default_callbacks = DEFAULT_CALLBACKS
         callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
         self.callback_handler = CallbackHandler(
             callbacks, self.model, self.tokenizer, self.optimizer, self.lr_scheduler
@@ -1171,6 +1170,22 @@ class Trainer:
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
                     self._print_timer()
                     step_control = 0
+
+                    if self.args.nvprof_start < self.args.nvprof_end:
+                        # for end
+                        if self.state.global_step - 1 >= self.args.nvprof_start:
+                            paddle.base.core.nvprof_nvtx_pop()
+                        if self.state.global_step == self.args.nvprof_end:
+                            paddle.base.core.nvprof_stop()
+                            sys.exit()
+
+                        # for begin
+                        if self.state.global_step == self.args.nvprof_start:
+                            paddle.base.core.nvprof_start()
+                            paddle.base.core.nvprof_enable_record_event()
+                        if self.state.global_step >= self.args.nvprof_start:
+                            paddle.base.core.nvprof_nvtx_push(str(self.state.global_step))
+
                 else:
                     self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
                     step_control += 1
@@ -1391,6 +1406,11 @@ class Trainer:
                     seq_length=seq_length,
                 )
             )
+
+            max_memory_allocated = paddle.device.cuda.max_memory_allocated() / 1024 / 1024
+            max_memory_reserved = paddle.device.cuda.max_memory_reserved() / 1024 / 1024
+            logs["max_memory_allocated"] = f"{round(max_memory_allocated, 2)} MB"
+            logs["max_memory_reserved"] = f"{round(max_memory_reserved, 2)} MB"
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step

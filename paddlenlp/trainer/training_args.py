@@ -796,6 +796,15 @@ class TrainingArguments:
         default=False,
         metadata={"help": ("Whether to train model under static mode by jit.to_static or distributed.to_static.")},
     )
+    nvprof_start: int = field(
+        default=-1,
+        metadata={"help": "The step to start nv_profiler."},
+    )
+    nvprof_end: int = field(
+        default=-1,
+        metadata={"help": "The step to end nv_profiler."},
+    )
+
     unified_checkpoint_config: Optional[str] = field(
         default="",
         metadata={

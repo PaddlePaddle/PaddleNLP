@@ -105,6 +105,14 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
     )
+    nvprof_start: int = field(
+        default=-1,
+        metadata={"help": "The step to start nv_profiler."},
+    )
+    nvprof_end: int = field(
+        default=-1,
+        metadata={"help": "The step to end nv_profiler."},
+    )
     job_schedule_profiler_start: int = field(
         default=-1,
         metadata={"help": "The step to start job_schedule_profiler."},
@@ -542,6 +550,8 @@ def main():
         pipeline.vpp_degree = config.virtual_pp_degree
         pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
 
+    # config.num_hidden_layers = 4
+
     print("Final pre-training config:", config)
 
     # Set the dtype for loading model
@@ -667,21 +677,26 @@ def main():
             with job_schedule_profiler_range(step, job_schedule_profiler_start, job_schedule_profiler_end) as status:
                 engine.enable_job_schedule_profiler = status
 
-            for micro_batch in local_batches:
-                outs = engine.run(micro_batch, mode="train")
+            with paddle.profiler.utils._nvprof_range(
+                iter_id=step,
+                start=training_args.nvprof_start,
+                end=training_args.nvprof_end,
+            ):
+                for micro_batch in local_batches:
+                    outs = engine.run(micro_batch, mode="train")
 
-                if "loss" in outs:
-                    if outs["loss"].dtype == np.uint16:
-                        tr_loss_step = np.sum(convert_uint16_to_float(outs["loss"]))
+                    if "loss" in outs:
+                        if outs["loss"].dtype == np.uint16:
+                            tr_loss_step = np.sum(convert_uint16_to_float(outs["loss"]))
+                        else:
+                            tr_loss_step = np.sum(outs["loss"])
                     else:
-                        tr_loss_step = np.sum(outs["loss"])
-                else:
-                    tr_loss_step = float(0)
+                        tr_loss_step = float(0)
 
-                if training_args.gradient_accumulation_steps > 1:
-                    tr_loss_step /= training_args.gradient_accumulation_steps
+                    if training_args.gradient_accumulation_steps > 1:
+                        tr_loss_step /= training_args.gradient_accumulation_steps
 
-                tr_loss += tr_loss_step
+                    tr_loss += tr_loss_step
 
             local_batches = []
 
@@ -703,6 +718,12 @@ def main():
                         num_steps=num_steps,
                     )
                 )
+
+                max_memory_allocated = paddle.device.cuda.max_memory_allocated() / 1024 / 1024
+                max_memory_reserved = paddle.device.cuda.max_memory_reserved() / 1024 / 1024
+                logs["max_memory_allocated"] = f"{round(max_memory_allocated, 2)} MB"
+                logs["max_memory_reserved"] = f"{round(max_memory_reserved, 2)} MB"
+
                 logger.info(", ".join(f"{k}: {v}" for k, v in logs.items()))
 
                 global_step_last_logged = global_step
