@@ -218,7 +218,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" dpo_train.py ./
 python  finetune_generation.py ./llama/ptq_argument.json
 
 # GPTQ 量化启动命令参考
-python  finetune_generation.py ./llama/ptq_argument.json
+python  finetune_generation.py ./llama/gptq_argument.json
 ```
 
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。
