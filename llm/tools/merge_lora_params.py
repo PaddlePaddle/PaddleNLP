@@ -43,7 +43,7 @@ def parse_arguments():
         "--lora_path", default=None, type=str, required=True, help="The directory of LoRA parameters. Default to None"
     )
     parser.add_argument("--output_path", default=None, type=str, required=True, help="The directory of saved model ")
-    parser.add_argument("--safe_serialization", default="True", type=strtobool, help="Whether save as safetensor.")
+    parser.add_argument("--safe_serialization", default="False", type=strtobool, help="Whether save as safetensor.")
     parser.add_argument(
         "--device",
         type=str,

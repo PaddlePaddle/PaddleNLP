@@ -86,7 +86,7 @@ class PreTrainingArguments(TrainingArguments):
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
     )
     unified_checkpoint: bool = field(
-        default=True,
+        default=False,
         metadata={"help": "Enable fused linear grad add strategy."},
     )
     unified_checkpoint_config: Optional[str] = field(

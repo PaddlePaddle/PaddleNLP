@@ -212,6 +212,7 @@ python merge_lora_params.py \
     --lora_path ./checkpoints/lora_ckpts \
     --output_path ./checkpoints/lora_merge \
     --device "gpu" \
+    --safe_serialization True
 ```
 
 <summary>&emsp; 脚本参数介绍</summary><div>

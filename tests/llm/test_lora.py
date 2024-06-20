@@ -98,7 +98,8 @@ class LoraTest(LLMTest, unittest.TestCase):
         # merge weights
         merge_lora_weights_config = {
             "lora_path": lora_config["output_dir"],
-            "merge_lora_model_path": lora_config["output_dir"],
+            "model_name_or_path": lora_config["model_name_or_path"],
+            "output_path": lora_config["output_dir"],
         }
         with argv_context_guard(merge_lora_weights_config):
             from tools.merge_lora_params import merge
