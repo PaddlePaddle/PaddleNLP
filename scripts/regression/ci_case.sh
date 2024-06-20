@@ -194,31 +194,6 @@ bigbird(){
         --max_pred_length 75 >${log_path}/bigbird_pretrain) >>${log_path}/bigbird_pretrain 2>&1
     print_info $? bigbird_pretrain
 }
-# 7 electra
-electra(){
-    cd ${nlp_dir}/model_zoo/electra/
-    export CUDA_VISIBLE_DEVICES=${cudaid2}
-    export DATA_DIR=./BookCorpus/
-    wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/BookCorpus.tar.gz && tar -xzvf BookCorpus.tar.gz
-    time (python -u ./run_pretrain.py \
-        --model_type electra \
-        --model_name_or_path electra-small \
-        --input_dir ./BookCorpus/ \
-        --output_dir ./pretrain_model/ \
-        --train_batch_size 64 \
-        --learning_rate 5e-4 \
-        --max_seq_length 128 \
-        --weight_decay 1e-2 \
-        --adam_epsilon 1e-6 \
-        --warmup_steps 10000 \
-        --num_train_epochs 4 \
-        --logging_steps 1 \
-        --save_steps 1 \
-        --max_steps 1 \
-        --device gpu >${log_path}/electra_pretrain) >>${log_path}/electra_pretrain 2>&1
-    print_info $? electra_pretrain
-}
-
 # 9 ernie
 ernie(){
     #data process
@@ -264,23 +239,6 @@ ernie(){
         --do_train \
         --device "gpu" >${log_path}/ernie_1.0_pretrain_trainer >>${log_path}/ernie_1.0_pretrain_trainer 2>&1
     print_info $? ernie_1.0_pretrain_trainer
-}
-# 10 xlnet
-xlnet(){
-    cd ${nlp_dir}/examples/language_model/xlnet/
-    export CUDA_VISIBLE_DEVICES=${cudaid2}
-    time (python -m paddle.distributed.launch ./run_glue.py \
-        --model_name_or_path xlnet-base-cased \
-        --task_name SST-2 \
-        --max_seq_length 128 \
-        --batch_size 32 \
-        --learning_rate 2e-5 \
-        --num_train_epochs 3 \
-        --max_steps 1 \
-        --logging_steps 1 \
-        --save_steps 1 \
-        --output_dir ./xlnet/ >${log_path}/xlnet_train) >>${log_path}/xlnet_train 2>&1
-    print_info $? xlnet_train
 }
 # 11 ofa
 ofa(){
@@ -547,41 +505,6 @@ transformer() {
 
     # fast_transformer
 }
-#25 ernie-doc
-ernie-doc(){
-    cd ${nlp_dir}/model_zoo/ernie-doc/
-    export CUDA_VISIBLE_DEVICES=${cudaid2}
-    time (python -m paddle.distributed.launch  --log_dir hyp run_classifier.py --epochs 15 --layerwise_decay 0.7 --learning_rate 5e-5 --batch_size 4 --save_steps 100 --max_steps 100  --dataset hyp --output_dir hyp >${log_path}/ernie-doc_hyp) >>${log_path}/ernie-doc_hyp 2>&1
-    print_info $? ernie-doc_hyp
-    time (python -m paddle.distributed.launch  --log_dir cmrc2018 run_mrc.py --batch_size 4 --layerwise_decay 0.8 --dropout 0.2 --learning_rate 4.375e-5 --epochs 1 --save_steps 100 --max_steps 100  --dataset cmrc2018 --output_dir cmrc2018  >${log_path}/ernie-doc_cmrc2018) >>${log_path}/ernie-doc_cmrc2018 2>&1
-    print_info $?  ernie-doc_cmrc2018
-    time (python -m paddle.distributed.launch  --log_dir c3 run_mcq.py --learning_rate 6.5e-5 --epochs 1 --save_steps 100 --max_steps 100  --output_dir c3 >${log_path}/ernie-doc_c3) >>${log_path}/ernie-doc_c3 2>&1
-    print_info $? ernie-doc_c3
-    time (python -m paddle.distributed.launch  --log_dir cail/ run_semantic_matching.py --epochs 1 --layerwise_decay 0.8 --learning_rate 1.25e-5 --batch_size 4  --save_steps 100 --max_steps 100 --output_dir cail >${log_path}/ernie-doc_cail) >>${log_path}/ernie-doc_cail 2>&1
-    print_info $? ernie-doc_cail
-    time (python -m paddle.distributed.launch  --log_dir msra run_sequence_labeling.py --learning_rate 3e-5 --epochs 1 --save_steps 100 --max_steps 100  --output_dir msra  >${log_path}/ernie-doc_msar) >>${log_path}/ernie-doc_msar 2>&1
-    print_info $? ernie-doc_msar
-    time (python run_mrc.py  --model_name_or_path ernie-doc-base-zh  --dataset dureader_robust  --batch_size 8 --learning_rate 2.75e-4 --epochs 1 --save_steps 10 --max_steps 2 --logging_steps 10 --device gpu >${log_path}/ernie-doc_dureader_robust) >>${log_path}/ernie-doc_dureader_robust 2>&1
-    print_info $? ernie-doc_dureader_robust
-}
-#26 transformer-xl
-transformer-xl (){
-    cd ${nlp_dir}/examples/language_model/transformer-xl/
-    mkdir gen_data && cd gen_data
-    wget https://paddle-qa.bj.bcebos.com/paddlenlp/enwik8.tar.gz && tar -zxvf enwik8.tar.gz
-    cd ../
-    export CUDA_VISIBLE_DEVICES=${cudaid2}
-    time (sed -i 's/print_step: 100/print_step: 1/g' configs/enwik8.yaml
-        sed -i 's/save_step: 10000/save_step: 3/g' configs/enwik8.yaml
-        sed -i 's/batch_size: 16/batch_size: 8/g' configs/enwik8.yaml
-        sed -i 's/max_step: 400000/max_step: 3/g' configs/enwik8.yaml
-        python -m paddle.distributed.launch  train.py --config ./configs/enwik8.yaml >${log_path}/transformer-xl_train_enwik8) >>${log_path}/transformer-xl_train_enwik8 2>&1
-    print_info $? transformer-xl_train_enwik8
-    time (sed -i 's/batch_size: 8/batch_size: 1/g' configs/enwik8.yaml
-        sed -i 's#init_from_params: "./trained_models/step_final/"#init_from_params: "./trained_models/step_3/"#g' configs/enwik8.yaml
-        python eval.py --config ./configs/enwik8.yaml >${log_path}/transformer-xl_eval_enwik8) >>${log_path}/transformer-xl_eval_enwik8 2>&1
-    print_info $? transformer-xl_eval_enwik8
-}
 #28 question_matching
 question_matching() {
     cd ${nlp_dir}/examples/text_matching/question_matching/
@@ -635,57 +558,7 @@ ernie-csc() {
     python predict.py --model_file infer_model/static_graph_params.pdmodel --params_file infer_model/static_graph_params.pdiparams >${log_path}/ernie-csc_deploy >>${log_path}/ernie-csc_deploy 2>&1
     print_info $? ernie-csc_deploy
 }
-#31 ernie-m
-ernie-m() {
-    export CUDA_VISIBLE_DEVICES=${cudaid2}
-    cd ${nlp_dir}/model_zoo/ernie-m
-    # TODO(ouyanghongyu): remove the following scripts later.
-    if [ ! -f 'test.py' ];then
-        echo '模型测试文件不存在！'
-        # finetuned for cross-lingual-transfer
-        python -m paddle.distributed.launch --log_dir output_clt run_classifier.py \
-            --do_train \
-            --do_eval \
-            --do_export \
-            --device gpu \
-            --task_type cross-lingual-transfer \
-            --model_name_or_path __internal_testing__/ernie-m \
-            --use_test_data True \
-            --test_data_path ../../tests/fixtures/tests_samples/xnli/xnli.jsonl \
-            --output_dir output_clt \
-            --export_model_dir output_clt \
-            --per_device_train_batch_size 8 \
-            --save_steps 1 \
-            --eval_steps 1  \
-            --max_steps 2 \
-            --overwrite_output_dir \
-            --remove_unused_columns False >${log_path}/ernie-m_clt >>${log_path}/ernie-m_clt 2>&1
-        print_info $? ernie-m_clt
-        # finetuned for translate-train-all
-        python -m paddle.distributed.launch --log_dir output_tta run_classifier.py \
-            --do_train \
-            --do_eval \
-            --do_export \
-            --device gpu \
-            --task_type translate-train-all \
-            --model_name_or_path __internal_testing__/ernie-m \
-            --use_test_data True \
-            --test_data_path ../../tests/fixtures/tests_samples/xnli/xnli.jsonl \
-            --output_dir output_tta \
-            --export_model_dir output_tta \
-            --per_device_train_batch_size 8 \
-            --save_steps 1 \
-            --eval_steps 1  \
-            --max_steps 2 \
-            --overwrite_output_dir \
-            --remove_unused_columns False >${log_path}/ernie-m_tta >>${log_path}/ernie-m_tta 2>&1
-        print_info $? ernie-m_tta
-    else
-        python -m pytest ${nlp_dir}/tests/model_zoo/test_ernie_m.py >${log_path}/ernie-m >>${log_path}/ernie-m 2>&1
-        print_info $? ernie-m
-    fi
-}
-#32 clue
+
 clue() {
     cd ${nlp_dir}/legacy/examples/benchmark/clue/classification
     python -u ./run_clue_classifier_trainer.py \
@@ -808,15 +681,6 @@ ernie-3.0(){
     # python compress_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2018  --output_dir ./best_models/cmrc2018 --config=configs/default.yml --max_steps 10 --eval_steps 5 --save_steps 5  --algo_list mse --batch_size_list 4 >${log_path}/ernie-3.0_compress_qa >>${log_path}/ernie-3.0_compress_qa 2>&1
     # print_info $? ernie-3.0_compress_qa
 }
-ernie-health(){
-    cd ${nlp_dir}/tests/model_zoo/
-    if [ ! -f 'test_ernie-health.py' ];then
-        echo '模型测试文件不存在！'
-    else
-        python -m pytest tests/model_zoo/test_ernie-health.py >${log_path}/ernie-health_unittest>>${log_path}/ernie-health_unittest 2>&1
-        print_info $? tests ernie-health_unittest
-    fi
-}
 uie(){
     cd ${nlp_dir}/model_zoo/uie/
     mkdir data && cd data && wget https://bj.bcebos.com/paddlenlp/datasets/uie/doccano_ext.json && cd ../
@@ -854,24 +718,12 @@ ernie-1.0(){
     ernie
 }
 
-ernie_m(){
-    ernie-m
-}
-
 ernie_layout(){
     ernie-layout
 }
 
 ernie_csc(){
     ernie-csc
-}
-
-ernie_doc(){
-    ernie-doc
-}
-
-ernie_health(){
-    ernie-health
 }
 
 segment_parallel_utils(){
