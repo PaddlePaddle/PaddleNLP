@@ -116,7 +116,7 @@ ERNIE 中文预训练更详细的介绍文档请可以参见[ERNIE 中文预训�
 <summary><b>CLUECorpusSmall 数据准备</b></summary>
 
 #### 数据准备
-数据下载部分请参考[preprocess](./preprocess)目录，根据文档中`CLUECorpusSmall 数据集处理教程`，下载数据。下载好后:
+数据下载部分请参考[preprocess](../../../llm/tools/preprocess)目录，根据文档中`CLUECorpusSmall 数据集处理教程`，下载数据。下载好后:
 
 解压文件
 ```shell
@@ -308,9 +308,9 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 
 #### 数据准备
 
-数据下载，数据转化部分，请参见[数据预处理文档](./preprocess/README.md)，
-- [CLUECorpus2020数据处理](./preprocess/docs/CLUECorpus2020.md)
-- [WuDaoCorpusBase数据处理](./preprocess/docs/WuDaoCorpusBase.md)
+数据下载，数据转化部分，请参见[数据预处理文档](../../../llm/tools/preprocess/README.md)，
+- [CLUECorpus2020数据处理](../../../llm/tools/preprocess/docs/CLUECorpus2020.md)
+- [WuDaoCorpusBase数据处理](../../../llm/tools/preprocess/docs/WuDaoCorpusBase.md)
 
 如果需要定制化词表，词表制作部分请参考[词表制作](./vocab/README.md)。
 
