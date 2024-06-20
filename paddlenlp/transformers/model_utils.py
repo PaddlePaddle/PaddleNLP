@@ -2348,6 +2348,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
                 pass
 
+        # Note:
+        # 1. PipelineLayer will create parameters for each layer and
+        # call `_synchronize_shared_weights()` to synchronize the shared parameters.
+        # 2. When setting the model `state_dict`, `_synchronize_shared_weights` will be called to
+        # synchronize the shared parameters.
+        # However, when state dict only contains the one piece of shared parameters, the shared parameters
+        # will be different from the original shared parameters.
+
+        if isinstance(model, PipelineLayer):
+            model._synchronize_shared_weights()
+
         if paddle.in_dynamic_mode():
             return model
 
