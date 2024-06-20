@@ -12,33 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-max_steps=${1:-800}
-
 set -x
-ps aux | grep run_pretrain.py | grep -v grep | awk '{print $2}' | xargs kill -9
-rm -rf ./log_8.0
-rm -rf output
-export PYTHONPATH=../../../:$PYTHONPATH
-export MC2=1
+
+max_steps=${1:-2000}
+
 export GLOG_v=0
 export FLAGS_npu_storage_format=1
-export HCCL_INTRA_PCIE_EHABLE=0
+export FLAGS_use_stride_kernel=0
+export HCCL_OP_BASE_FFTS_MODE_ENABLE=TRUE
+export MULTI_STREAM_MEMORY_REUSE=1
+export HCCL_INTRA_PCIE_ENABLE=0
 export HCCL_INTRA_ROCE_ENABLE=1
 export FLAGS_allocator_strategy=naive_best_fit
 export ASCEND_RT_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
 export FLAGS_NPU_MC2=1
 export MC2_Recompute=1
-unset PADDLE_TRAINER_ENDPOINTS
-unset DISTRIBUTED_TRAINER_ENDPOINTS
-
-export FLAGS_use_stride_kernel=0
-export HCCL_OP_BASE_FFTS_MODE_ENABLE=TRUE
-export MULTI_STREAM_MEMORY_REUSE=1
 
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
+export PYTHONPATH=../../../:$PYTHONPATH
+ps aux | grep run_pretrain.py | grep -v grep | awk '{print $2}' | xargs kill -9
 
 python -u  -m paddle.distributed.launch \
-    --log_dir "./log_8.0" \
+    --log_dir "./ppt_bf16_llama_N1C8" \
     ../run_pretrain.py \
     --model_name_or_path "meta-llama/Llama-2-13b" \
     --tokenizer_name_or_path "meta-llama/Llama-2-13b" \
@@ -55,10 +50,8 @@ python -u  -m paddle.distributed.launch \
     --learning_rate 0.00001 \
     --min_learning_rate 0.000001 \
     --max_steps ${max_steps} \
-    --decay_steps 2000 \
     --save_steps 2000 \
     --seed 100 \
-    --weight_decay 0.01 \
     --warmup_steps 20 \
     --max_grad_norm 1.0 \
     --logging_steps 1 \
@@ -83,6 +76,7 @@ python -u  -m paddle.distributed.launch \
     --pipeline_parallel_degree 1 \
     --ignore_data_skip 0 \
     --force_reshard_pp true \
+    --unified_checkpoint \
     --tensor_parallel_config "enable_mp_async_allreduce enable_mp_skip_c_identity" \
     --sequence_parallel 1 \
     --pipeline_parallel_config "disable_partial_send_recv" \
