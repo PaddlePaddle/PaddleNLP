@@ -198,7 +198,7 @@ class QWenAttention(nn.Layer):
 
         self.attn_dropout = nn.Dropout(config.attn_dropout_prob)
 
-    def _attn(self, query, key, value, sequence_parallel=False, attention_mask=None):
+    def _attn(self, query, key, value, attention_mask=None):
         # Support the flash attention and normal attention
         bsz, q_len, num_heads, head_dim = query.shape
         _, kv_seq_len, _, _ = value.shape
@@ -228,7 +228,7 @@ class QWenAttention(nn.Layer):
                 )
                 attn_weights = None
 
-            if sequence_parallel:
+            if self.sequence_parallel:
                 attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
             else:
                 attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
@@ -258,7 +258,7 @@ class QWenAttention(nn.Layer):
             attn_output = paddle.matmul(attn_weights, value)
             attn_output = attn_output.transpose([0, 2, 1, 3])
 
-            if sequence_parallel:
+            if self.sequence_parallel:
                 attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
             else:
                 attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
@@ -356,12 +356,11 @@ class QWenAttention(nn.Layer):
                 query,
                 key,
                 value,
-                self.sequence_parallel,
                 attention_mask,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
-            attn_output, attn_weight = self._attn(query, key, value, self.sequence_parallel, attention_mask)
+            attn_output, attn_weight = self._attn(query, key, value, attention_mask)
 
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
