@@ -20,12 +20,20 @@ from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
 
+from paddlenlp.experimental.model_utils import (
+    ActScalesLoader,
+    CacheScaleLoader,
+    WeightScalesLoader,
+)
+
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerWeightOnly,
+    FusedMultiTransformerA8W8,
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
+    FusedBlockMultiTransformerA8W8
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
@@ -77,12 +85,24 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.padding_idx = 0
-
+        self.num_layers = config.n_layer
         self.embed_dim = config.hidden_size
         self.n_head = config.n_head
         self.use_weight_only = False
         self.weight_only_quant_bits = config.weight_only_quant_bits
+        self.quant_type = config.quant_type
         self.quant_algo = "weight_only_int" + str(self.weight_only_quant_bits)
+
+        if self.quant_type is not None and "weight_only_int" in self.quant_type:
+            self.use_weight_only = True
+        elif self.quant_type is not None and "a8w8" in self.quant_type:
+            self.quant_model_path = config.model_name_or_path
+            self.shift = config.quantization_config.shift
+            self.smooth = config.quantization_config.smooth
+            self.shift_smooth_all_linears = config.quantization_config.shift_smooth_all_linears
+        else:
+            self.use_weight_only = False
+
         if self.weight_only_quant_bits != -1:
             self.use_weight_only = True
 
@@ -166,6 +186,88 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             ffn2_weight_scale_attrs = [
                 paddle.ParamAttr(name="fusemt.{}.ffn2_weight_scale".format(i)) for i in range(config.n_layer)
             ]
+        
+        qkv_out_scale_attrs = None
+        linear_out_scale_attrs = None
+        ffn1_out_scale_attrs = None
+        ffn2_out_scale_attrs = None
+        linear_shift_attrs = None
+        linear_smooth_attrs = None
+        ffn2_shift_attrs = None
+        ffn2_smooth_attrs = None
+        out_proj_bias_attrs = None
+
+        if self.quant_type == "a8w8":
+            self.quant_round_type = config.quantization_config.quant_round_type
+
+            qkv_out_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.qkv_out_scale".format(i)) for i in range(self.num_layers)
+            ]
+            linear_out_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.linear_out_scale".format(i)) for i in range(self.num_layers)
+            ]
+            ffn1_out_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.ffn1_out_scale".format(i)) for i in range(self.num_layers)
+            ]
+            ffn2_out_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.ffn2_out_scale".format(i)) for i in range(self.num_layers)
+            ]
+
+            if self.shift_smooth_all_linears:
+                linear_shift_attrs = [
+                    paddle.ParamAttr(name="fusemt.{}.linear_shift".format(i)) for i in range(self.num_layers)
+                ]
+                linear_smooth_attrs = [
+                    paddle.ParamAttr(name="fusemt.{}.linear_smooth".format(i)) for i in range(self.num_layers)
+                ]
+                ffn2_shift_attrs = [
+                    paddle.ParamAttr(name="fusemt.{}.ffn2_shift".format(i)) for i in range(self.num_layers)
+                ]
+                ffn2_smooth_attrs = [
+                    paddle.ParamAttr(name="fusemt.{}.ffn2_smooth".format(i)) for i in range(self.num_layers)
+                ]
+
+            if self.shift:
+                ln_bias_attrs = [
+                    paddle.ParamAttr(name="fusemt.{}.ln_bias".format(i)) for i in range(self.num_layers)
+                ]
+                ffn_ln_bias_attrs = [
+                    paddle.ParamAttr(name="fusemt.{}.ffn_ln_bias".format(i)) for i in range(self.num_layers)
+                ]
+                qkv_bias_attrs = [
+                    paddle.ParamAttr(name="fusemt.{}.qkv_bias".format(i)) for i in range(self.num_layers)
+                ]
+                ffn1_bias_attrs = [
+                    paddle.ParamAttr(name="fusemt.{}.ffn1_bias".format(i)) for i in range(self.num_layers)
+                ]
+                if self.shift_smooth_all_linears:
+                    out_proj_bias_attrs = [
+                        paddle.ParamAttr(name="fusemt.{}.out_proj_bias".format(i)) for i in range(self.num_layers)
+                    ]
+                    ffn2_bias_attrs = [
+                        paddle.ParamAttr(name="fusemt.{}.ffn2_bias".format(i)) for i in range(self.num_layers)
+                    ]
+
+
+        cache_k_scale_attrs = None
+        cache_v_scale_attrs = None
+        cache_k_out_scale_attrs = None
+        cache_v_out_scale_attrs = None
+
+        if config.use_cachekv_int8 == "static":
+            cache_k_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.cache_k_scale".format(i)) for i in range(self.num_layers)
+            ]
+            cache_v_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.cache_v_scale".format(i)) for i in range(self.num_layers)
+            ]
+            cache_k_out_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.cache_k_out_scale".format(i)) for i in range(self.num_layers)
+            ]
+            cache_v_out_scale_attrs = [
+                paddle.ParamAttr(name="fusemt.{}.cache_v_out_scale".format(i)) for i in range(self.num_layers)
+            ]
+
 
         transformer_config = FusedMultiTransformerConfig(
             self.embed_dim,
@@ -192,6 +294,19 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             ffn2_weight_attrs=ffn2_weight_attrs,
             ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             ffn2_bias_attrs=ffn2_bias_attrs,
+            qkv_out_scale_attrs=qkv_out_scale_attrs,
+            linear_out_scale_attrs=linear_out_scale_attrs,
+            ffn1_out_scale_attrs=ffn1_out_scale_attrs,
+            ffn2_out_scale_attrs=ffn2_out_scale_attrs,
+            linear_shift_attrs=linear_shift_attrs,
+            linear_smooth_attrs=linear_smooth_attrs,
+            ffn2_shift_attrs=ffn2_shift_attrs,
+            ffn2_smooth_attrs=ffn2_smooth_attrs,
+            cache_k_scale_attrs=cache_k_scale_attrs,
+            cache_v_scale_attrs=cache_v_scale_attrs,
+            cache_k_out_scale_attrs=cache_k_out_scale_attrs,
+            cache_v_out_scale_attrs=cache_v_out_scale_attrs,
+            use_dynamic_cachekv_quant=config.use_cachekv_int8 == "dynamic",
         )
 
         self.set_transformer_block(transformer_config)
@@ -206,6 +321,8 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
+        elif self.quant_type == "a8w8":
+            self.transformer_block = FusedMultiTransformerA8W8(transformer_config)
         else:
             self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
@@ -331,6 +448,10 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                         )
                         self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
                         self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
+                    elif self.quant_type == "a8w8":
+                        self.transformer_block.qkv_weights[idx].set_value(
+                            paddle.cast(paddle.to_tensor(qkv_weight_tensor), "int8")
+                        )
                     else:
                         self.transformer_block.qkv_weights[idx].set_value(qkv_weight_tensor)
                 elif k.endswith("self_attention.query_key_value.bias"):
@@ -354,6 +475,15 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                         )
                         self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
                         self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
+                    elif self.quant_type == "a8w8":
+                        self.transformer_block.linear_weights[idx].set_value(
+                            paddle.cast(
+                                linear_weight_tensor.transpose(
+                                    (1, 0)
+                                ),
+                                "int8",
+                            )
+                        )
                     else:
                         self.transformer_block.linear_weights[idx].set_value(linear_weight_tensor)
                 elif k.endswith("self_attention.dense.bias"):
@@ -370,6 +500,10 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                         )
                         self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
                         self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
+                    elif self.quant_type == "a8w8":
+                        self.transformer_block.ffn1_weights[idx].set_value(
+                            paddle.cast(ffn1_weight_tensor.transpose((1, 0)), "int8")
+                        )
                     else:
                         self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight_tensor)
                 elif k.endswith("mlp.dense_h_to_4h.bias"):
@@ -382,6 +516,10 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                         )
                         self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
                         self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
+                    elif self.quant_type == "a8w8":
+                        self.transformer_block.ffn2_weights[idx].set_value(
+                            paddle.cast(ffn2_weight_tensor.transpose((1, 0)), "int8")
+                        )
                     else:
                         self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
 
@@ -389,7 +527,116 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
                     self.transformer_block.ffn2_biases[idx].set_value(paddle.to_tensor(v))
                 else:
                     raise ValueError("Unknow weight {}".format(k))
+        if self.quant_type == "a8w8":
+            import os
+            import json
+            current_work_dir = os.path.dirname(__file__)
+            scale_map_file = (
+                f"{current_work_dir}/ptq_scales_map.json"
+                if not self.shift_smooth_all_linears
+                else f"{current_work_dir}/ptq_scales_map_shift_smooth.json"
+            )
 
+            with open(scale_map_file) as json_file:
+                scale_map_dict = json.load(json_file)
+                act_scale_map_dict = scale_map_dict["act_scale"]
+                weight_scale_map_dict = scale_map_dict["weight_scale"]
+                cache_scale_map_dict = scale_map_dict["cachekv_scale"]
+                # TODO(RichardWooSJTU): support multi-cards
+
+                act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
+                weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
+                if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
+                    act_scale_json_path = os.path.join(
+                        self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
+                    )
+                    weight_scale_json_path = os.path.join(
+                        self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
+                    )
+                act_scale_loader = ActScalesLoader(
+                    act_scale_json_path, act_scale_map_dict, num_of_layers=self.num_layers
+                )
+                self.transformer_block.act_scales = act_scale_loader.scale
+
+                weight_scales_loader = WeightScalesLoader(
+                    weight_scale_json_path,
+                    weight_scale_map_dict,
+                    num_of_layers=self.num_layers,
+                    concat_qkv=False,
+                    concat_ffn1=False,
+                )
+                if self.config.use_cachekv_int8 == "static":
+                    cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_act_scales.json")
+                    if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
+                        cache_scale_json_path = os.path.join(
+                            self.quant_model_path, f"cachekv_act_scales_{self.config.tensor_parallel_rank}.json"
+                        )
+                    cache_scales_loader = CacheScaleLoader(
+                        cache_scale_json_path,
+                        cache_scale_map_dict,
+                        num_of_layers=self.config.num_hidden_layers,
+                        num_heads=self.n_head,
+                    )
+                    for k, v in cache_scales_loader.scale.items():
+                        for i_layer, weight_scale in enumerate(v):
+                            weight_scale = weight_scale.astype("float32")
+                            if k == "cache_k_scale":
+                                self.transformer_block.cache_k_scales[i_layer].set_value(weight_scale)
+                            elif k == "cache_v_scale":
+                                self.transformer_block.cache_v_scales[i_layer].set_value(weight_scale)
+                            elif k == "cache_k_out_scale":
+                                self.transformer_block.cache_k_out_scales[i_layer].set_value(weight_scale)
+                            else:
+                                self.transformer_block.cache_v_out_scales[i_layer].set_value(weight_scale)
+
+                for k, v in weight_scales_loader.scale.items():
+                    if "qkv_" in k:
+                        for i_layer, weight_scale in enumerate(v):
+                            tmp = paddle.to_tensor(
+                                weight_scale
+                                / (
+                                    127.0 * 127.0 * act_scale_loader.scale["qkv_in_scale"][i_layer]
+                                )  # [3 * num_head * dim_head]
+                            ).reshape([-1])
+
+                            if self.config.tensor_parallel_degree > 1 and self.config.single_card_ptq:
+                                tmp = (
+                                    tmp.reshape([3, self.num_attention_heads, head_size])
+                                    .split(self.config.tensor_parallel_degree, axis=1)[
+                                        self.config.tensor_parallel_rank
+                                    ]
+                                    .reshape([-1])
+                                )
+                            self.transformer_block.qkv_out_scales[i_layer].set_value(tmp)
+                        pass
+                    elif "out_linear_" in k:
+                        for i_layer, weight_scale in enumerate(v):
+                            tmp = paddle.to_tensor(
+                                weight_scale / (127.0 * 127.0 * act_scale_loader.scale["out_linear_in_scale"][i_layer])
+                            )
+                            self.transformer_block.linear_out_scales[i_layer].set_value(tmp)
+                    elif "ffn1_weight_scale" in k:
+                        for i_layer, weight_scale in enumerate(v):
+                            tmp = paddle.to_tensor(
+                                weight_scale / (127.0 * 127.0 * act_scale_loader.scale["ffn1_in_scale"][i_layer])
+                            )
+                            if self.config.tensor_parallel_degree > 1 and self.config.single_card_ptq:
+                                tmp = paddle.split(tmp, self.config.tensor_parallel_degree * 2)
+                                tmp = paddle.concat(
+                                    [
+                                        tmp[self.config.tensor_parallel_rank],
+                                        tmp[self.config.tensor_parallel_rank + self.config.tensor_parallel_degree],
+                                    ],
+                                    axis=0,
+                                )
+                            self.transformer_block.ffn1_out_scales[i_layer].set_value(tmp)
+                    elif "ffn2" in k:
+                        for i_layer, weight_scale in enumerate(v):
+                            self.transformer_block.ffn2_out_scales[i_layer].set_value(
+                                paddle.to_tensor(
+                                    weight_scale / (127.0 * 127.0 * act_scale_loader.scale["ffn2_in_scale"][i_layer])
+                                )
+                            )
 
 class BloomLMHead(nn.Layer):
     def __init__(self, config, embedding_weights=None):
@@ -587,6 +834,8 @@ class BloomBlockInferenceModel(BloomModelInferenceModel):
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
+        elif self.quant_type == "a8w8":
+            self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
@@ -696,6 +945,10 @@ class BlommForCausalBlockLMInferenceModel(GenerationBlockInferenceModel, BloomPr
         v_quant_scales = kwargs.get("v_quant_scales", None)
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
         v_dequant_scales = kwargs.get("v_dequant_scales", None)
+        print(k_quant_scales)
+        print(v_quant_scales)
+        print(k_dequant_scales)
+        print(v_dequant_scales)
 
         # only slice a part of src_mask, because of phi::FlashAttnUnpaddedKernel.
         valid_max_encoder_len = paddle.max(seq_lens_encoder)
