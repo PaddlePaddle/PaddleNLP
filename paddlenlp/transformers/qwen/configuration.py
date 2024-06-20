@@ -40,9 +40,6 @@ class QWenConfig(PretrainedConfig):
         use_dynamic_ntk=True,
         use_logn_attn=True,
         intermediate_size=22016,
-        tensor_parallel_output=True,
-        sequence_parallel=False,
-        fuse_sequence_parallel_allreduce=False,
         no_bias=True,
         tie_word_embeddings=False,
         pad_token_id=0,
@@ -73,8 +70,6 @@ class QWenConfig(PretrainedConfig):
         self.use_dynamic_ntk = use_dynamic_ntk
         self.use_logn_attn = use_logn_attn
         self.no_bias = no_bias
-        self.sequence_parallel = sequence_parallel
-        self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
         self.long_sequence_strategy_type = long_sequence_strategy_type
         self.long_sequence_strategy_name = long_sequence_strategy_name
         self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
