@@ -284,17 +284,14 @@ class QWenAttention(nn.Layer):
         mixed_x_layer = self.c_attn(hidden_states)
 
         if self.sequence_parallel:
-            # [bz, sql, hid] ==> [bz, sql, nh, hdim]
-            mixed_x_layer = paddle.reshape_(mixed_x_layer, [-1, self.seq_length, self.num_heads, 3 * self.head_dim])
-            query, key, value = paddle.split(
-                mixed_x_layer, num_or_sections=[self.head_dim, self.head_dim, self.head_dim], axis=-1
-            )
-        else:
-            query, key, value = paddle.split(mixed_x_layer, num_or_sections=3, axis=-1)
-            # [bz, sql, hid] ==> [bz, sql, nh, hdim]
-            query = self._split_heads(query, self.num_heads, self.head_dim)
-            key = self._split_heads(key, self.num_heads, self.head_dim)
-            value = self._split_heads(value, self.num_heads, self.head_dim)
+            target_shape = [-1, self.seq_length, self.num_heads * 3 * self.head_dim]
+            mixed_x_layer = paddle.reshape_(mixed_x_layer, target_shape)
+
+        # [bz, sql, hid] ==> [bz, sql, nh, hdim]
+        query, key, value = paddle.split(mixed_x_layer, num_or_sections=3, axis=-1)
+        query = self._split_heads(query, self.num_heads, self.head_dim)
+        key = self._split_heads(key, self.num_heads, self.head_dim)
+        value = self._split_heads(value, self.num_heads, self.head_dim)
 
         kv_seq_len = key.shape[-3]
         if layer_past:
@@ -616,6 +613,8 @@ class QWenPretrainedModel(PretrainedModel):
 
     def _init_weights(self, module):
         """Initialize the weights."""
+        if self.config.tensor_parallel_degree > 1:
+            rng_tracker = get_rng_state_tracker().rng_state
         if isinstance(
             module,
             (
@@ -625,11 +624,24 @@ class QWenPretrainedModel(PretrainedModel):
                 mpu.RowParallelLinear,
                 mpu.VocabParallelEmbedding,
                 QWenLMHead,
+                linear_utils.ColumnSequenceParallelLinear,
+                linear_utils.RowSequenceParallelLinear,
             ),
         ):
-            module.weight.set_value(
-                paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=module.weight.shape)
-            )
+            if isinstance(module.weight, paddle.Tensor):
+                if module.weight.is_distributed:
+                    with rng_tracker():
+                        module.weight.set_value(
+                            paddle.tensor.normal(
+                                mean=0.0,
+                                std=self.config.initializer_range,
+                                shape=module.weight.shape,
+                            )
+                        )
+            else:
+                module.weight.set_value(
+                    paddle.tensor.normal(mean=0.0, std=self.config.initializer_range, shape=module.weight.shape)
+                )
 
         for name, p in module.named_parameters():
             if name == "c_proj.weight":
