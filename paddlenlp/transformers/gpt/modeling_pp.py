@@ -121,7 +121,7 @@ class GPTEmbeddingPipe(GPTEmbeddings):
 class GPTDecoderLayerPipe(GPTDecoderLayer):
     def forward(self, args):
         hidden_states, attention_mask, position_ids = parse_args(args)
-        if self.enable_recompute and self.config.recompute_granularity == "full":
+        if self.enable_recompute and self.config.recompute_granularity == "full_attn":
             hidden_states = recompute(super().forward, hidden_states, attention_mask)
         else:
             hidden_states = super().forward(hidden_states, attention_mask)

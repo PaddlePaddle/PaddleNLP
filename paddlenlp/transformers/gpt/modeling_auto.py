@@ -419,7 +419,7 @@ class TransformerDecoder(nn.Layer):
             if decoder_layer.ipp is not None and pre_ipp != decoder_layer.ipp:
                 output = dist.reshard(output, get_mesh(decoder_layer.ipp), [dist.Shard(0), dist.Replicate()])
             has_gradient = not output.stop_gradient
-            if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full_attn":
+            if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full":
                 outputs = self.recompute_training(
                     layer_module=decoder_layer,
                     hidden_states=output,

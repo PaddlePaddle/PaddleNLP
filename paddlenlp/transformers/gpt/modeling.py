@@ -517,7 +517,7 @@ class TransformerDecoder(nn.Layer):
         for i, mod in enumerate(self.layers):
             has_gradient = not output.stop_gradient
             # def forward(self, hidden_states, attention_mask=None, use_cache=False, past_key_value=None, output_attentions=False):
-            if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full_attn":
+            if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full":
                 outputs = self.recompute_training(
                     layer_module=mod,
                     hidden_states=output,
