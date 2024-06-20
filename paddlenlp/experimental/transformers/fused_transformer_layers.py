@@ -37,7 +37,7 @@ if not is_paddlenlp_ops_available():
 
 from paddlenlp_ops import rebuild_padding_v2
 
-if core.is_compiled_with_cuda():
+if not core.is_compiled_with_xpu():
     from paddlenlp_ops import (
         dequant_int8,
         encode_rotary_qk,
@@ -1349,7 +1349,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
 class FusedBlockMultiTransformer(FusedMultiTransformerBase):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__(config)
-        if not core.is_compiled_with_cuda():
+        if core.is_compiled_with_xpu():
             self.cache_k_per_batch_maxs = paddle.full(shape=[10, 6], fill_value=0, dtype="float32")
             self.cache_v_per_batch_maxs = paddle.full(shape=[10, 6], fill_value=0, dtype="float32")
 
@@ -1379,7 +1379,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             v_quant_scales = self.cache_v_scales
             k_dequant_scales = self.cache_k_out_scales
             v_dequant_scales = self.cache_v_out_scales
-        if not core.is_compiled_with_cuda():
+        if core.is_compiled_with_xpu():
             fmha_out = paddle.incubate.nn.functional.block_multihead_attention_xpu(
                 qkv_out,
                 caches[2 * i],

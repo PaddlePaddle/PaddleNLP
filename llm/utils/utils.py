@@ -35,6 +35,7 @@ from paddlenlp.transformers import (
     ChatGLMv2Tokenizer,
     LlamaForCausalLMPipe,
     PretrainedConfig,
+    Qwen2ForCausalLMPipe,
 )
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
@@ -67,7 +68,7 @@ def get_prefix_tuning_params(model):
         num_hidden_layers = model.config.num_layers
         hidden_size = model.config.hidden_size
         postprocess_past_key_value = chatglm_postprocess_past_key_value
-        multi_query_group_num = model.config.multi_query_group_num
+        multi_query_group_num = model.config.multi_query_group_num  # num_key_value_heads
     elif model.base_model_prefix == "bloom":
         from paddlenlp.peft.prefix import bloom_postprocess_past_key_value
 
@@ -92,6 +93,14 @@ def get_prefix_tuning_params(model):
         hidden_size = model.config.hidden_size
         postprocess_past_key_value = qwen_postprocess_past_key_value
         multi_query_group_num = None
+    elif model.base_model_prefix == "qwen2":
+        from paddlenlp.peft.prefix import qwen_postprocess_past_key_value
+
+        num_attention_heads = model.config.num_attention_heads
+        num_hidden_layers = model.config.num_hidden_layers
+        hidden_size = model.config.hidden_size
+        postprocess_past_key_value = qwen_postprocess_past_key_value
+        multi_query_group_num = model.config.num_key_value_heads  # num_key_value_heads
     else:
         raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}. ")
     return dict(
@@ -159,6 +168,16 @@ def get_lora_target_modules(model):
             ".*mlp.w1.*",
             ".*mlp.w2.*",
             ".*mlp.c_proj.*",
+        ]
+    elif model.base_model_prefix == "qwen2" or isinstance(model, Qwen2ForCausalLMPipe):
+        target_modules = [
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*o_proj.*",
+            ".*gate_proj.*",
+            ".*down_proj.*",
+            ".*up_proj.*",
         ]
     elif model.base_model_prefix == "mixtral":
         target_modules = [
