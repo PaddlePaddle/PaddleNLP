@@ -105,19 +105,6 @@ class Qwen2Config(PretrainedConfig):
         initializer_range=0.02,
         rms_norm_eps=1e-6,
         use_cache=True,
-        use_recompute=False,
-        recompute_granularity="full",
-        pp_recompute_interval=1,
-        no_recompute_layers=None,
-        fuse_attention_qkv=False,
-        fuse_attention_ffn=False,
-        use_flash_attention=False,
-        use_fused_rms_norm=False,
-        use_fused_rope=False,
-        tensor_parallel_output=True,
-        sequence_parallel=False,
-        fuse_sequence_parallel_allreduce=False,
-        virtual_pp_degree=1,
         tie_word_embeddings=False,
         rope_theta=10000.0,
         pad_token_id=0,
@@ -155,20 +142,6 @@ class Qwen2Config(PretrainedConfig):
         self.attention_dropout = attention_dropout
 
         self.use_cache = use_cache
-        self.use_recompute = use_recompute
-        self.recompute_granularity = recompute_granularity
-        self.no_recompute_layers = no_recompute_layers
-        self.pp_recompute_interval = pp_recompute_interval
-        self.fuse_attention_qkv = fuse_attention_qkv
-        self.use_flash_attention = use_flash_attention
-        self.fuse_attention_ffn = fuse_attention_ffn
-        self.use_fused_rms_norm = use_fused_rms_norm
-        self.tensor_parallel_output = tensor_parallel_output
-        self.sequence_parallel = sequence_parallel
-        self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
-        self.virtual_pp_degree = virtual_pp_degree
-
-        self.use_fused_rope = use_fused_rope
         self.rope_scaling_factor = rope_scaling_factor
         self.rope_scaling_type = rope_scaling_type
 
@@ -177,6 +150,9 @@ class Qwen2Config(PretrainedConfig):
         self.eos_token_id = eos_token_id
 
         super().__init__(
+            pad_token_id=pad_token_id,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
             tie_word_embeddings=tie_word_embeddings,
             **kwargs,
         )

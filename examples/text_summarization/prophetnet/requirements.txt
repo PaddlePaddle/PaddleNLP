@@ -1,5 +1,0 @@
-configparser==5.2.0
-nltk==3.6.7
-numpy==1.21.0
-tqdm==4.62.3
-py-rouge==1.1

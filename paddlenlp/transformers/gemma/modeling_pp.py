@@ -243,7 +243,6 @@ class GemmaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     def __init__(self, config):
         self.config = config
 
-        self.use_recompute = self.config.use_recompute
         self.recompute_granularity = self.config.recompute_granularity
         self.pp_recompute_interval = self.config.pp_recompute_interval
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []

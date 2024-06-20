@@ -61,20 +61,20 @@ PaddleNLP将飞桨4D并行策略加入到Trainer API中， 用户只需修改Tra
 为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
 ```shell
 # llama 模型数据下载
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx
 
 # gpt 模型数据下载
-# wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
-# wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
+# wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt2_openwebtext_100k.bin
+# wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt2_openwebtext_100k.idx
 ```
 
 将所有预处理得到的文件统一放入一个文件夹中，以备训练使用：
 
 ```
 mkdir data
-mv llama_openwebtext_100k_ids.npy ./data
-mv llama_openwebtext_100k_idx.npz ./data
+mv llama_openwebtext_100k.bin ./data
+mv llama_openwebtext_100k.idx ./data
 ```
 
 ```shell
