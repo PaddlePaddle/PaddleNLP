@@ -27,7 +27,7 @@ from paddle.distributed import fleet
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
 
-from paddlenlp.datasets import InTokensIterableDataset
+from paddlenlp.datasets import ZeroPaddingIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
 from paddlenlp.transformers import (
@@ -35,13 +35,13 @@ from paddlenlp.transformers import (
     ChatGLMv2Tokenizer,
     LlamaForCausalLMPipe,
     PretrainedConfig,
+    Qwen2ForCausalLMPipe,
 )
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
 
 def compute_metrics(eval_preds):
-
     flattened_preds = np.array(eval_preds.predictions).flatten()
     flattened_labels = np.array(eval_preds.label_ids).flatten()
     filtered_preds = flattened_preds[flattened_labels != -100]
@@ -68,7 +68,7 @@ def get_prefix_tuning_params(model):
         num_hidden_layers = model.config.num_layers
         hidden_size = model.config.hidden_size
         postprocess_past_key_value = chatglm_postprocess_past_key_value
-        multi_query_group_num = model.config.multi_query_group_num
+        multi_query_group_num = model.config.multi_query_group_num  # num_key_value_heads
     elif model.base_model_prefix == "bloom":
         from paddlenlp.peft.prefix import bloom_postprocess_past_key_value
 
@@ -93,6 +93,14 @@ def get_prefix_tuning_params(model):
         hidden_size = model.config.hidden_size
         postprocess_past_key_value = qwen_postprocess_past_key_value
         multi_query_group_num = None
+    elif model.base_model_prefix == "qwen2":
+        from paddlenlp.peft.prefix import qwen_postprocess_past_key_value
+
+        num_attention_heads = model.config.num_attention_heads
+        num_hidden_layers = model.config.num_hidden_layers
+        hidden_size = model.config.hidden_size
+        postprocess_past_key_value = qwen_postprocess_past_key_value
+        multi_query_group_num = model.config.num_key_value_heads  # num_key_value_heads
     else:
         raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}. ")
     return dict(
@@ -151,22 +159,44 @@ def get_lora_target_modules(model):
             ".*mlp.w2.*",
             ".*mlp.c_proj.*",
         ]
+    elif model.base_model_prefix == "qwen2" or isinstance(model, Qwen2ForCausalLMPipe):
+        target_modules = [
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*o_proj.*",
+            ".*gate_proj.*",
+            ".*down_proj.*",
+            ".*up_proj.*",
+        ]
     elif model.base_model_prefix == "mixtral":
         target_modules = [
             ".*q_proj.*",
             ".*k_proj.*",
             ".*v_proj.*",
             ".*o_proj.*",
+            # ".*gate.*", # TODO(DrownFish19): Does the gate weight require training?
             ".*w1.*",
             ".*w2.*",
             ".*w3.*",
+        ]
+    elif model.base_model_prefix == "qwen2_moe":
+        target_modules = [
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*o_proj.*",
+            # ".*gate.*", # TODO(DrownFish19): Does the gate weight require training?
+            ".*gate_proj.*",
+            ".*up_proj.*",
+            ".*down_proj.*",
         ]
     else:
         raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}.")
     return target_modules
 
 
-class InTokensIterDatasetCallback(TrainerCallback):
+class ZeroPaddingIterDatasetCallback(TrainerCallback):
     """
     A [`TrainerCallback`] that handles early stopping.
 
@@ -174,19 +204,19 @@ class InTokensIterDatasetCallback(TrainerCallback):
 
     def on_step_end(self, args, state, control, **kwargs):
         train_dataloader = kwargs["train_dataloader"]
-        if isinstance(train_dataloader.dataset, InTokensIterableDataset):
+        if isinstance(train_dataloader.dataset, ZeroPaddingIterableDataset):
             dataset = train_dataloader.dataset
         elif isinstance(train_dataloader.dataset, IterableDatasetShard) and isinstance(
-            train_dataloader.dataset.dataset, InTokensIterableDataset
+            train_dataloader.dataset.dataset, ZeroPaddingIterableDataset
         ):
             dataset = train_dataloader.dataset.dataset
         else:
             raise ValueError(
-                "Unexpected dataset format: InTokensIterDatasetCallback expectes `paddlenlp.datasets.InTokensIterableDataset`"
+                "Unexpected dataset format: ZeroPaddingIterDatasetCallback expectes `paddlenlp.datasets.ZeroPaddingIterableDataset`"
             )
         if state.trial_params is None:
             state.trial_params = {}
-        state.trial_params["intokens_global_step"] = dataset.intokens_global_step
+        state.trial_params["zero_padding_global_step"] = dataset.zero_padding_global_step
 
 
 class CausalLMTrainer(Trainer):

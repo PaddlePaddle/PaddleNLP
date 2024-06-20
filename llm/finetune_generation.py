@@ -29,7 +29,7 @@ from argument import (
 from data import get_convert_example
 from utils import (
     CausalLMTrainer,
-    InTokensIterDatasetCallback,
+    ZeroPaddingIterDatasetCallback,
     compute_metrics,
     get_lora_target_modules,
     get_prefix_tuning_params,
@@ -37,7 +37,11 @@ from utils import (
 )
 
 from paddlenlp.data import DataCollatorForSeq2Seq
-from paddlenlp.datasets import InTokensIterableDataset, InTokensMapDataset, load_dataset
+from paddlenlp.datasets import (
+    ZeroPaddingIterableDataset,
+    ZeroPaddingMapDataset,
+    load_dataset,
+)
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
@@ -45,10 +49,12 @@ from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
+    AutoModelForCausalLMPipe,
     AutoTokenizer,
     Llama3Tokenizer,
     LlamaTokenizer,
 )
+from paddlenlp.transformers.configuration_utils import LlmMetaConfig, llmmetaclass
 from paddlenlp.utils.log import logger
 
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
@@ -64,6 +70,7 @@ def add_start_docstrings(*docstr):
 
 
 @dataclass
+@llmmetaclass
 @add_start_docstrings(TrainingArguments.__doc__)
 class FinetuneArguments(TrainingArguments):
     decay_steps: int = field(
@@ -142,65 +149,45 @@ def main():
 
     model_config = AutoConfig.from_pretrained(
         model_args.model_name_or_path,
-        tensor_parallel_output=training_args.tensor_parallel_output,
-        tensor_parallel_degree=training_args.tensor_parallel_degree,
-        tensor_parallel_rank=training_args.tensor_parallel_rank,
         dtype=dtype,
         from_aistudio=model_args.from_aistudio,
         quantization_config=quantization_config,
     )
-    if hasattr(model_config, "use_flash_attention"):
-        model_config.use_flash_attention = model_args.use_flash_attention
 
-    model_config.use_fused_rms_norm = model_args.use_fused_rms_norm
-    model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
-    model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
-    model_config.recompute_granularity = model_args.recompute_granularity
-    model_config.virtual_pp_degree = model_args.virtual_pp_degree
-    model_config.sequence_parallel = model_args.sequence_parallel
-    model_config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
-    model_config.use_fused_rope = model_args.use_fused_rope
-
-    model_config.no_recompute_layers = model_args.no_recompute_layers
-    model_config.pp_recompute_interval = model_args.pp_recompute_interval
-    model_config.recompute_use_reentrant = model_args.recompute_use_reentrant
-    model_config.use_recompute = training_args.recompute
-
-    model_config.tensor_parallel_degree = training_args.tensor_parallel_degree
-    model_config.tensor_parallel_rank = training_args.tensor_parallel_rank
+    LlmMetaConfig.set_llm_config(model_config, training_args)
 
     # Config for model using dropout, such as GPT.
-    model_config.hidden_dropout_prob = model_args.hidden_dropout_prob
-    model_config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
+    if hasattr(model_config, "hidden_dropout_prob"):
+        model_config.hidden_dropout_prob = model_args.hidden_dropout_prob
+    if hasattr(model_config, "attention_probs_dropout_prob"):
+        model_config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
 
-    model_config.sep_parallel_degree = training_args.sep_parallel_degree
-    model_config.tensor_parallel_output = training_args.tensor_parallel_output
+    if model_args.fuse_attention_qkv is not None:
+        model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
+    if model_args.fuse_attention_ffn is not None:
+        model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
+
     model_config.seq_length = data_args.max_length
 
+    print("Final model config:", model_config)
+
+    model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
             raise ValueError("Plese set eval_with_do_generation to false in pipeline parallel mode.")
-        from paddlenlp.transformers import AutoModelForCausalLMPipe
 
-        if not training_args.autotuner_benchmark:
-            model = AutoModelForCausalLMPipe.from_pretrained(
-                model_args.model_name_or_path,
-                config=model_config,
-                from_aistudio=model_args.from_aistudio,
-            )
-        else:
-            # NOTE(gongenlei): new add autotuner_benchmark
-            model = AutoModelForCausalLMPipe.from_config(model_config, dtype=dtype)
+        model_class = AutoModelForCausalLMPipe
+
+    if model_args.continue_training and not training_args.autotuner_benchmark:
+        model = model_class.from_pretrained(
+            model_args.model_name_or_path,
+            config=model_config,
+            from_aistudio=model_args.from_aistudio,
+        )
     else:
-        if not training_args.autotuner_benchmark:
-            model = AutoModelForCausalLM.from_pretrained(
-                model_args.model_name_or_path,
-                config=model_config,
-                from_aistudio=model_args.from_aistudio,
-            )
-        else:
-            # NOTE(gongenlei): new add autotuner_benchmark
-            model = AutoModelForCausalLM.from_config(model_config, dtype=dtype)
+        # NOTE(gongenlei): new add autotuner_benchmark
+        model = model_class.from_config(model_config, dtype=dtype)
+
     if training_args.do_train and model_args.neftune:
         # Inspired by https://github.com/neelsjain/NEFTune
         if hasattr(model, "get_input_embeddings"):
@@ -340,8 +327,8 @@ def main():
         )
         training_args.ignore_data_skip = True
         state = TrainerState.load_from_json(os.path.join(training_args.resume_from_checkpoint, "trainer_state.json"))
-        if state.trial_params is not None and "intokens_global_step" in state.trial_params:
-            consumed_samples = state.trial_params["intokens_global_step"]
+        if state.trial_params is not None and "zero_padding_global_step" in state.trial_params:
+            consumed_samples = state.trial_params["zero_padding_global_step"]
         else:
             consumed_samples = (
                 state.global_step
@@ -370,29 +357,31 @@ def main():
                 "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM and QWen so far."
             )
     train_ds = (
-        train_ds.map(partial(trans_func, is_test=False, intokens=data_args.zero_padding))
+        train_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding))
         if train_ds is not None
         else None
     )
     ptq_ds = (
-        ptq_ds.map(partial(trans_func, is_test=False, intokens=data_args.zero_padding)) if ptq_ds is not None else None
+        ptq_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding))
+        if ptq_ds is not None
+        else None
     )
-    eval_intokens = data_args.zero_padding
+    eval_zero_padding = data_args.zero_padding
     if data_args.zero_padding and data_args.eval_with_do_generation:
         logger.warning(
             "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
         )
-        eval_intokens = False
+        eval_zero_padding = False
     dev_ds = (
-        dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, intokens=eval_intokens))
+        dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, zero_padding=eval_zero_padding))
         if dev_ds is not None
         else None
     )
     if data_args.zero_padding:
         if data_args.lazy:
-            intoken_dataset = InTokensIterableDataset
+            intoken_dataset = ZeroPaddingIterableDataset
         else:
-            intoken_dataset = InTokensMapDataset
+            intoken_dataset = ZeroPaddingMapDataset
         logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
         train_ds = (
             intoken_dataset(
@@ -413,7 +402,7 @@ def main():
             else None
         )
 
-        if eval_intokens:
+        if eval_zero_padding:
             dev_ds = (
                 intoken_dataset(
                     dev_ds,
@@ -540,7 +529,7 @@ def main():
             pad_to_multiple_of=data_args.pad_to_multiple_of,
         ),
         do_generation=data_args.eval_with_do_generation,
-        callbacks=[InTokensIterDatasetCallback()] if isinstance(train_ds, InTokensIterableDataset) else None,
+        callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
         gen_args=gen_args,
         data_args=data_args,
     )
@@ -666,7 +655,7 @@ def main():
         )[0]
 
         test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
-        if eval_intokens:
+        if eval_zero_padding:
             test_ds = intoken_dataset(
                 test_ds,
                 tokenizer=tokenizer,

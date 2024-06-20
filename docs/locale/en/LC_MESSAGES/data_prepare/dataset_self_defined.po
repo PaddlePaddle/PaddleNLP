@@ -37,13 +37,6 @@ msgid ""
 "中创建数据集。"
 msgstr ""
 
-#: ../data_prepare/dataset_self_defined.rst:12
-msgid ""
-"以 `waybill_ie "
-"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/waybill_ie>`__"
-" 快递单信息抽取任务中的数据为例："
-msgstr ""
-
 #: ../data_prepare/dataset_self_defined.rst:32
 msgid ""
 "我们推荐将数据读取代码写成生成器(generator)的形式，这样可以更好的构建 :class:`MapDataset` 和 "

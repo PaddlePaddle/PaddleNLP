@@ -25,11 +25,15 @@ pretrain:
     qwen:
       model_name_or_path: __internal_testing__/tiny-fused-qwen
     gpt:
-      model_name_or_path: __internal_testing__/gpt 
+      model_name_or_path: __internal_testing__/gpt
+    qwen2:
+      model_name_or_path: __internal_testing__/tiny-random-qwen2
+    qwen2moe:
+      model_name_or_path: __internal_testing__/tiny-random-qwen2moe
 
 inference-predict:
   default:
-    mode: dynamic 
+    mode: dynamic
     max_length: 20
     batch_size: 2
     decode_strategy: greedy_search

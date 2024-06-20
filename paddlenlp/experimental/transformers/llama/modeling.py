@@ -22,11 +22,6 @@ import paddle
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
-from paddlenlp_ops import (
-    fused_get_rotary_embedding,
-    get_padding_offset,
-    get_padding_offset_v2,
-)
 
 from paddlenlp.experimental.model_utils import (
     ActScalesLoader,
@@ -127,7 +122,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.quant_type
             )
 
-        if config.tensor_parallel_degree > 1:
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
                 self.vocab_size,
                 self.hidden_size,
@@ -350,6 +345,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
+        from paddlenlp_ops import get_padding_offset
+
         ids_remove_padding, cum_offsets, padding_offset = get_padding_offset(
             input_ids, cum_offsets_now, token_num, seq_lens_this_time
         )
@@ -436,6 +433,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         theta = 10000.0
         if not is_decoder and pre_caches is not None:
             position_offset = 128
+        from paddlenlp_ops import fused_get_rotary_embedding
+
         new_rope = fused_get_rotary_embedding(
             input_ids, position_ids, self.head_dim_shape_tensor, position_offset, theta, True
         )
@@ -495,7 +494,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         num_key_value_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
                     ),
                     axis=-1,
-                )
+                ).transpose(1, 0)
             else:
                 unfused_state_dict = {}
                 unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
@@ -523,7 +522,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     )
                 )  # reshape(3, self.num_attention_heself.hidden_sizeads // self.config.tensor_parallel_degree, head_size, )
             if "llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx) in state_dict.keys():
-                ffn1_weight_tensor = np.concatenate(
+                concated_ffn1_weight = np.concatenate(
                     split_fn(state_dict["llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx)]), axis=-1
                 )
             else:
@@ -827,6 +826,8 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
+        from paddlenlp_ops import get_padding_offset_v2
+
         ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
             input_ids, cum_offsets_now, token_num, seq_lens_this_time
         )

@@ -17,17 +17,6 @@ from typing import List, Union
 
 import paddle
 import paddle.nn.functional as F
-from paddlenlp_ops import (
-    get_token_penalty_multi_scores,
-    get_token_penalty_multi_scores_v2,
-    save_output,
-    save_with_output,
-    set_stop_value_multi_ends,
-    set_stop_value_multi_ends_v2,
-    set_value_by_flags_and_idx,
-    set_value_by_flags_and_idx_v2,
-    update_inputs,
-)
 
 from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
 
@@ -208,6 +197,8 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["stop_flags"] = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
         if cache is None:
             next_tokens = paddle.where(just_decoder, paddle.full_like(next_tokens, -1), next_tokens)
+        from paddlenlp_ops import set_stop_value_multi_ends
+
         next_tokens, model_kwargs["stop_flags"] = set_stop_value_multi_ends(
             next_tokens, model_kwargs["stop_flags"], eos_token_id, 2
         )  # multi ends
@@ -305,6 +296,8 @@ class GenerationInferenceModel(GenerationMixin):
                 )  # not update when continue decode
             else:
                 step_idx = model_kwargs["step_idx"]
+            from paddlenlp_ops import set_value_by_flags_and_idx
+
             model_kwargs["stop_flags"] = set_value_by_flags_and_idx(
                 model_kwargs["pre_ids"],
                 model_kwargs["tgt_ids"],
@@ -316,6 +309,8 @@ class GenerationInferenceModel(GenerationMixin):
             logits = paddle.cast(logits, paddle.float32)
             logits = logits_processors(model_kwargs["all_input_ids"], logits, decoding_step=step_idx_ori)
 
+            from paddlenlp_ops import get_token_penalty_multi_scores
+
             logits = get_token_penalty_multi_scores(
                 model_kwargs["pre_ids"],
                 logits,
@@ -326,12 +321,12 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs["min_dec_len"],
                 eos_token_id,
             )
+            logits = logits / temperature
+
             # sample
             probs = F.softmax(logits)
 
             # compute next_tokens, use paddle.tensor.top_p_sampling
-            logits = logits / temperature
-
             _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
@@ -346,6 +341,8 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs["all_input_ids"] = next_tokens
             else:
                 model_kwargs["all_input_ids"] = paddle.concat([model_kwargs["all_input_ids"], next_tokens], axis=1)
+
+            from paddlenlp_ops import save_with_output
 
             save_with_output(
                 next_tokens,
@@ -635,6 +632,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
             model_kwargs,
         ):
             step_idx = model_kwargs["step_idx"]
+            from paddlenlp_ops import set_value_by_flags_and_idx_v2
+
             set_value_by_flags_and_idx_v2(
                 model_kwargs["pre_ids"],
                 model_kwargs["input_ids"],
@@ -648,6 +647,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
             logits = paddle.cast(outputs, paddle.float32)
 
             # pre-process distribution
+            from paddlenlp_ops import get_token_penalty_multi_scores_v2
+
             logits = get_token_penalty_multi_scores_v2(
                 model_kwargs["pre_ids"],
                 logits,
@@ -673,11 +674,15 @@ class GenerationBlockInferenceModel(GenerationMixin):
             paddle.assign(step_idx, model_kwargs["step_idx"])
             length_cond = paddle.greater_equal(step_idx, model_kwargs["max_dec_len"])
             stop_flags = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
+            from paddlenlp_ops import set_stop_value_multi_ends_v2
+
             set_stop_value_multi_ends_v2(
                 next_tokens, stop_flags, model_kwargs["seq_lens_this_time"], eos_token_id, model_kwargs["next_tokens"]
             )  # multi ends
             paddle.assign(stop_flags, model_kwargs["stop_flags"])
             # update inputs
+            from paddlenlp_ops import update_inputs
+
             update_inputs(
                 stop_flags,
                 model_kwargs["not_need_stop"],
@@ -689,6 +694,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 next_tokens,
                 model_kwargs["is_block_step"],
             )
+            from paddlenlp_ops import save_output
+
             save_output(next_tokens, model_kwargs["not_need_stop"], self.config.tensor_parallel_rank)
             return next_tokens
 
