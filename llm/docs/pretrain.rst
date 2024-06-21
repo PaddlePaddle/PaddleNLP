@@ -68,10 +68,10 @@ git clone 代码到本地，即可开始。
     cd ../model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 
     # llama 模型预训练
-    python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./llama/pretrain-llama2_7b-tp2sd4_stage2.json
+    python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json
 
     # Qwen 模型预训练
-    python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./qwen/pretrain_argument_stage2.json
+    python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./config/qwen/pretrain_argument.json
 
 
 注意：
