@@ -58,19 +58,19 @@ git clone 代码到本地，即可开始。
 ### 2.3 PTQ 量化
 
 ```
-python  finetune_generation.py ./llama/ptq_argument.json
+python  run_finetune.py ./config/llama/ptq_argument.json
 ```
 
 ### 2.4 GPTQ 量化
 
 ```
-python  finetune_generation.py ./llama/gptq_argument.json
+python  run_finetune.py ./config/llama/gptq_argument.json
 ```
 
 ### 2.5 AWQ 量化
 
 ```
-python  finetune_generation.py ./llama/awq_argument.json
+python  run_finetune.py ./config/llama/awq_argument.json
 ```
 
 ### 2.6 量化参数介绍
