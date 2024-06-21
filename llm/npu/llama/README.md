@@ -86,7 +86,7 @@ python -m pip install -e .
 # PaddleNLP仓库内置了部分昇腾专用的融合算子，以便用户享受到极致压缩的推理成本
 cd csrc/npu
 python setup.py build bdist_wheel
-pip install dist/paddlenlp_ops-0.0.0-cp39-cp39-linux_aarch64.whl
+pip install dist/paddlenlp_ops-0.0.0-cp39-cp39-linux_x86_64.whl
 cd -
 ```
 
@@ -94,7 +94,7 @@ cd -
 sft为精调策略，我们提供了广告生成数据集demo便于您调试使用
 ```
 #精调：为了方便测试，我们也提供了广告生成数据集可以直接使用：
-cd llm/llama/npu
+cd llm/npu/llama
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
 tar -zxvf AdvertiseGen.tar.gz
 ```
@@ -145,8 +145,7 @@ bash llama_npu_sft_N1C8.sh
 ```
 为了保障极致压缩的推理成本，我们使用了静态图实现。因此需要从训练产出的动态图模型中导出静态图模型，执行如下命令进行导出：
 ```
-cd ../..
-bash export_npu.sh ./llama/npu/output/sft_bf16_llama_N1C8/ ./inference
+bash export_npu.sh ./output/sft_bf16_llama_N1C8/ ./inference
 ```
 最终，我们通过静态图的模型执行推理：
 ```

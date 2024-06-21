@@ -14,11 +14,16 @@
 
 set -x
 
-src_path=${1:-"./llama/npu/output/sft_bf16_llama_N1C8/"}
+src_path=${1:-".npu/llama/output/sft_bf16_llama_N1C8/"}
 dst_path=${2:-"./inference"}
 
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/atb/set_env.sh
 
+src_path=`realpath $src_path`
+dst_path=`realpath $dst_path`
+cd ../../
+
 export PYTHONPATH=../:$PYTHONPATH
-python export_model.py --model_name_or_path ${src_path}  --inference_model --output_path ${dst_path} --dtype float16  --device npu  --block_attn
+python predict/export_model.py --model_name_or_path ${src_path}  --inference_model --output_path ${dst_path} --dtype float16  --device npu  --block_attn
+cd -

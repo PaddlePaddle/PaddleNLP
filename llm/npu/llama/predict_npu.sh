@@ -18,6 +18,8 @@ model_path=${1:-"./inference"}
 
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 source /usr/local/Ascend/atb/set_env.sh
-
+model_path=`realpath $model_path`
+cd ../../
 export PYTHONPATH=../:$PYTHONPATH
-python predictor.py  --model_name_or_path ${model_path} --inference_model --dtype "float16" --mode "static" --block_attn --device npu
+python predict/predictor.py  --model_name_or_path ${model_path} --inference_model --dtype "float16" --mode "static" --block_attn --device npu
+cd -

@@ -101,7 +101,7 @@ def main():
     validate_pdmodel(export_args.output_path, predictor_args.model_prefix, predictor_args.device)
 
     if predictor_args.device == "npu":
-        from llama.npu.export_utils import process_params
+        from npu.llama.export_utils import process_params
 
         process_params(os.path.join(export_args.output_path, predictor_args.model_prefix))
 
