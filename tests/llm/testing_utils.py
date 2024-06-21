@@ -68,7 +68,7 @@ class LLMTest:
         predict_config.update(config_params)
 
         with argv_context_guard(predict_config):
-            from predictor import predict
+            from predict.predictor import predict
 
             predict()
 
@@ -83,7 +83,7 @@ class LLMTest:
         config["model_name_or_path"] = self.output_dir
         config.update(config_params)
         with argv_context_guard(config):
-            from export_model import main
+            from predict.export_model import main
 
             main()
 
@@ -96,7 +96,7 @@ class LLMTest:
         config_params.pop("model_name_or_path", None)
         config.update(config_params)
         with argv_context_guard(config):
-            from predictor import predict
+            from predict.predictor import predict
 
             predict()
 

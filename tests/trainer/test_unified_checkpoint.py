@@ -194,7 +194,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
         self.need_allclose = True
         self.rtol = 1e-7
 
-        self.run_pretrain_file = "llm/llama/run_pretrain.py"
+        self.run_pretrain_file = "llm/run_pretrain.py"
 
     def runfirst(self, train_args):
         self.run_n1c8(self.run_pretrain_file, **train_args)
