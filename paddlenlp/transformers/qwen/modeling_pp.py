@@ -76,6 +76,7 @@ class QWenEmbeddingPipe(nn.Layer):
     def __init__(self, config):
         super(QWenEmbeddingPipe, self).__init__()
         self.hidden_size = config.hidden_size
+        self.sequence_parallel = config.sequence_parallel
         if config.tensor_parallel_degree > 1:
             self.wte = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
@@ -96,6 +97,14 @@ class QWenEmbeddingPipe(nn.Layer):
         """
         input_ids, attention_mask, position_ids = parse_args(args)
         input_embeds = self.wte(input_ids)
+        if self.sequence_parallel:
+            from paddlenlp.transformers import ScatterOp
+
+            # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
+            bs, seq_len, hidden_size = input_embeds.shape
+            input_embeds = paddle.reshape_(input_embeds, [bs * seq_len, hidden_size])
+            # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
+            input_embeds = ScatterOp.apply(input_embeds)
 
         batch_size, seq_length = input_ids.shape
         if attention_mask is not None:

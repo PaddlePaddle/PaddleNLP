@@ -85,6 +85,14 @@ class PreTrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
     )
+    unified_checkpoint: bool = field(
+        default=False,
+        metadata={"help": "Enable fused linear grad add strategy."},
+    )
+    unified_checkpoint_config: Optional[str] = field(
+        default="",
+        metadata={"help": "Configs to unify hybrid parallel checkpoint.\n"},
+    )
 
     def __post_init__(self):
         super().__post_init__()
@@ -360,7 +368,7 @@ def main():
         training_args.no_recompute_layers.sort()
 
     if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
+        from utils.fused_layers import mock_layers
 
         mock_layers()
 
@@ -473,7 +481,7 @@ def main():
         model_class = AutoModelForCausalLMPipe
         if "LLama" in str(config.architectures):
             try:
-                from register_reshard import register_pp_reshard_information
+                from utils.register_reshard import register_pp_reshard_information
 
                 register_pp_reshard_information(config.num_hidden_layers)
             except:
