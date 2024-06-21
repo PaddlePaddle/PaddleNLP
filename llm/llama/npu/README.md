@@ -65,12 +65,12 @@ docker run -it --name paddle-npu-dev -v $(pwd):/work \
 3. 安装paddle
 ```
 # paddlepaddle『飞桨』深度学习框架，提供运算基础能力
-pip install paddlepaddle==0.0.0 -f https://www.paddlepaddle.org.cn/whl/linux/cpu-mkl/develop.html
+python -m pip install paddlepaddle==3.0.0b0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
 ```
 4. 安装paddleCustomDevice
 ```
 # paddleCustomDevice是paddlepaddle『飞桨』深度学习框架的自定义硬件接入实现，提供NPU的算子实现。
-python -m pip install paddle-custom-npu -i https://www.paddlepaddle.org.cn/packages/nightly/npu/
+python -m pip install paddle-custom-npu==3.0.0b0 -i https://www.paddlepaddle.org.cn/packages/stable/npu/
 # 如想源码编译安装，请参考https://github.com/PaddlePaddle/PaddleCustomDevice/blob/develop/backends/npu/README_cn.md
 ```
 5. 克隆PaddleNLP仓库代码，并安装依赖
@@ -87,6 +87,7 @@ python -m pip install -e .
 cd csrc/npu
 python setup.py build bdist_wheel
 pip install dist/paddlenlp_ops-0.0.0-cp39-cp39-linux_aarch64.whl
+cd -
 ```
 
 ### （2）数据准备：(这将花费您2～5min时间)
@@ -110,12 +111,8 @@ tar -zxvf AdvertiseGen.tar.gz
 ### （3）训练：(这将花费您约4小时的时间)
 我们在本目录中提供了对应Pretrain/SFT/LoRA的三个入口脚本，并已经按照8张910芯片的训练资源优化了并行策略等配置供您参考。启动微调训练的详细步骤如下：
 ```
-cd llm/llama/npu
 # 运行sft策略
 bash llama_npu_sft_N1C8.sh
-
-# 由于当前的昇腾动转静模块暂不支持safetensors的格式，需要手动merge参数，否则会影响推理的checkpoint转化
-python merge_param.py --param_path ./output/sft_bf16_llama_N1C8
 ```
 ### （4）推理：(这将花费您10~15min时间)
 推理前需要准备推理用的配置文件，在merge好参数的路径下(本教程下路径为：`./output/sft_bf16_llama_N1C8`)将`config.json`更改为下面的内容：
@@ -148,12 +145,13 @@ python merge_param.py --param_path ./output/sft_bf16_llama_N1C8
 ```
 为了保障极致压缩的推理成本，我们使用了静态图实现。因此需要从训练产出的动态图模型中导出静态图模型，执行如下命令进行导出：
 ```
-python export_model.py --model_name_or_path merged_model  --inference_model --output_path ./inference --dtype float16  --device npu  --block_attn
+cd ../..
+bash export_npu.sh ./llama/npu/output/sft_bf16_llama_N1C8/ ./inference
 ```
 最终，我们通过静态图的模型执行推理：
 ```
 # 执行推理代码
-python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn --device npu
+bash predict_npu.sh ./inference
 ```
 成功运行后，可以查看到推理结果的生成，样例如下：
 ```
