@@ -18,9 +18,10 @@ python -m pip install -r ../requirements-dev.txt
 # install fused_ln custom ops
 cd ../legacy/model_zoo/gpt-3/external_ops/
 python setup.py install
+cd -
 
 # install tool_helpers
-cd ../../../../llm/llama
+cd ../llm
 python -m pip install tool_helpers
 
 rm -rf data && mkdir data
@@ -32,7 +33,7 @@ mv llama_openwebtext_100k.idx ./data
 
 # mv autoconfig
 rm -rf autoconfig
-cp -r ../../tests/test_tipc/auto_tuner/autoconfig ./
+cp -r ../tests/test_tipc/auto_tuner/autoconfig ./
 
 if [ -z "$1" ]; then  
   echo "单机任务"

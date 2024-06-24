@@ -18,9 +18,10 @@ python -m pip install -r ../requirements-dev.txt
 # install fused_ln custom ops
 cd ../legacy/model_zoo/gpt-3/external_ops/
 python setup.py install
+cd -
 
 # install tool_helpers
-cd ../../../../llm/llama
+cd ../llm/
 python -m pip install tool_helpers
 
 # download data
@@ -48,4 +49,4 @@ fi
 
 # mv autoconfig
 rm -rf auto_config_*
-cp -r ../../tests/test_tipc/dygraph/hybrid_parallelism/llama2/auto_config_* ./
+cp -r ../tests/test_tipc/dygraph/hybrid_parallelism/llama2/auto_config_* ./
