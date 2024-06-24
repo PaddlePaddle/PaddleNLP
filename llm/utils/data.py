@@ -173,11 +173,12 @@ def tokenize_rounds_example(tokenizer, example, data_args, **kwargs):
     return tokenized_source, labels
 
 
-def convert_example_common(example, tokenizer, data_args, is_test=True, zero_padding=False):
+def convert_example_common(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False):
     if tokenizer.chat_template is not None:
-        return convert_rounds_example_common(example, tokenizer, data_args, is_test, zero_padding)
+        return convert_rounds_example_common(example, tokenizer, data_args, is_test, zero_padding, flash_mask)
 
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
+
     if is_test:
         return {
             **tokenized_source,
@@ -194,12 +195,17 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, zero_pad
         if "position_ids" in tokenized_source:
             features["position_ids"] = list(range(seq_length))
         if zero_padding:
-            features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
+            if flash_mask:
+                features["attn_mask_startend_row_indices"] = (
+                    [seq_length] * seq_length
+                )
+            else:
+                features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
 
         return features
 
 
-def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, zero_padding=False):
+def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False):
     """convert multi-rounds conversation example
 
     Args:
@@ -227,7 +233,13 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, z
     seq_length = len(input_ids)
     features = {"input_ids": input_ids, "labels": labels}
     if zero_padding:
-        features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
+        if flash_mask:
+            features["attn_mask_startend_row_indices"] = (
+                [seq_length] * seq_length
+            )
+        else:
+            features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
+
 
     if "position_ids" in rounds_inputs:
         rounds_inputs["position_ids"] = rounds_inputs["position_ids"][:-1]

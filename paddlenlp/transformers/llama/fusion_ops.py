@@ -211,6 +211,10 @@ def fusion_flash_attention(
             else:
                 if attn_mask_startend_row_indices is not None:
                     assert alibi is None, "flash_attention_with_sparse_mask not support alibi"
+                    if len(attn_mask_startend_row_indices.shape) == 2:
+                        attn_mask_startend_row_indices = paddle.expand(
+                            paddle.unsqueeze(attn_mask_startend_row_indices, axis=1), shape=[-1, num_heads, -1]
+                        )
                     attn_output = F.flash_attention_with_sparse_mask(
                         query_states,
                         key_states,

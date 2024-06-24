@@ -370,6 +370,11 @@ class DataCollatorForSeq2Seq:
         if return_tensors is None:
             return_tensors = self.return_tensors
         labels = [feature["labels"] for feature in batch] if "labels" in batch[0].keys() else None
+        use_attn_mask_startend_row_indices = (
+            [feature["attn_mask_startend_row_indices"] for feature in batch]
+            if "attn_mask_startend_row_indices" in batch[0].keys()
+            else None
+        )
         # We have to pad the labels before calling `tokenizer.pad` as this method won't pad them and needs them of the
         # same length to return tensors.
         if labels is not None:
@@ -396,6 +401,24 @@ class DataCollatorForSeq2Seq:
                     feature["labels"] = np.concatenate([feature["labels"], remainder]).astype(np.int64)
                 else:
                     feature["labels"] = np.concatenate([remainder, feature["labels"]]).astype(np.int64)
+        if use_attn_mask_startend_row_indices is not None:
+            max_length = max(len(l) for l in use_attn_mask_startend_row_indices)
+            if self.pad_to_multiple_of is not None:
+                max_length = (
+                    (max_length + self.pad_to_multiple_of - 1) // self.pad_to_multiple_of * self.pad_to_multiple_of
+                )
+
+            padding_side = self.tokenizer.padding_side
+            for feature in batch:
+                remainder = [feature["attn_mask_startend_row_indices"][-1]] * (
+                    max_length - len(feature["attn_mask_startend_row_indices"])
+                )
+                if isinstance(feature["attn_mask_startend_row_indices"], list):
+                    feature["attn_mask_startend_row_indices"] = (
+                        feature["attn_mask_startend_row_indices"] + remainder
+                        if padding_side == "right"
+                        else remainder + feature["attn_mask_startend_row_indices"]
+                    )
 
         batch = self.tokenizer.pad(
             batch,
