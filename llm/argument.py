@@ -12,12 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import List, Optional
 
 from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import IntervalStrategy
 from paddlenlp.utils.log import logger
 
+from enum import Enum
+
+class QuantType(Enum):
+    WINT8AINT8 = 0
+    WEIGHT_ONLY_INT4 = 1
+    WEIGHT_ONLY_INT8 = 2
+    WFP8AFP8 = 3
 
 @dataclass
 class TrainingArguments(TrainingArguments):
@@ -105,16 +112,29 @@ class ModelArgument:
     model_name_or_path: str = field(
         default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
     )
+    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
+    use_fused_rms_norm: bool = field(
+        default=False,
+        metadata={"help": "llama or other model, use_fused_rms_norm"},
+    )
     fuse_attention_qkv: bool = field(
-        default=None,
+        default=False,
         metadata={"help": "whether to fuse attention qkv"},
     )
     fuse_attention_ffn: bool = field(
-        default=None,
+        default=False,
         metadata={"help": "whether to fuse first up and gate proj in mlp block"},
+    )
+    recompute_granularity: str = field(
+        default="full",
+        metadata={"help": "Choose among ['full', 'core_attn', 'full_attn']"},
+    )
+    virtual_pp_degree: int = field(
+        default=1,
+        metadata={"help": "virtual_pp_degree"},
     )
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
@@ -124,6 +144,32 @@ class ModelArgument:
         metadata={
             "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
         },
+    )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "whether to use sequence parallel"},
+    )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False,
+        metadata={"help": "whether to use fuse sequence parallel allreduce"},
+    )
+    use_fused_rope: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable rope fusion or not."},
+    )
+    no_recompute_layers: Optional[List[int]] = field(
+        default=None,
+        metadata={"help": "Specify the full transformer layers that should not be recomputed."},
+    )
+    pp_recompute_interval: int = field(
+        default=1,
+        metadata={
+            "help": "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0."
+        },
+    )
+    recompute_use_reentrant: bool = field(
+        default=False,
+        metadata={"help": "recompute_use_reentrant"},
     )
     weight_quantize_algo: str = field(
         default=None,
@@ -177,8 +223,8 @@ class ModelArgument:
 @dataclass
 class QuantArgument:
     quant_type: str = field(
-        default="a8w8(int)",
-        metadata={"help": "Quantization type. Supported values: a8w8(int), a8w8(fp) weight_only_int4, weight_only_int8"},
+        default=QuantType.WFP8AFP8,
+        metadata={"help": "Quantization type. Supported values: WINT8AINT8, WEIGHT_ONLY_INT4, WEIGHT_ONLY_INT8, WFP8AFP8"},
     )
 
     # QAT related parameters
