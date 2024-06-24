@@ -24,3 +24,4 @@ tool_helpers ; platform_system == "Linux"
 aistudio-sdk>=0.1.3
 jinja2
 regex
+numpy==1.26.4

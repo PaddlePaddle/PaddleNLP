@@ -46,7 +46,7 @@ class UITest(unittest.TestCase):
         self.model_path = "__internal_testing__/micro-random-llama"
         command = (
             "cd ./llm && PYTHONPATH=../:$PYTHONPATH"
-            + ' {python} flask_server.py --model_name_or_path {model_path} --port {port} --flask_port {flask_port} --src_length 1024 --dtype "float16"'.format(
+            + ' {python} predict/flask_server.py --model_name_or_path {model_path} --port {port} --flask_port {flask_port} --src_length 1024 --dtype "float16"'.format(
                 flask_port=self.flask_port, port=self.port, model_path=self.model_path, python=sys.executable
             )
         )

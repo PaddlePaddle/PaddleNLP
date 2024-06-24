@@ -81,20 +81,20 @@ function _train(){
     case ${device_num} in
     N1C1) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0 \
-            --auto_tuner_json ${autoconfig_json_file} finetune_generation.py ${modle_json_file}"
+            --auto_tuner_json ${autoconfig_json_file} run_finetune.py ${modle_json_file}"
         ;;
     N1C8) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
-            --auto_tuner_json ${autoconfig_json_file} finetune_generation.py ${modle_json_file}"
+            --auto_tuner_json ${autoconfig_json_file} run_finetune.py ${modle_json_file}"
         ;;
     N2C16) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --auto_tuner_json ${autoconfig_json_file} --master etcd://$master_ip:2379 --nnodes $nnodes:$nnodes \
-            finetune_generation.py ${modle_json_file}"
+            run_finetune.py ${modle_json_file}"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
-            --auto_tuner_json ${autoconfig_json_file} finetune_generation.py ${modle_json_file}"
+            --auto_tuner_json ${autoconfig_json_file} run_finetune.py ${modle_json_file}"
         ;;
     esac
     cd ../llm/

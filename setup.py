@@ -165,7 +165,7 @@ try:
         license_files=("LICENSE",),
         packages=setuptools.find_packages(
             where=".",
-            exclude=("examples*", "tests*", "applications*", "fast_tokenizer*", "fast_generation*", "model_zoo*"),
+            exclude=("examples*", "tests*", "applications*", "fast_generation*", "model_zoo*"),
         ),
         package_data={
             "paddlenlp.ops": get_package_data_files(

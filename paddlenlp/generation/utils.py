@@ -757,13 +757,10 @@ class GenerationMixin(object):
 
         use_fast = False
         if "use_faster" in model_kwargs:
-            use_fast = model_kwargs.pop("use_faster")
-            if not self.deprecated_warnings.get("use_faster", False):
-                logger.warning("`use_faster` will be deprecated in near future. Please use `use_fast` instead. ")
-                self.deprecated_warnings["use_faster"] = True
+            raise ValueError("`use_faster` is deprecated now.")
 
         if "use_fast" in model_kwargs:
-            use_fast = model_kwargs.pop("use_fast")
+            raise ValueError("`use_fast` is deprecated now.")
 
         bos_token_id = (
             generation_config.bos_token_id if generation_config.bos_token_id is not None else self.config.bos_token_id

@@ -119,7 +119,7 @@ class TestUnifiedCheckpointSingle(TestMultipleGpus):
 
         self.need_allclose = True
         self.rtol = 1e-7
-        self.run_lora_file = "llm/finetune_generation.py"
+        self.run_lora_file = "llm/run_finetune.py"
         self.num_nodes = 1
 
     def runfirst(self, train_args):
@@ -169,7 +169,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
         self.need_allclose = True
         self.rtol = 1e-7
 
-        self.run_lora_file = "llm/finetune_generation.py"
+        self.run_lora_file = "llm/run_finetune.py"
 
     def runfirst(self, train_args):
         self.run_n1c8(self.run_lora_file, **train_args)

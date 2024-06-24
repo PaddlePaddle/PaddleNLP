@@ -5079,6 +5079,6 @@ class TestLongSequenceStrategiesTest(LLMTest, unittest.TestCase):
             config["model_name_or_path"] = save_path
 
             with argv_context_guard(config):
-                from export_model import main
+                from predict.export_model import main
 
                 main()
