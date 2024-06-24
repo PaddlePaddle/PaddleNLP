@@ -27,7 +27,7 @@ from itertools import takewhile
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from paddlenlp.transformers import PretrainedFastTokenizer, PretrainedTokenizer
+from paddlenlp.transformers import PretrainedTokenizer
 from paddlenlp.transformers.tokenizer_utils import AddedToken, Trie
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
@@ -55,8 +55,6 @@ def filter_roberta_detectors(_, pretrained_name: str):
 class TokenizerTesterMixin:
 
     tokenizer_class = None
-    fast_tokenizer_class = None
-    test_fast_tokenizer = False
     space_between_special_tokens = False
     from_pretrained_kwargs = None
     from_pretrained_filter = None
@@ -139,9 +137,6 @@ class TokenizerTesterMixin:
 
     def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
         return self.tokenizer_class.from_pretrained(self.tmpdirname, **kwargs)
-
-    def get_fast_tokenizer(self, **kwargs) -> PretrainedFastTokenizer:
-        return self.fast_tokenizer_class.from_pretrained(self.tmpdirname, **kwargs)
 
     def tokenizer_integration_test_util(
         self,
@@ -507,39 +502,6 @@ class TokenizerTesterMixin:
                 after_tokens = after_tokenizer.encode(sample_text, add_special_tokens=False)
                 after_vocab = after_tokenizer.get_vocab()
                 self.assertListEqual(before_tokens["input_ids"], after_tokens["input_ids"])
-                self.assertDictEqual(before_vocab, after_vocab)
-                self.assertIn("bim", after_vocab)
-                self.assertIn("bambam", after_vocab)
-                self.assertIn("new_additional_special_token", after_tokenizer.additional_special_tokens)
-                self.assertEqual(after_tokenizer.model_max_length, 42)
-
-                tokenizer = tokenizer.__class__.from_pretrained(tmpdirname, model_max_length=43)
-                self.assertEqual(tokenizer.model_max_length, 43)
-
-                shutil.rmtree(tmpdirname)
-
-        # Test that we can also use the non-legacy saving format for fast tokenizers
-        tokenizers = self.get_tokenizers(model_max_length=42)
-        for tokenizer in tokenizers:
-            if not tokenizer.is_fast:
-                continue
-            with self.subTest(f"{tokenizer.__class__.__name__}"):
-                # Isolate this from the other tests because we save additional tokens/etc
-                tmpdirname = tempfile.mkdtemp()
-
-                sample_text = " He is very happy, UNwant\u00E9d,running"
-                tokenizer.add_tokens(["bim", "bambam"])
-                additional_special_tokens = tokenizer.additional_special_tokens
-                additional_special_tokens.append("new_additional_special_token")
-                tokenizer.add_special_tokens({"additional_special_tokens": additional_special_tokens})
-                before_tokens = tokenizer.encode(sample_text, add_special_tokens=False)
-                before_vocab = tokenizer.get_vocab()
-                tokenizer.save_pretrained(tmpdirname)
-
-                after_tokenizer = tokenizer.__class__.from_pretrained(tmpdirname)
-                after_tokens = after_tokenizer.encode(sample_text, add_special_tokens=False)
-                after_vocab = after_tokenizer.get_vocab()
-                self.assertListEqual(before_tokens, after_tokens)
                 self.assertDictEqual(before_vocab, after_vocab)
                 self.assertIn("bim", after_vocab)
                 self.assertIn("bambam", after_vocab)
@@ -2170,28 +2132,6 @@ class TokenizerTesterMixin:
                         tokenizer.convert_tokens_to_ids(["a_new_additional_special_token"])
                     ),
                 )
-
-    def test_convert_tokens_to_string_format(self):
-        tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
-        for tokenizer in tokenizers:
-            with self.subTest(f"{tokenizer.__class__.__name__}"):
-                tokens = ["this", "is", "a", "test"]
-                string = tokenizer.convert_tokens_to_string(tokens)
-
-                self.assertIsInstance(string, str)
-
-    def test_consecutive_unk_string(self):
-        tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
-        for tokenizer in tokenizers:
-            tokens = [tokenizer.unk_token for _ in range(2)]
-            string = tokenizer.convert_tokens_to_string(tokens)
-            encoding = tokenizer(
-                text=string,
-                truncation=True,
-                return_offsets_mapping=True,
-            )
-            self.assertEqual(len(encoding["input_ids"]), 4)
-            self.assertEqual(len(encoding["offset_mapping"]), 4)
 
 
 class TrieTest(unittest.TestCase):

@@ -18,47 +18,11 @@ import tempfile
 import unittest
 
 import paddlenlp
-from paddlenlp.transformers import AutoTokenizer, is_fast_tokenizer_available
+from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.env import TOKENIZER_CONFIG_NAME
 
 
 class AutoTokenizerTest(unittest.TestCase):
-    def test_fast_tokenizer_import(self):
-        tokenizer1 = AutoTokenizer.from_pretrained("__internal_testing__/bert", use_fast=False)
-        self.assertIsInstance(tokenizer1, paddlenlp.transformers.BertTokenizer)
-
-        tokenizer2 = AutoTokenizer.from_pretrained("__internal_testing__/bert", use_fast=True)
-        if is_fast_tokenizer_available():
-            self.assertIsInstance(tokenizer2, paddlenlp.transformers.BertFastTokenizer)
-        else:
-            self.assertIsInstance(tokenizer2, paddlenlp.transformers.BertTokenizer)
-
-    def test_fast_tokenizer_non_exist(self):
-        tokenizer1 = AutoTokenizer.from_pretrained("t5-small", use_fast=True)
-        # T5 FastTokenizer doesn't exist yet, so from_pretrained will return the normal tokenizer.
-        self.assertIsInstance(tokenizer1, paddlenlp.transformers.T5Tokenizer)
-
-    def test_use_faster(self):
-        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/bert", use_faster=True)
-        if is_fast_tokenizer_available():
-            self.assertIsInstance(tokenizer, paddlenlp.transformers.BertFastTokenizer)
-        else:
-            self.assertIsInstance(tokenizer, paddlenlp.transformers.BertTokenizer)
-
-    @unittest.skip("skipping due to connection error!")
-    def test_hf_tokenizer(self):
-        t1 = AutoTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-BertModel", from_hf_hub=True, use_fast=True
-        )
-        t2 = AutoTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-BertModel", from_hf_hub=True, use_fast=False
-        )
-        if is_fast_tokenizer_available():
-            self.assertIsInstance(t1, paddlenlp.transformers.BertFastTokenizer)
-        else:
-            self.assertIsInstance(t1, paddlenlp.transformers.BertTokenizer)
-        self.assertIsInstance(t2, paddlenlp.transformers.BertTokenizer)
-
     @unittest.skip("skipping due to connection error!")
     def test_from_aistudio(self):
         tokenizer = AutoTokenizer.from_pretrained("PaddleNLP/tiny-random-bert", from_aistudio=True)

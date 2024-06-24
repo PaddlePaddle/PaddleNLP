@@ -212,6 +212,7 @@ def scaled_dot_product_attention(
     attention_mask,
     output_attentions,
     alibi=None,
+    attn_mask_startend_row_indices=None,
     sequence_parallel=False,
     reshard_layer=None,
     npu_is_casual=False,
@@ -228,6 +229,7 @@ def scaled_dot_product_attention(
             attention_mask,
             output_attentions,
             alibi,
+            attn_mask_startend_row_indices,
             sequence_parallel,
             reshard_layer,
             npu_is_casual,
@@ -818,6 +820,7 @@ class LlamaAttention(nn.Layer):
         output_attentions: bool = False,
         use_cache: bool = False,
         alibi: Optional[paddle.Tensor] = None,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         npu_is_casual: bool = False,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
@@ -1016,6 +1019,7 @@ class LlamaAttention(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
+                attn_mask_startend_row_indices,
                 self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
                 use_reentrant=self.config.recompute_use_reentrant,
@@ -1029,6 +1033,7 @@ class LlamaAttention(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
+                attn_mask_startend_row_indices,
                 self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
                 npu_is_casual=npu_is_casual,
@@ -1084,6 +1089,7 @@ class LlamaDecoderLayer(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
         alibi: Optional[paddle.Tensor] = None,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         npu_is_casual: bool = False,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
@@ -1121,6 +1127,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                attn_mask_startend_row_indices,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -1132,6 +1139,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 npu_is_casual=npu_is_casual,
             )
 
@@ -1461,6 +1469,7 @@ class LlamaModel(LlamaPretrainedModel):
         past_key_value: Tensor,
         use_cache: bool,
         alibi=None,
+        attn_mask_startend_row_indices=None,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -1477,6 +1486,7 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value,
             use_cache,
             alibi,
+            attn_mask_startend_row_indices,
             use_reentrant=self.config.recompute_use_reentrant,
         )
 
@@ -1493,6 +1503,7 @@ class LlamaModel(LlamaPretrainedModel):
         output_attentions=False,
         output_hidden_states=None,
         return_dict=False,
+        attn_mask_startend_row_indices=None,
         **kwargs,
     ):
         if self.sequence_parallel and use_cache:
@@ -1539,10 +1550,10 @@ class LlamaModel(LlamaPretrainedModel):
         if self.config.context_parallel_degree > 1 and (attention_mask is not None or self.config.alibi):
             raise NotImplementedError("Ring FlashAttention dosen't support attention_mask or alibi")
         # embed positions
-        if attention_mask is None:
+        if attn_mask_startend_row_indices is None and attention_mask is None:
             # [bs, seq_len]
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-        if self.config.alibi:
+        if attn_mask_startend_row_indices is None and self.config.alibi:
             if self.config.use_long_sequence_strategies:
                 alibi_layer = LongSequenceStrategies.build_long_sequence_strategy(
                     self.config.long_sequence_strategy_type,
@@ -1573,14 +1584,14 @@ class LlamaModel(LlamaPretrainedModel):
 
         if use_casual_mask:
             attention_mask = None
-        else:
+        elif attn_mask_startend_row_indices is None:
             attention_mask = self._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
             )  # [bs, 1, seq_len, seq_len]
 
         is_casual = False
 
-        if self.config.use_flash_attention and get_env_device() != "gcu":
+        if attn_mask_startend_row_indices is None and self.config.use_flash_attention and get_env_device() != "gcu":
             if use_casual_mask:
                 is_casual = True
             else:
@@ -1617,6 +1628,7 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                     alibi=alibi,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -1627,6 +1639,7 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                     alibi=alibi,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                     npu_is_casual=is_casual,
                 )
 
@@ -1888,6 +1901,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        attn_mask_startend_row_indices=None,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1904,6 +1918,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]

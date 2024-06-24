@@ -39,8 +39,6 @@ GEMMA_PRETRAINED_INIT_CONFIGURATION = {
         "eos_token_id": 1,
         "pad_token_id": 0,
         "use_cache": True,
-        "use_recompute": False,
-        "use_flash_attention": False,
     },
 }
 
@@ -83,8 +81,6 @@ class GemmaConfig(PretrainedConfig):
             relevant if `config.is_decoder=True`.
         tie_word_embeddings(`bool`, *optional*, defaults to `False`):
             Whether to tie weight embeddings
-        use_fused_rope(`bool`, *optional*, defaults to False):
-            Enable rope fusion or not.
         num_key_value_heads (`int`, *optional*):
             This is the number of key_value heads that should be used to implement Grouped Query Attention. If
             `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
@@ -124,8 +120,6 @@ class GemmaConfig(PretrainedConfig):
         initializer_range=0.02,
         rms_norm_eps=1e-6,
         use_cache=True,
-        use_recompute=False,
-        recompute_granularity="full",
         pad_token_id=0,
         eos_token_id=1,
         bos_token_id=2,
@@ -133,18 +127,9 @@ class GemmaConfig(PretrainedConfig):
         rope_theta=10000.0,
         attention_bias=False,
         attention_dropout=0.0,
-        tensor_parallel_output=True,
-        sequence_parallel=False,
-        fuse_sequence_parallel_allreduce=False,
-        use_fused_rope=False,
         fuse_attention_qkv=False,
         fuse_attention_ffn=False,
         alibi=False,
-        pp_recompute_interval=1,
-        no_recompute_layers=None,
-        use_flash_attention=False,
-        use_fused_rms_norm=False,
-        virtual_pp_degree=1,
         rope_scaling_factor=1.0,
         rope_scaling_type=None,
         **kwargs,
@@ -162,23 +147,15 @@ class GemmaConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.rms_norm_eps = rms_norm_eps
         self.use_cache = use_cache
-        self.use_recompute = use_recompute
-        self.recompute_granularity = recompute_granularity
+
         self.rope_theta = rope_theta
         self.attention_bias = attention_bias
         self.attention_dropout = attention_dropout
-        self.tensor_parallel_output = tensor_parallel_output
-        self.sequence_parallel = sequence_parallel
-        self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
-        self.use_fused_rope = use_fused_rope
+
         self.fuse_attention_qkv = fuse_attention_qkv
         self.fuse_attention_ffn = fuse_attention_ffn
         self.alibi = alibi
-        self.pp_recompute_interval = pp_recompute_interval
-        self.no_recompute_layers = no_recompute_layers
-        self.use_flash_attention = use_flash_attention
-        self.use_fused_rms_norm = use_fused_rms_norm
-        self.virtual_pp_degree = virtual_pp_degree
+
         self.rope_scaling_factor = rope_scaling_factor
         self.rope_scaling_type = rope_scaling_type
         super().__init__(
@@ -186,7 +163,6 @@ class GemmaConfig(PretrainedConfig):
             bos_token_id=bos_token_id,
             eos_token_id=eos_token_id,
             tie_word_embeddings=tie_word_embeddings,
-            tensor_parallel_output=tensor_parallel_output,
             **kwargs,
         )
 
