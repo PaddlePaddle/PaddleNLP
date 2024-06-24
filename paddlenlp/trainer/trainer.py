@@ -816,7 +816,8 @@ class Trainer:
                 self.model_wrapped = model
             if delay_optimizer_creation:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-            self._load_optimizer_and_scheduler(resume_from_checkpoint)
+            if not self.args.to_static:
+                self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
         logger.info(f"{self.runtime_timer.log()}")
 
@@ -1732,12 +1733,19 @@ class Trainer:
         random.setstate(checkpoint_rng_state["python"])
         np.random.set_state(checkpoint_rng_state["numpy"])
 
-        core.default_cpu_generator().set_state(checkpoint_rng_state["cpu"])
+        if self.args.to_static:
+            core.default_cpu_generator().manual_seed(checkpoint_rng_state["cpu"])
+        else:
+            core.default_cpu_generator().set_state(checkpoint_rng_state["cpu"])
+
         if core.is_compiled_with_cuda():
             if not len(checkpoint_rng_state["cuda"]) == core.get_cuda_device_count():
                 raise ValueError("Length of gpu state list shoule be equal to the gpu device count")
             for i in range(core.get_cuda_device_count()):
-                core.default_cuda_generator(i).set_state(checkpoint_rng_state["cuda"][i])
+                if self.args.to_static:
+                    core.default_cuda_generator(i).manual_seed(checkpoint_rng_state["cuda"][i])
+                else:
+                    core.default_cuda_generator(i).set_state(checkpoint_rng_state["cuda"][i])
 
         if paddle.device.get_all_custom_device_type() is not None:
             custom_device_type = paddle.device.get_all_custom_device_type()
@@ -1745,9 +1753,14 @@ class Trainer:
                 if not len(checkpoint_rng_state["cuda"]) == core.get_custom_device_count(device):
                     raise ValueError("Length of custom device state list shoule be equal to the custom device count")
                 for i in range(core.get_custom_device_count(device)):
-                    core.default_custom_device_generator(paddle.CustomPlace(device, i)).set_state(
-                        checkpoint_rng_state["cuda"][i]
-                    )
+                    if self.args.to_static:
+                        core.default_custom_device_generator(paddle.CustomPlace(device, i)).manual_seed(
+                            checkpoint_rng_state["cuda"][i]
+                        )
+                    else:
+                        core.default_custom_device_generator(paddle.CustomPlace(device, i)).set_state(
+                            checkpoint_rng_state["cuda"][i]
+                        )
 
         if self.args.use_hybrid_parallel:
             if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:

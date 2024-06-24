@@ -14,6 +14,7 @@
 
 import os
 import random
+import re
 import time
 from typing import Any, Dict, Optional, Union
 
@@ -267,6 +268,10 @@ class AutoTrainer(Trainer):
             npu_accelerate_plugin(self.optimizer)
 
         model, dist_loader = self._wrap_for_auto(model, train_dataloader)
+
+        if self.args.to_static:
+            self._load_from_checkpoint(model, resume_from_checkpoint)
+
         train_dataloader = dist_loader()
 
         self.timers and self.timers("read-data").start()
@@ -528,12 +533,16 @@ class AutoTrainer(Trainer):
         with _exec_mode_guard("dynamic"):
             super()._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, **kwargs)
 
+    FREE_SVAE_LOAD_KEY_PATTERNS = ["gradient_merge_", "learning_rate_", "gradient_merge_", "@GRAD@MERG", "eager_tmp"]
+    PARAM_FILE_SUFFIX = ".model.param"
+
     def _save_checkpoint(self, model, metrics=None):
 
         # Save model checkpoint
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
         run_dir = self.args.output_dir
         output_dir = f"{run_dir}/{checkpoint_folder}"
+        path = os.path.join(output_dir, DIST_CKPT_PATH)
 
         if self.args.should_save or self.args.should_save_model_state:
             os.makedirs(output_dir, exist_ok=True)
@@ -542,17 +551,42 @@ class AutoTrainer(Trainer):
             logger.info(f"Saving checkpoinit files into {output_dir}")
 
             if self.args.should_save_model_state:
+                if self.args.to_static:
+                    local_model_state_dict = {}
+                    free_save_load_keys = []
 
-                optim_state_dict = self.optimizer.state_dict()
-                optim_state_dict.pop("LR_Scheduler", None)
+                    model_state_dict = model.dist_main_program("train").state_dict("all")
 
-                state_dict = {
-                    MODEL_NAME: self.model.state_dict(),
-                    OPTIMIZER_NAME: optim_state_dict,
-                }
+                    for key in model_state_dict.keys():
+                        for free_pattern in self.FREE_SVAE_LOAD_KEY_PATTERNS:
+                            if re.search(free_pattern, key):
+                                free_save_load_keys.append(key)
 
-                self._save_ckpt_func(state_dict, os.path.join(output_dir, DIST_CKPT_PATH))
-                logger.info(f"Model weights and optimizer states saved in {output_dir}/{DIST_CKPT_PATH}")
+                    for key, val in model_state_dict.items():
+                        if key not in free_save_load_keys:
+                            local_model_state_dict[key] = paddle.Tensor(val)
+
+                    unique_id = 0
+                    file_name = ""
+                    while True:
+                        file_name = f"{paddle.distributed.get_rank()}_{unique_id}"
+                        if not os.path.exists(os.path.join(path, file_name)):
+                            break
+                            unique_id += 1
+                else:
+                    optim_state_dict = self.optimizer.state_dict()
+                    optim_state_dict.pop("LR_Scheduler", None)
+
+                    state_dict = {
+                        MODEL_NAME: self.model.state_dict(),
+                        OPTIMIZER_NAME: optim_state_dict,
+                    }
+
+                    self._save_ckpt_func(state_dict, os.path.join(output_dir, DIST_CKPT_PATH))
+                    logger.info(f"Model weights and optimizer states saved in {output_dir}/{DIST_CKPT_PATH}")
+
+                # TODO: When using data parallelism, parameters should be stored in one copy rather than multiple copies
+                paddle.save(local_model_state_dict, os.path.join(path, file_name + self.PARAM_FILE_SUFFIX))
 
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
@@ -623,7 +657,7 @@ class AutoTrainer(Trainer):
             self._save_ckpt_func(self.model.state_dict(), os.path.join(output_dir, MODEL_NAME))
             logger.info(f"Model weights saved in {output_dir}/{MODEL_NAME}")
 
-    def _load_from_checkpoint(self, resume_from_checkpoint=None):
+    def _load_from_checkpoint(self, model, resume_from_checkpoint=None):
 
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
 
@@ -660,17 +694,50 @@ class AutoTrainer(Trainer):
             if not os.path.isdir(ckpt_path):
                 raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
 
-            optim_state_dict = self.optimizer.state_dict()
-            optim_state_dict.pop("LR_Scheduler", None)
+            if self.args.to_static:
+                model_state_dict = model.dist_main_program("train").state_dict("all")
 
-            state_dict = {
-                MODEL_NAME: self.model.state_dict(),
-                OPTIMIZER_NAME: optim_state_dict,
-            }
+                accessible_files = os.listdir(ckpt_path)
+                model_state_dict_files = []
+                for file_name in accessible_files:
+                    if self.PARAM_FILE_SUFFIX in file_name and paddle.distributed.get_rank() == int(
+                        file_name.split("_")[0]
+                    ):
+                        model_state_dict_files.append(file_name)
 
-            print("state_dict :", state_dict)
+                assert len(model_state_dict_files) == 1
 
-            self._load_ckpt_func(state_dict, ckpt_path)
+                free_save_load_keys = []
+                for key in model_state_dict.keys():
+                    for free_pattern in self.FREE_SVAE_LOAD_KEY_PATTERNS:
+                        if re.search(free_pattern, key):
+                            free_save_load_keys.append(key)
 
-            # release memory
-            del state_dict
+                for key, val in model_state_dict.items():
+                    if key not in free_save_load_keys:
+                        val._clear()
+
+                load_model_state_dict = paddle.load(os.path.join(ckpt_path, model_state_dict_files[0]))
+
+                for key, val in model_state_dict.items():
+                    if key not in free_save_load_keys:
+                        assert key in load_model_state_dict
+                        assert val.shape() == load_model_state_dict[key].shape
+                        val._share_data_with(load_model_state_dict[key].get_tensor())
+
+                del load_model_state_dict
+            else:
+                optim_state_dict = self.optimizer.state_dict()
+                optim_state_dict.pop("LR_Scheduler", None)
+
+                state_dict = {
+                    MODEL_NAME: self.model.state_dict(),
+                    OPTIMIZER_NAME: optim_state_dict,
+                }
+
+                print("state_dict :", state_dict)
+
+                self._load_ckpt_func(state_dict, ckpt_path)
+
+                # release memory
+                del state_dict
