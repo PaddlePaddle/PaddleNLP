@@ -331,7 +331,7 @@ class ErnieViLConfig(PretrainedConfig):
 
         return cls(text_config=text_config.to_dict(), vision_config=vision_config.to_dict(), **kwargs)
 
-    def to_dict(self):
+    def to_dict(self, *args, **kwargs):
         """
         Serializes this instance to a Python dictionary. Override the default [`~PretrainedConfig.to_dict`].
 

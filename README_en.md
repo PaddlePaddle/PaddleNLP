@@ -224,18 +224,6 @@ For more details please refer to [Speech Command Analysis](./applications/speech
 
 ### High Performance Distributed Training and Inference
 
-#### ⚡ FastTokenizer: High Performance Text Preprocessing Library
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168407921-b4395b1d-44bd-41a0-8c58-923ba2b703ef.png" width="400">
-</div>
-
-```python
-AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
-```
-
-Set `use_fast=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FastTokenizer](./fast_tokenizer).
-
 #### ⚡ FastGeneration: High Performance Generation Library
 
 <div align="center">

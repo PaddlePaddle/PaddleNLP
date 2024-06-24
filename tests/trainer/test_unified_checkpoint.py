@@ -186,15 +186,15 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
         os.environ.update(environment_variables)
 
         files = [
-            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy",
-            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx",
         ]
         self.prepare_inputs_data(pretrain_arguments["input_dir"], files)
 
         self.need_allclose = True
         self.rtol = 1e-7
 
-        self.run_pretrain_file = "llm/llama/run_pretrain.py"
+        self.run_pretrain_file = "llm/run_pretrain.py"
 
     def runfirst(self, train_args):
         self.run_n1c8(self.run_pretrain_file, **train_args)
@@ -651,8 +651,8 @@ class TestPaddleCheckpointOnN1C2Reset(TestMultipleGpus):
         os.environ.update(environment_variables)
 
         files = [
-            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy",
-            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx",
         ]
         self.prepare_inputs_data(pretrain_arguments["input_dir"], files)
 
@@ -693,8 +693,8 @@ class TestUnifiedCheckpointOnN1C2Reset(TestMultipleGpus):
         os.environ.update(environment_variables)
 
         files = [
-            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy",
-            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin",
+            "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx",
         ]
         self.prepare_inputs_data(pretrain_arguments["input_dir"], files)
 

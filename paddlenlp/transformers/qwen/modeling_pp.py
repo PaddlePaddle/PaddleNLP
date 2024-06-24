@@ -76,6 +76,7 @@ class QWenEmbeddingPipe(nn.Layer):
     def __init__(self, config):
         super(QWenEmbeddingPipe, self).__init__()
         self.hidden_size = config.hidden_size
+        self.sequence_parallel = config.sequence_parallel
         if config.tensor_parallel_degree > 1:
             self.wte = fleet.meta_parallel.VocabParallelEmbedding(
                 config.vocab_size,
@@ -96,6 +97,14 @@ class QWenEmbeddingPipe(nn.Layer):
         """
         input_ids, attention_mask, position_ids = parse_args(args)
         input_embeds = self.wte(input_ids)
+        if self.sequence_parallel:
+            from paddlenlp.transformers import ScatterOp
+
+            # [bs, seq_len, num_head * head_dim] -> [bs * seq_len, num_head * head_dim]
+            bs, seq_len, hidden_size = input_embeds.shape
+            input_embeds = paddle.reshape_(input_embeds, [bs * seq_len, hidden_size])
+            # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
+            input_embeds = ScatterOp.apply(input_embeds)
 
         batch_size, seq_length = input_ids.shape
         if attention_mask is not None:
@@ -138,7 +147,7 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     def __init__(self, config):
         self.config = config
 
-        self.use_recompute = self.config.use_recompute
+        self.recompute = self.config.recompute
         self.recompute_granularity = self.config.recompute_granularity
         self.pp_recompute_interval = self.config.pp_recompute_interval
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
@@ -168,7 +177,7 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.add_sequential_layer(LayerDesc(QWenLMHead, config=config), "lm_head")
 
         recompute_interval = 0
-        if self.use_recompute and self.recompute_granularity == "full":
+        if self.recompute and self.recompute_granularity == "full":
             assert self.config.pp_recompute_interval <= config.num_hidden_layers // (
                 virtual_pp_degree * get_hcg().topology().get_dim_size("pipe")
             ), "pp recompute interval should smaller than num layers of each pp chunk"

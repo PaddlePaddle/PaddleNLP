@@ -67,6 +67,8 @@ __all__ = [
     "Qwen2PretrainedModel",
     "Qwen2ForCausalLM",
     "Qwen2PretrainingCriterion",
+    "Qwen2ForSequenceClassification",
+    "Qwen2ForTokenClassification",
 ]
 
 
@@ -112,7 +114,7 @@ def assign_kv_heads(num_kv_heads: int, num_gpus: int):
     return assignment_list
 
 
-def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
+def parallel_matmul(x: Tensor, y: Tensor, transpose_y=True, tensor_parallel_output=True):
     is_fleet_init = True
     tensor_parallel_degree = 1
     try:
@@ -130,7 +132,7 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
     if is_fleet_init and tensor_parallel_degree > 1 and y_is_distributed:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, y, transpose_y=False)
+        logits = paddle.matmul(input_parallel, y, transpose_y=transpose_y)
 
         if tensor_parallel_output:
             return logits
@@ -138,7 +140,7 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
-        logits = paddle.matmul(x, y, transpose_y=False)
+        logits = paddle.matmul(x, y, transpose_y=transpose_y)
         return logits
 
 
@@ -291,12 +293,10 @@ class Qwen2RMSNorm(nn.Layer):
     def forward(self, hidden_states):
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
-                hidden_states = hidden_states.astype("float32")
-                variance = hidden_states.pow(2).mean(-1, keepdim=True)
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
                 hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
         else:
-            hidden_states = hidden_states.astype("float32")
-            variance = hidden_states.pow(2).mean(-1, keepdim=True)
+            variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
             hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
 
         if self.weight.dtype in [paddle.float16, paddle.bfloat16]:
@@ -480,12 +480,8 @@ class Qwen2Attention(nn.Layer):
 
         if config.tensor_parallel_degree > 1:
             self.q_proj = ColumnParallelLinear(self.hidden_size, self.hidden_size, has_bias=True, gather_output=False)
-            self.k_proj = ColumnParallelLinear(
-                self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
-            )
-            self.v_proj = ColumnParallelLinear(
-                self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False
-            )
+            self.k_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False)  # fmt:skip
+            self.v_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False)  # fmt:skip
             self.o_proj = RowParallelLinear(self.hidden_size, self.hidden_size, has_bias=False, input_is_parallel=True)
         else:
             self.q_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=True)
@@ -511,8 +507,6 @@ class Qwen2Attention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
-
-        batch_size, seq_len, _ = hidden_states.shape
 
         query_states = self.q_proj(hidden_states)
         key_states = self.k_proj(hidden_states)
@@ -617,6 +611,7 @@ class Qwen2Attention(nn.Layer):
 class Qwen2DecoderLayer(nn.Layer):
     def __init__(self, config: Qwen2Config, layerwise_recompute: bool = False):
         super().__init__()
+        self.config = config
         self.hidden_size = config.hidden_size
         self.self_attn = Qwen2Attention(config, layerwise_recompute)
 
@@ -757,7 +752,8 @@ class Qwen2PretrainedModel(PretrainedModel):
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
                 mapping[1] = "qwen2." + mapping[1]
-            model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
+            if not config.tie_word_embeddings:
+                model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
@@ -777,11 +773,14 @@ class Qwen2PretrainedModel(PretrainedModel):
             final_actions = {}
 
             base_actions = {
-                "lm_head.weight": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
             }
+            if config.tie_word_embeddings:
+                base_actions["lm_head.weight"] = partial(fn, is_column=False)
+            else:
+                base_actions["lm_head.weight"] = partial(fn, is_column=True)
 
             if not config.vocab_size % config.tensor_parallel_degree == 0:
                 base_actions.pop("lm_head.weight")
@@ -985,12 +984,10 @@ class Qwen2Model(Qwen2PretrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
-        )
-        use_cache = use_cache if use_cache is not None else self.config.use_cache
 
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states  # fmt:skip
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # retrieve input_ids and inputs_embeds
@@ -1014,6 +1011,7 @@ class Qwen2Model(Qwen2PretrainedModel):
             cache_length = past_key_values[0][0].shape[1]
             seq_length_with_past += cache_length
         if inputs_embeds is None:
+            # [bs, seq_len, dim]
             inputs_embeds = self.embed_tokens(input_ids)
 
         if self.sequence_parallel:
@@ -1143,7 +1141,7 @@ class Qwen2PretrainingCriterion(nn.Layer):
 
 
 class Qwen2LMHead(nn.Layer):
-    def __init__(self, config: Qwen2Config):
+    def __init__(self, config: Qwen2Config, embedding_weights=None, transpose_y=False):
         super(Qwen2LMHead, self).__init__()
         self.config = config
         if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
@@ -1151,14 +1149,33 @@ class Qwen2LMHead(nn.Layer):
         else:
             vocab_size = config.vocab_size
 
-        self.weight = self.create_parameter(
-            shape=[config.hidden_size, vocab_size],
-            dtype=paddle.get_default_dtype(),
-        )
+        self.transpose_y = transpose_y
+        if transpose_y:
+            if embedding_weights is not None:
+                self.weight = embedding_weights
+            else:
+                self.weight = self.create_parameter(
+                    shape=[vocab_size, config.hidden_size],
+                    dtype=paddle.get_default_dtype(),
+                )
+        else:
+            if vocab_size != config.vocab_size:
+                with get_rng_state_tracker().rng_state():
+                    self.weight = self.create_parameter(
+                        shape=[config.hidden_size, vocab_size],
+                        dtype=paddle.get_default_dtype(),
+                    )
+            else:
+                self.weight = self.create_parameter(
+                    shape=[config.hidden_size, vocab_size],
+                    dtype=paddle.get_default_dtype(),
+                )
+
         # Must set distributed attr for Tensor Parallel !
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
         if self.weight.is_distributed:
-            self.weight.split_axis = 1
+            # for tie_word_embeddings
+            self.weight.split_axis = 0 if self.transpose_y else 1
 
     def forward(self, hidden_states, tensor_parallel_output=None):
         if self.config.sequence_parallel:
@@ -1169,7 +1186,9 @@ class Qwen2LMHead(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
+        logits = parallel_matmul(
+            hidden_states, self.weight, transpose_y=self.transpose_y, tensor_parallel_output=tensor_parallel_output
+        )
         return logits
 
 
@@ -1180,7 +1199,11 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
     def __init__(self, config: Qwen2Config):
         super().__init__(config)
         self.qwen2 = Qwen2Model(config)
-        self.lm_head = Qwen2LMHead(config)
+        if config.tie_word_embeddings:
+            self.lm_head = Qwen2LMHead(config, embedding_weights=self.qwen2.embed_tokens.weight, transpose_y=True)
+            self.tie_weights()
+        else:
+            self.lm_head = Qwen2LMHead(config)
         self.criterion = Qwen2PretrainingCriterion(config)
         self.vocab_size = config.vocab_size
 
@@ -1250,10 +1273,18 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
             model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[..., -1:] + 1], axis=-1)
 
         if not is_encoder_decoder and "attention_mask" in model_kwargs:
+            # TODO: support attention mask for other models
             attention_mask = model_kwargs["attention_mask"]
-            model_kwargs["attention_mask"] = paddle.concat(
-                [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
-            )
+            if len(attention_mask.shape) == 2:
+                model_kwargs["attention_mask"] = paddle.concat(
+                    [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)],
+                    axis=-1,
+                )
+            elif len(attention_mask.shape) == 4:
+                model_kwargs["attention_mask"] = paddle.concat(
+                    [attention_mask, paddle.ones([*attention_mask.shape[:3], 1], dtype=attention_mask.dtype)],
+                    axis=-1,
+                )[:, :, -1:, :]
 
         return model_kwargs
 
@@ -1347,7 +1378,7 @@ class Qwen2ForSequenceClassification(Qwen2PretrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.qwen2 = Qwen2Model(config)
-        self.score = nn.Linear(config.hidden_size, self.num_labels, bias=False)
+        self.score = nn.Linear(config.hidden_size, self.num_labels, bias_attr=False)
 
     def get_input_embeddings(self):
         return self.qwen2.embed_tokens
@@ -1402,17 +1433,17 @@ class Qwen2ForSequenceClassification(Qwen2PretrainedModel):
         else:
             if input_ids is not None:
                 # if no pad token found, use modulo instead of reverse indexing for ONNX compatibility
-                sequence_lengths = paddle.eq(input_ids, self.config.pad_token_id).int().argmax(-1) - 1
+                sequence_lengths = paddle.equal(input_ids, self.config.pad_token_id).astype("int32").argmax(-1) - 1
                 sequence_lengths = sequence_lengths % input_ids.shape[-1]
-                sequence_lengths = sequence_lengths.to(logits.device)
+                sequence_lengths = sequence_lengths
             else:
                 sequence_lengths = -1
 
-        pooled_logits = logits[paddle.arange(batch_size, device=logits.device), sequence_lengths]
+        # pooled_logits = logits[paddle.arange(batch_size), sequence_lengths]
+        pooled_logits = logits.gather_nd(paddle.stack([paddle.arange(logits.shape[0]), sequence_lengths], axis=-1))
 
         loss = None
         if labels is not None:
-            labels = labels.to(logits.device)
             if self.config.problem_type is None:
                 if self.num_labels == 1:
                     self.config.problem_type = "regression"

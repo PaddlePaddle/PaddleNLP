@@ -41,7 +41,7 @@ if int(os.getenv("MC2_Recompute", 0)):
 def is_mc2_valid():
     current_device = get_env_device()
     if current_device == "npu":
-        return int(os.getenv("MC2", 0))
+        return int(os.getenv("FLAGS_NPU_MC2", 0))
     return 0
 
 

@@ -17,7 +17,7 @@ PaddleNLP 提供了动态图推理和静态图推理两种方式，方便用户�
 ### 1.1 动态图推理
 ```shell
 # 动态图模型推理命令参考
-python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --data_file ./data/dev.json --dtype float16
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --data_file ./data/dev.json --dtype float16
 ```
 对于LoRA、PrefixTuning 模型只需额外传入相应的lora_path或prefix_path即可，如：`--lora_path ./checkpoints/llama_lora_ckpts`或`--prefix_path ./checkpoints/llama_prefix_ckpts`，详见推理参数减少。
 
@@ -26,9 +26,9 @@ python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --data_file 
 ```shell
 # 静态图模型推理命令参考， LoRA需要先合并参数，Prefix Tuning暂不支持
 # step1 : 静态图导出
-python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --output_path ./inference --dtype float16
+python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --output_path ./inference --dtype float16
 # step2: 静态图推理
-python predictor.py --model_name_or_path ./inference --data_file ./data/dev.json --dtype float16 --mode static
+python ./predict/predictor.py --model_name_or_path ./inference --data_file ./data/dev.json --dtype float16 --mode static
 ```
 
 ## 2. 高性能模型推理
@@ -83,7 +83,10 @@ PaddleNLP 针对于Transformer 系列编写了高性能自定义算子，提升�
 
 ```shell
 git clone https://github.com/PaddlePaddle/PaddleNLP
+#GPU设备安装自定义算子
 cd ./paddlenlp/csrc && python setup_cuda.py install
+#XPU设备安装自定义算子
+cd ./paddlenlp/csrc/xpu/src && sh cmake_build.sh
 ```
 
 ### 2.3 关闭BlockAttention的高性能推理
@@ -92,16 +95,16 @@ cd ./paddlenlp/csrc && python setup_cuda.py install
 
 ```shell
 # 动态图模型推理命令参考
-python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16
 
 # PrefixTuning动态图推理参考
-python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --export_precache true --prefix_path ./checkpoints/llama_prefix_ckpts
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --export_precache true --prefix_path ./checkpoints/llama_prefix_ckpts
 
 # Weight Only Int8 动态图推理参考
-python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --quant_type weight_only_int8
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --quant_type weight_only_int8
 
 # PTQ-A8W8推理命令参考
-python predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --dtype float16
+python ./predict/predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --dtype float16
 ```
 **Note**：
 1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/merge_lora_params.py)。
@@ -112,16 +115,16 @@ python predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference
 **step1：动转静**
 ```shell
 # 动转静命令参考
-python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16
+python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16
 
 # PrefixTuning动转静命令参考
-python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --export_precache true
+python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --export_precache true
 
 # Weight Only Int8 动转静命令参考
-python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --quant_type weight_only_int8
+python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --quant_type weight_only_int8
 
 # PTQ-A8W8动转静命令参考
-python export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --output_path ./inference --dtype float16
+python ./predict/export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --output_path ./inference --dtype float16
 ```
 **Note**：
 1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/merge_lora_params.py)。
@@ -132,13 +135,13 @@ python export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --infere
 **step2：静态图推理**
 ```shell
 # 静态图推理命令参考
-python predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static"
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static"
 
 # PrefixTuning静态图推理命令参考
-python predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static" --export_precache true --prefix_path ./checkpoints/llama_prefix_ckpts
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static" --export_precache true --prefix_path ./checkpoints/llama_prefix_ckpts
 
 # Weight Only Int8 静态图推理命令参考
-python predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static" --quant_type weight_only_int8
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static" --quant_type weight_only_int8
 
 # PTQ-A8W8静态图推理命令参考
 # 以下环境变量用于开启int8矩阵乘的算法选择以获得更快的推理速度，打开之后第一次执行会执行算法选择从而导致速度较慢。
@@ -146,7 +149,7 @@ export FLAGS_use_autotune=1
 export FLAGS_cublaslt_exhaustive_search_times=10
 export FLAGS_cache_inference_while_scope=1
 
-python predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static"
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static"
 ```
 **Note**：
 1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/merge_lora_params.py)。
@@ -161,41 +164,50 @@ python predictor.py  --model_name_or_path ./inference --inference_model --quant_
 
 ```shell
 # 动态图模型推理命令参考
-python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn
+
+# XPU设备动态图模型推理命令参考
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --device xpu
 
 # Weight Only Int8 动态图推理参考
-python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --quant_type weight_only_int8 --block_attn
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --quant_type weight_only_int8 --block_attn
 
 # PTQ-A8W8推理命令参考
-python predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --dtype float16 --block_attn
+python ./predict/predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --dtype float16 --block_attn
 
 # CacheKV 动态量化推理命令参考
-python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --cachekv_int8
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --cachekv_int8
 ```
 
 #### 2.4.2 静态图推理
 **step1：动转静**
 ```shell
 # 动转静命令参考
-python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn
+python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn
+
+# XPU设备动转静命令参考
+python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn --device xpu
 
 # Weight Only Int8 动转静命令参考
-python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --quant_type weight_only_int8 --block_attn
+python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --quant_type weight_only_int8 --block_attn
 
 # PTQ-A8W8动转静命令参考
-python export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --output_path ./inference --dtype float16 --block_attn
+python ./predict/export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --output_path ./inference --dtype float16 --block_attn
 
 # CacheKV 动态量化动转静命令参考
-python export_model.py  --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn --cachekv_int8
+python ./predict/export_model.py  --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn --cachekv_int8
 ```
 
 **step2：静态图推理**
 ```shell
 # 静态图推理命令参考
-python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn
+
+# XPU设备静态图推理命令参考
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn --device xpu
 
 # Weight Only Int8 静态图推理命令参考
-python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --quant_type weight_only_int8 --block_attn
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --quant_type weight_only_int8 --block_attn
 
 # PTQ-A8W8静态图推理命令参考
 # 以下环境变量用于开启int8矩阵乘的算法选择以获得更快的推理速度，打开之后第一次执行会执行算法选择从而导致速度较慢。
@@ -203,10 +215,10 @@ export FLAGS_use_autotune=1
 export FLAGS_cublaslt_exhaustive_search_times=10
 export FLAGS_cache_inference_while_scope=1
 
-python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn
 
 # CacheKV 动态量化8静态图推理命令参考
-python predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --cachekv_int8 --block_attn
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --cachekv_int8 --block_attn
 ```
 **Note**：
 1. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
