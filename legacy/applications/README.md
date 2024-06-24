@@ -41,7 +41,6 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 | **情感分析**  | [情感分析](../pipelines/examples/sentiment_analysis)  | [情感分析](./sentiment_analysis) |  [情感分析](https://aistudio.baidu.com/aistudio/projectdetail/5318177)|
 | **文档智能**  | [文档抽取问答](../pipelines/examples/document-intelligence) |  [跨模态文档问答](./document_intelligence/doc_vqa)| [文档抽取问答](https://aistudio.baidu.com/aistudio/projectdetail/4881278)<br>[汽车说明书问答](https://aistudio.baidu.com/aistudio/projectdetail/4049663)  |
 | **文生图**  | [文生图系统](../pipelines/examples/text_to_image)  | 可参考[PPDiffusers](../ppdiffusers) |   |
-| **语音指令解析**  | 暂无 | [语音指令解析](./speech_cmd_analysis) | [语音指令解析](https://aistudio.baidu.com/aistudio/projectdetail/4399703) |
 | **文本摘要**  | 暂无 | [文本摘要](./text_summarization) | [文本摘要](https://aistudio.baidu.com/aistudio/projectdetail/4903667) |
 
 ## 3、典型范例介绍
@@ -118,13 +117,3 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 <br>
 
 详细使用说明请参考[情感分析](./sentiment_analysis)，更多：[文章解读](https://mp.weixin.qq.com/s/QAHjIRG9zxpYfM6YPRQ-9w)。
-
-#### 🎙️ 智能语音指令解析
-
-- 集成了[PaddleSpeech](https://github.com/PaddlePaddle/PaddleSpeech)和[百度开放平台](https://ai.baidu.com/)的语音识别和[UIE](./model_zoo/uie)通用信息抽取等技术，打造智能一体化的语音指令解析系统范例，该方案可应用于智能语音填单、智能语音交互、智能语音检索等场景，提高人机交互效率。
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/16698950/168589100-a6c6f346-97bb-47b2-ac26-8d50e71fddc5.png" width="400">
-</div>
-
-详细使用说明请参考[智能语音指令解析](./applications/speech_cmd_analysis)。

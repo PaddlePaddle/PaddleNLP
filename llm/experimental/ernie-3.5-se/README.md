@@ -25,7 +25,7 @@
 
 ## 2. 预训练
 
-预训练数据制作参考[此处](../../model_zoo/ernie-1.0/preprocess/docs/OpenWebText2.md)
+预训练数据制作参考[此处](../../tools/preprocess/docs/OpenWebText2.md)
 
 为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
 ```shell
