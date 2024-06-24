@@ -705,7 +705,7 @@ class AutoTrainer(Trainer):
                     ):
                         model_state_dict_files.append(file_name)
 
-                assert len(model_state_dict_files) == 1
+                assert len(model_state_dict_files) == 0
 
                 free_save_load_keys = []
                 for key in model_state_dict.keys():
