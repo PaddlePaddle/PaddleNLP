@@ -181,7 +181,7 @@ emb.set_state_dict(load_layer_state_dict) # 加载模型参数
 
 **A:** 预训练模型通常会有配套的tokenzier和词典，对于大多数中文预训练模型，如ERNIE-3.0，使用的都是字粒度的输入，tokenzier会将句子转换为字粒度的形式，模型无法收到词粒度的输入。如果希望引入额外的词典，需要修改预训练模型的tokenizer和词典，可以参考这里[blog](https://kexue.fm/archives/7758/comment-page-1#Tokenizer )，另外注意embedding矩阵也要加上这些新增词的embedding表示。
 
-另外还有一种方式可以使用这些字典信息，可以将数据中在词典信息中的词进行整体mask进行一个mask language model的二次预训练，这样经过二次训练的模型就包含了对额外字典的表征。可参考 [PaddleNLP 预训练数据流程](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0/)。
+另外还有一种方式可以使用这些字典信息，可以将数据中在词典信息中的词进行整体mask进行一个mask language model的二次预训练，这样经过二次训练的模型就包含了对额外字典的表征。可参考 [PaddleNLP 预训练数据流程](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/ernie-1.0/)。
 
 
 此外还有些词粒度及字词混合粒度的预训练模型，在这些词粒度的模型下引入额外的词表也会容易些，我们也将持续丰富PaddleNLP中的预训练模型。
@@ -343,7 +343,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 
 （2）如果是下游任务模型，查看是否所有模型参数都被导入了，直接使用bert-base这种预训练模型是不包含任务相关参数的，要确认导入的是微调后的模型，否则任务相关参数会随机初始化导致出现随机性。
 
-（3）部分算子使用CUDNN后端产生的不一致性可以通过环境变量的设置来避免。如果模型中使用了CNN相关算子，可以设置`FLAGS_cudnn_deterministic=True`。如果模型中使用了RNN相关算子，可以设置`CUBLAS_WORKSPACE_CONFIG=:16:8`或`CUBLAS_WORKSPACE_CONFIG=:4096:2`（CUDNN 10.2以上版本可用，参考[CUDNN 8 release note](https://docs.nvidia.com/deeplearning/sdk/cudnn-release-notes/rel_8.html)）。
+（3）部分算子使用CUDNN后端产生的不一致性可以通过环境变量的设置来避免。如果模型中使用了CNN相关算子，可以设置`FLAGS_cudnn_deterministic=True`。如果模型中使用了RNN相关算子，可以设置`CUBLAS_WORKSPACE_CONFIG=:16:8`或`CUBLAS_WORKSPACE_CONFIG=:4096:2`（CUDNN 10.2以上版本可用，参考[CUDNN 8 release note](https://docs.nvidia.com/deeplearning/cudnn/archives/cudnn-894/release-notes/index.html)）。
 
 <a name="4-7"></a>
 

@@ -35,7 +35,7 @@ tar xf GPT_345M.tar.gz
 
 ### 稀疏训练
 
-- [345M模型稀疏训练](../gpt/prune_gpt_345M_single_card.sh)
+- [345M模型稀疏训练](../prune_gpt_345M_single_card.sh)
 
 快速启动：
 ```shell

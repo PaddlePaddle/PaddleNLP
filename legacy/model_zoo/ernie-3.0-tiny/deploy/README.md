@@ -23,21 +23,9 @@
 
 ```text
 
-├── cpp
-│   ├── CMakeLists.txt    # CMake编译脚本
-│   ├── infer_demo.cc     # C++ 部署示例代码
-│   └── README.md         # C++ 部署示例文档
 ├── python
 │   ├── infer_demo.py     # Python 部署示例代码
 │   └── README.md         # Python 部署示例文档
-├── android
-│   ├── README.md         # Android部署文档
-│   ├── app               # App示例代码
-│   ├── build.gradle
-│   ├── ernie_tiny        # ERNIE 3.0 Tiny JNI & Java封装代码
-│   ├── ......            # Android相关的工程文件及目录
-│   ├── local.properties
-│   └── ui                # 一些辅助用的UI代码
 └── README.md             # 文档
 
 ```
@@ -53,5 +41,3 @@
 ## 详细部署文档
 
 - [Python部署](python/README.md)
-- [C++部署](cpp/README.md)
-- [Android部署](android/README.md)

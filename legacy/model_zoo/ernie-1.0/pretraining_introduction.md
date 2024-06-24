@@ -48,7 +48,7 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 
 ## 1. 数据准备
 
-数据流是预训练的非常重要的，[预处理文档](./preprocess/README.md)提供了整体的数据变动的流程示意，用户可以查看数据制作的细节文档。
+数据流是预训练的非常重要的，[预处理文档](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/tools/preprocess)提供了整体的数据变动的流程示意，用户可以查看数据制作的细节文档。
 
 
 <a name="大规模中文数据"> </a>
@@ -567,7 +567,7 @@ python3 -u  -m paddle.distributed.launch \
 
 
 - **下游任务评估**：CLUE Benchmark搜索评估参数效果
-    - 使用[批量启动-grid-search](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/benchmark/clue#%E6%89%B9%E9%87%8F%E5%90%AF%E5%8A%A8-grid-search)，可以进行批量搜索任务
+    - 使用[批量启动-grid-search](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/benchmark/clue#%E6%89%B9%E9%87%8F%E5%90%AF%E5%8A%A8-grid-search)，可以进行批量搜索任务
     - 注意，这里使用的是训练中的checkpoint进行评估，可以直接试着 评估待评估的参数为，所在的路径地址，即如 `python grid_seach.py output/ernie-base-outdir/model_100000` 之类的checkpoint地址。
 
 

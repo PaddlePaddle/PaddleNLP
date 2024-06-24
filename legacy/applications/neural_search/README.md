@@ -16,7 +16,7 @@
 车头如何放置车牌    后牌照怎么装
 ```
 
-语义检索系统的关键就在于，采用语义而非关键词方式进行召回，达到更精准、更广泛得召回相似结果的目的。想快速体验搜索的效果，请参考[Pipelines的语义检索实现](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/semantic-search)
+语义检索系统的关键就在于，采用语义而非关键词方式进行召回，达到更精准、更广泛得召回相似结果的目的。想快速体验搜索的效果，请参考[Pipelines的语义检索实现](../../pipelines/examples/semantic-search)
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/12107462/190302765-663ba441-9dd3-470a-8fee-f7a6f81da615.gif" width="500px">
@@ -66,11 +66,11 @@
 
 我们针对不同的数据情况推出三种语义索引方案，如下图所示，您可以参照此方案，快速建立语义索引：
 
-|  ⭐️ 无监督数据 |  ⭐️ 有监督数据 | **召回方案** |
-| ------------ | ------------ | ------------ |
-|  多 |  无 | SimCSE |
-|  无 |  多 | In-batch Negatives|
-|  有 | 有  | SimCSE+ In-batch Negatives |
+| ⭐️ 无监督数据 | ⭐️ 有监督数据 | **召回方案**               |
+|--------------|--------------|----------------------------|
+| 多           | 无           | SimCSE                     |
+| 无           | 多           | In-batch Negatives         |
+| 有           | 有           | SimCSE+ In-batch Negatives |
 
 最基本的情况是只有无监督数据，我们推荐您使用 SimCSE 进行无监督训练；另一种方案是只有有监督数据，我们推荐您使用 In-batch Negatives 的方法进行有监督训练。
 
@@ -120,12 +120,12 @@
 
 （4）在排序阶段，使用点击（作为正样本）和展现未点击（作为负样本）数据构造排序阶段的训练集，进行精排训练。
 
-|  阶段 |模型 |   训练集 | 评估集（用于评估模型效果） | 召回库 |测试集 |
-| ------------ | ------------ |------------ | ------------ | ------------ | ------------ |
-|  召回 |  Domain-adaptive Pretraining  |  2kw | - | - | - |
-|  召回 |  无监督预训练 - SimCSE |  798w  | 20000 |  300000| 1000 |
-|  召回 |  有监督训练 - In-batch Negatives | 3998  | 20000 |300000  | 1000 |
-|  排序 |  有监督训练 - ERNIE-Gram单塔 Pairwise/RocketQA Cross Encoder| 1973538   | 57811 | - | 1000 |
+| 阶段 | 模型                                                        | 训练集  | 评估集（用于评估模型效果） | 召回库 | 测试集 |
+|------|-------------------------------------------------------------|---------|----------------------------|--------|--------|
+| 召回 | Domain-adaptive Pretraining                                 | 2kw     | -                          | -      | -      |
+| 召回 | 无监督预训练 - SimCSE                                       | 798w    | 20000                      | 300000 | 1000   |
+| 召回 | 有监督训练 - In-batch Negatives                             | 3998    | 20000                      | 300000 | 1000   |
+| 排序 | 有监督训练 - ERNIE-Gram单塔 Pairwise/RocketQA Cross Encoder | 1973538 | 57811                      | -      | 1000   |
 
 我们将除 Domain-adaptive Pretraining 之外的其他数据集全部开源，下载地址：
 
@@ -314,7 +314,7 @@ pip install -r requirements.txt
 
 ## 4. Neural Search 快速体验实践
 
-PaddleNLP已经基于ERNIE 1.0训练了一个基线模型，如果想快速搭建Neural Search的完整系统，有两种方法，第一种是请参考下面的实现，包含了服务化的完整流程，另一种是使用Pipelines加载，Pipelines已经支持Neural Search训练的模型的载入，可以使用Pipelines的快速的基于Neural Search模型实现检索系统，详情请参考文档[Pipelines-Neural-Search](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/semantic-search/Neural_Search.md)。
+PaddleNLP已经基于ERNIE 1.0训练了一个基线模型，如果想快速搭建Neural Search的完整系统，有两种方法，第一种是请参考下面的实现，包含了服务化的完整流程，另一种是使用Pipelines加载，Pipelines已经支持Neural Search训练的模型的载入，可以使用Pipelines的快速的基于Neural Search模型实现检索系统，详情请参考文档[Pipelines-Neural-Search](../../pipelines/examples/semantic-search/Neural_Search.md)。
 
 ### 4.1. 召回
 
@@ -385,14 +385,14 @@ time to cost :0.05616641044616699 seconds
 
 我们进行了多组实践，用来对比说明召回阶段各方案的效果：
 
-|  模型 |  Recall@1 | Recall@5 |Recall@10 |Recall@20 |Recall@50 |策略简要说明|
-| ------------ | ------------ | ------------ |--------- |--------- |--------- |--------- |
-|  有监督训练 Baseline | 30.077| 43.513| 48.633 | 53.448 |59.632| 标准 pair-wise 训练范式，通过随机采样产生负样本|
-|  有监督训练 In-batch Negatives |  51.301 | 65.309| 69.878| 73.996|78.881| In-batch Negatives 有监督训练|
-|  无监督训练 SimCSE |  42.374 | 57.505| 62.641| 67.09|72.331| SimCSE 无监督训练|
-|  无监督 + 有监督训练 SimCSE + In-batch Negatives |  55.976 | 71.849| 76.363| 80.49|84.809| SimCSE无监督训练，In-batch Negatives 有监督训练|
-|  Domain-adaptive Pretraining + SimCSE |  51.031 | 66.648| 71.338 | 75.676 |80.144| ERNIE 预训练，SimCSE 无监督训练|
-|  Domain-adaptive Pretraining + SimCSE + In-batch Negatives|  **58.248** | **75.099**| **79.813**| **83.801**|**87.733**| ERNIE 预训练，SimCSE 无监督训训练，In-batch Negatives 有监督训练|
+| 模型                                                      | Recall@1   | Recall@5   | Recall@10  | Recall@20  | Recall@50  | 策略简要说明                                                     |
+|-----------------------------------------------------------|------------|------------|------------|------------|------------|------------------------------------------------------------------|
+| 有监督训练 Baseline                                       | 30.077     | 43.513     | 48.633     | 53.448     | 59.632     | 标准 pair-wise 训练范式，通过随机采样产生负样本                  |
+| 有监督训练 In-batch Negatives                             | 51.301     | 65.309     | 69.878     | 73.996     | 78.881     | In-batch Negatives 有监督训练                                    |
+| 无监督训练 SimCSE                                         | 42.374     | 57.505     | 62.641     | 67.09      | 72.331     | SimCSE 无监督训练                                                |
+| 无监督 + 有监督训练 SimCSE + In-batch Negatives           | 55.976     | 71.849     | 76.363     | 80.49      | 84.809     | SimCSE无监督训练，In-batch Negatives 有监督训练                  |
+| Domain-adaptive Pretraining + SimCSE                      | 51.031     | 66.648     | 71.338     | 75.676     | 80.144     | ERNIE 预训练，SimCSE 无监督训练                                  |
+| Domain-adaptive Pretraining + SimCSE + In-batch Negatives | **58.248** | **75.099** | **79.813** | **83.801** | **87.733** | ERNIE 预训练，SimCSE 无监督训训练，In-batch Negatives 有监督训练 |
 
 从上述表格可以看出，首先利用 ERNIE 3.0 做 Domain-adaptive Pretraining ，然后把训练好的模型加载到 SimCSE 上进行无监督训练，最后利用 In-batch Negatives 在有监督数据上进行训练能够获得最佳的性能。[模型下载](https://paddlenlp.bj.bcebos.com/models/inbatch_model_best.zip)，模型的使用方式参考[In-batch Negatives](./recall/in_batch_negative/) 。
 
@@ -401,7 +401,7 @@ time to cost :0.05616641044616699 seconds
 
 第一步：无监督训练 Domain-adaptive Pretraining
 
-训练用时 16hour55min，可参考：[ERNIE 1.0](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0)
+训练用时 16hour55min，可参考：[ERNIE 1.0](../../model_zoo/ernie-1.0)
 
 第二步：无监督训练 SimCSE
 
@@ -453,11 +453,11 @@ time to cost :0.05616641044616699 seconds
 
 排序阶段的效果评估：
 
-|  模型 |  AUC |
-| ------------ | ------------ |
-|  Baseline: In-batch Negatives |  0.582 |
-| pairwise ERNIE-Gram  |0.801 |
-|  CrossEncoder：rocketqa-base-cross-encoder  |**0.835** |
+| 模型                                      | AUC       |
+|-------------------------------------------|-----------|
+| Baseline: In-batch Negatives              | 0.582     |
+| pairwise ERNIE-Gram                       | 0.801     |
+| CrossEncoder：rocketqa-base-cross-encoder | **0.835** |
 
 
 同样输入文本：

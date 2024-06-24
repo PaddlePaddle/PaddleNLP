@@ -118,7 +118,7 @@ Text	Label	Prediction
 ### 单词级别可解释性分析
 本项目开源模型的词级别可解释性分析Notebook，提供LIME、Integrated Gradient、GradShap 三种分析方法，支持分析微调后模型的预测结果，开发者可以通过更改**数据目录**和**模型目录**在自己的任务中使用Jupyter Notebook进行数据分析。
 
-运行 [word_interpret.ipynb](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/text_classification/hierarchical/analysis/README.md) 代码，即可分析影响样本预测结果的关键词以及可视化所有词对预测结果的贡献情况，颜色越深代表这个词对预测结果影响越大：
+运行 `word_interpret.ipynb`代码，即可分析影响样本预测结果的关键词以及可视化所有词对预测结果的贡献情况，颜色越深代表这个词对预测结果影响越大：
 <div align="center">
     <img src="https://user-images.githubusercontent.com/63761690/195334753-78cc2dc8-a5ba-4460-9fde-3b1bb704c053.png" width="1000">
 </div>

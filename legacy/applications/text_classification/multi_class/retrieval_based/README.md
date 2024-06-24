@@ -78,7 +78,7 @@ pip install -r requirements.txt
 
 ## 4. 数据准备
 
-训练需要准备指定格式的本地数据集,如果没有已标注的数据集，可以参考[文本分类任务doccano数据标注使用指南](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/text_classification/doccano.md)进行文本分类数据标注。
+训练需要准备指定格式的本地数据集,如果没有已标注的数据集，可以参考[文本分类任务doccano数据标注使用指南](../../doccano.md)进行文本分类数据标注。
 
 **指定格式本地数据集目录结构**
 

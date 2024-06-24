@@ -128,12 +128,6 @@ msgid ""
 "<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dialogue/unified_transformer>`_"
 msgstr ""
 
-#: ../advanced_guide/fastgeneration/fastgeneration.rst:96
-msgid ""
-"`model_zoo/gpt/fast_gpt "
-"<https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt/fast_gpt>`_"
-msgstr ""
-
 #: ../advanced_guide/fastgeneration/fastgeneration.rst:97
 msgid ""
 "`examples/text_generation/unimo-text "

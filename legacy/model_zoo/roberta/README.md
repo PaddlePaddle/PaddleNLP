@@ -77,7 +77,7 @@ https://github.com/PaddlePaddle/Paddle/blob/0ee230a7d3177f791d2a5388ab4dffdccc03
 
 ## fine-tune
 
-finetune代码请参考[benchmark_glue](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/benchmark/glue)
+finetune代码请参考[benchmark_glue](../../examples/benchmark/glue)
 
 运行如下：
 
@@ -102,9 +102,9 @@ python -u ./run_glue.py \
 ```
 
 
-总训练tokens：512(seq_len）* 32(batch_size) * 780000(iteration)，约RoBERTa训练量10%，在GLUE validation set表现：
+总训练tokens：512(seq_len) * 32(batch_size) * 780000(iteration)，约RoBERTa训练量10%，在GLUE validation set表现：
 
-| Model GLUE Score   | CoLA  | SST-2  | MRPC   | STS-B  | QQP    | MNLI   | QNLI   | RTE    |
-|--------------------|-------|--------|--------|--------|--------|--------|--------|--------|
-| RoBERTa paper      |  68.0 |  96.4  |  90.9  |  92.4  |  92.2  |  90.2  |  94.7  |  86.6  |
-| PaddleNLP 6-epoch  | 36.9  | 89.5   | 84.3   | 86.2   | 88.6   | 80.5   | 88.4   | 58.1   |
+| Model GLUE Score  | CoLA | SST-2 | MRPC | STS-B | QQP  | MNLI | QNLI | RTE  |
+|-------------------|------|-------|------|-------|------|------|------|------|
+| RoBERTa paper     | 68.0 | 96.4  | 90.9 | 92.4  | 92.2 | 90.2 | 94.7 | 86.6 |
+| PaddleNLP 6-epoch | 36.9 | 89.5  | 84.3 | 86.2  | 88.6 | 80.5 | 88.4 | 58.1 |

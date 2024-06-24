@@ -6,8 +6,8 @@ GPT-[2](https://cdn.openai.com/better-language-models/language_models_are_unsupe
 本项目是语言模型 GPT 的 PaddlePaddle 大模型实现。目前，PaddleFleetX 提供了 [GPT-345M](https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M.tar.gz) 的预训练模型文件；分别基于 [LAMBADA](https://raw.githubusercontent.com/cybertronai/bflm/master/lambada_test.jsonl) 和 [WikiText](https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip) 数据集，采用 ACC(accuracy) 和 PPL(perplexity) 指标后的评估结果如下：
 
 | **模型文件** | **ACC** | **PPL** |
-|---------|-----------|---------------|
-| GPT-345M | 44.17% |  18.01  |
+|--------------|---------|---------|
+| GPT-345M     | 44.17%  | 18.01   |
 
 下面是本例的简要目录结构及说明：
 
@@ -108,13 +108,13 @@ cd .. # 回到 PaddleFleetX 根目录下
 ```
 
 其中参数对应的释义如下：
-| **参数名**                      | **参数释义**               |
-|------------------------------|------------------------|
-| device | 设备信息 |
-| seed | 随机数种子 |
+| **参数名**        | **参数释义**                                         |
+|-------------------|------------------------------------------------------|
+| device            | 设备信息                                             |
+| seed              | 随机数种子                                           |
 | global_batch_size | 全局的batch size大小，即一次参数更新等效的batch size |
-| local_batch_size  | 每个进程训练的batch size大小                  |
-| micro_batch_size  | 每次前向计算的batch size大小                  |
+| local_batch_size  | 每个进程训练的batch size大小                         |
+| micro_batch_size  | 每次前向计算的batch size大小                         |
 
 
 ### Engine训练控制
@@ -145,29 +145,29 @@ Engine训练设置完成模型训练/验证/推理等过程中的参数设置，
 ```
 其中参数对应的释义如下：
 
-| **参数名**                      | **参数释义**               |
-|------------------------------|------------------------|
-| max_steps         | 最大训练步数                               |
-| num_train_epochs  | 训练的epoch数量                           |
-| accumulate_steps  | 梯度累加次数                           |
-| logging_freq      | 训练日志打印的频率                            |
-| eval_freq         | 模型评估间隔                               |
-| eval_iters        | 模型评估时训练评估测试集的轮数                      |
-| test_iters        | 模型测试或推理时的轮数                      |
-| enable            | 是否使用混合精度策略进行训练                     |
-| dtype             | 混合精度训练数据类型使用float16还是bfloat16，默认为float16类型 |
-| level             | 混合精度训练模式，默认``O2``模式                 |
-| scale_loss        | 使用fp16混合精度策略下，loss的放缩比例                  |
+| **参数名**        | **参数释义**                                                                                                                                               |
+|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| max_steps         | 最大训练步数                                                                                                                                               |
+| num_train_epochs  | 训练的epoch数量                                                                                                                                            |
+| accumulate_steps  | 梯度累加次数                                                                                                                                               |
+| logging_freq      | 训练日志打印的频率                                                                                                                                         |
+| eval_freq         | 模型评估间隔                                                                                                                                               |
+| eval_iters        | 模型评估时训练评估测试集的轮数                                                                                                                             |
+| test_iters        | 模型测试或推理时的轮数                                                                                                                                     |
+| enable            | 是否使用混合精度策略进行训练                                                                                                                               |
+| dtype             | 混合精度训练数据类型使用float16还是bfloat16，默认为float16类型                                                                                             |
+| level             | 混合精度训练模式，默认``O2``模式                                                                                                                           |
+| scale_loss        | 使用fp16混合精度策略下，loss的放缩比例                                                                                                                     |
 | custom_black_list | 自定义算子黑名单。这个名单中的算子在支持混合精度计算时会被认为是数值危险的，它们的影响也可能会在下游操作中观察到。这些算子通常不会转为float16/bfloat16计算 |
 | custom_white_list | 自定义算子白名单。这个名单中的算子在支持混合精度计算时会被认为是数值安全的，并且对性能至关重要。如果设置了白名单，该名单中的算子会使用float16/bfloat16计算 |
-| save_steps        | 保存模型间隔step数                         |
-| save_epoch        | 保存模型间隔epoch数                        |
-| output_dir        | 指定输出文件                              |
-| ckpt_dir          | checkpoint的加载目录                      |
+| save_steps        | 保存模型间隔step数                                                                                                                                         |
+| save_epoch        | 保存模型间隔epoch数                                                                                                                                        |
+| output_dir        | 指定输出文件                                                                                                                                               |
+| ckpt_dir          | checkpoint的加载目录                                                                                                                                       |
 
 ### 模型网络
 
-网络部分完成了网络的组网操作，GPT在[PaddleFleetX/ppfleetx/models/language_model/gpt/dygraph/single_model.py]((https://github.com/PaddlePaddle/PaddleFleetX/blob/develop/ppfleetx/models/language_model/gpt/dygraph/single_model.py))下。
+网络部分完成了网络的组网操作，GPT在[PaddleFleetX/ppfleetx/models/language_model/gpt/dygraph/single_model.py](https://github.com/PaddlePaddle/PaddleFleetX/blob/develop/ppfleetx/models/language_model/gpt/dygraph/single_model.py)下。
 可以使用配置文件配置模型的规模，如：
 
 ```yaml
@@ -193,26 +193,26 @@ Engine训练设置完成模型训练/验证/推理等过程中的参数设置，
 ```
 
 其中参数对应的释义如下：
-| **参数名**                      | **参数释义**               |
-|------------------------------|------------------------|
-| module | 指定GPT模型的执行模块 ｜
-| vocab_size                   | 训练词表大小                 |
-| hidden_size                  | 隐藏层大小                  |
-| num_layers                   | transformer层数          |
-| num_attention_heads          | attention head的数量      |
-| max_seq_len                  | 输入文本序列的长度              |
-| ffn_hidden_size              | ffn层大小，一般为隐藏层的四倍       |
-| attention_probs_dropout_prob | attention中的dropout的失活率 |
-| max_position_embeddings      | position embedding的长度  |
-| type_vocab_size              | 词表类型                   |
-| initializer_range            | 参数初始化的范围               |
-| use_recompute     | 是否使用recompute训练                      |
-| recompute_granularity | recompute训练的粒度，可选 `full` `full_attn` `core_attn`，full即recompute全部transformer，full_attn表明只recompute所有self attention部分，core_attn表明只recompute `softmax(qkT)v` 部分。注：显存占用方面，`core_attn` > `full_attn` > `full`，若所选策略产生OOM错误，可以适当更改recompute_granularity |
-|no_recompute_layers| list of integer，标识哪些层的transformer不需要进行recompute。所有在该list中的值应该 >= 0 同时应该 < num_layers。向该参数中增加不进行recompute 的层数可以提升模型训练的整体吞吐，但是会适当的增加显存。若训练中发现有显存富裕，可以适当增加不进行recompute的层数。如果使用该参数后出现OOM错误，可以适当减小不进行recompute的层数。 ｜
-| fused_linear      | 是否使用fused_linear代替传统Linear加速训练。注：该功能需要cuda 11.6及以上编译的paddle支持。       |
-| fuse_attn_qkv     | 是否对attention层中的qkv计算使用fuse策略以加速训练 |
-| sequence_parallel | 是否使用序列并行策略以加速训练。注：只有混合并行的GPT才支持该功能，它与张量模型并行共用通信组，当mp_degree=1时，序列并行策略会被强制关闭。 |
-| virtual_pp_degree | 虚拟流水线并行维度，该参数会减小流水线bubble的占比以提升流水线的吞吐。但是该参数会增加流水线间的通讯，所以该参数的推荐值为2。并且，只有 num_layers可以被 pp_degree * virtual_pp_degree 整除时，才可以使用虚拟流水线并行。 |
+| **参数名**                   | **参数释义**                                                                                                                                                                                                                                                                                                                         |
+|------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| module                       | 指定GPT模型的执行模块 ｜                                                                                                                                                                                                                                                                                                             |
+| vocab_size                   | 训练词表大小                                                                                                                                                                                                                                                                                                                         |
+| hidden_size                  | 隐藏层大小                                                                                                                                                                                                                                                                                                                           |
+| num_layers                   | transformer层数                                                                                                                                                                                                                                                                                                                      |
+| num_attention_heads          | attention head的数量                                                                                                                                                                                                                                                                                                                 |
+| max_seq_len                  | 输入文本序列的长度                                                                                                                                                                                                                                                                                                                   |
+| ffn_hidden_size              | ffn层大小，一般为隐藏层的四倍                                                                                                                                                                                                                                                                                                        |
+| attention_probs_dropout_prob | attention中的dropout的失活率                                                                                                                                                                                                                                                                                                         |
+| max_position_embeddings      | position embedding的长度                                                                                                                                                                                                                                                                                                             |
+| type_vocab_size              | 词表类型                                                                                                                                                                                                                                                                                                                             |
+| initializer_range            | 参数初始化的范围                                                                                                                                                                                                                                                                                                                     |
+| use_recompute                | 是否使用recompute训练                                                                                                                                                                                                                                                                                                                |
+| recompute_granularity        | recompute训练的粒度，可选 `full` `full_attn` `core_attn`，full即recompute全部transformer，full_attn表明只recompute所有self attention部分，core_attn表明只recompute `softmax(qkT)v` 部分。注：显存占用方面，`core_attn` > `full_attn` > `full`，若所选策略产生OOM错误，可以适当更改recompute_granularity                              |
+| no_recompute_layers          | list of integer，标识哪些层的transformer不需要进行recompute。所有在该list中的值应该 >= 0 同时应该 < num_layers。向该参数中增加不进行recompute 的层数可以提升模型训练的整体吞吐，但是会适当的增加显存。若训练中发现有显存富裕，可以适当增加不进行recompute的层数。如果使用该参数后出现OOM错误，可以适当减小不进行recompute的层数。 ｜ |
+| fused_linear                 | 是否使用fused_linear代替传统Linear加速训练。注：该功能需要cuda 11.6及以上编译的paddle支持。                                                                                                                                                                                                                                          |
+| fuse_attn_qkv                | 是否对attention层中的qkv计算使用fuse策略以加速训练                                                                                                                                                                                                                                                                                   |
+| sequence_parallel            | 是否使用序列并行策略以加速训练。注：只有混合并行的GPT才支持该功能，它与张量模型并行共用通信组，当mp_degree=1时，序列并行策略会被强制关闭。                                                                                                                                                                                           |
+| virtual_pp_degree            | 虚拟流水线并行维度，该参数会减小流水线bubble的占比以提升流水线的吞吐。但是该参数会增加流水线间的通讯，所以该参数的推荐值为2。并且，只有 num_layers可以被 pp_degree * virtual_pp_degree 整除时，才可以使用虚拟流水线并行。                                                                                                            |
 ### 数据集
 
 数据集参数分为“Train”、“Eval”和“Test”三部分，分别对应模型预训练、离线评估、推理等三个模块。
@@ -238,18 +238,18 @@ Engine训练设置完成模型训练/验证/推理等过程中的参数设置，
 ```
 
 其中参数对应的释义如下：
-| **参数名**                      | **参数释义**               |
-|------------------------------|------------------------|
-| dataset.name         | 指定自定义数据集的名称  |
-| input_dir         | 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件       |
-| split             | 训练集，验证集和测试集的切分比例                     |
-| max_seq_len       | 输入文本序列的长度                            |
-| sampler.name         | 指定自定义采样器的名称  |
-| shuffle         | 是否需要在生成样本下标时打乱顺序     |
-| drop_last             | 是否需要丢弃最后无法凑整一个mini-batch的样本        |
-| num_workers        | 用于加载数据的子进程个数  |
-| return_list         | 每个设备上的数据是否以list形式返回    |
-| collate_fn             | 通过此参数指定如果将样本列表组合为mini-batch数据；支持自定义     |
+| **参数名**   | **参数释义**                                                 |
+|--------------|--------------------------------------------------------------|
+| dataset.name | 指定自定义数据集的名称                                       |
+| input_dir    | 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件 |
+| split        | 训练集，验证集和测试集的切分比例                             |
+| max_seq_len  | 输入文本序列的长度                                           |
+| sampler.name | 指定自定义采样器的名称                                       |
+| shuffle      | 是否需要在生成样本下标时打乱顺序                             |
+| drop_last    | 是否需要丢弃最后无法凑整一个mini-batch的样本                 |
+| num_workers  | 用于加载数据的子进程个数                                     |
+| return_list  | 每个设备上的数据是否以list形式返回                           |
+| collate_fn   | 通过此参数指定如果将样本列表组合为mini-batch数据；支持自定义 |
 
 
 ### 优化器
@@ -278,21 +278,21 @@ GPT训练默认使用AdamW优化器以及cosine学习率衰减，这里通过配
 
 其中参数说明：
 
-| **参数名**      | **参数释义**                  |
-|--------------|---------------------------|
-| name | 指定自定义优化器的名称               |
-| weight_decay | weight的衰减率                |
-| beta1   | 一阶矩估计的指数衰减率               |
-| beta2   | 二阶矩估计的指数衰减率               |
-| epsilon | 指定优化器需要优化的参数              |
-| lr.name | 指定自定义学习率策略的名称               |
-| decay_steps  | 衰减的步长                     |
-| warmup_rate  | warmup 率                  |
-| max_lr       | Adam 的初始最大学习率             |
-| min_lr       | Adam 的初始最小学习率             |
-| grad_clip.name    | 指定自定义梯度裁剪策略的名称 |
-| clip_norm    | 所允许的范数最大值 |
-| tensor_fusion    | 是否使用tensor_fustion功能加速训练 |
+| **参数名**     | **参数释义**                       |
+|----------------|------------------------------------|
+| name           | 指定自定义优化器的名称             |
+| weight_decay   | weight的衰减率                     |
+| beta1          | 一阶矩估计的指数衰减率             |
+| beta2          | 二阶矩估计的指数衰减率             |
+| epsilon        | 指定优化器需要优化的参数           |
+| lr.name        | 指定自定义学习率策略的名称         |
+| decay_steps    | 衰减的步长                         |
+| warmup_rate    | warmup 率                          |
+| max_lr         | Adam 的初始最大学习率              |
+| min_lr         | Adam 的初始最小学习率              |
+| grad_clip.name | 指定自定义梯度裁剪策略的名称       |
+| clip_norm      | 所允许的范数最大值                 |
+| tensor_fusion  | 是否使用tensor_fustion功能加速训练 |
 
 另外，[Profiler](./hybrid_profiler.md)中还介绍了在 GPT 中开启 Profiler 并分析调试分析结果的方法及相关的参数解释。
 

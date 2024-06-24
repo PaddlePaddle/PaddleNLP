@@ -277,4 +277,4 @@ key function
         该函数会遍历整个权重参数列表，对于每个权重参数weight，统计所有进行梯度更新的参数，最后将信息打印出来。
 ```
 
-更详细的使用可以参考[finetuning 脚本](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/run_finetune.py)版本, 以及对应的启动脚本编写方式（写在 [README.md](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/causallm/README.md)文件中)。
+更详细的使用可以参考[finetuning 脚本](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/run_finetune.py)版本, 以及对应的启动脚本编写方式（写在 [README.md](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/README.md)文件中)。

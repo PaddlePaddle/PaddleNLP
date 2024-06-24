@@ -262,8 +262,4 @@ batch size = 32，max length = 16。
 
 [ERNIE 3.0 Tiny模型详细介绍](../../README.md)
 
-[ERNIE 3.0 Tiny模型C++部署方法](../cpp/README.md)
-
-[ERNIE 3.0 Tiny模型Android部署方法](../android/README.md)
-
 [FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)

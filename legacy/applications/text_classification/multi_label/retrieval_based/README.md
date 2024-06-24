@@ -81,7 +81,7 @@ pip install -r requirements.txt
 
 ## 4. 数据准备
 
-训练需要准备指定格式的本地数据集,如果没有已标注的数据集，可以参考[文本分类任务doccano数据标注使用指南](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/text_classification/doccano.md)进行文本分类数据标注。
+训练需要准备指定格式的本地数据集,如果没有已标注的数据集，可以参考[文本分类任务doccano数据标注使用指南](../../doccano.md)进行文本分类数据标注。
 
 **指定格式本地数据集目录结构**
 
@@ -433,7 +433,7 @@ python export_to_serving.py \
 sh scripts/export_to_serving.sh
 ```
 
-Paddle Serving的部署采用Pipeline的方式，如果用户有对性能有更高的要求，可以采用C++的部署形式，请参考[Neural Search](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/neural_search/recall/in_batch_negative#c%E7%9A%84%E6%96%B9%E5%BC%8F)：
+Paddle Serving的部署采用Pipeline的方式，如果用户有对性能有更高的要求，可以采用C++的部署形式，请参考[Neural Search](../../../neural_search/recall/in_batch_negative/#c%E7%9A%84%E6%96%B9%E5%BC%8F)：
 
 #### Pipeline方式
 
