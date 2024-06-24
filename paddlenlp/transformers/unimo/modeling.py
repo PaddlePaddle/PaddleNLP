@@ -327,7 +327,7 @@ class UNIMOLMHead(nn.Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        logits = paddle.tensor.matmul(hidden_states, self.weight, transpose_y=True) + self.decoder_bias
+        logits = paddle.tensor.matmul(hidden_states, self.weight, transpose_y=True)
         return logits
 
 
