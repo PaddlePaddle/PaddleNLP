@@ -313,13 +313,13 @@ class UNIMOLMHead(nn.Layer):
         self.transform = nn.Linear(hidden_size, hidden_size)
         self.activation = getattr(nn.functional, activation)
         self.layer_norm = nn.LayerNorm(hidden_size)
-        self.decoder_weight = (
+        self.weight = (
             self.create_parameter(shape=[vocab_size, hidden_size], dtype=self.transform.weight.dtype, is_bias=False)
             if embedding_weights is None
             else embedding_weights
         )
-        self.decoder_bias = self.create_parameter(shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
-
+        self.decoder_bias = self.create_parameter(shape=[vocab_size], dtype=self.weight.dtype, is_bias=True)
+        
     def forward(self, hidden_states: Tensor, masked_positions: Optional[Tensor] = None):
         if masked_positions is not None:
             hidden_states = paddle.reshape(hidden_states, [-1, hidden_states.shape[-1]])
@@ -327,7 +327,7 @@ class UNIMOLMHead(nn.Layer):
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        logits = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True) + self.decoder_bias
+        logits = paddle.tensor.matmul(hidden_states, self.weight, transpose_y=True) + self.decoder_bias
         return logits
 
 
@@ -349,6 +349,10 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
             config.hidden_act,
             self.unimo.embeddings.word_embeddings.weight,
         )
+        self.tie_weights()
+        
+    def get_output_embeddings(self):
+        return self.lm_head
 
     def forward(
         self,
