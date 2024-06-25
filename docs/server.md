@@ -204,4 +204,4 @@ texts = [
 ## 参考示例
 - [UIE 服务化部署](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/uie/deploy/serving/simple_serving)
 - [文本分类服务化部署](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/applications/text_classification/multi_class/deploy/simple_serving)
-- [预训练模型定制化post_handler](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/ernie-health/cblue/deploy/serving/simple_serving)
+- [预训练模型定制化post_handler](https://github.com/PaddlePaddle/PaddleNLP/blob/release/2.8/model_zoo/ernie-health/cblue/deploy/serving/simple_serving)

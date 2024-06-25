@@ -56,15 +56,15 @@ PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 
 | Model                            | Inference Model | PTuning | WINT8 | PTQ-A8W8 |
 |----------------------------------|-----------------|---------|-------|----------|
-| [LLaMA1/2](./config/llama)      | ✅               | ✅       | ✅     | ✅        |
-| [ChatGLM](./config/chatglm)     | ✅               | ✅       | ✅     | ❌        |
-| [ChatGLM2](./config/chatglm2)   | ✅               | ❌       | ❌     | ❌        |
-| [Bloom](./config/bloom)         | ✅               | ✅       | ✅     | ❌        |
-| [GPT-3](./config/gpt-3)         | ✅               | ❌       | ❌     | ❌        |
-| [Qwen](./config/qwen)           | ✅               | ❌       | ❌     | ❌        |
-| [BaiChuan-7B](./config/baichuan)   | ✅               | ✅       | ✅     | 🚧       |
-| [BaiChuan2-7B](./config/baichuan)  | ✅               | ✅       | ✅     | 🚧       |
-| [BaiChuan2-13B](./config/baichuan) | 🚧              | 🚧      | 🚧    | 🚧       |
+| [LLaMA1/2](../config/llama)      | ✅               | ✅       | ✅     | ✅        |
+| [ChatGLM](../config/chatglm)     | ✅               | ✅       | ✅     | ❌        |
+| [ChatGLM2](../config/chatglm2)   | ✅               | ❌       | ❌     | ❌        |
+| [Bloom](../config/bloom)         | ✅               | ✅       | ✅     | ❌        |
+| [GPT-3](../config/gpt-3)         | ✅               | ❌       | ❌     | ❌        |
+| [Qwen](../config/qwen)           | ✅               | ❌       | ❌     | ❌        |
+| [BaiChuan-7B](../config/baichuan)   | ✅               | ✅       | ✅     | 🚧       |
+| [BaiChuan2-7B](../config/baichuan)  | ✅               | ✅       | ✅     | 🚧       |
+| [BaiChuan2-13B](../config/baichuan) | 🚧              | 🚧      | 🚧    | 🚧       |
 
 * ✅: Supported
 * 🚧: In Progress

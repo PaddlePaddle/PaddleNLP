@@ -8,7 +8,7 @@ PaddleNLP致力于预训练开源工作，使用开源中文语料CLUE、WuDao �
 
 接下来将从下面几个方面，详细介绍整个数据制作全流程，从零开始，构建一个预训练模型。
 
-* [1. 数据准备](数据准备)
+* [1. 数据准备](#数据准备)
     * [1.1 大规模中文数据](#大规模中文数据)
     * [1.2 高精准中文分词](#高精准中文分词)
     * [1.3 快速Token ID 转化](#快速TokenID转化)
@@ -102,7 +102,7 @@ ERNIE 使用知识嵌入的方式进行预训练。文本中的知识，比如 �
 
 
 ```shell
-python ./preprocess/words_segmentation.py \
+python $PADDLENLP_PATH/llm/tools/preprocess/words_segmentation.py \
     --input_path "./WuDaoCorpus2.0_base_200G" \
     --output_path "./wudao_lac_cut" \
     --data_format "wudao" \
@@ -112,9 +112,9 @@ python ./preprocess/words_segmentation.py \
 
 注：预训练需要实现 SOP( Sentence Order Predict) 任务，在分词的同时，我们使用 简单规则 进行了文本断句。如果语料只有一句话，建议去除SOP loss，训练时设置 `binary_head=False`。
 
-文本转化完成后。我们使用 `./preprocess/trans_to_json.py`重新转换为jsonl格式（分词完毕）。
+文本转化完成后。我们使用 `$PADDLENLP_PATH/llm/tools/preprocess/trans_to_json.py`重新转换为jsonl格式（分词完毕）。
 ```shell
-python ./preprocess/trans_to_json.py  \
+python $PADDLENLP_PATH/llm/tools/preprocess/trans_to_json.py  \
     --input_path "./wudao_lac_cut" \
     --output_path "wudao_corpus_200g_sample.jsonl" \
     --workers 40 \
@@ -144,7 +144,7 @@ wget https://bj.bcebos.com/paddlenlp/models/transformers/data_tools/wudao_corpus
 使用 Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz CPU测试，40线程，处理速度 8+MB/s，约7个小时左右，即可完成 200GB 文本转化为ID.
 
 ```shell
-python -u  ./preprocess/create_pretraining_data.py \
+python -u  $PADDLENLP_PATH/llm/tools/preprocess/create_pretraining_data.py \
     --model_name "ernie-3.0-base-zh" \
     --tokenizer_name "ErnieTokenizer" \
     --input_path "wudao_corpus_200g.jsonl" \

@@ -132,7 +132,7 @@ emb.set_state_dict(load_layer_state_dict) # 加载模型参数
 
 ##### Q1.4 当训练样本较少时，有什么推荐的方法能提升模型效果吗？
 
-**A:** 增加训练样本带来的效果是最直接的。此外，可以基于我们开源的[预训练模型](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers)进行热启，再用少量数据集fine-tune模型。此外，针对分类、匹配等场景，[小样本学习](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/few_shot)也能够带来不错的效果。
+**A:** 增加训练样本带来的效果是最直接的。此外，可以基于我们开源的[预训练模型](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/transformers)进行热启，再用少量数据集fine-tune模型。此外，针对分类、匹配等场景，[小样本学习](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/few_shot)也能够带来不错的效果。
 
 <a name="1-5"></a>
 
@@ -140,7 +140,7 @@ emb.set_state_dict(load_layer_state_dict) # 加载模型参数
 
 **A:** 从工程角度，对于服务器端部署可以使用[Paddle Inference](https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/05_inference_deployment/inference/inference_cn.html)高性能预测引擎进行预测部署。对于Transformer类模型的GPU预测还可以使用PaddleNLP中提供的[FastGeneration](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/paddlenlp/ops)功能来进行快速预测，其集成了[NV FasterTransformer](https://github.com/NVIDIA/FasterTransformer)并进行了功能增强。
 
-从模型策略角度，可以使用一些模型小型化技术来进行模型压缩，如模型蒸馏和裁剪，通过小模型来实现加速。PaddleNLP中集成了ERNIE-Tiny这样一些通用小模型供下游任务微调使用。另外PaddleNLP提供了[模型压缩示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/model_compression)，实现了DynaBERT、TinyBERT、MiniLM等方法策略，可以参考对自己的模型进行蒸馏压缩。
+从模型策略角度，可以使用一些模型小型化技术来进行模型压缩，如模型蒸馏和裁剪，通过小模型来实现加速。PaddleNLP中集成了ERNIE-Tiny这样一些通用小模型供下游任务微调使用。另外PaddleNLP提供了[模型压缩示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/model_compression)，实现了DynaBERT、TinyBERT、MiniLM等方法策略，可以参考对自己的模型进行蒸馏压缩。
 
 <a name="NLP通用问题"></a>
 
@@ -321,7 +321,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 
 （2）对于第二种方法：
 
-- 我们在PaddleNLP的examples目录下提供了常见任务的训练与预测脚本：如[GLUE](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/benchmark/glue) 和 [SQuAD](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_reading_comprehension/SQuAD)等
+- 我们在PaddleNLP的examples目录下提供了常见任务的训练与预测脚本：如[GLUE](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/benchmark/glue) 和 [SQuAD](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/machine_reading_comprehension/SQuAD)等
 
 - 开发者可以参考上述脚本进行自定义训练与预测脚本的开发。
 
@@ -408,7 +408,7 @@ model.set_state_dict(paddle.load("xxx_para"))
 
 ##### Q4.4 【语义匹配】语义索引和语义匹配有什么区别？
 
-**A:** 语义索引要解决的核心问题是如何从海量 Doc 中通过 ANN 索引的方式快速、准确地找出与 query 相关的文档，语义匹配要解决的核心问题是对 query和文档更精细的语义匹配信息建模。换个角度理解， [语义索引](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/semantic_indexing)是要解决搜索、推荐场景下的召回问题，而[语义匹配](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_matching)是要解决排序问题，两者要解决的问题不同，所采用的方案也会有很大不同，但两者间存在一些共通的技术点，可以互相借鉴。
+**A:** 语义索引要解决的核心问题是如何从海量 Doc 中通过 ANN 索引的方式快速、准确地找出与 query 相关的文档，语义匹配要解决的核心问题是对 query和文档更精细的语义匹配信息建模。换个角度理解， [语义索引](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/semantic_indexing)是要解决搜索、推荐场景下的召回问题，而[语义匹配](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_matching)是要解决排序问题，两者要解决的问题不同，所采用的方案也会有很大不同，但两者间存在一些共通的技术点，可以互相借鉴。
 
 <a name="6-5"></a>
 

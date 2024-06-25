@@ -34,7 +34,7 @@
 
 * **2024.01.04 [PaddleNLP v2.7](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.7.1)**： 大模型体验全面升级，统一工具链大模型入口。统一预训练、精调、压缩、推理以及部署等环节的实现代码，到 `PaddleNLP/llm`目录。全新[大模型工具链文档](https://paddlenlp.readthedocs.io/zh/latest/llm/finetune.html)，一站式指引用户从大模型入门到业务部署上线。全断点存储机制 Unified Checkpoint，大大提高大模型存储的通用性。高效微调升级，支持了高效微调+LoRA同时使用，支持了QLoRA等算法。
 
-* **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**： 发布[全流程大模型工具链](./llm)，涵盖预训练，精调，压缩，推理以及部署等各个环节，为用户提供端到端的大模型方案和一站式的开发体验；内置[4D并行分布式Trainer](./docs/trainer.md)，[高效微调算法LoRA/Prefix Tuning](./llm#33-lora), [自研INT8/INT4量化算法](./llm#6-量化)等等；全面支持[LLaMA 1/2](./llm/llama), [BLOOM](.llm/bloom), [ChatGLM 1/2](./llm/chatglm), [GLM](./llm/glm), [OPT](./llm/opt)等主流大模型
+* **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**： 发布[全流程大模型工具链](./llm)，涵盖预训练，精调，压缩，推理以及部署等各个环节，为用户提供端到端的大模型方案和一站式的开发体验；内置[4D并行分布式Trainer](./docs/trainer.md)，[高效微调算法LoRA/Prefix Tuning](./llm#33-lora), [自研INT8/INT4量化算法](./llm#6-量化)等等；全面支持[LLaMA 1/2](./llm/config/llama), [BLOOM](.llm/config/bloom), [ChatGLM 1/2](./llm/config/chatglm), [OPT](./llm/config/opt)等主流大模型
 
 
 ## 安装
@@ -255,7 +255,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 </div>
 
 
-更多使用说明请参考[智能问答系统](./legacy/applications/question_answering)与[文档智能问答](./legacy/applications/document_intelligence/doc_vqa)
+更多使用说明请参考[智能问答系统](./legacy/applications/question_answering)与[文档智能问答](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/document_intelligence/doc_vqa)
 
 #### 💌 评论观点抽取与情感分析
 
@@ -265,7 +265,7 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
     <img src="https://user-images.githubusercontent.com/11793384/168407260-b7f92800-861c-4207-98f3-2291e0102bbe.png" width="400">
 </div>
 
-更多使用说明请参考[情感分析](./legacy/applications/sentiment_analysis)。
+更多使用说明请参考[情感分析](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/sentiment_analysis)。
 
 #### 🎙️ 智能语音指令解析
 
@@ -275,25 +275,9 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
     <img src="https://user-images.githubusercontent.com/16698950/168589100-a6c6f346-97bb-47b2-ac26-8d50e71fddc5.png" width="400">
 </div>
 
-更多使用说明请参考[智能语音指令解析](./legacy/applications/speech_cmd_analysis)。
+更多使用说明请参考[智能语音指令解析](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/speech_cmd_analysis)。
 
 ### 高性能分布式训练与推理
-
-#### ⚡️ FastGeneration：高性能生成加速库
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="400">
-</div>
-
-```python
-model = GPTLMHeadModel.from_pretrained('gpt-cpm-large-cn')
-...
-outputs, _ = model.generate(
-    input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search',
-    use_fast=True)
-```
-
-简单地在`generate()`API上打开`use_fast=True`选项，轻松在Transformer、GPT、BART、PLATO、UniLM等生成式预训练模型上获得5倍以上GPU加速，更多使用说明可参考[FastGeneration文档](./fast_generation)。
 
 #### 🚀 Fleet：飞桨4D混合并行分布式训练技术
 
@@ -302,7 +286,7 @@ outputs, _ = model.generate(
 </div>
 
 
-更多关于千亿级AI模型的分布式训练使用说明可参考[GPT-3](./legacy/examples/language_model/gpt-3)。
+更多关于千亿级AI模型的分布式训练使用说明可参考[GPT-3](./legacy/model_zoo/gpt-3)。
 
 ## 社区交流
 
