@@ -322,7 +322,7 @@ def main():
 
     if data_args.zero_padding:
         if (
-            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen"]
+            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen", "jamba"]
             and training_args.pipeline_parallel_degree < 1
         ):
             raise NotImplementedError(

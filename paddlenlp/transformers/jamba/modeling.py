@@ -1111,7 +1111,7 @@ class JambaMambaDecoderLayer(nn.Layer):
 
 class JambaPretrainedModel(PretrainedModel):
     config_class = JambaConfig
-    base_model_prefix = "model"
+    base_model_prefix = "jamba"
     supports_gradient_checkpointing = True
     _no_split_modules = ["JambaAttentionDecoderLayer", "JambaMambaDecoderLayer"]
 
@@ -1185,7 +1185,7 @@ class JambaPretrainedModel(PretrainedModel):
         if "JambaModel" not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
-                mapping[1] = "model." + mapping[1]
+                mapping[1] = "jamba." + mapping[1]
             if not config.tie_word_embeddings:
                 model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
@@ -1559,7 +1559,7 @@ class JambaForCausalLM(JambaPretrainedModel):
     def __init__(self, config: JambaConfig):
         super().__init__(config)
 
-        self.model = JambaModel(config)
+        self.jamba = JambaModel(config)
         assert not config.tie_word_embeddings, "Tied word embeddings are not supported in JambaForCausalLM"
         self.lm_head = JambaLMHead(config)
         self.criterion = JambaPretrainingCriterion(config)
@@ -1571,10 +1571,10 @@ class JambaForCausalLM(JambaPretrainedModel):
         self.post_init()
 
     def get_input_embeddings(self):
-        return self.model.embed_tokens
+        return self.jamba.embed_tokens
 
     def set_input_embeddings(self, value):
-        self.model.embed_tokens = value
+        self.jamba.embed_tokens = value
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -1583,10 +1583,10 @@ class JambaForCausalLM(JambaPretrainedModel):
         self.lm_head = new_embeddings
 
     def set_decoder(self, decoder):
-        self.model = decoder
+        self.jamba = decoder
 
     def get_decoder(self):
-        return self.model
+        return self.jamba
 
     # Ignore copy
     def forward(
@@ -1647,7 +1647,7 @@ class JambaForCausalLM(JambaPretrainedModel):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
-        outputs = self.model(
+        outputs = self.jamba(
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -1766,17 +1766,17 @@ class JambaForSequenceClassification(JambaPretrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.num_labels = config.num_labels
-        self.model = JambaModel(config)
+        self.jamba = JambaModel(config)
         self.score = nn.Linear(config.hidden_size, self.num_labels, bias_attr=False)
 
         # Initialize weights and apply final processing
         self.post_init()
 
     def get_input_embeddings(self):
-        return self.model.embed_tokens
+        return self.jamba.embed_tokens
 
     def set_input_embeddings(self, value):
-        self.model.embed_tokens = value
+        self.jamba.embed_tokens = value
 
     def forward(
         self,
@@ -1799,7 +1799,7 @@ class JambaForSequenceClassification(JambaPretrainedModel):
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        transformer_outputs = self.model(
+        transformer_outputs = self.jamba(
             input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,

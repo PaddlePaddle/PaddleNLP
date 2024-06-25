@@ -159,10 +159,6 @@ class JambaConfig(PretrainedConfig):
         mamba_dt_rank="auto",
         mamba_conv_bias=True,
         mamba_proj_bias=False,
-        # new added
-        use_recompute=False,
-        use_flash_attention=True,
-        tensor_parallel_output=True,
         **kwargs,
     ):
         super().__init__(
@@ -210,11 +206,6 @@ class JambaConfig(PretrainedConfig):
         self.mamba_dt_rank = math.ceil(self.hidden_size / 16) if mamba_dt_rank == "auto" else mamba_dt_rank
         self.mamba_conv_bias = mamba_conv_bias
         self.mamba_proj_bias = mamba_proj_bias
-
-        # new added
-        self.use_recompute = use_recompute
-        self.use_flash_attention = use_flash_attention
-        self.tensor_parallel_output = tensor_parallel_output
 
     @property
     def layers_block_type(self):
