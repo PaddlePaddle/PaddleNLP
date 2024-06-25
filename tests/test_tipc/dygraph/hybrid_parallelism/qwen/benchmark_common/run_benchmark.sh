@@ -107,7 +107,7 @@ function _train(){
     use_pure_fp16=False
     train_cmd="--model_name_or_path ${model_name_or_path} \
     --tokenizer_name_or_path ${model_name_or_path} \
-    --input_dir ./qwen/data \
+    --input_dir ./data \
     --output_dir ./output \
     --split 949,50,1 \
     --max_seq_length 2048 \
