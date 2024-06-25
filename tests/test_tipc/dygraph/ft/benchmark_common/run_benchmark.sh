@@ -118,11 +118,11 @@ function _train(){
     cd ../llm/
     echo "run run_mode: ${run_mode} device_num: ${device_num}"
     if [ "N1C1" = ${device_num} ]; then
-        train_cmd="python -u finetune_generation.py ${train_cmd}" 
+        train_cmd="python -u run_finetune.py ${train_cmd}" 
     else
         rm -rf ./mylog   # 注意执行前删掉log目录
         train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=$CUDA_VISIBLE_DEVICES \
-            finetune_generation.py ${train_cmd}" 
+            run_finetune.py ${train_cmd}" 
     fi
 
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"

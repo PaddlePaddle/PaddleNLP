@@ -19,12 +19,12 @@ set -e
 export log_path=/workspace/case_logs
 export root_path=/workspace/PaddleNLP
 
-export gpt_case_path=$root_path/model_zoo/gpt-3
+export gpt_case_path=$root_path/legacy/model_zoo/gpt-3
 export gpt_data_path=/fleetx_data
 
-export llama_case_path=$root_path/llm/llama/auto_parallel
+export llama_case_path=$root_path/llm/auto_parallel/llama
 export llama_data_path=/llama_data
-export llm_gpt_case_path=$root_path/llm/gpt-3/auto_parallel
+export llm_gpt_case_path=$root_path/llm/auto_parallel/gpt-3
 
 unset CUDA_VISIBLE_DEVICES
 

@@ -22,7 +22,6 @@ from ..bert.test_tokenizer import BertTokenizationTest
 
 class SqueezeBertTokenizationTest(BertTokenizationTest):
     tokenizer_class = SqueezeBertTokenizer
-    test_fast_tokenizer = False
 
     @slow
     def test_sequence_builders(self):

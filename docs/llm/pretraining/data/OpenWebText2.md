@@ -14,7 +14,7 @@
 ```shell
 # wget https://mystic.the-eye.eu/public/AI/pile_preliminary_components/openwebtext2.jsonl.zst.tar
 wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/openwebtext2.jsonl.zst.tar
-tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
+tar -xvf openwebtext2.jsonl.zst.tar -C  /path/to/openwebtext
 ```
 
 ## Llama训练数据制作

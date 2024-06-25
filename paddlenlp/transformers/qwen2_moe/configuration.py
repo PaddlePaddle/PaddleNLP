@@ -122,16 +122,8 @@ class Qwen2MoeConfig(PretrainedConfig):
         initializer_range=0.02,
         rms_norm_eps=1e-6,
         use_cache=True,
-        use_recompute=False,
-        recompute_granularity="full",
-        no_recompute_layers=None,
-        use_flash_attention=False,
         attention_dropout=0.0,
-        use_fused_rope=False,
         rope_theta=1000000.0,
-        tensor_parallel_output=True,
-        sequence_parallel=False,
-        fuse_sequence_parallel_allreduce=False,
         pad_token_id=0,
         bos_token_id=151643,
         eos_token_id=151643,
@@ -167,19 +159,11 @@ class Qwen2MoeConfig(PretrainedConfig):
         self.rms_norm_eps = rms_norm_eps
 
         self.use_cache = use_cache
-        self.use_recompute = use_recompute
-        self.recompute_granularity = recompute_granularity
-        self.no_recompute_layers = no_recompute_layers
-        self.use_flash_attention = use_flash_attention
-        self.tensor_parallel_output = tensor_parallel_output
-        self.sequence_parallel = sequence_parallel
-        self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
 
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
 
-        self.use_fused_rope = use_fused_rope
         self.rope_theta = rope_theta
         self.attention_dropout = attention_dropout
 
@@ -198,6 +182,5 @@ class Qwen2MoeConfig(PretrainedConfig):
             bos_token_id=bos_token_id,
             eos_token_id=eos_token_id,
             tie_word_embeddings=tie_word_embeddings,
-            tensor_parallel_output=tensor_parallel_output,
             **kwargs,
         )

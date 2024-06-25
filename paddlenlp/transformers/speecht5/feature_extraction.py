@@ -382,8 +382,8 @@ class SpeechT5FeatureExtractor(SequenceFeatureExtractor):
 
         return padded_inputs
 
-    def to_dict(self) -> Dict[str, Any]:
-        output = super().to_dict()
+    def to_dict(self, *args, **kwargs) -> Dict[str, Any]:
+        output = super().to_dict(*args, **kwargs)
 
         # Don't serialize these as they are derived from the other properties.
         names = ["window", "mel_filters", "sample_size", "sample_stride", "n_fft", "n_freqs"]
