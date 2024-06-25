@@ -296,3 +296,5 @@ from .deberta_v2.tokenizer import *
 from .deberta_v2.configuration import *
 from .qwen2 import *
 from .qwen2_moe import *
+from .yuan.modeling import *
+from .yuan.configuration import *
