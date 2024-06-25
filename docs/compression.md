@@ -29,29 +29,29 @@ PaddleNLP 模型压缩 API 功能支持对 ERNIE 类下游任务上微调后的�
 如下表所示，ERNIE 3.0-Medium (6-layer, 384-hidden, 12-heads) 模型在三类任务（文本分类、序列标注、抽取式阅读理解）经过裁剪 + 量化后加速比均达到 3 倍左右，所有任务上平均精度损失可控制在 0.5 以内（0.46）。
 
 |                            | TNEWS 性能    | TNEWS 精度   | MSRA_NER 性能 | MSRA_NER 精度 | CMRC2018 性能 | CMRC2018 精度 |
-| -------------------------- | ------------- | ------------ | ------------- | ------------- | ------------- | ------------- |
+|----------------------------|---------------|--------------|---------------|---------------|---------------|---------------|
 | ERNIE 3.0-Medium+FP32      | 1123.85(1.0x) | 57.45        | 366.75(1.0x)  | 93.04         | 146.84(1.0x)  | 66.95         |
-| ERNIE 3.0-Medium+INT8      | 3226.26(2.9x) | 56.99(-0.46) | 889.33(2.4x)  | 92.70(-0.34)  | 348.84(2.4x)  | 66.32(-0.63   |
+| ERNIE 3.0-Medium+INT8      | 3226.26(2.9x) | 56.99(-0.46) | 889.33(2.4x)  | 92.70(-0.34)  | 348.84(2.4x)  | 66.32(-0.63)  |
 | ERNIE 3.0-Medium+裁剪+FP32 | 1424.01(1.3x) | 57.31(-0.14) | 454.27(1.2x)  | 93.27(+0.23)  | 183.77(1.3x)  | 65.92(-1.03)  |
 | ERNIE 3.0-Medium+裁剪+INT8 | 3635.48(3.2x) | 57.26(-0.19) | 1105.26(3.0x) | 93.20(+0.16)  | 444.27(3.0x)  | 66.17(-0.78)  |
 
-(以上数据来自 [ERNIE 3.0 性能测试文档](../legacy/model_zoo/ernie-3.0/#性能测试)，文档包含测试环境介绍)
+(以上数据来自 [ERNIE 3.0 性能测试文档](../legacy/model_zoo/ernie-3.0/README.md#性能测试)，文档包含测试环境介绍)
 
 ##### UIE 压缩效果
 
 以报销工单信息抽取任务为例，使用 `uie-base` 进行微调，先得到原始 FP32 模型，然后使用 QAT 策略进一步量化。量化后的模型比原始 FP32 模型的 F1 值高 2.19。
 
-| Models         | F1           |
-| -------------  |:------------:|
-| uie-base+微调+FP32   | 91.93        |
-| uie-base+微调+量化+INT8 | 94.12        |
+| Models                  |  F1   |
+|-------------------------|:-----:|
+| uie-base+微调+FP32      | 91.93 |
+| uie-base+微调+量化+INT8 | 94.12 |
 
 
 <a name="三大场景快速启动模型压缩示例"></a>
 
 ### 三大场景快速启动模型压缩示例
 
-本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、抽取式阅读理解三大场景下的使用样例，可以分别参考 [ERNIE 3.0](../legacy/model_zoo/ernie-3.0/) 目录下的 [compress_seq_cls.py](../legacy/model_zoo/ernie-3.0/compress_seq_cls.py) 、[compress_token_cls.py](../legacy/model_zoo/ernie-3.0/compress_token_cls.py)、[compress_qa.py](../legacy/model_zoo/ernie-3.0/compress_qa.py) 脚本，启动方式如下：
+本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、抽取式阅读理解三大场景下的使用样例，可以分别参考 [ERNIE 3.0](../legacy/model_zoo/ernie-3.0) 目录下的 [compress_seq_cls.py](../legacy/model_zoo/ernie-3.0/compress_seq_cls.py) 、[compress_token_cls.py](../legacy/model_zoo/ernie-3.0/compress_token_cls.py)、[compress_qa.py](../legacy/model_zoo/ernie-3.0/compress_qa.py) 脚本，启动方式如下：
 
 ```shell
 # 分类任务
@@ -243,9 +243,9 @@ trainer.compress()
 
 目前 DynaBERT 裁剪功能只支持 SequenceClassification 等三类 PaddleNLP 内置 class，并且内置评估器对应为 Accuracy、F1、Squad。
 
-| Model class name |  SequenceClassification   | TokenClassification   | QuestionAnswering |
-| ---------------- | ------------------------- | --------------------- | ----------------- |
-|      Metrics     |          Accuracy         |           F1          |        Squad      |
+| Model class name | SequenceClassification | TokenClassification | QuestionAnswering |
+|------------------|------------------------|---------------------|-------------------|
+| Metrics          | Accuracy               | F1                  | Squad             |
 
 需要注意以下三个条件：
 
