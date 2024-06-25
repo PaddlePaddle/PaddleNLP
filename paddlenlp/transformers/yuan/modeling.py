@@ -35,7 +35,6 @@ except:
 try:
     if get_env_device() == "npu":
         import os
-        from paddle.base import core
         for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
             if lib.endswith(".so"):
                 paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(lib)
@@ -316,7 +315,6 @@ class YuanPreTrainedModel(PretrainedModel):
    
     def _init_weights(self, module):
         if self.config.tensor_parallel_degree > 1:
-            rng_tracker = get_rng_state_tracker().rng_state
         std = self.config.initializer_range
         if isinstance(module, nn.Linear):
             module.weight.data.normal_(mean=0.0, std=std)
@@ -448,7 +446,7 @@ class YuanAttention(nn.Layer):
             if self.num_key_value_heads % config.tensor_parallel_degree == 0:
                 self.num_key_value_heads = self.num_key_value_heads // config.tensor_parallel_degree
             else:
-                assert false
+                assert False
         if config.sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
             RowParallelLinear = RowSequenceParallelLinear
@@ -922,10 +920,8 @@ class YuanForCausalLM(YuanPreTrainedModel):
         self.model = YuanModel(config)
         if config.sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
         else:
             ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-            RowParallelLinear = fleet.meta_parallel.RowParallelLinear
         
         if config.tensor_parallel_degree > 1:
             self.lm_head = ColumnParallelLinear(

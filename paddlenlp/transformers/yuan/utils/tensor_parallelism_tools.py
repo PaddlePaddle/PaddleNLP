@@ -10,7 +10,7 @@ print("load yuan weights finish ......")
 tp_degree = 2
 #set the number of hidden_layers, from config.json
 hidden_layers = 24
-size = model[f"model.layers.0.self_attn.q_proj.weight"].shape[0]
+size = model["model.layers.0.self_attn.q_proj.weight"].shape[0]
 step = size//tp_degree
 for i in range(0,hidden_layers):
     
