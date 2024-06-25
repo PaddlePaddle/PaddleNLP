@@ -37,15 +37,12 @@ ip_lists=($(echo $TRAINER_INSTANCES | tr ',' ' '))
 master_ip=${ip_lists[0]}
 rank=$PADDLE_TRAINER_ID
 echo $master_ip $rank
-if [ $rank == 0 ]; then
-    net=$(netstat -anp | grep "2379 " | grep "LISTEN")
-    if [ ${#net} == 0 ]; then
-        nohup etcd -data-dir ~/data.etcd -advertise-client-urls http://0.0.0.0:2379 -listen-client-urls http://0.0.0.0:2379 &
-        ps -ef |grep etcd
-    fi  
-else
-    sleep 5
-fi
+#多机任务在每台机器上都启动服务，保证同步，否则多机运行会报错
+net=$(netstat -anp | grep ":2379" | grep "LISTEN")
+if [ ${#net} == 0 ]; then
+    nohup etcd -data-dir ~/data.etcd -advertise-client-urls http://0.0.0.0:2379 -listen-client-urls http://0.0.0.0:2379 &
+    ps -ef |grep etcd
+fi  
 
 # mv autoconfig
 rm -rf auto_config_*
