@@ -221,7 +221,7 @@ class ModelArgument:
 @dataclass
 class QuantArgument:
     quant_type: str = field(
-        default=QuantType.WFP8AFP8,
+        default=QuantType.WINT8AINT8,
         metadata={"help": "Quantization type. Supported values: WINT8AINT8, WEIGHT_ONLY_INT4, WEIGHT_ONLY_INT8, WFP8AFP8"},
     )
 
