@@ -221,7 +221,7 @@ def load_unified_checkpoint(args, model, optimizer, resume_from_checkpoint: str,
 
 def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, safe_serialization=False):
     """
-    Only dataset_rank == 0 can enter this function.
+    Only dataset_rank == 0 or using expert parallel can enter this function.
     """
     index_filename = select_model_weight_index(args, model, resume_from_checkpoint, safe_serialization, local=True)
 
@@ -232,7 +232,14 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
     loaded_keys = sharded_metadata["all_checkpoint_keys"]
 
     model_state_dict = get_expected_state_dict(model)
-    expected_keys = set(list(model_state_dict.keys()))
+    # If using expert parallel, when dp_rank > 0, need to modify the expected_keys here.
+    if not args.use_expert_parallel or (args.use_expert_parallel and args.data_parallel_rank == 0):
+        expected_keys = set(list(model_state_dict.keys()))
+    else:
+        expected_keys = set()
+        for key in model_state_dict.keys():
+            if getattr(model_state_dict[key], "no_sync", False):
+                expected_keys.add(key)
     missing_keys = expected_keys - set(loaded_keys)
 
     use_fast_set = True
@@ -507,7 +514,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
     model_keys = list(model_state_dict.keys())
     struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}  # get optimizer param mappings
 
-    expected_keys = get_expected_keys(sharded_metadata, model, optimizer)
+    expected_keys = get_expected_keys(args, sharded_metadata, model, optimizer)
 
     # This should always be a list but, just to be sure.
     if not isinstance(resolved_archive_file, list):
@@ -531,7 +538,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             index_filename=os.path.join(resume_from_checkpoint, index_filename_master_weights),
         )
 
-        expected_keys_mw = get_expected_keys(sharded_metadata_mw, model, optimizer)
+        expected_keys_mw = get_expected_keys(args, sharded_metadata_mw, model, optimizer, is_master_weights=True)
         if not isinstance(resolved_archive_file_mw, list):
             resolved_archive_file_mw = [resolved_archive_file_mw]
         if len(resolved_archive_file_mw) > 1:
@@ -888,6 +895,9 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
 
                 # When using expert parallel, there's no need to check tensors with `no_sync=False` when dp_rank > 0.
                 if args.use_expert_parallel and dp_rank > 0 and not getattr(state_dict[key], "no_sync", False):
+                    continue
+
+                if is_master_weights and state_dict[key].dtype == core.VarDesc.VarType.FP32:
                     continue
 
                 if not is_master_weights:
@@ -1270,8 +1280,9 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
     for key in index["weight_map"].keys():
         _, typename = key.split("/")
         typename_set.add(typename)
-    struct2static_name_mappings = {k: v.name for k, v in get_expected_state_dict(model).items()}
-    static2struct_name_mappings = {v.name: k for k, v in get_expected_state_dict(model).items()}
+    model_state_dict = get_expected_state_dict(model)
+    struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}
+    static2struct_name_mappings = {v.name: k for k, v in model_state_dict.items()}
     # Get send_table and recv_table. The send table indicates which workers are responsible for sending tensors, and the recv table indicates which workers should receive the tensors.
     send_table, recv_table = create_optimizer_dispatch_table(
         args,
@@ -1393,7 +1404,10 @@ def load_unified_optimizer_dynamically(args, model, optimizer, resume_from_check
         key_name = key.split("/")
         static_name = struct2static_name_mappings[key_name[0]]
         if has_master_weights:
-            key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
+            if model_state_dict[key_name[0]].dtype != core.VarDesc.VarType.FP32:
+                key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
+            else:
+                key_name = "_".join([static_name, key_name[1]])
         else:
             key_name = "_".join([static_name, key_name[1]])
         optim_state_dict[key_name] = optim_state_dict.pop(key)
@@ -1978,7 +1992,7 @@ def get_optimizer_shard_files(optimizer_path, index_filename):
         return shard_filenames, sharded_metadata
 
 
-def get_expected_keys(sharded_metadata, model, optimizer):
+def get_expected_keys(args, sharded_metadata, model, optimizer, is_master_weights=False):
     hcg = fleet.get_hybrid_communicate_group()
     sharding_group = hcg.get_sharding_parallel_group()
     sharding_rank = sharding_group.rank
@@ -1986,11 +2000,23 @@ def get_expected_keys(sharded_metadata, model, optimizer):
     if in_sharding_parallel_model:
         params2rank = optimizer._param2rank
 
-    struct2static_name_mappings = {k: v.name for k, v in get_expected_state_dict(model).items()}
+    model_state_dict = get_expected_state_dict(model)
+    struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}
 
     expected_keys = []
     for key in list(sharded_metadata["all_optimizer_keys"]):
         key_name = key.split("/")[0]
+        if (
+            is_master_weights
+            and key_name in model_state_dict
+            and model_state_dict[key_name].dtype == core.VarDesc.VarType.FP32
+        ):
+            continue
+
+        if args.use_expert_parallel and args.data_parallel_rank > 0:
+            if key_name in model_state_dict and not getattr(model_state_dict[key_name], "no_sync", False):
+                continue
+
         static_name = struct2static_name_mappings.get(key_name, None)
 
         if in_sharding_parallel_model:
