@@ -314,7 +314,6 @@ class YuanPreTrainedModel(PretrainedModel):
         return mappings
    
     def _init_weights(self, module):
-        if self.config.tensor_parallel_degree > 1:
         std = self.config.initializer_range
         if isinstance(module, nn.Linear):
             module.weight.data.normal_(mean=0.0, std=std)
