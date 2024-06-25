@@ -24,10 +24,13 @@ from paddlenlp.transformers.conversion_utils import (
 from .configuration import YuanConfig
 from ..activations import ACT2FN
 from ...utils.log import logger
-from ..sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    RowSequenceParallelLinear,
-)
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        ColumnSequenceParallelLinear,
+        RowSequenceParallelLinear,
+    )
+except:
+    pass
 
 try:
     if get_env_device() == "npu":
