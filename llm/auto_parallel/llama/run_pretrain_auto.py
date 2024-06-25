@@ -393,6 +393,24 @@ class PretrainingTrainer(AutoTrainer):
         dist_loader._input_keys = ["input_ids", "labels"]
         return dist_loader
 
+    def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
+        if self.train_dataset is None:
+            return None
+
+        total_batch_size_per_acc_step = self.args.per_device_train_batch_size * self.args.dataset_world_size
+        total_batch_size = total_batch_size_per_acc_step
+
+        # In llm/llama/run_pretrain.py, it uses paddlenlp.utils.batch_sampler.DistributedBatchSampler,
+        # which does no shuffle when shuffle is set True.
+        sampler = paddle.io.BatchSampler(
+            dataset=self.train_dataset,
+            shuffle=False,
+            batch_size=total_batch_size,
+            drop_last=self.args.dataloader_drop_last,
+        )
+        sampler._acc_steps = self.args.gradient_accumulation_steps
+        return sampler
+
 
 def print_config(args, key=""):
     """
