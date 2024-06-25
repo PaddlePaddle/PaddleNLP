@@ -12,7 +12,6 @@ import paddle.distributed.fleet.meta_parallel as mpu
 from paddlenlp.transformers.model_outputs import  CausalLMOutputWithPast, BaseModelOutputWithPast
 from paddle.nn import CrossEntropyLoss
 from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 
 from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils.tools import get_env_device
