@@ -51,6 +51,7 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     ChatGLMTokenizer,
     ChatGLMv2Tokenizer,
+    Llama3Tokenizer,
     LlamaTokenizer,
     PretrainedModel,
     PretrainedTokenizer,
@@ -739,12 +740,14 @@ class BlockInferencePredictorMixin:
 
         self.architectures = self.model_config.architectures[0].lower()
 
-        self.dtype = config.dtype or self.model_config
+        self.dtype = config.dtype or self.model_config.dtype
 
         self.total_max_length = config.src_length + config.max_length
         self.block_size = config.block_size
         self.pre_max_block_num = (self.total_max_length + config.block_size - 1) // config.block_size
         self.max_block_nums = config.batch_size * self.pre_max_block_num
+
+        self.rope_theta = self.model_config.rope_theta
 
         self.pre_cache_length = 0
 
@@ -828,7 +831,7 @@ class BlockInferencePredictorMixin:
         )
         self.inputs["stop_nums"] = paddle.full(shape=[1], fill_value=config.batch_size, dtype="int64")
         self.inputs["rope_emb"] = self._get_rotary_position_embedding(
-            paddle.arange(self.total_max_length).reshape((1, -1)), self.head_dim
+            paddle.arange(self.total_max_length).reshape((1, -1)), self.head_dim, self.rope_theta
         )
         eos_token_id = get_eos_token_id(self.tokenizer, self.generation_config)
         if isinstance(eos_token_id, int):
@@ -895,7 +898,7 @@ class BlockInferencePredictorMixin:
         self.inputs["free_list"] = paddle.to_tensor(free_list, dtype="int32")
         self.inputs["free_list_len"] = paddle.full(shape=[1], fill_value=self.pre_max_block_num * 0.25, dtype="int32")
 
-    def _get_rotary_position_embedding(self, position_ids, head_dim):
+    def _get_rotary_position_embedding(self, position_ids, head_dim, rope_theta=10000.0):
         """
         Pre-calculate rotary position embedding for position_ids.
 
@@ -908,7 +911,7 @@ class BlockInferencePredictorMixin:
         """
         bsz, max_seq_len = position_ids.shape[:2]
         rot_emb = paddle.zeros((2, bsz, max_seq_len, 1, head_dim), dtype="float32")
-        inv_freq = 10000 ** (-paddle.arange(0, head_dim, 2, dtype="float32") / head_dim)
+        inv_freq = rope_theta ** (-paddle.arange(0, head_dim, 2, dtype="float32") / head_dim)
 
         # shape: [B, S, D/2]
         freqs = paddle.einsum("ij,k->ijk", position_ids.cast("float32"), inv_freq)
@@ -1213,8 +1216,8 @@ def create_predictor(
     init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
 
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
-    if isinstance(tokenizer, LlamaTokenizer) and not tokenizer.pad_token:
-        tokenizer.pad_token = tokenizer.unk_token
+    if (isinstance(tokenizer, (LlamaTokenizer, Llama3Tokenizer))) and not tokenizer.pad_token:
+        tokenizer.pad_token = tokenizer.bos_token
 
     config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
 
@@ -1310,10 +1313,13 @@ def create_predictor(
             config.use_cachekv_int8 = predictor_args.use_cachekv_int8
             config.single_card_ptq = True
 
-            if predictor_args.quant_type is not None and predictor_args.quant_type.startswith("weight_only_int"):
-                weight_only_quant_bits = int(predictor_args.quant_type[-1])
-                config.weight_only_quant_bits = weight_only_quant_bits
-                config.quant_type = predictor_args.quant_type
+            if predictor_args.quant_type is not None:
+                if predictor_args.quant_type.startswith("weight_only_int"):
+                    weight_only_quant_bits = int(predictor_args.quant_type[-1])
+                    config.weight_only_quant_bits = weight_only_quant_bits
+                    config.quant_type = predictor_args.quant_type
+                elif predictor_args.quant_type == "a8w8":
+                    config.quant_type = predictor_args.quant_type
 
             if config.quantization_config.quant_type is not None and "a8w8" in config.quantization_config.quant_type:
                 config.model_name_or_path = predictor_args.model_name_or_path

@@ -96,11 +96,14 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
         self.num_attention_heads = config.num_attention_heads
+        self.num_key_value_heads = config.num_key_value_heads
         self.intermediate_size = config.intermediate_size
         self.num_layers = config.num_hidden_layers
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
         self.quant_type = config.quant_type
+
+        self.rope_theta = config.rope_theta
 
         self.use_weight_only = False
         self.weight_only_quant_bits = config.weight_only_quant_bits
@@ -188,8 +191,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         ffn2_bias_attrs = None
 
         if self.quant_type == "a8w8":
-            self.quant_round_type = config.quantization_config.quant_round_type
-
             qkv_out_scale_attrs = [
                 paddle.ParamAttr(name="fusellama.{}.qkv_out_scale".format(i)) for i in range(self.num_layers)
             ]
@@ -277,9 +278,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             ]
 
         transformer_config = FusedMultiTransformerConfig(
-            self.hidden_size,
-            self.num_attention_heads,
-            self.intermediate_size,
+            embed_dim=self.hidden_size,
+            num_heads=self.num_attention_heads,
+            kv_num_heads=self.num_key_value_heads,
+            dim_feedforward=self.intermediate_size,
             weight_only_quant_bits=self.weight_only_quant_bits,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
@@ -430,13 +432,12 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
 
         position_offset = 0
-        theta = 10000.0
         if not is_decoder and pre_caches is not None:
             position_offset = 128
         from paddlenlp_ops import fused_get_rotary_embedding
 
         new_rope = fused_get_rotary_embedding(
-            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, theta, True
+            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, self.rope_theta, True
         )
 
         with dy2st_nocheck_guard_context():
@@ -491,7 +492,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         state_dict["llama.layers.{}.self_attn.qkv_proj.weight".format(idx)],
                         is_qkv=True,
                         num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
-                        num_key_value_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                        num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
                     ),
                     axis=-1,
                 ).transpose(1, 0)
@@ -517,10 +518,14 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     )
                     .transpose(1, 0)
                     .reshape(
-                        3 * (self.num_attention_heads // self.config.tensor_parallel_degree) * (head_size),
+                        (
+                            self.num_attention_heads // self.config.tensor_parallel_degree
+                            + 2 * self.num_key_value_heads // self.config.tensor_parallel_degree
+                        )
+                        * (head_size),
                         self.hidden_size,
                     )
-                )  # reshape(3, self.num_attention_heself.hidden_sizeads // self.config.tensor_parallel_degree, head_size, )
+                )
             if "llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx) in state_dict.keys():
                 concated_ffn1_weight = np.concatenate(
                     split_fn(state_dict["llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx)]), axis=-1
@@ -744,7 +749,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         cache_scale_json_path,
                         cache_scale_map_dict,
                         num_of_layers=self.config.num_hidden_layers,
-                        num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                        num_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
                     )
                     for k, v in cache_scales_loader.scale.items():
                         for i_layer, weight_scale in enumerate(v):
@@ -919,7 +924,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
                 [
                     2,
                     max_batch_size,
-                    config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                    config.num_key_value_heads // max(config.tensor_parallel_degree, 1),
                     max_length,
                     config.hidden_size // config.num_attention_heads,
                 ]
@@ -1205,7 +1210,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         for _ in range(config.num_hidden_layers):
             cache_kv_shape = [
                 max_block_nums,
-                config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                config.num_key_value_heads // max(config.tensor_parallel_degree, 1),
                 config.block_size,
                 config.hidden_size // config.num_attention_heads,
             ]
