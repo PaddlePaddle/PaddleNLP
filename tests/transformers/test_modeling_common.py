@@ -695,6 +695,8 @@ class ModelTesterMixin:
 
             loaded_config = config.__class__.from_pretrained(tempdir)
             for key in config.__dict__.keys():
+                if key == "paddlenlp_version" and config.paddlenlp_version is None:
+                    continue
                 self.assertEqual(getattr(config, key), getattr(loaded_config, key))
 
     def random_choice_pretrained_config_field(self) -> Optional[str]:

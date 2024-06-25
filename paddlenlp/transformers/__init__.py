@@ -294,8 +294,6 @@ from .deberta.configuration import *
 from .deberta_v2.modeling import *
 from .deberta_v2.tokenizer import *
 from .deberta_v2.configuration import *
-
-
 from .jamba.modeling import *
 from .jamba.configuration import *
 from .jamba.tokenizer import *
@@ -310,3 +308,6 @@ if is_fast_tokenizer_available():
     from .tinybert.fast_tokenizer import *
     from .ernie_m.fast_tokenizer import *
     from .nystromformer.fast_tokenizer import *
+
+from .qwen2 import *
+from .qwen2_moe import *

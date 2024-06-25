@@ -757,13 +757,10 @@ class GenerationMixin(object):
 
         use_fast = False
         if "use_faster" in model_kwargs:
-            use_fast = model_kwargs.pop("use_faster")
-            if not self.deprecated_warnings.get("use_faster", False):
-                logger.warning("`use_faster` will be deprecated in near future. Please use `use_fast` instead. ")
-                self.deprecated_warnings["use_faster"] = True
+            raise ValueError("`use_faster` is deprecated now.")
 
         if "use_fast" in model_kwargs:
-            use_fast = model_kwargs.pop("use_fast")
+            raise ValueError("`use_fast` is deprecated now.")
 
         bos_token_id = (
             generation_config.bos_token_id if generation_config.bos_token_id is not None else self.config.bos_token_id
@@ -1221,10 +1218,19 @@ class GenerationMixin(object):
                 try:
                     hcg = fleet.get_hybrid_communicate_group()
                     group = hcg.get_model_parallel_group()
-                    src = group.get_model_parallel_group_src_rank()
+                    src = hcg.get_model_parallel_group_src_rank()
                 except:
                     group, src = None, 0
                 paddle.distributed.broadcast(next_tokens, src=src, group=group)
+            # config does not include pipeline_parallel_degree, and pipeline parallel
+            # uses trainer.model_wrapped to run in both train and predict mode
+            # which has pp_group as a attribute
+            # TODO(guosheng): only let the last stage of pipeline to do softmax
+            # and sampling, and then broadcast to avoid broadcast logits.
+            if getattr(self, "pp_group", None) is not None:
+                paddle.distributed.broadcast(
+                    next_tokens, src=self.pp_group.ranks[0], group=self.pp_group  # use rank 0 for same seed to check
+                )
 
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 

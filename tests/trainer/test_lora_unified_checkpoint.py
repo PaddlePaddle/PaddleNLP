@@ -119,7 +119,7 @@ class TestUnifiedCheckpointSingle(TestMultipleGpus):
 
         self.need_allclose = True
         self.rtol = 1e-7
-        self.run_lora_file = "llm/finetune_generation.py"
+        self.run_lora_file = "llm/run_finetune.py"
         self.num_nodes = 1
 
     def runfirst(self, train_args):
@@ -151,7 +151,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
 
     def setUp(self):
         """
-        1. update runfrist and rerun to run defined different config
+        1. update runfirst and rerun to run defined different config
         2. update need_allclose to True if you want to check the result
         3. update rtol to the relative value you want to check
         """
@@ -169,9 +169,9 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
         self.need_allclose = True
         self.rtol = 1e-7
 
-        self.run_lora_file = "llm/finetune_generation.py"
+        self.run_lora_file = "llm/run_finetune.py"
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n1c8(self.run_lora_file, **train_args)
 
     def rerun(self, train_args):
@@ -183,7 +183,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["TP4PP2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -198,7 +198,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["TP2Sharding4"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -216,7 +216,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["TP8"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -230,7 +230,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["TP4DP2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -245,7 +245,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["TP4Sharding2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -260,7 +260,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["TP2PP4"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -275,7 +275,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["PP8"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -290,7 +290,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["PP4DP2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -305,7 +305,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["PP4Sharding2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -320,7 +320,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["Sharding8S1"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -335,7 +335,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["Sharding8S2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -350,7 +350,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["Sharding4S1DP2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -365,7 +365,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["Sharding4S2DP2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -380,7 +380,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["Sharding2S1DP4"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -395,7 +395,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["Sharding2S2DP4"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -410,7 +410,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(lora_arguments["output_dir"])
 
         train_args = self.configs["DP8"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -419,19 +419,21 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
             np.testing.assert_allclose(res[0], res[1], self.rtol)
 
 
+@pytest.mark.skipif(True, reason="Skip for None CE")
 class TestUnifiedCheckpointOnN2C4(TestUnifiedCheckpointBase):
     def setUp(self):
         super().setUp()
         self.need_allclose = True
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n2c4(self.run_lora_file, **train_args)
 
     def rerun(self, train_args):
         self.run_n2c4(self.run_lora_file, **train_args)
 
 
+@pytest.mark.skipif(True, reason="Skip for None CE")
 class TestUnifiedCheckpointOnN1C8CheckpointCompatible(TestUnifiedCheckpointBase):
     def setUp(self):
         super().setUp()
@@ -439,7 +441,7 @@ class TestUnifiedCheckpointOnN1C8CheckpointCompatible(TestUnifiedCheckpointBase)
         self.need_allclose = True
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["unified_checkpoint"] = 0
         self.run_n1c8(self.run_lora_file, **train_args)
 
@@ -448,6 +450,7 @@ class TestUnifiedCheckpointOnN1C8CheckpointCompatible(TestUnifiedCheckpointBase)
         self.run_n1c8(self.run_lora_file, **train_args)
 
 
+@pytest.mark.skipif(True, reason="Skip for None CE")
 class TestPaddleCheckpointOnN1C8Reset(TestUnifiedCheckpointBase):
     def setUp(self):
         super().setUp()
@@ -455,7 +458,7 @@ class TestPaddleCheckpointOnN1C8Reset(TestUnifiedCheckpointBase):
         self.need_allclose = True
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["unified_checkpoint"] = 0
         self.run_n1c8(self.run_lora_file, **train_args)
 
@@ -472,7 +475,7 @@ class TestUnifiedCheckpointOnN2C4CheckpointCompatible(TestUnifiedCheckpointBase)
         self.need_allclose = True
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["unified_checkpoint"] = 0
         self.run_n2c4(self.run_lora_file, **train_args)
 

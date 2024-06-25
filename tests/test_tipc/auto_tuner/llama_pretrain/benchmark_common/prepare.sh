@@ -16,19 +16,19 @@ python -m pip install -r ../requirements.txt
 python -m pip install -r ../requirements-dev.txt
 
 # install fused_ln custom ops
-cd ../model_zoo/gpt-3/external_ops/
+cd ../legacy/model_zoo/gpt-3/external_ops/
 python setup.py install
 
 # install tool_helpers
-cd ../../../llm/llama
+cd ../../../../llm/llama
 python -m pip install tool_helpers
 
 rm -rf data && mkdir data
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx
 
-mv llama_openwebtext_100k_ids.npy ./data
-mv llama_openwebtext_100k_idx.npz ./data
+mv llama_openwebtext_100k.bin ./data
+mv llama_openwebtext_100k.idx ./data
 
 # mv autoconfig
 rm -rf autoconfig
@@ -44,7 +44,7 @@ else
   rank=$PADDLE_TRAINER_ID
   echo $master_ip $rank
   if [ $rank == 0 ]; then
-    net=$(netstat -anp | grep 2379 | grep "LISTEN")
+    net=$(netstat -anp | grep :2379 | grep "LISTEN")
     if [ ${#net} == 0 ]; then
         apt-get install -y --allow-downgrades etcd
         nohup etcd -data-dir ~/data.etcd -advertise-client-urls  http://0.0.0.0:2379 -listen-client-urls http://0.0.0.0:2379 &

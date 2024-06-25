@@ -77,6 +77,7 @@ setup(
             "./generation/step.cu",
             "./generation/quant_int8.cu",
             "./generation/dequant_int8.cu",
+            "./generation/flash_attn_bwd.cc",
         ],
         extra_compile_args={
             "cxx": ["-O3"],

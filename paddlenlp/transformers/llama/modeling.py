@@ -212,6 +212,7 @@ def scaled_dot_product_attention(
     attention_mask,
     output_attentions,
     alibi=None,
+    attn_mask_startend_row_indices=None,
     sequence_parallel=False,
     reshard_layer=None,
     npu_is_casual=False,
@@ -228,6 +229,7 @@ def scaled_dot_product_attention(
             attention_mask,
             output_attentions,
             alibi,
+            attn_mask_startend_row_indices,
             sequence_parallel,
             reshard_layer,
             npu_is_casual,
@@ -237,6 +239,9 @@ def scaled_dot_product_attention(
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
 
     else:
+        if config.context_parallel_degree > 1:
+            raise ValueError("Context parallel requires `use_flash_attention=True`")
+
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
         # merge with the next tranpose
@@ -366,8 +371,9 @@ class LlamaRMSNorm(nn.Layer):
 
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
-                hidden_states = hidden_states.astype("float32")
-                variance = hidden_states.pow(2).mean(-1, keepdim=True)
+                # hidden_states = hidden_states.astype("float32")
+                # variance = hidden_states.pow(2).mean(-1, keepdim=True)
+                variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
                 hidden_states = paddle.rsqrt(variance + self.variance_epsilon) * hidden_states
         else:
             hidden_states = hidden_states.astype("float32")
@@ -812,6 +818,7 @@ class LlamaAttention(nn.Layer):
         output_attentions: bool = False,
         use_cache: bool = False,
         alibi: Optional[paddle.Tensor] = None,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         npu_is_casual: bool = False,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
@@ -936,6 +943,17 @@ class LlamaAttention(nn.Layer):
             if self.reshard_layer is not None:
                 batch_size, seq_length, _, _ = query_states.shape
                 position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
+            if self.config.context_parallel_degree > 1:
+                batch_size, seq_length, _, _ = query_states.shape
+                group = fleet.get_hybrid_communicate_group().get_sep_parallel_group()
+                chunk_size = seq_length // 2
+                chunk_num = group.nranks * 2
+                rank = group.rank
+                first_chunk_ids = paddle.arange(rank * chunk_size, (rank + 1) * chunk_size, dtype="int64")
+                second_chunk_ids = paddle.arange(
+                    (chunk_num - rank - 1) * chunk_size, (chunk_num - rank) * chunk_size, dtype="int64"
+                )
+                position_ids = paddle.concat([first_chunk_ids, second_chunk_ids]).expand((batch_size, seq_length))
             if self.use_fused_rope:
                 query_states, key_states = fusion_ops.fusion_rope(
                     query_states,
@@ -945,9 +963,12 @@ class LlamaAttention(nn.Layer):
                     position_ids,
                     past_key_value,
                     self.rotary_emb,
+                    self.config.context_parallel_degree,
                 )
 
             else:
+                if self.config.context_parallel_degree > 1:
+                    kv_seq_len *= self.config.context_parallel_degree
                 if self.config.use_long_sequence_strategies:
                     cos, sin = self.rotary_emb(seq_len=kv_seq_len)
                     cos = cos[None, :, None, :]
@@ -996,6 +1017,7 @@ class LlamaAttention(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
+                attn_mask_startend_row_indices,
                 self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
                 use_reentrant=self.config.recompute_use_reentrant,
@@ -1009,6 +1031,7 @@ class LlamaAttention(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
+                attn_mask_startend_row_indices,
                 self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
                 npu_is_casual=npu_is_casual,
@@ -1064,6 +1087,7 @@ class LlamaDecoderLayer(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
         alibi: Optional[paddle.Tensor] = None,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         npu_is_casual: bool = False,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
@@ -1101,6 +1125,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                attn_mask_startend_row_indices,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -1112,6 +1137,7 @@ class LlamaDecoderLayer(nn.Layer):
                 output_attentions,
                 use_cache,
                 alibi,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 npu_is_casual=npu_is_casual,
             )
 
@@ -1441,6 +1467,7 @@ class LlamaModel(LlamaPretrainedModel):
         past_key_value: Tensor,
         use_cache: bool,
         alibi=None,
+        attn_mask_startend_row_indices=None,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -1457,6 +1484,7 @@ class LlamaModel(LlamaPretrainedModel):
             past_key_value,
             use_cache,
             alibi,
+            attn_mask_startend_row_indices,
             use_reentrant=self.config.recompute_use_reentrant,
         )
 
@@ -1473,6 +1501,7 @@ class LlamaModel(LlamaPretrainedModel):
         output_attentions=False,
         output_hidden_states=None,
         return_dict=False,
+        attn_mask_startend_row_indices=None,
         **kwargs,
     ):
         if self.sequence_parallel and use_cache:
@@ -1516,11 +1545,13 @@ class LlamaModel(LlamaPretrainedModel):
             # [seq_len * bs / n, num_head * head_dim] (n is mp parallelism)
             inputs_embeds = ScatterOp.apply(inputs_embeds)
 
+        if self.config.context_parallel_degree > 1 and (attention_mask is not None or self.config.alibi):
+            raise NotImplementedError("Ring FlashAttention dosen't support attention_mask or alibi")
         # embed positions
-        if attention_mask is None:
+        if attn_mask_startend_row_indices is None and attention_mask is None:
             # [bs, seq_len]
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-        if self.config.alibi:
+        if attn_mask_startend_row_indices is None and self.config.alibi:
             if self.config.use_long_sequence_strategies:
                 alibi_layer = LongSequenceStrategies.build_long_sequence_strategy(
                     self.config.long_sequence_strategy_type,
@@ -1551,14 +1582,14 @@ class LlamaModel(LlamaPretrainedModel):
 
         if use_casual_mask:
             attention_mask = None
-        else:
+        elif attn_mask_startend_row_indices is None:
             attention_mask = self._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
             )  # [bs, 1, seq_len, seq_len]
 
         is_casual = False
 
-        if self.config.use_flash_attention and get_env_device() != "gcu":
+        if attn_mask_startend_row_indices is None and self.config.use_flash_attention and get_env_device() != "gcu":
             if use_casual_mask:
                 is_casual = True
             else:
@@ -1567,7 +1598,7 @@ class LlamaModel(LlamaPretrainedModel):
                 if is_casual and alibi is None:
                     attention_mask = None
             else:
-                attention_mask = attention_mask.astype("bool")
+                attention_mask = None if attention_mask is None else attention_mask.astype("bool")
         hidden_states = inputs_embeds
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
@@ -1595,6 +1626,7 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                     alibi=alibi,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -1605,6 +1637,7 @@ class LlamaModel(LlamaPretrainedModel):
                     past_key_value,
                     use_cache,
                     alibi=alibi,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                     npu_is_casual=is_casual,
                 )
 
@@ -1651,7 +1684,11 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         super(LlamaPretrainingCriterion, self).__init__()
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
-        self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
+        self.enable_parallel_cross_entropy = (
+            config.tensor_parallel_degree > 1
+            and config.vocab_size % config.tensor_parallel_degree == 0
+            and config.tensor_parallel_output
+        )
 
         if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
             self.loss_func = mpu.ParallelCrossEntropy(ignore_index=self.ignore_index)
@@ -1669,9 +1706,9 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
 
-            if self.config.sep_parallel_degree > 1:
+            if self.config.sep_parallel_degree > 1 or self.config.context_parallel_degree > 1:
                 _hcg = fleet.get_hybrid_communicate_group()
-                masked_lm_loss = ConcatSePMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
+                masked_lm_loss = ConcatMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
             # skip ignore_index which loss == 0
             # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
             # loss = paddle.mean(masked_lm_loss)
@@ -1687,7 +1724,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         return loss
 
 
-class ConcatSePMaskedLoss(PyLayer):
+class ConcatMaskedLoss(PyLayer):
     @staticmethod
     def forward(ctx, inp, axis, group):
         inputs = []
@@ -1749,10 +1786,13 @@ class LlamaLMHead(nn.Layer):
             if self.config.sep_parallel_degree > 1:
                 assert seq_length % self.config.sep_parallel_degree == 0
                 seq_length = seq_length // self.config.sep_parallel_degree
+            if self.config.context_parallel_degree > 1:
+                assert seq_length % self.config.context_parallel_degree == 0
+                seq_length = seq_length // self.config.context_parallel_degree
             hidden_states = paddle.reshape_(hidden_states, [-1, seq_length, self.config.hidden_size])
 
         if tensor_parallel_output is None:
-            tensor_parallel_output = self.config.tensor_parallel_output
+            tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
         if get_env_device() == "xpu" and self.xpu_parallel_matmul is not None:
             logits = self.xpu_parallel_matmul(
@@ -1859,6 +1899,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
+        attn_mask_startend_row_indices=None,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1875,17 +1916,12 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
 
-        # if labels is None，means we need full output, instead of tensor_parallel_output
-        # tensor_parallel_output is togather with ParallelCrossEntropy
-        tensor_parallel_output = (
-            self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
-        )
-
-        logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
+        logits = self.lm_head(hidden_states)
 
         loss = None
         if labels is not None:

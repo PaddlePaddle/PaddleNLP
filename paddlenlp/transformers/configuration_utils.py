@@ -18,12 +18,14 @@
 from __future__ import annotations
 
 import copy
+import inspect
 import json
 import os
 import re
 import shutil
 import sys
 import warnings
+from dataclasses import field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -63,24 +65,6 @@ def custom_object_save(obj, folder, config=None):
         module_name = obj.__class__.__module__
         last_module = module_name.split(".")[-1]
         full_name = f"{last_module}.{obj.__class__.__name__}"
-        # Special handling for tokenizers
-        if "Tokenizer" in full_name:
-            slow_tokenizer_class = None
-            fast_tokenizer_class = None
-            if obj.__class__.__name__.endswith("Fast"):
-                # Fast tokenizer: we have the fast tokenizer class and we may have the slow one has an attribute.
-                fast_tokenizer_class = f"{last_module}.{obj.__class__.__name__}"
-                if getattr(obj, "slow_tokenizer_class", None) is not None:
-                    slow_tokenizer = getattr(obj, "slow_tokenizer_class")
-                    slow_tok_module_name = slow_tokenizer.__module__
-                    last_slow_tok_module = slow_tok_module_name.split(".")[-1]
-                    slow_tokenizer_class = f"{last_slow_tok_module}.{slow_tokenizer.__name__}"
-            else:
-                # Slow tokenizer: no way to have the fast class
-                slow_tokenizer_class = f"{last_module}.{obj.__class__.__name__}"
-
-            full_name = (slow_tokenizer_class, fast_tokenizer_class)
-
         if isinstance(_config, dict):
             auto_map = _config.get("auto_map", {})
             auto_map[obj._auto_class] = full_name
@@ -216,6 +200,118 @@ def resolve_hf_config_path(repo_id: str, cache_dir: str, subfolder=None) -> str:
         library_name="PaddleNLP",
         library_version=__version__,
     )
+
+
+def set_expected_keys(config, llm_meta, kwargs):
+    for key, value in llm_meta.items():
+        if key in kwargs:
+            value = kwargs.pop(key)
+        setattr(config, key, value)
+
+    return kwargs
+
+
+def llmmetaclass(cls):
+    # https://github.com/python/cpython/blob/2b091b9aa9a6ca5e2a34654dde909c5bdfc52fa8/Lib/dataclasses.py#L970C31-L970C46
+    llm_meta = LlmMetaConfig._get_all_meta()
+
+    for name, datatype, default_value, comment in llm_meta:
+        if not hasattr(cls, name):
+            value = field(
+                default=default_value,
+                metadata={"help": comment},
+            )
+            setattr(cls, name, value)
+            cls.__annotations__[name] = datatype
+
+    return cls
+
+
+class LlmMetaConfig:
+    op_fusion_attributes = [
+        # name, type, default_value, comment
+        ("use_flash_attention", bool, False, "Whether to use flash attention to accelerate training."),
+        ("use_fused_rms_norm", bool, False, "llama or other model, use_fused_rms_norm"),
+        ("use_fused_rope", bool, False, "Enable rope fusion or not."),
+        ("use_fused_linear", bool, False, "GPT3 model, use fused linear layer"),
+        ("use_fused_dropout_add", bool, False, "GPT3 model, use fused `dropout + residual add` op."),
+    ]
+
+    hybrid_parallel_attributes = [
+        # tensor_parallel
+        ("tensor_parallel_degree", int, 1, "tensor_parallel_degree"),
+        ("tensor_parallel_rank", int, 0, "tensor_parallel_rank"),
+        ("tensor_parallel_output", bool, True, "tensor_parallel_output"),
+        # pipeline_parallel
+        ("pipeline_parallel_degree", int, 1, "pipeline_parallel_degree"),
+        ("virtual_pp_degree", int, 1, "Virtual pipeline degree"),
+        # pp refine recompute
+        ("no_recompute_layers", Optional[List[int]], None, "no_recompute_layers"),
+        (
+            "pp_recompute_interval",
+            int,
+            1,
+            "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0.",
+        ),
+        # sep_parallel
+        ("sep_parallel_degree", int, 1, "sep_parallel_degree"),
+        ("context_parallel_degree", int, 1, "context_parallel_degree"),
+        ("sequence_parallel", bool, False, "Whether to use sequence parallel"),
+        ("fuse_sequence_parallel_allreduce", bool, False, "Whether to use fuse sequence parallel allreduce"),
+    ]
+    recompute_attributes = [
+        ("recompute", bool, False, "recompute"),
+        (
+            "recompute_granularity",
+            str,
+            "full",
+            "Recompute granularity, Choose among ['full', 'core_attn', 'full_attn']",
+        ),
+        ("recompute_use_reentrant", bool, False, "recompute_use_reentrant"),
+    ]
+
+    @classmethod
+    def _get_defaults(cls):
+        ret = {}
+        for attrs in [
+            cls.op_fusion_attributes,
+            cls.hybrid_parallel_attributes,
+            cls.recompute_attributes,
+        ]:
+            for attr in attrs:
+                # return dict of key and default values
+                ret[attr[0]] = attr[2]
+        return ret
+
+    @classmethod
+    def _get_all_meta(cls):
+        ret = []
+        for attrs in [
+            cls.op_fusion_attributes,
+            cls.hybrid_parallel_attributes,
+            cls.recompute_attributes,
+        ]:
+            for attr in attrs:
+                # return dict of key and default values
+                ret.append(attr)
+        return ret
+
+    @classmethod
+    def _get_nonsavable_keys(cls):
+        ret = set()
+        for attrs in [
+            cls.op_fusion_attributes,
+            cls.hybrid_parallel_attributes,
+            cls.recompute_attributes,
+        ]:
+            for attr in attrs:
+                ret.add(attr[0])
+        return ret
+
+    @classmethod
+    def set_llm_config(cls, config, args):
+        for key, value in cls._get_defaults().items():
+            setattr(config, key, getattr(args, key, value))
 
 
 class PretrainedConfig:
@@ -419,6 +515,9 @@ class PretrainedConfig:
 
     _auto_class: Optional[str] = None
 
+    # Fix me, it is global for all config
+    _nonsavable_keys = set()
+
     def __setattr__(self, key, value):
         if key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
@@ -441,15 +540,29 @@ class PretrainedConfig:
         # Attributes with defaults
         # map the old attr to new atr, eg: num_classes -> num_labels
         kwargs = attribute_map(self, kwargs=kwargs)
+        kwargs.pop("transformers_version", None)
+        llm_meta = LlmMetaConfig._get_defaults()
+        self._nonsavable_keys.update(LlmMetaConfig._get_nonsavable_keys())
 
+        kwargs = set_expected_keys(self, llm_meta, kwargs)
+        if self.sequence_parallel:
+            assert (
+                self.tensor_parallel_degree > 1
+            ), f"senquence-parallel only works in tensor parallel, got tensor parallel degree={self.tensor_parallel_degree}"
+
+        self.chunk_size_feed_forward = kwargs.pop("chunk_size_feed_forward", 0)
         self.return_dict = kwargs.pop("return_dict", False)
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
         self.use_cache = kwargs.pop("use_cache", False)
+
+        # for transformers fuse
+        self.fuse_attention_qkv = kwargs.pop("fuse_attention_qkv", False)
+        self.fuse_attention_ffn = kwargs.pop("fuse_attention_ffn", False)
+
         if "quantization_config" in kwargs and isinstance(kwargs["quantization_config"], Dict):
             kwargs["quantization_config"] = QuantizationConfig.from_dict(kwargs["quantization_config"])
         self.quantization_config = kwargs.pop("quantization_config", QuantizationConfig())
-        self.use_flash_attention = kwargs.pop("use_flash_attention", False)
 
         self.pruned_heads = kwargs.pop("pruned_heads", {})
         self.tie_word_embeddings = kwargs.pop(
@@ -462,17 +575,6 @@ class PretrainedConfig:
         else:
             self.dtype = kwargs.pop("dtype", paddle.get_default_dtype())
 
-        # Parameters for tensor parallel
-        self.tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", -1)
-        self.tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
-        # Parameters for sep
-        self.sep_parallel_degree = kwargs.pop("sep_parallel_degree", -1)
-        # If set to True, this option is used with fleet.meta_parallel.ParallelCrossEntropy
-        # to calculate cross-entropy loss for parallel model.
-        self.tensor_parallel_output = kwargs.pop("tensor_parallel_output", False)
-        # Temporary switch to control hook vs. PyLayer implementation of recompute
-        self.recompute_use_reentrant = kwargs.pop("recompute_use_reentrant", False)
-
         # Is decoder is used in encoder-decoder models to differentiate encoder from decoder
         self.is_encoder_decoder = kwargs.pop("is_encoder_decoder", False)
         self.is_decoder = kwargs.pop("is_decoder", False)
@@ -480,31 +582,10 @@ class PretrainedConfig:
         self.add_cross_attention = kwargs.pop("add_cross_attention", False)
         self.tie_encoder_decoder = kwargs.pop("tie_encoder_decoder", False)
 
-        # Parameters for sequence generation
-        self.max_length = kwargs.pop("max_length", 20)
-        self.min_length = kwargs.pop("min_length", 0)
-        self.do_sample = kwargs.pop("do_sample", False)
-        self.early_stopping = kwargs.pop("early_stopping", False)
-        self.num_beams = kwargs.pop("num_beams", 1)
-        self.num_beam_groups = kwargs.pop("num_beam_groups", 1)
-        self.diversity_penalty = kwargs.pop("diversity_penalty", 0.0)
-        self.temperature = kwargs.pop("temperature", 1.0)
-        self.top_k = kwargs.pop("top_k", 50)
-        self.top_p = kwargs.pop("top_p", 1.0)
-        self.typical_p = kwargs.pop("typical_p", 1.0)
-        self.repetition_penalty = kwargs.pop("repetition_penalty", 1.0)
-        self.length_penalty = kwargs.pop("length_penalty", 1.0)
-        self.no_repeat_ngram_size = kwargs.pop("no_repeat_ngram_size", 0)
-        self.encoder_no_repeat_ngram_size = kwargs.pop("encoder_no_repeat_ngram_size", 0)
-        self.bad_words_ids = kwargs.pop("bad_words_ids", None)
-        self.num_return_sequences = kwargs.pop("num_return_sequences", 1)
-        self.chunk_size_feed_forward = kwargs.pop("chunk_size_feed_forward", 0)
-        self.output_scores = kwargs.pop("output_scores", False)
-        self.return_dict_in_generate = kwargs.pop("return_dict_in_generate", False)
-        self.forced_bos_token_id = kwargs.pop("forced_bos_token_id", None)
-        self.forced_eos_token_id = kwargs.pop("forced_eos_token_id", None)
-        self.remove_invalid_values = kwargs.pop("remove_invalid_values", False)
-        self.exponential_decay_length_penalty = kwargs.pop("exponential_decay_length_penalty", None)
+        # Retrocompatibility: Parameters for sequence generation. While we will keep the ability to load these
+        # parameters, saving them will be deprecated. In a distant future, we won't need to load them.
+        for parameter_name, default_value in self._get_generation_defaults().items():
+            setattr(self, parameter_name, kwargs.pop(parameter_name, default_value))
 
         # Fine-tuning task arguments
         self.architectures = kwargs.pop("architectures", None)
@@ -569,6 +650,45 @@ class PretrainedConfig:
             except AttributeError as err:
                 logger.error(f"Can't set {key} with value {value} for {self}")
                 raise err
+
+    @staticmethod
+    def _get_generation_defaults() -> Dict[str, Any]:
+        return {
+            "max_length": 20,
+            "min_length": 0,
+            "do_sample": False,
+            "early_stopping": False,
+            "num_beams": 1,
+            "num_beam_groups": 1,
+            "diversity_penalty": 0.0,
+            "temperature": 1.0,
+            "top_k": 50,
+            "top_p": 1.0,
+            "typical_p": 1.0,
+            "repetition_penalty": 1.0,
+            "length_penalty": 1.0,
+            "no_repeat_ngram_size": 0,
+            "encoder_no_repeat_ngram_size": 0,
+            "bad_words_ids": None,
+            "num_return_sequences": 1,
+            "output_scores": False,
+            "return_dict_in_generate": False,
+            "forced_bos_token_id": None,
+            "forced_eos_token_id": None,
+            "remove_invalid_values": False,
+            "exponential_decay_length_penalty": None,
+            "suppress_tokens": None,
+            "begin_suppress_tokens": None,
+        }
+
+    def _has_non_default_generation_parameters(self) -> bool:
+        """
+        Whether or not this instance holds non-default generation parameters.
+        """
+        for parameter_name, default_value in self._get_generation_defaults().items():
+            if hasattr(self, parameter_name) and getattr(self, parameter_name) != default_value:
+                return True
+        return False
 
     @property
     def name_or_path(self) -> str:
@@ -856,7 +976,7 @@ class PretrainedConfig:
     def __repr__(self):
         return f"{self.__class__.__name__} {self.to_json_string()}"
 
-    def to_diff_dict(self) -> Dict[str, Any]:
+    def to_diff_dict(self, saving_file=False) -> Dict[str, Any]:
         """
         Removes all attributes from config which correspond to the default config attributes for better readability and
         serializes to a Python dictionary.
@@ -864,13 +984,13 @@ class PretrainedConfig:
         Returns:
             `Dict[str, Any]`: Dictionary of all the attributes that make up this configuration instance,
         """
-        config_dict = self.to_dict()
+        config_dict = self.to_dict(saving_file=saving_file)
 
         # get the default config dict
-        default_config_dict = PretrainedConfig().to_dict()
+        default_config_dict = PretrainedConfig().to_dict(saving_file=saving_file)
 
         # get class specific config dict
-        class_config_dict = self.__class__().to_dict() if not self.is_composition else {}
+        class_config_dict = self.__class__().to_dict(saving_file=saving_file) if not self.is_composition else {}
 
         serializable_config_dict = {}
 
@@ -891,7 +1011,16 @@ class PretrainedConfig:
 
         return serializable_config_dict
 
-    def to_dict(self) -> Dict[str, Any]:
+    def register_nonsaveable_keys(self, keys):
+        # Save: not save it in any case
+        # Print: show it if non defalut value
+        if type(keys) == list or type(keys) == tuple:
+            for key in keys:
+                self._nonsavable_keys.add(key)
+        else:
+            self._nonsavable_keys.add(keys)
+
+    def to_dict(self, saving_file=False) -> Dict[str, Any]:
         """
         Serializes this instance to a Python dictionary.
 
@@ -904,11 +1033,36 @@ class PretrainedConfig:
         if "_auto_class" in output:
             del output["_auto_class"]
 
-        output["quantization_config"] = self.quantization_config.to_dict()
+        # PaddleNLP version when serializing the model
+        output["paddlenlp_version"] = __version__
+
+        for key, value in output.items():
+            # Deal with nested configs like CLIP
+            if isinstance(value, PretrainedConfig):
+                value = value.to_dict()
+                del value["paddlenlp_version"]
+
+            output[key] = value
+
+        # Fix for rewrited from_pretrained method, hasattr
+        if saving_file and hasattr(self, "_nonsavable_keys"):
+            for key in list(output.keys()):
+                if key in self._nonsavable_keys:
+                    output.pop(key)
+
+        if hasattr(self, "quantization_config"):
+            output["quantization_config"] = (
+                self.quantization_config.to_dict()
+                if not isinstance(self.quantization_config, dict)
+                else self.quantization_config
+            )
+
+            # pop the `_pre_quantization_dtype` as torch.dtypes are not serializable.
+            _ = output.pop("_pre_quantization_dtype", None)
 
         return output
 
-    def to_json_string(self, use_diff: bool = True) -> str:
+    def to_json_string(self, use_diff: bool = True, saving_file=False) -> str:
         """
         Serializes this instance to a JSON string.
 
@@ -921,12 +1075,13 @@ class PretrainedConfig:
             `str`: String containing all the attributes that make up this configuration instance in JSON format.
         """
         if use_diff is True:
-            config_dict = self.to_diff_dict()
+            config_dict = self.to_diff_dict(saving_file=saving_file)
         else:
-            config_dict = self.to_dict()
+            config_dict = self.to_dict(saving_file=saving_file)
+
         return json.dumps(config_dict, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
-    def to_json_file(self, json_file_path: Union[str, os.PathLike], use_diff: bool = True):
+    def to_json_file(self, json_file_path: Union[str, os.PathLike], use_diff: bool = True, saving_file=True):
         """
         Save this instance to a JSON file.
 
@@ -937,8 +1092,14 @@ class PretrainedConfig:
                 If set to `True`, only the difference between the config instance and the default `PretrainedConfig()`
                 is serialized to JSON file.
         """
+        spec = inspect.getfullargspec(self.to_json_string)
+        has_saving_file_arg = "saving_file" in spec.args or spec.varkw
         with open(json_file_path, "w", encoding="utf-8") as writer:
-            writer.write(self.to_json_string(use_diff=use_diff))
+            if has_saving_file_arg:
+                s = self.to_json_string(use_diff=use_diff, saving_file=saving_file)
+            else:
+                s = self.to_json_string(use_diff=use_diff)
+            writer.write(s)
 
     def update(self, config_dict: Dict[str, Any]):
         """
