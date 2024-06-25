@@ -1,6 +1,8 @@
 """ Yuan model tools"""
 
 import paddle
+
+
 print("load yuan weights ......")
 model = paddle.load('/workspace/model_state.pdparams')
 print("load yuan weights finish ......")
