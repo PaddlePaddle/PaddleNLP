@@ -27,7 +27,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
-from paddle import nn
+from paddle import Tensor, nn
+from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
@@ -96,6 +98,36 @@ def get_triangle_upper_mask(x, mask=None):
     mask = paddle.triu(mask, diagonal=1)
     mask.stop_gradient = True
     return mask
+
+
+def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
+    is_fleet_init = True
+    tensor_parallel_degree = 1
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        model_parallel_group = hcg.get_model_parallel_group()
+        tensor_parallel_degree = hcg.get_model_parallel_world_size()
+    except:
+        is_fleet_init = False
+
+    if paddle.in_dynamic_mode():
+        y_is_distributed = y.is_distributed
+    else:
+        y_is_distributed = tensor_parallel_degree > 1
+
+    if is_fleet_init and tensor_parallel_degree > 1 and y_is_distributed:
+        # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
+        input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
+        logits = paddle.matmul(input_parallel, y, transpose_y=False)
+
+        if tensor_parallel_output:
+            return logits
+
+        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+
+    else:
+        logits = paddle.matmul(x, y, transpose_y=False)
+        return logits
 
 
 # Copied from transformers.models.mixtral.modeling_mixtral.load_balancing_loss_func with gate->router
@@ -539,8 +571,8 @@ class JambaFlashAttention2(JambaAttention):
             query_states,
             key_states,
             value_states,
-            attn_mask=attention_mask,
-            is_causal=attention_mask is None,
+            attn_mask=None,
+            is_causal=True,
             dropout_p=dropout_rate,
             training=self.training,
         )
@@ -1338,15 +1370,16 @@ class JambaModel(JambaPretrainedModel):
 
         # prepare attention mask with causal mask
         # bool 4D mask
-        past_length = 0
-        if past_key_values is not None:
-            past_length = past_key_values.get_seq_length()
-        attention_mask = self.get_masks(
-            hidden_states.shape[0], hidden_states.shape[1], past_length, padding_mask=attention_mask
-        )
-        zero = paddle.zeros(attention_mask.shape, dtype=hidden_states.dtype)
-        neg_inf = paddle.full_like(attention_mask, paddle.finfo(hidden_states.dtype).min, dtype=hidden_states.dtype)
-        attention_mask = paddle.where(attention_mask, zero, neg_inf)
+        # past_length = 0
+        # if past_key_values is not None:
+        #     past_length = past_key_values.get_seq_length()
+        # attention_mask = self.get_masks(
+        #     hidden_states.shape[0], hidden_states.shape[1], past_length, padding_mask=attention_mask
+        # )
+        # zero = paddle.zeros(attention_mask.shape, dtype=hidden_states.dtype)
+        # neg_inf = paddle.full_like(attention_mask, paddle.finfo(hidden_states.dtype).min, dtype=hidden_states.dtype)
+        # # attention_mask = paddle.where(attention_mask, zero, neg_inf)
+        attention_mask = None
 
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
@@ -1446,26 +1479,90 @@ class JambaModel(JambaPretrainedModel):
         return casual_mask
 
 
+class JambaPretrainingCriterion(nn.Layer):
+    """
+    Criterion for Jamba.
+    It calculates the final loss.
+    """
+
+    def __init__(self, config: JambaConfig):
+
+        super().__init__()
+        self.ignore_index = getattr(config, "ignore_index", -100)
+        self.config = config
+        self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
+
+        if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
+            self.loss_func = mpu.ParallelCrossEntropy(ignore_index=self.ignore_index)
+        else:
+            self.loss_func = nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
+
+    def forward(self, prediction_scores, masked_lm_labels):
+        if self.enable_parallel_cross_entropy:
+            if prediction_scores.shape[-1] == self.config.vocab_size:
+                logger.warning_once(
+                    f"enable_parallel_cross_entropy, the vocab_size should be splited: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
+                )
+                self.loss_func = nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
+
+        with paddle.amp.auto_cast(False):
+            masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+            # skip ignore_index which loss == 0
+            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
+            loss = paddle.mean(masked_lm_loss)
+
+        return loss
+
+
+class JambaLMHead(nn.Layer):
+    def __init__(self, config: JambaConfig):
+        super().__init__()
+        self.config = config
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
+            vocab_size = config.vocab_size // config.tensor_parallel_degree
+        else:
+            vocab_size = config.vocab_size
+
+        if vocab_size != config.vocab_size:
+            with get_rng_state_tracker().rng_state():
+                self.weight = self.create_parameter(
+                    shape=[config.hidden_size, vocab_size],
+                    dtype=paddle.get_default_dtype(),
+                )
+        else:
+            self.weight = self.create_parameter(
+                shape=[config.hidden_size, vocab_size],
+                dtype=paddle.get_default_dtype(),
+            )
+        # Must set distributed attr for Tensor Parallel !
+        self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
+        if self.weight.is_distributed:
+            self.weight.split_axis = 1
+
+    def forward(self, hidden_states, tensor_parallel_output=None):
+        # if self.config.sequence_parallel:
+        #     hidden_states = GatherOp.apply(hidden_states)
+        #     seq_length = self.config.seq_length
+        #     hidden_states = paddle.reshape_(hidden_states, [-1, seq_length, self.config.hidden_size])
+
+        if tensor_parallel_output is None:
+            tensor_parallel_output = self.config.tensor_parallel_output
+
+        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
+        return logits
+
+
 # Adapted from transformers.models.mixtral.modeling_mixtral.MixtralForCausalLM with MIXTRAL->JAMBA, Mixtral->Jamba
 class JambaForCausalLM(JambaPretrainedModel):
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config: JambaConfig):
         super().__init__(config)
+
         self.model = JambaModel(config)
-        self.vocab_size = config.vocab_size
-        if self.config.tie_word_embeddings:
-            self.lm_head = lambda x: paddle.matmul(x, self.model.embed_tokens.weight, transpose_y=True)
-        else:
-            if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
-                self.lm_head = mpu.ColumnParallelLinear(
-                    config.hidden_size,
-                    config.vocab_size,
-                    has_bias=False,
-                    gather_output=config.tensor_parallel_output,  # default True
-                )
-            else:
-                self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
+        assert not config.tie_word_embeddings, "Tied word embeddings are not supported in JambaForCausalLM"
+        self.lm_head = JambaLMHead(config)
+        self.criterion = JambaPretrainingCriterion(config)
 
         self.router_aux_loss_coef = config.router_aux_loss_coef
         self.num_experts = config.num_experts
@@ -1480,13 +1577,9 @@ class JambaForCausalLM(JambaPretrainedModel):
         self.model.embed_tokens = value
 
     def get_output_embeddings(self):
-        if self.config.tie_word_embeddings:
-            return None
         return self.lm_head
 
     def set_output_embeddings(self, new_embeddings):
-        if self.config.tie_word_embeddings:
-            return None
         self.lm_head = new_embeddings
 
     def set_decoder(self, decoder):
@@ -1568,28 +1661,24 @@ class JambaForCausalLM(JambaPretrainedModel):
             return_dict=return_dict,
         )
 
-        hidden_states = outputs[0]
+        hidden_states = outputs[0]  # [bs, seq_len, dim]
+
+        # if labels is None，means we need full output, instead of tensor_parallel_output
+        # tensor_parallel_output is togather with ParallelCrossEntropy
+        tensor_parallel_output = (
+            self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
+        )
+
         if num_logits_to_keep is None:
-            logits = self.lm_head(hidden_states)
+            logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
         else:
-            logits = self.lm_head(hidden_states[..., -num_logits_to_keep:, :])
-        logits = logits.cast("float32")
+            logits = self.lm_head(
+                hidden_states[..., -num_logits_to_keep:, :], tensor_parallel_output=tensor_parallel_output
+            )
 
         loss = None
         if labels is not None:
-            # Shift so that tokens < n predict n
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
-            # Flatten the tokens
-            loss_fct = CrossEntropyLoss()
-            shift_logits = shift_logits.reshape([-1, self.config.vocab_size])
-            shift_labels = shift_labels.reshape(
-                [
-                    -1,
-                ]
-            )
-            # Enable model parallelism
-            loss = loss_fct(shift_logits, shift_labels)
+            loss = self.criterion(logits, labels)
 
         aux_loss = None
         if output_router_logits:
