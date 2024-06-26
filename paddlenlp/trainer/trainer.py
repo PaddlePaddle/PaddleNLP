@@ -2521,7 +2521,6 @@ class Trainer:
                 save_function=self._save_ckpt_func,
                 merge_tensor_parallel=merge_tensor_parallel,
                 is_main_process=self.args.should_save,
-                max_shard_size="1024GB",
             )
         # TODO: @ZHUI unifiy unwrap_model(self.model) and self.model
         elif not isinstance(self.model, PretrainedModel):
@@ -2539,7 +2538,6 @@ class Trainer:
                         variant=weight_name_suffix,
                         save_function=self._save_ckpt_func,
                         is_main_process=self.args.should_save,
-                        max_shard_size="1024GB",
                     )
                 else:
                     unwrap_model(self.model).save_pretrained(
@@ -2548,7 +2546,6 @@ class Trainer:
                         variant=self.args.weight_name_suffix,
                         save_function=self._save_ckpt_func,
                         is_main_process=self.args.should_save,
-                        max_shard_size="1024GB",
                     )
             else:
                 logger.info("Trainer.model is not a `PretrainedModel`, only saving its state dict.")
@@ -2580,7 +2577,6 @@ class Trainer:
                     variant=weight_name_suffix,
                     save_function=self._save_ckpt_func,
                     is_main_process=self.args.should_save,
-                    max_shard_size="1024GB",
                 )
             else:
                 self.model.save_pretrained(
@@ -2589,7 +2585,6 @@ class Trainer:
                     variant=self.args.weight_name_suffix,
                     save_function=self._save_ckpt_func,
                     is_main_process=self.args.should_save,
-                    max_shard_size="1024GB",
                 )
         if self.args.should_save_sharding_stage1_model:
             self.sharding_io.save_distributed_model_meta(output_dir)
