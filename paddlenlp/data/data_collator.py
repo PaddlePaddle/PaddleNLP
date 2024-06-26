@@ -408,17 +408,19 @@ class DataCollatorForSeq2Seq:
                     (max_length + self.pad_to_multiple_of - 1) // self.pad_to_multiple_of * self.pad_to_multiple_of
                 )
 
-            padding_side = self.tokenizer.padding_side
             for feature in batch:
-                remainder = [feature["attn_mask_startend_row_indices"][-1]] * (
-                    max_length - len(feature["attn_mask_startend_row_indices"])
-                )
-                if isinstance(feature["attn_mask_startend_row_indices"], list):
-                    feature["attn_mask_startend_row_indices"] = (
-                        feature["attn_mask_startend_row_indices"] + remainder
-                        if padding_side == "right"
-                        else remainder + feature["attn_mask_startend_row_indices"]
+                pad_len = max_length - len(feature["attn_mask_startend_row_indices"])
+                remainder = np.zeros([1, pad_len], dtype=np.int32)
+                feature["attn_mask_startend_row_indices"] = (
+                    np.concatenate(
+                        [remainder, np.array([feature["attn_mask_startend_row_indices"]], dtype=np.int32) + pad_len],
+                        axis=-1,
                     )
+                    if padding_side == "left"
+                    else np.concatenate(
+                        [np.array([feature["attn_mask_startend_row_indices"]], dtype=np.int32), remainder], axis=-1
+                    )
+                )
 
         batch = self.tokenizer.pad(
             batch,

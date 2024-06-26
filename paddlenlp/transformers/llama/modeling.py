@@ -1916,6 +1916,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
                 "You have provided both attn_mask_startend_row_indices and attention_mask. "
                 "The attn_mask_startend_row_indices will be used."
             )
+            attention_mask = None
 
         outputs = self.llama(
             input_ids,  # [bs, seq_len]
