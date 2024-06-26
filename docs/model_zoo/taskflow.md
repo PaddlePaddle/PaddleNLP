@@ -930,7 +930,7 @@ from paddlenlp import Taskflow
 
 #### 定制训练
 
-对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用[定制训练](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/legacy/model_zoo/uie)（标注少量数据进行模型微调）以进一步提升效果。
+对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用[定制训练](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/uie)（标注少量数据进行模型微调）以进一步提升效果。
 
 我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
 
@@ -1781,8 +1781,8 @@ Tensor(shape=[2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 |                     `Taskflow("pos_tagging")`                     |                    `$HOME/.paddlenlp/taskflow/lac`                     |             [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/lexical_analysis)             |
 |                  `Taskflow("ner", mode="fast")`                   |                    `$HOME/.paddlenlp/taskflow/lac`                     |             [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/lexical_analysis)             |
 |                `Taskflow("ner", mode="accurate")`                 |                  `$HOME/.paddlenlp/taskflow/wordtag`                   |       [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_to_knowledge/ernie-ctm)        |
-|      `Taskflow("information_extraction", model="uie-base")`       |      `$HOME/.paddlenlp/taskflow/information_extraction/uie-base`       |               [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/legacy/model_zoo/uie)                |
-|      `Taskflow("information_extraction", model="uie-tiny")`       |      `$HOME/.paddlenlp/taskflow/information_extraction/uie-tiny`       |               [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/legacy/model_zoo/uie)                |
+|      `Taskflow("information_extraction", model="uie-base")`       |      `$HOME/.paddlenlp/taskflow/information_extraction/uie-base`       |               [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/uie)                |
+|      `Taskflow("information_extraction", model="uie-tiny")`       |      `$HOME/.paddlenlp/taskflow/information_extraction/uie-tiny`       |               [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/uie)                |
 |         `Taskflow("text_correction", model="ernie-csc")`          |         `$HOME/.paddlenlp/taskflow/text_correction/ernie-csc`          |        [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_correction/ernie-csc)         |
 |        `Taskflow("dependency_parsing", model="ddparser")`         |        `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser`         |       [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/examples/dependency_parsing/ddparser)        |
 |   `Taskflow("dependency_parsing", model="ddparser-ernie-1.0")`    |   `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0`    |       [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/examples/dependency_parsing/ddparser)        |
@@ -1841,7 +1841,7 @@ my_ner = Taskflow("ner", mode="accurate", task_path="./custom_task_path/")
   <tr><td rowspan="2">命名实体识别<td>精确模式：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
   <tr><td>快速模式：BiGRU+CRF <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含2200万句子，覆盖多种场景
   <tr><td>依存句法分析<td>DDParser<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/dependency_parsing/ddparser"> 训练详情 <td> 百度自建数据集，DuCTB 1.0中文依存句法树库
-  <tr><td>信息抽取<td> UIE <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/legacy/model_zoo/uie"> 训练详情 <td> 百度自建数据集
+  <tr><td>信息抽取<td> UIE <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/uie"> 训练详情 <td> 百度自建数据集
   <tr><td rowspan="2">解语知识标注<td>词类知识标注：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
   <tr><td>名词短语标注：NPTag <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_to_knowledge/nptag"> 训练详情 <td> 百度自建数据集
   <tr><td>文本纠错<td>ERNIE-CSC<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_correction/ernie-csc"> 训练详情 <td> SIGHAN简体版数据集及 <a href="https://github.com/wdimmy/Automatic-Corpus-Generation/blob/master/corpus/train.sgml"> Automatic Corpus Generation生成的中文纠错数据集
