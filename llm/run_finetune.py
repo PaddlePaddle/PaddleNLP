@@ -14,6 +14,7 @@
 import json
 import os
 import sys
+import inspect
 from functools import partial
 
 import paddle
@@ -159,6 +160,9 @@ def main():
     else:
         # NOTE(gongenlei): new add autotuner_benchmark
         model = model_class.from_config(model_config, dtype=dtype)
+
+    if model_args.use_attn_mask_startend_row_indices and "attn_mask_startend_row_indices" not in inspect.signature(model.forward).parameters:
+        raise NotImplementedError(f"{model.__class__} not support flash mask.")
 
     if training_args.do_train and model_args.neftune:
         # Inspired by https://github.com/neelsjain/NEFTune

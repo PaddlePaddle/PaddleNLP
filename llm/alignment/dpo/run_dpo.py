@@ -17,6 +17,7 @@
 import os
 import sys
 import time
+import inspect
 from functools import partial
 
 import paddle
@@ -123,6 +124,9 @@ def main():
         ref_config = AutoConfig.from_pretrained(**model_kwargs)
         ref_model = AutoModelForCausalLM.from_config(ref_config)
         model.set_state_dict(ref_model.state_dict())
+
+    if model_args.use_attn_mask_startend_row_indices and "attn_mask_startend_row_indices" not in inspect.signature(model.forward).parameters:
+        raise NotImplementedError(f"{model.__class__} not support flash mask.")
 
     if model_args.tokenizer_name_or_path is not None:
         tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
