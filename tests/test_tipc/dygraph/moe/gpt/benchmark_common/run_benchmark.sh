@@ -147,7 +147,7 @@ function _train(){
         ;;
     *) echo "choose run_mode "; exit 1;
     esac
-    cd ../examples/language_model/moe/dygraph/
+    cd ../legacy/model_zoo/moe/dygraph/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间

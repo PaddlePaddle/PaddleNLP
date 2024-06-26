@@ -1039,7 +1039,10 @@ class TrainingArguments:
                 strategy = fleet.DistributedStrategy()
                 assert self.data_parallel_config == "", "data_parallle_config is not supported in hybrid parallel"
                 if self.pipeline_parallel_degree > 1:
-                    pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
+                    if " " in self.pipeline_parallel_config:
+                        pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
+                    else:
+                        pipeline_parallel_config = set(self.pipeline_parallel_config.split(","))
                     for x in pipeline_parallel_config:
                         if len(x) > 0:
                             if x not in [
@@ -1222,7 +1225,10 @@ class TrainingArguments:
                 strategy.hybrid_configs = hybrid_configs
 
                 if self.sharding_parallel_degree > 1:
-                    sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
+                    if " " in self.sharding_parallel_config:
+                        sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
+                    else:
+                        sharding_parallel_config = set(self.sharding_parallel_config.split(","))
                     for x in sharding_parallel_config:
                         if len(x) > 0:
                             if x not in [
@@ -1378,7 +1384,10 @@ class TrainingArguments:
 
             # navie-pp: pipeline_parallel_degree > 1 and gradient_accumulation_steps == 1
             if self.pipeline_parallel_degree > 1 and self.gradient_accumulation_steps > 1:
-                pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
+                if " " in self.pipeline_parallel_config:
+                    pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
+                else:
+                    pipeline_parallel_config = set(self.pipeline_parallel_config.split(","))
                 for x in pipeline_parallel_config:
                     if len(x) > 0:
                         if x not in [
@@ -1464,7 +1473,10 @@ class TrainingArguments:
                 elif ShardingOption.FULL_SHARD in self.sharding:
                     sharding.stage = 3
 
-                sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
+                if " " in self.sharding_parallel_config:
+                    sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
+                else:
+                    sharding_parallel_config = set(self.sharding_parallel_config.split(","))
                 for x in sharding_parallel_config:
                     if len(x) > 0:
                         if x not in [
