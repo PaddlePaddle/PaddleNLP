@@ -28,7 +28,7 @@
 python -m pip install -r ../requirements.txt
 python -m pip install -r ../requirements-dev.txt
 # get data
-cd ../llm/gpt-3
+cd ../llm
 rm -rf data
 mkdir data
 wget -O data/gpt2-en-mmap.bin https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/gpt/mmap/gpt2-en-mmap.bin
