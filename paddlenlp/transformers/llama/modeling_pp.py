@@ -193,12 +193,26 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
     def forward(self, args):
         hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, alibi = parse_args(args)
         # we can't distinguish
-        # hidden_states, attention_mask, position_ids or
-        # hidden_states, attention_mask, alibi
-
-        if self.config.alibi and alibi is None and position_ids is not None:
-            alibi = position_ids
+        if self.config.alibi and alibi is None and position_ids is None and attn_mask_startend_row_indices is not None:
+            # hidden_states, attention_mask, alibi
+            alibi = attn_mask_startend_row_indices
             position_ids = None
+            attn_mask_startend_row_indices = None
+        elif (
+            self.config.alibi
+            and alibi is None
+            and position_ids is not None
+            and attn_mask_startend_row_indices is not None
+        ):
+            # hidden_states, attention_mask, position_ids, alibi
+            alibi = position_ids
+            position_ids = attn_mask_startend_row_indices
+            attn_mask_startend_row_indices = None
+        elif not self.config.alibi and position_ids is None and attn_mask_startend_row_indices is not None:
+            # hidden_states, attention_mask, position_ids
+            position_ids = attn_mask_startend_row_indices
+            attn_mask_startend_row_indices = None
+            alibi = None
 
         has_gradient = not hidden_states.stop_gradient
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
