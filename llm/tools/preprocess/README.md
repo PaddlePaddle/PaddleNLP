@@ -35,14 +35,14 @@
 
 飞桨是自主研发、功能完备、开源开放的产业级深度学习平台，集深度学习核心训练和推理框架、基础模型库、端到端开发套件和丰富的工具组件于一体
 
-|步骤|阶段&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|数据格式| 样例|
-|-|-|-|-|
-| 0️⃣初始状态 | -|原始数据： <br/> **每个doc之间用空行间隔开** <br/> - 中文，默认每句换行符，作为句子结束。<br/> - 英文，默认使用nltk判断句子结束  | ```飞桨是功能完备、开源开放的产业级深度学习平台。``` <br/> ```飞桨拥有核心训练和推理框架、基础模型库。``` <br/><br/> ```PaddleNLP是自然语言处理领域的优秀工具。```  |
-|1️⃣原始数据转换<br/>`trans_to_json.py`|预处理 <br>输入：0️⃣初始状态 <br>输出：jsonl|jsonl格式：每个doc对应一行json字符串| ```{"text": "飞桨是功能完备、开源开放的产业级深度学习平台。飞桨拥有..."}```<br/>```{"text": "PaddleNLP是自然语言..."}```
-|❇️(**可选**)数据中文分词<br/>`words_segmentation.py`|语料分词：中文WWM <br>输入：jsonl  <br> 输出：0️⃣初始状态| 将jsonl格式的数据，恢复成分词后的原始格式数据 <br> | ```飞桨 是 功能 完备、开源 开放的 产业级 深度学习 平台。``` <br/> ```飞桨 拥有 核心 训练和推理 框架、基础 模型库。``` <br/><br/> ```PaddleNLP 是 自然语言处理领域 的 优秀工具。```
-|2️⃣数据ID化<br/>`create_pretrain_data.py`|预处理| bin格式：数据id化后的token id <br/>idx格式：数据句子、文章位置索引 | -
-|3️⃣训练index文件生成|训练启动|npy格式：<br/> 根据训练步数max_steps生成<br/>train、valid、test的每个样本索引文件| -
-|4️⃣token动态mask（可选）| Dataset取数据 | 无 |-
+| 步骤                                                | 阶段&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | 数据格式                                                                                                                        | 样例                                                                                                                                                                               |
+|-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 0️⃣初始状态                                           | -                                                                                                                                  | 原始数据： <br/> **每个doc之间用空行间隔开** <br/> - 中文，默认每句换行符，作为句子结束。<br/> - 英文，默认使用nltk判断句子结束 | ```飞桨是功能完备、开源开放的产业级深度学习平台。``` <br/> ```飞桨拥有核心训练和推理框架、基础模型库。``` <br/><br/> ```PaddleNLP是自然语言处理领域的优秀工具。```                 |
+| 1️⃣原始数据转换<br/>`trans_to_json.py`                | 预处理 <br>输入：0️⃣初始状态 <br>输出：jsonl                                                                                         | jsonl格式：每个doc对应一行json字符串                                                                                            | ```{"text": "飞桨是功能完备、开源开放的产业级深度学习平台。飞桨拥有..."}```<br/>```{"text": "PaddleNLP是自然语言..."}```                                                           |
+| ❇️(**可选**)数据中文分词<br/>`words_segmentation.py` | 语料分词：中文WWM <br>输入：jsonl  <br> 输出：0️⃣初始状态                                                                            | 将jsonl格式的数据，恢复成分词后的原始格式数据 <br>                                                                              | ```飞桨 是 功能 完备、开源 开放的 产业级 深度学习 平台。``` <br/> ```飞桨 拥有 核心 训练和推理 框架、基础 模型库。``` <br/><br/> ```PaddleNLP 是 自然语言处理领域 的 优秀工具。``` |
+| 2️⃣数据ID化<br/>`create_pretrain_data.py`             | 预处理                                                                                                                             | bin格式：数据id化后的token id <br/>idx格式：数据句子、文章位置索引                                                              | -                                                                                                                                                                                  |
+| 3️⃣训练index文件生成                                  | 训练启动                                                                                                                           | npy格式：<br/> 根据训练步数max_steps生成<br/>train、valid、test的每个样本索引文件                                               | -                                                                                                                                                                                  |
+| 4️⃣token动态mask（可选）                              | Dataset取数据                                                                                                                      | 无                                                                                                                              | -                                                                                                                                                                                  |
 
 
 注意：
@@ -59,12 +59,12 @@
 
 针对目前开源的数据集，PaddleNLP提供了详细的数据教程，点击对应数据集的链接，即可开始进行数据制作：
 
-| 名称 | 文本类型 | 纯文本大小 | 适配模型
-|-|-|-|-|
-| [CLUECorpusSmall](./docs/CLUECorpusSmall.md)| 中文 | 14GB | Llama
-| [OpenWebText2](./docs/OpenWebText2.md) | 英文 | 70GB | Llama
-| [WuDaoCorpus2.0 Base](./docs/WuDaoCorpusBase.md)| 中文 |  200GB | Llama
-| [CLUECorpus2020](./docs/CLUECorpus2020.md)| 中文 | 200GB | Llama
+| 名称                                             | 文本类型 | 纯文本大小 | 适配模型 |
+|--------------------------------------------------|----------|------------|----------|
+| [CLUECorpusSmall](./docs/CLUECorpusSmall.md)     | 中文     | 14GB       | Llama    |
+| [OpenWebText2](./docs/OpenWebText2.md)           | 英文     | 70GB       | Llama    |
+| [WuDaoCorpus2.0 Base](./docs/WuDaoCorpusBase.md) | 中文     | 200GB      | Llama    |
+| [CLUECorpus2020](./docs/CLUECorpus2020.md)       | 中文     | 200GB      | Llama    |
 
 ## 预训练详细准备
 
@@ -128,7 +128,7 @@ optional arguments:
   -h, --help            show this help message and exit
   --model_name MODEL_NAME
                         What model to use.
-                        必须设置，如：idea-ccnl/ziya-llama-13b-v1, 可以参考已有的模型名称 https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/llama/README.md
+                        必须设置，如：idea-ccnl/ziya-llama-13b-v1, 可以参考已有的模型名称 https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm
   --tokenizer_name {LlamaTokenizer}
                         What type of tokenizer to use.
                         模型对应的tokenizer, Llama模型需使用LlamaTokenizer
@@ -245,8 +245,8 @@ mkdir data
 mv ./preprocess/baike_sample* ./data
 ```
 
-* llama预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/llama/README.md)。
-* ernie预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/pretraining_introduction.md)。
+* llama预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm)。
+* ernie预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/model_zoo/ernie-1.0/pretraining_introduction.md)。
 
 
 代码说明：

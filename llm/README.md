@@ -19,17 +19,17 @@
 
 ##  🛠️ 支持模型列表 🛠️
 
-| Model | Pretrain | SFT | LoRA | Prefix Tuning |  DPO |  Quantization | Weight convert |
-| --- | --- | --- | --- | --- | --- |  --- | --- |
-| [LLaMA](./llama) | ✅  | ✅ | ✅ | ✅ | ✅  | ✅  | ✅  |
-| [Qwen](./qwen) | ✅ | ✅ | ✅ | ✅ | ✅  | 🚧 | ✅  |
-| [Mixtral](./mixtral) | ✅  | ✅ | ✅ | ❌  |  🚧 |🚧 | 🚧  |
-| [Baichuan/Baichuan2](./llama) | ✅  | ✅ | ✅ | ✅ | ✅  | ✅  |  ✅  |
-| [ChatGLM-6B](./chatglm) |  ❌  |  ✅  |    ✅  |  ✅  |  🚧  |  ✅  | ❌  |
-| [ChatGLM2/ChatGLM3](./chatglm2) |  ❌  |    ✅  |  ✅  |  ✅  | 🚧  | ✅  | ✅  |
-| [Bloom](./bloom) | ❌  | ✅ | ✅ |  ✅ |🚧 | ✅ | ✅  |
-| [GPT-3](./gpt-3) |   ✅  |  ✅  |    🚧  | 🚧  |🚧 | 🚧 | ✅  |
-| [OPT](./opt) | 🚧 | ✅ | ✅ | 🚧 |  🚧 |🚧 | ✅  |
+| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO | Quantization | Weight convert |
+|----------------------------------------|----------|-----|------|---------------|-----|--------------|----------------|
+| [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅   | ✅            | ✅              |
+| [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧           | ✅              |
+| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | 🚧  | 🚧           | 🚧             |
+| [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅   | ✅            | ✅              |
+| [ChatGLM-6B](./config/chatglm)         | ❌        | ✅   | ✅    | ✅             | 🚧  | ✅            | ❌              |
+| [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅    | ✅             | 🚧  | ✅            | ✅              |
+| [Bloom](./config/bloom)                | ❌        | ✅   | ✅    | ✅             | 🚧  | ✅            | ✅              |
+| [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧  | 🚧           | ✅              |
+| [OPT](./config/opt)                    | 🚧       | ✅   | ✅    | 🚧            | 🚧  | 🚧           | ✅              |
 
 * ✅: Supported
 * 🚧: In Progress
@@ -39,7 +39,7 @@
 ##  🚀 快速开始 🚀
 
 ### 1. 预训练
-PaddleNLP将飞桨4D并行策略加入到Trainer API中， 用户只需修改Trainer配置即可使用不同的分布式策略。目前工具链提供[LLaMA/LLaMA2](./llama)、[GPT-3](./gpt-3)、[Qwen](./qwen)、[Baichuan/Baichuan2](./llama)、[Mixtral](./mixtral) 等模型预训练功能，更多模型支持持续更新中。
+PaddleNLP将飞桨4D并行策略加入到Trainer API中， 用户只需修改Trainer配置即可使用不同的分布式策略。目前工具链提供[LLaMA/LLaMA2](./config/llama)、[GPT-3](./config/gpt-3)、[Qwen](./config/qwen)、[Baichuan/Baichuan2](./config/baichuan)、[Mixtral](./config/mixtral) 等模型预训练功能，更多模型支持持续更新中。
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/a2f0261d-7f76-4faf-ae01-cc9d37d5fcc0">
@@ -51,7 +51,7 @@ PaddleNLP将飞桨4D并行策略加入到Trainer API中， 用户只需修改Tra
 </div>
 
 
-我们在此处提供了更详细的[预训练数据制作]()，[分布式策略支持情况]( https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-performance)，参见: https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html. 大模型权重列表参见[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-weight)
+我们在此处提供了更详细的[预训练数据制作]()，[分布式策略支持情况](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-performance)，参见: https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html. 大模型权重列表参见[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-weight)
 
 
 此项目支持了LLaMA、GPT-3、BaiChuan、Qwen、Mixtral 等大模型的预训练。用户切换配置config文件，即可一键运行。
@@ -79,7 +79,7 @@ mv llama_openwebtext_100k.idx ./data
 
 ```shell
 # 编译自定义算子，可选
-cd ..legacy/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
+cd ../legacy/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 
 # 模型预训练参考
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json

@@ -74,7 +74,7 @@ PaddleNLP提供开箱即用的产业级NLP预置任务能力，无需训练，�
 关键配置参数说明：
 * `model`：可选模型，默认为unimo-text-1.0-dureader_qg，支持的模型有["unimo-text-1.0", "unimo-text-1.0-dureader_qg", "unimo-text-1.0-question-generation", "unimo-text-1.0-question-generation-dureader_qg"]。
 
-具体参数配置可参考[Taskflow文档](../../../docs/model_zoo/taskflow.md)。
+具体参数配置可参考[Taskflow文档](../../../../docs/model_zoo/taskflow.md)。
 
 ## 训练定制
 

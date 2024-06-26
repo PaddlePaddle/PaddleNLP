@@ -243,5 +243,3 @@ FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以�
 ## 相关文档
 
 [ERNIE 3.0模型详细介绍](../../README.md)
-
-[ERNIE 3.0模型C++部署方法](../cpp/README.md)

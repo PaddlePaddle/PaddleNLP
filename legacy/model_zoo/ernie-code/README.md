@@ -1,6 +1,6 @@
 # ERNIE-Code
 
-[ACL 2023 (Findings)](https://aclanthology.org/2023.findings-acl.676/) | [arXiv](https://arxiv.org/pdf/2212.06742) | [BibTex](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-code/README.md#bibtex) | [English version](./README.en.md)
+[ACL 2023 (Findings)](https://aclanthology.org/2023.findings-acl.676/) | [arXiv](https://arxiv.org/pdf/2212.06742) | [BibTex](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/model_zoo/ernie-code#bibtex) | [English version](https://github.com/PaddlePaddle/PaddleNLP/blob/release/2.8/model_zoo/ernie-code/README.en.md)
 
 ![ernie-code-comp](https://github.com/KB-Ding/PaddleNLP/assets/13767887/2a550b46-a7d5-416d-b300-83cce7044be4)
 

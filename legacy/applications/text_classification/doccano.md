@@ -175,7 +175,7 @@ python doccano.py \
     --task_type "multi_class"
 ```
 
-稀疏数据识别出的有效标注请增加配置参数`--valid`，脏数据清洗的标注数据（文本中有脏数据标签）请增加配置参数`--dirty`，更多稀疏数据识别和脏数据清洗详见[多分类训练评估与模型优化指南](multi_class/analysis/README.md)
+稀疏数据识别出的有效标注请增加配置参数`--valid`，脏数据清洗的标注数据（文本中有脏数据标签）请增加配置参数`--dirty`，更多稀疏数据识别和脏数据清洗详见[多分类训练评估与模型优化指南](./multi_class/analysis/README.md)
 
 ### 7.2 多标签任务
 通过 [doccano.py](./doccano.py) 脚本进行数据形式转换，然后便可以按照[多标签文本分类任务指南](multi_label/README.md)中固定格式进行相应模型训练。

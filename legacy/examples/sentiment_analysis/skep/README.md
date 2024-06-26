@@ -268,4 +268,4 @@ python predict_opinion.py \
 
 **备注**：
 1. 评价对象级情感分类和观点抽取两类任务的模型部署方式可参考语句级情感分类，这里不再赘述。
-2. 评级级情感分类以及观点抽取，暂不支持skep模型的Taskflow离线模型加载。如需使用此类功能，请参考：[unified_sentiment_analysis](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/sentiment_analysis/unified_sentiment_extraction)。
+2. 评级级情感分类以及观点抽取，暂不支持skep模型的Taskflow离线模型加载。如需使用此类功能，请参考：[unified_sentiment_analysis](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/sentiment_analysis/unified_sentiment_extraction)。
