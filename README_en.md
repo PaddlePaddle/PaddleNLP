@@ -42,7 +42,7 @@
 ## Features
 
 <div align="center">
-    <img src="https://private-user-images.githubusercontent.com/15797489/343144042-ca646310-570a-4d25-bc02-a053787c1546.jpg?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTk0MDI5NjUsIm5iZiI6MTcxOTQwMjY2NSwicGF0aCI6Ii8xNTc5NzQ4OS8zNDMxNDQwNDItY2E2NDYzMTAtNTcwYS00ZDI1LWJjMDItYTA1Mzc4N2MxNTQ2LmpwZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDA2MjYlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQwNjI2VDExNTEwNVomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTliODQxYmM3N2FjNmVhMzk1OGQ0MTQ4YjUyY2IxNTFmODIyZTZmZDdiNmY1MzUxMTZlYTYwMDZjMmM0Y2M0MGYmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JmFjdG9yX2lkPTAma2V5X2lkPTAmcmVwb19pZD0wIn0.Qc7mnekjtQB6el72gefbgfD2en4fu3YkSI265C0yr_M" width="600">
+    <img src="./docs/LLM_EN.png" width="600">
 </div>
 
 ### <a href=#Integrated training and inference on multiple hardware platforms> 🔧 Integrated training and inference on multiple hardware platforms </a>
