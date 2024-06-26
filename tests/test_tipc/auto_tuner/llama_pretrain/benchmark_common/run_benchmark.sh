@@ -97,7 +97,7 @@ function _train(){
             --auto_tuner_json ${autoconfig_json_file} run_pretrain.py ${modle_json_file}"
         ;;
     esac
-    cd ../llm/llama
+    cd ../llm
     if [[ ${model_item} =~ "resume" ]];then
         cp $PWD/autoconfig/resume.csv $PWD/autoconfig/llama7b_pretrain_history.csv
     fi
