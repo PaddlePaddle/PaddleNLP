@@ -20,9 +20,10 @@
 
 
 <h4 align="center">
+  <a href=#特性> 特性 </a> |
+  <a href=#模型支持> 模型支持 </a> |
   <a href=#安装> 安装 </a> |
   <a href=#快速开始> 快速开始 </a> |
-  <a href=#特性> 特性 </a> |
   <a href=#社区交流> 社区交流 </a>
 </h4>
 
@@ -31,7 +32,6 @@
 ## News 📢
 
 * **2024.06.27 [PaddleNLP v3.0 Beta](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0)**：拥抱大模型，体验全升级。统一大模型工具链，实现国产计算芯片全流程接入；全面支持飞桨4D并行配置、高效精调策略、高效对齐算法、高性能推理等大模型产业级应用流程；自研极致收敛的RsLoRA+算法、全断点存储机制Unified Checkpoint和通用化支持FastFNN、FusedQKV助力大模型训推；主流模型持续支持更新，提供高效解决方案。
-
 
 * **2024.04.24 [PaddleNLP v2.8](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.8.0)**：自研极致收敛的RsLoRA+算法，大幅提升PEFT训练收敛速度以及训练效果；引入高性能生成加速到RLHF PPO算法，打破 PPO 训练中生成速度瓶颈，PPO训练性能大幅领先。通用化支持 FastFNN、FusedQKV等多个大模型训练性能优化方式，大模型训练更快、更稳定。
 
@@ -47,17 +47,17 @@
 </div>
 
 ### <a href=#多硬件训推一体> 🔧 多硬件训推一体 </a>
-支持英伟达GPU、昆仑芯XPU、昇腾NPU、海光DCU、燧原GCU 等多个硬件的大模型训练和推理，同时套件接口支持硬件快速切换，大幅降低硬件切换的研发成本。
+支持英伟达GPU、昆仑XPU、昇腾NPU、燧原GCU和海光DCU等多个硬件的大模型训练和推理，套件接口支持硬件快速切换，大幅降低硬件切换研发成本。
 
 ### <a href=#高效易用的预训练> 🚀 高效易用的预训练 </a>
-支持数据、完全分片数据、张量、流水线并行的高性能训练，同时PaddleNLP Trainer支持分布式策略配置化，降低复杂分布式组合带来的使用成本；
-PaddleNLP unified checkpoint大模型存储格式在模型参数分布上支持动态扩缩容训练，降低硬件切换带来的迁移成本。
+支持数据、分片、张量、流水线并行的4D高性能训练，Trainer支持分布式策略配置化，降低复杂分布式组合带来的使用成本；
+Unified Checkpoint大模型存储格式在模型参数分布上支持动态扩缩容训练，降低硬件切换带来的迁移成本。
 
 ### <a href=#高效精调与高效对齐> 🤗 高效精调与高效对齐 </a>
-精调和对齐算法深度结合零填充数据流和FlashMask高性能算子，降低训练无效数据填充和无效数据计算，大幅提升精调和对齐训练吞吐。
+精调和对齐算法深度结合零填充数据流和FlashMask高性能算子，降低训练无效数据填充和计算，大幅提升精调和对齐训练吞吐。
 
 ### <a href=#无损压缩和高性能推理> 🎛️ 无损压缩和高性能推理 </a>
-大模型套件高性能推理模块内置动态插入和全环节算子融合策略，极大加快并行推理的速度。同时隐藏了底层实现的细节，实现了开箱即用高性能并行推理能力。
+大模型套件高性能推理模块内置动态插入和全环节算子融合策略，极大加快并行推理速度。底层实现细节封装化，实现开箱即用的高性能并行推理能力。
 
 ------------------------------------------------------------------------------------------
 
@@ -79,6 +79,7 @@ PaddleNLP unified checkpoint大模型存储格式在模型参数分布上支持�
 * 🚧: In Progress
 * ❌: Not Supported
 
+详细列表👉[模型参数支持](https://github.com/PaddlePaddle/PaddleNLP/issues/8663)
 ------------------------------------------------------------------------------------------
 
 ## 安装
@@ -102,8 +103,8 @@ pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/pad
 
 更多关于PaddlePaddle和PaddleNLP安装的详细教程请查看[Installation](./docs/get_started/installation.rst)。
 
-
 ------------------------------------------------------------------------------------------
+
 ## 快速开始
 
 ### 大模型文本生成
@@ -146,7 +147,6 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py 
 
 ------------------------------------------------------------------------------------------
 
-
 ## 社区交流
 
 - 微信扫描二维码并填写问卷，回复小助手关键词（NLP）之后，即可加入交流群领取福利
@@ -154,9 +154,9 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py 
   - 与众多社区开发者以及官方团队深度交流。
   - 10G重磅NLP学习大礼包！
 
-  <div align="center">
-  <img src="https://user-images.githubusercontent.com/11987277/245085922-0aa68d24-00ff-442e-9c53-2f1e898151ce.png" width="150" height="150" />
-  </div>
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/11987277/245085922-0aa68d24-00ff-442e-9c53-2f1e898151ce.png" width="150" height="150" />
+</div>
 
 ## Citation
 
