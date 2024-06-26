@@ -46,9 +46,6 @@
     <img src="https://private-user-images.githubusercontent.com/15797489/343082084-dafcd65a-c7b8-4458-9eaf-429fa81ce3d8.jpg?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTkzOTIxNjAsIm5iZiI6MTcxOTM5MTg2MCwicGF0aCI6Ii8xNTc5NzQ4OS8zNDMwODIwODQtZGFmY2Q2NWEtYzdiOC00NDU4LTllYWYtNDI5ZmE4MWNlM2Q4LmpwZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDA2MjYlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQwNjI2VDA4NTEwMFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTM1ZDAwNzE1NGU3MDYwYTQ3ZWU2ZmM5Y2FiNGI2MGE5MDlmYjM1NDc2NmY4YmU3YTkzZjg1YjVkOTcxMzFlYjQmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JmFjdG9yX2lkPTAma2V5X2lkPTAmcmVwb19pZD0wIn0.o639_JGZ51Zhiog-GQvgEjlNyWJ3WhuCMs4H8RwP8Tg" width="600">
 </div>
 
-
-
-
 ### <a href=#多硬件训推一体> 🔧 多硬件训推一体 </a>
 支持英伟达GPU、昆仑芯XPU、昇腾NPU、海光DCU、燧原GCU 等多个硬件的大模型训练和推理，同时套件接口支持硬件快速切换，大幅降低硬件切换的研发成本。
 
@@ -64,12 +61,32 @@ PaddleNLP unified checkpoint大模型存储格式在模型参数分布上支持�
 
 ------------------------------------------------------------------------------------------
 
+## 模型支持
+
+| Model                                      | Pretrain | SFT | LoRA | Prefix Tuning | DPO | Quantization | Weight convert |
+|--------------------------------------------|----------|-----|------|---------------|-----|--------------|----------------|
+| [LLaMA](./llm/config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅   | ✅            | ✅              |
+| [Qwen](./llm/config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧           | ✅              |
+| [Mixtral](./llm/config/mixtral)            | ✅        | ✅   | ✅    | ❌             | 🚧  | 🚧           | 🚧             |
+| [Baichuan/Baichuan2](./llm/config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅   | ✅            | ✅              |
+| [ChatGLM-6B](./llm/config/chatglm)         | ❌        | ✅   | ✅    | ✅             | 🚧  | ✅            | ❌              |
+| [ChatGLM2/ChatGLM3](./llm/config/chatglm2) | ❌        | ✅   | ✅    | ✅             | 🚧  | ✅            | ✅              |
+| [Bloom](./llm/config/bloom)                | ❌        | ✅   | ✅    | ✅             | 🚧  | ✅            | ✅              |
+| [GPT-3](./llm/config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧  | 🚧           | ✅              |
+| [OPT](./llm/config/opt)                    | 🚧       | ✅   | ✅    | 🚧            | 🚧  | 🚧           | ✅              |
+
+* ✅: Supported
+* 🚧: In Progress
+* ❌: Not Supported
+
+------------------------------------------------------------------------------------------
+
 ## 安装
 
 ### 环境依赖
 
 - python >= 3.8
-- paddlepaddle >= 3.0beta
+- paddlepaddle >= 3.0.0b0
 
 ### pip安装
 
@@ -103,33 +120,26 @@ PaddleNLP提供了方便易用的Auto API，能够快速的加载模型和Tokeni
 ['\n你好！我是一个AI语言模型，可以回答你的问题和提供帮助。']
 ```
 
-### 一键UIE预测
-
-PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练，直接输入数据即可开放域抽取结果。这里以信息抽取-命名实体识别任务，UIE模型为例：
-
-```python
->>> from pprint import pprint
->>> from paddlenlp import Taskflow
-
->>> schema = ['时间', '选手', '赛事名称'] # Define the schema for entity extraction
->>> ie = Taskflow('information_extraction', schema=schema)
->>> pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！"))
-[{'时间': [{'end': 6,
-          'probability': 0.9857378532924486,
-          'start': 0,
-          'text': '2月8日上午'}],
-  '赛事名称': [{'end': 23,
-            'probability': 0.8503089953268272,
-            'start': 6,
-            'text': '北京冬奥会自由式滑雪女子大跳台决赛'}],
-  '选手': [{'end': 31,
-          'probability': 0.8981548639781138,
-          'start': 28,
-          'text': '谷爱凌'}]}]
+### 大模型预训练
+```shell
+mkdir -p llm/data && cd llm/data
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx
+cd .. # change folder to PaddleNLP/llm
+python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json
 ```
 
+### 大模型SFT精调
+```shell
+mkdir -p llm/data && cd llm/data
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz && tar -zxvf AdvertiseGen.tar.gz
+cd .. # change folder to PaddleNLP/llm
+python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py ./config/llama/sft_argument.json
+```
+
+更多大模型全流程步骤，请参考[大模型全流程工具链](./llm)。
+
 更多PaddleNLP内容可参考：
-- [大模型全流程工具链](./llm)，包含主流中文大模型的全流程方案。
 - [精选模型库](./legacy/model_zoo)，包含优质预训练模型的端到端全流程使用。
 - [多场景示例](./legacy/examples)，了解如何使用PaddleNLP解决NLP多种技术问题，包含基础技术、系统应用与拓展应用。
 - [交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，在🆓免费算力平台AI Studio上快速学习PaddleNLP。
