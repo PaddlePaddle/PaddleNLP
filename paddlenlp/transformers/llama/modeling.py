@@ -1355,8 +1355,8 @@ class LlamaModel(LlamaPretrainedModel):
 
     def __init__(self, config: LlamaConfig):
         #####################################
-        from paddlenlp.PaddleAPEX import Acc
-        self.checker = Acc()
+        from paddleapex import Tracer
+        self.checker = Tracer()
         #####################################
         super().__init__(config)
 
