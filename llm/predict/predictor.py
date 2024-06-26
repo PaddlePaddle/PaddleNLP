@@ -747,7 +747,10 @@ class BlockInferencePredictorMixin:
         self.pre_max_block_num = (self.total_max_length + config.block_size - 1) // config.block_size
         self.max_block_nums = config.batch_size * self.pre_max_block_num
 
-        self.rope_theta = self.model_config.rope_theta
+        try:
+            self.rope_theta = self.model_config.rope_theta
+        except:
+            self.rope_theta = 10000.0
 
         self.pre_cache_length = 0
 
