@@ -193,12 +193,36 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
     def forward(self, args):
         hidden_states, attention_mask, attn_mask_startend_row_indices, position_ids, alibi = parse_args(args)
         # we can't distinguish
-        # hidden_states, attention_mask, position_ids or
-        # hidden_states, attention_mask, alibi
-
-        if self.config.alibi and alibi is None and position_ids is not None:
-            alibi = position_ids
+        if self.config.alibi and alibi is None and position_ids is None and attn_mask_startend_row_indices is not None:
+            # hidden_states, attention_mask, alibi
+            alibi = attn_mask_startend_row_indices
             position_ids = None
+            attn_mask_startend_row_indices = None
+        elif (
+            self.config.alibi
+            and alibi is None
+            and position_ids is not None
+            and attn_mask_startend_row_indices is not None
+        ):
+            # hidden_states, attention_mask, position_ids, alibi
+            alibi = position_ids
+            position_ids = attn_mask_startend_row_indices
+            attn_mask_startend_row_indices = None
+        elif not self.config.alibi:
+            if get_env_device() in ["gpu"]:
+                if attention_mask.dtype == paddle.int32:
+                    attention_mask, attn_mask_startend_row_indices, position_ids = (
+                        None,
+                        attention_mask,
+                        attn_mask_startend_row_indices,
+                    )
+                elif attention_mask.dtype == paddle.int64:
+                    attention_mask, attn_mask_startend_row_indices, position_ids = None, None, attention_mask
+                elif attn_mask_startend_row_indices == paddle.int64:
+                    attn_mask_startend_row_indices, position_ids = None, attn_mask_startend_row_indices
+            elif position_ids is None and attn_mask_startend_row_indices is not None:
+                position_ids = attn_mask_startend_row_indices
+                attn_mask_startend_row_indices = None
 
         has_gradient = not hidden_states.stop_gradient
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
