@@ -69,7 +69,7 @@ class YuanRMSNorm(nn.Layer):
         super().__init__()
         self.weight = paddle.create_parameter(
             shape=[hidden_size],
-            dtype="float32",
+            dtype=paddle.get_default_dtype,
             default_initializer=paddle.nn.initializer.Assign(paddle.ones([hidden_size])),
         )
         self.variance_epsilon = eps
