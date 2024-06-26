@@ -502,6 +502,7 @@ def main():
             padding=padding,
             max_label_length=max_length,
             return_tensors="np",
+            return_attention_masks=not model_args.use_attn_mask_startend_row_indices,
             pad_to_multiple_of=data_args.pad_to_multiple_of,
         ),
         do_generation=data_args.eval_with_do_generation,
