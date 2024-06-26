@@ -63,6 +63,7 @@ function _set_params(){
         skip_steps=10                # (必选)解析日志，跳过模型前几个性能不稳定的step
         keyword="interval_tokens_per_second_per_device:"     # (必选)解析日志，筛选出性能数据所在行的关键字
         is_large_model=False
+        model_mode=5
     fi
 
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
