@@ -1,28 +1,46 @@
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Paddle Yuan model"""
 
-import math
 import copy
-import paddle
+import math
 from functools import partial
 from typing import List, Optional, Tuple, Union
+
+import paddle
+import paddle.distributed.fleet.meta_parallel as mpu
 from einops import rearrange
 from paddle import nn
-
-import paddle.distributed.fleet.meta_parallel as mpu
-from paddlenlp.transformers.model_outputs import  CausalLMOutputWithPast, BaseModelOutputWithPast
-from paddle.nn import CrossEntropyLoss
 from paddle.distributed import fleet
+from paddle.nn import CrossEntropyLoss
 
-from paddlenlp.transformers.model_utils import PretrainedModel
-from paddlenlp.utils.tools import get_env_device
 from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
 )
+from paddlenlp.transformers.model_outputs import (
+    BaseModelOutputWithPast,
+    CausalLMOutputWithPast,
+)
+from paddlenlp.transformers.model_utils import PretrainedModel
+from paddlenlp.utils.tools import get_env_device
 
-from .configuration import YuanConfig
-from ..activations import ACT2FN
 from ...utils.log import logger
+from ..activations import ACT2FN
+from .configuration import YuanConfig
+
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         ColumnSequenceParallelLinear,
@@ -34,6 +52,7 @@ except:
 try:
     if get_env_device() == "npu":
         import os
+
         for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
             if lib.endswith(".so"):
                 paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(lib)
@@ -43,21 +62,24 @@ except:
 
 
 class YuanRMSNorm(nn.Layer):
-    
     def __init__(self, hidden_size, eps=1e-6):
         """
         YuanRMSNorm is equivalent to LlamaRMSNorm
         """
         super().__init__()
-        self.weight = paddle.create_parameter(shape=[hidden_size], dtype='float32', default_initializer=paddle.nn.initializer.Assign(paddle.ones([hidden_size])))
+        self.weight = paddle.create_parameter(
+            shape=[hidden_size],
+            dtype="float32",
+            default_initializer=paddle.nn.initializer.Assign(paddle.ones([hidden_size])),
+        )
         self.variance_epsilon = eps
 
     def forward(self, hidden_states):
         input_dtype = hidden_states.dtype
-        hidden_states = paddle.cast(hidden_states,'float32')
+        hidden_states = paddle.cast(hidden_states, "float32")
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
-        return self.weight * paddle.cast(hidden_states,input_dtype)
+        return self.weight * paddle.cast(hidden_states, input_dtype)
 
 
 class LocalizedFiltering(paddle.nn.Layer):
@@ -74,12 +96,26 @@ class LocalizedFiltering(paddle.nn.Layer):
         self.lf_conv2d_group = 1
         self.lf_conv2d_num_pad = 1
 
-        self.conv1 = paddle.nn.Conv2D(self.embed_dim, self.embed_dim // 2, (2, 1), stride=(1, 1), padding=(self.lf_conv2d_num_pad, 0), groups=self.lf_conv2d_group)
-        self.conv2 = paddle.nn.Conv2D(self.embed_dim // 2, self.embed_dim, (2, 1), stride=(1, 1), padding=(self.lf_conv2d_num_pad, 0), groups=self.lf_conv2d_group)
+        self.conv1 = paddle.nn.Conv2D(
+            self.embed_dim,
+            self.embed_dim // 2,
+            (2, 1),
+            stride=(1, 1),
+            padding=(self.lf_conv2d_num_pad, 0),
+            groups=self.lf_conv2d_group,
+        )
+        self.conv2 = paddle.nn.Conv2D(
+            self.embed_dim // 2,
+            self.embed_dim,
+            (2, 1),
+            stride=(1, 1),
+            padding=(self.lf_conv2d_num_pad, 0),
+            groups=self.lf_conv2d_group,
+        )
         self.output_layernorm = YuanRMSNorm(self.embed_dim)
 
     def _train_forward(self, inputs):
-        inputs = paddle.transpose(inputs, perm=[1, 0,*range(2, len(inputs.shape))])
+        inputs = paddle.transpose(inputs, perm=[1, 0, *range(2, len(inputs.shape))])
         seq_len, bsz, embed_dim = inputs.shape
         if embed_dim != self.embed_dim:
             raise ValueError(
@@ -97,13 +133,13 @@ class LocalizedFiltering(paddle.nn.Layer):
         assert output2.shape == residual.shape
 
         lf_output = self.output_layernorm(output2 + residual)
-        lf_output = paddle.transpose(lf_output, [1, 0,*range(2, len(lf_output.shape))])
+        lf_output = paddle.transpose(lf_output, [1, 0, *range(2, len(lf_output.shape))])
         return lf_output
 
     def _inference_forward(self, inputs, before_hidden_states):
 
         if before_hidden_states is None:
-            inputs = inputs.transpose([1, 0,*range(2, len(inputs.shape))])
+            inputs = inputs.transpose([1, 0, *range(2, len(inputs.shape))])
             seq_len, bsz, embed_dim = inputs.shape
             if embed_dim != self.embed_dim:
                 raise ValueError(
@@ -121,11 +157,13 @@ class LocalizedFiltering(paddle.nn.Layer):
             assert output2.shape == residual.shape
 
             lf_output = self.output_layernorm(output2 + residual)
-            lf_output = paddle.transpose(lf_output, [1, 0,*range(2, len(lf_output.shape))])
+            lf_output = paddle.transpose(lf_output, [1, 0, *range(2, len(lf_output.shape))])
             return lf_output
         else:
-            inputs = paddle.transpose(inputs,[1,0,*range(2, len(inputs.shape))])
-            before_hidden_states = paddle.transpose(before_hidden_states,[1,0,*range(2, len(before_hidden_states.shape))])
+            inputs = paddle.transpose(inputs, [1, 0, *range(2, len(inputs.shape))])
+            before_hidden_states = paddle.transpose(
+                before_hidden_states, [1, 0, *range(2, len(before_hidden_states.shape))]
+            )
             residual = inputs
 
             seq_len, bsz, embed_dim = inputs.shape
@@ -137,22 +175,17 @@ class LocalizedFiltering(paddle.nn.Layer):
             inputs = paddle.transpose(paddle.reshape(inputs, [3, 1, bsz, embed_dim]), [2, 3, 0, 1])
 
             output1 = self.conv1(inputs)
-            output2 = self.conv2(output1[:,:,1:-1,:])
-            output2 = output2[:,:,1:-1,:]
+            output2 = self.conv2(output1[:, :, 1:-1, :])
+            output2 = output2[:, :, 1:-1, :]
             output2 = paddle.reshape(output2, [1, bsz, embed_dim])
             assert output2.shape == residual.shape
 
             lf_output = self.output_layernorm(output2 + residual)
-            lf_output = paddle.transpose(lf_output, [1, 0,*range(2, len(lf_output.shape))])
+            lf_output = paddle.transpose(lf_output, [1, 0, *range(2, len(lf_output.shape))])
 
         return lf_output
 
-
-    def forward(
-        self,
-        inputs,
-        before_hidden_states
-    ) -> paddle.Tensor:
+    def forward(self, inputs, before_hidden_states) -> paddle.Tensor:
         assert self.lf_conv2d_num_pad == 1
         if self.training:
             lf_output = self._train_forward(inputs)
@@ -160,7 +193,7 @@ class LocalizedFiltering(paddle.nn.Layer):
             lf_output = self._inference_forward(inputs, before_hidden_states)
 
         return lf_output
-    
+
 
 # Copied from transformers.models.bart.modeling_bart._make_causal_mask
 def _make_causal_mask(
@@ -177,7 +210,9 @@ def _make_causal_mask(
     mask = paddle.where(mask_cond < mask_cond_reshaped, paddle.zeros_like(mask), mask)
     mask = paddle.cast(mask, dtype)
     if past_key_values_length > 0:
-        mask = paddle.concat([paddle.zeros([tgt_len, past_key_values_length], dtype=dtype, device=device), mask], zeros=-1)
+        mask = paddle.concat(
+            [paddle.zeros([tgt_len, past_key_values_length], dtype=dtype, device=device), mask], zeros=-1
+        )
     return mask[None, None, :, :].expand(bsz, 1, tgt_len, tgt_len + past_key_values_length)
 
 
@@ -194,7 +229,7 @@ def _expand_mask(mask: paddle.Tensor, dtype: paddle.dtype, tgt_len: Optional[int
 
     inverted_mask = 1.0 - expanded_mask
 
-    return inverted_mask.masked_fill(paddle.cast(inverted_mask,paddle.bool), paddle.finfo(dtype).min)
+    return inverted_mask.masked_fill(paddle.cast(inverted_mask, paddle.bool), paddle.finfo(dtype).min)
 
 
 def rotate_half(x):
@@ -216,7 +251,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
 
 
 class YuanPreTrainedModel(PretrainedModel):
-    config_class = YuanConfig 
+    config_class = YuanConfig
     base_model_prefix = "model"
     supports_gradient_checkpointing = True
     _no_split_modules = ["YuanDecoderLayer"]
@@ -311,7 +346,7 @@ class YuanPreTrainedModel(PretrainedModel):
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
         return mappings
-   
+
     def _init_weights(self, module):
         std = self.config.initializer_range
         if isinstance(module, nn.Linear):
@@ -329,13 +364,12 @@ class YuanPreTrainedModel(PretrainedModel):
 
     def _post_init(self, *args, **kwargs):
         with paddle.no_grad():
-          self.init_weights()
+            self.init_weights()
 
 
 class YuanRotaryEmbedding(nn.Layer):
-
     def __init__(self, dim, max_position_embeddings=2048, base=10000):
-        
+
         """
         YuanRotaryEmbedding is equivalent to LlamaRotaryEmbedding in transformers v4.36
         """
@@ -366,17 +400,13 @@ class YuanRotaryEmbedding(nn.Layer):
         cos = self.cos_cached[:, :, :seq_len, ...]
         sin = self.sin_cached[:, :, :seq_len, ...]
         return (
-            paddle.cast(cos,x.dtype) ,
-            paddle.cast(sin,x.dtype) ,
+            paddle.cast(cos, x.dtype),
+            paddle.cast(sin, x.dtype),
         )
 
 
 class YuanMLP(nn.Layer):
-    
-    def __init__(
-        self,
-        config
-    ):
+    def __init__(self, config):
         super().__init__()
         if config.sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
@@ -384,11 +414,11 @@ class YuanMLP(nn.Layer):
         else:
             ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
             RowParallelLinear = fleet.meta_parallel.RowParallelLinear
-        self.hidden_size=config.hidden_size
-        self.intermediate_size=config.intermediate_size
-        self.hidden_act=config.hidden_act
+        self.hidden_size = config.hidden_size
+        self.intermediate_size = config.intermediate_size
+        self.hidden_act = config.hidden_act
         if config.tensor_parallel_degree > 1:
-            
+
             self.gate_proj = ColumnParallelLinear(
                 self.hidden_size,
                 self.intermediate_size,
@@ -419,7 +449,7 @@ class YuanMLP(nn.Layer):
 
 
 class YuanAttention(nn.Layer):
-    
+
     """Localized Filtering-based Attention 'YUAN 2.0: A Large Language Model with Localized Filtering-based Attention' paper"""
 
     def __init__(self, config: YuanConfig):
@@ -473,10 +503,10 @@ class YuanAttention(nn.Layer):
                 gather_output=False,
             )
             self.k_proj = ColumnParallelLinear(
-                    self.hidden_size,
-                    self.config.num_key_value_heads * self.head_dim,
-                    has_bias=False,
-                    gather_output=False,
+                self.hidden_size,
+                self.config.num_key_value_heads * self.head_dim,
+                has_bias=False,
+                gather_output=False,
             )
         else:
             self.o_proj = nn.Linear(
@@ -489,7 +519,7 @@ class YuanAttention(nn.Layer):
             self.k_proj = nn.Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=False)
         self.rotary_emb = YuanRotaryEmbedding(self.head_dim, max_position_embeddings=self.max_position_embeddings)
         self.lf_gate = LocalizedFiltering(self.hidden_size)
-          
+
     def _shape(self, tensor: paddle.Tensor, seq_len: int, bsz: int):
         return tensor.reshape([bsz, seq_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
 
@@ -507,7 +537,9 @@ class YuanAttention(nn.Layer):
         is_first_step = False
         if use_cache:
             if past_key_value is None:
-                inference_hidden_states_memory = paddle.empty([bsz, 2, hidden_states.shape[2]], dtype=hidden_states.dtype)
+                inference_hidden_states_memory = paddle.empty(
+                    [bsz, 2, hidden_states.shape[2]], dtype=hidden_states.dtype
+                )
                 is_first_step = True
             else:
                 before_hidden_states = past_key_value[2]
@@ -515,23 +547,27 @@ class YuanAttention(nn.Layer):
         if use_cache:
             if is_first_step:
                 if q_len >= 2:
-                    inference_hidden_states_memory = hidden_states[ :, -2:, :]
+                    inference_hidden_states_memory = hidden_states[:, -2:, :]
                 else:
                     inference_hidden_states_memory[:, :, :] = 0
                     inference_hidden_states_memory[:, -1:, :] = hidden_states[:, -1:, :]
             else:
                 hidden_states_tmp = before_hidden_states[:, -1:, :]
-                inference_hidden_states_memory = copy.deepcopy(paddle.concat((hidden_states_tmp, hidden_states), axis=1))
+                inference_hidden_states_memory = copy.deepcopy(
+                    paddle.concat((hidden_states_tmp, hidden_states), axis=1)
+                )
 
-        value_states = self.v_proj(hidden_states).reshape([bsz, q_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
-        hidden_states = self.lf_gate(hidden_states,before_hidden_states)
+        value_states = (
+            self.v_proj(hidden_states).reshape([bsz, q_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
+        )
+        hidden_states = self.lf_gate(hidden_states, before_hidden_states)
         query_states = self.q_proj(hidden_states)
         key_states = self.k_proj(hidden_states)
         qk_states = paddle.concat([query_states, key_states], axis=-1)
         qk_states = qk_states.reshape([bsz, q_len, self.num_heads, int(qk_states.shape[-1] // self.num_heads)])
-        (query_states,key_states) =  paddle.chunk(qk_states, 2, axis=-1)
-        query_states = query_states.transpose([0,2, 1,*range(3, len(query_states.shape))])
-        key_states = key_states.transpose([0,2, 1,*range(3, len(key_states.shape))])
+        (query_states, key_states) = paddle.chunk(qk_states, 2, axis=-1)
+        query_states = query_states.transpose([0, 2, 1, *range(3, len(query_states.shape))])
+        key_states = key_states.transpose([0, 2, 1, *range(3, len(key_states.shape))])
 
         kv_seq_len = key_states.shape[-2]
         if past_key_value is not None:
@@ -544,18 +580,18 @@ class YuanAttention(nn.Layer):
             key_states = paddle.concat([past_key_value[0], key_states], axis=2)
             value_states = paddle.concat([past_key_value[1], value_states], axis=2)
 
-        past_key_value = (key_states, value_states,inference_hidden_states_memory) if use_cache else None
-        
+        past_key_value = (key_states, value_states, inference_hidden_states_memory) if use_cache else None
+
         if self.use_flash_attention:
             attn_weights = None
-            query_states = query_states.transpose([0,2, 1,*range(3, len(query_states.shape))])
-            key_states = key_states.transpose([0,2, 1,*range(3, len(key_states.shape))])
-            value_states = value_states.transpose([0,2, 1,*range(3, len(value_states.shape))])
+            query_states = query_states.transpose([0, 2, 1, *range(3, len(query_states.shape))])
+            key_states = key_states.transpose([0, 2, 1, *range(3, len(key_states.shape))])
+            value_states = value_states.transpose([0, 2, 1, *range(3, len(value_states.shape))])
 
             batch_size, seqlen_q = query_states.shape[0], query_states.shape[1]
             seqlen_k = key_states.shape[1]
 
-            q, k, v = [rearrange(x, 'b s ... -> (b s) ...') for x in [query_states, key_states, value_states]]
+            q, k, v = [rearrange(x, "b s ... -> (b s) ...") for x in [query_states, key_states, value_states]]
 
             cu_seqlens_q = paddle.arange(0, (batch_size + 1) * seqlen_q, step=seqlen_q, dtype="int32")
 
@@ -566,13 +602,15 @@ class YuanAttention(nn.Layer):
             else:
                 is_causal = seqlen_q == seqlen_k
                 cu_seqlens_k = paddle.arange(0, (batch_size + 1) * seqlen_k, step=seqlen_k, dtype="int32")
-                self.dropout=0
+                self.dropout = 0
             output = flash_attn_unpadded(
                 q, k, v, cu_seqlens_q, cu_seqlens_k, seqlen_q, seqlen_k, self.dropout, causal=is_causal
             )
-            attn_output = rearrange(output[0], '(b s) ... -> b s ...', b=batch_size)
+            attn_output = rearrange(output[0], "(b s) ... -> b s ...", b=batch_size)
         else:
-            attn_weights = paddle.matmul(query_states, key_states.transpose([0,1,3,2,*range(4, len(key_states.shape))])) / math.sqrt(self.head_dim)
+            attn_weights = paddle.matmul(
+                query_states, key_states.transpose([0, 1, 3, 2, *range(4, len(key_states.shape))])
+            ) / math.sqrt(self.head_dim)
 
             if attn_weights.shape != [bsz, self.num_heads, q_len, kv_seq_len]:
                 raise ValueError(
@@ -588,7 +626,9 @@ class YuanAttention(nn.Layer):
                 attn_weights = paddle.maximum(attn_weights, paddle.to_tensor(paddle.finfo(attn_weights.dtype).min))
 
             # upcast attention to fp32
-            attn_weights = paddle.cast(nn.functional.softmax(attn_weights, axis=-1, dtype=paddle.float32),query_states.dtype)
+            attn_weights = paddle.cast(
+                nn.functional.softmax(attn_weights, axis=-1, dtype=paddle.float32), query_states.dtype
+            )
             attn_output = paddle.matmul(attn_weights, value_states)
 
             if attn_output.shape != [bsz, self.num_heads, q_len, self.head_dim]:
@@ -597,7 +637,7 @@ class YuanAttention(nn.Layer):
                     f" {attn_output.shape}"
                 )
 
-            attn_output = attn_output.transpose([0,2, 1,*range(3, len(attn_output.shape))])
+            attn_output = attn_output.transpose([0, 2, 1, *range(3, len(attn_output.shape))])
 
         # attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
         attn_output = attn_output.reshape([bsz, q_len, -1])
@@ -684,7 +724,7 @@ class YuanModel(YuanPreTrainedModel):
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
 
-        #TODO: control it by config
+        # TODO: control it by config
         self.eod_token = config.eod_token
         self.reset_attention_mask = config.reset_attention_mask
         self.reset_position_ids = config.reset_position_ids
@@ -731,19 +771,20 @@ class YuanModel(YuanPreTrainedModel):
 
         return combined_attention_mask
 
-    def _prepare_decoder_attention_mask_training(self, input_id, inputs_embeds, eod_token, reset_mask_flag ,reset_attention_mask=True, reset_position_ids=True):
-    
+    def _prepare_decoder_attention_mask_training(
+        self, input_id, inputs_embeds, eod_token, reset_mask_flag, reset_attention_mask=True, reset_position_ids=True
+    ):
+
         micro_batch_size, seq_length = input_id.shape
-        attention_mask = paddle.tril(paddle.ones(
-            (micro_batch_size, seq_length, seq_length)))
-        attention_mask = paddle.reshape(attention_mask, (micro_batch_size, 1, seq_length, seq_length)) 
-                
+        attention_mask = paddle.tril(paddle.ones((micro_batch_size, seq_length, seq_length)))
+        attention_mask = paddle.reshape(attention_mask, (micro_batch_size, 1, seq_length, seq_length))
+
         position_ids = paddle.arange(seq_length, dtype=paddle.int64)
         position_ids = position_ids.unsqueeze(0).expand_as(input_id)
-               
+
         if reset_position_ids:
             position_ids = position_ids.clone()
-        
+
         if reset_position_ids or reset_attention_mask:
             # Loop through the batches:
             for b in range(micro_batch_size):
@@ -760,16 +801,18 @@ class YuanModel(YuanPreTrainedModel):
                     i = eod_index[j]
                     # Mask attention loss.
                     if reset_attention_mask:
-                        attention_mask[b, 0, (i + 1):, :(i + 1)] = 0
+                        attention_mask[b, 0, (i + 1) :, : (i + 1)] = 0
                     # Reset positions.
                     if reset_position_ids:
-                        position_ids[b, (i + 1):] -= (i + 1 - prev_index)
+                        position_ids[b, (i + 1) :] -= i + 1 - prev_index
                         prev_index = i + 1
-                        
-        inverted_mask = 1 - attention_mask   
-        output_attn_mask = inverted_mask.masked_fill(paddle.cast(inverted_mask, 'bool'), paddle.finfo(inputs_embeds.dtype).min)
+
+        inverted_mask = 1 - attention_mask
+        output_attn_mask = inverted_mask.masked_fill(
+            paddle.cast(inverted_mask, "bool"), paddle.finfo(inputs_embeds.dtype).min
+        )
         if reset_mask_flag:
-            output_attn_mask = output_attn_mask[:,:,-1:,:]
+            output_attn_mask = output_attn_mask[:, :, -1:, :]
         return output_attn_mask, position_ids
 
     def forward(
@@ -820,18 +863,20 @@ class YuanModel(YuanPreTrainedModel):
             position_ids = paddle.unsqueeze(position_ids, axis=0).reshape([-1, seq_length])
         else:
             position_ids = paddle.reshape(position_ids, [-1, seq_length])
-            position_ids = paddle.cast(position_ids, dtype='int64')
+            position_ids = paddle.cast(position_ids, dtype="int64")
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
         if self.training or self.reset_position_ids:
-            attention_mask, _ = self._prepare_decoder_attention_mask_training(input_ids1, 
-                                                                              inputs_embeds, 
-                                                                              self.eod_token, 
-                                                                              reset_mask_flag, 
-                                                                              self.reset_attention_mask, 
-                                                                              self.reset_position_ids)
-        
-        else: 
+            attention_mask, _ = self._prepare_decoder_attention_mask_training(
+                input_ids1,
+                inputs_embeds,
+                self.eod_token,
+                reset_mask_flag,
+                self.reset_attention_mask,
+                self.reset_position_ids,
+            )
+
+        else:
             if attention_mask is None:
                 attention_mask = paddle.ones(
                     (batch_size, seq_length_with_past), dtype=paddle.bool, device=inputs_embeds.place()
@@ -868,7 +913,7 @@ class YuanModel(YuanPreTrainedModel):
                         return module(*inputs, output_attentions, None)
 
                     return custom_forward
-                
+
                 layer_outputs = paddle.incubate.checkpoint(
                     create_custom_forward(decoder_layer),
                     hidden_states,
@@ -920,19 +965,18 @@ class YuanForCausalLM(YuanPreTrainedModel):
             ColumnParallelLinear = ColumnSequenceParallelLinear
         else:
             ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-        
+
         if config.tensor_parallel_degree > 1:
             self.lm_head = ColumnParallelLinear(
-                        config.hidden_size,
-                        config.vocab_size,
-                        has_bias=False,
-                        gather_output=True,
-                    )
+                config.hidden_size,
+                config.vocab_size,
+                has_bias=False,
+                gather_output=True,
+            )
         else:
             self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
         # Initialize weights and apply final processing
         self._post_init()
-
 
     def get_input_embeddings(self):
         return self.model.embed_tokens
@@ -954,13 +998,11 @@ class YuanForCausalLM(YuanPreTrainedModel):
 
     def get_loss_mask(self, input_ids, labels, eod_token, sep_token):
         micro_batch_size, seq_length = input_ids.shape
-        
-        loss_mask = paddle.ones(input_ids.shape, dtype=paddle.float, device=input_ids.place())
-        
-        position_ids = paddle.arange(seq_length, dtype=paddle.int64,
-                                device=input_ids.place())
-        position_ids = position_ids.unsqueeze(0).expand_as(input_ids) 
 
+        loss_mask = paddle.ones(input_ids.shape, dtype=paddle.float, device=input_ids.place())
+
+        position_ids = paddle.arange(seq_length, dtype=paddle.int64, device=input_ids.place())
+        position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
 
         """modify loss_mask to only calculate the loss of the answer (separated with [SEP])"""
 
@@ -972,7 +1014,7 @@ class YuanForCausalLM(YuanPreTrainedModel):
                 loss_mask[b] = 1.0
             else:
                 if eod_indexs[0] > sep_indexs[0]:
-                    loss_mask[b, 0:sep_indexs[0]] = 0
+                    loss_mask[b, 0 : sep_indexs[0]] = 0
 
                     if len(eod_indexs) == len(sep_indexs):
                         for ii, eod_index in enumerate(eod_indexs):
@@ -984,7 +1026,7 @@ class YuanForCausalLM(YuanPreTrainedModel):
                             loss_mask[b, start_index:stop_index] = 0.0
                     else:
                         if len(eod_indexs) > len(sep_indexs):
-                            loss_mask[b,:] = 1.0
+                            loss_mask[b, :] = 1.0
                         else:
                             for ii, eod_index in enumerate(eod_indexs):
                                 start_index = eod_index
@@ -1002,7 +1044,7 @@ class YuanForCausalLM(YuanPreTrainedModel):
 
                     else:
                         if len(eod_indexs) < len(sep_indexs):
-                            loss_mask[b,:] = 1.0
+                            loss_mask[b, :] = 1.0
                         else:
                             for ii, eod_index in enumerate(eod_indexs):
                                 start_index = eod_index
@@ -1013,8 +1055,8 @@ class YuanForCausalLM(YuanPreTrainedModel):
                                 loss_mask[b, start_index:stop_index] = 0.0
 
         loss_mask[input_ids == eod_token] = 1.0
-        return loss_mask 
-                      
+        return loss_mask
+
     def forward(
         self,
         input_ids: paddle.Tensor = None,
@@ -1083,13 +1125,13 @@ class YuanForCausalLM(YuanPreTrainedModel):
             shift_labels = labels[..., :].contiguous()
             # Flatten the tokens
             if self.use_loss_mask:
-                loss_fct = CrossEntropyLoss(reduction='none')
+                loss_fct = CrossEntropyLoss(reduction="none")
                 shift_logits = paddle.reshape(shift_logits, [-1, self.config.vocab_size])
                 shift_labels = paddle.reshape(shift_labels, [-1])
                 # Enable model parallelism
                 shift_labels = paddle.to_tensor(shift_labels)
                 loss = loss_fct(shift_logits, shift_labels)
-                
+
                 loss = paddle.sum(loss * loss_mask) / loss_mask.sum()
             else:
                 loss_fct = CrossEntropyLoss()
@@ -1116,7 +1158,7 @@ class YuanForCausalLM(YuanPreTrainedModel):
         position_ids = None
         if attention_mask is not None and position_ids is None:
             # create position_ids on the fly for batch generation
-            position_ids = paddle.cast(attention_mask,dtype="int64").cumsum(-1) - 1
+            position_ids = paddle.cast(attention_mask, dtype="int64").cumsum(-1) - 1
             position_ids.masked_fill_(attention_mask == 0, 1)
             if past_key_values:
                 position_ids = position_ids[:, -1].unsqueeze(-1)

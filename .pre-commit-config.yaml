@@ -1,21 +1,21 @@
 exclude: 'model_zoo/gpt-3'
 repos:
 # For Python files
--   repo: https://github.com/psf/black.git
+-   repo: https://gitee.com/wygfzren/black.git
     rev: 22.8.0
     hooks:
     -   id: black
         files: \.(py|pyi)$
         additional_dependencies: [toml]
--   repo: https://github.com/PyCQA/isort
+-   repo: https://gitee.com/SWHL/isort
     rev: 5.11.5
     hooks:
     -   id: isort
--   repo: https://github.com/PyCQA/flake8
+-   repo: https://gitee.com/Auditore8/flake8
     rev: 4.0.1
     hooks:
     -   id: flake8
--   repo: https://github.com/pre-commit/pre-commit-hooks
+-   repo: https://gitee.com/gengteng/pre-commit-hooks
     rev: v4.1.0
     hooks:
     -   id: check-merge-conflict
