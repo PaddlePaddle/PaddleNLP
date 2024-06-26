@@ -26,24 +26,50 @@
   <a href=#社区交流> 社区交流 </a>
 </h4>
 
-**PaddleNLP**是一款**简单易用**且**功能强大**的自然语言处理和大语言模型(LLM)开发库。聚合业界**优质预训练模型**并提供**开箱即用**的开发体验，覆盖NLP多场景的模型库搭配**产业实践范例**可满足开发者**灵活定制**的需求。
+**PaddleNLP**是一款基于飞桨深度学习框架的大语言模型(LLM)开发套件，支持在多种硬件上进行高效的大模型训练、无损压缩以及快速推理。PaddleNLP具备**简单易用**和**性能极致**的特点，致力于助力开发者实现高效的大模型产业级应用。
 
 ## News 📢
+
+* **2024.06.27 [PaddleNLP v3.0 Beta](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0)**：拥抱大模型，体验全升级。统一大模型工具链，实现国产计算芯片全流程接入；全面支持飞桨4D并行配置、高效精调策略、高效对齐算法、高性能推理等大模型产业级应用流程；自研极致收敛的RsLoRA+算法、全断点存储机制Unified Checkpoint和通用化支持FastFNN、FusedQKV助力大模型训推；主流模型持续支持更新，提供高效解决方案。
+
 
 * **2024.04.24 [PaddleNLP v2.8](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.8.0)**：自研极致收敛的RsLoRA+算法，大幅提升PEFT训练收敛速度以及训练效果；引入高性能生成加速到RLHF PPO算法，打破 PPO 训练中生成速度瓶颈，PPO训练性能大幅领先。通用化支持 FastFNN、FusedQKV等多个大模型训练性能优化方式，大模型训练更快、更稳定。
 
 * **2024.01.04 [PaddleNLP v2.7](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.7.1)**： 大模型体验全面升级，统一工具链大模型入口。统一预训练、精调、压缩、推理以及部署等环节的实现代码，到 `PaddleNLP/llm`目录。全新[大模型工具链文档](https://paddlenlp.readthedocs.io/zh/latest/llm/finetune.html)，一站式指引用户从大模型入门到业务部署上线。全断点存储机制 Unified Checkpoint，大大提高大模型存储的通用性。高效微调升级，支持了高效微调+LoRA同时使用，支持了QLoRA等算法。
 
-* **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**： 发布[全流程大模型工具链](./llm)，涵盖预训练，精调，压缩，推理以及部署等各个环节，为用户提供端到端的大模型方案和一站式的开发体验；内置[4D并行分布式Trainer](./docs/trainer.md)，[高效微调算法LoRA/Prefix Tuning](./llm#33-lora), [自研INT8/INT4量化算法](./llm#6-量化)等等；全面支持[LLaMA 1/2](./llm/config/llama), [BLOOM](./llm/config/bloom), [ChatGLM 1/2](./llm/config/chatglm), [OPT](./llm/config/opt)等主流大模型
+* **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**： 发布[全流程大模型工具链](./llm)，涵盖预训练，精调，压缩，推理以及部署等各个环节，为用户提供端到端的大模型方案和一站式的开发体验；内置[4D并行分布式Trainer](./docs/trainer.md)，[高效微调算法LoRA/Prefix Tuning](./llm#33-lora), [自研INT8/INT4量化算法](./llm#6-量化)等等；全面支持[LLaMA 1/2](./llm/llama), [BLOOM](.llm/bloom), [ChatGLM 1/2](./llm/chatglm), [GLM](./llm/glm), [OPT](./llm/opt)等主流大模型
 
+
+## 特性
+
+<div align="center">
+    <img src="https://private-user-images.githubusercontent.com/15797489/343082084-dafcd65a-c7b8-4458-9eaf-429fa81ce3d8.jpg?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3MTkzOTIxNjAsIm5iZiI6MTcxOTM5MTg2MCwicGF0aCI6Ii8xNTc5NzQ4OS8zNDMwODIwODQtZGFmY2Q2NWEtYzdiOC00NDU4LTllYWYtNDI5ZmE4MWNlM2Q4LmpwZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNDA2MjYlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjQwNjI2VDA4NTEwMFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTM1ZDAwNzE1NGU3MDYwYTQ3ZWU2ZmM5Y2FiNGI2MGE5MDlmYjM1NDc2NmY4YmU3YTkzZjg1YjVkOTcxMzFlYjQmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JmFjdG9yX2lkPTAma2V5X2lkPTAmcmVwb19pZD0wIn0.o639_JGZ51Zhiog-GQvgEjlNyWJ3WhuCMs4H8RwP8Tg" width="600">
+</div>
+
+
+
+
+### <a href=#多硬件训推一体> 🔧 多硬件训推一体 </a>
+支持英伟达GPU、昆仑芯XPU、昇腾NPU、海光DCU、燧原GCU 等多个硬件的大模型训练和推理，同时套件接口支持硬件快速切换，大幅降低硬件切换的研发成本。
+
+### <a href=#高效易用的预训练> 🚀 高效易用的预训练 </a>
+支持数据、完全分片数据、张量、流水线并行的高性能训练，同时PaddleNLP Trainer支持分布式策略配置化，降低复杂分布式组合带来的使用成本；
+PaddleNLP unified checkpoint大模型存储格式在模型参数分布上支持动态扩缩容训练，降低硬件切换带来的迁移成本。
+
+### <a href=#高效精调与高效对齐> 🤗 高效精调与高效对齐 </a>
+精调和对齐算法深度结合零填充数据流和FlashMask高性能算子，降低训练无效数据填充和无效数据计算，大幅提升精调和对齐训练吞吐。
+
+### <a href=#无损压缩和高性能推理> 🎛️ 无损压缩和高性能推理 </a>
+大模型套件高性能推理模块内置动态插入和全环节算子融合策略，极大加快并行推理的速度。同时隐藏了底层实现的细节，实现了开箱即用高性能并行推理能力。
+
+------------------------------------------------------------------------------------------
 
 ## 安装
 
 ### 环境依赖
 
-- python >= 3.7
-- paddlepaddle >= 2.6.0
-- 如需大模型功能，请使用 paddlepaddle-gpu >= 2.6.0
+- python >= 3.8
+- paddlepaddle >= 3.0beta
 
 ### pip安装
 
@@ -59,8 +85,9 @@ pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/pad
 
 更多关于PaddlePaddle和PaddleNLP安装的详细教程请查看[Installation](./docs/get_started/installation.rst)。
 
-## 快速开始
 
+------------------------------------------------------------------------------------------
+## 快速开始
 
 ### 大模型文本生成
 
@@ -107,186 +134,8 @@ PaddleNLP提供[一键预测功能](./docs/model_zoo/taskflow.md)，无需训练
 - [多场景示例](./legacy/examples)，了解如何使用PaddleNLP解决NLP多种技术问题，包含基础技术、系统应用与拓展应用。
 - [交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，在🆓免费算力平台AI Studio上快速学习PaddleNLP。
 
+------------------------------------------------------------------------------------------
 
-## 特性
-
-#### <a href=#开箱即用的nlp工具集> 📦 开箱即用的NLP工具集 </a>
-
-#### <a href=#丰富完备的中文模型库> 🤗 丰富完备的中文模型库 </a>
-
-#### <a href=#产业级端到端系统范例> 🎛️ 产业级端到端系统范例 </a>
-
-#### <a href=#高性能分布式训练与推理> 🚀 高性能分布式训练与推理 </a>
-
-
-### 开箱即用的NLP工具集
-
-Taskflow提供丰富的**📦开箱即用**的产业级NLP预置模型，覆盖自然语言理解与生成两大场景，提供**💪产业级的效果**与**⚡️极致的推理性能**。
-
-![taskflow1](https://user-images.githubusercontent.com/11793384/159693816-fda35221-9751-43bb-b05c-7fc77571dd76.gif)
-
-更多使用方法可参考[Taskflow文档](./docs/model_zoo/taskflow.md)。
-### 丰富完备的中文模型库
-
-#### 🀄 业界最全的中文预训练模型
-
-精选 45+ 个网络结构和 500+ 个预训练模型参数，涵盖业界最全的中文预训练模型：既包括文心NLP大模型的ERNIE、PLATO等，也覆盖BERT、GPT、RoBERTa、T5等主流结构。通过`AutoModel` API一键⚡**高速下载**⚡。
-
-```python
-from paddlenlp.transformers import *
-
-ernie = AutoModel.from_pretrained('ernie-3.0-medium-zh')
-bert = AutoModel.from_pretrained('bert-wwm-chinese')
-albert = AutoModel.from_pretrained('albert-chinese-tiny')
-roberta = AutoModel.from_pretrained('roberta-wwm-ext')
-electra = AutoModel.from_pretrained('chinese-electra-small')
-gpt = AutoModelForPretraining.from_pretrained('gpt-cpm-large-cn')
-```
-
-针对预训练模型计算瓶颈，可以使用API一键使用文心ERNIE-Tiny全系列轻量化模型，降低预训练模型部署难度。
-
-```python
-# 6L768H
-ernie = AutoModel.from_pretrained('ernie-3.0-medium-zh')
-# 6L384H
-ernie = AutoModel.from_pretrained('ernie-3.0-mini-zh')
-# 4L384H
-ernie = AutoModel.from_pretrained('ernie-3.0-micro-zh')
-# 4L312H
-ernie = AutoModel.from_pretrained('ernie-3.0-nano-zh')
-```
-
-对预训练模型应用范式如语义表示、文本分类、句对匹配、序列标注、问答等，提供统一的API体验。
-
-```python
-import paddle
-from paddlenlp.transformers import *
-
-tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
-text = tokenizer('自然语言处理')
-
-# 语义表示
-model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
-sequence_output, pooled_output = model(input_ids=paddle.to_tensor([text['input_ids']]))
-# 文本分类 & 句对匹配
-model = AutoModelForSequenceClassification.from_pretrained('ernie-3.0-medium-zh')
-# 序列标注
-model = AutoModelForTokenClassification.from_pretrained('ernie-3.0-medium-zh')
-# 问答
-model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
-```
-
-#### 💯 全场景覆盖的应用示例
-
-覆盖从学术到产业的NLP应用示例，涵盖NLP基础技术、NLP系统应用以及拓展应用。全面基于飞桨核心框架2.0全新API体系开发，为开发者提供飞桨文本领域的最佳实践。
-
-精选预训练模型示例可参考[Model Zoo](./legacy/model_zoo)，更多场景示例文档可参考[examples目录](./legacy/examples)。更有免费算力支持的[AI Studio](https://aistudio.baidu.com)平台的[Notbook交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)提供实践。
-
-<details><summary> PaddleNLP预训练模型适用任务汇总（<b>点击展开详情</b>）</summary><div>
-
-| Model              | Sequence Classification | Token Classification | Question Answering | Text Generation | Multiple Choice |
-|:-------------------|-------------------------|----------------------|--------------------|-----------------|-----------------|
-| ALBERT             | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
-| BART               | ✅                       | ✅                    | ✅                  | ✅               | ❌               |
-| BERT               | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
-| BigBird            | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
-| BlenderBot         | ❌                       | ❌                    | ❌                  | ✅               | ❌               |
-| ChineseBERT        | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
-| ConvBERT           | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
-| CTRL               | ✅                       | ❌                    | ❌                  | ❌               | ❌               |
-| DistilBERT         | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
-| ELECTRA            | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
-| ERNIE              | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
-| ERNIE-CTM          | ❌                       | ✅                    | ❌                  | ❌               | ❌               |
-| ERNIE-Doc          | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
-| ERNIE-GEN          | ❌                       | ❌                    | ❌                  | ✅               | ❌               |
-| ERNIE-Gram         | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
-| ERNIE-M            | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
-| FNet               | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
-| Funnel-Transformer | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
-| GPT                | ✅                       | ✅                    | ❌                  | ✅               | ❌               |
-| LayoutLM           | ✅                       | ✅                    | ❌                  | ❌               | ❌               |
-| LayoutLMv2         | ❌                       | ✅                    | ❌                  | ❌               | ❌               |
-| LayoutXLM          | ❌                       | ✅                    | ❌                  | ❌               | ❌               |
-| LUKE               | ❌                       | ✅                    | ✅                  | ❌               | ❌               |
-| mBART              | ✅                       | ❌                    | ✅                  | ❌               | ✅               |
-| MegatronBERT       | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
-| MobileBERT         | ✅                       | ❌                    | ✅                  | ❌               | ❌               |
-| MPNet              | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
-| NEZHA              | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
-| PP-MiniLM          | ✅                       | ❌                    | ❌                  | ❌               | ❌               |
-| ProphetNet         | ❌                       | ❌                    | ❌                  | ✅               | ❌               |
-| Reformer           | ✅                       | ❌                    | ✅                  | ❌               | ❌               |
-| RemBERT            | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
-| RoBERTa            | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
-| RoFormer           | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
-| SKEP               | ✅                       | ✅                    | ❌                  | ❌               | ❌               |
-| SqueezeBERT        | ✅                       | ✅                    | ✅                  | ❌               | ❌               |
-| T5                 | ❌                       | ❌                    | ❌                  | ✅               | ❌               |
-| TinyBERT           | ✅                       | ❌                    | ❌                  | ❌               | ❌               |
-| UnifiedTransformer | ❌                       | ❌                    | ❌                  | ✅               | ❌               |
-| XLNet              | ✅                       | ✅                    | ✅                  | ❌               | ✅               |
-
-</div></details>
-
-可参考[Transformer 文档](/docs/model_zoo/index.rst) 查看目前支持的预训练模型结构、参数和详细用法。
-
-### 产业级端到端系统范例
-
-PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高频NLP场景，提供了端到端系统范例，打通*数据标注*-*模型训练*-*模型调优*-*预测部署*全流程，持续降低NLP技术产业落地门槛。更多详细的系统级产业范例使用说明请参考[Applications](./legacy/applications)。
-
-#### 🔍 语义检索系统
-
-针对无监督数据、有监督数据等多种数据情况，结合SimCSE、In-batch Negatives、ERNIE-Gram单塔模型等，推出前沿的语义检索方案，包含召回、排序环节，打通训练、调优、高效向量检索引擎建库和查询全流程。
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168514909-8817d79a-72c4-4be1-8080-93d1f682bb46.gif" width="400">
-</div>
-
-
-更多使用说明请参考[语义检索系统](./legacy/applications/neural_search)。
-
-#### ❓ 智能问答系统
-
-基于[🚀RocketQA](https://github.com/PaddlePaddle/RocketQA)技术的检索式问答系统，支持FAQ问答、说明书问答等多种业务场景。
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168514868-1babe981-c675-4f89-9168-dd0a3eede315.gif" width="400">
-</div>
-
-
-更多使用说明请参考[智能问答系统](./legacy/applications/question_answering)与[文档智能问答](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/document_intelligence/doc_vqa)
-
-#### 💌 评论观点抽取与情感分析
-
-基于情感知识增强预训练模型SKEP，针对产品评论进行评价维度和观点抽取，以及细粒度的情感分析。
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168407260-b7f92800-861c-4207-98f3-2291e0102bbe.png" width="400">
-</div>
-
-更多使用说明请参考[情感分析](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/sentiment_analysis)。
-
-#### 🎙️ 智能语音指令解析
-
-集成了[PaddleSpeech](https://github.com/PaddlePaddle/PaddleSpeech)和[百度开放平台](https://ai.baidu.com/)的语音识别和[UIE](./legacy/model_zoo/uie)通用信息抽取等技术，打造智能一体化的语音指令解析系统范例，该方案可应用于智能语音填单、智能语音交互、智能语音检索等场景，提高人机交互效率。
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/16698950/168589100-a6c6f346-97bb-47b2-ac26-8d50e71fddc5.png" width="400">
-</div>
-
-更多使用说明请参考[智能语音指令解析](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/speech_cmd_analysis)。
-
-### 高性能分布式训练与推理
-
-#### 🚀 Fleet：飞桨4D混合并行分布式训练技术
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168515134-513f13e0-9902-40ef-98fa-528271dcccda.png" width="300">
-</div>
-
-
-更多关于千亿级AI模型的分布式训练使用说明可参考[GPT-3](./legacy/model_zoo/gpt-3)。
 
 ## 社区交流
 
