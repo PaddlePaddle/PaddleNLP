@@ -480,7 +480,7 @@ def _partion_for_pipeline_mode(keys):
 
 def shard_checkpoint(
     state_dict: Dict[str, paddle.Tensor],
-    max_shard_size: Union[int, str] = "10GB",
+    max_shard_size: Union[int, str] = None,
     weights_name: str = PADDLE_WEIGHTS_NAME,
     shard_format="naive",
 ):
@@ -502,7 +502,7 @@ def shard_checkpoint(
 
     Args:
         state_dict (`Dict[str, paddle.Tensor]`): The state dictionary of a model to save.
-        max_shard_size (`int` or `str`, *optional*, defaults to `"10GB"`):
+        max_shard_size (`int` or `str`, *optional*, defaults to None):
             The maximum size of each sub-checkpoint. If expressed as a string, needs to be digits followed by a unit
             (like `"5MB"`).
         weights_name (`str`, *optional*, defaults to `"model_state.pdparams"`):
@@ -510,6 +510,9 @@ def shard_checkpoint(
         shard_format (`str`, *optional*, defaults to `"naive"`):
             support naive or pipeline.
     """
+    if max_shard_size is None:
+        return {weights_name: state_dict}, None
+
     assert shard_format in [
         "naive",
         "pipeline",
@@ -1319,7 +1322,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 save_dir,
                 shard_format="pipeline",
                 safe_serialization=(is_safetensors_available() and safe_serialization),
-                max_shard_size="5GB",
                 merge_tensor_parallel=merge_tensor_parallel,
             )
 
@@ -2359,7 +2361,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         is_main_process: bool = True,
         state_dict: Optional[dict] = None,
         save_function: Callable = paddle.save,
-        max_shard_size: Union[int, str] = "10GB",
+        max_shard_size: Union[int, str] = None,
         safe_serialization: bool = False,
         variant: Optional[str] = None,
         *args,
