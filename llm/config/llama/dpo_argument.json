@@ -27,7 +27,7 @@
     "sharding_parallel_degree": 1,
     "sharding": "stage1",
     "use_flash_attention": true,
-    "use_attn_mask_startend_row_indices":false,
+    "flash_mask":true,
     "recompute": false,
     "recompute_granularity": "full",
     "dpo_beta": 0.1,

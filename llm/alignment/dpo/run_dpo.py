@@ -37,7 +37,13 @@ from paddlenlp.trl import (
     preference_collate_fn,
     preprocess_preference_data,
 )
+from paddlenlp.transformers import (
+    LlamaForCausalLM,
+    LlamaForCausalLMPipe,
+)
 from paddlenlp.utils.log import logger
+
+flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
 
 
 def main():
@@ -125,7 +131,14 @@ def main():
         ref_model = AutoModelForCausalLM.from_config(ref_config)
         model.set_state_dict(ref_model.state_dict())
 
-    if model_args.use_attn_mask_startend_row_indices and "attn_mask_startend_row_indices" not in inspect.signature(model.forward).parameters:
+    if model_args.flash_mask and (not data_args.zero_padding or not model.config.use_flash_attention):
+        logger.warning(
+            "`flash_mask` must use with zero padding and flash attention."
+        )
+        data_args.zero_padding = True
+        model.config.use_flash_attention = True
+
+    if not any(isinstance(model, cls) for cls in flash_mask_support_list):
         raise NotImplementedError(f"{model.__class__} not support flash mask.")
 
     if model_args.tokenizer_name_or_path is not None:

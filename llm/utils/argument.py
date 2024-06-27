@@ -209,8 +209,8 @@ class ModelArgument:
     aistudio_token: str = field(default=None, metadata={"help": "The token of aistudio"})
     neftune: bool = field(default=False, metadata={"help": "Whether to apply NEFT"})
     neftune_noise_alpha: float = field(default=5.0, metadata={"help": "NEFT noise alpha"})
-    use_attn_mask_startend_row_indices: bool = field(
-        default=False, metadata={"help": "Whether to use attn_mask_startend_row_indices in flash attention."}
+    flash_mask: bool = field(
+        default=False, metadata={"help": "Whether to use flash_mask in flash attention."}
     )
 
 

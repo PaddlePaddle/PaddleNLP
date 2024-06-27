@@ -159,7 +159,7 @@ def preprocess_preference_data(data, tokenizer, data_args, model_args):
     }
 
     # attention mask
-    if model_args.use_attn_mask_startend_row_indices:
+    if model_args.flash_mask:
         output_dict["attn_mask_startend_row_indices"] = (
             [seq_len] * prompt_len + [prompt_len + chosen_len] * chosen_len + [seq_len] * rejected_len
         )

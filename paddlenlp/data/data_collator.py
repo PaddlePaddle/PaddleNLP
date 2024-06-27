@@ -402,7 +402,10 @@ class DataCollatorForSeq2Seq:
                 else:
                     feature["labels"] = np.concatenate([remainder, feature["labels"]]).astype(np.int64)
         if use_attn_mask_startend_row_indices is not None:
-            max_length = max(len(l) for l in use_attn_mask_startend_row_indices)
+            if self.max_label_length is not None:
+                max_length = self.max_length
+            else:
+                max_length = max(len(l) for l in use_attn_mask_startend_row_indices)
             if self.pad_to_multiple_of is not None:
                 max_length = (
                     (max_length + self.pad_to_multiple_of - 1) // self.pad_to_multiple_of * self.pad_to_multiple_of

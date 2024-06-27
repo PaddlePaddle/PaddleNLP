@@ -52,12 +52,16 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     Llama3Tokenizer,
     LlamaTokenizer,
+    LlamaForCausalLM,
+    LlamaForCausalLMPipe,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.utils.log import logger
 
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "False"
+
+flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
 
 
 def main():
@@ -78,6 +82,7 @@ def main():
         raise ValueError(
             "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
         )
+    
 
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
@@ -161,7 +166,14 @@ def main():
         # NOTE(gongenlei): new add autotuner_benchmark
         model = model_class.from_config(model_config, dtype=dtype)
 
-    if model_args.use_attn_mask_startend_row_indices and "attn_mask_startend_row_indices" not in inspect.signature(model.forward).parameters:
+    if model_args.flash_mask and (not data_args.zero_padding or not model.config.use_flash_attention):
+        logger.warning(
+            "`flash_mask` must use with zero padding and flash attention."
+        )
+        data_args.zero_padding = True
+        model.config.use_flash_attention = True
+
+    if not any(isinstance(model, cls) for cls in flash_mask_support_list):
         raise NotImplementedError(f"{model.__class__} not support flash mask.")
 
     if training_args.do_train and model_args.neftune:
@@ -333,12 +345,12 @@ def main():
                 "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM and QWen so far."
             )
     train_ds = (
-        train_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.use_attn_mask_startend_row_indices))
+        train_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask))
         if train_ds is not None
         else None
     )
     ptq_ds = (
-        ptq_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.use_attn_mask_startend_row_indices))
+        ptq_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask))
         if ptq_ds is not None
         else None
     )
@@ -349,7 +361,7 @@ def main():
         )
         eval_zero_padding = False
     dev_ds = (
-        dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, zero_padding=eval_zero_padding, flash_mask=model_args.use_attn_mask_startend_row_indices))
+        dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, zero_padding=eval_zero_padding, flash_mask=model_args.flash_mask))
         if dev_ds is not None
         else None
     )
@@ -502,7 +514,7 @@ def main():
             padding=padding,
             max_label_length=max_length,
             return_tensors="np",
-            return_attention_mask=not model_args.use_attn_mask_startend_row_indices,
+            return_attention_mask=not model_args.flash_mask,
             pad_to_multiple_of=data_args.pad_to_multiple_of,
         ),
         do_generation=data_args.eval_with_do_generation,

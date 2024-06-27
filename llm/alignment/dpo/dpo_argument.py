@@ -87,8 +87,8 @@ class DPOModelArgument:
             "help": "The granularity of recompute training can be selected as `full` or `full_attn` or `core_attn`."
         },
     )
-    use_attn_mask_startend_row_indices: bool = field(
-        default=False, metadata={"help": "Whether to use attn_mask_startend_row_indices in flash attention."}
+    flash_mask: bool = field(
+        default=False, metadata={"help": "Whether to use flash mask in flash attention."}
     )
     virtual_pp_degree: int = field(
         default=1,

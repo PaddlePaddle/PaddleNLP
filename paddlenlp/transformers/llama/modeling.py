@@ -1907,10 +1907,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        if attn_mask_startend_row_indices is not None and attn_mask_startend_row_indices.dtype == paddle.int64:
-            attn_mask_startend_row_indices = attn_mask_startend_row_indices.astype(paddle.int32)
-            logger.info("cast attn_mask_startend_row_indices to paddle.int32")
-
         if attn_mask_startend_row_indices is not None and attention_mask is not None:
             logger.warning(
                 "You have provided both attn_mask_startend_row_indices and attention_mask. "
