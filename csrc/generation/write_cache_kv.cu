@@ -152,11 +152,13 @@ void WriteCacheKV(const paddle::Tensor& input_k,
                   const paddle::Tensor& cache_kv,
                   const paddle::Tensor& sequence_lengths_shape) {
     switch (cache_kv.type()) {
+#ifdef CUDA_ENABLE_BF16
         case paddle::DataType::BFLOAT16: {
             return LaunchWriteCacheKV<paddle::DataType::BFLOAT16>(
                 input_k, input_v, cache_kv, sequence_lengths_shape
             );
         }
+#endif
         case paddle::DataType::FLOAT16: {
             return LaunchWriteCacheKV<paddle::DataType::FLOAT16>(
                 input_k, input_v, cache_kv, sequence_lengths_shape
