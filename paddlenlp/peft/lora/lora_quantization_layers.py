@@ -108,6 +108,7 @@ class QuantizationLoRALinear(QuantizationLinear):
         )
         self.weight = None
         self.scaling = self.lora_alpha / self.r
+        self.disable_lora = False
 
     def init_float_weight(self):
         self.weight = self.create_parameter(
@@ -161,7 +162,7 @@ class QuantizationLoRALinear(QuantizationLinear):
             result = paddle.nn.functional.linear(x, self.weight, self.bias)
         else:
             result = super().forward(x)
-        if not self.merged:
+        if not self.merged and not self.disable_lora:
             result += (self.lora_dropout(x) @ self.lora_A @ self.lora_B) * self.scaling
         return result
 
@@ -235,14 +236,17 @@ class ColumnParallelQuantizationLoRALinear(ColumnParallelQuantizationLinear):
         self.lora_B.is_distributed = True
         self.lora_B.split_axis = 1
         self.scaling = self.lora_alpha / self.r
+        self.disable_lora = False
 
     def forward(self, x):
+
         result_mp = super().forward(x)
 
-        input_a = self.lora_dropout(x) @ self.lora_A
-        input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
-        delta_mp = (input_a_mp @ self.lora_B) * self.scaling
-        result_mp += delta_mp
+        if not self.disable_lora:
+            input_a = self.lora_dropout(x) @ self.lora_A
+            input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
+            delta_mp = (input_a_mp @ self.lora_B) * self.scaling
+            result_mp += delta_mp
 
         if self.gather_output and self.is_mp:
             result = mp_ops._c_concat(result_mp, group=self.model_parallel_group)
@@ -320,6 +324,7 @@ class RowParallelQuantizationLoRALinear(RowParallelQuantizationLinear):
         self.lora_A.split_axis = 0
         self.lora_B.is_distributed = False
         self.scaling = self.lora_alpha / self.r
+        self.disable_lora = False
 
     def forward(self, x: paddle.Tensor):
         if not self.input_is_parallel:
@@ -337,18 +342,18 @@ class RowParallelQuantizationLoRALinear(RowParallelQuantizationLinear):
             use_calc_stream=True,
             use_model_parallel=True,
         )
-
-        # x @ A: [bz, in_f/ ws] ===> [bz, r]
-        input_mp = self.lora_dropout(input_mp) @ self.lora_A
-        # all reduce to keep Lora B's gradient on different gpu consistent
-        input_dup = mp_ops._mp_allreduce(
-            input_mp,
-            group=self.model_parallel_group,
-            use_calc_stream=True,
-            use_model_parallel=True,
-        )
-        #  @ B: [bz, r] ===> [bz, out_f]
-        delta_mp = (input_dup @ self.lora_B) * self.scaling
-        output += delta_mp
+        if not self.disable_lora:
+            # x @ A: [bz, in_f/ ws] ===> [bz, r]
+            input_mp = self.lora_dropout(input_mp) @ self.lora_A
+            # all reduce to keep Lora B's gradient on different gpu consistent
+            input_dup = mp_ops._mp_allreduce(
+                input_mp,
+                group=self.model_parallel_group,
+                use_calc_stream=True,
+                use_model_parallel=True,
+            )
+            #  @ B: [bz, r] ===> [bz, out_f]
+            delta_mp = (input_dup @ self.lora_B) * self.scaling
+            output += delta_mp
         output = output + self.bias if self.bias is not None else output
         return output

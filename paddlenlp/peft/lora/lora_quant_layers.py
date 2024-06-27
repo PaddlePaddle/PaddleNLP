@@ -53,10 +53,11 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
             self.weight_quanter = q_config.weight._instance(layer)
         if q_config.activation is not None:
             self.activation_quanter = q_config.activation._instance(layer)
+        self.disable_lora = False
 
     def forward(self, input):
 
-        if self.merge_weights and self.merged:
+        if (self.merge_weights and self.merged) or self.disable_lora:
             weight = self.weight
         else:
             weight = self.weight + self.lora_A @ self.lora_B * self.scaling
@@ -131,10 +132,11 @@ class ColumnParallelQuantedLoRALinear(ConvertibleQuantedLayer):
             self.weight_quanter = q_config.weight._instance(layer)
         if q_config.activation is not None:
             self.activation_quanter = q_config.activation._instance(layer)
+        self.disable_lora = False
 
     def forward(self, input):
 
-        if self.merge_weights and self.merged:
+        if (self.merge_weights and self.merged) or self.disable_lora:
             weight = self.weight
         else:
             weight = (
@@ -220,10 +222,11 @@ class RowParallelQuantedLoRALinear(ConvertibleQuantedLayer):
             self.weight_quanter = q_config.weight._instance(layer)
         if q_config.activation is not None:
             self.activation_quanter = q_config.activation._instance(layer)
+        self.disable_lora = False
 
     def forward(self, input):
 
-        if self.merge_weights and self.merged:
+        if (self.merge_weights and self.merged) or self.disable_lora:
             weight = self.weight
         else:
             weight = (
