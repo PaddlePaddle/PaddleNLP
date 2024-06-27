@@ -43,7 +43,7 @@
 ## 特性
 
 <div align="center">
-    <img src="./docs/LLM.png" width="600">
+    <img src="https://github.com/PaddlePaddle/PaddleNLP/assets/15797489/983d1ee1-1acc-4e01-a341-557cfe43aec5" width="600">
 </div>
 
 ### <a href=#多硬件训推一体> 🔧 多硬件训推一体 </a>

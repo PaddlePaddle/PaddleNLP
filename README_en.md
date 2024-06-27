@@ -42,7 +42,7 @@
 ## Features
 
 <div align="center">
-    <img src="./docs/LLM_EN.png" width="600">
+    <img src="https://github.com/PaddlePaddle/PaddleNLP/assets/15797489/c22f218f-cdfa-4d73-8bc8-b6ba5237a3c1" width="600">
 </div>
 
 ### <a href=#Integrated training and inference on multiple hardware platforms> 🔧 Integrated training and inference on multiple hardware platforms </a>
