@@ -131,11 +131,10 @@ def main():
         ref_model = AutoModelForCausalLM.from_config(ref_config)
         model.set_state_dict(ref_model.state_dict())
 
-    if model_args.flash_mask and (not data_args.zero_padding or not model.config.use_flash_attention):
+    if model_args.flash_mask and not model.config.use_flash_attention:
         logger.warning(
             "`flash_mask` must use with zero padding and flash attention."
         )
-        data_args.zero_padding = True
         model.config.use_flash_attention = True
 
     if not any(isinstance(model, cls) for cls in flash_mask_support_list):
