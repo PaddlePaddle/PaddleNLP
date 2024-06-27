@@ -1,4 +1,4 @@
-# Alignment
+# RLHF
 
 提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。其中 PPO 代码实现细节参考了 [PKU-Alignment/safe-rlhf](https://github.com/PKU-Alignment/safe-rlhf)（PKU Beaver） 中的 PPO 实现，支持reward normalization、pretraining loss等常用的 PPO 稳定训练策略；示例使用 PKU-Alignment/safe-rlhf 提供的部分数据集和模型。后续将持续完善扩展，支持更好效果、更低成本、更高性能、更大规模的 RLHF 能力。
 
@@ -7,7 +7,7 @@
 项目整体组织结构如下：
 
 ```
-.
+./alignment
 ├── ppo                          # PPO 训练相关目录
 │   ├── comm_utils.py            # 通信相关工具py文件
 │   ├── data                     # 数据集相关目录
@@ -54,7 +54,7 @@
 PPO 训练包括 Supervised Fine-Tuning、Reward Model Fine-Tuning、RLHF 三个阶段（可见下文训练部分），会涉及到多个数据集，下面分别介绍并给出自定义数据的方法。
 
 #### Supervised Fine-Tuning 数据
-同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，可以直接参考对应内容进行数据准备。
+同[LLM 精调](finetune.md)，可以直接参考对应内容进行数据准备。
 
 #### Reward Model Fine-Tuning 数据
 Reward Model Fine-Tuning 阶段需要使用人类偏好数据。示例使用 PKU-Alignment/safe-rlhf 提供的 [PKU-Alignment/PKU-SafeRLHF-30K](https://huggingface.co/datasets/PKU-Alignment/PKU-SafeRLHF-30K) 数据集，下面是其中一条样本，这里使用其中的`prompt、response_0、response_1、better_response_id`字段来组织偏好数据（safe字段，该数据集将helpful 和 harmless 分开标注，示例这里使用其 helpful 标注）。
@@ -175,7 +175,7 @@ PPO 完整的训练过程包括以下 3 个阶段，如下图所示（来自[Dee
 
 1. Supervised Fine-Tuning (SFT)
 
-同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，可以直接参考对应内容进行训练并使用其产出模型。
+同[LLM 精调](finetune.md)，可以直接参考对应内容进行训练并使用其产出模型。
 
 2. Reward Model Fine-Tuning
 
@@ -186,7 +186,7 @@ cd rm
 python -u -m paddle.distributed.launch run_reward.py ../../config/llama/rm_argument.json
 ```
 
-`rm_argument.json` 中的绝大部分参数释义同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，不再赘述；稍有区别的是 `train_datasets`/`eval_datasets` 分别使用数据集定义注册时的`NAME`属性给出训练和验证集。另外对于奖励模型训练有以下特殊参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
+`rm_argument.json` 中的绝大部分参数释义同[LLM 精调](finetune.md)，不再赘述；稍有区别的是 `train_datasets`/`eval_datasets` 分别使用数据集定义注册时的`NAME`属性给出训练和验证集。另外对于奖励模型训练有以下特殊参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
 
 - `normalize_score_during_training`：是否在训练过程中对奖励进行 normalize，默认为 `False`。
 - `normalizer_type`：使用 normalizer 时计算 mean、var 的方式，可选`"RunningMeanStd", "ExponentialMovingAverage"`。
@@ -204,7 +204,7 @@ cd ppo
 PYTHONPATH=../../ GLOG_minloglevel=2 python -u -m paddle.distributed.launch run_ppo.py ../../config/llama/ppo_argument.json
 ```
 
-`ppo_argument.json` 中的绝大部分参数释义同[LLM 精调](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#2-%E7%B2%BE%E8%B0%83)，不再赘述，重点给出以下参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
+`ppo_argument.json` 中的绝大部分参数释义同[LLM 精调](finetune.md)，不再赘述，重点给出以下参数配置及释义（使用 PKU-Alignment/PKU-SafeRLHF 中的默认值）：
 
 - `train_datasets`：使用数据集定义注册时的`NAME`属性给出训练集。
 - `eval_datasets`：使用数据集定义注册时的`NAME`属性给出验证集。
@@ -239,7 +239,7 @@ PYTHONPATH=../../ GLOG_minloglevel=2 python -u -m paddle.distributed.launch run_
 
 ### 推理
 
-训练完成后可以直接使用 `outpt_dir` 所指定目录中 policy 文件夹下的 checkpoints 按照[LLM 推理](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm#4-%E6%8E%A8%E7%90%86)部分的介绍来进行推理，请参考相应部分内容。
+训练完成后可以直接使用 `outpt_dir` 所指定目录中 policy 文件夹下的 checkpoints 按照[LLM 推理](inference.md)部分的介绍来进行推理，请参考相应部分内容。
 
 ## Acknowledge
 
