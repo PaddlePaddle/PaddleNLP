@@ -173,7 +173,7 @@ def main():
         data_args.zero_padding = True
         model.config.use_flash_attention = True
 
-    if not any(isinstance(model, cls) for cls in flash_mask_support_list):
+    if model_args.flash_mask and not any(isinstance(model, cls) for cls in flash_mask_support_list):
         raise NotImplementedError(f"{model.__class__} not support flash mask.")
 
     if training_args.do_train and model_args.neftune:
