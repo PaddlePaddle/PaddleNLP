@@ -210,15 +210,17 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
             attn_mask_startend_row_indices = None
         elif not self.config.alibi:
             if get_env_device() in ["gpu"]:
-                if attention_mask.dtype == paddle.int32:
+                if attention_mask is not None and attention_mask.dtype == paddle.int32:
                     attention_mask, attn_mask_startend_row_indices, position_ids = (
                         None,
                         attention_mask,
                         attn_mask_startend_row_indices,
                     )
-                elif attention_mask.dtype == paddle.int64:
+                elif attention_mask is not None and attention_mask.dtype == paddle.int64:
                     attention_mask, attn_mask_startend_row_indices, position_ids = None, None, attention_mask
-                elif attn_mask_startend_row_indices == paddle.int64:
+                elif (
+                    attn_mask_startend_row_indices is not None and attn_mask_startend_row_indices.dtype == paddle.int64
+                ):
                     attn_mask_startend_row_indices, position_ids = None, attn_mask_startend_row_indices
             elif position_ids is None and attn_mask_startend_row_indices is not None:
                 position_ids = attn_mask_startend_row_indices
