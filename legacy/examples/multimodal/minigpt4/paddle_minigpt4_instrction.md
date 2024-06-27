@@ -11,9 +11,9 @@
 
 根据你准备的Vicuna模型版本，下载预训练的MiniGPT4 权重。
 
-|  Checkpoint Aligned with Vicuna 7B  |  Checkpoint Aligned with Vicuna 13B |
-:-------------------------------------:|:-----------------------------------:
-[Download](https://drive.google.com/file/d/1RY9jV0dyqLX-o38LrumkKRh6Jtaop58R/view?usp=sharing) | [Download](https://drive.google.com/file/d/1a4zLvaiDBr-36pasffmgpvH5P7CKmpze/view?usp=share_link)
+|                               Checkpoint Aligned with Vicuna 7B                                |                                Checkpoint Aligned with Vicuna 13B                                 |
+|:----------------------------------------------------------------------------------------------:|:-------------------------------------------------------------------------------------------------:|
+| [Download](https://drive.google.com/file/d/1RY9jV0dyqLX-o38LrumkKRh6Jtaop58R/view?usp=sharing) | [Download](https://drive.google.com/file/d/1a4zLvaiDBr-36pasffmgpvH5P7CKmpze/view?usp=share_link) |
 
 ### 1.2准备 ViT and Qformer 权重
 MiniGPT4中使用的ViT和Qformer Weight来自blip2-flan-t5-xxl，这个weight在PaddleNLP中进行了转换。 所以你可以从 PaddleNLP 下载它，你有两种下载方式进行下载：
@@ -34,9 +34,9 @@ Blip2Model.from_pretrained("Salesforce/blip2-flan-t5-xxl")
 #### 1.2.2 直接点击下载
 可以直接进行点击下载：
 
-|  blip2-flan-t5-xxl 权重  |  点击下载 |
-:-------------------------------------:|:-----------------------------------:
-| model_state.pdparams | [Download](https://paddlenlp.bj.bcebos.com/models/community/Salesforce/blip2-flan-t5-xxl/model_state.pdparams) |
+| blip2-flan-t5-xxl 权重 |                                                    点击下载                                                    |
+|:----------------------:|:--------------------------------------------------------------------------------------------------------------:|
+|  model_state.pdparams  | [Download](https://paddlenlp.bj.bcebos.com/models/community/Salesforce/blip2-flan-t5-xxl/model_state.pdparams) |
 
 ### 1.3 准备 Vicuna 权重
 
@@ -46,15 +46,15 @@ Blip2Model.from_pretrained("Salesforce/blip2-flan-t5-xxl")
 
 这里展示两种Vicuna delta 权重，请根据需要选择一种并点击下载。
 
-|  vicuna-7b-delta-v0  |  vicuna-13b-delta-v0 |
-:-------------------------------------:|:-----------------------------------:
- [Download](https://huggingface.co/lmsys/vicuna-7b-delta-v0/tree/main) | [Download](https://huggingface.co/lmsys/vicuna-13b-delta-v0g)
+|                          vicuna-7b-delta-v0                           |                     vicuna-13b-delta-v0                      |
+|:---------------------------------------------------------------------:|:------------------------------------------------------------:|
+| [Download](https://huggingface.co/lmsys/vicuna-7b-delta-v0/tree/main) | [Download](https://huggingface.co/lmsys/vicuna-13b-delta-v0) |
 
 #### 1.3.2 根据以上选择的vicuna delta 权重，下载 相应的 llama 权重。
 
-|  llama-7b  |  llama-13b |
-:-------------------------------------:|:-----------------------------------:
- [Download](https://huggingface.co/decapoda-research/llama-7b-hf/tree/main) | [Download](https://huggingface.co/decapoda-research/llama-13b-hf)
+|                                  llama-7b                                  |                             llama-13b                             |
+|:--------------------------------------------------------------------------:|:-----------------------------------------------------------------:|
+| [Download](https://huggingface.co/baffo32/decapoda-research-llama-7B-hf/tree/main) | [Download](https://huggingface.co/yahma/llama-13b-hf/tree/main) |
 
 
 #### 1.3.3 结合上面的两个权重，得到可以使用的 vicuna 权重

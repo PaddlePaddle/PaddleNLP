@@ -30,7 +30,6 @@
 本项目是基于预训练语言模型UNIMO-Text的文本摘要，具有以下优势：
 - 效果领先。
 - 开箱即用。本项目提供TaskFlow接口，无需训练，仅需几行代码便可预测。
-- 高性能推理。本项目基于[FastGeneration](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/fast_generation)进行推理加速，能够提供更高性能的推理体验。
 - 训练推理全流程打通。本项目提供了全面的定制训练流程，从数据准备、模型训练预测，到模型推理部署，一应俱全。
 
 ### 基于预训练语言模型的文本摘要

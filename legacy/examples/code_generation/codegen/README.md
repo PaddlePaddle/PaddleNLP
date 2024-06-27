@@ -32,7 +32,6 @@
 本项目是基于预训练语言模型CodeGen的代码生成，具有以下优势：
 - **效果领先**。CodeGen（16B）在HumanEval benchmark上评估指标已经超过[OpenAI's Codex](https://arxiv.org/pdf/2107.03374.pdf)。
 - **免费的Github Copilot**。支持通过Github Copilot调用该模型，让你免费体验代码AI助理。
-- **高性能**。基于[FastGeneration](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/fast_generation)打造高性能推理，毫秒级响应。具体加速指标可参考[perf](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/fast_generation/README.md)。
 - **支持自定义数据集训练**。可增加自己的代码数据加以微调，让其更智能。
 - **开箱即用**。本项目提供TaskFlow接口，无需训练，仅需几行代码便可预测。
 

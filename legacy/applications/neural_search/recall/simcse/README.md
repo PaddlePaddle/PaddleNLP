@@ -50,10 +50,10 @@ SimCSE 模型适合缺乏监督数据，但是又有大量无监督数据的匹�
 
 **效果评估**
 
-|  策略 | 模型| Recall@1 | Recall@5 |Recall@10 |Recall@20 |Recall@50 |
-| ------------ | ------------ | ------------ |--------- |--------- |--------- |--------- |
-|  SimCSE | ernie 1.0 |42.374 | 57.505| 62.641| 67.09|72.331|
-|  SimCSE | rocketqa-zh-base-query-encoder |**50.108** | **64.005**| **68.288**| **72.306**|**77.306**|
+| 策略   | 模型                           | Recall@1   | Recall@5   | Recall@10  | Recall@20  | Recall@50  |
+|--------|--------------------------------|------------|------------|------------|------------|------------|
+| SimCSE | ernie 1.0                      | 42.374     | 57.505     | 62.641     | 67.09      | 72.331     |
+| SimCSE | rocketqa-zh-base-query-encoder | **50.108** | **64.005** | **68.288** | **72.306** | **77.306** |
 
 <a name="环境依赖"></a>
 
@@ -155,9 +155,9 @@ simcse/
 
 以下模型结构参数为: `TrasformerLayer:12, Hidden:768, Heads:12, OutputEmbSize: 256`
 
-|Model|训练参数配置|硬件|MD5|
-| ------------ | ------------ | ------------ |-----------|
-|[SimCSE](https://bj.bcebos.com/v1/paddlenlp/models/simcse_model.zip)|<div style="width: 150pt">ernie 1.0 epoch:3 lr:5E-5 bs:64 max_len:64 </div>|<div style="width: 100pt">4卡 v100-16g</div>|7c46d9b15a214292e3897c0eb70d0c9f|
+| Model                                                                | 训练参数配置                                                                | 硬件                                         | MD5                              |
+|----------------------------------------------------------------------|-----------------------------------------------------------------------------|----------------------------------------------|----------------------------------|
+| [SimCSE](https://bj.bcebos.com/v1/paddlenlp/models/simcse_model.zip) | <div style="width: 150pt">ernie 1.0 epoch:3 lr:5E-5 bs:64 max_len:64 </div> | <div style="width: 100pt">4卡 v100-16g</div> | 7c46d9b15a214292e3897c0eb70d0c9f |
 
 ### 训练环境说明
 
@@ -442,7 +442,7 @@ sh deploy.sh
 
 #### SimCSE模型怎么部署？
 
-+ SimCSE使用的模型跟 In-batch Negatives 训练出来的模型网络结构是一样的，使用 In-batch Negatives 的部署流程即可，参考[In-batch Negatives](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/neural_search/recall/in_batch_negative/deploy/python)
++ SimCSE使用的模型跟 In-batch Negatives 训练出来的模型网络结构是一样的，使用 In-batch Negatives 的部署流程即可，参考[In-batch Negatives](../in_batch_negative/deploy/python)
 
 ## Reference
 [1] Gao, Tianyu, Xingcheng Yao, and Danqi Chen. “SimCSE: Simple Contrastive Learning of Sentence Embeddings.” ArXiv:2104.08821 [Cs], April 18, 2021. http://arxiv.org/abs/2104.08821.

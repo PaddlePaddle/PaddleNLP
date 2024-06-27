@@ -36,7 +36,7 @@
 
 #### News 📢: UIE-X 🧾
 
-**全新升级UIE-X，除已有纯文本抽取的全部功能外，新增文档抽取能力**，欢迎体验 👉 [信息抽取应用](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/information_extraction/#readme)
+**全新升级UIE-X，除已有纯文本抽取的全部功能外，新增文档抽取能力**，欢迎体验 👉 [信息抽取应用](../../applications/information_extraction)
 
 #### UIE的优势
 
@@ -629,7 +629,7 @@ python labelstudio2doccano.py --labelstudio_file label-studio.json
 
 #### 4.3 模型微调
 
-推荐使用 [Trainer API ](../../docs/trainer.md) 对模型进行微调。只需输入模型、数据集等就可以使用 Trainer API 高效快速地进行预训练、微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，Trainer API 还针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等。
+推荐使用 [Trainer API ](../../../docs/trainer.md) 对模型进行微调。只需输入模型、数据集等就可以使用 Trainer API 高效快速地进行预训练、微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，Trainer API 还针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等。
 
 使用下面的命令，使用 `uie-base` 作为预训练模型进行模型微调，将微调后的模型保存至`$finetuned_model`：
 
@@ -945,7 +945,7 @@ python deploy/python/infer.py --model_dir ./checkpoint/model_best --device gpu -
 为了进一步探索通用信息抽取的边界，我们举办了**CCKS 2022 千言通用信息抽取竞赛评测**（2022/03/30 - 2022/07/31）。
 
 - [报名链接](https://aistudio.baidu.com/aistudio/competition/detail/161/0/introduction)
-- [基线代码](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/DuUIE)
+- [基线代码](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/examples/information_extraction/DuUIE)
 
 ## References
 - **[Unified Structure Generation for Universal Information Extraction](https://arxiv.org/pdf/2203.12277.pdf)**

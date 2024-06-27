@@ -10,7 +10,7 @@
 
 ### 模型特点
 
-STACL 是论文 [STACL: Simultaneous Translation with Implicit Anticipation and Controllable Latency using Prefix-to-Prefix Framework](https://www.aclweb.org/anthology/P19-1289/) 中针对同传提出的适用于所有同传场景的翻译架构[2]，该架构基于Transformer实现，可参考PaddleNLP的[Transformer](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_translation/transformer)。
+STACL 是论文 [STACL: Simultaneous Translation with Implicit Anticipation and Controllable Latency using Prefix-to-Prefix Framework](https://www.aclweb.org/anthology/P19-1289/) 中针对同传提出的适用于所有同传场景的翻译架构[2]，该架构基于Transformer实现，可参考PaddleNLP的[Transformer](../../machine_translation/transformer)。
 
 STACL 主要具有以下优势：
 

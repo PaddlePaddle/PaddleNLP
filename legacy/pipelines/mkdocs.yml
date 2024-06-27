@@ -1,5 +1,5 @@
 site_name: PaddleNLP-Pipelines
-repo_url: https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines
+repo_url: https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/pipelines
 repo_name: PaddleNLP-Pipelines
 site_url: https://paddlenlp-pipelines.readthedocs.io/zh-cn/latest/
 site_description: provides an easy-to-use paddlenlp application tool suite.

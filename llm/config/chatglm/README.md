@@ -6,11 +6,11 @@ ChatGLM-6B 是一个开源的、支持中英双语问答的对话语言模型，
 
 **支持模型权重:**
 
-| Model                            |
-|----------------------------------|
-| THUDM/chatglm-6b                 |
-| THUDM/chatglm-6b-v1.1            |
+| Model                 |
+|-----------------------|
+| THUDM/chatglm-6b      |
+| THUDM/chatglm-6b-v1.1 |
 
 ## 2. 模型协议
 
-ChatGLM-6B 模型的权重的使用需要遵循[License](../../paddlenlp/transformers/chatglm/LICENSE)。
+ChatGLM-6B 模型的权重的使用需要遵循[License](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/transformers/chatglm/LICENSE)。

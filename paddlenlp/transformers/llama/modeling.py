@@ -1578,7 +1578,7 @@ class LlamaModel(LlamaPretrainedModel):
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
 
-        use_casual_mask = get_use_casual_mask()
+        use_casual_mask = get_use_casual_mask() and not self.config.alibi
 
         if use_casual_mask:
             attention_mask = None
