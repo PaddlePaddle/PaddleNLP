@@ -61,17 +61,17 @@ The high-performance inference module of the large model toolkit incorporates dy
 
 ## Support Models
 
-| Model                                      | Pretrain | SFT | LoRA | Prefix Tuning | DPO | Quantization | Weight convert |
-|--------------------------------------------|----------|-----|------|---------------|-----|--------------|----------------|
-| [LLaMA](./llm/config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅   | ✅            | ✅              |
-| [Qwen](./llm/config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧           | ✅              |
-| [Mixtral](./llm/config/mixtral)            | ✅        | ✅   | ✅    | ❌             | 🚧  | 🚧           | 🚧             |
-| [Baichuan/Baichuan2](./llm/config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅   | ✅            | ✅              |
-| [ChatGLM-6B](./llm/config/chatglm)         | ❌        | ✅   | ✅    | ✅             | 🚧  | ✅            | ❌              |
-| [ChatGLM2/ChatGLM3](./llm/config/chatglm2) | ❌        | ✅   | ✅    | ✅             | 🚧  | ✅            | ✅              |
-| [Bloom](./llm/config/bloom)                | ❌        | ✅   | ✅    | ✅             | 🚧  | ✅            | ✅              |
-| [GPT-3](./llm/config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧  | 🚧           | ✅              |
-| [OPT](./llm/config/opt)                    | 🚧       | ✅   | ✅    | 🚧            | 🚧  | 🚧           | ✅              |
+| Model                                      | Pretrain | SFT | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Weight convert |
+|--------------------------------------------|:--------:|:---:|:----:|:-------------:|:---:|:----:|:------------:|:--------------:|
+| [LLaMA](./llm/config/llama)                |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  ✅   |      ✅       |       ✅        |
+| [Qwen](./llm/config/qwen)                  |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      🚧      |       ✅        |
+| [Mixtral](./llm/config/mixtral)            |    ✅     |  ✅  |  ✅   |       ❌       | 🚧  |  🚧  |      🚧      |       🚧       |
+| [Baichuan/Baichuan2](./llm/config/llama)   |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      ✅       |       ✅        |
+| [ChatGLM-6B](./llm/config/chatglm)         |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ❌        |
+| [ChatGLM2/ChatGLM3](./llm/config/chatglm2) |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅        |
+| [Bloom](./llm/config/bloom)                |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅        |
+| [GPT-3](./llm/config/gpt-3)                |    ✅     |  ✅  |  🚧  |      🚧       | 🚧  |  🚧  |      🚧      |       ✅        |
+| [OPT](./llm/config/opt)                    |    🚧    |  ✅  |  ✅   |      🚧       | 🚧  |  🚧  |      🚧      |       ✅        |
 
 * ✅: Supported
 * 🚧: In Progress
