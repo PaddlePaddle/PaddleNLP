@@ -225,7 +225,7 @@ PYTHONPATH=../../ GLOG_minloglevel=2 python -u -m paddle.distributed.launch run_
 - `clip_range_ratio`：将当前sequence的新概率与Experience Buffer中旧概率比值裁剪到`(1-clip_range_ratio, 1+clip_range_ratio)`范围（PPO-Clip）。
 - `ptx_coeff`： 预训练损失项 ptx-loss 的系数。
 
-另外所有 [`TrainingArguments` 支持参数配置](https://paddlenlp.readthedocs.io/zh/latest/trainer.html#trainingarguments)将为 actor-model 和 critic-model 的训练复用（如`sharding_stage`），除单独提供了 `critic_learning_rate/critic_weight_decay/critic_lr_scheduler_type/critic_warmup_ratio/critic_recompute` 这些参数支持为 critic-model 训练单独指定相应配置。actor-model 和 critic-model 的 checkpoints 将分别保存在 `outpt_dir` 所指定目录的 policy 和 value 文件夹下。
+另外所有 [`TrainingArguments` 支持参数配置](https://paddlenlp.readthedocs.io/zh/latest/trainer.html#trainingarguments)将为 actor-model 和 critic-model 的训练复用（如`sharding_stage`），除单独提供了 `critic_learning_rate/critic_weight_decay/critic_lr_scheduler_type/critic_warmup_ratio/critic_recompute` 这些参数支持为 critic-model 训练单独指定相应配置。actor-model 和 critic-model 的 checkpoints 将分别保存在 `output_dir` 所指定目录的 policy 和 value 文件夹下。
 
 此外为了支持更高性、更大规模的 RLHF 训练提供了以下特殊参数配置，可以按需使用：
 - `use_fusemt`：安装 paddlenlp_ops 后将在 rollout 生成时开启生成加速（开启流水线并行时不支持生成加速），通过此设置可以禁用生成加速。
@@ -239,7 +239,7 @@ PYTHONPATH=../../ GLOG_minloglevel=2 python -u -m paddle.distributed.launch run_
 
 ### 推理
 
-训练完成后可以直接使用 `outpt_dir` 所指定目录中 policy 文件夹下的 checkpoints 按照[LLM 推理](inference.md)部分的介绍来进行推理，请参考相应部分内容。
+训练完成后可以直接使用 `output_dir` 所指定目录中 policy 文件夹下的 checkpoints 按照[LLM 推理](inference.md)部分的介绍来进行推理，请参考相应部分内容。
 
 ## Acknowledge
 

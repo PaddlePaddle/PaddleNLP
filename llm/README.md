@@ -1,25 +1,24 @@
 ## 🚣‍♂️ 飞桨大模型套件介绍 🚣
-飞桨大模型套件秉承了一站式体验、性能极致、生态兼容的设计理念，旨在提供业界主流大模型预训练、精调（含SFT、PEFT）、对齐、量化、推理等统一流程， 帮助开发者低成本、低门槛、快速实现大语言模型定制化。
+飞桨大模型套件以一站式体验、极致性能和生态兼容性为设计理念，致力于为开发者提供业界主流的大模型预训练、精调（包含SFT、PEFT技术）、对齐、量化和推理等全方位服务。开发者能够以便捷、低成本的方式快速实现大语言模型的定制化需求。
 
 <div align="center">
-    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/da10e972-260c-4925-bf49-1e0aefd2a65c">
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/50bc1074-335c-4cd5-af6a-d5dfe18fefe1">
 </div>
 
 
 ##  💪🏼 大模型套件特色 💪🏼
 
--  **飞桨4D并行分布式策略**。 PaddleNLP Trainer 封装支持飞桨4D并行配置（数据并行、张量并行、流水线并行、 分组参数切分并行），屏蔽多硬件编程复杂性，用户可以修改Trainer配置组合多种预训练或精调过程的分布式策略，充分组合大模型4D并行训练能力，能有效提升在多模型、多硬件下的训练性能。
+-  **飞桨4D并行分布式策略**。 PaddleNLP Trainer通过封装支持飞桨的4D并行配置，即数据并行、张量并行、流水线并行以及分组参数切分并行，从而简化了多硬件编程的复杂性。用户仅需通过修改Trainer的配置，就能灵活组合各种预训练或精调过程中的分布式策略，充分发挥大模型的4D并行训练能力，进而在多模型、多硬件环境下显著提升训练性能。
 
--  **高效精调对齐策略**。飞桨大模型套件提供SFT、DPO、RLHF等精调对齐策略，搭载自研Zero Padding零填充优化策略有效减少训练数据中pad token的占比，提高模型训练效率。独创PEFT结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛。
+-  **高效精调对齐策略**。飞桨大模型套件提供了包括SFT、DPO、RLHF在内的多种精调对齐方法。套件中自研的Zero Padding零填充优化技术，有效降低了训练数据中无效填充标记（pad token）的比例，进一步增强了模型训练的效率。同时，独创的PEFT技术结合低比特和分布式并行方法，显著降低了进行大模型精调对齐的硬件要求。
 
-- **大模型无损量化**。大模型套件预置了PaddleSlim PTQ.LLM量化算法和业界主流GPTQ、AWQ的W4量化，实现了主流大模型的无损量化，有效加速模型推理。
+- **大模型无损量化**。大模型套件预先集成了PaddleSlim LLM.PTQ量化算法，以及业界广泛采用的GPTQ和AWQ的W4量化方法，成功实现了对主流大模型的无损量化处理，显著加速了模型的推理速度。
 
-- **高性能推理**。大模型套件高性能推理模块内置动态插入和全环节算子融合策略，极大加快并行推理的速度。同时隐藏了底层实现的细节，实现了开箱即用高性能并行推理能力。
-
+- **高性能推理**。大模型套件的高性能推理模块内置了动态插入和全环节算子融合的高级策略，这极大地提升了并行推理的速度。同时，该模块隐藏了底层技术细节，为用户提供了开箱即用的高性能并行推理功能。
 
 ##  🛠️ 支持模型列表 🛠️
 
-| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Weight convert |
+| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Torch convert |
 |----------------------------------------|----------|-----|------|---------------|-----|--------------|----------------|----------------|
 | [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅  | ✅  | ✅            | ✅              |
 | [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅  | 🚧   | 🚧           | ✅              |
@@ -191,11 +190,11 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
 #### 3.2 RLHF
-飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF](./docs/rlhf.md)。
+飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF文档](./docs/rlhf.md)。
 
 ### 4. 量化
 大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。工具链量化算法包含：
-- **PTQ**。PaddleSlim 团队自研的自适应Shift-SmoothQuant量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
+- **PTQ**。PaddleSlim 团队自研的自适应LLM.PTQ量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
 新增PieceWiseSearch参数搜索算法，对模型权重和激活分布进行调整，减少后续A8W8 PTQ量化损失。
 
 
