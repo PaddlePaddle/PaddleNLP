@@ -2,7 +2,7 @@
 飞桨大模型套件以一站式体验、极致性能和生态兼容性为设计理念，致力于为开发者提供业界主流的大模型预训练、精调（包含SFT、PEFT技术）、对齐、量化和推理等全方位服务。开发者能够以便捷、低成本的方式快速实现大语言模型的定制化需求。
 
 <div align="center">
-    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/50bc1074-335c-4cd5-af6a-d5dfe18fefe1">
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/4e61647b-8d66-4870-ba45-77a57990523c">
 </div>
 
 
