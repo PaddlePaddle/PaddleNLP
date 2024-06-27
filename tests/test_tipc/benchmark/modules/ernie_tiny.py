@@ -30,7 +30,9 @@ from .model_base import BenchmarkBase
 sys.path.insert(
     0,
     os.path.abspath(
-        os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir, os.pardir, "model_zoo", "ernie-3.0")
+        os.path.join(
+            os.path.dirname(__file__), os.pardir, os.pardir, os.pardir, os.pardir, "legacy", "model_zoo", "ernie-3.0"
+        )
     ),
 )
 

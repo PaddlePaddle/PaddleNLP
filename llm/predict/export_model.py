@@ -44,6 +44,8 @@ def validate_pdmodel(model_path, model_prefix, device):
     paddle.enable_static()
     if device == "gpu":
         place = paddle.CUDAPlace(0)
+    elif device == "cpu":
+        place = paddle.CPUPlace()
     else:
         place = paddle.CustomPlace(device, 0)
     exe = paddle.static.Executor(place)
@@ -93,6 +95,7 @@ def main():
         },
     )
     predictor.model.config.save_pretrained(export_args.output_path)
+    predictor.model.generation_config.save_pretrained(export_args.output_path)
     predictor.tokenizer.save_pretrained(export_args.output_path)
     generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 

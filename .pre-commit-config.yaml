@@ -1,4 +1,4 @@
-exclude: 'model_zoo/gpt-3'
+exclude: 'legacy/model_zoo/gpt-3'
 repos:
 # For Python files
 -   repo: https://github.com/psf/black.git
