@@ -44,6 +44,8 @@ def validate_pdmodel(model_path, model_prefix, device):
     paddle.enable_static()
     if device == "gpu":
         place = paddle.CUDAPlace(0)
+    elif device == "cpu":
+        place = paddle.CPUPlace()
     else:
         place = paddle.CustomPlace(device, 0)
     exe = paddle.static.Executor(place)
