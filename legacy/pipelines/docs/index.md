@@ -14,7 +14,7 @@ PaddleNLP Pipelines 是一个端到端NLP流水线系统框架，面向 NLP **�
 
 * **低门槛开发**：依托丰富的预置组件，像搭积木一样快速构建产品级系统，预置组件覆盖文档解析、数据处理、模型组网、预测部署、Web 服务、UI 界面等全流程系统功能。
 
-* **高精度预测**：基于前沿的预训练模型、成熟的系统方案，可构建效果领先的产品级系统，如[NLP流水线系统](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#NLP流水线系统)中预置的语义检索系统、阅读理解式智能问答系统等。
+* **高精度预测**：基于前沿的预训练模型、成熟的系统方案，可构建效果领先的产品级系统，如[NLP流水线系统](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/pipelines#NLP流水线系统)中预置的语义检索系统、阅读理解式智能问答系统等。
 
 * **灵活可定制**：除深度兼容 PaddleNLP 模型组件外，还可嵌入飞桨生态下任意模型、[AI 开放平台算子](https://ai.baidu.com/)、其它开源项目如 Elasticsearch 等作为基础组件，快速扩展，从而实现任意复杂系统的灵活定制开发。
 
@@ -24,15 +24,15 @@ PaddleNLP Pipelines 是一个端到端NLP流水线系统框架，面向 NLP **�
     <img src="https://user-images.githubusercontent.com/12107462/187362675-f0818e77-a521-4479-8dd7-bcbf4a820f7d.png" width="500">
 </div>
 
-更多的Benchmarks的信息请参考文档[Benchmarks](./benchmarks/README.md)
+更多的Benchmarks的信息请参考文档[Benchmarks](../benchmarks/README.md)
 
 ## NLP流水线系统
 
 PaddleNLP Pipelines NLP流水线系统针对 NLP 部分高频场景开源了经过充分打磨的产品级系统，并会不断开放其它场景的产品级系统，用户可以基于NLP流水线系统提供的系统能力快速开发出适配业务数据的产品。
 
-* 快速搭建产品级[**语义检索**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/semantic-search)系统：使用自然语言文本通过语义进行智能文档查询，而不是关键字匹配
-* 快速搭建产品级[**智能问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/question-answering)系统：用自然语言提问，即可获得精准答案片段
-* 快速搭建产品级 [**FAQ 问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/FAQ)系统：用自然语言提问，匹配相关的高频问题，并返回匹配到的高频问题的答案
+* 快速搭建产品级[**语义检索**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/pipelines/examples/semantic-search)系统：使用自然语言文本通过语义进行智能文档查询，而不是关键字匹配
+* 快速搭建产品级[**智能问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/pipelines/examples/question-answering)系统：用自然语言提问，即可获得精准答案片段
+* 快速搭建产品级 [**FAQ 问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/pipelines/examples/FAQ)系统：用自然语言提问，匹配相关的高频问题，并返回匹配到的高频问题的答案
 
 ### 效果展示
 
@@ -54,16 +54,16 @@ PaddleNLP Pipelines NLP流水线系统针对 NLP 部分高频场景开源了经�
     <img src="https://user-images.githubusercontent.com/12107462/190307449-38135678-f259-4483-ac0f-2fa3ae4be97f.gif" width="500px">
 </div>
 
-|  |  |
-|-|-|
-| :floppy_disk: [快速安装](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#floppy_disk-安装) |安装 PaddleNLP Pipelines|
-| :beginner: [快速体验](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#beginner-快速体验) |基于 Pipelines 快速搭建语义检索/智能问答等产品系统|
-| :man_office_worker: [用户案例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#man_office_worker-用户案例) |各行业用户基于PaddleNLP Pipelinse 构建的产品案例|
-| :mortar_board: [Tutorials](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#mortar_board-tutorials) |像搭积木一样一步步构建 NLP 流水线系统教程|
-| :bar_chart: [Benchmarks](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/benchmarks) |针对各场景模型的性能、精度评测指标|
-| :telescope: [Roadmap](https://github.com/PaddlePaddle/PaddleNLP) | PaddleNLP Pipelines 产品路线图|
-| :newspaper: [技术博客](https://github.com/PaddlePaddle/PaddleNLP) | 阅读 PaddleNLP Pipelines 系列技术文章|
-| :vulcan_salute: [社区交流](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#vulcan_salute-社区交流) | [官方微信群](https://github.com/PaddlePaddle/PaddleNLP#社区交流), [GitHub Discussions](https://github.com/PaddlePaddle/PaddleNLP/discussions) |
+|                                                                                                                                    |                                                                                                                                               |
+|------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| :floppy_disk: [快速安装](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/pipelines#floppy_disk-安装)                 | 安装 PaddleNLP Pipelines                                                                                                                      |
+| :beginner: [快速体验](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/pipelines#beginner-快速体验)                   | 基于 Pipelines 快速搭建语义检索/智能问答等产品系统                                                                                            |
+| :man_office_worker: [用户案例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/pipelines#man_office_worker-用户案例) | 各行业用户基于PaddleNLP Pipelinse 构建的产品案例                                                                                              |
+| :mortar_board: [Tutorials](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/pipelines#mortar_board-tutorials)         | 像搭积木一样一步步构建 NLP 流水线系统教程                                                                                                     |
+| :bar_chart: [Benchmarks](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/pipelines/benchmarks)                       | 针对各场景模型的性能、精度评测指标                                                                                                            |
+| :telescope: [Roadmap](https://github.com/PaddlePaddle/PaddleNLP)                                                                   | PaddleNLP Pipelines 产品路线图                                                                                                                |
+| :newspaper: [技术博客](https://github.com/PaddlePaddle/PaddleNLP)                                                                  | 阅读 PaddleNLP Pipelines 系列技术文章                                                                                                         |
+| :vulcan_salute: [社区交流](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/pipelines#vulcan_salute-社区交流)         | [官方微信群](https://github.com/PaddlePaddle/PaddleNLP#社区交流), [GitHub Discussions](https://github.com/PaddlePaddle/PaddleNLP/discussions) |
 
 ## :floppy_disk: 安装
 Note: 因为 pipelines 依赖较多, 安装耗时大概 10 分钟左右，安装过程中请请耐心等待。
@@ -170,23 +170,23 @@ GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1�
 对于国内用户，因为网络问题下载docker比较慢时，可使用百度提供的镜像：
 
 
-|  环境                         |   镜像 Tag               |    运行平台      |
-| :--------------------------: | :-------------------------------: | :-------------: |
-|  CPU                         | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0                      |  Linux    |
-|  CPU                         | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0.windows.darwin       |  Windows&Macos   |
-|  CUDA10.2 + cuDNN 7           | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7 |  Linux   |
-|  CUDA11.2 + cuDNN 8           | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda11.2-cudnn8 |  Linux   |
+|        环境        |                                镜像 Tag                                |   运行平台    |
+|:------------------:|:----------------------------------------------------------------------:|:-------------:|
+|        CPU         |           registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0           |     Linux     |
+|        CPU         |   registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0.windows.darwin    | Windows&Macos |
+| CUDA10.2 + cuDNN 7 | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7 |     Linux     |
+| CUDA11.2 + cuDNN 8 | registry.baidubce.com/paddlepaddle/paddlenlp:2.4.0-gpu-cuda11.2-cudnn8 |     Linux     |
 
 如果您的机器不在中国大陆地区，我们推荐您使用DockerHub的镜像：
 
-|  环境                         |   镜像 Tag               |    运行平台      |
-| :--------------------------: | :-------------------------------: | :-------------: |
-|  CPU                         | paddlepaddle/paddlenlp:2.4.0                      |  Linux    |
-|  CPU                         | paddlepaddle/paddlenlp:2.4.0.windows.darwin       |  Windows&Macos   |
-|  CUDA10.2 + cuDNN 7          | paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7  |  Linux   |
-|  CUDA11.2 + cuDNN 8          | paddlepaddle/paddlenlp:2.4.0-gpu-cuda11.2-cudnn8  |  Linux   |
+|        环境        |                     镜像 Tag                     |   运行平台    |
+|:------------------:|:------------------------------------------------:|:-------------:|
+|        CPU         |           paddlepaddle/paddlenlp:2.4.0           |     Linux     |
+|        CPU         |   paddlepaddle/paddlenlp:2.4.0.windows.darwin    | Windows&Macos |
+| CUDA10.2 + cuDNN 7 | paddlepaddle/paddlenlp:2.4.0-gpu-cuda10.2-cudnn7 |     Linux     |
+| CUDA11.2 + cuDNN 8 | paddlepaddle/paddlenlp:2.4.0-gpu-cuda11.2-cudnn8 |     Linux     |
 
-对于智能问答应用，请参考Docker文档[docker文档](./docker/README.md)，只需做少量的修改，就可以完成智能问答应用的部署。
+对于智能问答应用，请参考Docker文档[docker文档](../docker/README.md)，只需做少量的修改，就可以完成智能问答应用的部署。
 
 #### REST API
 
@@ -212,10 +212,10 @@ Pipelines可以服务化，通过HTTP接口的形式供其他程序进行调用�
 市面现已有的工程规范查询系统解决方案一直延续着传统关键字词匹配的查询方式，依赖用户对查询结果进行自行排序、筛选、鉴别，有时甚至还要再次由工程设计人员耗费一定时间精力人工查阅工程规范文件后，才能最终确认是否为想要查询的规范条款。传统规范查询系统至少需要进行 3~5 次查询才能找到用户想要的规范条款，而寻规系统是基于强大预训练模型构建起来的语义检索系统，针对 80% 的规范查询需求仅 **1 次查询** 就能精确命中查询意图，并返回真正符合工程设计人员查询意图的结果！
 
 ## :mortar_board: Tutorials
-- Tutorial 1 - Pipelines [Windows视频安装教程](https://www.bilibili.com/video/BV1DY4y1M7HE/?zw)
-- Tutorial 2 - 语义检索 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442670) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/semantic-search/semantic_search_example.py)
-- Tutorial 3 - 智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442857) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/question-answering/dense_qa_example.py)
-- Tutorial 4 - FAQ智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4465498) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/FAQ/dense_faq_example.py)
+- Tutorial 1 - Pipelines [Windows视频安装教程](https://www.bilibili.com/video/BV1DY4y1M7HE)
+- Tutorial 2 - 语义检索 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442670) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/pipelines/examples/semantic-search/semantic_search_example.py)
+- Tutorial 3 - 智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442857) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/pipelines/examples/question-answering/dense_qa_example.py)
+- Tutorial 4 - FAQ智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4465498) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/pipelines/examples/FAQ/dense_faq_example.py)
 - Tutorial 5 - Pipelines 快速上手二次开发教程: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/5011119)
 ## :vulcan_salute: 社区交流
 微信扫描二维码并填写问卷之后，加入交流群与来自各行各业的小伙伴交流学习吧~

@@ -18,7 +18,7 @@
 
 #### 1. 数据准备
 
-数据流是预训练的非常重要的，[预处理文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/preprocess/README.md)提供了整体的数据变动的流程示意，用户可以查看数据制作的细节文档。
+数据流是预训练的非常重要的，[预处理文档](../../../llm/tools/preprocess/README.md)提供了整体的数据变动的流程示意，用户可以查看数据制作的细节文档。
 
 在数据ID化步骤中，我们需要配置tokenzer_name，选择t5模型对应的tokenizer；通过下面脚本转化，我们可以得到处理好的预训练数据，token ids:[`t5_openwebtext.bin`](https://paddlenlp.bj.bcebos.com/models/transformers/t5/data/t5_openwebtext.bin), 文章索引信息[`t5_openwebtext.idx`](https://paddlenlp.bj.bcebos.com/models/transformers/t5/data/t5_openwebtext.idx).（这里提供了一个处理好的预训练数据，可点击链接下载）
 

@@ -178,7 +178,7 @@ function _train(){
         workerlog_id=0
         ;;
     esac
-    cd ../llm/gpt-3
+    cd ../llm
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
         ${train_cmd} > ${log_file} 2>&1

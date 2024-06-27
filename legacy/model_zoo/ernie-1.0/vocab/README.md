@@ -25,12 +25,12 @@ PaddleNLP致力于预训练开源工作，本文档提供了ERNIE词表的制作
 
 **WuDaoCorpus2.0 Base 语料**
 
-WuDaoCorpora是悟道爬取的中文大规模语料。整体数量为3TB，目前开源的部分为WuDaoCorpus2.0 bases数据集，大小为200GB。用户请参考[这里](../preprocess/docs/WuDaoCorpusBase.md)获取原始文本数据。
+WuDaoCorpora是悟道爬取的中文大规模语料。整体数量为3TB，目前开源的部分为WuDaoCorpus2.0 bases数据集，大小为200GB。用户请参考[这里](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/tools/preprocess/docs/WuDaoCorpusBase.md)获取原始文本数据。
 
 
 **CLUECorpus2020 语料**
 
-CLUECorpus2020 过对Common Crawl的中文部分进行语料清洗得到。开源部分提供了约200G左右的语料文本，详细介绍见[官网](https://github.com/CLUEbenchmark/CLUECorpus2020#%E6%95%B0%E6%8D%AE%E4%B8%8B%E8%BD%BD)，用户参考[这里](./preprocess/docs/CLUECorpus2020.md)获取原始文本数据。
+CLUECorpus2020 过对Common Crawl的中文部分进行语料清洗得到。开源部分提供了约200G左右的语料文本，详细介绍见[官网](https://github.com/CLUEbenchmark/CLUECorpus2020#%E6%95%B0%E6%8D%AE%E4%B8%8B%E8%BD%BD)，用户参考[这里](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/tools/preprocess/docs/CLUECorpus2020.md)获取原始文本数据。
 
 
 

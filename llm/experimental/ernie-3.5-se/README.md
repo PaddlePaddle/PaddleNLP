@@ -25,7 +25,7 @@
 
 ## 2. 预训练
 
-预训练数据制作参考[此处](../../model_zoo/ernie-1.0/preprocess/docs/OpenWebText2.md)
+预训练数据制作参考[此处](../../tools/preprocess/docs/OpenWebText2.md)
 
 为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
 ```shell
@@ -89,7 +89,7 @@ python -u -m paddle.distributed.launch \
 1. 需要paddle develop版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失whl包
 2. `use_flash_attention` 需要在A100机器开启，否则loss可能不正常（很快变成0.00x,非常小不正常）。建议使用cuda11.8环境。
 3. `continue_training` 表示从现有的预训练模型加载训练，如果需要从头开始预训练模型，则设置为0。
-4. `use_fused_ln` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
+4. `use_fused_ln` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
 5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，可另外调整相关参数。
 
 

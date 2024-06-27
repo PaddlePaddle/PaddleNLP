@@ -28,9 +28,9 @@
 ## 简介
 问答（QA）系统中最关键的挑战之一是标记数据的稀缺性，这是因为对目标领域获取问答对或常见问答对（FAQ）的成本很高，需要消耗大量的人力和时间。由于上述制约，这导致检索式问答系统落地困难，解决此问题的一种方法是依据问题上下文或大量非结构化文本自动生成的QA问答对。
 
-在此背景下，无监督检索式问答系统（即问答对自动生成智能检索式问答），基于PaddleNLP[问题生成](../../../examples/question_generation/README.md)、[UIE](../../../model_zoo/uie/README.md)、[检索式问答](../supervised_qa/faq_finance/README.md)，支持以非结构化文本形式为上下文自动生成QA问答对，生成的问答对语料可以通过无监督的方式构建检索式问答系统。
+在此背景下，无监督检索式问答系统（即问答对自动生成智能检索式问答），基于PaddleNLP[问题生成](../../../examples/question_generation/README.md)、[UIE](../../../model_zoo/uie/README.md)、[检索式问答](https://github.com/PaddlePaddle/PaddleNLP/blob/release/2.8/applications/question_answering/supervised_qa/faq_finance/README.md)，支持以非结构化文本形式为上下文自动生成QA问答对，生成的问答对语料可以通过无监督的方式构建检索式问答系统。
 
-若开发者已有FAQ语料，请参考[supervised_qa](../supervised_qa)。
+若开发者已有FAQ语料，请参考[supervised_qa](https://github.com/PaddlePaddle/PaddleNLP/blob/release/2.8/applications/question_answering/supervised_qa)。
 
 ### 项目优势
 具体来说，本项目具有以下优势：
@@ -167,21 +167,21 @@ python -u run_qa_pairs_generation.py \
 - `source_file_path` 源文件路径，源文件中每一行代表一条待生成问答对的上下文文本。
 - `target_file_path` 目标文件路径，生成的目标文件为json格式。
 - `answer_generation_model_path` 要加载的答案抽取模型的路径，可以是PaddleNLP提供的预训练模型，或者是本地模型checkpoint路径。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
-   | 可选预训练模型        |
-   |---------------------------------|
-   | uie-base-answer-extractor-v1    |
+   | 可选预训练模型               |
+   |------------------------------|
+   | uie-base-answer-extractor-v1 |
 
 - `question_generation_model_path` 要加载的问题生成模型的路径，可以是PaddleNLP提供的预训练模型，或者是本地模型checkpoint路径。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
-   | 可选预训练模型        |
-   |---------------------------------|
-   | unimo-text-1.0-question-generation      |
-   | unimo-text-1.0-dureader_qg |
+   | 可选预训练模型                                 |
+   |------------------------------------------------|
+   | unimo-text-1.0-question-generation             |
+   | unimo-text-1.0-dureader_qg                     |
    | unimo-text-1.0-question-generation-dureader_qg |
 
 - `filtration_model_path` 要加载的过滤模型的路径，可以是PaddleNLP提供的预训练模型，或者是本地模型checkpoint路径。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
    | 可选预训练模型        |
-   |---------------------------------|
-   | uie-base-qa-filter-v1     |
+   |-----------------------|
+   | uie-base-qa-filter-v1 |
 
 - `batch_size` 使用taskflow时的批处理大小，请结合机器情况进行调整，默认为8。
 - `a_max_answer_candidates` 答案抽取阶段，每个输入的最大返回答案候选数，默认为5。
@@ -219,7 +219,7 @@ python -u run_corpus_preparation.py \
 关于如何对语义检索模型进行无监督训练，以及针对给定问答语料库进行模型部署，请参考faq_system -->
 
 ### 基于Pipelines构建问答系统
-本项目提供了基于Pipelines的低成本构建问答对自动生成智能检索问答系统的能力。开发者只需要提供非结构化的纯文本，就可以使用本项目预制的问答对生成模块生成大量的问答对，并基于此快速搭建一个针对自己业务的检索问答系统，并可以提供Web可视化产品服务。Web可视化产品服务支持问答检索、在线问答对生成，在线文件上传和解析，在线索引库更新等功能，用户也可根据需要自行调整。具体的构建流程请参考[Pipelines-无监督智能检索问答系统](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/unsupervised-question-answering)。
+本项目提供了基于Pipelines的低成本构建问答对自动生成智能检索问答系统的能力。开发者只需要提供非结构化的纯文本，就可以使用本项目预制的问答对生成模块生成大量的问答对，并基于此快速搭建一个针对自己业务的检索问答系统，并可以提供Web可视化产品服务。Web可视化产品服务支持问答检索、在线问答对生成，在线文件上传和解析，在线索引库更新等功能，用户也可根据需要自行调整。具体的构建流程请参考[Pipelines-无监督智能检索问答系统](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/pipelines/examples/unsupervised-question-answering)。
 
 
 
@@ -376,11 +376,11 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/question_gener
 - `train_file` 本地训练数据地址，数据格式必须与`dataset_name`所指数据集格式相同，默认为None。
 - `predict_file` 本地测试数据地址，数据格式必须与`dataset_name`所指数据集格式相同，默认为None。
 - `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一，默认为`unimo-text-1.0`。
-   | 可选预训练模型        |
-   |---------------------------------|
-   | unimo-text-1.0      |
-   | unimo-text-1.0-large |
-   | unimo-text-1.0-question-generation      |
+   | 可选预训练模型                     |
+   |------------------------------------|
+   | unimo-text-1.0                     |
+   | unimo-text-1.0-large               |
+   | unimo-text-1.0-question-generation |
 
 - `save_dir` 表示模型的保存路径。
 - `output_path` 表示预测结果的保存路径。
@@ -463,10 +463,10 @@ python finetune/answer_extraction_and_roundtrip_filtration/evaluate.py \
 - `limit`: SpanEvaluator测评指标的`limit`，当概率数组中的最后一个维度大于该值时将返回相应的文本片段。
 
 #### 语义索引和召回模型
-我们的语义索引和召回模型是基于RocketQA的QueryEncoder训练的双塔模型，该模型用于语义索引和召回阶段，分别进行语义向量抽取和相似度召回。除使用预置模型外，如果用户想训练并接入自己的模型，模型训练可以参考[FAQ Finance](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/question_answering/supervised_qa/faq_finance)。
+我们的语义索引和召回模型是基于RocketQA的QueryEncoder训练的双塔模型，该模型用于语义索引和召回阶段，分别进行语义向量抽取和相似度召回。除使用预置模型外，如果用户想训练并接入自己的模型，模型训练可以参考[FAQ Finance](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/question_answering/supervised_qa/faq_finance)。
 
 #### 排序模型
-我们的排序模型是基于RocketQA的CrossEncoder训练的单塔模型，该模型用于搜索的排序阶段，对召回的结果进行重新排序的作用。关于排序的定制训练，可以参考[CrossEncoder](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/neural_search/ranking/cross_encoder)。
+我们的排序模型是基于RocketQA的CrossEncoder训练的单塔模型，该模型用于搜索的排序阶段，对召回的结果进行重新排序的作用。关于排序的定制训练，可以参考[CrossEncoder](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/neural_search/ranking/cross_encoder)。
 
 ## References
 [1] Zheng, Chujie, and Minlie Huang. "Exploring prompt-based few-shot learning for grounded dialog generation." arXiv preprint arXiv:2109.06513 (2021).

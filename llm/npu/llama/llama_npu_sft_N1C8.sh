@@ -12,28 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export FLAGS_use_stride_kernel=0
-export FLAGS_npu_storage_format=1
-export HCCL_INTRA_PCIE_EHABLE=0
-export HCCL_INTRA_ROCE_ENABLE=1
-export ASCEND_RT_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
+set -x
 
-unset PADDLE_TRAINER_ENDPOINTS
-unset DISTRIBUTED_TRAINER_ENDPOINTS
+max_steps=${1:-100}
+
 export GLOG_v=0
-export FLAGS_NPU_MC2=1
-export MC2_Recompute=1
-export MC2=1
-export FLAGS_allocator_strategy=naive_best_fit
-source /usr/local/Ascend/ascend-toolkit/set_env.sh
-
+export FLAGS_npu_storage_format=1
+export FLAGS_use_stride_kernel=0
 export HCCL_OP_BASE_FFTS_MODE_ENABLE=TRUE
 export MULTI_STREAM_MEMORY_REUSE=1
+export HCCL_INTRA_PCIE_ENABLE=0
+export HCCL_INTRA_ROCE_ENABLE=1
+export FLAGS_allocator_strategy=naive_best_fit
+export ASCEND_RT_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
+export FLAGS_NPU_MC2=1
+export MC2_Recompute=1
 
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
 export PYTHONPATH=../../../:$PYTHONPATH
-rm -rf sft_bf16_llama_N1C8
-rm -rf output/sft_bf16_llama_N1C8
-ps aux | grep "run_finetune.py" | grep -v grep | awk '{print $2}' | xargs kill -9
+ps aux | grep run_finetune.py | grep -v grep | awk '{print $2}' | xargs kill -9
+
 python -u  -m paddle.distributed.launch \
     --devices "0,1,2,3,4,5,6,7" \
     --log_dir "./sft_bf16_llama_N1C8" \
@@ -42,14 +40,13 @@ python -u  -m paddle.distributed.launch \
     --model_name_or_path "meta-llama/Llama-2-13b" \
     --dataset_name_or_path "data/" \
     --output_dir "./output/sft_bf16_llama_N1C8" \
-    --logging_dir "./sft_logs" \
     --per_device_train_batch_size 2 \
-    --gradient_accumulation_steps 32 \
+    --gradient_accumulation_steps 64 \
     --per_device_eval_batch_size 1 \
     --eval_accumulation_steps 1 \
-    --max_steps 2000 \
+    --max_steps ${max_steps} \
     --learning_rate 3e-06 \
-    --warmup_steps 2 \
+    --warmup_steps 20 \
     --save_steps 1000 \
     --logging_steps 1 \
     --evaluation_strategy "epoch" \
@@ -63,7 +60,7 @@ python -u  -m paddle.distributed.launch \
     --eval_with_do_generation false \
     --metric_for_best_model "accuracy" \
     --recompute false \
-    --tensor_parallel_degree 4 \
+    --tensor_parallel_degree 8 \
     --pipeline_parallel_degree 1 \
     --zero_padding 0 \
     --amp_master_grad true \
@@ -73,7 +70,7 @@ python -u  -m paddle.distributed.launch \
     --use_flash_attention 1 \
     --use_fused_rope 1 \
     --use_fused_rms_norm 1 \
-        --sharding_parallel_degree 2 \
+    --sharding_parallel_degree 1 \
     --pad_to_multiple_of 4096 \
-        --sharding "stage1" \
-        --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap"
+    --sharding "stage1" \
+    --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap"

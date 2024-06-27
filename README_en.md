@@ -25,8 +25,7 @@
 
 * **2024.01.04 [PaddleNLP v2.7](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.7.0)**: The LLM experience is fully upgraded, and the tool chain LLM entrance is unified. Unify the implementation code of pre-training, fine-tuning, compression, inference and deployment to the `PaddleNLP/llm` directory. The new [LLM Toolchain Documentation](https://paddlenlp.readthedocs.io/zh/latest/llm/finetune.html) provides one-stop guidance for users from getting started with LLM to business deployment and launch. The full breakpoint storage mechanism Unified Checkpoint greatly improves the versatility of LLM storage. Efficient fine-tuning upgrade supports the simultaneous use of efficient fine-tuning + LoRA, and supports QLoRA and other algorithms.
 
-* **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**: Release [Full-process LLM toolchain](./llm) , covering all aspects of pre-training, fine-tuning, compression, inference and deployment, providing users with end-to-end LLM solutions and one-stop development experience; built-in [4D parallel distributed Trainer](./docs/trainer.md ), [Efficient fine-tuning algorithm LoRA/Prefix Tuning](./llm#33-lora), [Self-developed INT8/INT4 quantization algorithm](./llm#6-quantization), etc.; fully supports [LLaMA 1/2](./llm/llama), [BLOOM](.llm/bloom), [ChatGLM 1/2](./llm/chatglm), [GLM](./llm/glm), [OPT](./llm/opt) and other mainstream LLMs.
-
+* **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**: Release [Full-process LLM toolchain](./llm) , covering all aspects of pre-training, fine-tuning, compression, inference and deployment, providing users with end-to-end LLM solutions and one-stop development experience; built-in [4D parallel distributed Trainer](./docs/trainer.md ), [Efficient fine-tuning algorithm LoRA/Prefix Tuning](./llm/README.md#2-%E7%B2%BE%E8%B0%83), [Self-developed INT8/INT4 quantization algorithm](./llm/README.md#4-%E9%87%8F%E5%8C%96), etc.; fully supports [LLaMA 1/2](./llm/config/llama), [BLOOM](./llm/config/bloom), [ChatGLM 1/2](./llm/config/chatglm), [OPT](./llm/config/opt) and other mainstream LLMs.
 
 ## Installation
 
@@ -119,7 +118,7 @@ model = AutoModelForQuestionAnswering.from_pretrained('ernie-3.0-medium-zh')
 
 #### Wide-range NLP Task Support
 
-PaddleNLP provides rich examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./model_zoo), and wide-range NLP application [examples](./examples) with detailed instructions.
+PaddleNLP provides rich examples covering mainstream NLP task to help developers accelerate problem solving. You can find our powerful transformer [Model Zoo](./legacy/model_zoo), and wide-range NLP application [examples](./legacy/examples) with detailed instructions.
 
 Also you can run our interactive [Notebook tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995) on AI Studio, a powerful platform with **FREE** computing resource.
 
@@ -176,7 +175,7 @@ For more pretrained model usage, please refer to [Transformer API Docs](./docs/m
 
 We provide high value scenarios including information extraction, semantic retrieval, question answering high-value.
 
-For more details industrial cases please refer to [Applications](./applications).
+For more details industrial cases please refer to [Applications](./legacy/applications).
 
 
 #### 🔍 Neural Search System
@@ -186,7 +185,7 @@ For more details industrial cases please refer to [Applications](./applications)
 </div>
 
 
-For more details please refer to [Neural Search](./applications/neural_search).
+For more details please refer to [Neural Search](./legacy/applications/neural_search).
 
 #### ❓ Question Answering System
 
@@ -197,7 +196,7 @@ We provide question answering pipeline which can support FAQ system, Document-le
 </div>
 
 
-For more details please refer to [Question Answering](./applications/question_answering) and [Document VQA](./applications/document_intelligence/doc_vqa).
+For more details please refer to [Question Answering](./legacy/applications/question_answering) and [Document VQA](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/document_intelligence/doc_vqa).
 
 
 #### 💌 Opinion Extraction and Sentiment Analysis
@@ -209,7 +208,7 @@ We build an opinion extraction system for product review and fine-grained sentim
 </div>
 
 
-For more details please refer to [Sentiment Analysis](./applications/sentiment_analysis).
+For more details please refer to [Sentiment Analysis](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/sentiment_analysis).
 
 #### 🎙️ Speech Command Analysis
 
@@ -220,25 +219,9 @@ Integrated ASR Model, Information Extraction, we provide a speech command analys
 </div>
 
 
-For more details please refer to [Speech Command Analysis](./applications/speech_cmd_analysis).
+For more details please refer to [Speech Command Analysis](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/speech_cmd_analysis).
 
 ### High Performance Distributed Training and Inference
-
-#### ⚡ FastGeneration: High Performance Generation Library
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="400">
-</div>
-
-```python
-model = GPTLMHeadModel.from_pretrained('gpt-cpm-large-cn')
-...
-outputs, _ = model.generate(
-    input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search',
-    use_fast=True)
-```
-
-Set `use_fast=True` to achieve 5x speedup for Transformer, GPT, BART, PLATO, UniLM text generation. For more usage please refer to [FastGeneration](./fast_generation).
 
 #### 🚀 Fleet: 4D Hybrid Distributed Training
 
@@ -247,7 +230,7 @@ Set `use_fast=True` to achieve 5x speedup for Transformer, GPT, BART, PLATO, Uni
 </div>
 
 
-For more super large-scale model pre-training details please refer to [GPT-3](./examples/language_model/gpt-3).
+For more super large-scale model pre-training details please refer to [GPT-3](./legacy/model_zoo/gpt-3).
 
 
 ## Quick Start

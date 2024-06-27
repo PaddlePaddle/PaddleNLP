@@ -154,8 +154,6 @@ python predict.py --config ./configs/transformer.base.yaml
 
 需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
-另外 `predict.py` 中使用的 `TransformerGenerator` 接口对于GPU预测将在适配的条件下自动切换到 `FastGeneration` 预测加速版本（期间会进行jit编译）， `FastGeneration` 的更多内容可以参考 `fast_transformer/README.md`。
-
 #### 基于自定义数据集进行预测
 
 本示例同样支持自定义数据集进行预测。可以参照以下文档。
@@ -405,10 +403,6 @@ python predict.py \
 * `--without_ft`: 本示例在预测时，支持了 GPU 的翻译预测的加速，如果不使用加速特性，可以设置 `--without_ft` 即会执行普通的 PaddlePaddle 动态图预测。
 
 翻译结果会输出到 config 文件中 `output_file` 条目指定的文件中。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。
-
-## 使用 FastGeneration 实现预测
-
-具体的说明可以参考 `fast_transformer/README.md`。`cd fast_transformer/` 即可查看。
 
 ## 模型评估
 
