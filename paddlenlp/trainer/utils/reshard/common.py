@@ -147,38 +147,38 @@ class NodeModelState:
         """
         rename param names and change the keys of the dicts(model_weights, opt, master_weights) accordingly
         """
-        # model weighs
-        model_weights_tmp = OrderedDict()
-        (self._model_weights, model_weights_tmp) = (model_weights_tmp, self._model_weights)
-        for key in list(model_weights_tmp.keys()):
-            structure_name, t_name = key
-            t_name_new = map_func(structure_name, t_name)
-            self._model_weights[(structure_name, t_name_new)] = model_weights_tmp[key]
-            del model_weights_tmp[key]
 
-        # opt
-        opt_tmp = OrderedDict()
-        (self._opt_state, opt_tmp) = (opt_tmp, self._opt_state)
-        for key in list(opt_tmp.keys()):
-            structure_name, t_name, opt_name = key
+        def map_key(state_dict, map_key_func):
+            state_dict_tmp = OrderedDict()
+            (state_dict_tmp, state_dict) = (state_dict, state_dict_tmp)
+            for key in list(state_dict_tmp.keys()):
+                key_new = map_key_func(key)
+                state_dict[key_new] = state_dict_tmp[key]
+                del state_dict_tmp[key]
+            return state_dict
+
+        def map_model_state_key(key):
+            packed = isinstance(key[0], tuple)
+            structure_name, t_name = key[0] if packed else key
             t_name_new = map_func(structure_name, t_name)
-            if self._model_weights:
-                assert (structure_name, t_name_new) in self._model_weights
+            key_new = ((structure_name, t_name_new), key[1]) if packed else (structure_name, t_name_new)
+            return key_new
+
+        def map_opt_key(key):
+            packed = isinstance(key[0], tuple)
+            structure_name, t_name, opt_name = key[0] if packed else key
+            t_name_new = map_func(structure_name, t_name)
             opt_name_new = t_name_new + opt_name[len(t_name) :]
-            self._opt_state[(structure_name, t_name_new, opt_name_new)] = opt_tmp[key]
-            del opt_tmp[key]
+            key_new = (
+                ((structure_name, t_name_new, opt_name_new), key[1])
+                if packed
+                else (structure_name, t_name_new, opt_name_new)
+            )
+            return key_new
 
-        # master weights
-        master_weights_tmp = OrderedDict()
-        (self._master_weights, master_weights_tmp) = (master_weights_tmp, self._master_weights)
-        for key in list(master_weights_tmp.keys()):
-            structure_name, master_weights_name = key
-            master_weights_name_new = map_func(structure_name, master_weights_name)
-            if self._model_weights:
-                assert (structure_name, t_name_new) in self._model_weights
-            self._master_weights[(structure_name, master_weights_name_new)] = master_weights_tmp[key]
-            del master_weights_tmp[key]
-
+        self._model_weights = map_key(self._model_weights, map_model_state_key)
+        self._opt_state = map_key(self._opt_state, map_opt_key)
+        self._master_weights = map_key(self._master_weights, map_opt_key)
         return self
 
     def drop_rank(self):
@@ -200,7 +200,7 @@ class NodeModelState:
 
         self._model_weights = drop(self._model_weights, 2)
         self._opt_state = drop(self._opt_state, 3)
-        self._master_weights = drop(self._master_weights, 2)
+        self._master_weights = drop(self._master_weights, 3)
         return self
 
     def collapse_key(self):
@@ -217,7 +217,8 @@ class NodeModelState:
             for key in state_keys:
                 assert len(key) == 2
                 k, rank = key
-                assert len(k) == l
+                if isinstance(k, tuple):
+                    assert len(k) == l
                 if k != pre:
                     pre = k
                     state[k] = []
@@ -227,7 +228,7 @@ class NodeModelState:
 
         self._model_weights = collapse(self._model_weights, 2)
         self._opt_state = collapse(self._opt_state, 3)
-        self._master_weights = collapse(self._master_weights, 2)
+        self._master_weights = collapse(self._master_weights, 3)
         return self
 
     def flatten_key(self):
@@ -248,7 +249,7 @@ class NodeModelState:
 
         self._model_weights = flatten(self._model_weights, 2)
         self._opt_state = flatten(self._opt_state, 3)
-        self._master_weights = flatten(self._master_weights, 2)
+        self._master_weights = flatten(self._master_weights, 3)
         return self
 
     def pack_keys(self, structure_name_mapping=None):
@@ -265,6 +266,16 @@ class NodeModelState:
             all_names.extend(opt_names)
             all_names.sort()
             pre_t_name = ""
+            suffix = [
+                "_fp32_master_0_beta1_pow_acc_0",
+                "_fp32_master_0_beta2_pow_acc_0",
+                "_fp32_master_0_moment1_0",
+                "_fp32_master_0_moment2_0",
+                "_beta1_pow_acc_0",
+                "_beta2_pow_acc_0",
+                "_moment1_0",
+                "_moment2_0",
+            ]
             opt_to_t = {}
             for n in all_names:
                 if n in tensor_names:
@@ -273,12 +284,22 @@ class NodeModelState:
                 else:
                     assert pre_t_name
                     opt_to_t[n] = pre_t_name
+
+            for t in opt_names:
+                _find = False
+                for s in suffix:
+                    if t.endswith(s):
+                        logger.info(f"{t}-{t[:-len(s)]}--{t[:-len(s)] in tensor_names}")
+                        opt_to_t[t] = t[: -len(s)]
+                        _find = True
+                        break
+                assert _find
             return opt_to_t
 
         if structure_name_mapping is not None:
             tname_to_structure_name = {v: k for (k, v) in structure_name_mapping.items()}
         else:
-            structure_name_mapping = {k: v for (k, v) in self._model_weights.items()}
+            structure_name_mapping = {k: v.name for (k, v) in self._model_weights.items()}
             tname_to_structure_name = {v: k for (k, v) in structure_name_mapping.items()}
 
         tensor_names = list(tname_to_structure_name.keys())
@@ -290,7 +311,7 @@ class NodeModelState:
         (self._model_weights, model_weights_tmp) = (model_weights_tmp, self._model_weights)
         for k in list(model_weights_tmp.keys()):
             t_name = structure_name_mapping[k]
-            self._model_weights[(k, t_name)] = model_weights_tmp[k]
+            self._model_weights[(k, t_name)] = paddle.to_tensor(model_weights_tmp[k]).cpu()
             del model_weights_tmp[k]
 
         # opt
@@ -307,11 +328,12 @@ class NodeModelState:
         # master weights
         master_weights_tmp = OrderedDict()
         (self._master_weights, master_weights_tmp) = (master_weights_tmp, self._master_weights)
-        for master_weights_name in list(master_weights_tmp.keys()):
-            assert master_weights_name in tname_to_structure_name
-            structure_name = tname_to_structure_name[master_weights_name]
-            self._master_weights[(structure_name, master_weights_name)] = master_weights_tmp[master_weights_name].cpu()
-            del master_weights_tmp[master_weights_name]
+        for t_name in list(master_weights_tmp.keys()):
+            assert t_name in tname_to_structure_name
+            structure_name = tname_to_structure_name[t_name]
+            master_name = getattr(master_weights_tmp[t_name], "name", "")
+            self._master_weights[(structure_name, t_name, master_name)] = master_weights_tmp[t_name].cpu()
+            del master_weights_tmp[t_name]
 
         return self
 
@@ -338,17 +360,18 @@ class NodeModelState:
             if structure_name in self._model_weights:
                 assert self._model_weights[structure_name].name == t_name
             self._opt_state[opt_name] = opt_tmp[key]
+            self._opt_state[opt_name].name = opt_name
             del opt_tmp[key]
 
         # master weights
         master_weights_tmp = OrderedDict()
         (self._master_weights, master_weights_tmp) = (master_weights_tmp, self._master_weights)
         for key in list(master_weights_tmp.keys()):
-            structure_name, master_weights_name = key
+            structure_name, t_name, master_name = key
             if structure_name in self._model_weights:
-                assert self._model_weights[structure_name].name == master_weights_name
-            self._master_weights[master_weights_name] = master_weights_tmp[key]
-            del master_weights_tmp[key]
+                assert self._model_weights[structure_name].name == t_name
+            self._master_weights[t_name] = master_weights_tmp[key]
+            self._master_weights[t_name].name = master_name
         return self
 
     def split_state(self, split_func):
@@ -382,6 +405,9 @@ class NodeModelState:
         in the dicts of (key, rank)=>tensor, items keys of the same key but different rank are distributed to the
         same worker
         """
+        # sharding degree == 1
+        if group is None or group.nranks < 2:
+            return self
 
         def build_router(state_dict):
             state_keys_list = all_gather_simple_object([(k, v.shape) for (k, v) in state_dict.items()], group)
@@ -450,7 +476,7 @@ class NodeModelState:
 
         self._model_weights = split(self._model_weights, 2)
         self._opt_state = split(self._opt_state, 3)
-        self._master_weights = split(self._master_weights, 2)
+        self._master_weights = split(self._master_weights, 3)
         return self
 
     def merge_items(self, merge_func):
@@ -463,7 +489,8 @@ class NodeModelState:
             (state, tmp_state) = (tmp_state, state)
             state_keys = list(tmp_state.keys())
             for key in state_keys:
-                assert len(key) == l
+                if isinstance(key, tuple):
+                    assert len(key) == l
                 v = tmp_state[key]
                 v = sorted(v, key=lambda x: x[0])
                 state[key] = merge_func(key, v)
@@ -472,13 +499,16 @@ class NodeModelState:
 
         self._model_weights = merge(self._model_weights, 2)
         self._opt_state = merge(self._opt_state, 3)
-        self._master_weights = merge(self._master_weights, 2)
+        self._master_weights = merge(self._master_weights, 3)
         return self
 
     def merge_from(self, other, rank=None):
+        self.add_weights(other.model_weights, rank)
         self.add_opts(other.opt_state, rank)
         self.add_master_weights(other.master_weights, rank)
-        self.set_lr_scheduler(other.lr_scheduler)
+        if other.lr_scheduler is not None:
+            self.set_lr_scheduler(other.lr_scheduler)
+        return self
 
     def get_opt_state_dict(self):
         opt_state_dict = OrderedDict()
@@ -492,6 +522,8 @@ class NodeModelState:
 
 def all_gather_simple_object(obj, group):
     res = []
+    if group.nranks < 2:
+        return [obj]
     paddle.distributed.all_gather_object(res, obj, group)
     return res
 

@@ -29,16 +29,20 @@ from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .image_processing_utils import ImageProcessingMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
-from .sequence_parallel_utils import (
-    GatherOp,
-    ScatterOp,
-    AllGatherOp,
-    ReduceScatterOp,
-    ColumnSequenceParallelLinear,
-    RowSequenceParallelLinear,
-    mark_as_sequence_parallel_parameter,
-    register_sequence_parallel_allreduce_hooks,
-)
+
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        GatherOp,
+        ScatterOp,
+        AllGatherOp,
+        ReduceScatterOp,
+        ColumnSequenceParallelLinear,
+        RowSequenceParallelLinear,
+        mark_as_sequence_parallel_parameter,
+        register_sequence_parallel_allreduce_hooks,
+    )
+except:
+    pass
 from .export import export_model
 
 # isort: split
@@ -200,6 +204,7 @@ from .xlm.configuration import *
 from .gau_alpha.modeling import *
 from .gau_alpha.tokenizer import *
 from .gau_alpha.configuration import *
+from .gemma import *
 from .roformerv2.modeling import *
 from .roformerv2.tokenizer import *
 from .roformerv2.configuration import *
@@ -209,6 +214,7 @@ from .opt.modeling import *
 from .auto.modeling import *
 from .auto.tokenizer import *
 from .auto.processing import *
+from .auto.image_processing import *
 from .auto.configuration import *
 from .codegen.modeling import *
 from .codegen.tokenizer import *
@@ -282,14 +288,13 @@ from .rw.tokenizer import *
 from .mistral.modeling import *
 from .mistral.configuration import *
 from .qwen import *
-
-# For faster tokenizer
-from ..utils.import_utils import is_fast_tokenizer_available
-
-if is_fast_tokenizer_available():
-    from .tokenizer_utils_fast import PretrainedFastTokenizer
-    from .bert.fast_tokenizer import *
-    from .ernie.fast_tokenizer import *
-    from .tinybert.fast_tokenizer import *
-    from .ernie_m.fast_tokenizer import *
-    from .nystromformer.fast_tokenizer import *
+from .mixtral.modeling import *
+from .mixtral.configuration import *
+from .deberta.modeling import *
+from .deberta.tokenizer import *
+from .deberta.configuration import *
+from .deberta_v2.modeling import *
+from .deberta_v2.tokenizer import *
+from .deberta_v2.configuration import *
+from .qwen2 import *
+from .qwen2_moe import *

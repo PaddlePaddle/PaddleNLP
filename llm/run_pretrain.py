@@ -11,15 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import copy
 import math
 import os
-import random
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Optional
 
-import numpy as np
 import paddle
 
 from paddlenlp.data.causal_dataset import (
@@ -32,6 +31,7 @@ from paddlenlp.trainer import (
     Trainer,
     TrainingArguments,
     get_last_checkpoint,
+    set_seed,
     speed_metrics,
 )
 from paddlenlp.transformers import (
@@ -43,8 +43,13 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     register_sequence_parallel_allreduce_hooks,
 )
+from paddlenlp.transformers.configuration_utils import LlmMetaConfig, llmmetaclass
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import get_env_device
+
+# Pretaining Environment Variables to support sharding stage1 overlap optimization.
+os.environ["USE_CASUAL_MASK"] = "True"
 
 
 def add_start_docstrings(*docstr):
@@ -56,6 +61,7 @@ def add_start_docstrings(*docstr):
 
 
 @dataclass
+@llmmetaclass
 @add_start_docstrings(TrainingArguments.__doc__)
 class PreTrainingArguments(TrainingArguments):
     min_learning_rate: float = field(
@@ -74,6 +80,36 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
+    # NOTE(gongenlei): new add autotuner_benchmark
+    autotuner_benchmark: bool = field(
+        default=False,
+        metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+    unified_checkpoint: bool = field(
+        default=False,
+        metadata={"help": "Enable fused linear grad add strategy."},
+    )
+    unified_checkpoint_config: Optional[str] = field(
+        default="",
+        metadata={"help": "Configs to unify hybrid parallel checkpoint.\n"},
+    )
+
+    def __post_init__(self):
+        super().__post_init__()
+        # NOTE(gongenlei): new add autotuner_benchmark
+        from paddlenlp.trainer.trainer_utils import IntervalStrategy
+
+        if self.autotuner_benchmark:
+            self.max_steps = 5
+            self.do_train = True
+            self.do_export = False
+            self.do_predict = False
+            self.do_eval = False
+            self.overwrite_output_dir = True
+            self.load_best_model_at_end = False
+            self.report_to = []
+            self.save_strategy = IntervalStrategy.NO
+            self.evaluation_strategy = IntervalStrategy.NO
 
 
 @dataclass
@@ -125,64 +161,32 @@ class ModelArguments:
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
 
-    config_name: Optional[str] = field(
-        default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
-    )
-    use_flash_attention: bool = field(
+    use_fast_layer_norm: bool = field(
         default=False,
-        metadata={"help": "use_flash_attention"},
+        metadata={"help": "GPT3 model, use fast layernorm"},
     )
-    use_fused_rms_norm: bool = field(
-        default=False,
-        metadata={"help": "llama or other model, use_fused_rms_norm"},
-    )
+
+    hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
+    attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
+
     fuse_attention_qkv: bool = field(
-        default=False,
+        default=None,
         metadata={"help": "whether to fuse attention qkv"},
     )
     fuse_attention_ffn: bool = field(
-        default=False,
+        default=None,
         metadata={"help": "whether to fuse first up and gate proj in mlp block"},
     )
-    recompute_granularity: str = field(
-        default="full",
-        metadata={"help": "Choose among ['full', 'core_attn', 'full_attn']"},
-    )
-    virtual_pp_degree: int = field(
-        default=1,
-        metadata={"help": "virtual_pp_degree"},
-    )
+
     continue_training: bool = field(
         default=False,
         metadata={
             "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
         },
     )
-    sequence_parallel: bool = field(
-        default=False,
-        metadata={"help": "whether to use sequence parallel"},
-    )
-    fuse_sequence_parallel_allreduce: bool = field(
-        default=False,
-        metadata={"help": "whether to use fuse sequence parallel allreduce"},
-    )
-    use_fused_rope: Optional[bool] = field(
-        default=False,
-        metadata={"help": "Enable rope fusion or not."},
-    )
-    no_recompute_layers: Optional[List[int]] = field(
+    num_hidden_layers: Optional[int] = field(
         default=None,
-        metadata={"help": "Specify the full transformer layers that should not be recomputed."},
-    )
-    pp_recompute_interval: int = field(
-        default=1,
-        metadata={
-            "help": "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0."
-        },
-    )
-    recompute_use_reentrant: bool = field(
-        default=False,
-        metadata={"help": "recompute_use_reentrant"},
+        metadata={"help": "num_hidden_layers."},
     )
 
 
@@ -241,7 +245,7 @@ def create_pretrained_dataset(
     def _collate_data(data, stack_fn=Stack()):
         tokens_ = stack_fn([x["text"] for x in data])
 
-        labels = tokens_[:, 1:]
+        labels = copy.deepcopy(tokens_)[:, 1:]
         tokens = tokens_[:, :-1]
 
         return {
@@ -271,7 +275,7 @@ def get_train_data_file(args):
             if (os.path.isfile(os.path.join(args.input_dir, f)) and ("_idx.npz" in str(f) or ".idx" in str(f)))
         ]
         files = [x.replace("_idx.npz", "") for x in files]
-        files = [x.replace(".idx", "") for x in files]  # add
+        files = [x.replace(".idx", "") for x in files]
 
         if len(files) > 1:
             ret = []
@@ -285,19 +289,10 @@ def get_train_data_file(args):
     return files
 
 
-def set_seed(args):
-    if args.device == "cpu":
-        idx = 0
-    else:
-        idx = paddle.distributed.get_rank()
-    random.seed(args.seed + idx)
-    np.random.seed(args.seed + idx)
-    paddle.seed(args.seed + idx)
-
-
 class PretrainingTrainer(Trainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.is_pretraining = True
 
     def evaluate(self, eval_dataset=None, ignore_keys=None, metric_key_prefix: str = "eval"):
         # keep eval_dataloader
@@ -362,13 +357,18 @@ class PretrainingTrainer(Trainer):
 
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, PreTrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    # Support format as "args.json --arg1 value1 --arg2 value2.”
+    # In case of conflict, command line arguments take precedence.
+    if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
+        model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    if training_args.no_recompute_layers is not None:
+        training_args.no_recompute_layers.sort()
+
     if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
+        from utils.fused_layers import mock_layers
 
         mock_layers()
 
@@ -378,10 +378,8 @@ def main():
     if data_args.data_cache is not None:
         os.makedirs(data_args.data_cache, exist_ok=True)
 
-    set_seed(training_args)
     paddle.set_device(training_args.device)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
+    set_seed(seed=training_args.seed)
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
@@ -413,6 +411,9 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
     config = AutoConfig.from_pretrained(model_args.model_name_or_path)
+    # set all llm config
+    LlmMetaConfig.set_llm_config(config, training_args)
+    config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
@@ -423,25 +424,47 @@ def main():
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
         logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
 
-    if model_args.no_recompute_layers is not None:
-        model_args.no_recompute_layers.sort()
+    config.num_hidden_layers = (
+        model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
+    )
+    # Config for model using dropout, such as GPT.
+    if hasattr(config, "hidden_dropout_prob"):
+        config.hidden_dropout_prob = model_args.hidden_dropout_prob
+    if hasattr(config, "attention_probs_dropout_prob"):
+        config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
+    if model_args.fuse_attention_qkv is not None:
+        config.fuse_attention_qkv = model_args.fuse_attention_qkv
+    if model_args.fuse_attention_ffn is not None:
+        config.fuse_attention_ffn = model_args.fuse_attention_ffn
 
-    config.use_flash_attention = model_args.use_flash_attention
-    config.use_fused_rms_norm = model_args.use_fused_rms_norm
-    config.fuse_attention_qkv = model_args.fuse_attention_qkv
-    config.fuse_attention_ffn = model_args.fuse_attention_ffn
-    config.recompute_granularity = model_args.recompute_granularity
-    config.virtual_pp_degree = model_args.virtual_pp_degree
-    config.sequence_parallel = model_args.sequence_parallel
-    config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
-    config.use_fused_rope = model_args.use_fused_rope
-    config.no_recompute_layers = model_args.no_recompute_layers
-    config.pp_recompute_interval = model_args.pp_recompute_interval
-    config.recompute_use_reentrant = model_args.recompute_use_reentrant
+    if config.sequence_parallel:
+        assert config.tensor_parallel_degree > 1, "tensor_parallel_degree must be larger than 1 for sequence parallel."
+    assert (
+        config.num_attention_heads % config.sep_parallel_degree == 0
+    ), f"num_attention_heads:{config.num_attention_heads} must be divisible by sep_parallel_degree {config.sep_parallel_degree}"
+    assert (
+        config.seq_length % config.context_parallel_degree == 0
+    ), f"seq_length:{config.seq_length} must be divisible by context_parallel_degree {config.context_parallel_degree}"
 
-    config.use_recompute = training_args.recompute
-    config.tensor_parallel_degree = training_args.tensor_parallel_degree
-    config.tensor_parallel_rank = training_args.tensor_parallel_rank
+    if training_args.sharding_parallel_config is not None:
+        # for stage1 overlap optimization
+        if (
+            "enable_stage1_allgather_overlap" in training_args.sharding_parallel_config
+            or "enable_stage1_broadcast_overlap" in training_args.sharding_parallel_config
+        ):
+            from paddle.io.reader import use_pinned_memory
+
+            use_pinned_memory(False)
+
+    if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
+        try:
+            from paddle_xpu.layers.nn.linear import LinearConfig  # noqa: F401
+
+            LinearConfig.enable_accumulate_steps_opt()
+            LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
+        except ImportError:
+            # It's OK, not use accumulate_steps optimization
+            pass
 
     print("Final pre-training config:", config)
 
@@ -456,19 +479,30 @@ def main():
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         model_class = AutoModelForCausalLMPipe
+        if "LLama" in str(config.architectures):
+            try:
+                from utils.register_reshard import register_pp_reshard_information
+
+                register_pp_reshard_information(config.num_hidden_layers)
+            except:
+                print("Not register llama pp reshard information.")
 
     if model_args.continue_training:
-        model = model_class.from_pretrained(
-            model_args.model_name_or_path,
-            config=config,
-            dtype=dtype,
-        )
+        # NOTE(gongenlei): new add
+        if training_args.autotuner_benchmark:
+            model = model_class.from_config(config, dtype=dtype)
+        else:
+            model = model_class.from_pretrained(
+                model_args.model_name_or_path,
+                config=config,
+                dtype=dtype,
+            )
     else:
         model = model_class.from_config(config, dtype=dtype)
 
-    if model_args.sequence_parallel:
+    if training_args.sequence_parallel:
         register_sequence_parallel_allreduce_hooks(
-            model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
+            model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
         )
 
     if training_args.recompute:
@@ -477,7 +511,11 @@ def main():
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
-    warmup_steps = training_args.warmup_ratio * training_args.max_steps
+
+    if training_args.warmup_steps > 0:
+        warmup_steps = training_args.warmup_steps
+    else:
+        warmup_steps = training_args.warmup_ratio * training_args.max_steps
 
     lr_scheduler = None
     if training_args.lr_scheduler_type.value == "cosine":
@@ -533,11 +571,15 @@ def main():
     # Training
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        metrics = train_result.metrics
-        trainer.save_model()
-        trainer.log_metrics("train", metrics)
-        trainer.save_metrics("train", metrics)
-        trainer.save_state()
+
+        # NOTE(gongenlei): new add
+        if not training_args.autotuner_benchmark:
+            metrics = train_result.metrics
+            if not int(os.getenv("test_ci_no_save_model", 0)):
+                trainer.save_model()
+            trainer.log_metrics("train", metrics)
+            trainer.save_metrics("train", metrics)
+            trainer.save_state()
 
     if training_args.do_predict:
         test_ret = trainer.predict(test_dataset)

@@ -18,7 +18,6 @@ from __future__ import annotations
 import numpy as np
 import paddle
 import paddle.nn as nn
-from paddlenlp_ops import get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerBase,
@@ -147,6 +146,8 @@ class OPTInferenceModel(OPTPretrainedModel):
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
+        from paddlenlp_ops import get_padding_offset
+
         ids_remove_padding, cum_offsets, padding_offset = get_padding_offset(
             input_ids, cum_offsets_now, token_num, seq_lens_this_time
         )
@@ -327,12 +328,10 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
         self.lm_head = OPTLMHead(config)
 
     @classmethod
-    def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
-    ):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         # TODO: Support safetensors loading.
         kwargs["use_safetensors"] = kwargs.get("use_safetensors", False)
-        return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
+        return super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
 
     @classmethod
     def get_cache_kvs_shape(

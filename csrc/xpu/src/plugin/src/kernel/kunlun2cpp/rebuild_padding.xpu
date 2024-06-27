@@ -1,0 +1,71 @@
+#include "xpu/kernel/cluster.h"
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/cluster_primitive.h"
+#include "xpu/kernel/xtdk_io.h"
+
+namespace xpu2 {
+namespace plugin {
+
+template <typename T>
+__global__ void rebuild_padding(T *output_data, // [bs, dim_embed]
+                                            const T *input_data, // [token_num, dim_embed]
+                                            const int *cum_offsets, // [bs]
+                                            const int *seq_len_decoder, // [bs]
+                                            const int *seq_len_encoder, // [bs]
+                                            const int seq_len,
+                                            const int dim_embed,
+                                            const int elem_nums) {
+  int ncores = core_num();
+  int cid = core_id();
+  int tid = cluster_num() * cid + cluster_id();
+  int nthreads = cluster_num() * ncores;
+  int bs = elem_nums / dim_embed;
+  __local__ int cum_offsets_lm[bs];
+  __local__ int seq_len_decoder_lm[bs];
+  __local__ int seq_len_encoder_lm[bs];
+  GM2LM_ASYNC(cum_offsets, cum_offsets_lm, bs * sizeof(int));
+  GM2LM_ASYNC(seq_len_decoder, seq_len_decoder_lm, bs * sizeof(int));
+  GM2LM_ASYNC(seq_len_encoder, seq_len_encoder_lm, bs * sizeof(int));
+  mfence();
+  int buf_size = 128;
+  __local__ T buf[buf_size];
+  if (dim_embed< buf_size){
+    buf_size = dim_embed;
+  }
+  int read_len = (dim_embed - 1) / buf_size + 1;
+
+  for (int64_t i = tid; i < bs * read_len; i += nthreads) {
+    int bi = i / (read_len);
+    int bias_idx = i % (read_len);
+    int seq_id = 0;
+    // just encoder or stop, get last token; just decoder, get first token.
+    if (seq_len_decoder_lm[bi] == 0) {
+        if (seq_len_encoder_lm[bi] != 0) {
+            seq_id = seq_len_encoder_lm[bi] - 1;
+        } else {
+            continue;
+        }
+    }
+    int ori_token_idx = bi * seq_len - cum_offsets_lm[bi] + seq_id;
+    int src_offset = ori_token_idx * dim_embed + bias_idx * buf_size;
+    int copy_len = (bias_idx + 1) * buf_size <= dim_embed ? buf_size : dim_embed - buf_size;
+    GM2LM(input_data + src_offset, buf, copy_len * sizeof(T));
+    LM2GM(buf, output_data + bi * dim_embed + bias_idx * buf_size, copy_len * sizeof(T));
+  }
+}
+
+#define _XPU_DEF_REBUILD_PADING_(DATA_TYPE)            \
+  template __global__ void rebuild_padding<DATA_TYPE>( \
+      DATA_TYPE * output_data,                         \
+      const DATA_TYPE *input_data,                     \
+      const int *cum_offsets,                          \
+      const int *seq_len_decoder,                      \
+      const int *seq_len_encoder,                      \
+      const int seq_len,                               \
+      const int dim_embed,                             \
+      const int elem_nums);
+_XPU_DEF_REBUILD_PADING_(float);
+_XPU_DEF_REBUILD_PADING_(float16);
+
+}  // namespace plugin
+}  // namespace xpu2

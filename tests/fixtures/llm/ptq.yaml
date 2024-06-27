@@ -12,13 +12,14 @@ ptq:
     eval_with_do_generation: false
     do_ptq: true
     ptq_step: 4
+
   default:
     llama:
-      model_name_or_path: __internal_testing__/tiny-random-llama
+      model_name_or_path: __internal_testing__/tiny-fused-llama-inference5.2
     chatglm:
       model_name_or_path: __internal_testing__/tiny-fused-chatglm
     chatglm2:
-      model_name_or_path: __internal_testing__/tiny-random-chatglm2
+      model_name_or_path: __internal_testing__/tiny-fused-chatglm2
     bloom:
       model_name_or_path: __internal_testing__/tiny-fused-bloom
 

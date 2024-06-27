@@ -3,10 +3,10 @@ name: Pipelines-Test
 on:
   push:
     paths:
-      - 'pipelines/*'
+      - 'legacy/pipelines/*'
   pull_request:
     paths:
-      - 'pipelines/*'
+      - 'legacy/pipelines/*'
 
 
 jobs:
@@ -17,14 +17,14 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: 3.8
+          python-version: '3.10'
           cache: 'pip' # caching pip dependencies
       - name: Install dependencies
-        working-directory: ./pipelines
+        working-directory: ./legacy/pipelines
         run: |
           python -m pip install --upgrade pip
           make install
           pip install -r tests/requirements.txt
       - name: run the command
-        working-directory: ./pipelines
+        working-directory: ./legacy/pipelines
         run: make test

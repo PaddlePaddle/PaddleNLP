@@ -15,7 +15,7 @@
 
 import copy
 import os
-from typing import Optional, Union
+from typing import Union
 
 from ...utils.log import logger
 from ..configuration_utils import PretrainedConfig
@@ -149,14 +149,7 @@ class ClapTextConfig(PretrainedConfig):
         self.projection_dim = projection_dim
 
     @classmethod
-    def from_pretrained(
-        cls,
-        pretrained_model_name_or_path: Union[str, os.PathLike],
-        from_hf_hub: bool = False,
-        cache_dir: Optional[str] = None,
-        **kwargs
-    ) -> "PretrainedConfig":
-        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
+    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> "PretrainedConfig":
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # get the text config dict if we are loading from ClapConfig
@@ -325,14 +318,7 @@ class ClapAudioConfig(PretrainedConfig):
         self.projection_hidden_act = projection_hidden_act
 
     @classmethod
-    def from_pretrained(
-        cls,
-        pretrained_model_name_or_path: Union[str, os.PathLike],
-        from_hf_hub: bool = False,
-        cache_dir: Optional[str] = None,
-        **kwargs
-    ) -> "PretrainedConfig":
-        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
+    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> "PretrainedConfig":
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # get the audio config dict if we are loading from ClapConfig
@@ -450,7 +436,7 @@ class ClapConfig(PretrainedConfig):
 
         return cls(text_config=text_config.to_dict(), audio_config=audio_config.to_dict(), **kwargs)
 
-    def to_dict(self):
+    def to_dict(self, *args, **kwargs):
         """
         Serializes this instance to a Python dictionary. Override the default [`~PretrainedConfig.to_dict`].
 

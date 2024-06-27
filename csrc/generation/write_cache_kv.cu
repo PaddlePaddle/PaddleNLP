@@ -113,8 +113,6 @@ void LaunchWriteCacheKV(const paddle::Tensor& input_k,
     const int64_t dim_head = cache_kv.shape()[4]; 
     // printf("bsz: %d, cache_bsz: %d, num_head: %d, seq_len: %d, dim_head: %d.\n", bsz, cache_bsz, num_head, seq_len, dim_head);
 
-    auto cache_kv_out = paddle::full({1}, -1, cache_kv.dtype(), cache_kv.place());
-
     const DataType_ *k_ptr = reinterpret_cast<const DataType_*>(input_k.data<data_t>());
     const DataType_ *v_ptr = reinterpret_cast<const DataType_*>(input_v.data<data_t>());
 

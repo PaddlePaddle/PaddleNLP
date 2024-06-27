@@ -1,3 +1,4 @@
+trainer.md
 # PaddleNLP Trainer API
 
 PaddleNLP提供了Trainer训练API，针对训练过程的通用训练配置做了封装，比如：
@@ -13,7 +14,7 @@ PaddleNLP提供了Trainer训练API，针对训练过程的通用训练配置做�
 ## Trainer基本使用方法介绍
 
 下面是用户使用 Trainer API进行finetune任务的简单示例，这里以中文情感分类数据集`chnsenticorp`为例。
-更详细的使用可以参考[CLUE Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/benchmark/clue/classification/run_clue_classifier_trainer.py)版本。
+更详细的使用可以参考[CLUE Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/examples/benchmark/clue/classification/run_clue_classifier_trainer.py)版本。
 
 1. 导入需要用到的头文件。
     - 主要是模型、Tokenizer
@@ -81,7 +82,7 @@ if training_args.do_train:
     trainer.log_metrics("train", metrics)
     trainer.save_state()
 ```
-预训练的使用方式可以参考[ERNIE-1.0 Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/run_pretrain_trainer.py)版本。
+预训练的使用方式可以参考[ERNIE-1.0 Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/model_zoo/ernie-1.0/run_pretrain_trainer.py)版本。
 
 
 ## Trainer进阶分布式能力使用介绍
@@ -101,9 +102,9 @@ if training_args.do_train:
 混合并行这里, 主要添加了 tensor parallel (TP) 和 pipeline parallel(PP)支持.
 目前, PaddleNLP主要对一些大模型, 如 GPT, Llama等做了 TP PP支持, 用户可以使用这些策略.
 
-相关代码实现可以参考llama训练的[例子](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/llama/run_trainer_tp4pp2.sh)
+相关代码实现可以参考llama训练的[例子](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm)
 
-流水线并行的组网改造可以参见[modeling_pp.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/llama/modeling_pp.py)
+流水线并行的组网改造可以参见[modeling_pp.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/transformers/llama/modeling_pp.py)
 
 
 当组网适配好 张量并行(TP), 流水线并行(PP)之后, 用户使用 `--tensor_parallel_degree` `--pipeline_parallel_degree` 即可启用混合并行训练.
@@ -114,7 +115,7 @@ if training_args.do_train:
 ## Trainer 实例化参数介绍
 Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并针对 PaddleNLP 模型进行了优化。
 
-```python
+```text
 参数：
     model（[`PretrainedModel`] 或 `paddle.nn.Layer`，可选）：
         用于训练、评估或预测的模型。
@@ -209,7 +210,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
 
 
 ## TrainingArguments 参数介绍
-```python
+```text
   --output_dir
                         保存模型输出和中间checkpoints的输出目录。(`str`, 必须, 默认为 `None`)
 
@@ -320,9 +321,9 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
   --num_train_epochs
                         要执行的训练 epoch 总数（如果不是整数，将在停止训练
                         之前执行最后一个 epoch 的小数部分百分比）。
-                        (`float`, 可选, 默认为 3.0):
+                        (`float`, 可选, 默认为 1.0):
 
-                        Total number of training epochs to perform. (default:3.0)
+                        Total number of training epochs to perform. (default:1.0)
 
   --max_steps
                         如果设置为正数，则表示要执行的训练步骤总数。
@@ -520,6 +521,20 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         default -1 for not use tensor parallel,  Suggest tensor_parallel_degree<=8 for better proformance.
                         Note, this need model support in source code, currently GPT/BLOOM/LLAMA/BLOOM/CLM/CHATGLM is supported.
 
+  --tensor_parallel_config
+                        对于张量并行,一些选项会影响训练性能,这里将一些选项配置集中管理,以str形式传入配置.
+                        支持如下选项:
+                            enable_delay_scale_loss : 在优化器阶段做梯度累加，将所有梯度除以累加次数，而不是直接对loss除以累加次数。
+                            sync_param : 在优化器阶段使用broadcast同步所有is_distributed=False的参数
+                            sync_grad : 在优化器阶段使用broadcast同步所有is_distributed=False的梯度
+                            sync_moment : 在优化器阶段使用broadcast同步所有is_distributed=False的momentum
+
+                        Some additional config it highly affect the usage of tensor parallel, we provide some option to config it.
+                        following config is support:
+                            enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
+                            sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
+                            sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
+                            sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.
 
   --pipeline_parallel_degree
                         流水线并行是Megatron论文针对多层Transformer结构提出的按层划分方法.
@@ -548,10 +563,28 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         following config is support:
                           disable_p2p_cache_shape, if you max sequence length is varying, please set disable_p2p_cache_shape.
                           disable_partial_send_recv, optmize send speed for tensor parallel.
-                          enable_delay_scale_loss, accumulate gradients util optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
+                          enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by inner pipeline accumute step. instead of div accumute step on loss directly.
                           enable_dp_comm_overlap, fuse data parallel gradient communication.
 
+  --data_parallel_config
+                        对于数据并行,一些选项会影响训练性能,这里将一些选项配置集中管理,以str形式传入配置.
+                        支持如下选项:
+                            enable_allreduce_avg_in_gradinent_scale : 在数据并行中, 替换`allreduce_sum + scale`模式为`allreduce_avg`, 以提高性能. 仅支持auto模式.
+                            gradient_sync_after_accumulate : 当梯度累积开启时, 将梯度同步操作从backward阶段移动到optimizer阶段, 以减少同步次数, 提高性能, 但会增加显存占用. 仅支持auto模式.
 
+                        Some additional configs which affect data parallel performance, we provide some option to config it.
+                        following config is support:
+                            enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in data_parallel, which improve the performance. ONLY supported for auto mode now.
+                            gradient_sync_after_accumulate, move gradient sync operations from backward into optimizer step when gradient accumulate enabling, which reduce the sync times to improve performance, but will increase the memory usage. ONLY supported for auto mode now.
+  --context_parallel_degree
+                        上下文并行是将训练数据在序列维度进行切分的并行方法。
+                        该方法使用Ring FlashAttention来保障切分后Attention结果的正确性。通过环状通信和迭代更新来得到完整的注意力分数。
+                        默认值-1, 表示不启用上下文并行,
+                        (`int`, 可选, 默认为 `-1`)
+                        (注: 该方法需要修改模型结构, 目前支持LLAMA)
+                        (注: 该方法对通信开销较大, 建议只有在序列长度超长时, 如1024k, 时才使用)
+                        Context parallelism is a parallel method that segments training data in the sequence dimension.
+                        This method uses Ring FlashAttention to ensure the correctness of the Attention result after segmentation. The complete attention score is obtained through ring communication and iterative updates.
   --recompute
                         是否使用重计算训练。可以节省显存。
                         重新计算前向过程以获取梯度，减少中间变量显存.
@@ -661,6 +694,29 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         The path to a folder with a valid checkpoint for your
                         model. (default: None)
 
+  --unified_checkpoint
+                       是否使用unified_checkpoint，开启后训练的checkpoint将存储为新格式。
+                       可以支持跨分布式策略重启、动态扩缩容重启。(可选，默认为False)
+                       Whether to use unified_checkpoint, enable it to store training checkpoint in a new format.
+                       Supporting restart with different distribution strategies and devices，(optional, defaults to False)
+
+  --unified_checkpoint_config
+                       与Unified Checkpoint相关的一些优化配置项，以str形式传入配置。
+                       支持如下选项:
+                           skip_save_model_weight: 当master_weights存在时，跳过保存模型权重。
+                           master_weight_compatible: 1. 仅当optimizer需要master_weights时，才进行加载;
+                                                     2. 如果checkpoint中不存在master_weights，则将model weight作为master_weights进行加载。
+                           async_save: 在保存Checkpoint至磁盘时做异步保存，不影响训练过程，提高训练效率。
+                           enable_all_options: 上述参数全部开启。
+
+                       Some additional config of Unified checkpoint, we provide some options to config.
+                       Following config is support:
+                           skip_save_model_weight, no need to save model weights when the master_weights exist.
+                           master_weight_compatible, 1. if the master_weights exist, only load when needed.
+                                                     2. if master_weights does not exist, convert model weights to master_weights when needed.
+                           async_save, enable asynchronous saving checkpoints to disk.
+                           enable_all_options, enable all unified checkpoint optimization configs.
+
   --skip_memory_metrics
                        是否跳过内存profiler检测。（可选，默认为True，跳过）
                        Whether or not to skip adding of memory profiler reports
@@ -670,5 +726,9 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                        是否在优化器中使用flatten_param_grads策略，该策略将素有参数摊平后输入Optimizer更新。目前该策略仅在NPU设备上生效。（可选，默认为False）
                        Whether use flatten_param_grads method in optimizer,
                        only used on NPU devices.(default:False)
+
+  --use_expert_parallel
+                       Whether to enable MoE (Mixture of Experts) expert parallel training.
+                       (default: False)
 
 ```

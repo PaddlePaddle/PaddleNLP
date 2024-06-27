@@ -46,11 +46,24 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         finetune_config["output_dir"] = self.output_dir
 
         with argv_context_guard(finetune_config):
-            from finetune_generation import main
+            from run_finetune import main
 
             main()
 
         self.run_predictor({"inference_model": True})
+
+    def test_blha(self):
+        finetune_config = load_test_config(self.config_path, "ptq", self.model_dir)
+
+        finetune_config["dataset_name_or_path"] = self.data_dir
+        finetune_config["output_dir"] = self.output_dir
+
+        with argv_context_guard(finetune_config):
+            from run_finetune import main
+
+            main()
+
+        self.run_predictor({"inference_model": True, "block_attn": True})
 
     def test_ptq_smooth(self):
         finetune_config = load_test_config(self.config_path, "ptq", self.model_dir)
@@ -60,7 +73,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         finetune_config["smooth"] = True
 
         with argv_context_guard(finetune_config):
-            from finetune_generation import main
+            from run_finetune import main
 
             main()
 
@@ -75,7 +88,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         finetune_config["shift"] = True
 
         with argv_context_guard(finetune_config):
-            from finetune_generation import main
+            from run_finetune import main
 
             main()
 

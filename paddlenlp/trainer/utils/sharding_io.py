@@ -40,7 +40,7 @@ from paddlenlp.transformers.utils import paddlenlp_load
 from paddlenlp.utils.log import logger
 
 from . import reshard as reshard_util
-from .reshard import SHARDING_STRATEGY_V1
+from .reshard import SHARDING_STRATEGY_V1, pp_reshard
 
 # Name of the files used for checkpointing
 TRAINING_ARGS_NAME = "training_args.bin"
@@ -67,11 +67,14 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
     if reshard_util.get_sharding_strategy(optimizer) == reshard_util.SHARDING_STRATEGY_V1:
         optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizer)
         for (k, v) in state_dict.items():
-            assert v.name in optimizer._param2rank
-            sharded_rank = optimizer._param2rank[v.name]
-            if sharded_rank != sharding_rank:
-                continue
-            filtered_state_dict[k] = v
+            if v.name in optimizer._param2rank:
+                sharded_rank = optimizer._param2rank[v.name]
+                if sharded_rank != sharding_rank:
+                    continue
+                filtered_state_dict[k] = v
+            else:
+                if sharding_rank == 0:
+                    filtered_state_dict[k] = v
     else:
         optimizer = unwrap_optimizer(optimizer, DygraphShardingOptimizerV2)
         parameters = optimizer._parameter_list
@@ -123,26 +126,55 @@ class ShardingIO:
     def set_optimizer(self, optimizer):
         self.optimizer = optimizer
 
-    def load_state_dict_from_checkpoint_with_reshard(self, resume_from_checkpoint, base_weight_name):
-        """load state_dict from_checkpoint with reshard, Only load model state dict."""
-        parallel_config = self._load_distributed_strategy(resume_from_checkpoint)
-        pp_degree = parallel_config["pp_degree"]
+    def load_state_dict_from_checkpoint_with_reshard(
+        self, checkpoint, base_weight_name, model_wrapped, opt_state_dict=None
+    ):
+        """load state_dict from_checkpoint with reshard, Only load model state dict.
+        Args:
+            checkpoint (str): The directory of the checkpoint.
+            base_weight_name (str): The name of the checkpoint file.
+            model_wrapped (nn.Layer): The wrapped model.
+        """
+        parallel_config = self._load_distributed_strategy(checkpoint)
         pp_degree = parallel_config["pp_degree"]
         mp_degree = parallel_config["mp_degree"]
         sharding_degree = parallel_config["sharding_degree"]
-        self.args.pipeline_parallel_degree == pp_degree
-        self.args.tensor_parallel_degree == mp_degree
+        assert (
+            self.args.tensor_parallel_degree == mp_degree
+        ), f"mp_degree of the script {self.args.tensor_parallel_degree} and mp of the model {mp_degree} are not matched"
         cur_sharding_degree = self.args.sharding_parallel_degree
+        cur_pp_degree = self.args.pipeline_parallel_degree
+        if pp_degree > 1:
+            assert cur_pp_degree > 1, "can not reshard from pp to non pp"
+        if pp_degree <= 1:
+            assert cur_pp_degree <= 1, "can not reshard from non pp to pp"
 
-        state_dict = OrderedDict()
+        def load_model_slices():
+            model_state = reshard_util.NodeModelState()
+            for j in range(self.args.pipeline_parallel_rank, pp_degree, cur_pp_degree):
+                cur_sharding_meta = self._load_sharding_meta(checkpoint, j)
+                assert "structure_name_mapping" in cur_sharding_meta
+                structure_name_map = cur_sharding_meta["structure_name_mapping"]
+                for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
+                    tmp = self._load_one_state_dict_from_checkpoint(
+                        checkpoint, base_weight_name, self.args.sharded_name_suffix(i, j)
+                    )
+                    node_model_state_tmp = reshard_util.NodeModelState()
+                    node_model_state_tmp.add_weights(tmp)
+                    node_model_state_tmp.pack_keys(structure_name_map)
+                    model_state.merge_from(node_model_state_tmp, i)
+            return model_state
 
-        for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
-            tmp = self._load_one_state_dict_from_checkpoint(
-                resume_from_checkpoint, base_weight_name, self.args.sharded_name_suffix(i)
-            )
-            for (k, v) in tmp.items():
-                state_dict[k] = v
-            del tmp
+        node_model_state = load_model_slices()
+
+        if self._need_reshard_pp(checkpoint):
+            meta = self._load_model_meta(checkpoint)
+            reshard_context = pp_reshard.build_pipeline_context(meta, model_wrapped)
+            node_model_state = pp_reshard.reshard(node_model_state, reshard_context, self.hcg)
+
+        node_model_state.drop_rank()
+        node_model_state.unpack_keys()
+        state_dict = node_model_state.model_weights
 
         def filter_func(name):
             return True
@@ -150,7 +182,7 @@ class ShardingIO:
         state_dict = reshard_util.all_gather_state_dict(state_dict, filter_func, self.sharding_group)
 
         if self.args.bf16:
-            state_dict = self._recover_params_from_master_weights(state_dict)
+            state_dict = self._recover_params_from_master_weights(state_dict, opt_state_dict=opt_state_dict)
 
         return state_dict
 
@@ -177,6 +209,8 @@ class ShardingIO:
         return None
 
     def _need_reshard(self, checkpoint):
+        if self._need_reshard_pp(checkpoint):
+            return True
         parallel_config = self._load_distributed_strategy(checkpoint)
         sharding_meta = self._load_sharding_meta(checkpoint)
         sharding_degree = parallel_config["sharding_degree"]
@@ -197,14 +231,24 @@ class ShardingIO:
                 if optimizer._param2rank[k] != int(v):
                     return True
         else:
-            # reshard anyway
-            if "pp_overlap" not in sharding_meta:
-                return True
-            pp_overlap = sharding_meta["pp_overlap"]
+            pp_overlap = None
+            # backward compatibility
+            if "enable_overlap" in sharding_meta:
+                pp_overlap = sharding_meta["enable_overlap"]
+
             cur_pp_overlap = unwrap_optimizer(self.optimizer, DygraphShardingOptimizerV2).pp_overlap
             return pp_overlap != cur_pp_overlap
 
         return False
+
+    def _need_reshard_pp(self, checkpoint):
+        parallel_config = self._load_distributed_strategy(checkpoint)
+        pp_degree = parallel_config["pp_degree"]
+        cur_pp_degree = self.args.pipeline_parallel_degree
+        if pp_degree != cur_pp_degree:
+            return True
+        # vpp、segment method changes is not auto supported yet
+        return self.args.force_reshard_pp
 
     def load_optimizer_state_with_reshard(self, checkpoint, base_opt_name, model_wrapped):
         """load state_dict of multiple shard from_checkpoint, Only load model state dict."""
@@ -214,51 +258,78 @@ class ShardingIO:
             return self._load_optimizer_state_of_one_shard(checkpoint, base_opt_name, self.args.optimizer_name_suffix)
         logger.info("reshard optimizer state")
         parallel_config = self._load_distributed_strategy(checkpoint)
-        sharding_meta = self._load_sharding_meta(checkpoint)
+        sharding_meta = self._load_sharding_meta(checkpoint, 0)
         pp_degree = parallel_config["pp_degree"]
         mp_degree = parallel_config["mp_degree"]
         sharding_degree = parallel_config["sharding_degree"]
         sharding_strategy = SHARDING_STRATEGY_V1
         if "sharding_strategy" in sharding_meta:
             sharding_strategy = sharding_meta["sharding_strategy"]
-        assert self.args.pipeline_parallel_degree == pp_degree
         assert self.args.tensor_parallel_degree == mp_degree
+        cur_pp_degree = self.args.pipeline_parallel_degree
+
+        if pp_degree > 1:
+            assert cur_pp_degree > 1, "can not reshard from pp to non pp"
+        if pp_degree <= 1:
+            assert cur_pp_degree <= 1, "can not reshard from non pp to pp"
+
         cur_sharding_degree = self.args.sharding_parallel_degree
         cur_sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
-        node_model_state = reshard_util.NodeModelState()
-        structure_name_map = {k: v.name for (k, v) in self.model.state_dict().items()}
-        for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
-            tmp = self._load_optimizer_state_of_one_shard(checkpoint, base_opt_name, self.args.sharded_name_suffix(i))
-            node_model_state_tmp = reshard_util.NodeModelState()
-            node_model_state_tmp.add_opts(tmp)
-            node_model_state_tmp.pack_keys(structure_name_map)
-            node_model_state.merge_from(node_model_state_tmp, i)
-            del tmp
-            del node_model_state_tmp
 
-        restore_func = (
-            reshard_util.sharding_v1.restore
-            if sharding_strategy == SHARDING_STRATEGY_V1
-            else reshard_util.sharding_v2.restore
-        )
-        node_model_state = restore_func(node_model_state, self.model, self.optimizer, self.hcg)
+        def load_model_slices():
+            model_state = reshard_util.NodeModelState()
+            for j in range(self.args.pipeline_parallel_rank, pp_degree, cur_pp_degree):
+                cur_sharding_meta = self._load_sharding_meta(checkpoint, j)
+                assert "structure_name_mapping" in cur_sharding_meta
+                structure_name_map = cur_sharding_meta["structure_name_mapping"]
+                for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
+                    tmp = self._load_optimizer_state_of_one_shard(
+                        checkpoint, base_opt_name, self.args.sharded_name_suffix(i, j)
+                    )
+                    node_model_state_tmp = reshard_util.NodeModelState()
+                    node_model_state_tmp.add_opts(tmp)
+                    node_model_state_tmp.pack_keys(structure_name_map)
+                    model_state.merge_from(node_model_state_tmp, i)
+            return model_state
 
-        shard_func = (
-            reshard_util.sharding_v1.shard
-            if cur_sharding_strategy == SHARDING_STRATEGY_V1
-            else reshard_util.sharding_v2.shard
-        )
-        node_model_state = shard_func(node_model_state, model_wrapped, self.optimizer, self.hcg)
-        # drop structural name in the key
-        node_model_state.unpack_keys()
-        return node_model_state.get_opt_state_dict()
+        def reshard_pp(model_state):
+            # pp reshard
+            if self._need_reshard_pp(checkpoint):
+                meta = self._load_model_meta(checkpoint)
+                reshard_context = pp_reshard.build_pipeline_context(meta, model_wrapped)
+                model_state = pp_reshard.reshard(model_state, reshard_context, self.hcg)
+            return model_state
 
-    def manipulate_state_dict_and_config(self, model_to_save, merge_tensor_parallel=False):
+        def reshard_sharding(node_model_state):
+            # shard reshard
+            restore_func = (
+                reshard_util.sharding_v1.restore
+                if sharding_strategy == SHARDING_STRATEGY_V1
+                else reshard_util.sharding_v2.restore
+            )
+            node_model_state = restore_func(node_model_state, self.model, self.optimizer, self.hcg)
+
+            shard_func = (
+                reshard_util.sharding_v1.shard
+                if cur_sharding_strategy == SHARDING_STRATEGY_V1
+                else reshard_util.sharding_v2.shard
+            )
+            node_model_state = shard_func(node_model_state, model_wrapped, self.optimizer, self.hcg)
+            # drop structural name in the key
+            node_model_state.unpack_keys()
+            return node_model_state.get_opt_state_dict()
+
+        node_model_state = load_model_slices()
+        node_model_state = reshard_pp(node_model_state)
+        return reshard_sharding(node_model_state)
+
+    def manipulate_state_dict_and_config(self, model_to_save, merge_tensor_parallel=False, state_dict=None):
         weight_name_suffix = self.args.sharded_name_suffix()
 
-        state_dict = model_to_save.state_dict()
-        if self.args.should_save_sharding_stage1_model:
-            state_dict = filter_sharded_params(state_dict, self.optimizer, self.sharding_group)
+        if state_dict is None:
+            state_dict = model_to_save.state_dict()
+            if self.args.should_save_sharding_stage1_model:
+                state_dict = filter_sharded_params(state_dict, self.optimizer, self.sharding_group)
 
         config_to_save = None
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
@@ -287,7 +358,7 @@ class ShardingIO:
             )
             logger.info(
                 "param_names_in_master_weights len:{}, bf16 state_dict len:{}, :{}".format(
-                    len(param_names_in_master_weights), len(state_dict), state_dict
+                    len(param_names_in_master_weights), len(state_dict), state_dict.keys()
                 )
             )
         return state_dict, config_to_save, weight_name_suffix
@@ -316,7 +387,7 @@ class ShardingIO:
 
         path = os.path.join(dir, MODEL_META_NAME)
         with open(path, "w") as f:
-            json.dump(model_meta, f, indent=4)
+            json.dump(model_meta, f)
 
     def _get_distributed_strategy(self):
         pp_degree = 1
@@ -344,15 +415,18 @@ class ShardingIO:
         }
         return parallel_config
 
-    def _recover_params_from_master_weights(self, state_dict):
-        opt_state_dict = self.optimizer.state_dict()
-        assert "master_weights" in opt_state_dict
+    def _recover_params_from_master_weights(self, state_dict, opt_state_dict=None):
+        if opt_state_dict is None:
+            opt_state_dict = self.optimizer.state_dict()
+        assert "master_weights" in opt_state_dict, opt_state_dict.keys()
         master_weights = opt_state_dict["master_weights"]
         tmp = OrderedDict()
         (master_weights, tmp) = (tmp, master_weights)
         # cast to before
         for (k, v) in tmp.items():
+            name = v.name
             master_weights[k] = paddle.cast(v.cuda(), paddle.bfloat16).cpu()
+            master_weights[k].name = name
 
         structure_name_map = {k: v.name for (k, v) in self.model.state_dict().items()}
         node_model_state = reshard_util.NodeModelState()
@@ -377,12 +451,17 @@ class ShardingIO:
 
         master_weights = reshard_util.all_gather_state_dict(master_weights, filter_func, self.sharding_group)
         model_state_dict = self.model.state_dict()
+        logger.info(f"state-dict-keys: {state_dict.keys()}, nums: {len(state_dict.keys())}")
         logger.info("before recover, model_state_dict number: {}".format(len(model_state_dict)))
         for key, param in model_state_dict.items():
             if param.name in master_weights:
                 assert param.shape == master_weights[param.name].shape
-                paddle.assign(master_weights[param.name].cuda(), model_state_dict[key])
-
+                paddle.assign(paddle.cast(master_weights[param.name].cuda(), paddle.bfloat16), model_state_dict[key])
+            elif key in state_dict:
+                logger.info(f"key: {key} is in state_dict, but not in master_weights")
+                paddle.assign(state_dict[key], model_state_dict[key])
+            else:
+                logger.info(f"key: {key} is not in state_dict and master_weights")
         logger.info("after recover, casted model_state_dict number: {}".format(len(model_state_dict)))
         state_dict.update(model_state_dict)
         return state_dict
@@ -391,6 +470,8 @@ class ShardingIO:
         if group is None:
             group = self.hcg.get_sharding_parallel_group()
         res = []
+        if group.nranks < 2:
+            return [obj]
         paddle.distributed.all_gather_object(res, obj, group)
         return res
 
@@ -410,8 +491,10 @@ class ShardingIO:
         assert "sharding_degree" in parallel_config
         return parallel_config
 
-    def _load_sharding_meta(self, dir):
-        suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
+    def _load_sharding_meta(self, dir, pp_rank=None):
+        if pp_rank is None:
+            pp_rank = self.args.pipeline_parallel_rank
+        suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{pp_rank:0>2d}"
         distributed_model_meta = self._load_model_meta(dir)
         if "sharding_metas" in distributed_model_meta:
             sharding_metas = distributed_model_meta["sharding_metas"]
@@ -465,15 +548,20 @@ class ShardingIO:
             pp_overlap = unwrap_optimizer(self.optimizer, DygraphShardingOptimizerV2).pp_overlap
 
         model = self.model
-        structure_name_mapping = {k: v.name for (k, v) in model.state_dict().items()}
+        structure_name_mapping = {}
+        param_meta = {}
+        for k, v in model.state_dict().items():
+            structure_name_mapping[k] = v.name
+            param_meta[k] = (v.shape, int(v.dtype))
 
         sharding_metas = {}
         sharding_meta = {}
 
         sharding_meta["param2rank"] = param2rank
         sharding_meta["structure_name_mapping"] = structure_name_mapping
+        sharding_meta["param_meta"] = param_meta
         sharding_meta["sharding_strategy"] = sharding_strategy
-        sharding_meta["pp_overlap"] = pp_overlap
+        sharding_meta["enable_overlap"] = pp_overlap
         suffix = f"tp{self.args.tensor_parallel_rank:0>2d}_pp{self.args.pipeline_parallel_rank:0>2d}"
         sharding_metas[suffix] = sharding_meta
         sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_model_parallel_group())

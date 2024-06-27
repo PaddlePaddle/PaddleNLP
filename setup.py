@@ -109,7 +109,7 @@ def show():
         f.write(content)
 
 
-__version__ = "2.6.1.post"
+__version__ = "2.8.0.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 
@@ -165,7 +165,7 @@ try:
         license_files=("LICENSE",),
         packages=setuptools.find_packages(
             where=".",
-            exclude=("examples*", "tests*", "applications*", "fast_tokenizer*", "fast_generation*", "model_zoo*"),
+            exclude=("examples*", "tests*", "applications*", "fast_generation*", "model_zoo*"),
         ),
         package_data={
             "paddlenlp.ops": get_package_data_files(
