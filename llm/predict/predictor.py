@@ -98,7 +98,13 @@ class PredictorArgument:
         default=None,
         metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
     )
-
+    avx_model: bool = field(
+        default=False, metadata={"help": "whether use AvxModel to do generation when using cpu inference"}
+    )
+    avx_type: str = field(
+        default=None,
+        metadata={"help": "avx compute type. Supported values: fp16, bf16"},
+    )
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
         default=False,
@@ -388,61 +394,74 @@ class StaticGraphPredictor(BasePredictor):
 
 class InferencePredictorMixin:
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer):
-
         self.architectures = self.model_config.architectures[0].lower()
 
         self.dtype = config.dtype or self.model_config
-        self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
-        self.num_layers, self.num_attention_heads, self.head_dim = (
-            len(self.cache_kvs),
-            self.cache_kvs[0].shape[-3],
-            self.cache_kvs[0].shape[-1],
-        )
         self.pre_ids = paddle.full([config.batch_size, config.total_max_length], -1, dtype="int64")
-        if "chatglm" in self.architectures:
-            self.attention_mask = paddle.ones(
-                shape=(config.batch_size, 1, config.total_max_length, config.total_max_length),
-                dtype=self.dtype,
-            )
-            self.tgt_pos = paddle.ones(
-                shape=[config.batch_size, 2, 1],
-                dtype="int64",
-            )
+
+        if config.device == "cpu" and config.avx_model:
+            assert (
+                "llama" in self.architectures and self.model_config.model_type != "llama-img2txt"
+            ), "avx_mode only support llama now"
+            self.cache_kvs = None
+            self.attention_mask = None
+            self.tgt_generation_mask = None
+            self.tgt_pos = None
         else:
-            self.attention_mask = paddle.zeros(
-                shape=(config.batch_size, 1, config.total_max_length, config.total_max_length),
+            self.arange_tensor_encoder = paddle.arange(config.total_max_length, dtype=self.dtype)
+            self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
+            self.num_layers, self.num_attention_heads, self.head_dim = (
+                len(self.cache_kvs),
+                self.cache_kvs[0].shape[-3],
+                self.cache_kvs[0].shape[-1],
+            )
+            self.tgt_generation_mask = paddle.ones(
+                shape=[config.batch_size, 1, 1, config.total_max_length],
                 dtype=self.dtype,
             )
-
-        self.tgt_generation_mask = paddle.ones(
-            shape=[config.batch_size, 1, 1, config.total_max_length],
-            dtype=self.dtype,
-        )
-        self.arange_tensor_encoder = paddle.arange(config.total_max_length, dtype=self.dtype)
-
-        if config.export_precache:
-            if config.prefix_path:
-                prefix_cache = (
-                    paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy")).astype(self.dtype).unsqueeze(2)
-                )
-                prefix_cache = paddle.expand(
-                    prefix_cache,
-                    [
-                        self.num_layers,
-                        2,
-                        config.batch_size,
-                        self.num_attention_heads,
-                        prefix_cache.shape[-2],
-                        self.head_dim,
-                    ],
-                )
-                self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, self.num_layers, axis=0)]
-            else:
-                prefix_cache = paddle.zeros(
-                    [self.num_layers, 2, config.batch_size, self.num_attention_heads, 128, self.head_dim],
+            if "chatglm" in self.architectures:
+                self.attention_mask = paddle.ones(
+                    shape=(config.batch_size, 1, config.total_max_length, config.total_max_length),
                     dtype=self.dtype,
                 )
-                self.pre_caches = [item.squeeze_(0) for item in paddle.split(prefix_cache, self.num_layers, axis=0)]
+                self.tgt_pos = paddle.ones(
+                    shape=[config.batch_size, 2, 1],
+                    dtype="int64",
+                )
+            else:
+                self.attention_mask = paddle.zeros(
+                    shape=(config.batch_size, 1, config.total_max_length, config.total_max_length),
+                    dtype=self.dtype,
+                )
+            if config.export_precache:
+                if config.prefix_path:
+                    prefix_cache = (
+                        paddle.to_tensor(np.load(f"{config.prefix_path}/pre_caches.npy"))
+                        .astype(self.dtype)
+                        .unsqueeze(2)
+                    )
+                    prefix_cache = paddle.expand(
+                        prefix_cache,
+                        [
+                            self.num_layers,
+                            2,
+                            config.batch_size,
+                            self.num_attention_heads,
+                            prefix_cache.shape[-2],
+                            self.head_dim,
+                        ],
+                    )
+                    self.pre_caches = [
+                        item.squeeze_(0) for item in paddle.split(prefix_cache, self.num_layers, axis=0)
+                    ]
+                else:
+                    prefix_cache = paddle.zeros(
+                        [self.num_layers, 2, config.batch_size, self.num_attention_heads, 128, self.head_dim],
+                        dtype=self.dtype,
+                    )
+                    self.pre_caches = [
+                        item.squeeze_(0) for item in paddle.split(prefix_cache, self.num_layers, axis=0)
+                    ]
 
         try:
             self.generation_config = GenerationConfig.from_pretrained(config.model_name_or_path)
@@ -463,8 +482,10 @@ class InferencePredictorMixin:
             return None
 
     def _preprocess(self, source):
-        self.attention_mask[:] = 0
-        self.tgt_generation_mask[:] = 1
+        if self.attention_mask is not None:
+            self.attention_mask[:] = 0
+        if self.tgt_generation_mask is not None:
+            self.tgt_generation_mask[:] = 1
         pre_caches_length = 0 if not self.config.export_precache else self.pre_caches[0].shape[-2]
 
         if self.tokenizer.chat_template is not None:
@@ -489,9 +510,11 @@ class InferencePredictorMixin:
                 self.tgt_pos = self.tgt_pos[: inputs["input_ids"].shape[0]]
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
-                self.attention_mask[i, 0, :length, :length] = 1
-                self.attention_mask[i, 0, : length - 1, length - 1] = 0
-                self.tgt_pos[i, 0, 0] = paddle.to_tensor([length], dtype="int64")
+                if self.attention_mask is not None:
+                    self.attention_mask[i, 0, :length, :length] = 1
+                    self.attention_mask[i, 0, : length - 1, length - 1] = 0
+                if self.tgt_pos is not None:
+                    self.tgt_pos[i, 0, 0] = paddle.to_tensor([length], dtype="int64")
 
                 if pre_caches_length > 0:
                     prefix_attention_mask = paddle.ones(
@@ -509,9 +532,10 @@ class InferencePredictorMixin:
         elif "bloom" in self.architectures:
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
-                self.attention_mask[i, :, :length, :length] = paddle.tril(
-                    paddle.ones(shape=(length, length), dtype=self.config.dtype)
-                )
+                if self.attention_mask is not None:
+                    self.attention_mask[i, :, :length, :length] = paddle.tril(
+                        paddle.ones(shape=(length, length), dtype=self.config.dtype)
+                    )
                 if pre_caches_length > 0:
                     if self.config.prefix_path is None:
                         prefix_attention_mask = paddle.zeros([1, length, pre_caches_length], dtype=self.config.dtype)
@@ -520,10 +544,10 @@ class InferencePredictorMixin:
                     post_attention_mask = paddle.tril(
                         paddle.ones(shape=(length, length), dtype=self.config.dtype)
                     ).unsqueeze_(axis=0)
-
-                    self.attention_mask[i, :, :length, : length + pre_caches_length] = paddle.concat(
-                        [prefix_attention_mask, post_attention_mask], axis=2
-                    )
+                    if self.attention_mask is not None:
+                        self.attention_mask[i, :, :length, : length + pre_caches_length] = paddle.concat(
+                            [prefix_attention_mask, post_attention_mask], axis=2
+                        )
 
             inputs["tgt_pos"] = inputs["tgt_pos"] + pre_caches_length
             # alibi encoder
@@ -576,9 +600,10 @@ class InferencePredictorMixin:
         else:
             for i in range(inputs["input_ids"].shape[0]):
                 length = inputs["seq_len_encoder"][i][0]
-                self.attention_mask[i, 0, :length, :length] = paddle.tril(
-                    paddle.ones(shape=(length, length), dtype=self.config.dtype)
-                )
+                if self.attention_mask is not None:
+                    self.attention_mask[i, 0, :length, :length] = paddle.tril(
+                        paddle.ones(shape=(length, length), dtype=self.config.dtype)
+                    )
 
                 if pre_caches_length > 0:
                     if self.config.prefix_path is None:
@@ -592,13 +617,20 @@ class InferencePredictorMixin:
                     post_attention_mask = paddle.tril(
                         paddle.ones(shape=(length, length), dtype=self.attention_mask.dtype)
                     ).unsqueeze_(axis=0)
-                    self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
-                        [prefix_attention_mask, post_attention_mask], axis=2
-                    )
+                    if self.attention_mask is not None:
+                        self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                            [prefix_attention_mask, post_attention_mask], axis=2
+                        )
 
         inputs["pre_ids"] = self.pre_ids
         inputs["attention_mask"] = self.attention_mask
         inputs["tgt_generation_mask"] = self.tgt_generation_mask
+
+        if self.config.device == "cpu" and self.config.avx_model:
+            inputs.pop("position_ids")
+            inputs.pop("tgt_pos")
+            inputs.pop("attention_mask")
+            inputs.pop("tgt_generation_mask")
 
         if pre_caches_length > 0:
             if self.config.mode == "dynamic":
@@ -631,12 +663,15 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
             )
 
         # register the custome ops
-        import_module("paddlenlp_ops.encode_rotary_qk")
-        import_module("paddlenlp_ops.get_padding_offset")
-        import_module("paddlenlp_ops.qkv_transpose_split")
-        import_module("paddlenlp_ops.rebuild_padding")
-        import_module("paddlenlp_ops.transpose_remove_padding")
-        import_module("paddlenlp_ops.write_cache_kv")
+        if predictor_args.device == "cpu" and predictor_args.avx_model:
+            import_module("paddlenlp_ops.xft_llama_layer")
+        else:
+            import_module("paddlenlp_ops.encode_rotary_qk")
+            import_module("paddlenlp_ops.get_padding_offset")
+            import_module("paddlenlp_ops.qkv_transpose_split")
+            import_module("paddlenlp_ops.rebuild_padding")
+            import_module("paddlenlp_ops.transpose_remove_padding")
+            import_module("paddlenlp_ops.write_cache_kv")
 
         infer_model_path = get_infer_model_path(predictor_args.model_name_or_path, predictor_args.model_prefix)
 
@@ -655,6 +690,9 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
                 "you should export xpu static model with --block_attn flag and use predictor with --block_attn too"
                 "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/inference.md"
             )
+        elif predictor_args.device == "cpu" and predictor_args.avx_model:
+            config.disable_gpu()
+            config.switch_ir_optim(False)
         else:
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
             config.enable_use_gpu(100, device_id)
@@ -1309,6 +1347,8 @@ def create_predictor(
             config.model_name_or_path = ""
             config.use_cachekv_int8 = predictor_args.use_cachekv_int8
             config.single_card_ptq = True
+            if predictor_args.avx_model:
+                config.avx_type = predictor_args.avx_type
 
             if predictor_args.quant_type is not None and predictor_args.quant_type.startswith("weight_only_int"):
                 weight_only_quant_bits = int(predictor_args.quant_type[-1])
@@ -1354,9 +1394,14 @@ def create_predictor(
                             "you should run xpu dynamic model with --block_attn flag"
                             "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/inference.md"
                         )
-                    from paddlenlp.experimental.transformers import (
-                        LlamaForCausalLMInferenceModel as LlamaInferenceModel,
-                    )
+                    elif predictor_args.device == "cpu" and predictor_args.avx_model:
+                        from paddlenlp.experimental.transformers import (
+                            LlamaForCausalLMAvxInferenceModel as LlamaInferenceModel,
+                        )
+                    else:
+                        from paddlenlp.experimental.transformers import (
+                            LlamaForCausalLMInferenceModel as LlamaInferenceModel,
+                        )
 
                     model = LlamaInferenceModel.from_pretrained(
                         predictor_args.model_name_or_path,
@@ -1465,6 +1510,10 @@ def create_predictor(
                     config.use_dynamic_cachekv_quant = predictor_args.use_cachekv_int8 == "dynamic"
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
+                    )
+                elif predictor_args.avx_model and predictor_args.device == "cpu":
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForCausalLMAvxInferenceModel as LlamaInferenceModel,
                     )
                 else:
                     from paddlenlp.experimental.transformers import (
