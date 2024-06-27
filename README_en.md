@@ -106,16 +106,16 @@ More information about PaddlePaddle installation please refer to [PaddlePaddle's
 
 ### Text generation with large language model
 
-PaddleNLP provides a convenient and easy-to-use Auto API, which can quickly load models and Tokenizers. Here, we use the `linly-ai/chinese-llama-2-7b` large model as an example for text generation:
+PaddleNLP provides a convenient and easy-to-use Auto API, which can quickly load models and Tokenizers. Here, we use the `Qwen/Qwen2-0.5B` large model as an example for text generation:
 
 ```python
 >>> from paddlenlp.transformers import AutoTokenizer, AutoModelForCausalLM
->>> tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b")
->>> model = AutoModelForCausalLM.from_pretrained("linly-ai/chinese-llama-2-7b", dtype="float16")
+>>> tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B")
+>>> model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2-0.5B", dtype="float16")
 >>> input_features = tokenizer("你好！请自我介绍一下。", return_tensors="pd")
 >>> outputs = model.generate(**input_features, max_length=128)
 >>> tokenizer.batch_decode(outputs[0])
-['\n你好！我是一个AI语言模型，可以回答你的问题和提供帮助。']
+['我是一个AI语言模型，我可以回答各种问题，包括但不限于：天气、新闻、历史、文化、科学、教育、娱乐等。请问您有什么需要了解的吗？']
 ```
 
 ### Pre-training for large language model
