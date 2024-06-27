@@ -236,16 +236,16 @@ python -m paddle.distributed.launch --gpus "0" run_glue_trainer.py \
 
 基于`bert-base-uncased`在GLUE各评测任务上Fine-tuning后，在验证集上有如下结果：
 
-| Task  | Metric                       | Result            |
-|:-----:|:----------------------------:|:-----------------:|
-| SST2 | Accuracy                     |      0.92660      |
-| QNLI  | Accuracy                     |      0.91707      |
-| CoLA  | Mattehew's corr              |      0.59557      |
-| MRPC  | F1/Accuracy                  |  0.91667/0.88235  |
-| STSB | Person/Spearman corr         |  0.88847/0.88350  |
-| QQP   | Accuracy/F1                  |  0.90581/0.87347  |
-| MNLI  | Matched acc/MisMatched acc   |  0.84422/0.84825  |
-| RTE   | Accuracy                     |      0.711191     |
+| Task |           Metric           |     Result      |
+|:----:|:--------------------------:|:---------------:|
+| SST2 |          Accuracy          |     0.92660     |
+| QNLI |          Accuracy          |     0.91707     |
+| CoLA |      Mattehew's corr       |     0.59557     |
+| MRPC |        F1/Accuracy         | 0.91667/0.88235 |
+| STSB |    Person/Spearman corr    | 0.88847/0.88350 |
+| QQP  |        Accuracy/F1         | 0.90581/0.87347 |
+| MNLI | Matched acc/MisMatched acc | 0.84422/0.84825 |
+| RTE  |          Accuracy          |    0.711191     |
 
 
 ### 预测
@@ -285,4 +285,4 @@ Batch id: 4, example id: 0, sentence1: this new jangle of noise , mayhem and stu
 
 ## 扩展
 
-上述的介绍是基于动态图的BERT的预训练任务和微调任务以及预测任务的实践过程，同时在我们也提供了基于PaddlePaddle Fleet API的静态图的BERT相关实践，在组网代码层面保持动静统一，在计算速度以及多机联合训练方面有着更优的性能，具体的细节可以参考 [BERT静态图](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/bert/static)  。
+上述的介绍是基于动态图的BERT的预训练任务和微调任务以及预测任务的实践过程，同时在我们也提供了基于PaddlePaddle Fleet API的静态图的BERT相关实践，在组网代码层面保持动静统一，在计算速度以及多机联合训练方面有着更优的性能，具体的细节可以参考 [BERT静态图](./static/)。

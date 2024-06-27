@@ -18,7 +18,7 @@ Fine-tuning 使用GLUE数据，这部分Paddle已提供，在执行Fine-tuning �
 
 
 ## **模型预训练**
-模型预训练过程可参考[Electra的README](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/electra/README.md)
+模型预训练过程可参考[Electra的README](../electra/README.md)
 
 ## **Fine-tuning**
 
@@ -80,16 +80,16 @@ eval loss: 0.226449, acc: 0.9013761467889908, eval done total : 0.51035308837890
 
 使用convbert-small预训练模型进行单卡Fine-tuning ，在验证集上有如下结果（这里各类任务的结果是运行1次的结果）：
 
-| Task  | Metric                       | Result      |
-|-------|------------------------------|-------------|
-| CoLA  | Matthews corr                | 56.22       |
-| SST-2 | acc.                         | 91.39       |
-| MRPC  | acc./F1                      | 87.70       |
-| STS-B | Pearson/Spearman corr        | 86.34       |
-| QQP   | acc./F1                      | 85.47       |
-| MNLI  | matched acc./mismatched acc. | 81.87       |
-| QNLI  | acc.                         | 87.71       |
-| RTE   | acc.                         | 66.06       |
+| Task  | Metric                       | Result |
+|-------|------------------------------|--------|
+| CoLA  | Matthews corr                | 56.22  |
+| SST-2 | acc.                         | 91.39  |
+| MRPC  | acc./F1                      | 87.70  |
+| STS-B | Pearson/Spearman corr        | 86.34  |
+| QQP   | acc./F1                      | 85.47  |
+| MNLI  | matched acc./mismatched acc. | 81.87  |
+| QNLI  | acc.                         | 87.71  |
+| RTE   | acc.                         | 66.06  |
 
 注：acc.是Accuracy的简称，表中Metric字段名词取自[GLUE论文](https://openreview.net/pdf?id=rJ4km2R5t7)
 
