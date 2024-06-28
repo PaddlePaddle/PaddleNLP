@@ -14,7 +14,7 @@ PaddleNLP提供了Trainer训练API，针对训练过程的通用训练配置做�
 ## Trainer基本使用方法介绍
 
 下面是用户使用 Trainer API进行finetune任务的简单示例，这里以中文情感分类数据集`chnsenticorp`为例。
-更详细的使用可以参考[CLUE Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/benchmark/clue/classification/run_clue_classifier_trainer.py)版本。
+更详细的使用可以参考[CLUE Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/examples/benchmark/clue/classification/run_clue_classifier_trainer.py)版本。
 
 1. 导入需要用到的头文件。
     - 主要是模型、Tokenizer
@@ -82,7 +82,7 @@ if training_args.do_train:
     trainer.log_metrics("train", metrics)
     trainer.save_state()
 ```
-预训练的使用方式可以参考[ERNIE-1.0 Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/model_zoo/ernie-1.0/run_pretrain_trainer.py)版本。
+预训练的使用方式可以参考[ERNIE-1.0 Trainer](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/model_zoo/ernie-1.0/run_pretrain_trainer.py)版本。
 
 
 ## Trainer进阶分布式能力使用介绍
@@ -102,9 +102,9 @@ if training_args.do_train:
 混合并行这里, 主要添加了 tensor parallel (TP) 和 pipeline parallel(PP)支持.
 目前, PaddleNLP主要对一些大模型, 如 GPT, Llama等做了 TP PP支持, 用户可以使用这些策略.
 
-相关代码实现可以参考llama训练的[例子](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/llama/run_trainer_tp4pp2.sh)
+相关代码实现可以参考llama训练的[例子](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm)
 
-流水线并行的组网改造可以参见[modeling_pp.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/language_model/llama/modeling_pp.py)
+流水线并行的组网改造可以参见[modeling_pp.py](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/transformers/llama/modeling_pp.py)
 
 
 当组网适配好 张量并行(TP), 流水线并行(PP)之后, 用户使用 `--tensor_parallel_degree` `--pipeline_parallel_degree` 即可启用混合并行训练.
@@ -576,7 +576,15 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         following config is support:
                             enable_allreduce_avg_in_gradinent_scale, it replace `allreduce_sum + scale` pattern with `allreduce_avg` when scale gradient in data_parallel, which improve the performance. ONLY supported for auto mode now.
                             gradient_sync_after_accumulate, move gradient sync operations from backward into optimizer step when gradient accumulate enabling, which reduce the sync times to improve performance, but will increase the memory usage. ONLY supported for auto mode now.
-
+  --context_parallel_degree
+                        上下文并行是将训练数据在序列维度进行切分的并行方法。
+                        该方法使用Ring FlashAttention来保障切分后Attention结果的正确性。通过环状通信和迭代更新来得到完整的注意力分数。
+                        默认值-1, 表示不启用上下文并行,
+                        (`int`, 可选, 默认为 `-1`)
+                        (注: 该方法需要修改模型结构, 目前支持LLAMA)
+                        (注: 该方法对通信开销较大, 建议只有在序列长度超长时, 如1024k, 时才使用)
+                        Context parallelism is a parallel method that segments training data in the sequence dimension.
+                        This method uses Ring FlashAttention to ensure the correctness of the Attention result after segmentation. The complete attention score is obtained through ring communication and iterative updates.
   --recompute
                         是否使用重计算训练。可以节省显存。
                         重新计算前向过程以获取梯度，减少中间变量显存.
@@ -718,5 +726,9 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                        是否在优化器中使用flatten_param_grads策略，该策略将素有参数摊平后输入Optimizer更新。目前该策略仅在NPU设备上生效。（可选，默认为False）
                        Whether use flatten_param_grads method in optimizer,
                        only used on NPU devices.(default:False)
+
+  --use_expert_parallel
+                       Whether to enable MoE (Mixture of Experts) expert parallel training.
+                       (default: False)
 
 ```

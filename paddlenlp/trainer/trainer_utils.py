@@ -58,7 +58,15 @@ __all__ = [
     "get_last_checkpoint",
     "get_scheduler",
     "set_hyrbid_parallel_seed",
+    "log_trainer_start",
 ]
+
+
+def log_trainer_start():
+    if "MAIN_PROCESS_STARTED" not in os.environ:
+        start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        logger.info(f"The Training Main Process Started Successfully. time: {start_time}, pid: {os.getpid()}")
+        os.environ["MAIN_PROCESS_STARTED"] = "1"
 
 
 def _get_distributed_seeds(seed: int = 1234, topo: Topology = None):

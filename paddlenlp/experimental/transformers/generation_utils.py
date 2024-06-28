@@ -17,21 +17,15 @@ from typing import List, Union
 
 import paddle
 import paddle.nn.functional as F
-from paddlenlp_ops import (
-    get_token_penalty_multi_scores,
-    get_token_penalty_multi_scores_v2,
-    save_output,
-    save_with_output,
-    set_stop_value_multi_ends,
-    set_stop_value_multi_ends_v2,
-    set_value_by_flags_and_idx,
-    set_value_by_flags_and_idx_v2,
-    update_inputs,
+
+from paddlenlp.generation import (
+    GenerationMixin,
+    LogitsProcessor,
+    LogitsProcessorList,
+    TopPProcess,
 )
 
-from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
-
-__all__ = ["GenerationInferenceModel", "GenerationBlockInferenceModel"]
+__all__ = ["GenerationInferenceModel", "GenerationBlockInferenceModel", "GenerationAvxInferenceModel"]
 
 
 class ForcedDecodingEOSTokenLogitsProcessor(LogitsProcessor):
@@ -208,6 +202,8 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["stop_flags"] = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
         if cache is None:
             next_tokens = paddle.where(just_decoder, paddle.full_like(next_tokens, -1), next_tokens)
+        from paddlenlp_ops import set_stop_value_multi_ends
+
         next_tokens, model_kwargs["stop_flags"] = set_stop_value_multi_ends(
             next_tokens, model_kwargs["stop_flags"], eos_token_id, 2
         )  # multi ends
@@ -305,6 +301,8 @@ class GenerationInferenceModel(GenerationMixin):
                 )  # not update when continue decode
             else:
                 step_idx = model_kwargs["step_idx"]
+            from paddlenlp_ops import set_value_by_flags_and_idx
+
             model_kwargs["stop_flags"] = set_value_by_flags_and_idx(
                 model_kwargs["pre_ids"],
                 model_kwargs["tgt_ids"],
@@ -316,6 +314,8 @@ class GenerationInferenceModel(GenerationMixin):
             logits = paddle.cast(logits, paddle.float32)
             logits = logits_processors(model_kwargs["all_input_ids"], logits, decoding_step=step_idx_ori)
 
+            from paddlenlp_ops import get_token_penalty_multi_scores
+
             logits = get_token_penalty_multi_scores(
                 model_kwargs["pre_ids"],
                 logits,
@@ -326,12 +326,12 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs["min_dec_len"],
                 eos_token_id,
             )
+            logits = logits / temperature
+
             # sample
             probs = F.softmax(logits)
 
             # compute next_tokens, use paddle.tensor.top_p_sampling
-            logits = logits / temperature
-
             _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
@@ -346,6 +346,8 @@ class GenerationInferenceModel(GenerationMixin):
                 model_kwargs["all_input_ids"] = next_tokens
             else:
                 model_kwargs["all_input_ids"] = paddle.concat([model_kwargs["all_input_ids"], next_tokens], axis=1)
+
+            from paddlenlp_ops import save_with_output
 
             save_with_output(
                 next_tokens,
@@ -635,6 +637,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
             model_kwargs,
         ):
             step_idx = model_kwargs["step_idx"]
+            from paddlenlp_ops import set_value_by_flags_and_idx_v2
+
             set_value_by_flags_and_idx_v2(
                 model_kwargs["pre_ids"],
                 model_kwargs["input_ids"],
@@ -648,6 +652,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
             logits = paddle.cast(outputs, paddle.float32)
 
             # pre-process distribution
+            from paddlenlp_ops import get_token_penalty_multi_scores_v2
+
             logits = get_token_penalty_multi_scores_v2(
                 model_kwargs["pre_ids"],
                 logits,
@@ -671,15 +677,19 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
             step_idx = paddle.where(model_kwargs["stop_flags"], model_kwargs["step_idx"], model_kwargs["step_idx"] + 1)
             paddle.assign(step_idx, model_kwargs["step_idx"])
-            length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
+            length_cond = paddle.greater_equal(step_idx, model_kwargs["max_dec_len"])
             stop_flags = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
+            from paddlenlp_ops import set_stop_value_multi_ends_v2
+
             set_stop_value_multi_ends_v2(
                 next_tokens, stop_flags, model_kwargs["seq_lens_this_time"], eos_token_id, model_kwargs["next_tokens"]
             )  # multi ends
             paddle.assign(stop_flags, model_kwargs["stop_flags"])
             # update inputs
+            from paddlenlp_ops import update_inputs
+
             update_inputs(
-                model_kwargs["stop_flags"],
+                stop_flags,
                 model_kwargs["not_need_stop"],
                 model_kwargs["seq_lens_this_time"],
                 model_kwargs["seq_lens_encoder"],
@@ -689,6 +699,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 next_tokens,
                 model_kwargs["is_block_step"],
             )
+            from paddlenlp_ops import save_output
+
             save_output(next_tokens, model_kwargs["not_need_stop"], self.config.tensor_parallel_rank)
             return next_tokens
 
@@ -707,3 +719,284 @@ class GenerationBlockInferenceModel(GenerationMixin):
         )
 
         return next_tokens
+
+
+class GenerationAvxInferenceModel(GenerationMixin):
+    @classmethod
+    def get_cache_kvs_shape(cls, max_batch_size: int = None, max_length: int = None) -> list[list[int]]:
+        raise NotImplementedError
+
+    def to_static(self, output_path: str, config: dict):
+        input_spec = [
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
+            None,  # attention_mask
+            None,  # position_ids
+            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
+            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
+            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="presence_score"),  # presence_score
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="min_length"),  # min_decode_length
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="max_length"),  # max_decode_length
+            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="temperature"),  # temperature
+            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="top_p"),  # top_p
+            paddle.static.InputSpec(shape=[None], dtype="int64", name="eos_token_id"),  # eos_token_id
+            paddle.static.InputSpec(shape=[None, 1], dtype="int32", name="seq_len_encoder"),  # seq_len_encoder
+            paddle.static.InputSpec(shape=[None, 1], dtype="int32", name="seq_len_decoder"),  # seq_len_decoder
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="step_idx"),  # step_idx
+            paddle.static.InputSpec(shape=[None, 1], dtype="bool", name="stop_flags"),  # stop_flags
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="tgt_ids"),  # tgt_ids
+            None,  # tgt_pos
+            None,  # tgt_generation_mask
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="pre_ids"),  # pre_ids
+            paddle.static.InputSpec(shape=[1], dtype="int64", name="stop_nums"),  # stop_nums
+            None,  # cache_kvs
+            None,  # inputs_embeds
+            config.get("logits_processors", None),
+            None,
+        ]
+        model = paddle.jit.to_static(self.generate, input_spec=input_spec)
+        paddle.jit.save(
+            model, output_path, skip_prune_program=True
+        )  # Note(Zhengzekang): If we prune program it may cause some inference error.
+
+    @staticmethod
+    def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
+        batch_size = 1
+        seq_len = 1
+        if bos_token_id is None:
+            raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
+        if encoder_output is not None:
+            batch_size = encoder_output.shape[0]
+            seq_len = encoder_output.shape[1]
+        return paddle.ones([batch_size, seq_len], dtype="int64") * bos_token_id
+
+    @paddle.no_grad()
+    def generate(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        position_ids=None,
+        penalty_score=None,
+        frequency_score=None,
+        presence_score=None,
+        min_length=None,
+        max_length=None,
+        temperature=None,
+        top_p=None,
+        eos_token_id=None,
+        seq_len_encoder=None,
+        seq_len_decoder=None,
+        step_idx=None,
+        stop_flags=None,
+        tgt_ids=None,
+        tgt_pos=None,
+        tgt_generation_mask=None,
+        pre_ids=None,
+        stop_nums=None,
+        cache_kvs=[],
+        inputs_embeds=None,
+        logits_processors=None,
+        pre_caches=None,
+        **model_kwargs,
+    ):
+        model_kwargs["seq_len_encoder"] = seq_len_encoder
+        model_kwargs["seq_len_decoder"] = seq_len_decoder
+        model_kwargs["tgt_ids"] = tgt_ids
+        model_kwargs["step_idx"] = step_idx
+        model_kwargs["stop_flags"] = stop_flags
+        model_kwargs["pre_ids"] = pre_ids
+        model_kwargs["min_dec_len"] = min_length
+        model_kwargs["max_dec_len"] = max_length
+        model_kwargs["stop_nums"] = stop_nums
+        model_kwargs["penalty_score"] = penalty_score
+        model_kwargs["frequency_score"] = frequency_score
+        model_kwargs["presence_score"] = presence_score
+        model_kwargs["logits_processors"] = logits_processors or LogitsProcessorList()
+
+        ret = self.sample(
+            input_ids,
+            eos_token_id,
+            top_p=top_p,
+            cache_kvs=cache_kvs,
+            temperature=temperature,
+            inputs_embeds=inputs_embeds,
+            **model_kwargs,
+        )
+        return ret
+
+    def update_model_kwargs_for_generation(self, cache, just_decoder, next_tokens, eos_token_id, model_kwargs):
+        if cache is None:
+            # llama step_idx ++
+            model_kwargs["step_idx"] = paddle.where(
+                model_kwargs["seq_len_encoder"] == 0,
+                model_kwargs["step_idx"],
+                model_kwargs["step_idx"] + 1,
+            )
+        else:
+            model_kwargs["step_idx"] = paddle.where(
+                model_kwargs["stop_flags"],
+                model_kwargs["step_idx"],
+                model_kwargs["step_idx"] + 1,
+            )
+
+        length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
+        model_kwargs["stop_flags"] = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
+        if cache is None:
+            next_tokens = paddle.where(just_decoder, paddle.full_like(next_tokens, -1), next_tokens)
+        from paddlenlp_ops import set_stop_value_multi_ends
+
+        next_tokens, model_kwargs["stop_flags"] = set_stop_value_multi_ends(
+            next_tokens, model_kwargs["stop_flags"], eos_token_id
+        )  # multi ends
+
+        if cache is None:
+            # encoder's generation
+            model_kwargs["tgt_ids"] = paddle.where(just_decoder, model_kwargs["tgt_ids"], next_tokens)
+            model_kwargs["seq_len_decoder"] = paddle.where(
+                model_kwargs["stop_flags"],
+                model_kwargs["seq_len_decoder"] - model_kwargs["seq_len_decoder"],
+                model_kwargs["seq_len_decoder"],
+            )
+        else:
+            model_kwargs["tgt_ids"] = next_tokens
+            model_kwargs["seq_len_decoder"] = paddle.where(
+                model_kwargs["stop_flags"],
+                model_kwargs["seq_len_decoder"],
+                model_kwargs["seq_len_decoder"] + 1,
+            )
+
+            model_kwargs["seq_len_decoder"] = paddle.where(
+                model_kwargs["stop_flags"],
+                model_kwargs["seq_len_decoder"] - model_kwargs["seq_len_decoder"],
+                model_kwargs["seq_len_decoder"],
+            )
+
+        model_kwargs["next_tokens"] = next_tokens
+        return model_kwargs
+
+    def sample(
+        self,
+        input_ids=None,
+        eos_token_id=None,
+        cache_kvs=[],
+        top_p=None,
+        temperature=None,
+        inputs_embeds=None,
+        **model_kwargs,
+    ):
+        step_idx_ori = paddle.full(shape=[1], dtype="int64", fill_value=1)
+        batch_idx = paddle.full(shape=[1], dtype="int32", fill_value=-1)
+
+        # fake temp next_tokens
+        batch = input_ids.shape[0] if input_ids is not None else inputs_embeds.shape[0]
+        next_tokens = paddle.full(shape=[batch, 1], dtype="int32", fill_value=0)
+
+        # let inputs_embeds enter into model_kwargs.
+        # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
+        model_kwargs["inputs_embeds"] = inputs_embeds
+        model_kwargs["all_input_ids"] = input_ids
+        logits_processors = model_kwargs.pop("logits_processors")
+
+        def _forward_(**args):
+            # cache_kvs is never empty because it is passed as a parameter in def sample.
+            model_inputs = self.prepare_inputs_for_generation(input_ids, **args)
+            return self(**model_inputs)
+
+        def _post_process_(outputs, top_p, temperature, step_idx_ori, model_kwargs):
+            cache = model_kwargs.get("cache", None)
+            just_decoder = model_kwargs["seq_len_encoder"] == 0
+            if cache is None:  # first decoder
+                step_idx = paddle.where(
+                    just_decoder,
+                    paddle.full_like(model_kwargs["step_idx"], -1),
+                    model_kwargs["step_idx"],
+                )  # not update when continue decode
+            else:
+                step_idx = model_kwargs["step_idx"]
+
+            from paddlenlp_ops import set_value_by_flags_and_idx
+
+            model_kwargs["stop_flags"] = set_value_by_flags_and_idx(
+                model_kwargs["pre_ids"],
+                model_kwargs["tgt_ids"],
+                step_idx,
+                model_kwargs["stop_flags"],
+            )
+            logits = outputs[0] if isinstance(outputs, tuple) else outputs
+            logits = paddle.cast(logits, paddle.float32)
+            logits = logits_processors(model_kwargs["all_input_ids"], logits, decoding_step=step_idx_ori)
+
+            from paddlenlp_ops import get_token_penalty_multi_scores
+
+            logits = get_token_penalty_multi_scores(
+                model_kwargs["pre_ids"],
+                logits,
+                model_kwargs["penalty_score"],
+                model_kwargs["frequency_score"],
+                model_kwargs["presence_score"],
+                step_idx,
+                model_kwargs["min_dec_len"],
+                eos_token_id,
+            )
+            logits = logits / temperature
+            probs = F.softmax(logits)
+            min_tokens_to_keep = 1
+            if top_p is not None and top_p < 1.0:
+                probs = TopPProcess(probs, top_p, min_tokens_to_keep)
+            next_tokens = paddle.multinomial(probs)
+
+            model_kwargs = self.update_model_kwargs_for_generation(
+                cache, just_decoder, next_tokens, eos_token_id, model_kwargs
+            )
+            next_tokens = model_kwargs["next_tokens"]
+
+            if model_kwargs["all_input_ids"] is None:
+                model_kwargs["all_input_ids"] = next_tokens
+            else:
+                model_kwargs["all_input_ids"] = paddle.concat([model_kwargs["all_input_ids"], next_tokens], axis=1)
+
+            from paddlenlp_ops import save_with_output
+
+            save_with_output(
+                next_tokens,
+                batch_idx,
+                step_idx_ori,
+                "real_time_save.temp_ids",
+                self.config.tensor_parallel_rank,
+            )
+
+            return next_tokens, model_kwargs
+
+        # encoder
+        outputs = _forward_(**model_kwargs)
+        # first decoder
+        next_tokens, model_kwargs = _post_process_(
+            outputs,
+            top_p,
+            temperature,
+            step_idx_ori,
+            model_kwargs,
+        )
+        step_idx_ori += 1
+
+        # gives it a value, means we will entered into decoder phase.
+        model_kwargs["cache"] = 0
+
+        while paddle.less_than(
+            paddle.sum(paddle.cast(model_kwargs["stop_flags"], "int64")),
+            model_kwargs["stop_nums"],
+        ):
+            next_tokens, model_kwargs = _post_process_(
+                _forward_(**model_kwargs),
+                top_p,
+                temperature,
+                step_idx_ori,
+                model_kwargs,
+            )
+            step_idx_ori += 1
+        return (
+            next_tokens,
+            model_kwargs["step_idx"],
+            paddle.cast(model_kwargs["stop_flags"], "int32"),
+            model_kwargs["seq_len_decoder"],
+            None,
+        )

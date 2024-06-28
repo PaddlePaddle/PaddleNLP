@@ -797,7 +797,7 @@ def _load_state_dict_into_meta_model(
 
     dtype = convert_np_dtype_to_dtype_(dtype)
     error_msgs = []
-
+    model_state_dict = model.state_dict()
     for param_name, param in state_dict.items():
         # First part of the test is always true as loaded_state_dict_keys always contains state_dict keys.
         if param_name not in loaded_state_dict_keys or param_name not in expected_keys:
@@ -832,7 +832,7 @@ def _load_state_dict_into_meta_model(
             if old_param is not None:
                 param = param.astype(dtype=old_param.dtype)
         with paddle.no_grad():
-            model.state_dict()[param_name].get_tensor()._share_data_with(param.value().get_tensor())
+            model_state_dict[param_name].get_tensor()._share_data_with(param.value().get_tensor())
             param.value().get_tensor()._clear()
     return error_msgs
 
@@ -1687,8 +1687,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model: PretrainedModel,
         state_dict: Dict[str, Tensor],
         loaded_keys: List[str],
-        resolved_archive_file: Union[str, List],
-        pretrained_model_name_or_path,
+        resolved_archive_file: Union[str, List] = [],
+        pretrained_model_name_or_path=None,
         config=None,
         ignore_mismatched_sizes=False,
         low_cpu_mem_usage=False,
@@ -1743,7 +1743,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 quantization_linear_list = [".".join([prefix, s]) for s in quantization_linear_list]
 
         # Weight quantization if not yet quantized & update loaded_keys
-        if config.quantization_config.is_weight_quantize():
+        if hasattr(config, "quantization_config") and config.quantization_config.is_weight_quantize():
             try:
                 from ..quantization.quantization_utils import (
                     convert_to_quantize_state_dict,
@@ -1860,20 +1860,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             return state_dict, resume_state_dict, fused_keys, new_keys
 
         if state_dict is not None:
-            # DONT Hold tensor parallel here, only hold afer load state dict.
-            # Whole checkpoint
-            # For model parallel if FastGeneration
-            # To avoid recursive import temporarily.
-            import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
-
-            state_dict = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
-
             # have loaded all state_dict, no resume state_dict
             state_dict, _, fused_keys, new_keys = _fuse_or_split_keys(
                 state_dict,
                 config,
                 loaded_keys,
-                pre_tensor_parallel_split=True if config.tensor_parallel_degree > 1 else False,
+                pre_tensor_parallel_split=True if config is not None and config.tensor_parallel_degree > 1 else False,
             )
             missing_keys = list(set(missing_keys) - set(new_keys))
             unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
@@ -1887,7 +1879,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 ignore_mismatched_sizes,
             )
 
-            if config.quantization_config.is_weight_quantize():
+            if hasattr(config, "quantization_config") and config.quantization_config.is_weight_quantize():
                 error_msgs = _load_state_dict_into_meta_model(
                     model_to_load,
                     state_dict,
@@ -1918,7 +1910,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if (
                     shard_file.endswith(".safetensors")
                     and config.tensor_parallel_degree > 1
-                    and "tp" not in shard_file
+                    and "tp" not in os.path.split(shard_file)[-1]
                 ):
                     pre_tensor_parallel_split = True
                     assert loaded_keys is not None, "loaded_keys is not None."
@@ -2356,6 +2348,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
                 pass
 
+        # Note:
+        # 1. PipelineLayer will create parameters for each layer and
+        # call `_synchronize_shared_weights()` to synchronize the shared parameters.
+        # 2. When setting the model `state_dict`, `_synchronize_shared_weights` will be called to
+        # synchronize the shared parameters.
+        # However, when state dict only contains the one piece of shared parameters, the shared parameters
+        # will be different from the original shared parameters.
+
+        if isinstance(model, PipelineLayer):
+            model._synchronize_shared_weights()
+
         if paddle.in_dynamic_mode():
             return model
 
@@ -2589,7 +2592,8 @@ class PipelinePretrainedModel(PretrainedModel):
                     idx = name_splited[0]
                     # for normal pp layer
                     if idx.isdigit():
-                        single_name = [prefixes[idx]]
+                        # allow empty prefix
+                        single_name = [] if prefixes[idx] == "" else [prefixes[idx]]
                         single_name.extend(name_splited[1:])
                     elif idx == "shared_layers":
                         single_name = [self.get_shardlayer_prefix(name_splited)]

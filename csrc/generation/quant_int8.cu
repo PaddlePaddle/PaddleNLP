@@ -22,8 +22,13 @@
 #include<sys/mman.h>
 #include<stdio.h>
 #include<algorithm>
+#ifdef PADDLE_WITH_HIP
+#include <hip/hip_fp16.h>
+#include <hip/hip_bfloat16.h>
+#else
 #include<cuda_fp16.h>
 #include<cuda_bf16.h>
+#endif
 
 
 constexpr int DequantKernelVecSize = 4;
@@ -52,11 +57,17 @@ __forceinline__ __device__ half add_mul<half>(half a, half b, half c) {
     return __hmul(__hadd(a, b), c);
 }
 
+#ifdef PADDLE_WITH_HIP
+template<>
+__forceinline__ __device__ hip_bfloat16 add_mul<hip_bfloat16>(hip_bfloat16 a, hip_bfloat16 b, hip_bfloat16 c) {
+    return (a + b) * c;
+}
+#else
 template<>
 __forceinline__ __device__ __nv_bfloat16 add_mul<__nv_bfloat16>(__nv_bfloat16 a, __nv_bfloat16 b, __nv_bfloat16 c) {
     return __hmul(__hadd(a, b), c);
 }
-
+#endif
 
 
 template <typename data_t>
@@ -173,8 +184,13 @@ std::vector<paddle::Tensor> LaunchQuantInt8(const paddle::Tensor& input,
     auto output=paddle::full(input_shape, -1, paddle::DataType::INT8, input.place());
     int m = input_shape[0];
     int n = input_shape[1];
+#ifdef PADDLE_WITH_HIP
+    dim3 grid(((n >> 2) + 63) / 64, (m + 7) / 8);
+    dim3 block(64, 8);
+#else
     dim3 grid((n >> 2 + 31) / 32, (m + 31) / 32);
     dim3 block(32, 32);
+#endif
     auto stream = input.stream();
     if (shift && smooth) {
         QuantKernel<DataType_><<<grid, block, 0, stream>>>(reinterpret_cast<const DataType_*>(input.data<data_t>()),

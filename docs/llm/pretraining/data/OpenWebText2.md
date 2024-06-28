@@ -14,12 +14,12 @@
 ```shell
 # wget https://mystic.the-eye.eu/public/AI/pile_preliminary_components/openwebtext2.jsonl.zst.tar
 wget https://paddlenlp.bj.bcebos.com/models/transformers/gpt/openwebtext2.jsonl.zst.tar
-tar -xvf openwebtext2.json.zst.tar -C  /path/to/openwebtext
+tar -xvf openwebtext2.jsonl.zst.tar -C  /path/to/openwebtext
 ```
 
 ## Llama训练数据制作
 
-然后使用[preprocess](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-1.0/preprocess) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
+然后使用[preprocess](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/tools/preprocess) 工具下的`create_pretraining_data.py`脚本进行数据集制作：
 ```
 python -u  create_pretraining_data.py \
     --model_name meta-llama/Llama-2-7b \

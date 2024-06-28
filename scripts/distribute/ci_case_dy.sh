@@ -19,10 +19,10 @@ set -e
 export log_path=/workspace/case_logs
 export root_path=/workspace/PaddleNLP
 
-export gpt_case_path=$root_path/model_zoo/gpt-3
+export gpt_case_path=$root_path/legacy/model_zoo/gpt-3
 export gpt_data_path=/fleetx_data
 
-export llm_gpt_case_path=$root_path/llm/gpt-3
+export llm_gpt_case_path=$root_path/llm
 export llm_gpt_data_path=/llm_gpt_data
 
 unset CUDA_VISIBLE_DEVICES
@@ -273,7 +273,7 @@ function gpt_export_345M_mp1() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=$root_path/model_zoo/gpt-3:$PYTHONPATH
+    export PYTHONPATH=$root_path/legacy/model_zoo/gpt-3:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=1
     python -m paddle.distributed.launch --log_dir $log_dir --devices "1" \
         ./tools/auto_export.py \
@@ -294,7 +294,7 @@ function gpt_export_345M_mp2() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=$root_path/model_zoo/gpt-3:$PYTHONPATH
+    export PYTHONPATH=$root_path/legacy/model_zoo/gpt-3:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=0,1
     python -m paddle.distributed.launch --devices "0,1" \
         ./tools/auto_export.py \
@@ -515,6 +515,8 @@ function before_hook_for_gpt() {
     if [[ $FLAGS_install_deps == 0 ]];then
         echo -e "\033[31m ---- Install requirements for GPT dygraph cases  \033[0m"
         python -m pip install -r requirements.txt --force-reinstall
+        python -m pip install -r $root_path/requirements.txt
+        python -m pip install -r $root_path/requirements-dev.txt
         python -m pip install --no-cache-dir https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --force-reinstall --no-dependencies
         python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)";
     else

@@ -18,11 +18,12 @@ python -m pip install -r ../requirements-dev.txt
 python -m pip install tiktoken
 
 # install fused_ln custom ops
-cd ../model_zoo/gpt-3/external_ops/
+cd ../legacy/model_zoo/gpt-3/external_ops/
 python setup.py install
+cd -
 
 # install tool_helpers
-cd ../../../llm/qwen
+cd ../llm/
 python -m pip install tool_helpers
 
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy

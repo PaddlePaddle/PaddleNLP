@@ -4,7 +4,6 @@ regex
 torch>=1.5
 transformers
 tool_helpers
-fast_tokenizer_python
 sacremoses
 pydantic==1.10.9
 modelscope
@@ -12,7 +11,11 @@ hyperopt
 h5py
 deploy
 ray
-loguru
+loguru==0.6.0
 data
 wget
 huggingface_hub>=0.19.2
+protobuf==3.20.2
+pytest-retry
+gradio
+paddleslim

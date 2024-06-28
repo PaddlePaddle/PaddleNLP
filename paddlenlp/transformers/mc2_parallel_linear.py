@@ -34,14 +34,14 @@ except:
 from paddlenlp.utils.tools import get_env_device
 
 __all_gather_recomputation__ = False
-if int(os.getenv("MC2_Recompute", 0)):
+if int(os.getenv("FLAGS_NPU_MC2_Recompute", 0)):
     __all_gather_recomputation__ = True
 
 
 def is_mc2_valid():
     current_device = get_env_device()
     if current_device == "npu":
-        return int(os.getenv("MC2", 0))
+        return int(os.getenv("FLAGS_NPU_MC2", 0))
     return 0
 
 

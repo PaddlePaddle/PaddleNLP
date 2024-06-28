@@ -44,8 +44,11 @@ class UITest(unittest.TestCase):
         self.flask_port = self.avaliable_free_port()
         self.port = self.avaliable_free_port([self.flask_port])
         self.model_path = "__internal_testing__/micro-random-llama"
-        command = 'cd llm && {python} flask_server.py --model_name_or_path {model_path} --port {port} --flask_port {flask_port} --src_length 1024 --dtype "float16"'.format(
-            flask_port=self.flask_port, port=self.port, model_path=self.model_path, python=sys.executable
+        command = (
+            "cd ./llm && PYTHONPATH=../:$PYTHONPATH"
+            + ' {python} predict/flask_server.py --model_name_or_path {model_path} --port {port} --flask_port {flask_port} --src_length 1024 --dtype "float16"'.format(
+                flask_port=self.flask_port, port=self.port, model_path=self.model_path, python=sys.executable
+            )
         )
         current_env = copy.copy(os.environ.copy())
         current_env.pop("http_proxy", None)
@@ -59,7 +62,7 @@ class UITest(unittest.TestCase):
         return super().setUp()
 
     def tearDown(self):
-        self.ui_process.kill()
+        self.ui_process.terminate()
 
     def avaliable_free_port(self, exclude=None):
         exclude = exclude or []

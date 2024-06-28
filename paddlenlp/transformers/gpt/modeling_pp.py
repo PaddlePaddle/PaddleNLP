@@ -204,7 +204,7 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         )
 
         recompute_interval = 0
-        # if use_recompute and recompute_granularity == "full":
+        # if self.config.recompute and recompute_granularity == "full":
         #    assert pp_recompute_interval <= config.num_hidden_layers // (
         #        virtual_pp_degree * get_hcg().topology().get_dim_size("pipe")
         #    ), "pp recompute interval should smaller than num layers of each pp chunk"

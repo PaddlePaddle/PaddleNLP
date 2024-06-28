@@ -175,7 +175,7 @@ function _train(){
         workerlog_id=0
         ;;
     esac
-    cd ../llm/llama
+    cd ../llm
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
     if [[ ${model_name_or_path} =~ "CE" ]];then # CE精度-不限制执行时间

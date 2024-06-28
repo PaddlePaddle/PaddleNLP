@@ -294,14 +294,5 @@ from .deberta.configuration import *
 from .deberta_v2.modeling import *
 from .deberta_v2.tokenizer import *
 from .deberta_v2.configuration import *
-
-# For faster tokenizer
-from ..utils.import_utils import is_fast_tokenizer_available
-
-if is_fast_tokenizer_available():
-    from .tokenizer_utils_fast import PretrainedFastTokenizer
-    from .bert.fast_tokenizer import *
-    from .ernie.fast_tokenizer import *
-    from .tinybert.fast_tokenizer import *
-    from .ernie_m.fast_tokenizer import *
-    from .nystromformer.fast_tokenizer import *
+from .qwen2 import *
+from .qwen2_moe import *

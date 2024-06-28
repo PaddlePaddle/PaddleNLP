@@ -22,11 +22,6 @@ import paddle
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
-from paddlenlp_ops import (
-    fused_get_rotary_embedding,
-    get_padding_offset,
-    get_padding_offset_v2,
-)
 
 from paddlenlp.experimental.model_utils import (
     ActScalesLoader,
@@ -38,15 +33,18 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformerA8W8,
     FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerA8W8,
+    FusedMultiTransformerAvx,
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
+    GenerationAvxInferenceModel,
     GenerationBlockInferenceModel,
     GenerationInferenceModel,
 )
 from paddlenlp.transformers import LlamaConfig, LlamaPretrainedModel
+from paddlenlp.transformers.conversion_utils import split_param_func
 from paddlenlp.transformers.llama.modeling import LlamaLMHead
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -61,6 +59,7 @@ from paddlenlp.utils.log import logger
 __all__ = [
     "LlamaInferenceModel",
     "LlamaForCausalLMInferenceModel",
+    "LlamaForCausalLMAvxInferenceModel",
     "LlamaForCausalLMBlockInferenceModel",
     "LlamaForMiniGPT4InferenceModel",
 ]
@@ -88,7 +87,7 @@ class FusedLlamaRMSNorm(nn.Layer):
 
 
 @register_base_model
-class LlamaInferenceModel(LlamaPretrainedModel):
+class LlamaAvxInferenceModel(LlamaPretrainedModel):
     """
     Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LlamaDecoderLayer`]
     Args:
@@ -105,6 +104,250 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
         self.quant_type = config.quant_type
+        self.dtype = config.dtype
+        self.embed_tokens = nn.Embedding(
+            self.vocab_size,
+            self.hidden_size,
+        )
+        self.compute_type = config.avx_type
+        ln_scale_attrs = [paddle.ParamAttr(name="fusellama.{}.ln_scale".format(i)) for i in range(self.num_layers)]
+        qkv_weight_attrs = [
+            paddle.ParamAttr(
+                name="fusellama.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
+        ]
+        out_proj_weight_attrs = [
+            paddle.ParamAttr(
+                name="fusellama.{}.out_proj_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
+        ]
+        ffn_ln_scale_attrs = [
+            paddle.ParamAttr(name="fusellama.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
+        ]
+        ffn1_weight_attrs = [
+            paddle.ParamAttr(
+                name="fusellama.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
+        ]
+        ffn2_weight_attrs = [
+            paddle.ParamAttr(
+                name="fusellama.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
+        ]
+
+        transformer_config = FusedMultiTransformerConfig(
+            self.hidden_size,
+            self.num_attention_heads,
+            self.intermediate_size,
+            activation="silu",
+            num_layers=config.num_hidden_layers,
+            ln_scale_attrs=ln_scale_attrs,
+            qkv_weight_attrs=qkv_weight_attrs,
+            linear_weight_attrs=out_proj_weight_attrs,
+            ffn_ln_scale_attrs=ffn_ln_scale_attrs,
+            ffn1_weight_attrs=ffn1_weight_attrs,
+            ffn2_weight_attrs=ffn2_weight_attrs,
+            epsilon=self.epsilon,
+            norm_type="rmsnorm",
+        )
+
+        self.set_transformer_block(transformer_config, config.max_position_embeddings, self.compute_type)
+        self.norm = FusedLlamaRMSNorm(config)
+
+    def set_transformer_block(self, transformer_config, max_position_embeddings, compute_type):
+        self.transformer_block = FusedMultiTransformerAvx(transformer_config, max_position_embeddings, compute_type)
+
+    @staticmethod
+    def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
+        batch_size = 1
+        seq_len = 1
+        if bos_token_id is None:
+            raise ValueError("`bos_token_id` should be defined when no " "`input_ids` are provided.")
+        if encoder_output is not None:
+            batch_size = encoder_output.shape[0]
+            seq_len = encoder_output.shape[1]
+        return paddle.ones([batch_size, seq_len], dtype="int64") * bos_token_id
+
+    def forward(
+        self,
+        input_ids=None,
+        inputs_embeds=None,
+        past_seq_len=None,
+        cur_seq_len=None,
+        step_idx=None,
+        output_hidden_states=None,
+        return_dict=False,
+        **kwargs,
+    ):
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is None and inputs_embeds is None:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
+
+        # genereate a fake input_ids according to inputs_embeds
+        if input_ids is None and inputs_embeds is not None:
+            input_ids = self.prepare_input_ids_for_generation(self.config.bos_token_id, inputs_embeds)
+        if inputs_embeds is not None:
+            batch, seq_len, hidden_dim = inputs_embeds.shape
+            # merge batch and seq_len dimension.
+            inputs_embeds = inputs_embeds.reshape([batch * seq_len, hidden_dim])
+
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        if inputs_embeds is None:
+            inputs_embeds = self.embed_tokens(input_ids)
+
+        hidden_states = inputs_embeds
+
+        # decoder layers
+        all_hidden_states = () if output_hidden_states else None
+        with dy2st_nocheck_guard_context():
+            hidden_states = self.transformer_block(
+                input_ids,
+                hidden_states,
+                past_seq_len=past_seq_len,
+                cur_seq_len=cur_seq_len,
+                step_idx=step_idx,
+            )
+        hidden_states = self.norm(hidden_states)
+
+        if output_hidden_states:
+            all_hidden_states = all_hidden_states + (hidden_states,)
+
+        if not return_dict:
+            return tuple(v for v in [hidden_states, None, all_hidden_states, None] if v is not None)
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=None,
+            hidden_states=all_hidden_states,
+            attentions=None,
+        )
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        unfused_state_dict = {}
+        head_size = self.hidden_size // self.num_attention_heads
+        split_fn = split_param_func()
+
+        self.embed_tokens.weight.set_value(
+            paddle.to_tensor(state_dict["llama.embed_tokens.weight"]).cast(self.embed_tokens.weight.dtype)
+        )
+        self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"]).cast(self.norm.weight.dtype))
+
+        for idx in range(self.config.num_hidden_layers):
+            logger.info(f"set state for layer {idx}")
+
+            if "llama.layers.{}.self_attn.qkv_proj.weight".format(idx) in state_dict.keys():
+                concated_qkv_weight = np.concatenate(
+                    split_fn(
+                        state_dict["llama.layers.{}.self_attn.qkv_proj.weight".format(idx)],
+                        is_qkv=True,
+                        num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                        num_key_value_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                    ),
+                    axis=-1,
+                )
+            else:
+                unfused_state_dict = {}
+                unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
+                    "llama.layers.{}.self_attn.q_proj.weight".format(idx)
+                ]
+                unfused_state_dict["self_attn.k_proj.weight"] = state_dict[
+                    "llama.layers.{}.self_attn.k_proj.weight".format(idx)
+                ]
+                unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
+                    "llama.layers.{}.self_attn.v_proj.weight".format(idx)
+                ]
+                concated_qkv_weight = np.concatenate(
+                    [
+                        unfused_state_dict["self_attn.q_proj.weight"],
+                        unfused_state_dict["self_attn.k_proj.weight"],
+                        unfused_state_dict["self_attn.v_proj.weight"],
+                    ],
+                    axis=-1,
+                ).reshape(
+                    self.hidden_size,
+                    3 * (self.num_attention_heads // self.config.tensor_parallel_degree) * (head_size),
+                )  # reshape(3, self.num_attention_heself.hidden_sizeads // self.config.tensor_parallel_degree, head_size, )
+            if "llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx) in state_dict.keys():
+                concated_ffn1_weight = np.concatenate(
+                    split_fn(state_dict["llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx)]), axis=-1
+                )
+            else:
+                unfused_state_dict["mlp.gate_proj.weight"] = state_dict[
+                    "llama.layers.{}.mlp.gate_proj.weight".format(idx)
+                ]
+                unfused_state_dict["mlp.up_proj.weight"] = state_dict["llama.layers.{}.mlp.up_proj.weight".format(idx)]
+                concated_ffn1_weight = np.concatenate(
+                    [unfused_state_dict["mlp.gate_proj.weight"], unfused_state_dict["mlp.up_proj.weight"]], axis=-1
+                )
+            gate_up_list = split_fn(concated_ffn1_weight)
+            gate_weight_tensor = paddle.to_tensor(gate_up_list[0])
+            up_weight_tensor = paddle.to_tensor(gate_up_list[1])
+
+            qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight)
+            self.transformer_block.qkv_weights[idx].set_value(
+                qkv_weight_tensor.cast(self.transformer_block.qkv_weights[idx].dtype)
+            )
+
+            linear_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)])
+            self.transformer_block.linear_weights[idx].set_value(
+                linear_weight_tensor.cast(self.transformer_block.linear_weights[idx].dtype)
+            )
+            self.transformer_block.gate_weights[idx].set_value(
+                gate_weight_tensor.cast(self.transformer_block.gate_weights[idx].dtype)
+            )
+            self.transformer_block.up_weights[idx].set_value(
+                up_weight_tensor.cast(self.transformer_block.up_weights[idx].dtype)
+            )
+
+            ffn2_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
+            self.transformer_block.ffn2_weights[idx].set_value(
+                ffn2_weight_tensor.cast(self.transformer_block.ffn2_weights[idx].dtype)
+            )
+            self.transformer_block.ln_scales[idx].set_value(
+                paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.weight".format(idx)]).cast(
+                    self.transformer_block.ln_scales[idx].dtype
+                )
+            )
+
+            self.transformer_block.ffn_ln_scales[idx].set_value(
+                paddle.to_tensor(state_dict["llama.layers.{}.post_attention_layernorm.weight".format(idx)]).cast(
+                    self.transformer_block.ffn_ln_scales[idx].dtype
+                )
+            )
+
+
+@register_base_model
+class LlamaInferenceModel(LlamaPretrainedModel):
+    """
+    Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LlamaDecoderLayer`]
+    Args:
+        config: LlamaConfig
+    """
+
+    def __init__(self, config: LlamaConfig):
+        super().__init__(config)
+        self.vocab_size = config.vocab_size
+        self.hidden_size = config.hidden_size
+        self.num_attention_heads = config.num_attention_heads
+        self.num_key_value_heads = config.num_key_value_heads
+        self.intermediate_size = config.intermediate_size
+        self.num_layers = config.num_hidden_layers
+        self.epsilon = config.rms_norm_eps
+        self.max_position_embeddings = config.max_position_embeddings
+        self.quant_type = config.quant_type
+
+        self.rope_theta = config.rope_theta
 
         self.use_weight_only = False
         self.weight_only_quant_bits = config.weight_only_quant_bits
@@ -126,7 +369,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.quant_type
             )
 
-        if config.tensor_parallel_degree > 1:
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
                 self.vocab_size,
                 self.hidden_size,
@@ -192,8 +435,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         ffn2_bias_attrs = None
 
         if self.quant_type == "a8w8":
-            self.quant_round_type = config.quantization_config.quant_round_type
-
             qkv_out_scale_attrs = [
                 paddle.ParamAttr(name="fusellama.{}.qkv_out_scale".format(i)) for i in range(self.num_layers)
             ]
@@ -281,9 +522,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             ]
 
         transformer_config = FusedMultiTransformerConfig(
-            self.hidden_size,
-            self.num_attention_heads,
-            self.intermediate_size,
+            embed_dim=self.hidden_size,
+            num_heads=self.num_attention_heads,
+            kv_num_heads=self.num_key_value_heads,
+            dim_feedforward=self.intermediate_size,
             weight_only_quant_bits=self.weight_only_quant_bits,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
@@ -349,6 +591,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
+        from paddlenlp_ops import get_padding_offset
+
         ids_remove_padding, cum_offsets, padding_offset = get_padding_offset(
             input_ids, cum_offsets_now, token_num, seq_lens_this_time
         )
@@ -434,8 +678,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         position_offset = 0
         if not is_decoder and pre_caches is not None:
             position_offset = 128
+        from paddlenlp_ops import fused_get_rotary_embedding
+
         new_rope = fused_get_rotary_embedding(
-            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, True
+            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, self.rope_theta, True
         )
 
         with dy2st_nocheck_guard_context():
@@ -472,48 +718,70 @@ class LlamaInferenceModel(LlamaPretrainedModel):
     def set_state_dict(self, state_dict):
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
+        split_fn = split_param_func()
 
-        self.embed_tokens.weight.set_value(paddle.to_tensor(state_dict["llama.embed_tokens.weight"]))
-        self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"], dtype=self.norm.weight.dtype))
+        self.embed_tokens.weight.set_value(
+            paddle.to_tensor(state_dict["llama.embed_tokens.weight"]).cast(self.embed_tokens.weight.dtype)
+        )
+        self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"]).cast(self.norm.weight.dtype))
 
         for idx in range(self.config.num_hidden_layers):
             logger.info(f"set state for layer {idx}")
 
             if self.use_weight_only:
                 logger.info("weight only is enabled")
-            unfused_state_dict = {}
-            unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
-                "llama.layers.{}.self_attn.q_proj.weight".format(idx)
-            ]
-            unfused_state_dict["self_attn.k_proj.weight"] = state_dict[
-                "llama.layers.{}.self_attn.k_proj.weight".format(idx)
-            ]
-            unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
-                "llama.layers.{}.self_attn.v_proj.weight".format(idx)
-            ]
-
-            concated_qkv_weight = (
-                np.concatenate(
-                    [
-                        unfused_state_dict["self_attn.q_proj.weight"],
-                        unfused_state_dict["self_attn.k_proj.weight"],
-                        unfused_state_dict["self_attn.v_proj.weight"],
-                    ],
+            if "llama.layers.{}.self_attn.qkv_proj.weight".format(idx) in state_dict.keys():
+                concated_qkv_weight = np.concatenate(
+                    split_fn(
+                        state_dict["llama.layers.{}.self_attn.qkv_proj.weight".format(idx)],
+                        is_qkv=True,
+                        num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                        num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
+                    ),
                     axis=-1,
+                ).transpose(1, 0)
+            else:
+                unfused_state_dict = {}
+                unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
+                    "llama.layers.{}.self_attn.q_proj.weight".format(idx)
+                ]
+                unfused_state_dict["self_attn.k_proj.weight"] = state_dict[
+                    "llama.layers.{}.self_attn.k_proj.weight".format(idx)
+                ]
+                unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
+                    "llama.layers.{}.self_attn.v_proj.weight".format(idx)
+                ]
+                concated_qkv_weight = (
+                    np.concatenate(
+                        [
+                            unfused_state_dict["self_attn.q_proj.weight"],
+                            unfused_state_dict["self_attn.k_proj.weight"],
+                            unfused_state_dict["self_attn.v_proj.weight"],
+                        ],
+                        axis=-1,
+                    )
+                    .transpose(1, 0)
+                    .reshape(
+                        (
+                            self.num_attention_heads // self.config.tensor_parallel_degree
+                            + 2 * self.num_key_value_heads // self.config.tensor_parallel_degree
+                        )
+                        * (head_size),
+                        self.hidden_size,
+                    )
                 )
-                .transpose(1, 0)
-                .reshape(
-                    3 * (self.num_attention_heads // self.config.tensor_parallel_degree) * (head_size),
-                    self.hidden_size,
+            if "llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx) in state_dict.keys():
+                concated_ffn1_weight = np.concatenate(
+                    split_fn(state_dict["llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx)]), axis=-1
                 )
-            )  # reshape(3, self.num_attention_heself.hidden_sizeads // self.config.tensor_parallel_degree, head_size, )
-
-            unfused_state_dict["mlp.gate_proj.weight"] = state_dict["llama.layers.{}.mlp.gate_proj.weight".format(idx)]
-            unfused_state_dict["mlp.up_proj.weight"] = state_dict["llama.layers.{}.mlp.up_proj.weight".format(idx)]
-
-            concated_ffn1_weight = np.concatenate(
-                [unfused_state_dict["mlp.gate_proj.weight"], unfused_state_dict["mlp.up_proj.weight"]], axis=-1
-            )
+            else:
+                unfused_state_dict["mlp.gate_proj.weight"] = state_dict[
+                    "llama.layers.{}.mlp.gate_proj.weight".format(idx)
+                ]
+                unfused_state_dict["mlp.up_proj.weight"] = state_dict["llama.layers.{}.mlp.up_proj.weight".format(idx)]
+                concated_ffn1_weight = np.concatenate(
+                    [unfused_state_dict["mlp.gate_proj.weight"], unfused_state_dict["mlp.up_proj.weight"]], axis=-1
+                )
             ffn1_weight_tensor = paddle.to_tensor(concated_ffn1_weight)
 
             qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight)
@@ -533,7 +801,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     paddle.cast(paddle.to_tensor(concated_qkv_weight), "int8")
                 )
             else:
-                self.transformer_block.qkv_weights[idx].set_value(qkv_weight_tensor)
+                self.transformer_block.qkv_weights[idx].set_value(
+                    qkv_weight_tensor.cast(self.transformer_block.qkv_weights[idx].dtype)
+                )
 
             linear_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)])
             if self.use_weight_only:
@@ -555,7 +825,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     )
                 )
             else:
-                self.transformer_block.linear_weights[idx].set_value(linear_weight_tensor)
+                self.transformer_block.linear_weights[idx].set_value(
+                    linear_weight_tensor.cast(self.transformer_block.linear_weights[idx].dtype)
+                )
 
             if self.use_weight_only:
                 ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
@@ -571,7 +843,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     paddle.cast(paddle.to_tensor(concated_ffn1_weight).transpose((1, 0)), "int8")
                 )
             else:
-                self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight_tensor)
+                self.transformer_block.ffn1_weights[idx].set_value(
+                    ffn1_weight_tensor.cast(self.transformer_block.ffn1_weights[idx].dtype)
+                )
 
             ffn2_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
             if self.use_weight_only:
@@ -593,7 +867,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     )
                 )
             else:
-                self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
+                self.transformer_block.ffn2_weights[idx].set_value(
+                    ffn2_weight_tensor.cast(self.transformer_block.ffn2_weights[idx].dtype)
+                )
 
             if self.quant_type == "a8w8":
                 if self.shift_smooth_all_linears:
@@ -659,16 +935,14 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         )
 
             self.transformer_block.ln_scales[idx].set_value(
-                paddle.to_tensor(
-                    state_dict["llama.layers.{}.input_layernorm.weight".format(idx)],
-                    dtype=self.transformer_block.ln_scales[idx].dtype,
+                paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.weight".format(idx)]).cast(
+                    self.transformer_block.ln_scales[idx].dtype
                 )
             )
 
             self.transformer_block.ffn_ln_scales[idx].set_value(
-                paddle.to_tensor(
-                    state_dict["llama.layers.{}.post_attention_layernorm.weight".format(idx)],
-                    dtype=self.transformer_block.ffn_ln_scales[idx].dtype,
+                paddle.to_tensor(state_dict["llama.layers.{}.post_attention_layernorm.weight".format(idx)]).cast(
+                    self.transformer_block.ffn_ln_scales[idx].dtype
                 )
             )
 
@@ -719,7 +993,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         cache_scale_json_path,
                         cache_scale_map_dict,
                         num_of_layers=self.config.num_hidden_layers,
-                        num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                        num_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
                     )
                     for k, v in cache_scales_loader.scale.items():
                         for i_layer, weight_scale in enumerate(v):
@@ -801,6 +1075,8 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
+        from paddlenlp_ops import get_padding_offset_v2
+
         ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
             input_ids, cum_offsets_now, token_num, seq_lens_this_time
         )
@@ -852,6 +1128,102 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         )
 
 
+class LlamaForCausalLMAvxInferenceModel(GenerationAvxInferenceModel, LlamaPretrainedModel):
+
+    _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.llama = LlamaAvxInferenceModel(config)
+        self.lm_head = LlamaLMHead(config)
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+        # TODO: Support safetensors loading.
+        kwargs["use_safetensors"] = False
+        return super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+
+    @classmethod
+    def get_cache_kvs_shape(
+        cls, config: LlamaConfig, max_batch_size: int = None, max_length: int = None
+    ) -> list[list[int]]:
+        return []
+
+    def prepare_inputs_for_generation(
+        self,
+        input_ids,
+        **kwargs,
+    ):
+        seq_len_encoder = kwargs.get("seq_len_encoder", None)
+        seq_len_decoder = kwargs.get("seq_len_decoder", None)
+        tgt_ids = kwargs.get("tgt_ids", None)
+        cache = kwargs.get("cache", None)
+        inputs_embeds = kwargs.get("inputs_embeds", None)
+        step_idx = kwargs.get("step_idx", None)
+        if cache is None:
+            # encoder
+            past_seq_len = paddle.zeros_like(seq_len_decoder - seq_len_encoder, dtype="int64")
+        else:
+            # decoer
+            past_seq_len = paddle.cast(seq_len_decoder, "int64")
+            input_ids = tgt_ids
+            inputs_embeds = None
+
+        model_inputs = {
+            "input_ids": input_ids,
+            "inputs_embeds": inputs_embeds,
+            "past_seq_len": past_seq_len,
+            "step_idx": step_idx,
+        }
+        return model_inputs
+
+    def forward(
+        self,
+        input_ids,
+        inputs_embeds=None,
+        past_seq_len=None,
+        step_idx=None,
+        output_hidden_states=None,
+        return_dict=None,
+    ):
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        outputs = self.llama(
+            input_ids,
+            inputs_embeds=inputs_embeds,
+            past_seq_len=past_seq_len,
+            cur_seq_len=paddle.to_tensor(input_ids.shape[1], dtype="int64"),
+            step_idx=step_idx,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        hidden_states = outputs[0]
+        logits = self.lm_head(
+            hidden_states,
+            tensor_parallel_output=False,
+        )
+
+        if not return_dict:
+            output = (logits,) + outputs[1:]
+            return output
+
+        return CausalLMOutputWithCrossAttentions(
+            loss=None,
+            logits=logits,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
+
+    @paddle.no_grad()
+    def set_state_dict(self, state_dict):
+        if "lm_head.weight" in state_dict:
+            self.lm_head.weight.set_value(state_dict["lm_head.weight"])
+        self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+
+
 class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedModel):
     """
     Dynamic Batching for LLaMA Model with pretraining tasks on top.
@@ -892,7 +1264,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
                 [
                     2,
                     max_batch_size,
-                    config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                    config.num_key_value_heads // max(config.tensor_parallel_degree, 1),
                     max_length,
                     config.hidden_size // config.num_attention_heads,
                 ]
@@ -1178,7 +1550,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         for _ in range(config.num_hidden_layers):
             cache_kv_shape = [
                 max_block_nums,
-                config.num_attention_heads // max(config.tensor_parallel_degree, 1),
+                config.num_key_value_heads // max(config.tensor_parallel_degree, 1),
                 config.block_size,
                 config.hidden_size // config.num_attention_heads,
             ]
@@ -1263,7 +1635,9 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         if "lm_head.weight" in state_dict:
-            self.lm_head.weight.set_value(state_dict["lm_head.weight"])
+            self.lm_head.weight.set_value(
+                paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
+            )
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
 

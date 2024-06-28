@@ -17,17 +17,3 @@ import paddle
 from . import optimizer
 from .distributed import *
 from .einsum import *
-
-# isort: split
-from .fast_transformer.transformer.decoding import *
-
-# isort: split
-from .fast_transformer.transformer.decoder import *
-from .fast_transformer.transformer.encoder import *
-from .fast_transformer.transformer.fast_transformer import *
-
-paddle.nn.TransformerEncoderLayer._ft_forward = encoder_layer_forward  # noqa F405
-paddle.nn.TransformerEncoder._ft_forward = encoder_forward  # noqa F405
-
-paddle.nn.TransformerEncoderLayer._ori_forward = paddle.nn.TransformerEncoderLayer.forward
-paddle.nn.TransformerEncoder._ori_forward = paddle.nn.TransformerEncoder.forward

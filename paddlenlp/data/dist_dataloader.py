@@ -171,8 +171,6 @@ class DistDataLoader(paddle.io.DataLoader):
                 src=self._pp_group.ranks[0],
                 group=self._pp_group,
             )
-        else:
-            fake_data = [None]
 
         fake_data = fake_data[0]
         if fake_data is None:

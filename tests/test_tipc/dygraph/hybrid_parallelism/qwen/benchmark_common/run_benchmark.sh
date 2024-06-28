@@ -38,6 +38,17 @@ function _set_params(){
     pipeline_parallel_config=${pipeline_parallel_config:-""}
     recompute_use_reentrant=${recompute_use_reentrant:-"true"}
     recompute_granularity=${recompute_granularity:-"full"}
+    #添加多机脚本时需要提取下面的不同参数
+    max_seq_length=${max_seq_length:-2048}
+    min_learning_rate=${min_learning_rate:-0.000001}
+    save_steps=${save_steps:-50000}
+    eval_steps=${eval_steps:-1001}
+    scale_loss=${scale_loss:-1024}
+    sharding_parallel_config=${sharding_parallel_config:-"split_param enable_stage1_overlap"}
+    # #替换pipeline_parallel_config和sharding_parallel_config的参数为空格表示
+    # pipeline_parallel_config=$(echo $pipeline_parallel_config | tr ',' ' ')
+    # sharding_parallel_config=$(echo $sharding_parallel_config | tr ',' ' ')
+
 
     base_batch_size=${global_batch_size}
 
@@ -46,6 +57,14 @@ function _set_params(){
     speed_unit="tokens/s"         # (必选)速度指标单位
     skip_steps=0                  # (必选)解析日志，跳过模型前几个性能不稳定的step
     keyword="ips:"                 # (必选)解析日志，筛选出性能数据所在行的关键字
+    is_large_model=True
+    #添加多机脚本时直接取最后10步的平均值就可以
+    if [[ $device_num == "N4C32" ]]; then
+        skip_steps=10                # (必选)解析日志，跳过模型前几个性能不稳定的step
+        keyword="interval_tokens_per_second_per_device:"     # (必选)解析日志，筛选出性能数据所在行的关键字
+        is_large_model=False
+        model_mode=5
+    fi
 
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
 
@@ -68,7 +87,7 @@ function _set_params(){
     mkdir -p $(dirname ${speed_log_file})
 
     OUTPUT_PATH=${run_log_path}/output
-    is_large_model=True
+    
 }
 
 function _train(){
@@ -99,18 +118,32 @@ function _train(){
     # fi
 
     if [ "${pipeline_parallel_config}" != "" ]; then
+        #pipeline_parallel_config_args="--pipeline_parallel_config \"${pipeline_parallel_config}\""
         pipeline_parallel_config_args="--pipeline_parallel_config ${pipeline_parallel_config}"
     else
         pipeline_parallel_config_args=""
+    fi
+    #qwen的多机需要额外设置的参数
+    if [ "${device_num}" == "N4C32" ]; then
+    #    diff_args="--sequence_parallel ${sequence_parallel} --sharding_parallel_degree ${sharding_parallel_degree} \
+    #    --scale_loss 1024 --recompute_granularity ${recompute_granularity} \
+    #    --sharding_parallel_config \"${sharding_parallel_config}\""
+       diff_args="--sequence_parallel ${sequence_parallel} --sharding_parallel_degree ${sharding_parallel_degree} \
+       --scale_loss 1024 --recompute_granularity ${recompute_granularity} \
+       --sharding_parallel_config ${sharding_parallel_config}"
+    else
+       diff_args="--recompute_use_reentrant ${recompute_use_reentrant} \
+        --skip_memory_metrics 0 \
+        --data_cache ./data_cache"
     fi
 
     use_pure_fp16=False
     train_cmd="--model_name_or_path ${model_name_or_path} \
     --tokenizer_name_or_path ${model_name_or_path} \
-    --input_dir ./qwen/data \
+    --input_dir ./data \
     --output_dir ./output \
     --split 949,50,1 \
-    --max_seq_length 2048 \
+    --max_seq_length ${max_seq_length} \
     --per_device_train_batch_size ${per_device_train_batch_size} \
     --gradient_accumulation_steps ${gradient_accumulation_steps} \
     --use_flash_attention 1 \
@@ -123,15 +156,15 @@ function _train(){
     --virtual_pp_degree ${virtual_pp_degree} \
     --pp_recompute_interval ${pp_recompute_interval} \
     --learning_rate 0.00001 \
-    --min_learning_rate 0.000001 \
+    --min_learning_rate ${min_learning_rate} \
     --max_steps ${max_steps} \
-    --save_steps 50000 \
+    --save_steps ${save_steps} \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
     --max_grad_norm 1.0 \
     --logging_steps 1 \
     --dataloader_num_workers 1 \
-    --eval_steps 1001 \
+    --eval_steps ${eval_steps} \
     --sharding ${sharding} \
     --disable_tqdm true \
     --continue_training 0 \
@@ -142,10 +175,7 @@ function _train(){
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
     --tensor_parallel_config ${tensor_parallel_config} ${pipeline_parallel_config_args} \
-    --recompute ${recompute} \
-    --recompute_use_reentrant ${recompute_use_reentrant} \
-    --skip_memory_metrics 0 \
-    --data_cache ./data_cache"
+    --recompute ${recompute} ${diff_args}"
 
     if [ ${PADDLE_TRAINER_ID} ]
     then
@@ -200,6 +230,7 @@ function _train(){
 }
 
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
+export CUDA_DEVICE_MAX_CONNECTIONS=1
 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
