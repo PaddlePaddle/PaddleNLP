@@ -259,6 +259,21 @@ python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat
 python ./predict/predictor.py --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static"
 ```
 
+- **Cpu 高性能推理**：PaddleNLP 还提供了基于intel/xFasterTransformer的Cpu高性能推理模型，目前支持FP16、BF16多种推理方式。
+```shell
+# Cpu自定义算子安装
+cd ../csrc/cpu/src
+bash setup.sh
+# Cpu动态图模型推理命令参考
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float32 --avx_mode --avx_type "fp16" --device "cpu"
+
+# Cpu静态图模型推理命令参考
+# step1 : 静态图导出
+python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float32 --avx_mode --avx_type "fp16" --device "cpu"
+# step2: 静态图推理
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --avx_mode --avx_type "fp16" --dtype "float32" --mode "static" --device "cpu"
+```
+
 更多常用模型推理和高性能模型使用方法详见[大模型推理文档](./docs/inference.md)。
 
 ### 6. 服务化部署
