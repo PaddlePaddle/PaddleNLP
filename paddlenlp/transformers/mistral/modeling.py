@@ -661,7 +661,7 @@ class MistralModel(MistralPreTrainedModel):
 
         q_length = input_shape[-1]
         kv_length = q_length + past_key_values_length
-        if kv_length > sliding_window:
+        if sliding_window and kv_length > sliding_window:
             combined_attention_mask = _make_sliding_window_causal_mask(
                 input_shape,
                 inputs_embeds.dtype,
