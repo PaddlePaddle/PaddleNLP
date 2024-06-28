@@ -31,7 +31,7 @@
 
 ## News 📢
 
-* **2024.06.27 [PaddleNLP v3.0 Beta](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0)**：拥抱大模型，体验全升级。统一大模型工具链，实现国产计算芯片全流程接入；全面支持飞桨4D并行配置、高效精调策略、高效对齐算法、高性能推理等大模型产业级应用流程；自研极致收敛的RsLoRA+算法、自动扩缩容存储机制Unified Checkpoint和通用化支持FastFFN、FusedQKV助力大模型训推；主流模型持续支持更新，提供高效解决方案。
+* **2024.06.27 [PaddleNLP v3.0 Beta](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta0)**：拥抱大模型，体验全升级。统一大模型工具链，实现国产计算芯片全流程接入；全面支持飞桨4D并行配置、高效精调策略、高效对齐算法、高性能推理等大模型产业级应用流程；自研极致收敛的RsLoRA+算法、自动扩缩容存储机制Unified Checkpoint和通用化支持FastFFN、FusedQKV助力大模型训推；主流模型持续支持更新，提供高效解决方案。
 
 * **2024.04.24 [PaddleNLP v2.8](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.8.0)**：自研极致收敛的RsLoRA+算法，大幅提升PEFT训练收敛速度以及训练效果；引入高性能生成加速到RLHF PPO算法，打破 PPO 训练中生成速度瓶颈，PPO训练性能大幅领先。通用化支持 FastFFN、FusedQKV等多个大模型训练性能优化方式，大模型训练更快、更稳定。
 
