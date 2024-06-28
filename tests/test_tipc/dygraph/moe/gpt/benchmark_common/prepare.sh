@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 cd ../legacy/model_zoo/moe/data_tools/
 sed -i "s/python3/python3.10/g" Makefile
 cd -
