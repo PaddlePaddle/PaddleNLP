@@ -17,6 +17,7 @@
 import os
 import sys
 import time
+import inspect
 from functools import partial
 
 import paddle
@@ -36,7 +37,13 @@ from paddlenlp.trl import (
     preference_collate_fn,
     preprocess_preference_data,
 )
+from paddlenlp.transformers import (
+    LlamaForCausalLM,
+    LlamaForCausalLMPipe,
+)
 from paddlenlp.utils.log import logger
+
+flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
 
 
 def main():
@@ -123,6 +130,15 @@ def main():
         ref_config = AutoConfig.from_pretrained(**model_kwargs)
         ref_model = AutoModelForCausalLM.from_config(ref_config)
         model.set_state_dict(ref_model.state_dict())
+
+    if model_args.flash_mask and not model.config.use_flash_attention:
+        logger.warning(
+            "`flash_mask` must use with zero padding and flash attention."
+        )
+        model.config.use_flash_attention = True
+
+    if model_args.flash_mask and not any(isinstance(model, cls) for cls in flash_mask_support_list):
+        raise NotImplementedError(f"{model.__class__} not support flash mask.")
 
     if model_args.tokenizer_name_or_path is not None:
         tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
