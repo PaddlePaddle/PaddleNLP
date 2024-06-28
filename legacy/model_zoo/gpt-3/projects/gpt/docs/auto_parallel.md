@@ -19,13 +19,13 @@ Global:
 ```
 
 其中参数对应的释义如下：
-| **参数名**                      | **参数释义**               |
-|--------------------------------|---------------------------|
-| device | 设备信息 |
-| seed | 随机数种子 |
+| **参数名**        | **参数释义**                                          |
+|-------------------|-------------------------------------------------------|
+| device            | 设备信息                                              |
+| seed              | 随机数种子                                            |
 | global_batch_size | 全局的batch size大小，即一次参数更新等效的 batch size |
-| local_batch_size  | 每个进程训练的batch size大小                        |
-| micro_batch_size  | 每次前向计算的batch size大小                        |
+| local_batch_size  | 每个进程训练的batch size大小                          |
+| micro_batch_size  | 每次前向计算的batch size大小                          |
 
 
 ### Engine训练控制
@@ -53,27 +53,27 @@ Engine训练设置完成模型训练/验证/推理等过程中的参数设置，
 
 其中参数对应的释义如下：
 
-| **参数名**         | **参数释义**                              |
-|-------------------|------------------------------------------|
-| max_steps         | 最大训练步数                               |
-| num_train_epochs  | 训练的epoch数量                            |
-| logging_freq      | 训练日志打印的频率                          |
-| eval_freq         | 模型评估间隔，以epoch为粒度                  |
-| eval_iters        | 模型评估时训练评估测试集的轮数                |
-| test_iters        | 模型测试或推理时的轮数                       |
-| enable            | 是否使用混合精度的类型，可选: `True` `False`   |
-| dtype             | 使用混合精度的类型，可选: `float16` `bfloat16`|
-| level             | 使用混合精度训练的等级，可选 `o1` `o2` `o3`   |
-| scale_loss        | 使用混合精度float16下，loss的放缩比例         |
+| **参数名**        | **参数释义**                                                                                                                                                         |
+|-------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| max_steps         | 最大训练步数                                                                                                                                                         |
+| num_train_epochs  | 训练的epoch数量                                                                                                                                                      |
+| logging_freq      | 训练日志打印的频率                                                                                                                                                   |
+| eval_freq         | 模型评估间隔，以epoch为粒度                                                                                                                                          |
+| eval_iters        | 模型评估时训练评估测试集的轮数                                                                                                                                       |
+| test_iters        | 模型测试或推理时的轮数                                                                                                                                               |
+| enable            | 是否使用混合精度的类型，可选: `True` `False`                                                                                                                         |
+| dtype             | 使用混合精度的类型，可选: `float16` `bfloat16`                                                                                                                       |
+| level             | 使用混合精度训练的等级，可选 `o1` `o2` `o3`                                                                                                                          |
+| scale_loss        | 使用混合精度float16下，loss的放缩比例                                                                                                                                |
 | custom_black_list | 自定义算子黑名单。这个名单中的算子在支持float16/bfloat16计算时会被认为是数值危险的，它们的影响也可能会在下游操作中观察到。这些算子通常不会转为float16/bfloat16计算。 |
-| custom_white_list | 自定义算子白名单。这个名单中的算子在支持float16/bfloat16计算时会被认为是数值安全的，并且对性能至关重要。如果设置了白名单，该名单中的算子会使用float16/bfloat16计算。|
-| output_dir        | 指定输出文件                              |
-| ckpt_dir          | checkpoint的加载目录                      |
+| custom_white_list | 自定义算子白名单。这个名单中的算子在支持float16/bfloat16计算时会被认为是数值安全的，并且对性能至关重要。如果设置了白名单，该名单中的算子会使用float16/bfloat16计算。 |
+| output_dir        | 指定输出文件                                                                                                                                                         |
+| ckpt_dir          | checkpoint的加载目录                                                                                                                                                 |
 
 
 ### 模型网络
 
-网络部分完成了网络的组网操作，GPT在[PaddleFleetX/ppfleetx/models/language_model/gpt/auto/auto_model.py]((https://github.com/PaddlePaddle/PaddleFleetX/blob/develop/ppfleetx/models/language_model/gpt/auto/auto_model.py))下。
+网络部分完成了网络的组网操作，GPT在[PaddleFleetX/ppfleetx/models/language_model/gpt/auto/auto_model.py](https://github.com/PaddlePaddle/PaddleFleetX/blob/develop/ppfleetx/models/language_model/gpt/auto/auto_model.py)下。
 可以使用配置文件配置模型的规模，如：
 
 ```yaml
@@ -95,20 +95,20 @@ Engine训练设置完成模型训练/验证/推理等过程中的参数设置，
 ```
 
 其中参数对应的释义如下：
-| **参数名**                    | **参数释义**               |
-|------------------------------|------------------------|
-| module | 指定GPT模型的执行模块  |
-| vocab_size                   | 训练词表大小                 |
-| hidden_size                  | 隐藏层大小                  |
-| num_layers                   | transformer层数          |
-| num_attention_heads          | attention head的数量      |
-| max_seq_len                  | 输入文本序列的长度              |
-| ffn_hidden_size              | ffn层大小，一般为隐藏层的四倍       |
-| attention_probs_dropout_prob | attention中的dropout的失活率 |
-| max_position_embeddings      | position embedding的长度  |
-| type_vocab_size              | 词表类型                   |
-| initializer_range            | 参数初始化的范围               |
-| use_recompute                | 是否使用recompute训练，重计算全部transformer  |
+| **参数名**                   | **参数释义**                                             |
+|------------------------------|----------------------------------------------------------|
+| module                       | 指定GPT模型的执行模块                                    |
+| vocab_size                   | 训练词表大小                                             |
+| hidden_size                  | 隐藏层大小                                               |
+| num_layers                   | transformer层数                                          |
+| num_attention_heads          | attention head的数量                                     |
+| max_seq_len                  | 输入文本序列的长度                                       |
+| ffn_hidden_size              | ffn层大小，一般为隐藏层的四倍                            |
+| attention_probs_dropout_prob | attention中的dropout的失活率                             |
+| max_position_embeddings      | position embedding的长度                                 |
+| type_vocab_size              | 词表类型                                                 |
+| initializer_range            | 参数初始化的范围                                         |
+| use_recompute                | 是否使用recompute训练，重计算全部transformer             |
 | fuse_attn_qkv                | 是否对attention层中qkv计算使用fuse代替传统Linear加速训练 |
 
 
@@ -131,14 +131,14 @@ Engine训练设置完成模型训练/验证/推理等过程中的参数设置，
 ```
 
 其中参数对应的释义如下：
-| **参数名**         | **参数释义**               |
-|-------------------|------------------------|
-| collate_fn        | 通过此参数指定如果将样本列表组合为mini-batch数据；支持自定义  |
-| sample_split      | 通过此参数dataset返回的sample被组织为(inputs,labels) |
-| dataset.name      | 指定自定义数据集的名称  |
-| input_dir         | 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件 |
-| split             | 训练集，验证集和测试集的切分比例 |
-| max_seq_len       | 输入文本序列的长度 |
+| **参数名**   | **参数释义**                                                 |
+|--------------|--------------------------------------------------------------|
+| collate_fn   | 通过此参数指定如果将样本列表组合为mini-batch数据；支持自定义 |
+| sample_split | 通过此参数dataset返回的sample被组织为(inputs,labels)         |
+| dataset.name | 指定自定义数据集的名称                                       |
+| input_dir    | 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件 |
+| split        | 训练集，验证集和测试集的切分比例                             |
+| max_seq_len  | 输入文本序列的长度                                           |
 
 
 ### 优化器
@@ -165,19 +165,19 @@ GPT训练默认使用AdamW优化器以及cosine学习率衰减，这里通过配
 
 其中参数说明：
 
-| **参数名**      | **参数释义**                |
-|----------------|---------------------------|
-| name           | 指定自定义优化器的名称        |
-| weight_decay   | weight的衰减率              |
-| beta1          | 一阶矩估计的指数衰减率        |
-| beta2          | 二阶矩估计的指数衰减率        |
-| epsilon        | 指定优化器需要优化的参数      |
-| lr.name        | 指定自定义学习率策略的名称     |
-| decay_steps    | 衰减的步长                  |
-| warmup_rate    | warmup 率                  |
+| **参数名**     | **参数释义**                 |
+|----------------|------------------------------|
+| name           | 指定自定义优化器的名称       |
+| weight_decay   | weight的衰减率               |
+| beta1          | 一阶矩估计的指数衰减率       |
+| beta2          | 二阶矩估计的指数衰减率       |
+| epsilon        | 指定优化器需要优化的参数     |
+| lr.name        | 指定自定义学习率策略的名称   |
+| decay_steps    | 衰减的步长                   |
+| warmup_rate    | warmup 率                    |
 | max_lr         | Adam 的初始最大学习率        |
 | min_lr         | Adam 的初始最小学习率        |
-| grad_clip.name | 指定自定义梯度裁剪策略的名称   |
+| grad_clip.name | 指定自定义梯度裁剪策略的名称 |
 | clip_norm      | 所允许的范数最大值           |
 
 
@@ -197,23 +197,23 @@ GPT训练默认使用AdamW优化器以及cosine学习率衰减，这里通过配
 
 其中参数说明：
 
-| **参数名**          | **参数释义**                             |
-|------------------|--------------------------------------|
-| dp_degree        | 数据并行维度                               |
-| mp_degree        | 张量模型并行维度                             |
-| pp_degree        | 流水线并行维度                              |
-| sharding_degree  | 分组切分并行维度                             |
-| sharding_stage   | 切分策略；1表示仅切分优化器状态，2表示再切分梯度，3表示再切分前向参数 |
+| **参数名**      | **参数释义**                                                          |
+|-----------------|-----------------------------------------------------------------------|
+| dp_degree       | 数据并行维度                                                          |
+| mp_degree       | 张量模型并行维度                                                      |
+| pp_degree       | 流水线并行维度                                                        |
+| sharding_degree | 分组切分并行维度                                                      |
+| sharding_stage  | 切分策略；1表示仅切分优化器状态，2表示再切分梯度，3表示再切分前向参数 |
 
 
 ## 运行方式
 本目录按照345M、1.3B和6.7B规模大小，给出32G V100环境下GPT模型半自动并行训练的策略配置如下：
 
-| 模型规模   | 训练策略                     | yaml文件                               |
-|----------|---------------------------- |----------------------------------------|
-| 345MB    | 单卡+fp16                    | pretrain_gpt_345M_single_card.yaml     |
-| 1.3B     | dp8+fp16+recompute          | pretrain_gpt_1.3B_dp8.yaml             |
-| 6.7B     | sharding16+fp16+recompute   | pretrain_gpt_6.7B_sharding16.yaml  |
+| 模型规模 | 训练策略                  | yaml文件                           |
+|----------|---------------------------|------------------------------------|
+| 345MB    | 单卡+fp16                 | pretrain_gpt_345M_single_card.yaml |
+| 1.3B     | dp8+fp16+recompute        | pretrain_gpt_1.3B_dp8.yaml         |
+| 6.7B     | sharding16+fp16+recompute | pretrain_gpt_6.7B_sharding16.yaml  |
 
 若要在显存容量更小的16G V100环境下进行GPT大模型训练，可将对应yaml文件中的`Model`-`hidden size`值改为原来的1/2即可。
 
@@ -247,7 +247,7 @@ python ./tools/auto.py -c ./ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_1.3B_sing
 
 **启动命令**
 ```shell
-cd PaddleNLP/model_zoo/gpt-3 # 如果已在 PaddleNLP/model_zoo/gpt-3 目录下，则忽略
+cd PaddleNLP/legacy/model_zoo/gpt-3 # 如果已在 PaddleNLP/model_zoo/gpt-3 目录下，则忽略
 
 log_dir=log_auto
 python -m paddle.distributed.launch --log_dir $log_dir --devices "0,1,2,3,4,5,6,7" \

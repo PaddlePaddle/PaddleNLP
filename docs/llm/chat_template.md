@@ -1,1 +1,0 @@
-../../llm/docs/chat_template.md

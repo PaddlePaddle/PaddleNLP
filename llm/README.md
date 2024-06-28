@@ -1,35 +1,34 @@
 ## 🚣‍♂️ 飞桨大模型套件介绍 🚣
-飞桨大模型套件秉承了一站式体验、性能极致、生态兼容的设计理念，旨在提供业界主流大模型预训练、精调（含SFT、PEFT）、量化、推理等统一流程， 帮助开发者低成本、低门槛、快速实现大语言模型定制化。
+飞桨大模型套件以一站式体验、极致性能和生态兼容性为设计理念，致力于为开发者提供业界主流的大模型预训练、精调（包含SFT、PEFT技术）、对齐、量化和推理等全方位服务。开发者能够以便捷、低成本的方式快速实现大语言模型的定制化需求。
 
 <div align="center">
-    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/da10e972-260c-4925-bf49-1e0aefd2a65c">
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/4e61647b-8d66-4870-ba45-77a57990523c">
 </div>
 
 
 ##  💪🏼 大模型套件特色 💪🏼
 
--  **飞桨4D并行分布式策略**。 PaddleNLP Trainer 封装支持飞桨4D并行配置（数据并行、张量并行、流水线并行、 分组参数切分并行），屏蔽多硬件编程复杂性，用户可以修改Trainer配置组合多种预训练或精调过程的分布式策略，充分组合大模型4D并行训练能力，能有效提升在多模型、多硬件下的训练性能。
+-  **飞桨4D并行分布式策略**。 PaddleNLP Trainer通过封装支持飞桨的4D并行配置，即数据并行、张量并行、流水线并行以及分组参数切分并行，从而简化了多硬件编程的复杂性。用户仅需通过修改Trainer的配置，就能灵活组合各种预训练或精调过程中的分布式策略，充分发挥大模型的4D并行训练能力，进而在多模型、多硬件环境下显著提升训练性能。
 
--  **高效精调策略**。飞桨大模型套件提供SFT、PEFT等多种精调策略，搭载自研Zero Padding零填充优化策略有效减少训练数据中pad token的占比，提高模型训练效率。独创PEFT结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛。
+-  **高效精调对齐策略**。飞桨大模型套件提供了包括SFT、DPO、RLHF在内的多种精调对齐方法。套件中自研的Zero Padding零填充优化技术，有效降低了训练数据中无效填充标记（pad token）的比例，进一步增强了模型训练的效率。同时，独创的PEFT技术结合低比特和分布式并行方法，显著降低了进行大模型精调对齐的硬件要求。
 
-- **大模型无损量化**。大模型套件内置了PaddleSlim团队自研的自适应Shift-SmoothQuant的A8W8量化算法和业界主流GPTQ的W4量化算法，实现了主流大模型的无损量化，有效加速模型推理。
+- **大模型无损量化**。大模型套件预先集成了PaddleSlim LLM.PTQ量化算法，以及业界广泛采用的GPTQ和AWQ的W4量化方法，成功实现了对主流大模型的无损量化处理，显著加速了模型的推理速度。
 
-- **高性能推理**。大模型套件高性能推理模块内置动态插入和全环节算子融合策略，极大加快并行推理的速度。同时隐藏了底层实现的细节，实现了开箱即用高性能并行推理能力。
-
+- **高性能推理**。大模型套件的高性能推理模块内置了动态插入和全环节算子融合的高级策略，这极大地提升了并行推理的速度。同时，该模块隐藏了底层技术细节，为用户提供了开箱即用的高性能并行推理功能。
 
 ##  🛠️ 支持模型列表 🛠️
 
-| Model | Pretrain | SFT | LoRA | Prefix Tuning |  DPO |  Quantization | Weight convert |
-| --- | --- | --- | --- | --- | --- |  --- | --- |
-| [LLaMA](./llama) | ✅  | ✅ | ✅ | ✅ | ✅  | ✅  | ✅  |
-| [Qwen](./qwen) | ✅ | ✅ | ✅ | ✅ | ✅  | 🚧 | ✅  |
-| [Mixtral](./mixtral) | ✅  | ✅ | ✅ | ❌  |  🚧 |🚧 | 🚧  |
-| [Baichuan/Baichuan2](./llama) | ✅  | ✅ | ✅ | ✅ | ✅  | ✅  |  ✅  |
-| [ChatGLM-6B](./chatglm) |  ❌  |  ✅  |    ✅  |  ✅  |  🚧  |  ✅  | ❌  |
-| [ChatGLM2/ChatGLM3](./chatglm2) |  ❌  |    ✅  |  ✅  |  ✅  | 🚧  | ✅  | ✅  |
-| [Bloom](./bloom) | ❌  | ✅ | ✅ |  ✅ |🚧 | ✅ | ✅  |
-| [GPT-3](./gpt-3) |   ✅  |  ✅  |    🚧  | 🚧  |🚧 | 🚧 | ✅  |
-| [OPT](./opt) | 🚧 | ✅ | ✅ | 🚧 |  🚧 |🚧 | ✅  |
+| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Torch convert |
+|----------------------------------------|----------|-----|------|---------------|-----|--------------|----------------|----------------|
+| [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅  | ✅  | ✅            | ✅              |
+| [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅  | 🚧   | 🚧           | ✅              |
+| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | 🚧  | 🚧  | 🚧           | 🚧             |
+| [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅  | 🚧   | ✅            | ✅              |
+| [ChatGLM-6B](./config/chatglm)         | ❌        | ✅   | ✅    | ✅             | 🚧 | 🚧   | ✅            | ❌              |
+| [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅    | ✅             | 🚧 | 🚧   | ✅            | ✅              |
+| [Bloom](./config/bloom)                | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧  | ✅            | ✅              |
+| [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧  | 🚧  | 🚧           | ✅              |
+| [OPT](./config/opt)                    | 🚧       | ✅   | ✅    | 🚧            | 🚧 | 🚧   | 🚧           | ✅              |
 
 * ✅: Supported
 * 🚧: In Progress
@@ -39,7 +38,7 @@
 ##  🚀 快速开始 🚀
 
 ### 1. 预训练
-PaddleNLP将飞桨4D并行策略加入到Trainer API中， 用户只需修改Trainer配置即可使用不同的分布式策略。目前工具链提供[LLaMA/LLaMA2](./llama)、[GPT-3](./gpt-3)、[Qwen](./qwen)、[Baichuan/Baichuan2](./llama)、[Mixtral](./mixtral) 等模型预训练功能，更多模型支持持续更新中。
+PaddleNLP将飞桨4D并行策略加入到Trainer API中， 用户只需修改Trainer配置即可使用不同的分布式策略。目前工具链提供[LLaMA/LLaMA2/LLaMA3](./config/llama)、[GPT-3](./config/gpt-3)、[Qwen](./config/qwen)、[Baichuan/Baichuan2](./config/baichuan)、[Mixtral](./config/mixtral) 等模型预训练功能，更多模型支持持续更新中。
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/a2f0261d-7f76-4faf-ae01-cc9d37d5fcc0">
@@ -51,7 +50,7 @@ PaddleNLP将飞桨4D并行策略加入到Trainer API中， 用户只需修改Tra
 </div>
 
 
-我们在此处提供了更详细的[预训练数据制作]()，[分布式策略支持情况]( https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-performance)，参见: https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html. 大模型权重列表参见[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-weight)
+我们在此处提供了更详细的[预训练数据制作]()，[分布式策略支持情况](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-performance)，参见: https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html. 大模型权重列表参见[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-weight)
 
 
 此项目支持了LLaMA、GPT-3、BaiChuan、Qwen、Mixtral 等大模型的预训练。用户切换配置config文件，即可一键运行。
@@ -79,7 +78,7 @@ mv llama_openwebtext_100k.idx ./data
 
 ```shell
 # 编译自定义算子，可选
-cd ..legacy/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
+cd ../legacy/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 
 # 模型预训练参考
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json
@@ -152,8 +151,8 @@ python  run_finetune.py ./config/llama/pt_argument.json
 更多大模型精调分布式使用文档、训练细节和效果请参见[大模型精调教程](./docs/finetune.md)。
 
 ### 3. 对齐
-我们支持DPO等偏好对齐策略。DPO策略采用zero_padding策略，结合FlashMask策略，有效提升模型训练效率。
-
+我们支持DPO、RLHF等偏好对齐策略。DPO策略采用zero_padding策略，结合FlashMask策略，有效提升模型训练效率。
+#### 3.1 DPO
 **数据准备**：
 
 我们支持的精调数据格式是每行包含一个字典的json文件，每个字典包含以下字段：
@@ -190,10 +189,12 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 # DPO启动命令参考
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
+#### 3.2 RLHF
+飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF文档](./docs/rlhf.md)。
 
 ### 4. 量化
 大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。工具链量化算法包含：
-- **PTQ**。PaddleSlim 团队自研的自适应Shift-SmoothQuant量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
+- **PTQ**。PaddleSlim 团队自研的自适应LLM.PTQ量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
 新增PieceWiseSearch参数搜索算法，对模型权重和激活分布进行调整，减少后续A8W8 PTQ量化损失。
 
 
