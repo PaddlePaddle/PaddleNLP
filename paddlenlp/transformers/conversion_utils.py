@@ -37,7 +37,7 @@ from numpy import allclose, ndarray, transpose
 from paddle import Tensor
 from paddle.nn import Layer
 
-from paddlenlp.utils.distributed import distributed_gather
+from paddlenlp.utils.distributed import distributed_gather, distributed_allgather
 from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME, PYTORCH_WEIGHTS_NAME
 from paddlenlp.utils.import_utils import (
     is_package_available,
@@ -1269,7 +1269,10 @@ class ConversionMixin:
         for key in state_dict.keys():
             tensor = state_dict[key]
             if key in name_action_mappings:
-                ret = distributed_gather(tensor, group=mp_group, offload=True)
+                if paddle.is_compiled_with_xpu():
+                    ret = distributed_allgather(tensor, group=mp_group, offload=True)
+                else:
+                    ret = distributed_gather(tensor, group=mp_group, offload=True)
                 action = name_action_mappings.pop(key)
                 tensor = action(ret) if is_dst else None
             else:
