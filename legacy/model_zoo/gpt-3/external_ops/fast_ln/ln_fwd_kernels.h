@@ -87,6 +87,7 @@ __global__ __launch_bounds__(Ktraits::THREADS_PER_CTA) void ln_fwd_kernel(
   }
 
   constexpr compute_t rn = 1.f / compute_t(Ktraits::COLS);
+  bool is_rmsnorm = mu_ptr == nullptr;
 
   for (int row = r; row < params.rows;
        row += params.ctas_per_col * ROWS_PER_CTA) {
@@ -104,7 +105,7 @@ __global__ __launch_bounds__(Ktraits::THREADS_PER_CTA) void ln_fwd_kernel(
       idx += VEC_COLS_PER_LDG;
     }
 
-    stats_t s = stats.compute(xf, rn);
+    stats_t s = stats.compute(xf, rn, is_rmsnorm);
 
     compute_t mu = layer_norm::Get<0>::of<stats_t, compute_t>(s);
     compute_t m2 = layer_norm::Get<1>::of<stats_t, compute_t>(s);
@@ -125,7 +126,12 @@ __global__ __launch_bounds__(Ktraits::THREADS_PER_CTA) void ln_fwd_kernel(
     for (int it = 0; it < LDGS; it++) {
 #pragma unroll
       for (int jt = 0; jt < NUM_ELTS; jt++) {
-        output_t y_ij = output_t(rs * (xf[it * NUM_ELTS + jt] - mu));
+        output_t y_ij;
+        if (is_rmsnorm) {
+          y_ij = output_t(rs * xf[it * NUM_ELTS + jt]);
+        } else {
+          y_ij = output_t(rs * (xf[it * NUM_ELTS + jt] - mu));
+        }
         output_t g_ij = gamma[it].data.elt[jt];
         output_t b_ij = beta[it].data.elt[jt];
         z[it].data.elt[jt] = (g_ij * y_ij + b_ij);
