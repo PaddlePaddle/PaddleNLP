@@ -1091,7 +1091,7 @@ class GenerationMixin(object):
             next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
             next_scores = paddle.index_sample(probs, next_tokens)
 
-            if eos_token_id is not None:
+            if eos_token_id is not None and pad_token_id is not None:
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
 
             scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
@@ -1234,7 +1234,7 @@ class GenerationMixin(object):
 
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
-            if eos_token_id is not None:
+            if eos_token_id is not None and pad_token_id is not None:
                 next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
 
             scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
