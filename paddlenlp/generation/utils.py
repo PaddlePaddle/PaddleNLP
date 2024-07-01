@@ -1440,38 +1440,40 @@ class GenerationMixin(object):
         # make the shape of attention_mask = (-1, -1, -1, -1) in dy2static.
         model_kwargs["attention_mask"] = paddle.reshape(attn_mask, attn_mask.shape)
         model_kwargs["cache"] = outputs[1] if isinstance(outputs, tuple) else None
-        max_new_tokens = paddle.full([1], max_new_tokens + cur_len - 1, dtype="int64")
+        # max_new_tokens = paddle.full([1], max_new_tokens + cur_len - 1, dtype="int64")
 
-        if hasattr(paddle.framework, "_no_check_dy2st_diff"):
-            # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
-            # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
-            # removed after static graphs support inplace and stride.
-            with paddle.framework._no_check_dy2st_diff():
-                while cur_len < max_new_tokens and paddle.any(unfinished_flag):
-                    input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
-                        _forward_(**model_kwargs),
-                        input_ids,
-                        cur_len_gpu,
-                        origin_len_gpu,
-                        scores,
-                        unfinished_flag,
-                        model_kwargs,
-                    )
-                    paddle.increment(cur_len)
-                    paddle.increment(cur_len_gpu)
-        else:
-            while cur_len < max_new_tokens and paddle.any(unfinished_flag):
-                input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
-                    _forward_(**model_kwargs),
-                    input_ids,
-                    cur_len_gpu,
-                    origin_len_gpu,
-                    scores,
-                    unfinished_flag,
-                    model_kwargs,
-                )
-                paddle.increment(cur_len)
-                paddle.increment(cur_len_gpu)
+        # if hasattr(paddle.framework, "_no_check_dy2st_diff"):
+        #     # TODO(daisiming): _no_check_dy2st_diff is used to turn off the checking of behavior
+        #     # inconsistency between dynamic graph and static graph. _no_check_dy2st_diff should be
+        #     # removed after static graphs support inplace and stride.
+        #     with paddle.framework._no_check_dy2st_diff():
+        #         # llama infer while begin
+        #         while cur_len < max_new_tokens and paddle.any(unfinished_flag):
+        #             input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
+        #                 _forward_(**model_kwargs),
+        #                 input_ids,
+        #                 cur_len_gpu,
+        #                 origin_len_gpu,
+        #                 scores,
+        #                 unfinished_flag,
+        #                 model_kwargs,
+        #             )
+        #             paddle.increment(cur_len)
+        #             paddle.increment(cur_len_gpu)
+        #         # llama infer while end
+        # else:
+        #     while cur_len < max_new_tokens and paddle.any(unfinished_flag):
+        #         input_ids, scores, unfinished_flag, model_kwargs = _post_process_(
+        #             _forward_(**model_kwargs),
+        #             input_ids,
+        #             cur_len_gpu,
+        #             origin_len_gpu,
+        #             scores,
+        #             unfinished_flag,
+        #             model_kwargs,
+        #         )
+        #         paddle.increment(cur_len)
+        #         paddle.increment(cur_len_gpu)
 
         return input_ids[:, origin_len:], scores
 
