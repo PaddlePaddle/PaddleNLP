@@ -190,6 +190,17 @@ def get_lora_target_modules(model):
             ".*w2.*",
             ".*w3.*",
         ]
+    elif model.base_model_prefix == "mistral":
+        target_modules = [
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*o_proj.*",
+            ".*gate.*",
+            ".*w1.*",
+            ".*w2.*",
+            ".*w3.*",
+        ]
     elif model.base_model_prefix == "qwen2_moe":
         target_modules = [
             ".*q_proj.*",
@@ -279,6 +290,7 @@ class CausalLMTrainer(Trainer):
             )[0]
             all_preds = []
             for pred_tokens in generated_tokens:
+                pred_tokens = pred_tokens.numpy()
                 pred_tokens = pred_tokens[pred_tokens != self.tokenizer.pad_token_id].tolist()
                 all_preds.append(pred_tokens)
             max_pred_length = max([len(x) for x in all_preds])

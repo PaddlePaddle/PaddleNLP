@@ -39,18 +39,6 @@ from ..model_utils import PretrainedModel
 from .configuration import MistralConfig
 
 
-def _get_unpad_data(padding_mask):
-    seqlens_in_batch = padding_mask.sum(axis=-1, dtype=paddle.int32)
-    indices = paddle.nonzero(padding_mask.flatten(), as_tuple=False).flatten()
-    max_seqlen_in_batch = seqlens_in_batch.max().item()
-    cu_seqlens = F.pad(paddle.cumsum(seqlens_in_batch, axis=0, dtype=paddle.paddle.int32), (1, 0))
-    return (
-        indices,
-        cu_seqlens,
-        max_seqlen_in_batch,
-    )
-
-
 def _make_causal_mask(
     input_ids_shape: paddle.shape,
     dtype: paddle.dtype,
@@ -462,10 +450,6 @@ class MistralDecoderLayer(nn.Layer):
 class MistralPreTrainedModel(PretrainedModel):
     config_class = MistralConfig
     base_model_prefix = "mistral"
-    supports_gradient_checkpointing = True
-    _no_split_modules = ["MistralDecoderLayer"]
-    _skip_keys_device_placement = "past_key_values"
-    _supports_flash_attn_2 = True
 
     @classmethod
     def _get_name_mappings(cls, config: MistralConfig) -> List[StateDictNameMapping]:
