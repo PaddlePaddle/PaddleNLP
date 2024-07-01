@@ -21,7 +21,7 @@ import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
-from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
+from paddle.nn import CrossEntropyLoss
 
 from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
@@ -34,7 +34,6 @@ from ..model_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithCrossAttentions,
     CausalLMOutputWithPast,
-    SequenceClassifierOutputWithPast,
 )
 from ..model_utils import PretrainedModel
 from .configuration import MistralConfig
@@ -56,7 +55,6 @@ def _make_causal_mask(
     input_ids_shape: paddle.shape,
     dtype: paddle.dtype,
     past_key_values_length: int = 0,
-    sliding_window: int = 4096,
 ):
     """
     Make causal mask used for sliding window attention
@@ -68,45 +66,10 @@ def _make_causal_mask(
         fill_value=1,
     )
     mask = paddle.tril(tensor, diagonal=0)
-    mask = paddle.triu(mask, diagonal=-sliding_window)
     mask = paddle.log(mask).astype(dtype)
 
     if past_key_values_length > 0:
         mask = paddle.concat([paddle.zeros([tgt_len, past_key_values_length], dtype=dtype), mask], axis=-1)
-    return mask[None, None, :, :].expand([bsz, 1, tgt_len, tgt_len + past_key_values_length])
-
-
-def _make_sliding_window_causal_mask(
-    input_ids_shape: paddle.shape,
-    dtype: paddle.dtype,
-    past_key_values_length: int = 0,
-    sliding_window: int = 4096,
-):
-    """
-    Make causal mask used for sliding window attention
-    """
-    bsz, tgt_len = input_ids_shape
-    mask = paddle.full(
-        (tgt_len, tgt_len),
-        fill_value=0.0,
-        dtype="float32",
-    )
-    if past_key_values_length > 0:
-        mask = paddle.concat([paddle.zeros([tgt_len, past_key_values_length], dtype="float32"), mask], axis=-1)
-
-    # make sliding window mask
-    # note that: this computation of SWA only modify the mask
-    # to imitate sliding window which has same time complexity
-    # with normal attention calculation, just for test.
-    for qidx in range(tgt_len):
-        q_causal_start = past_key_values_length + qidx - sliding_window
-        q_causal_end = q_causal_start + sliding_window
-        q_causal_start = max(0, q_causal_start)
-        # paddle do not support index operation on bfloat16 tensor temporary
-        mask[qidx, q_causal_start : q_causal_end + 1] = 1.0
-
-    mask = paddle.log(mask).astype(dtype)
-
     return mask[None, None, :, :].expand([bsz, 1, tgt_len, tgt_len + past_key_values_length])
 
 
@@ -653,28 +616,15 @@ class MistralModel(MistralPreTrainedModel):
     def set_input_embeddings(self, value):
         self.embed_tokens = value
 
-    def _prepare_decoder_attention_mask(
-        self, attention_mask, input_shape, inputs_embeds, past_key_values_length, sliding_window
-    ):
+    def _prepare_decoder_attention_mask(self, attention_mask, input_shape, inputs_embeds, past_key_values_length):
         # create causal mask
         # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
 
-        q_length = input_shape[-1]
-        kv_length = q_length + past_key_values_length
-        if sliding_window and kv_length > sliding_window:
-            combined_attention_mask = _make_sliding_window_causal_mask(
-                input_shape,
-                inputs_embeds.dtype,
-                past_key_values_length=past_key_values_length,
-                sliding_window=sliding_window,
-            )
-        else:
-            combined_attention_mask = _make_causal_mask(
-                input_shape,
-                inputs_embeds.dtype,
-                past_key_values_length=past_key_values_length,
-                sliding_window=sliding_window,
-            )
+        combined_attention_mask = _make_causal_mask(
+            input_shape,
+            inputs_embeds.dtype,
+            past_key_values_length=past_key_values_length,
+        )
 
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
@@ -760,7 +710,6 @@ class MistralModel(MistralPreTrainedModel):
             (batch_size, seq_length),
             inputs_embeds,
             past_key_values_length,
-            sliding_window=self.config.sliding_window,
         )
 
         hidden_states = inputs_embeds
@@ -1020,104 +969,4 @@ class MistralForCausalLM(MistralPreTrainedModel):
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
-        )
-
-
-class MistralForSequenceClassification(MistralPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
-        self.num_labels = config.num_labels
-        self.model = MistralModel(config)
-        self.score = nn.Linear(config.hidden_size, self.num_labels, bias_attr=False)
-
-    def get_input_embeddings(self):
-        return self.model.embed_tokens
-
-    def set_input_embeddings(self, value):
-        self.model.embed_tokens = value
-
-    def forward(
-        self,
-        input_ids: paddle.Tensor = None,
-        attention_mask: Optional[paddle.Tensor] = None,
-        position_ids: Optional[paddle.Tensor] = None,
-        past_key_values: Optional[List[paddle.Tensor]] = None,
-        inputs_embeds: Optional[paddle.Tensor] = None,
-        labels: Optional[paddle.Tensor] = None,
-        use_cache: Optional[bool] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
-    ) -> Union[Tuple, SequenceClassifierOutputWithPast]:
-        r"""
-        labels (`paddle.Tensor` of shape `(batch_size,)`, *optional*):
-            Labels for computing the sequence classification/regression loss. Indices should be in `[0, ...,
-            config.num_labels - 1]`. If `config.num_labels == 1` a regression loss is computed (Mean-Square loss), If
-            `config.num_labels > 1` a classification loss is computed (Cross-Entropy).
-        """
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
-        transformer_outputs = self.model(
-            input_ids,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            past_key_values=past_key_values,
-            inputs_embeds=inputs_embeds,
-            use_cache=use_cache,
-            output_attentions=output_attentions,
-            output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
-        )
-        hidden_states = transformer_outputs[0]
-        logits = self.score(hidden_states)
-
-        if input_ids is not None:
-            batch_size = input_ids.shape[0]
-        else:
-            batch_size = inputs_embeds.shape[0]
-
-        if self.config.pad_token_id is None and batch_size != 1:
-            raise ValueError("Cannot handle batch sizes > 1 if no padding token is defined.")
-        if self.config.pad_token_id is None:
-            sequence_lengths = -1
-        else:
-            if input_ids is not None:
-                sequence_lengths = paddle.eq(input_ids, self.config.pad_token_id).long().argmax(-1) - 1
-            else:
-                sequence_lengths = -1
-
-        pooled_logits = logits[paddle.arange(batch_size), sequence_lengths]
-
-        loss = None
-        if labels is not None:
-            if self.config.problem_type is None:
-                if self.num_labels == 1:
-                    self.config.problem_type = "regression"
-                elif self.num_labels > 1 and (labels.dtype == paddle.int64 or labels.dtype == paddle.int):
-                    self.config.problem_type = "single_label_classification"
-                else:
-                    self.config.problem_type = "multi_label_classification"
-
-            if self.config.problem_type == "regression":
-                loss_fct = MSELoss()
-                if self.num_labels == 1:
-                    loss = loss_fct(pooled_logits.squeeze(), labels.squeeze())
-                else:
-                    loss = loss_fct(pooled_logits, labels)
-            elif self.config.problem_type == "single_label_classification":
-                loss_fct = CrossEntropyLoss()
-                loss = loss_fct(pooled_logits.reshape([-1, self.num_labels]), labels.reshape([-1]))
-            elif self.config.problem_type == "multi_label_classification":
-                loss_fct = BCEWithLogitsLoss()
-                loss = loss_fct(pooled_logits, labels)
-        if not return_dict:
-            output = (pooled_logits,) + transformer_outputs[1:]
-            return ((loss,) + output) if loss is not None else output
-
-        return SequenceClassifierOutputWithPast(
-            loss=loss,
-            logits=pooled_logits,
-            past_key_values=transformer_outputs.past_key_values,
-            hidden_states=transformer_outputs.hidden_states,
-            attentions=transformer_outputs.attentions,
         )
