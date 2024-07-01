@@ -19,4 +19,5 @@ from .utils import (
     chatglm_postprocess_past_key_value,
     llama_postprocess_past_key_value,
     qwen_postprocess_past_key_value,
+    mistral_postprocess_past_key_value,
 )

@@ -216,7 +216,10 @@ class MistralAttention(nn.Layer):
         self.num_key_value_groups = self.num_heads // self.num_key_value_heads
         self.max_position_embeddings = config.max_position_embeddings
         self.rope_theta = config.rope_theta
+<<<<<<< Updated upstream
         self.use_flash_attention = getattr(config, "_flash_attn_2_enabled", False)
+=======
+>>>>>>> Stashed changes
 
         if (self.head_dim * self.num_heads) != self.hidden_size:
             raise ValueError(
@@ -329,7 +332,11 @@ class MistralAttention(nn.Layer):
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
+<<<<<<< Updated upstream
         if not self.use_flash_attention:
+=======
+        if not self.config.use_flash_attention:
+>>>>>>> Stashed changes
             attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(self.head_dim)
 
             if attn_weights.shape != [bsz, self.num_heads, q_len, kv_seq_len]:
@@ -787,14 +794,26 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=T
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
         logits = paddle.matmul(input_parallel, y, transpose_y=False)
+<<<<<<< Updated upstream
+=======
+        print(y)
+>>>>>>> Stashed changes
 
         if tensor_parallel_output:
             return logits
 
+<<<<<<< Updated upstream
+=======
+        print(logits)
+>>>>>>> Stashed changes
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
         logits = paddle.matmul(x, y, transpose_y=False)
+<<<<<<< Updated upstream
+=======
+        print(y)
+>>>>>>> Stashed changes
         return logits
 
 
@@ -820,6 +839,10 @@ class MistralLMHead(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
+<<<<<<< Updated upstream
+=======
+        print(tensor_parallel_output)
+>>>>>>> Stashed changes
         logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
 
@@ -935,7 +958,14 @@ class MistralForCausalLM(MistralPreTrainedModel):
         )
 
         hidden_states = outputs[0]
+<<<<<<< Updated upstream
         logits = self.lm_head(hidden_states)
+=======
+        print(hidden_states)
+        logits = self.lm_head(hidden_states)
+        print(logits)
+        import pdb;pdb.set_trace()
+>>>>>>> Stashed changes
         logits = logits.astype("float32")
 
         loss = None
