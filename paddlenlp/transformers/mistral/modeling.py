@@ -791,7 +791,6 @@ class MistralLMHead(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-        print(tensor_parallel_output)
         logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
 
