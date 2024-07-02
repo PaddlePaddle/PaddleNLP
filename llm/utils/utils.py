@@ -279,6 +279,7 @@ class CausalLMTrainer(Trainer):
             )[0]
             all_preds = []
             for pred_tokens in generated_tokens:
+                pred_tokens = pred_tokens.numpy()
                 pred_tokens = pred_tokens[pred_tokens != self.tokenizer.pad_token_id].tolist()
                 all_preds.append(pred_tokens)
             max_pred_length = max([len(x) for x in all_preds])
