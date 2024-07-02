@@ -54,7 +54,6 @@ class LoRALinear(nn.Linear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        merge_weights: bool = True,
         use_quick_lora: bool = False,
         rslora: bool = False,
         lora_plus_scale: float = 1.0,
@@ -73,7 +72,6 @@ class LoRALinear(nn.Linear):
             self.lora_dropout = lambda x: x
         # Mark the weight as unmerged
         self.merged = False
-        self.merge_weights = merge_weights
         self.pissa = pissa
 
         # Actual trainable parameters
@@ -129,21 +127,17 @@ class LoRALinear(nn.Linear):
         weight = res.astype(dtype)
         self.weight.set_value(weight)
 
-    def train(self):
-        super().train()
-        if self.merge_weights and self.merged:
-            # Make sure that the weights are not merged
-            new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
-            self.weight.set_value(new_weight)
-            self.merged = False
-
-    def eval(self):
-        super().eval()
-        if self.merge_weights and not self.merged:
-            # Merge the weights and mark it
+    def merge(self):
+        if not self.merged:
             new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = True
+
+    def unmerge(self):
+        if self.merged:
+            new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
+            self.weight.set_value(new_weight)
+            self.merged = False
 
     def forward(self, input: paddle.Tensor, *args, **kwargs):
         if not self.apply_pissa and self.pissa:
@@ -175,7 +169,6 @@ class RowParallelLoRALinear(RowParallelLinear):
         lora_dropout: float = 0.0,
         rslora: bool = False,
         lora_plus_scale: float = 1.0,
-        merge_weights: bool = True,
         use_quick_lora: bool = False,
         pissa: bool = False,
         **kwargs
@@ -196,7 +189,6 @@ class RowParallelLoRALinear(RowParallelLinear):
             self.lora_dropout = lambda x: x
         # Mark the weight as unmerged
         self.merged = False
-        self.merge_weights = merge_weights
 
         # compatible
         self.name = self._name
@@ -237,18 +229,14 @@ class RowParallelLoRALinear(RowParallelLinear):
     def use_quick_lora(self):
         return self._use_quick_lora and self.training and not self.merged
 
-    def train(self):
-        super().train()
-        if self.merge_weights and self.merged:
-            # Make sure that the weights are not merged
+    def unmerge(self):
+        if self.merged:
             new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = False
 
-    def eval(self):
-        super().eval()
-        if self.merge_weights and not self.merged:
-            # Merge the weights and mark it
+    def merge(self):
+        if not self.merged:
             new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = True
@@ -334,7 +322,6 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
         lora_dropout: float = 0.0,
         rslora: bool = False,
         lora_plus_scale: float = 1.0,
-        merge_weights: bool = True,
         use_quick_lora: bool = False,
         **kwargs
     ):
@@ -350,7 +337,6 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
             self.lora_dropout = lambda x: x
         # Mark the weight as unmerged
         self.merged = False
-        self.merge_weights = merge_weights
 
         # compatible
         self.name = self._name
@@ -393,18 +379,14 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
         # TODO(@gexiao): support qlora
         return False  # self._use_quick_lora and self.training and not self.merged
 
-    def train(self):
-        super().train()
-        if self.merge_weights and self.merged:
-            # Make sure that the weights are not merged
+    def unmerge(self):
+        if self.merged:
             new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = False
 
-    def eval(self):
-        super().eval()
-        if self.merge_weights and not self.merged:
-            # Merge the weights and mark it
+    def merge(self):
+        if not self.merged:
             new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = True
@@ -450,7 +432,6 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         lora_dropout: float = 0.0,
         rslora: bool = False,
         lora_plus_scale: float = 1.0,
-        merge_weights: bool = True,
         lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         use_quick_lora: bool = False,
         pissa: bool = False,
@@ -472,7 +453,6 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             self.lora_dropout = lambda x: x
         # Mark the weight as unmerged
         self.merged = False
-        self.merge_weights = merge_weights
 
         # compatible
         self.name = self._name
@@ -511,17 +491,15 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
     def use_quick_lora(self):
         return self._use_quick_lora and self.training and not self.merged
 
-    def train(self):
-        super().train()
-        if self.merge_weights and self.merged:
+    def unmerge(self):
+        if self.merged:
             # Make sure that the weights are not merged
             new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = False
 
-    def eval(self):
-        super().eval()
-        if self.merge_weights and not self.merged:
+    def merge(self):
+        if not self.merged:
             # Merge the weights and mark it
             new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
@@ -589,7 +567,6 @@ class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear):
         lora_dropout: float = 0.0,
         rslora: bool = False,
         lora_plus_scale: float = 1.0,
-        merge_weights: bool = True,
         lora_A_weight_attr: Optional[paddle.ParamAttr] = None,
         use_quick_lora: bool = False,
         **kwargs
@@ -606,7 +583,6 @@ class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear):
             self.lora_dropout = lambda x: x
         # Mark the weight as unmerged
         self.merged = False
-        self.merge_weights = merge_weights
 
         # compatible
         self.name = self._name
@@ -648,18 +624,14 @@ class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear):
         # TODO(@gexiao): support qlora
         return False  # self._use_quick_lora and self.training and not self.merged
 
-    def train(self):
-        super().train()
-        if self.merge_weights and self.merged:
-            # Make sure that the weights are not merged
+    def unmerge(self):
+        if self.merged:
             new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = False
 
-    def eval(self):
-        super().eval()
-        if self.merge_weights and not self.merged:
-            # Merge the weights and mark it
+    def merge(self):
+        if not self.merged:
             new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = True
@@ -708,7 +680,6 @@ class LoRAConv2D(nn.Conv2D):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        merge_weights: bool = True,
         **kwargs
     ):
         nn.Conv2D.__init__(self, in_channels, out_channels, kernel_size, **kwargs)
@@ -723,7 +694,6 @@ class LoRAConv2D(nn.Conv2D):
             self.lora_dropout = lambda x: x
         # Mark the weight as unmerged
         self.merged = False
-        self.merge_weights = merge_weights
 
         # Actual trainable parameters
         lora_A = nn.Conv2D(
@@ -755,9 +725,8 @@ class LoRAConv2D(nn.Conv2D):
             self.bias.stop_gradient = True
         self.disable_lora = False
 
-    def train(self):
-        super().train()
-        if self.merge_weights and self.merged:
+    def unmerge(self):
+        if self.merged:
             weight_A = self.lora_A.cast(dtype=self.weight.dtype)
             weight_B = self.lora_B.cast(dtype=self.weight.dtype)
             if self.weight.shape[2:4] == [1, 1]:
@@ -779,9 +748,8 @@ class LoRAConv2D(nn.Conv2D):
             self.weight.set_value(new_weight)
             self.merged = False
 
-    def eval(self):
-        super().eval()
-        if self.merge_weights and not self.merged:
+    def merge(self):
+        if not self.merged:
             weight_A = self.lora_A.cast(dtype=self.weight.dtype)
             weight_B = self.lora_B.cast(dtype=self.weight.dtype)
             if self.weight.shape[2:4] == [1, 1]:

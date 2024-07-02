@@ -42,7 +42,6 @@ Prefix-tuning[论文](https://arxiv.org/abs/2101.00190)
         target_modules=target_modules,
         r=lora_rank,
         lora_alpha=2 * lora_rank,
-        merge_weights=True
     )
     model = LoRAModel(model, lora_config)
     model.mark_only_lora_as_trainable()
@@ -92,7 +91,7 @@ Parameters:
                         默认为 0.0，dropout的比例设置，float 类型
 
     --merge_weights
-                        默认为 False，模型推理时，是否进行base model 权重和 LoRA 权重的合参操作，bool 类型
+                        默认为 False，接口将被废弃。请使用model.merge()或model.unmerge()替代。
 
     --trainable_bias
                         指定可训练的 bias, 可选项 ['lora', 'all']

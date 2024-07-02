@@ -31,6 +31,10 @@ from paddle.distributed.fleet.meta_parallel import (
     PipelineLayer,
     RowParallelLinear,
 )
+from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+    ColumnSequenceParallelLinear,
+    RowSequenceParallelLinear,
+)
 
 from ...transformers.conversion_utils import ConversionMixin
 from ...transformers.model_utils import (
@@ -62,15 +66,6 @@ AVALIABLE_LAYERS = [
     RowParallelLoRALinear,
     RowSequenceParallelLoRALinear,
 ]
-try:
-    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-        ColumnSequenceParallelLinear,
-        RowSequenceParallelLinear,
-    )
-
-    AVALIABLE_LAYERS += [ColumnSequenceParallelLinear, RowSequenceParallelLinear]
-except:
-    pass
 
 try:
     from ...quantization.quantization_linear import (
@@ -405,7 +400,6 @@ class LoRAModel(nn.Layer):
                 r=lora_config.r,
                 lora_alpha=lora_config.lora_alpha,
                 lora_dropout=lora_config.lora_dropout,
-                merge_weights=lora_config.merge_weights,
                 rslora=lora_config.rslora,
                 lora_plus_scale=lora_config.lora_plus_scale,
                 pissa=lora_config.pissa,
@@ -426,7 +420,6 @@ class LoRAModel(nn.Layer):
                 r=lora_config.r,
                 lora_alpha=lora_config.lora_alpha,
                 lora_dropout=lora_config.lora_dropout,
-                merge_weights=lora_config.merge_weights,
                 bias_attr=module._bias_attr,
             )
         elif isinstance(module, ColumnParallelLinear):
@@ -443,7 +436,6 @@ class LoRAModel(nn.Layer):
                 rslora=lora_config.rslora,
                 lora_plus_scale=lora_config.lora_plus_scale,
                 pissa=lora_config.pissa,
-                merge_weights=lora_config.merge_weights,
                 lora_A_weight_attr=paddle.ParamAttr(
                     initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
                 ),
@@ -470,7 +462,6 @@ class LoRAModel(nn.Layer):
                 rslora=lora_config.rslora,
                 lora_plus_scale=lora_config.lora_plus_scale,
                 pissa=lora_config.pissa,
-                merge_weights=lora_config.merge_weights,
                 use_quick_lora=lora_config.use_quick_lora,
             )
             # Lora column parallel will spilt lora A matrix
@@ -494,7 +485,6 @@ class LoRAModel(nn.Layer):
                 lora_dropout=lora_config.lora_dropout,
                 rslora=lora_config.rslora,
                 lora_plus_scale=lora_config.lora_plus_scale,
-                merge_weights=lora_config.merge_weights,
                 lora_A_weight_attr=paddle.ParamAttr(
                     initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
                 ),
@@ -520,7 +510,6 @@ class LoRAModel(nn.Layer):
                 lora_dropout=lora_config.lora_dropout,
                 rslora=lora_config.rslora,
                 lora_plus_scale=lora_config.lora_plus_scale,
-                merge_weights=lora_config.merge_weights,
                 use_quick_lora=lora_config.use_quick_lora,
             )
             # Lora column parallel will spilt lora A matrix
@@ -544,7 +533,6 @@ class LoRAModel(nn.Layer):
                 r=lora_config.r,
                 lora_alpha=lora_config.lora_alpha,
                 lora_dropout=lora_config.lora_dropout,
-                merge_weights=lora_config.merge_weights,
             )
             self.quantized = True
         elif ColumnParallelQuantizationLinear is not None and isinstance(module, ColumnParallelQuantizationLinear):
@@ -715,8 +703,6 @@ class LoRAModel(nn.Layer):
 
     def restore_original_model(self):
         # make sure W and lora weights are not merged before we restore the original model
-        if self.lora_config.merge_weights:
-            self.train()
 
         for layer_name, layer in self.model.named_sublayers():
             if isinstance(layer, LoRALinear):
@@ -825,3 +811,13 @@ class LoRAModel(nn.Layer):
         for _, layer in self.model.named_sublayers():
             if any(isinstance(layer, lora_layer) for lora_layer in AVALIABLE_LAYERS):
                 layer.disable_lora = False
+
+    def merge(self):
+        for _, layer in self.model.named_sublayers():
+            if any(isinstance(layer, lora_layer) for lora_layer in AVALIABLE_LAYERS):
+                layer.merge()
+
+    def unmerge(self):
+        for _, layer in self.model.named_sublayers():
+            if any(isinstance(layer, lora_layer) for lora_layer in AVALIABLE_LAYERS):
+                layer.unmerge()
