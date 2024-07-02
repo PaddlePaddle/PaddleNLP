@@ -97,6 +97,9 @@ cd ./paddlenlp/csrc/xpu/src && sh cmake_build.sh
 # 动态图模型推理命令参考
 python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16
 
+#Cpu设备使用avx指令动态图推理参考
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float32 --avx_mode --avx_type "fp16" --device "cpu"
+
 # PrefixTuning动态图推理参考
 python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --export_precache true --prefix_path ./checkpoints/llama_prefix_ckpts
 
@@ -117,6 +120,9 @@ python ./predict/predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts -
 # 动转静命令参考
 python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16
 
+# Cpu动转静avx指令动转静参考
+python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float32 --avx_mode --avx_type "fp16" --device "cpu"
+
 # PrefixTuning动转静命令参考
 python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --export_precache true
 
@@ -136,6 +142,9 @@ python ./predict/export_model.py --model_name_or_path checkpoints/llama_ptq_ckpt
 ```shell
 # 静态图推理命令参考
 python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static"
+
+#Cpu使用avx指令静态图推理参考
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --avx_mode --avx_type "fp16" --dtype "float32" --mode "static" --device "cpu"
 
 # PrefixTuning静态图推理命令参考
 python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static" --export_precache true --prefix_path ./checkpoints/llama_prefix_ckpts
