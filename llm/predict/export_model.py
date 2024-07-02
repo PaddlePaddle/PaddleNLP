@@ -56,11 +56,14 @@ def validate_pdmodel(model_path, model_prefix, device):
             os.path.join(model_path, model_prefix), exe
         )
 
-        for block in net_program.blocks:
-            ops: list[paddle.framework.Operator] = block.ops
-            for op in tqdm(ops, desc="checking the validation of ops"):
-                if op.type.lower() == "print":
-                    logger.warning(f"UNEXPECTED OP<{op.type}> which will reduce the performace of the static model")
+        if not paddle.framework.use_pir_api():
+            for block in net_program.blocks:
+                ops: list[paddle.framework.Operator] = block.ops
+                for op in tqdm(ops, desc="checking the validation of ops"):
+                    if op.type.lower() == "print":
+                        logger.warning(
+                            f"UNEXPECTED OP<{op.type}> which will reduce the performace of the static model"
+                        )
 
 
 def main():
