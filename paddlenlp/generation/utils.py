@@ -1091,8 +1091,13 @@ class GenerationMixin(object):
             next_tokens = paddle.argmax(probs, axis=-1).unsqueeze(-1)
             next_scores = paddle.index_sample(probs, next_tokens)
 
-            if pad_token_id is not None:
-                next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
+            if eos_token_id is not None:
+                if pad_token_id is None:
+                    next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, 0.0))
+                else:
+                    next_tokens = paddle.where(
+                        unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id)
+                    )
 
             scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
             cur_len += 1
@@ -1234,8 +1239,13 @@ class GenerationMixin(object):
 
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
-            if pad_token_id is not None:
-                next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
+            if eos_token_id is not None:
+                if pad_token_id is None:
+                    next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, 0.0))
+                else:
+                    next_tokens = paddle.where(
+                        unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id)
+                    )
 
             scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
@@ -1406,8 +1416,13 @@ class GenerationMixin(object):
             next_scores = paddle.index_sample(origin_probs, next_tokens)
             scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
-            if pad_token_id is not None:
-                next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
+            if eos_token_id is not None:
+                if pad_token_id is None:
+                    next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, 0.0))
+                else:
+                    next_tokens = paddle.where(
+                        unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id)
+                    )
 
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
