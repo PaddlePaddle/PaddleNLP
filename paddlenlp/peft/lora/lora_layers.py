@@ -143,15 +143,14 @@ class LoRALinear(nn.Linear):
         if not self.apply_pissa and self.pissa:
             self.pissa_init(self.r)
             self.apply_pissa = True
-        if self.disable_lora:
+        if self.disable_lora or self.merged:
             result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         elif self.use_quick_lora:
             # Use the quick lora implementation
             result = quick_lora(input, self.lora_A, self.lora_B, self.weight, self.bias, self.scaling)
         else:
             result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
-            if not self.merged:
-                result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
+            result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
         return result
 
     def extra_repr(self):
@@ -246,7 +245,7 @@ class RowParallelLoRALinear(RowParallelLinear):
             input_mp = mp_ops._c_split(x, group=self.model_parallel_group)
         else:
             input_mp = x
-        if self.disable_lora:
+        if self.disable_lora or self.merged:
             # x @ W : [bz, in_f / ws] ===> [bz, out_f]
             if MC2RowParallelCoreLinear is None:
                 result_mp = F.linear(x=input_mp, weight=self.weight, name=self.name)
@@ -291,19 +290,18 @@ class RowParallelLoRALinear(RowParallelLinear):
             else:
                 output = MC2RowParallelCoreLinear.apply(input_mp, self.weight, self.model_parallel_group)
 
-            if not self.merged:
-                # x @ A: [bz, in_f/ ws] ===> [bz, r]
-                input_mp = self.lora_dropout(input_mp) @ self.lora_A
-                # all reduce to keep Lora B's gradient on different gpu consistent
-                input_dup = mp_ops._mp_allreduce(
-                    input_mp,
-                    group=self.model_parallel_group,
-                    use_calc_stream=True,
-                    use_model_parallel=True,
-                )
-                #  @ B: [bz, r] ===> [bz, out_f]
-                delta_mp = (input_dup @ self.lora_B) * self.scaling
-                output += delta_mp
+            # x @ A: [bz, in_f/ ws] ===> [bz, r]
+            input_mp = self.lora_dropout(input_mp) @ self.lora_A
+            # all reduce to keep Lora B's gradient on different gpu consistent
+            input_dup = mp_ops._mp_allreduce(
+                input_mp,
+                group=self.model_parallel_group,
+                use_calc_stream=True,
+                use_model_parallel=True,
+            )
+            #  @ B: [bz, r] ===> [bz, out_f]
+            delta_mp = (input_dup @ self.lora_B) * self.scaling
+            output += delta_mp
             output = output + self.bias if self.bias is not None else output
         return output
 
@@ -506,7 +504,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             self.merged = True
 
     def forward(self, input: paddle.Tensor):
-        if self.disable_lora:
+        if self.disable_lora or self.merged:
             if MC2ColumnParallelCoreLinear is None:
                 input_mp = mp_ops._c_identity(input, group=self.model_parallel_group)
                 result_mp = F.linear(x=input_mp, weight=self.weight, bias=self.bias, name=self.name)
@@ -536,15 +534,14 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
                 res_mp = MC2ColumnParallelCoreLinear.apply(input, self.weight, self.model_parallel_group)
                 result_mp = (res_mp + self.bias) if self.bias is not None else res_mp
 
-            if not self.merged:
-                input_a = self.lora_dropout(input) @ self.lora_A
-                if MC2ColumnParallelCoreLinear is None:
-                    input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
-                    delta_mp = (input_a_mp @ self.lora_B) * self.scaling
-                else:
-                    tmp = MC2ColumnParallelCoreLinear.apply(input_a, self.lora_B, self.model_parallel_group)
-                    delta_mp = tmp * self.scaling
-                result_mp += delta_mp
+            input_a = self.lora_dropout(input) @ self.lora_A
+            if MC2ColumnParallelCoreLinear is None:
+                input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
+                delta_mp = (input_a_mp @ self.lora_B) * self.scaling
+            else:
+                tmp = MC2ColumnParallelCoreLinear.apply(input_a, self.lora_B, self.model_parallel_group)
+                delta_mp = tmp * self.scaling
+            result_mp += delta_mp
 
         if self.gather_output and self.is_mp:
             result = mp_ops._c_concat(result_mp, group=self.model_parallel_group)

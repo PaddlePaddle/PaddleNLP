@@ -80,9 +80,6 @@ try:
     )
 
     AVALIABLE_LAYERS += [
-        ColumnParallelQuantizationLinear,
-        QuantizationLinear,
-        RowParallelQuantizationLinear,
         ColumnParallelQuantizationLoRALinear,
         QuantizationLoRALinear,
         RowParallelQuantizationLoRALinear,
