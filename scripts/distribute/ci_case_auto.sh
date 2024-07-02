@@ -549,7 +549,7 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.53389835
+    loss_base=9.51876831
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.54253578
     fi
@@ -619,7 +619,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.39066124
+    loss_base=9.35078526
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.41613197
     fi
@@ -689,7 +689,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.38235474
+    loss_base=9.35139465
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.4053154
     fi
@@ -760,7 +760,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.38256836
+    loss_base=9.41604424
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.4055109
     fi
@@ -1028,7 +1028,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.57664108
+    loss_base=10.59205246
     loss_md5_base=0ebf68698887b33b33a46518621cf412
     ips_base=-1
     mem_base=-1
@@ -1101,7 +1101,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.57694054
+    loss_base=10.58860683
     loss_md5_base=6df87d01bd08113a92930f6349514b35
     ips_base=-1
     mem_base=-1
@@ -1174,7 +1174,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.5758028
+    loss_base=10.59993172
     loss_md5_base=6cb4e151b35f026190df90ab240d9a95
     ips_base=-1
     mem_base=-1
@@ -1247,7 +1247,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.5766201
+    loss_base=10.58456802
     loss_md5_base=e82a1f5668870d18a2d45b3ee0a25386
     ips_base=-1
     mem_base=-1
