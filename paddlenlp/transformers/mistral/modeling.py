@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import math
+import warnings
 from functools import partial
 from typing import List, Optional, Tuple, Union
 
@@ -216,10 +217,6 @@ class MistralAttention(nn.Layer):
         self.num_key_value_groups = self.num_heads // self.num_key_value_heads
         self.max_position_embeddings = config.max_position_embeddings
         self.rope_theta = config.rope_theta
-<<<<<<< Updated upstream
-        self.use_flash_attention = getattr(config, "_flash_attn_2_enabled", False)
-=======
->>>>>>> Stashed changes
 
         if (self.head_dim * self.num_heads) != self.hidden_size:
             raise ValueError(
@@ -290,9 +287,6 @@ class MistralAttention(nn.Layer):
             base=self.rope_theta,
         )
 
-    def _shape(self, tensor: paddle.Tensor, seq_len: int, bsz: int):
-        return tensor.reshape([bsz, seq_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
-
     def forward(
         self,
         hidden_states: paddle.Tensor,
@@ -301,7 +295,6 @@ class MistralAttention(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         output_attentions: bool = False,
         use_cache: bool = False,
-        padding_mask: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         bsz, q_len, _ = hidden_states.shape
 
@@ -332,11 +325,7 @@ class MistralAttention(nn.Layer):
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
-<<<<<<< Updated upstream
-        if not self.use_flash_attention:
-=======
         if not self.config.use_flash_attention:
->>>>>>> Stashed changes
             attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(self.head_dim)
 
             if attn_weights.shape != [bsz, self.num_heads, q_len, kv_seq_len]:
@@ -405,7 +394,6 @@ class MistralDecoderLayer(nn.Layer):
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         output_attentions: Optional[bool] = False,
         use_cache: Optional[bool] = False,
-        padding_mask: Optional[paddle.Tensor] = None,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
         Args:
@@ -433,7 +421,6 @@ class MistralDecoderLayer(nn.Layer):
             past_key_value=past_key_value,
             output_attentions=output_attentions,
             use_cache=use_cache,
-            padding_mask=padding_mask,
         )
         hidden_states = residual + hidden_states
 
@@ -674,28 +661,6 @@ class MistralModel(MistralPreTrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
-        padding_mask = None
-
-        # embed positions
-        if attention_mask is None:
-            attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
-        elif paddle.any(attention_mask == 0):
-            padding_mask = attention_mask
-
-        if (
-            padding_mask is not None
-            and hasattr(self.config, "_flash_attn_2_enabled")
-            and self.config._flash_attn_2_enabled
-            and past_key_values is not None
-        ):
-            is_padding_right = padding_mask[:, -1].sum().item() != batch_size
-            if is_padding_right:
-                raise ValueError(
-                    "You are attempting to perform batched generation with padding_side='right'"
-                    " this may lead to unexpected behaviour for Flash Attention version of Mistral. Make sure to "
-                    " call `tokenizer.padding_side  = 'left'` before tokenizing the input. "
-                )
-
         attention_mask = self._prepare_decoder_attention_mask(
             attention_mask,
             (batch_size, seq_length),
@@ -729,7 +694,7 @@ class MistralModel(MistralPreTrainedModel):
                 def create_custom_forward(module):
                     def custom_forward(*inputs):
                         # None for past_key_value
-                        return module(*inputs, past_key_value, output_attentions, padding_mask=padding_mask)
+                        return module(*inputs, past_key_value, output_attentions)
 
                     return custom_forward
 
@@ -747,7 +712,6 @@ class MistralModel(MistralPreTrainedModel):
                     past_key_value=past_key_value,
                     output_attentions=output_attentions,
                     use_cache=use_cache,
-                    padding_mask=padding_mask,
                 )
 
             hidden_states = layer_outputs[0]
@@ -794,26 +758,14 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, tensor_parallel_output=T
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
         logits = paddle.matmul(input_parallel, y, transpose_y=False)
-<<<<<<< Updated upstream
-=======
-        print(y)
->>>>>>> Stashed changes
 
         if tensor_parallel_output:
             return logits
 
-<<<<<<< Updated upstream
-=======
-        print(logits)
->>>>>>> Stashed changes
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
         logits = paddle.matmul(x, y, transpose_y=False)
-<<<<<<< Updated upstream
-=======
-        print(y)
->>>>>>> Stashed changes
         return logits
 
 
@@ -839,12 +791,44 @@ class MistralLMHead(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-<<<<<<< Updated upstream
-=======
         print(tensor_parallel_output)
->>>>>>> Stashed changes
         logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
+
+
+class MistralPretrainingCriterion(paddle.nn.Layer):
+    """
+    Criterion for Llama.
+    It calculates the final loss.
+    """
+
+    def __init__(self, config):
+
+        super(MistralPretrainingCriterion, self).__init__()
+        self.ignore_index = getattr(config, "ignore_index", -100)
+        self.config = config
+        self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
+
+        if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
+            self.loss_func = mpu.ParallelCrossEntropy(ignore_index=self.ignore_index)
+        else:
+            self.loss_func = CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
+
+    def forward(self, prediction_scores, masked_lm_labels):
+        if self.enable_parallel_cross_entropy:
+            if prediction_scores.shape[-1] == self.config.vocab_size:
+                warnings.warn(
+                    f"enable_parallel_cross_entropy, the vocab_size should be splited: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
+                )
+                self.loss_func = CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
+
+        with paddle.amp.auto_cast(False):
+            masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+            # skip ignore_index which loss == 0
+            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
+            loss = paddle.mean(masked_lm_loss)
+
+        return loss
 
 
 class MistralForCausalLM(MistralPreTrainedModel):
@@ -855,6 +839,7 @@ class MistralForCausalLM(MistralPreTrainedModel):
         self.mistral = MistralModel(config)
         self.vocab_size = config.vocab_size
         self.lm_head = MistralLMHead(config)
+        self.criterion = MistralPretrainingCriterion(config)
 
     def get_input_embeddings(self):
         return self.mistral.embed_tokens
@@ -958,20 +943,12 @@ class MistralForCausalLM(MistralPreTrainedModel):
         )
 
         hidden_states = outputs[0]
-<<<<<<< Updated upstream
         logits = self.lm_head(hidden_states)
-=======
-        print(hidden_states)
-        logits = self.lm_head(hidden_states)
-        print(logits)
-        import pdb;pdb.set_trace()
->>>>>>> Stashed changes
         logits = logits.astype("float32")
 
         loss = None
         if labels is not None:
-            loss_fct = CrossEntropyLoss()
-            loss = loss_fct(logits, labels)
+            loss = self.criterion(logits, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

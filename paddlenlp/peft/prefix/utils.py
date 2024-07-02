@@ -37,6 +37,7 @@ def llama_postprocess_past_key_value(past_key_values):
 
     return tuple(zip(keys, values))
 
+
 def mistral_postprocess_past_key_value(past_key_values):
     # (layer_num, bs, head_num/tensor_parallel_degree, prefixlen, head_dim)*2
     keys, values = paddle.transpose(past_key_values, perm=[2, 0, 3, 1, 4]).split(2)
