@@ -26,7 +26,7 @@
   "min_learning_rate": 3e-06,
   "warmup_steps": 30,
   "logging_steps": 10,
-  "max_steps": 50,
+  "max_steps": 500,
   "save_steps": 5000,
   "eval_steps": 1000,
   "weight_decay": 0.01,
