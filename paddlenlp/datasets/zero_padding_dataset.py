@@ -28,14 +28,14 @@ class ZeroPadding:
         "chosen_labels",
         "rejected_labels",
         "response_indexs",
-        "attn_mask_start_row_indices",
+        "attn_mask_startend_row_indices",
     ]
 
     @classmethod
     def _pad_batch_records(cls, batch_records):
         # Only consider supported input keys
         input_keys = [key for key in batch_records[0].keys() if key in cls.supported_input_keys]
-        if "attn_mask_start_row_indices" not in input_keys and "attention_mask" not in input_keys:
+        if "attn_mask_startend_row_indices" not in input_keys and "attention_mask" not in input_keys:
             input_keys.append("attention_mask")
         batched_features = {key: [] for key in input_keys}
         sequence_sum = 0
@@ -57,9 +57,9 @@ class ZeroPadding:
 
             seq_length = len(record["input_ids"])
             # If attention_mask is not given, assume it's causal mask
-            if "attn_mask_start_row_indices" in record:
-                attn_mask_start_row_indices = [i + sequence_sum for i in record["attn_mask_start_row_indices"]]
-                batched_features["attn_mask_start_row_indices"].extend(attn_mask_start_row_indices)
+            if "attn_mask_startend_row_indices" in record:
+                attn_mask_startend_row_indices = [i + sequence_sum for i in record["attn_mask_startend_row_indices"]]
+                batched_features["attn_mask_startend_row_indices"].extend(attn_mask_startend_row_indices)
             else:
                 attention_mask = record.get("attention_mask", np.tril(np.ones([seq_length, seq_length], dtype=bool)))
                 batched_features["attention_mask"].append(attention_mask)

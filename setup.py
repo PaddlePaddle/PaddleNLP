@@ -109,7 +109,7 @@ def show():
         f.write(content)
 
 
-__version__ = "2.8.0.post"
+__version__ = "3.0.0b0.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 
@@ -179,13 +179,12 @@ try:
         install_requires=REQUIRED_PACKAGES,
         entry_points={"console_scripts": ["paddlenlp = paddlenlp.cli:main"]},
         extras_require=extras,
-        python_requires=">=3.6",
+        python_requires=">=3.8",
         classifiers=[
             "Programming Language :: Python :: 3",
-            "Programming Language :: Python :: 3.6",
-            "Programming Language :: Python :: 3.7",
             "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
+            "Programming Language :: Python :: 3.10",
             "License :: OSI Approved :: Apache Software License",
             "Operating System :: OS Independent",
         ],

@@ -7,7 +7,7 @@
 **支持模型权重:**
 
 | Model              |
-| ------------------ |
+|--------------------|
 | google/gemma-7b    |
 | google/gemma-7b-it |
 | google/gemma-2b    |
@@ -15,4 +15,4 @@
 
 ## 2. 模型精调
 
-请参考[LLM全流程工具介绍](../README.md)
+请参考[LLM全流程工具介绍](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm)

@@ -32,7 +32,7 @@ bash projects/gpt/finetune_gpt_345M_single_card.sh SST2
 
 GLUE benchmark 包含 9 个数据集，分别是 **CoLA**、**SST-2**、**MRPC**、**QQP**、**STS-B**、**MNLI**、**QNLI**、**RTE**、**WNLI**，涉及到 **自然语言推断**，**文本蕴含**，**情感分析**，**语义相似** 等任务，整体可以归位 3 类，分别是单句任务：CoLA、SST-2；相似性：MRPC、QQP、STS-B；释义：MNLI、QNLI、RTE、WNLI。
 
-以下介绍载自 [huggingface](https://huggingface.co/datasets/glue/blob/main/glue.py).
+以下介绍载自 [huggingface](https://huggingface.co/datasets/nyu-mll/glue).
 
 * CoLA: The Corpus of Linguistic Acceptability consists of English acceptability judgments drawn from books and journal articles on linguistic theory. Each example is a sequence of words annotated with whether it is a grammatical English sentence.
 * SST-2: The Stanford Sentiment Treebank consists of sentences from movie reviews and human annotations of their sentiment. The task is to predict the sentiment of a given sentence. We use the two-way (positive/negative) class split, and use only sentence-level labels.
@@ -69,10 +69,10 @@ normal_(self.score.weight)
 
 ### Engine
 
-| 参数字段 | 参数含义 |
-| ------ | --------|
-|run_mode| 运行的模式，需要设置为 epoch 方式|
-|num_train_epochs| 需要 finetune 的 epoch 数 |
+| 参数字段         | 参数含义                          |
+|------------------|-----------------------------------|
+| run_mode         | 运行的模式，需要设置为 epoch 方式 |
+| num_train_epochs | 需要 finetune 的 epoch 数         |
 
 ```
 Engine:
@@ -82,15 +82,15 @@ Engine:
 
 ### Model
 
-| 参数字段 | 参数含义 |
-| ------ | --------|
-|module| 需要设置为 "GPTFinetuneModule" |
-|name | 需要设置为 "GPT" |
-|num_classes | finetune 时的类别数，根据语料库以及任务来设定 |
-|pretrained | 预训练的权重文件路径前缀，去掉 ".pdparams" |
-|loss.train.name | finetune 时的训练损失函数类名 |
-|loss.eval.name | finetune 时的验证损失函数类名 |
-|metric.eval.name | finetune 时的验证评估函数类名 |
+| 参数字段         | 参数含义                                      |
+|------------------|-----------------------------------------------|
+| module           | 需要设置为 "GPTFinetuneModule"                |
+| name             | 需要设置为 "GPT"                              |
+| num_classes      | finetune 时的类别数，根据语料库以及任务来设定 |
+| pretrained       | 预训练的权重文件路径前缀，去掉 ".pdparams"    |
+| loss.train.name  | finetune 时的训练损失函数类名                 |
+| loss.eval.name   | finetune 时的验证损失函数类名                 |
+| metric.eval.name | finetune 时的验证评估函数类名                 |
 
 微调时，不同任务对应的类别数 和 loss 函数以及评测指标不同，因此需要通过配置来改变设置。
 ```
@@ -113,18 +113,18 @@ Model:
 
 ### Optimizer 和 LRScheduler
 
-| 参数字段 | 参数含义 |
-| ------ | --------|
-|name| 优化器类名 |
-|weight_decay| 权重衰减值 |
-|beta1| FusedAdamW 的 beta1 |
-|beta2| FusedAdamW 的 beta2 |
-|epsilon| FusedAdamW 的 epsilon |
-|multi_precision| 当使用 FP16 O2 级别时，是否开启参数使用多精度表示 |
-|tensor_fusion| 是否开启 tensor_fusion |
-|lr.name| 学习率调整策略类名 |
-|lr.warmup| 当参数时小数时，表示 warmup 步数占总步数的比例，如果是整数时，则表示 warmup 的步数 |
-|lr.learning_rate| 初始化学习率值 |
+| 参数字段         | 参数含义                                                                           |
+|------------------|------------------------------------------------------------------------------------|
+| name             | 优化器类名                                                                         |
+| weight_decay     | 权重衰减值                                                                         |
+| beta1            | FusedAdamW 的 beta1                                                                |
+| beta2            | FusedAdamW 的 beta2                                                                |
+| epsilon          | FusedAdamW 的 epsilon                                                              |
+| multi_precision  | 当使用 FP16 O2 级别时，是否开启参数使用多精度表示                                  |
+| tensor_fusion    | 是否开启 tensor_fusion                                                             |
+| lr.name          | 学习率调整策略类名                                                                 |
+| lr.warmup        | 当参数时小数时，表示 warmup 步数占总步数的比例，如果是整数时，则表示 warmup 的步数 |
+| lr.learning_rate | 初始化学习率值                                                                     |
 
 注：这里的超参会跟随优化器类的不同而不同，可以自行查看优化器类和学习率调整策略类初始化函数需要设置的超参数设定。
 
@@ -145,11 +145,11 @@ Optimizer:
 
 ### Data
 
-| 参数字段 | 参数含义 |
-| ------ | --------|
-|Train.dataset| 描述 finetune 时的数据集 |
-|Train.sampler| 描述 dataloader 所需要的 batch sampler |
-|Train.loader| 描述 dataloader 所需要的相关信息，例如 num_workers 等 |
+| 参数字段      | 参数含义                                              |
+|---------------|-------------------------------------------------------|
+| Train.dataset | 描述 finetune 时的数据集                              |
+| Train.sampler | 描述 dataloader 所需要的 batch sampler                |
+| Train.loader  | 描述 dataloader 所需要的相关信息，例如 num_workers 等 |
 
 注：数据集的设定会根据不同任务不同语料库不同而设定不同，例如 `split` 字段，不同数据集是有不同的设定，请参考所需要 finetune 的数据集初始化函数。
 
@@ -317,14 +317,14 @@ python ./tools/train.py -c ./ppfleetx/configs/nlp/gpt/finetune_gpt_345M_single_c
 
 以下的指标是通过 [GPT_345M](https://paddlefleetx.bj.bcebos.com/model/nlp/gpt/GPT_345M.tar.gz) 预训练模型 finetune 得到的结果，仅作为参考。
 
-| Corpus | Task                | Domanin            | Metric                       | Result                       |
-| ------ | ------------------- | ------------------ | ---------------------------- | ---------------------------- |
-| CoLA   | acceptability       | Misc.              | Matthews corr                | 0.60471                      |
-| SST-2  | sentiment           | Movie reviews      | Accuracy                     | 0.93005                      |
-| MNLI   | NLI                 | Misc.              | Matched acc./Mismatched acc. | 0.84238/0.84815              |
-| QNLI   | QA/NLI              | Wikipedia          | Accuracy                     | 0.90445                      |
-| RTE    | NLI                 | News, Wikipedia    | Accuracy                     | 0.70397                      |
-| WNLI   | coreference         | Books              | Accuracy                     | 0.40845                      |
-| MRPC   | paraphrase          | News               | Accuracy/F1                  | 0.81913/0.87022              |
-| QQP    | paraphrase          | social QA question | Accuracy/F1                  | 0.86087/0.81055              |
-| STS-B  | sentence similarity | Misc.              | Pearson/Spearman corr.       | 0.85797/0.85824              |
+| Corpus | Task                | Domanin            | Metric                       | Result          |
+|--------|---------------------|--------------------|------------------------------|-----------------|
+| CoLA   | acceptability       | Misc.              | Matthews corr                | 0.60471         |
+| SST-2  | sentiment           | Movie reviews      | Accuracy                     | 0.93005         |
+| MNLI   | NLI                 | Misc.              | Matched acc./Mismatched acc. | 0.84238/0.84815 |
+| QNLI   | QA/NLI              | Wikipedia          | Accuracy                     | 0.90445         |
+| RTE    | NLI                 | News, Wikipedia    | Accuracy                     | 0.70397         |
+| WNLI   | coreference         | Books              | Accuracy                     | 0.40845         |
+| MRPC   | paraphrase          | News               | Accuracy/F1                  | 0.81913/0.87022 |
+| QQP    | paraphrase          | social QA question | Accuracy/F1                  | 0.86087/0.81055 |
+| STS-B  | sentence similarity | Misc.              | Pearson/Spearman corr.       | 0.85797/0.85824 |

@@ -1578,7 +1578,7 @@ class LlamaModel(LlamaPretrainedModel):
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
 
-        use_casual_mask = get_use_casual_mask()
+        use_casual_mask = get_use_casual_mask() and not self.config.alibi
 
         if use_casual_mask:
             attention_mask = None
@@ -1906,6 +1906,14 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        if attn_mask_startend_row_indices is not None and attention_mask is not None:
+            logger.warning(
+                "You have provided both attn_mask_startend_row_indices and attention_mask. "
+                "The attn_mask_startend_row_indices will be used."
+            )
+            attention_mask = None
+
         outputs = self.llama(
             input_ids,  # [bs, seq_len]
             position_ids=position_ids,

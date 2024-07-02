@@ -132,7 +132,7 @@ function _train(){
             ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json"
         ;;
     esac
-    cd ../llm/llama/auto_parallel/
+    cd ../llm/auto_parallel/llama
     # rm -rf ./auto_config_${MODEL_TYPE}/*GBS*
     # rm -rf ./auto_config_${MODEL_TYPE}/*auto_tuner.log
     # rm -rf ./auto_config_${MODEL_TYPE}/*csv

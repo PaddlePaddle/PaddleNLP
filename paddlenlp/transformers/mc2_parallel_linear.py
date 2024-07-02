@@ -34,7 +34,7 @@ except:
 from paddlenlp.utils.tools import get_env_device
 
 __all_gather_recomputation__ = False
-if int(os.getenv("MC2_Recompute", 0)):
+if int(os.getenv("FLAGS_NPU_MC2_Recompute", 0)):
     __all_gather_recomputation__ = True
 
 

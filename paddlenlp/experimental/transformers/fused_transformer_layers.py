@@ -34,10 +34,10 @@ if not is_paddlenlp_ops_available():
         "The paddlenlp_ops package is not installed. you can read the docs and install it by hand, "
         "you can refer to: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
     )
+if core.is_compiled_with_xpu() or core.is_compiled_with_cuda():
+    from paddlenlp_ops import rebuild_padding_v2
 
-from paddlenlp_ops import rebuild_padding_v2
-
-if not core.is_compiled_with_xpu():
+if core.is_compiled_with_cuda():
     from paddlenlp_ops import (
         dequant_int8,
         encode_rotary_qk,
@@ -356,7 +356,6 @@ class FusedMultiTransformerBase(Layer):
                     is_bias=True,
                     dtype=self._norm_weight_dtype,
                 )
-
             self.init_weight_shape(config)
 
             qkv_weight = self.create_parameter(
@@ -443,7 +442,7 @@ class FusedMultiTransformerBase(Layer):
             cache_k_scale = None
             if cache_k_scale_attr:
                 cache_k_scale = self.create_parameter(
-                    shape=[self.num_heads],
+                    shape=[self.kv_num_heads],
                     attr=cache_k_scale_attr,
                     dtype="float32",
                     is_bias=False,
@@ -452,7 +451,7 @@ class FusedMultiTransformerBase(Layer):
             cache_v_scale = None
             if cache_v_scale_attr:
                 cache_v_scale = self.create_parameter(
-                    shape=[self.num_heads],
+                    shape=[self.kv_num_heads],
                     attr=cache_v_scale_attr,
                     dtype="float32",
                     is_bias=False,
@@ -461,7 +460,7 @@ class FusedMultiTransformerBase(Layer):
             cache_k_out_scale = None
             if cache_k_out_scale_attr:
                 cache_k_out_scale = self.create_parameter(
-                    shape=[self.num_heads],
+                    shape=[self.kv_num_heads],
                     attr=cache_k_out_scale_attr,
                     dtype="float32",
                     is_bias=False,
@@ -470,7 +469,7 @@ class FusedMultiTransformerBase(Layer):
             cache_v_out_scale = None
             if cache_v_out_scale_attr:
                 cache_v_out_scale = self.create_parameter(
-                    shape=[self.num_heads],
+                    shape=[self.kv_num_heads],
                     attr=cache_v_out_scale_attr,
                     dtype="float32",
                     is_bias=False,
@@ -549,7 +548,7 @@ class FusedMultiTransformerBase(Layer):
         self.qkv_weight_shape = (
             [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim, self.embed_dim]
             if config.trans_qkvw
-            else [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim, self.embed_dim]
+            else [self.embed_dim, (self.num_heads + 2 * self.kv_num_heads) * self.head_dim]
         )
         self.linear_weight_shape = [self.num_heads * self.head_dim, self.embed_dim]
         self.ffn1_weight_shape = (
@@ -1036,6 +1035,117 @@ class FusedMultiTransformerWeightOnlyPostLayernorm(
         super().__init__(config)
 
 
+class FusedMultiTransformerAvx(FusedMultiTransformerBase):
+    def __init__(self, config: FusedMultiTransformerConfig, max_position_embeddings, compute_type):
+        super().__init__(config)
+        self._dtype = self._helper.get_default_dtype()
+        self.embed_dim = config.embed_dim
+        self.head_dim = config.embed_dim // config.num_heads
+        self.num_heads = config.num_heads // config.nranks
+        self.kv_num_heads = config.kv_num_heads // config.nranks
+        self.num_layers = config.num_layers
+        self.create_params_type = self.get_weight_create_dype()
+        self.activation = config.activation
+        self.norm_type = config.norm_type
+        self.intermediate_size = config.dim_feedforward
+        self.max_positions = max_position_embeddings
+        self.max_pos_embed = max_position_embeddings
+        self.hiddensize = self.num_heads * self.head_dim
+        self._compute_type = compute_type
+
+        self.gate_weights = []
+        self.up_weights = []
+
+        gate_weight_attrs = [
+            paddle.ParamAttr(
+                name="fusellama.{}.gate_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
+        ]
+        up_weight_attrs = [
+            paddle.ParamAttr(
+                name="fusellama.{}.up_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
+        ]
+
+        for i in range(self.num_layers):
+            gate_weight_attr = self.get_attr(gate_weight_attrs, i)
+            up_weight_attr = self.get_attr(up_weight_attrs, i)
+            gate_weight = self.create_parameter(
+                shape=self.gate_weight_shape,
+                attr=gate_weight_attr,
+                dtype=self.create_params_type,
+                is_bias=False,
+            )
+            up_weight = self.create_parameter(
+                shape=self.up_weight_shape,
+                attr=up_weight_attr,
+                dtype=self.create_params_type,
+                is_bias=False,
+            )
+            self.gate_weights.append(gate_weight)
+            self.up_weights.append(up_weight)
+            self._add_parameter(gate_weight)
+            self._add_parameter(up_weight)
+
+    def init_weight_shape(self, config):
+        self.gate_weight_shape = [self.embed_dim, self.dim_feedforward]
+        self.up_weight_shape = [self.embed_dim, self.dim_feedforward]
+        self.down_weight_shape = [self.dim_feedforward, self.embed_dim]
+        self.qkv_weight_shape = [self.embed_dim, (self.num_heads + 2 * self.kv_num_heads) * self.head_dim]
+        self.linear_weight_shape = [self.num_heads * self.head_dim, self.embed_dim]
+        self.ffn1_weight_shape = (
+            [self.embed_dim, self.dim_feedforward * 2]
+            if self.activation.endswith("glu")
+            else [self.embed_dim, self.dim_feedforward]
+        )
+        self.ffn2_weight_shape = [self.dim_feedforward, self.embed_dim]
+
+    def forward(
+        self,
+        input_ids,
+        src,
+        past_seq_len=None,
+        cur_seq_len=None,
+        step_idx=None,
+        **kwargs,
+    ):
+        for i in range(self.num_layers):
+            from paddlenlp_ops import xft_llama_layer
+
+            xft_out = xft_llama_layer(
+                src,
+                self.ln_scales[i],
+                self.qkv_weights[i],
+                self.linear_weights[i],
+                self.ffn_ln_scales[i],
+                self.gate_weights[i],
+                self.up_weights[i],
+                self.ffn2_weights[i],
+                past_seq_len,
+                cur_seq_len,
+                step_idx,
+                self.hiddensize,
+                self.num_layers,
+                self._compute_type,
+                self.activation,
+                self.norm_type,
+                i,
+                self.head_dim,
+                self.num_heads,
+                self.kv_num_heads,
+                self.max_positions,
+                self.max_pos_embed,
+                self.intermediate_size,
+            )
+            src = xft_out
+
+        src = src[:, -1, :]
+
+        return src
+
+
 class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__(config)
@@ -1075,7 +1185,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             ffn2_smooth_attr = self.get_attr(config.ffn2_smooth_attrs, i)
 
             qkv_out_scale = self.create_parameter(
-                shape=[self.head_dim * 3 * self.num_heads],
+                shape=[self.head_dim * (2 * self.kv_num_heads + self.num_heads)],
                 attr=qkv_out_scale_attr,
                 dtype="float32",
                 is_bias=False,
