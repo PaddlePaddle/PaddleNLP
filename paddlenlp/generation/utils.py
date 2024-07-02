@@ -1042,7 +1042,6 @@ class GenerationMixin(object):
         synced_gpus=False,
         **model_kwargs
     ):
-        pad_token_id = self.set_pad_token_id(pad_token_id, eos_token_id)
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
 
@@ -1148,7 +1147,6 @@ class GenerationMixin(object):
         synced_gpus=False,
         **model_kwargs
     ):
-        pad_token_id = self.set_pad_token_id(pad_token_id, eos_token_id)
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
 
         logits_processors = logits_processors if logits_processors is not None else LogitsProcessorList()
