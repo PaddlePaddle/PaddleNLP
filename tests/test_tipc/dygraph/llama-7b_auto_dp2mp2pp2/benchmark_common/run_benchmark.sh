@@ -124,7 +124,7 @@ function _train(){
     *) echo "choose run_mode "; exit 1;
     esac
 
-    cd ../llm/llama/auto_parallel/
+    cd ../llm/auto_parallel/llama/
     rm -rf ./mylog   # 注意执行前删掉log目录
     rm -rf output/$model_item
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"

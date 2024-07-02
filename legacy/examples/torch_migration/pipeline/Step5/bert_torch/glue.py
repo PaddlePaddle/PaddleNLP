@@ -259,7 +259,7 @@ class Glue(datasets.GeneratorBasedBuilder):
               year={2017}
             }"""
             ),
-            url="http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark",
+            url="https://huggingface.co/datasets/mteb/stsbenchmark-sts",
             process_label=np.float32,
         ),
         GlueConfig(

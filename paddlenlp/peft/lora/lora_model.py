@@ -44,6 +44,7 @@ from ...transformers.utils import get_checkpoint_shard_files, weight_name_suffix
 from ...utils.distributed import distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
+from ...utils.tools import get_env_device
 from .lora_config import LoRAConfig
 
 try:
@@ -51,19 +52,69 @@ try:
         ColumnSequenceParallelLinear,
         RowSequenceParallelLinear,
     )
-
-    from .lora_layers import (
-        ColumnParallelLoRALinear,
-        ColumnParallelLoRAMergedLinear,
-        ColumnSequenceParallelLoRALinear,
-        LoRAConv2D,
-        LoRALinear,
-        LoRAMergedLinear,
-        RowParallelLoRALinear,
-        RowSequenceParallelLoRALinear,
-    )
 except:
     pass
+
+
+def get_lora_layers():
+    try:
+        if get_env_device() == "xpu":
+            # If paddle_xpu is not installed, just use PaddleNLP's native lora layers
+            from paddle_xpu.layers.nn.lora_layers import (
+                XPUColumnParallelLoRALinear as ColumnParallelLoRALinear,
+            )
+            from paddle_xpu.layers.nn.lora_layers import (
+                XPUColumnSequenceParallelLoRALinear as ColumnSequenceParallelLoRALinear,
+            )
+            from paddle_xpu.layers.nn.lora_layers import XPULoRALinear as LoRALinear
+            from paddle_xpu.layers.nn.lora_layers import (
+                XPURowParallelLoRALinear as RowParallelLoRALinear,
+            )
+            from paddle_xpu.layers.nn.lora_layers import (
+                XPURowSequenceParallelLoRALinear as RowSequenceParallelLoRALinear,
+            )
+
+            from .lora_layers import (
+                ColumnParallelLoRAMergedLinear,
+                LoRAConv2D,
+                LoRAMergedLinear,
+            )
+
+        else:
+            raise ImportError  # Force to use the fallback if not XPU
+    except ImportError:
+        from .lora_layers import (
+            ColumnParallelLoRALinear,
+            ColumnParallelLoRAMergedLinear,
+            ColumnSequenceParallelLoRALinear,
+            LoRAConv2D,
+            LoRALinear,
+            LoRAMergedLinear,
+            RowParallelLoRALinear,
+            RowSequenceParallelLoRALinear,
+        )
+
+    return {
+        "ColumnParallelLoRALinear": ColumnParallelLoRALinear,
+        "ColumnParallelLoRAMergedLinear": ColumnParallelLoRAMergedLinear,
+        "ColumnSequenceParallelLoRALinear": ColumnSequenceParallelLoRALinear,
+        "LoRAConv2D": LoRAConv2D,
+        "LoRALinear": LoRALinear,
+        "LoRAMergedLinear": LoRAMergedLinear,
+        "RowParallelLoRALinear": RowParallelLoRALinear,
+        "RowSequenceParallelLoRALinear": RowSequenceParallelLoRALinear,
+    }
+
+
+lora_layers = get_lora_layers()
+ColumnParallelLoRALinear = lora_layers["ColumnParallelLoRALinear"]
+ColumnParallelLoRAMergedLinear = lora_layers["ColumnParallelLoRAMergedLinear"]
+ColumnSequenceParallelLoRALinear = lora_layers["ColumnSequenceParallelLoRALinear"]
+LoRAConv2D = lora_layers["LoRAConv2D"]
+LoRALinear = lora_layers["LoRALinear"]
+LoRAMergedLinear = lora_layers["LoRAMergedLinear"]
+RowParallelLoRALinear = lora_layers["RowParallelLoRALinear"]
+RowSequenceParallelLoRALinear = lora_layers["RowSequenceParallelLoRALinear"]
 
 try:
     from ...quantization.quantization_linear import (

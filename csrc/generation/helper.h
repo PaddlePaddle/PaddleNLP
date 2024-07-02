@@ -15,12 +15,44 @@
 #pragma once
 
 #include "paddle/extension.h"
+#ifdef PADDLE_WITH_HIP
+#include <hip/hip_runtime.h>
+#include <hip/hip_fp16.h>
+#include <hip/hip_bfloat16.h>
+#include <hipcub/hipcub.hpp>
+#include <hiprand.h>
+#include <hiprand_kernel.h>
+namespace cub = hipcub;
+#else
 #include <cub/cub.cuh>
 #include <curand_kernel.h>
+#endif
 
 constexpr int kBlockSize = 256; 
 constexpr int kNumWaves = 16; 
 
+#ifdef PADDLE_WITH_HIP
+inline hipError_t GetNumBlocks(int64_t n, int* num_blocks) {
+  int dev;
+  {
+    hipError_t err = hipGetDevice(&dev);
+    if (err != hipSuccess) { return err; }
+  }
+  int sm_count;
+  {
+    hipError_t err = hipDeviceGetAttribute(&sm_count, hipDeviceAttributeMultiprocessorCount, dev);
+    if (err != hipSuccess) { return err; }
+  }
+  int tpm;
+  {
+    hipError_t err = hipDeviceGetAttribute(&tpm, hipDeviceAttributeMaxThreadsPerMultiProcessor, dev);
+    if (err != hipSuccess) { return err; }
+  }
+  *num_blocks = std::max<int>(1, std::min<int64_t>((n + kBlockSize - 1) / kBlockSize,
+                                                    sm_count * tpm / kBlockSize * kNumWaves));
+  return hipSuccess;
+}
+#else
 inline cudaError_t GetNumBlocks(int64_t n, int* num_blocks) {
   int dev;
   {
@@ -41,6 +73,7 @@ inline cudaError_t GetNumBlocks(int64_t n, int* num_blocks) {
                                                     sm_count * tpm / kBlockSize * kNumWaves));
   return cudaSuccess;
 }
+#endif
 
 template<typename T>
 __device__ T max_func(const T a, const T b) {
@@ -74,7 +107,11 @@ public:
 template <>
 class PDTraits<paddle::DataType::BFLOAT16> {
 public:
+#ifdef PADDLE_WITH_HIP
+  typedef hip_bfloat16 DataType;
+#else
   typedef __nv_bfloat16 DataType;
+#endif
   typedef paddle::bfloat16 data_t;
 };
 

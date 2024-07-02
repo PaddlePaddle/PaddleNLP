@@ -27,26 +27,26 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 - 极致的产业级效果：在多个中文场景上提供产业级的精度与预测性能；
 - 统一的应用范式：通过`paddlenlp.Taskflow`调用，简捷易用。
 
-| 任务名称                           | 调用方式                         | 一键预测 | 单条输入 | 多条输入 | 文档级输入 | 定制化训练 | 其它特性                                               |
-| :--------------------------------- | -------------------------------- | -------- | -------- | -------- | ---------- | ---------- | ------------------------------------------------------ |
-| [中文分词](#中文分词)              | `Taskflow("word_segmentation")`  | ✅        | ✅        | ✅        | ✅          | ✅          | 多种分词模式，满足快速切分和实体粒度精准切分           |
-| [词性标注](#词性标注)              | `Taskflow("pos_tagging")`        | ✅        | ✅        | ✅        | ✅          | ✅          | 基于百度前沿词法分析工具LAC                            |
-| [命名实体识别](#命名实体识别)      | `Taskflow("ner")`                 | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖最全中文实体标签                                   |
-| [依存句法分析](#依存句法分析)      | `Taskflow("dependency_parsing")`  | ✅        | ✅        | ✅        |            | ✅          | 基于最大规模中文依存句法树库研发的DDParser             |
-| [信息抽取](#信息抽取)           | `Taskflow("information_extraction")`| ✅        | ✅        | ✅        | ✅         | ✅          | 适配多场景的开放域通用信息抽取工具                     |
-| [『解语』-知识标注](#解语知识标注) | `Taskflow("knowledge_mining")`     | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖所有中文词汇的知识标注工具                         |
-| [文本纠错](#文本纠错)              | `Taskflow("text_correction")`    | ✅        | ✅        | ✅        | ✅          | ✅          | 融合拼音特征的端到端文本纠错模型ERNIE-CSC              |
-| [文本相似度](#文本相似度)          | `Taskflow("text_similarity")`    | ✅        | ✅        | ✅        |            |            | 基于百万量级Dureader Retrieval数据集训练RocketQA并达到前沿文本相似效果|
-| [情感分析](#情感分析)      | `Taskflow("sentiment_analysis")`  | ✅        | ✅        | ✅        |            | ✅          | 集成BiLSTM、SKEP、UIE等模型，支持评论维度、观点抽取、情感极性分类等情感分析任务             |
-| [生成式问答](#生成式问答)          | `Taskflow("question_answering")` | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成问答                        |
-| [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
-| [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
-| [代码生成](#代码生成)          | `Taskflow("code_generation")`        | ✅        | ✅        | ✅        |      ✅        |            | 代码生成大模型 |
-| [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
-| [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座 |
-| [问题生成](#问题生成)          | `Taskflow("question_generation")`        | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型 |
-| [零样本文本分类](#零样本文本分类)      | `Taskflow("zero_shot_text_classification")`  | ✅        | ✅        | ✅        |            | ✅          | 集成多场景的通用文本分类工具       |
-| [模型特征提取](#模型特征提取)      | `Taskflow("feature_extraction")`  | ✅        | ✅        | ✅        |     ✅       |          | 集成文本，图片的特征抽取工具       |
+| 任务名称                           | 调用方式                                    | 一键预测 | 单条输入 | 多条输入 | 文档级输入 | 定制化训练 | 其它特性                                                                        |
+|:-----------------------------------|---------------------------------------------|----------|----------|----------|------------|------------|---------------------------------------------------------------------------------|
+| [中文分词](#中文分词)              | `Taskflow("word_segmentation")`             | ✅        | ✅        | ✅        | ✅          | ✅          | 多种分词模式，满足快速切分和实体粒度精准切分                                    |
+| [词性标注](#词性标注)              | `Taskflow("pos_tagging")`                   | ✅        | ✅        | ✅        | ✅          | ✅          | 基于百度前沿词法分析工具LAC                                                     |
+| [命名实体识别](#命名实体识别)      | `Taskflow("ner")`                           | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖最全中文实体标签                                                            |
+| [依存句法分析](#依存句法分析)      | `Taskflow("dependency_parsing")`            | ✅        | ✅        | ✅        |            | ✅          | 基于最大规模中文依存句法树库研发的DDParser                                      |
+| [信息抽取](#信息抽取)              | `Taskflow("information_extraction")`        | ✅        | ✅        | ✅        | ✅          | ✅          | 适配多场景的开放域通用信息抽取工具                                              |
+| [『解语』-知识标注](#解语知识标注) | `Taskflow("knowledge_mining")`              | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖所有中文词汇的知识标注工具                                                  |
+| [文本纠错](#文本纠错)              | `Taskflow("text_correction")`               | ✅        | ✅        | ✅        | ✅          | ✅          | 融合拼音特征的端到端文本纠错模型ERNIE-CSC                                       |
+| [文本相似度](#文本相似度)          | `Taskflow("text_similarity")`               | ✅        | ✅        | ✅        |            |            | 基于百万量级Dureader Retrieval数据集训练RocketQA并达到前沿文本相似效果          |
+| [情感分析](#情感分析)              | `Taskflow("sentiment_analysis")`            | ✅        | ✅        | ✅        |            | ✅          | 集成BiLSTM、SKEP、UIE等模型，支持评论维度、观点抽取、情感极性分类等情感分析任务 |
+| [生成式问答](#生成式问答)          | `Taskflow("question_answering")`            | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成问答                                                 |
+| [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`             | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                                                 |
+| [开放域对话](#开放域对话)          | `Taskflow("dialogue")`                      | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话                          |
+| [代码生成](#代码生成)              | `Taskflow("code_generation")`               | ✅        | ✅        | ✅        | ✅          |            | 代码生成大模型                                                                  |
+| [文本摘要](#文本摘要)              | `Taskflow("text_summarization")`            | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型                                                                  |
+| [文档智能](#文档智能)              | `Taskflow("document_intelligence")`         | ✅        | ✅        | ✅        | ✅          |            | 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座                      |
+| [问题生成](#问题生成)              | `Taskflow("question_generation")`           | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型                                                                  |
+| [零样本文本分类](#零样本文本分类)  | `Taskflow("zero_shot_text_classification")` | ✅        | ✅        | ✅        |            | ✅          | 集成多场景的通用文本分类工具                                                    |
+| [模型特征提取](#模型特征提取)      | `Taskflow("feature_extraction")`            | ✅        | ✅        | ✅        | ✅          |            | 集成文本，图片的特征抽取工具                                                    |
 
 ## QuickStart
 
@@ -164,7 +164,7 @@ from paddlenlp import Taskflow
 #### 标签集合
 
 | 标签 | 含义     | 标签 | 含义     | 标签 | 含义     | 标签 | 含义     |
-| ---- | -------- | ---- | -------- | ---- | -------- | ---- | -------- |
+|------|----------|------|----------|------|----------|------|----------|
 | n    | 普通名词 | f    | 方位名词 | s    | 处所名词 | t    | 时间     |
 | nr   | 人名     | ns   | 地名     | nt   | 机构名   | nw   | 作品名   |
 | nz   | 其他专名 | v    | 普通动词 | vd   | 动副词   | vn   | 名动词   |
@@ -368,7 +368,7 @@ from paddlenlp import Taskflow
 - 快速模式采用的标签集合
 
 | 标签 | 含义     | 标签 | 含义     | 标签 | 含义     | 标签 | 含义     |
-| ---- | -------- | ---- | -------- | ---- | -------- | ---- | -------- |
+|------|----------|------|----------|------|----------|------|----------|
 | n    | 普通名词 | f    | 方位名词 | s    | 处所名词 | t    | 时间     |
 | nr   | 人名     | ns   | 地名     | nt   | 机构名   | nw   | 作品名   |
 | nz   | 其他专名 | v    | 普通动词 | vd   | 动副词   | vn   | 名动词   |
@@ -484,7 +484,7 @@ from paddlenlp import Taskflow
 #### 依存句法分析标注关系集合
 
 | Label |  关系类型  | 说明                     | 示例                           |
-| :---: | :--------: | :----------------------- | :----------------------------- |
+|:-----:|:----------:|:-------------------------|:-------------------------------|
 |  SBV  |  主谓关系  | 主语与谓词间的关系       | 他送了一本书(他<--送)          |
 |  VOB  |  动宾关系  | 宾语与谓词间的关系       | 他送了一本书(送-->书)          |
 |  POB  |  介宾关系  | 介词与宾语间的关系       | 我把书卖了（把-->书）          |
@@ -870,17 +870,17 @@ from paddlenlp import Taskflow
 
 - 多模型选择，满足精度、速度要求
 
-  | 模型 |  结构  | 语言 |
-  | :---: | :--------: | :--------: |
-  | `uie-base` (默认)| 12-layers, 768-hidden, 12-heads | 中文 |
-  | `uie-base-en` | 12-layers, 768-hidden, 12-heads | 英文 |
-  | `uie-medical-base` | 12-layers, 768-hidden, 12-heads | 中文 |
-  | `uie-medium`| 6-layers, 768-hidden, 12-heads | 中文 |
-  | `uie-mini`| 6-layers, 384-hidden, 12-heads | 中文 |
-  | `uie-micro`| 4-layers, 384-hidden, 12-heads | 中文 |
-  | `uie-nano`| 4-layers, 312-hidden, 12-heads | 中文 |
-  | `uie-m-large`| 24-layers, 1024-hidden, 16-heads | 中、英文 |
-  | `uie-m-base`| 12-layers, 768-hidden, 12-heads | 中、英文 |
+  |        模型        |               结构               |   语言   |
+  |:------------------:|:--------------------------------:|:--------:|
+  | `uie-base` (默认)  | 12-layers, 768-hidden, 12-heads  |   中文   |
+  |   `uie-base-en`    | 12-layers, 768-hidden, 12-heads  |   英文   |
+  | `uie-medical-base` | 12-layers, 768-hidden, 12-heads  |   中文   |
+  |    `uie-medium`    |  6-layers, 768-hidden, 12-heads  |   中文   |
+  |     `uie-mini`     |  6-layers, 384-hidden, 12-heads  |   中文   |
+  |    `uie-micro`     |  4-layers, 384-hidden, 12-heads  |   中文   |
+  |     `uie-nano`     |  4-layers, 312-hidden, 12-heads  |   中文   |
+  |   `uie-m-large`    | 24-layers, 1024-hidden, 16-heads | 中、英文 |
+  |    `uie-m-base`    | 12-layers, 768-hidden, 12-heads  | 中、英文 |
 
 - `uie-nano`调用示例：
 
@@ -930,7 +930,7 @@ from paddlenlp import Taskflow
 
 #### 定制训练
 
-对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用[定制训练](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/uie)（标注少量数据进行模型微调）以进一步提升效果。
+对于简单的抽取目标可以直接使用```paddlenlp.Taskflow```实现零样本（zero-shot）抽取，对于细分场景我们推荐使用[定制训练](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/uie)（标注少量数据进行模型微调）以进一步提升效果。
 
 我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
 
@@ -1150,7 +1150,7 @@ from paddlenlp import Taskflow
    'TAIL_ROLE': [{'item': '王杰', 'offset': 10, 'type': '人物类_实体'}],
    'TRIG': [{'item': '作词', 'offset': 12}]}]]
 ```
-具体的WordTag-IE信息抽取的功能可以见[WordTag-IE具体介绍](../../examples/text_to_knowledge/wordtag-ie/README.md) .
+具体的WordTag-IE信息抽取的功能可以见[WordTag-IE具体介绍](../../legacy/examples/text_to_knowledge/wordtag-ie/README.md) .
 
 
 #### 名词短语标注
@@ -1246,16 +1246,16 @@ from paddlenlp import Taskflow
 
 - 多模型选择，满足精度、速度要求
 
-  | 模型 |  结构  | 语言 |
-  | :---: | :--------: | :--------: |
-  | `rocketqa-zh-dureader-cross-encoder`       | 12-layers, 768-hidden, 12-heads | 中文 |
-  | `simbert-base-chinese` (默认)               | 12-layers, 768-hidden, 12-heads | 中文 |
-  | `rocketqa-base-cross-encoder`              | 12-layers, 768-hidden, 12-heads | 中文 |
-  | `rocketqa-medium-cross-encoder`            | 6-layers, 768-hidden, 12-heads | 中文 |
-  | `rocketqa-mini-cross-encoder`              | 6-layers, 384-hidden, 12-heads | 中文 |
-  | `rocketqa-micro-cross-encoder`             | 4-layers, 384-hidden, 12-heads | 中文 |
-  | `rocketqa-nano-cross-encoder`              | 4-layers, 312-hidden, 12-heads | 中文 |
-  | `rocketqav2-en-marco-cross-encoder`        | 12-layers, 768-hidden, 12-heads | 英文 |
+  |                 模型                 |              结构               | 语言 |
+  |:------------------------------------:|:-------------------------------:|:----:|
+  | `rocketqa-zh-dureader-cross-encoder` | 12-layers, 768-hidden, 12-heads | 中文 |
+  |    `simbert-base-chinese` (默认)     | 12-layers, 768-hidden, 12-heads | 中文 |
+  |    `rocketqa-base-cross-encoder`     | 12-layers, 768-hidden, 12-heads | 中文 |
+  |   `rocketqa-medium-cross-encoder`    | 6-layers, 768-hidden, 12-heads  | 中文 |
+  |    `rocketqa-mini-cross-encoder`     | 6-layers, 384-hidden, 12-heads  | 中文 |
+  |    `rocketqa-micro-cross-encoder`    | 4-layers, 384-hidden, 12-heads  | 中文 |
+  |    `rocketqa-nano-cross-encoder`     | 4-layers, 312-hidden, 12-heads  | 中文 |
+  | `rocketqav2-en-marco-cross-encoder`  | 12-layers, 768-hidden, 12-heads | 英文 |
 
 
 #### 可配置参数说明
@@ -1417,7 +1417,7 @@ from paddlenlp import Taskflow
 ```
 
 #### 可配置参数说明
-* `model`：可选模型，默认为Salesforce/codegen-350M-mono，支持的模型参考[CodeGen文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/code_generation/codegen/README.md)。
+* `model`：可选模型，默认为Salesforce/codegen-350M-mono，支持的模型参考[CodeGen文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/examples/code_generation/codegen/README.md)。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
 * `max_length`：生成代码的最大长度，默认为128。
 * `min_length`：生成代码的最小长度，默认为0。
@@ -1697,12 +1697,12 @@ Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 
 - 多模型选择，满足精度、速度要求
 
-  | 模型 |  视觉| 文本  | 语言 |
-  | :---: | :--------: | :--------: | :--------: |
-  | `PaddlePaddle/ernie_vil-2.0-base-zh` (默认) | ViT | ERNIE | 中文 |
-  | `OFA-Sys/chinese-clip-vit-base-patch16`                     | ViT-B/16 |RoBERTa-wwm-Base| 中文 |
-  | `OFA-Sys/chinese-clip-vit-large-patch14`            | ViT-L/14 | RoBERTa-wwm-Base | 中文 |
-  | `OFA-Sys/chinese-clip-vit-large-patch14-336px`              | ViT-L/14 | RoBERTa-wwm-Base | 中文 |
+  |                      模型                      |   视觉   |       文本       | 语言 |
+  |:----------------------------------------------:|:--------:|:----------------:|:----:|
+  |  `PaddlePaddle/ernie_vil-2.0-base-zh` (默认)   |   ViT    |      ERNIE       | 中文 |
+  |    `OFA-Sys/chinese-clip-vit-base-patch16`     | ViT-B/16 | RoBERTa-wwm-Base | 中文 |
+  |    `OFA-Sys/chinese-clip-vit-large-patch14`    | ViT-L/14 | RoBERTa-wwm-Base | 中文 |
+  | `OFA-Sys/chinese-clip-vit-large-patch14-336px` | ViT-L/14 | RoBERTa-wwm-Base | 中文 |
 
 
 #### 可配置参数说明
@@ -1740,24 +1740,24 @@ Tensor(shape=[2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 
 - 多模型选择，满足精度、速度要求
 
-  | 模型 |  层数| 维度  | 语言|
-  | :---: | :--------: | :--------: | :--------: |
-  | `rocketqa-zh-dureader-query-encoder`  | 12 | 768 | 中文|
-  | `rocketqa-zh-dureader-para-encoder`  | 12 | 768 | 中文|
-  | `rocketqa-zh-base-query-encoder`  | 12 | 768 | 中文|
-  | `rocketqa-zh-base-para-encoder`  | 12 | 768 | 中文|
-  | `moka-ai/m3e-base`  | 12 | 768 | 中文|
-  | `rocketqa-zh-medium-query-encoder`  | 6 | 768 | 中文|
-  | `rocketqa-zh-medium-para-encoder`  | 6 | 768 | 中文|
-  | `rocketqa-zh-mini-query-encoder`  | 6 | 384 | 中文|
-  | `rocketqa-zh-mini-para-encoder`  | 6 | 384 | 中文|
-  | `rocketqa-zh-micro-query-encoder`  | 4 | 384 | 中文|
-  | `rocketqa-zh-micro-para-encoder`  | 4 | 384 | 中文|
-  | `rocketqa-zh-nano-query-encoder`  | 4 | 312 | 中文|
-  | `rocketqa-zh-nano-para-encoder`  | 4 | 312 | 中文|
-  | `rocketqav2-en-marco-query-encoder`  | 12 | 768 | 英文|
-  | `rocketqav2-en-marco-para-encoder`  | 12 | 768 | 英文|
-  | `ernie-search-base-dual-encoder-marco-en"`  | 12 | 768 | 英文|
+  |                    模型                    | 层数 | 维度 | 语言 |
+  |:------------------------------------------:|:----:|:----:|:----:|
+  |    `rocketqa-zh-dureader-query-encoder`    |  12  | 768  | 中文 |
+  |    `rocketqa-zh-dureader-para-encoder`     |  12  | 768  | 中文 |
+  |      `rocketqa-zh-base-query-encoder`      |  12  | 768  | 中文 |
+  |      `rocketqa-zh-base-para-encoder`       |  12  | 768  | 中文 |
+  |             `moka-ai/m3e-base`             |  12  | 768  | 中文 |
+  |     `rocketqa-zh-medium-query-encoder`     |  6   | 768  | 中文 |
+  |     `rocketqa-zh-medium-para-encoder`      |  6   | 768  | 中文 |
+  |      `rocketqa-zh-mini-query-encoder`      |  6   | 384  | 中文 |
+  |      `rocketqa-zh-mini-para-encoder`       |  6   | 384  | 中文 |
+  |     `rocketqa-zh-micro-query-encoder`      |  4   | 384  | 中文 |
+  |      `rocketqa-zh-micro-para-encoder`      |  4   | 384  | 中文 |
+  |      `rocketqa-zh-nano-query-encoder`      |  4   | 312  | 中文 |
+  |      `rocketqa-zh-nano-para-encoder`       |  4   | 312  | 中文 |
+  |    `rocketqav2-en-marco-query-encoder`     |  12  | 768  | 英文 |
+  |     `rocketqav2-en-marco-para-encoder`     |  12  | 768  | 英文 |
+  | `ernie-search-base-dual-encoder-marco-en"` |  12  | 768  | 英文 |
 
 #### 可配置参数说明
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
@@ -1774,23 +1774,23 @@ Tensor(shape=[2], dtype=float32, place=Place(gpu:0), stop_gradient=True,
 
 如果你有自己的业务数据集，可以对模型效果进一步调优，支持定制化训练的任务如下：
 
-|                           任务名称                           |                           默认路径                           |                                                              |
-| :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: |
-|         `Taskflow("word_segmentation", mode="base")`         |             `$HOME/.paddlenlp/taskflow/lac`                  | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
-|       `Taskflow("word_segmentation", mode="accurate")`       |             `$HOME/.paddlenlp/taskflow/wordtag`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
-|       `Taskflow("pos_tagging")`                              |             `$HOME/.paddlenlp/taskflow/lac`                  | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
-|                `Taskflow("ner", mode="fast")`                |             `$HOME/.paddlenlp/taskflow/lac`                  | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis) |
-|              `Taskflow("ner", mode="accurate")`              |             `$HOME/.paddlenlp/taskflow/wordtag`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
-|              `Taskflow("information_extraction", model="uie-base")`              |             `$HOME/.paddlenlp/taskflow/information_extraction/uie-base`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/uie) |
-|              `Taskflow("information_extraction", model="uie-tiny")`              |             `$HOME/.paddlenlp/taskflow/information_extraction/uie-tiny`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/uie) |
-|     `Taskflow("text_correction", model="ernie-csc")`     |  `$HOME/.paddlenlp/taskflow/text_correction/ernie-csc`   | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc) |
-|      `Taskflow("dependency_parsing", model="ddparser")`      |   `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser`    | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser) |
-| `Taskflow("dependency_parsing", model="ddparser-ernie-1.0")` | `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser) |
-| `Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")` | `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser) |
-| `Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")` | `$HOME/.paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep) |
-|       `Taskflow("knowledge_mining", model="wordtag")`        |             `$HOME/.paddlenlp/taskflow/wordtag`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
-|        `Taskflow("knowledge_mining", model="nptag")`         |      `$HOME/.paddlenlp/taskflow/knowledge_mining/nptag`      | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag) |
-|        `Taskflow("zero_shot_text_classification", model="utc-base")`         |      `$HOME/.paddlenlp/taskflow/zero_shot_text_classification/utc-base`      | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/zero_shot_text_classification) |
+|                             任务名称                              |                                默认路径                                |                                                                                                                  |
+|:-----------------------------------------------------------------:|:----------------------------------------------------------------------:|:----------------------------------------------------------------------------------------------------------------:|
+|           `Taskflow("word_segmentation", mode="base")`            |                    `$HOME/.paddlenlp/taskflow/lac`                     |             [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/lexical_analysis)             |
+|         `Taskflow("word_segmentation", mode="accurate")`          |                  `$HOME/.paddlenlp/taskflow/wordtag`                   |       [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_to_knowledge/ernie-ctm)        |
+|                     `Taskflow("pos_tagging")`                     |                    `$HOME/.paddlenlp/taskflow/lac`                     |             [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/lexical_analysis)             |
+|                  `Taskflow("ner", mode="fast")`                   |                    `$HOME/.paddlenlp/taskflow/lac`                     |             [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/lexical_analysis)             |
+|                `Taskflow("ner", mode="accurate")`                 |                  `$HOME/.paddlenlp/taskflow/wordtag`                   |       [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_to_knowledge/ernie-ctm)        |
+|      `Taskflow("information_extraction", model="uie-base")`       |      `$HOME/.paddlenlp/taskflow/information_extraction/uie-base`       |               [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/uie)                |
+|      `Taskflow("information_extraction", model="uie-tiny")`       |      `$HOME/.paddlenlp/taskflow/information_extraction/uie-tiny`       |               [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/uie)                |
+|         `Taskflow("text_correction", model="ernie-csc")`          |         `$HOME/.paddlenlp/taskflow/text_correction/ernie-csc`          |        [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_correction/ernie-csc)         |
+|        `Taskflow("dependency_parsing", model="ddparser")`         |        `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser`         |       [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/examples/dependency_parsing/ddparser)        |
+|   `Taskflow("dependency_parsing", model="ddparser-ernie-1.0")`    |   `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0`    |       [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/examples/dependency_parsing/ddparser)        |
+| `Taskflow("dependency_parsing", model="ddparser-ernie-gram-zh")`  | `$HOME/.paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh`  |       [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/examples/dependency_parsing/ddparser)        |
+| `Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")` | `$HOME/.paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch` |         [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/sentiment_analysis/skep)          |
+|          `Taskflow("knowledge_mining", model="wordtag")`          |                  `$HOME/.paddlenlp/taskflow/wordtag`                   |       [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_to_knowledge/ernie-ctm)        |
+|           `Taskflow("knowledge_mining", model="nptag")`           |           `$HOME/.paddlenlp/taskflow/knowledge_mining/nptag`           |         [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_to_knowledge/nptag)          |
+|   `Taskflow("zero_shot_text_classification", model="utc-base")`   |   `$HOME/.paddlenlp/taskflow/zero_shot_text_classification/utc-base`   | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/zero_shot_text_classification) |
 
 </div></details>
 
@@ -1808,7 +1808,7 @@ $HOME/.paddlenlp/taskflow/wordtag/
 └── tags.txt # 默认标签文件
 ```
 
-* 参考上表中对应[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm)准备数据集和标签文件`tags.txt`，执行相应训练脚本得到自己的`model_state.pdparams`和`model_config.json`。
+* 参考上表中对应[示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_to_knowledge/ernie-ctm)准备数据集和标签文件`tags.txt`，执行相应训练脚本得到自己的`model_state.pdparams`和`model_config.json`。
 
 * 根据自己数据集情况，修改标签文件`tags.txt`。
 
@@ -1834,25 +1834,25 @@ my_ner = Taskflow("ner", mode="accurate", task_path="./custom_task_path/")
 
 <table>
   <tr><td>任务名称<td>模型<td>模型详情<td>训练集
-  <tr><td rowspan="3">中文分词<td>默认模式: BiGRU+CRF<td>  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含近2200万句子，覆盖多种场景
+  <tr><td rowspan="3">中文分词<td>默认模式: BiGRU+CRF<td>  <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含近2200万句子，覆盖多种场景
   <tr><td>快速模式：Jieba<td> - <td> -
-  <tr><td>精确模式：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
-  <tr><td>词性标注<td>BiGRU+CRF<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含2200万句子，覆盖多种场景
-  <tr><td rowspan="2">命名实体识别<td>精确模式：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
-  <tr><td>快速模式：BiGRU+CRF <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含2200万句子，覆盖多种场景
-  <tr><td>依存句法分析<td>DDParser<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser"> 训练详情 <td> 百度自建数据集，DuCTB 1.0中文依存句法树库
-  <tr><td>信息抽取<td> UIE <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/uie"> 训练详情 <td> 百度自建数据集
-  <tr><td rowspan="2">解语知识标注<td>词类知识标注：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
-  <tr><td>名词短语标注：NPTag <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag"> 训练详情 <td> 百度自建数据集
-  <tr><td>文本纠错<td>ERNIE-CSC<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc"> 训练详情 <td> SIGHAN简体版数据集及 <a href="https://github.com/wdimmy/Automatic-Corpus-Generation/blob/master/corpus/train.sgml"> Automatic Corpus Generation生成的中文纠错数据集
+  <tr><td>精确模式：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
+  <tr><td>词性标注<td>BiGRU+CRF<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含2200万句子，覆盖多种场景
+  <tr><td rowspan="2">命名实体识别<td>精确模式：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
+  <tr><td>快速模式：BiGRU+CRF <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含2200万句子，覆盖多种场景
+  <tr><td>依存句法分析<td>DDParser<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/dependency_parsing/ddparser"> 训练详情 <td> 百度自建数据集，DuCTB 1.0中文依存句法树库
+  <tr><td>信息抽取<td> UIE <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/uie"> 训练详情 <td> 百度自建数据集
+  <tr><td rowspan="2">解语知识标注<td>词类知识标注：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
+  <tr><td>名词短语标注：NPTag <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_to_knowledge/nptag"> 训练详情 <td> 百度自建数据集
+  <tr><td>文本纠错<td>ERNIE-CSC<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/text_correction/ernie-csc"> 训练详情 <td> SIGHAN简体版数据集及 <a href="https://github.com/wdimmy/Automatic-Corpus-Generation/blob/master/corpus/train.sgml"> Automatic Corpus Generation生成的中文纠错数据集
   <tr><td>文本相似度<td>SimBERT<td> - <td> 收集百度知道2200万对相似句组
   <tr><td rowspan="3">情感分析<td> BiLSTM <td> - <td> 百度自建数据集
-  <tr><td> SKEP <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep"> 训练详情 <td> 百度自建数据集
-  <tr><td> UIE <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/sentiment_analysis/unified_sentiment_extraction"> 训练详情 <td> 百度自建数据集
+  <tr><td> SKEP <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/sentiment_analysis/skep"> 训练详情 <td> 百度自建数据集
+  <tr><td> UIE <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/sentiment_analysis/unified_sentiment_extraction"> 训练详情 <td> 百度自建数据集
   <tr><td>生成式问答<td>CPM<td> - <td> 100GB级别中文数据
   <tr><td>智能写诗<td>CPM<td> - <td> 100GB级别中文数据
   <tr><td>开放域对话<td>PLATO-Mini<td> - <td> 十亿级别中文对话数据
-  <tr><td>零样本文本分类<td>UTC<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/zero_shot_text_classification"> 训练详情  <td> 百度自建数据集
+  <tr><td>零样本文本分类<td>UTC<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/zero_shot_text_classification"> 训练详情  <td> 百度自建数据集
 </table>
 
 </div></details>

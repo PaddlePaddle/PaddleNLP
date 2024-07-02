@@ -35,7 +35,7 @@
 
 对于BERT的fine-tuning任务，本实验中使用了预训练模型`bert-bas-uncased`、`bert-wwm-ext-chinese`、`bert-base-chinese`。同样，这几个模型在训练时会被自动下载到`paddlenlp.utils.env.MODEL_HOME`路径下。例如，对于`bert-base-uncased`模型，在linux系统下，会被下载到`~/.paddlenlp/models/bert-base-uncased`下。
 
-在中文数据集上的小模型训练的输入利用jieba分词，其中词表同本repo下[文本分类项目](../../text_classification/rnn)的词表，可通过运行以下命令进行下载：
+在中文数据集上的小模型训练的输入利用jieba分词，其中词表同本repo下[文本分类项目](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/examples/text_classification/rnn)的词表，可通过运行以下命令进行下载：
 
 ```shell
 wget https://bj.bcebos.com/paddlenlp/data/senta_word_dict.txt

@@ -155,9 +155,9 @@ class SpeechT5FeatureExtractionTest(SequenceFeatureExtractionTestMixin, unittest
         encoded_sequences_2 = feat_extract(np_speech_inputs[0], return_tensors="np").input_values
         self.assertTrue(np.allclose(encoded_sequences_1, encoded_sequences_2, atol=1e-3))
 
-        # Test batched
-        encoded_sequences_1 = feat_extract(speech_inputs, return_tensors="np").input_values
-        encoded_sequences_2 = feat_extract(np_speech_inputs, return_tensors="np").input_values
+        # Test batched, adding padding=True for numpy version >=1.24.x
+        encoded_sequences_1 = feat_extract(speech_inputs, return_tensors="np", padding=True).input_values
+        encoded_sequences_2 = feat_extract(np_speech_inputs, return_tensors="np", padding=True).input_values
         for enc_seq_1, enc_seq_2 in zip(encoded_sequences_1, encoded_sequences_2):
             self.assertTrue(np.allclose(enc_seq_1, enc_seq_2, atol=1e-3))
 
@@ -165,7 +165,7 @@ class SpeechT5FeatureExtractionTest(SequenceFeatureExtractionTestMixin, unittest
         feat_extract = self.feature_extraction_class(**self.feat_extract_tester.prepare_feat_extract_dict())
         speech_inputs = [floats_list((1, x))[0] for x in range(800, 1400, 200)]
 
-        paddings = ["longest", "max_length", "do_not_pad"]
+        paddings = ["longest", "max_length"]  # "do_not_pad" removed for numpy version >=1.24.x
         max_lengths = [None, 1600, None]
         for max_length, padding in zip(max_lengths, paddings):
             processed = feat_extract(speech_inputs, padding=padding, max_length=max_length, return_tensors="np")
@@ -182,7 +182,7 @@ class SpeechT5FeatureExtractionTest(SequenceFeatureExtractionTestMixin, unittest
         lengths = range(800, 1400, 200)
         speech_inputs = [floats_list((1, x))[0] for x in lengths]
 
-        paddings = ["longest", "max_length", "do_not_pad"]
+        paddings = ["longest", "max_length"]  # "do_not_pad" removed for numpy version >=1.24.x
         max_lengths = [None, 1600, None]
 
         for max_length, padding in zip(max_lengths, paddings):
@@ -261,9 +261,9 @@ class SpeechT5FeatureExtractionTest(SequenceFeatureExtractionTestMixin, unittest
         encoded_sequences_2 = feature_extractor(np_speech_inputs[0], return_tensors="np").input_values
         self.assertTrue(np.allclose(encoded_sequences_1, encoded_sequences_2, atol=1e-3))
 
-        # Test batched
-        encoded_sequences_1 = feature_extractor(speech_inputs, return_tensors="np").input_values
-        encoded_sequences_2 = feature_extractor(np_speech_inputs, return_tensors="np").input_values
+        # Test batched, adding padding=True for numpy version >=1.24.x
+        encoded_sequences_1 = feature_extractor(speech_inputs, return_tensors="np", padding=True).input_values
+        encoded_sequences_2 = feature_extractor(np_speech_inputs, return_tensors="np", padding=True).input_values
         for enc_seq_1, enc_seq_2 in zip(encoded_sequences_1, encoded_sequences_2):
             self.assertTrue(np.allclose(enc_seq_1, enc_seq_2, atol=1e-3))
 
