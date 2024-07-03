@@ -27,21 +27,19 @@ from paddle.distributed.fleet.meta_parallel import (
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         AllGatherOp,
-        ColumnSequenceParallelLinear,
         ReduceScatterOp,
-        RowSequenceParallelLinear,
         mark_as_sequence_parallel_parameter,
     )
 except:
     pass
 
-from paddlenlp.transformers.mc2_parallel_linear import (
+from ...transformers import linear_utils
+from ...transformers.mc2_parallel_linear import (
     MC2ColumnParallelCoreLinear,
     MC2ColumnSeqParallelCoreLinear,
     MC2RowParallelCoreLinear,
     MC2RowSeqParallelCoreLinear,
 )
-
 from .lora_quick_layers import quick_lora
 
 
@@ -309,7 +307,7 @@ class RowParallelLoRALinear(RowParallelLinear):
         return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
 
 
-class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
+class RowSequenceParallelLoRALinear(linear_utils.RowSequenceParallelLinear):
     def __init__(
         self,
         in_features: int,
@@ -323,7 +321,7 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
         use_quick_lora: bool = False,
         **kwargs
     ):
-        RowSequenceParallelLinear.__init__(self, in_features, out_features, **kwargs)
+        linear_utils.RowSequenceParallelLinear.__init__(self, in_features, out_features, **kwargs)
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")
         self.r = r
@@ -554,7 +552,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
 
 
-class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear):
+class ColumnSequenceParallelLoRALinear(linear_utils.ColumnSequenceParallelLinear):
     def __init__(
         self,
         in_features: int,
@@ -569,7 +567,7 @@ class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear):
         use_quick_lora: bool = False,
         **kwargs
     ):
-        ColumnSequenceParallelLinear.__init__(self, in_features, out_features, **kwargs)
+        linear_utils.ColumnSequenceParallelLinear.__init__(self, in_features, out_features, **kwargs)
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")
         self.r = r
