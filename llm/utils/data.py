@@ -50,6 +50,7 @@ def get_convert_example(model):
         "opt",
         "qwen",
         "mixtral",
+        "mistral",
         "gemma",
         "qwen2",
         "qwen2_moe",
@@ -248,7 +249,11 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, z
     return rounds_inputs
 
 
-def convert_example_chatglm(example, tokenizer, data_args, is_test=True, zero_padding=False):
+def convert_example_chatglm(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False):
+    if flash_mask:
+        raise ValueError(
+            "chatglm does not support flash mask for now!"
+        )
     if tokenizer.chat_template is not None:
         # chatglm only support single-round finetune
         example = convert_multi_rounds_to_single_round(example, tokenizer)
