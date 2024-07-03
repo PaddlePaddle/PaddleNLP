@@ -23,6 +23,7 @@
 | [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅  | ✅  | ✅            | ✅              |
 | [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅  | 🚧   | 🚧           | ✅              |
 | [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | 🚧  | 🚧  | 🚧           | 🚧             |
+| [Mistral](./config/mistral)            | ❌        | ✅   | ✅    | ✅             | ✅  | 🚧  | 🚧           | ✅             |
 | [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅  | 🚧   | ✅            | ✅              |
 | [ChatGLM-6B](./config/chatglm)         | ❌        | ✅   | ✅    | ✅             | 🚧 | 🚧   | ✅            | ❌              |
 | [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅    | ✅             | 🚧 | 🚧   | ✅            | ✅              |
