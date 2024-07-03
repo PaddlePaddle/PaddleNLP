@@ -21,6 +21,7 @@ export log_path=/workspace/case_logs
 export case_list=()
 
 target_lists_for_gpt=(
+    "model_zoo/gpt-3"
     "llm/llama/auto_parallel/gpt-3"
     "paddlenlp/transformers/gpt/modeling.py"
     "paddlenlp/transformers/gpt/modeling_pp.py"
