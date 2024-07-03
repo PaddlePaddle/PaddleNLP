@@ -255,7 +255,7 @@ def scaled_dot_product_attention(
             alibi = alibi.reshape([bsz, num_heads, 1, -1])
             attn_weights = attn_weights + alibi
 
-        if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
+        if paddle.in_dynamic_mode() and attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
                 f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
                 f" {attn_weights.shape}"
@@ -271,7 +271,7 @@ def scaled_dot_product_attention(
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
-        if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
+        if paddle.in_dynamic_mode() and attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
             raise ValueError(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )

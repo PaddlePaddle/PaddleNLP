@@ -50,6 +50,7 @@ def get_convert_example(model):
         "opt",
         "qwen",
         "mixtral",
+        "mistral",
         "gemma",
         "qwen2",
         "qwen2_moe",

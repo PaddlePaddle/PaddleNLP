@@ -85,6 +85,14 @@ def get_prefix_tuning_params(model):
         hidden_size = model.config.hidden_size
         postprocess_past_key_value = llama_postprocess_past_key_value
         multi_query_group_num = None
+    elif model.base_model_prefix == "mistral":
+        from paddlenlp.peft.prefix import mistral_postprocess_past_key_value
+
+        num_attention_heads = model.config.num_attention_heads
+        num_hidden_layers = model.config.num_hidden_layers
+        hidden_size = model.config.hidden_size
+        postprocess_past_key_value = mistral_postprocess_past_key_value
+        multi_query_group_num = model.config.num_key_value_heads
     elif model.base_model_prefix == "qwen":
         from paddlenlp.peft.prefix import qwen_postprocess_past_key_value
 
@@ -186,6 +194,17 @@ def get_lora_target_modules(model):
             ".*v_proj.*",
             ".*o_proj.*",
             # ".*gate.*", # TODO(DrownFish19): Does the gate weight require training?
+            ".*w1.*",
+            ".*w2.*",
+            ".*w3.*",
+        ]
+    elif model.base_model_prefix == "mistral":
+        target_modules = [
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*o_proj.*",
+            ".*gate.*",
             ".*w1.*",
             ".*w2.*",
             ".*w3.*",
