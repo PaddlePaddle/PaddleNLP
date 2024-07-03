@@ -60,7 +60,7 @@ function _train(){
     mkdir $OUTPUT_PATH
 
     # if [ ${model_item} = "gpt3_moe" ];then
-    #     static_scripts="../examples/language_model/gpt-moe/dygraph/"
+    #     static_scripts="../legacy/model_zoo/gpt-moe/dygraph/"
     # else
     #     echo "not supported model item: ${model_item}"; exit 1;
     # fi
