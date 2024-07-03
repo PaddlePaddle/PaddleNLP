@@ -24,6 +24,8 @@ from paddle.distributed.fleet.meta_parallel import (
     RowParallelLinear,
 )
 
+from ...transformers import linear_utils
+
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         AllGatherOp,
@@ -36,12 +38,8 @@ except:
     AllGatherOp = None
     ReduceScatterOp = None
     mark_as_sequence_parallel_parameter = None
-
-    class ColumnSequenceParallelLinear:
-        pass
-
-    class RowSequenceParallelLinear:
-        pass
+    ColumnSequenceParallelLinear = linear_utils.ColumnSequenceParallelLinear
+    RowSequenceParallelLinear = linear_utils.RowSequenceParallelLinear
 
 
 from ...transformers.mc2_parallel_linear import (
