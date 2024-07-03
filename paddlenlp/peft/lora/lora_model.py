@@ -32,6 +32,7 @@ from paddle.distributed.fleet.meta_parallel import (
     RowParallelLinear,
 )
 
+from ...transformers import linear_utils
 from ...transformers.conversion_utils import ConversionMixin
 from ...transformers.model_utils import (
     PretrainedModel,
@@ -46,14 +47,6 @@ from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
 from ...utils.tools import get_env_device
 from .lora_config import LoRAConfig
-
-try:
-    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-        ColumnSequenceParallelLinear,
-        RowSequenceParallelLinear,
-    )
-except:
-    pass
 
 
 def get_lora_layers():
@@ -521,7 +514,7 @@ class LoRAModel(nn.Layer):
                     self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=False)
                     self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
                     self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
-            elif isinstance(module, ColumnSequenceParallelLinear):
+            elif isinstance(module, linear_utils.ColumnSequenceParallelLinear):
                 # recover the original output_features
                 output_features = module.weight.shape[1] * module.world_size
                 lora_module = ColumnSequenceParallelLoRALinear(
@@ -550,7 +543,7 @@ class LoRAModel(nn.Layer):
                     self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=True)
                     self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
                     self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
-            elif isinstance(module, RowSequenceParallelLinear):
+            elif isinstance(module, linear_utils.RowSequenceParallelLinear):
                 # recover the original output_features
                 lora_module = RowSequenceParallelLoRALinear(
                     in_features=module.weight.shape[0] * module.world_size,
