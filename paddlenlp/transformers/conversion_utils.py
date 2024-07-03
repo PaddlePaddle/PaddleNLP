@@ -1270,7 +1270,7 @@ class ConversionMixin:
         for key in state_dict.keys():
             tensor = state_dict[key]
             if key in name_action_mappings:
-                if get_env_device == "xpu":
+                if get_env_device() == "xpu":
                     ret = distributed_allgather(tensor, group=mp_group, offload=True)
                 else:
                     ret = distributed_gather(tensor, group=mp_group, offload=True)
