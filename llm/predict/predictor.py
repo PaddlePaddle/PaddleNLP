@@ -409,7 +409,6 @@ class InferencePredictorMixin:
             self.tgt_generation_mask = None
             self.tgt_pos = None
         else:
-            print(config.total_max_length)
             self.arange_tensor_encoder = paddle.arange(config.total_max_length, dtype=self.dtype)
             self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
             self.num_layers, self.num_attention_heads, self.head_dim = (
@@ -1489,15 +1488,10 @@ def create_predictor(
                 )
                 model.eval()
             elif "qwen2" in config.architectures[0].lower():
-                if model_args.model_type == "qwen2-img2txt":
-                    # we use qwen for img2txt.
-                    from paddlenlp.experimental.transformers import (
-                        Qwen2ForQWenVLInferenceModel as Qwen2InferenceModel,
-                    )
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        Qwen2ForCausalLMInferenceModel as Qwen2InferenceModel,
-                    )
+                from paddlenlp.experimental.transformers import (
+                    Qwen2ForCausalLMInferenceModel as Qwen2InferenceModel,
+                )
+
                 model = Qwen2InferenceModel.from_pretrained(
                     predictor_args.model_name_or_path,
                     config=config,

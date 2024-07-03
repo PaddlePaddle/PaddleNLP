@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 # Copyright 2018 The OpenAI Team Authors and HuggingFace Inc. team.
 # Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
@@ -39,10 +39,10 @@ from paddlenlp.transformers.model_utils import (
 )
 from paddlenlp.transformers.qwen2.modeling import Qwen2LMHead, Qwen2PretrainingCriterion
 
-__all__ = ["Qwen2ForCausalLMInferenceModel", "Qwen2ForQWenVLInferenceModel"]
+__all__ = ["Qwen2ForCausalLMInferenceModel"]
 
 
-class FusedQWenRMSNorm(nn.Layer):
+class FusedQwen2RMSNorm(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.eps = config.rms_norm_eps
@@ -61,7 +61,7 @@ class FusedQWenRMSNorm(nn.Layer):
 
 @register_base_model
 class Qwen2InferenceModel(Qwen2PretrainedModel):
-    def __init__(self, config: QWenConfig):
+    def __init__(self, config: Qwen2Config):
         super(Qwen2PretrainedModel, self).__init__(config)
         self.vocab_size = config.vocab_size
         self.hidden_size = config.hidden_size
@@ -89,32 +89,32 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
 
         self.wte = nn.Embedding(self.vocab_size, self.hidden_size)
 
-        ln_scale_attrs = [paddle.ParamAttr(name="fuseqwen.{}.ln_scale".format(i)) for i in range(self.num_layers)]
+        ln_scale_attrs = [paddle.ParamAttr(name="fuseqwen2.{}.ln_scale".format(i)) for i in range(self.num_layers)]
         qkv_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseqwen2.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(self.num_layers)
         ]
-        qkv_bias_attrs = [paddle.ParamAttr(name="fuseqwen.{}.qkv_bias".format(i)) for i in range(self.num_layers)]
+        qkv_bias_attrs = [paddle.ParamAttr(name="fuseqwen2.{}.qkv_bias".format(i)) for i in range(self.num_layers)]
         out_proj_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen.{}.out_proj_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseqwen2.{}.out_proj_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(self.num_layers)
         ]
         ffn_ln_scale_attrs = [
-            paddle.ParamAttr(name="fuseqwen.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(name="fuseqwen2.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
         ]
         ffn1_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseqwen2.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(self.num_layers)
         ]
         ffn2_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseqwen2.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(self.num_layers)
         ]
@@ -126,16 +126,16 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
 
         if self.use_weight_only:
             qkv_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen.{}.qkv_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseqwen2.{}.qkv_weight_scale".format(i)) for i in range(self.num_layers)
             ]
             out_proj_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen.{}.out_proj_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseqwen2.{}.out_proj_weight_scale".format(i)) for i in range(self.num_layers)
             ]
             ffn1_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen.{}.ffn1_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseqwen2.{}.ffn1_weight_scale".format(i)) for i in range(self.num_layers)
             ]
             ffn2_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseqwen2.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
             ]
 
         transformer_config = FusedMultiTransformerConfig(
@@ -169,7 +169,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         else:
             self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
-        self.ln_f = FusedQWenRMSNorm(config)
+        self.ln_f = FusedQwen2RMSNorm(config)
 
         self.cache_kvs = None
         self.head_dim_shape_tensor = paddle.ones((self.hidden_size // self.num_attention_heads), dtype="int8")
@@ -192,11 +192,11 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         for idx in range(self.num_layers):
             unfused_state_dict = {}
             ln_scale = paddle.to_tensor(
-                state_dict["qwen2.layers.{}.input_layernorm.weight".format(idx)], dtype=self.transformer_block.ln_scales[idx].dtype
+                state_dict["qwen2.layers.{}.input_layernorm.weight".format(idx)],
+                dtype=self.transformer_block.ln_scales[idx].dtype,
             )
             self.transformer_block.ln_scales[idx].set_value(ln_scale)
 
-            
             unfused_state_dict["qwen2.self_attn.q_proj.weight"] = state_dict[
                 "qwen2.layers.{}.self_attn.q_proj.weight".format(idx)
             ]
@@ -228,9 +228,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             )
 
             qkv_weight = paddle.to_tensor(concated_qkv_weight, dtype=dtype)
-            # qkv_weight = paddle.to_tensor(
-            #     state_dict["layers.{}.attn.c_attn.weight".format(idx)].transpose([1, 0]), dtype=dtype
-            # )
+
             if self.use_weight_only:
                 qkv_weight = paddle.transpose(qkv_weight, perm=[1, 0])
                 qkv_quanted_weight, qkv_weight_scale = weight_quantize(qkv_weight, algo=self.quant_type)
@@ -257,10 +255,11 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 axis=-1,
             )
             qkv_bias = paddle.to_tensor(concated_qkv_biases, dtype=dtype)
-            # qkv_bias = paddle.to_tensor(state_dict["layers.{}.attn.c_attn.bias".format(idx)], dtype=dtype)
             self.transformer_block.qkv_biases[idx].set_value(qkv_bias)
 
-            linear_weight = paddle.to_tensor(state_dict["qwen2.layers.{}.self_attn.o_proj.weight".format(idx)], dtype=dtype)
+            linear_weight = paddle.to_tensor(
+                state_dict["qwen2.layers.{}.self_attn.o_proj.weight".format(idx)], dtype=dtype
+            )
             if self.use_weight_only:
                 linear_quanted_weight, linear_weight_scale = weight_quantize(linear_weight, algo=self.quant_type)
                 self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight)
@@ -269,7 +268,8 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 self.transformer_block.linear_weights[idx].set_value(linear_weight)
 
             ffn_ln_scale = paddle.to_tensor(
-                state_dict["qwen2.layers.{}.post_attention_layernorm.weight".format(idx)], dtype=self.transformer_block.ffn_ln_scales[idx].dtype
+                state_dict["qwen2.layers.{}.post_attention_layernorm.weight".format(idx)],
+                dtype=self.transformer_block.ffn_ln_scales[idx].dtype,
             )
             self.transformer_block.ffn_ln_scales[idx].set_value(ffn_ln_scale)
 
@@ -377,7 +377,6 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
 
         position_offset = 0
-        # theta = 10000.0
         if not is_decoder and pre_caches is not None:
             position_offset = 128
 
@@ -418,11 +417,16 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             attentions=all_self_attentions,
         )
 
+
 class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedModel):
     def __init__(self, config: Qwen2Config, **kwargs):
         super(Qwen2ForCausalLMInferenceModel, self).__init__(config)
         self.qwen2 = Qwen2InferenceModel(config)
-        self.lm_head = Qwen2LMHead(config)
+        if config.tie_word_embeddings:
+            self.lm_head = Qwen2LMHead(config, embedding_weights=self.qwen2.wte.weight, transpose_y=True)
+            self.tie_weights()
+        else:
+            self.lm_head = Qwen2LMHead(config)
         self.criterion = Qwen2PretrainingCriterion(config)
 
     def get_output_embeddings(self):
@@ -440,7 +444,7 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
 
     @classmethod
     def get_cache_kvs_shape(
-        cls, config: QWenConfig, max_batch_size: int = None, max_length: int = None
+        cls, config: Qwen2Config, max_batch_size: int = None, max_length: int = None
     ) -> list[list[int]]:
         """get cache_kvs tensor for qwen model
 
@@ -577,122 +581,3 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
             lm_head_weight = paddle.to_tensor(state_dict["lm_head.weight"], dtype=self.lm_head.weight.dtype)
             self.lm_head.weight.set_value(lm_head_weight)
         self.qwen2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
-
-
-class Qwen2ForQWenVLInferenceModel(Qwen2ForCausalLMInferenceModel):
-    """
-    This class is 99% like QWenForCausalLMInferenceModel.
-    Used only for QWenVL's second part.
-    """
-
-    # This function corresponds to QWenVL's second part, only used for QWenVL.
-    @paddle.no_grad()
-    def generate_text_with_image_features(
-        self,
-        input_ids: paddle.Tensor,
-        image_features: paddle.Tensor,
-        img_pos: paddle.Tensor,
-        attention_mask: paddle.Tensor,
-        position_ids=None,
-        penalty_score=None,
-        frequency_score=None,
-        presence_score=None,
-        min_length=None,
-        max_length=None,
-        temperature=None,
-        top_p=None,
-        eos_token_id=None,
-        seq_len_encoder=None,
-        seq_len_decoder=None,
-        step_idx=None,
-        stop_flags=None,
-        tgt_ids=None,
-        tgt_pos=None,
-        tgt_generation_mask=None,
-        pre_ids=None,
-        stop_nums=None,
-        cache_kvs=[],
-        inputs_embeds=None,
-        **generate_kwargs
-    ) -> paddle.Tensor:
-        inputs_embeds = self.qwen.wte(input_ids)
-        inputs_embeds_dtype = inputs_embeds.dtype
-        if inputs_embeds_dtype != paddle.float32:
-            inputs_embeds = paddle.cast(inputs_embeds, paddle.float32)
-            image_features = paddle.cast(image_features, paddle.float32)
-
-        for idx, (i, image_start_idx, image_end_idx) in enumerate(img_pos):
-            index = paddle.arange(image_start_idx + 1, image_end_idx).unsqueeze(-1)
-            inputs_embeds[i] = paddle.scatter(inputs_embeds[i], index, image_features[idx])
-
-        if inputs_embeds_dtype != paddle.float32:
-            inputs_embeds = paddle.cast(inputs_embeds, inputs_embeds_dtype)
-
-        outputs = self.generate(
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            penalty_score=penalty_score,
-            frequency_score=frequency_score,
-            presence_score=presence_score,
-            min_length=min_length,
-            max_length=max_length,
-            temperature=temperature,
-            top_p=top_p,
-            eos_token_id=eos_token_id,
-            seq_len_encoder=seq_len_encoder,
-            seq_len_decoder=seq_len_decoder,
-            step_idx=step_idx,
-            stop_flags=stop_flags,
-            tgt_ids=tgt_ids,
-            tgt_pos=tgt_pos,
-            tgt_generation_mask=tgt_generation_mask,
-            pre_ids=pre_ids,
-            stop_nums=stop_nums,
-            cache_kvs=cache_kvs,
-        )
-        return outputs
-
-    # rewrite to_static function in generation_utils.py
-    def to_static(self, output_path: str, config: dict):
-        dtype = config.get("dtype", paddle.get_default_dtype())
-        cache_kvs_shapes = self.get_cache_kvs_shape(self.config, max_length=config.get("max_length", None))
-        input_spec = [
-            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
-            paddle.static.InputSpec(
-                shape=[None, None, None], dtype="float32", name="image_features"
-            ),  # image_features
-            paddle.static.InputSpec(shape=[None, 3], dtype="int64", name="img_pos"),  # img_pos
-            paddle.static.InputSpec(shape=[None, None], dtype=dtype, name="attention_mask"),  # attention_mask
-            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),  # position_ids
-            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
-            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
-            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="presence_score"),  # presence_score
-            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="min_length"),  # min_decode_length
-            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="max_length"),  # max_decode_length
-            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="temperature"),  # temperature
-            paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="top_p"),  # top_p
-            paddle.static.InputSpec(shape=[None], dtype="int64", name="eos_token_id"),  # eos_token_id
-            paddle.static.InputSpec(shape=[None, 1], dtype="int32", name="seq_len_encoder"),  # seq_len_encoder
-            paddle.static.InputSpec(shape=[None, 1], dtype="int32", name="seq_len_decoder"),  # seq_len_decoder
-            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="step_idx"),  # step_idx
-            paddle.static.InputSpec(shape=[None, 1], dtype="bool", name="stop_flags"),  # stop_flags
-            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="tgt_ids"),  # tgt_ids
-            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="tgt_pos"),  # tgt_pos
-            paddle.static.InputSpec(
-                shape=[None, 1, 1, None], dtype=dtype, name="tgt_generation_mask"
-            ),  # tgt_generation_mask
-            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="pre_ids"),  # pre_ids
-            paddle.static.InputSpec(shape=[1], dtype="int64", name="stop_nums"),  # stop_nums
-            [
-                paddle.static.InputSpec(
-                    shape=shape,
-                    dtype=dtype,
-                    name="cache_kvs_{}".format(i),
-                )
-                for i, shape in enumerate(cache_kvs_shapes)
-            ],  # cache_kvs
-        ]
-
-        model = paddle.jit.to_static(self.generate_text_with_image_features, input_spec=input_spec)
-        paddle.jit.save(model, output_path, skip_prune_program=True)
