@@ -76,7 +76,7 @@ __global__ __launch_bounds__(Ktraits::THREADS_PER_CTA) void ln_bwd_kernel(
   Reducer reducer(params, bidm, bidn, warp_m, warp_n, lane, smem_dgrad);
 
   Sum<reduce_t> sum;
-
+  bool is_rmsnorm = params.mean == nullptr;
   constexpr float rn = 1.f / static_cast<float>(COLS);
   Wvec gamma[LDGS];
   index_t idx = c;
@@ -88,7 +88,7 @@ __global__ __launch_bounds__(Ktraits::THREADS_PER_CTA) void ln_bwd_kernel(
 #pragma unroll 1
   for (int row = r; row < params.rows;
        row += params.ctas_per_col * ROWS_PER_CTA) {
-    const compute_t mu_r = params.mean ? static_cast<const compute_t *>(params.mean)[row] : static_cast<compute_t>(0.);
+    const compute_t mu_r = is_rmsnorm ? static_cast<compute_t>(0.) : static_cast<const compute_t *>(params.mean)[row];
     const compute_t rs_r = static_cast<const compute_t *>(params.invvar)[row];
     Ivec x[LDGS];
     Ovec dz[LDGS];
@@ -138,7 +138,12 @@ __global__ __launch_bounds__(Ktraits::THREADS_PER_CTA) void ln_bwd_kernel(
       for (int jt = 0; jt < NUM_ELTS; jt++) {
         compute_t dy_tmp = dy[it * NUM_ELTS + jt];
         compute_t y_tmp = y[it * NUM_ELTS + jt];
-        compute_t dx_tmp = rs_r * (dy_tmp - (mdyy_local * y_tmp + mdy_local));
+        compute_t dx_tmp;
+        if (is_rmsnorm) {
+          dx_tmp = rs_r * (dy_tmp - (mdyy_local * y_tmp));
+        } else {
+          dx_tmp = rs_r * (dy_tmp - (mdyy_local * y_tmp + mdy_local));
+        }
         dx[it].data.elt[jt] = dx_tmp;
       }
       dx[it].store_to(params.dx, idx);
