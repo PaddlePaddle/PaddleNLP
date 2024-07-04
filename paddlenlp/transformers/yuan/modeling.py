@@ -22,22 +22,19 @@ from typing import List, Optional, Tuple, Union
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
 from einops import rearrange
-from paddle import nn, Tensor
+from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn import CrossEntropyLoss
 
-from ...transformers.conversion_utils import (
-    StateDictNameMapping,
-    init_name_mappings,
-)
+from ...transformers.conversion_utils import StateDictNameMapping, init_name_mappings
 from ...transformers.model_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast,
 )
 from ...transformers.model_utils import PretrainedModel
-from ...utils.tools import get_env_device
 from ...utils.log import logger
+from ...utils.tools import get_env_device
 from ..activations import ACT2FN
 from .configuration import YuanConfig
 
@@ -814,7 +811,7 @@ class YuanModel(YuanPretrainedModel):
         if reset_mask_flag:
             output_attn_mask = output_attn_mask[:, :, -1:, :]
         return output_attn_mask, position_ids
-    
+
     @paddle.jit.not_to_static
     def recompute_training_full(
         self,
