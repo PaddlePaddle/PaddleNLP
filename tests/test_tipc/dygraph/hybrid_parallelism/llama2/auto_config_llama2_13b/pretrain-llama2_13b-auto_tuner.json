@@ -16,6 +16,7 @@
     "sequence_parallel": 0,   
     "use_flash_attention": true,
     "use_fused_rms_norm": true,
+    "use_fast_layer_norm": true,
     "fuse_attention_ffn": true,
     "fuse_attention_qkv": true,
     "use_fused_rope": true,
