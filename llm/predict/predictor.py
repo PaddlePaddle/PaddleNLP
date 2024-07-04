@@ -347,9 +347,7 @@ class StaticGraphPredictor(BasePredictor):
         super().__init__(config, tokenizer)
 
         params_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdiparams")
-        # set FLAGS_enable_pir_api True json+pir
-        # set FLAGS_enable_pir_api False pdmodel+old ir
-        # set FLAGS_enable_pir_api False  FLAGS_enable_pir_in_executor True pdmodel+ pir ir
+
         if paddle.framework.use_pir_api():
             model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".json")
         else:
