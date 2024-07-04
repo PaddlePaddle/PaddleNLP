@@ -347,7 +347,13 @@ class StaticGraphPredictor(BasePredictor):
         super().__init__(config, tokenizer)
 
         params_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdiparams")
-        model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdmodel")
+        # set FLAGS_enable_pir_api True json+pir
+        # set FLAGS_enable_pir_api False pdmodel+old ir
+        # set FLAGS_enable_pir_api False  FLAGS_enable_pir_in_executor True pdmodel+ pir ir
+        if paddle.framework.use_pir_api():
+            model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".json")
+        else:
+            model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdmodel")
         inference_config = paddle.inference.Config(model_path, params_path)
 
         if self.config.device == "gpu":
@@ -357,12 +363,15 @@ class StaticGraphPredictor(BasePredictor):
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             inference_config.disable_gpu()
-        inference_config.disable_glog_info()
+        # inference_config.disable_glog_info()
         inference_config.enable_new_executor()
-        if in_pir_executor_mode():
+
+        if paddle.framework.use_pir_api() or in_pir_executor_mode():
             inference_config.enable_new_ir()
             if in_cinn_mode():
                 inference_config.enable_cinn()
+        # if use optimized_model to inference
+        # inference_config.use_optimized_model(True)
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)
@@ -372,7 +381,6 @@ class StaticGraphPredictor(BasePredictor):
     def _preprocess(self, input_text: str | list[str]):
         inputs = super()._preprocess(input_text)
         inputs["max_new_tokens"] = np.array(self.config.max_length, dtype="int64")
-
         inputs["top_p"] = np.array(self.config.top_p, dtype="float32")
         inputs["temperature"] = np.array(self.config.temperature, dtype="float32")
         inputs["top_k"] = np.array(self.config.top_k, dtype="int64")
