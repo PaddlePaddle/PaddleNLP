@@ -366,7 +366,7 @@ class StaticGraphPredictor(BasePredictor):
         # inference_config.disable_glog_info()
         inference_config.enable_new_executor()
 
-        if paddle.framework.use_pir_api() or in_pir_executor_mode():
+        if in_pir_executor_mode():
             inference_config.enable_new_ir()
             if in_cinn_mode():
                 inference_config.enable_cinn()
