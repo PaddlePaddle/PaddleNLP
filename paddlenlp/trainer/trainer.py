@@ -1147,6 +1147,9 @@ class Trainer:
                     else:
                         self.optimizer.step()
 
+                    if self.args.offload_optim:
+                        self._offload_optimizer()
+
                     self.timers and self.timers("optimizer-step").stop()
 
                     if optimizer_was_run:
@@ -1694,6 +1697,26 @@ class Trainer:
             )
 
         return self.optimizer
+
+    def _offload_optimizer(self):
+        if "gpu" not in paddle.device.get_device():
+            logger.warning("offload optimizer's states is only supported on GPU devices.")
+            return
+
+        if hasattr(self.optimizer, "_accumulators") and hasattr(self.optimizer, "_moment1_acc_str"):
+            # offload moment1
+            for key, value in self.optimizer._accumulators[self.optimizer._moment1_acc_str].items():
+                self.optimizer._accumulators[self.optimizer._moment1_acc_str][key] = value.pin_memory()
+
+        if hasattr(self.optimizer, "_accumulators") and hasattr(self.optimizer, "_moment2_acc_str"):
+            # offload moment2
+            for key, value in self.optimizer._accumulators[self.optimizer._moment2_acc_str].items():
+                self.optimizer._accumulators[self.optimizer._moment2_acc_str][key] = value.pin_memory()
+
+        if hasattr(self.optimizer, "_master_weights"):
+            # offload master_weight
+            for key, value in self.optimizer._master_weights.items():
+                self.optimizer._master_weights[key] = value.pin_memory()
 
     def _load_rng_state(self, checkpoint):
         # Load RNG states from `checkpoint`
