@@ -22,21 +22,21 @@ from typing import List, Optional, Tuple, Union
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
 from einops import rearrange
-from paddle import nn
+from paddle import nn, Tensor
 from paddle.distributed import fleet
+from paddle.distributed.fleet.utils import recompute
 from paddle.nn import CrossEntropyLoss
 
-from paddlenlp.transformers.conversion_utils import (
+from ...transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
 )
-from paddlenlp.transformers.model_outputs import (
+from ...transformers.model_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast,
 )
-from paddlenlp.transformers.model_utils import PretrainedModel
-from paddlenlp.utils.tools import get_env_device
-
+from ...transformers.model_utils import PretrainedModel
+from ...utils.tools import get_env_device
 from ...utils.log import logger
 from ..activations import ACT2FN
 from .configuration import YuanConfig
@@ -250,7 +250,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
     return q_embed, k_embed
 
 
-class YuanPreTrainedModel(PretrainedModel):
+class YuanPretrainedModel(PretrainedModel):
     config_class = YuanConfig
     base_model_prefix = "model"
     supports_gradient_checkpointing = True
@@ -281,7 +281,7 @@ class YuanPreTrainedModel(PretrainedModel):
             model_mappings.extend(layer_mappings)
 
         init_name_mappings(mappings=model_mappings)
-        # base-model prefix "LlamaModel"
+
         if "YuanModel" not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
@@ -357,10 +357,6 @@ class YuanPreTrainedModel(PretrainedModel):
             module.weight.data.normal_(mean=0.0, std=std)
             if module._padding_idx is not None:
                 module.weight.data[module._padding_idx].zero_()
-
-    def _set_gradient_checkpointing(self, module, value=False):
-        if isinstance(module, YuanModel):
-            module.gradient_checkpointing = value
 
     def _post_init(self, *args, **kwargs):
         with paddle.no_grad():
@@ -711,7 +707,7 @@ class YuanDecoderLayer(nn.Layer):
         return outputs
 
 
-class YuanModel(YuanPreTrainedModel):
+class YuanModel(YuanPretrainedModel):
     """
     Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`YuanDecoderLayer`]
 
@@ -721,6 +717,7 @@ class YuanModel(YuanPreTrainedModel):
 
     def __init__(self, config: YuanConfig):
         super().__init__(config)
+        self.config = config
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
 
@@ -728,6 +725,9 @@ class YuanModel(YuanPreTrainedModel):
         self.eod_token = config.eod_token
         self.reset_attention_mask = config.reset_attention_mask
         self.reset_position_ids = config.reset_position_ids
+        self.enable_recompute = False
+        self.recompute_granularity = config.recompute_granularity
+        self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
         if config.tensor_parallel_degree > 1:
             self.embed_tokens = mpu.VocabParallelEmbedding(
                 config.vocab_size,
@@ -814,6 +814,40 @@ class YuanModel(YuanPreTrainedModel):
         if reset_mask_flag:
             output_attn_mask = output_attn_mask[:, :, -1:, :]
         return output_attn_mask, position_ids
+    
+    @paddle.jit.not_to_static
+    def recompute_training_full(
+        self,
+        layer_module: nn.Layer,
+        hidden_states: Tensor,
+        position_ids: Optional[Tensor],
+        attention_mask: Tensor,
+        output_attentions: bool,
+        past_key_value: Tensor,
+        use_cache: bool,
+        alibi=None,
+        attn_mask_startend_row_indices=None,
+    ):
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs)
+
+            return custom_forward
+
+        hidden_states = recompute(
+            create_custom_forward(layer_module),
+            hidden_states,
+            position_ids,
+            attention_mask,
+            output_attentions,
+            past_key_value,
+            use_cache,
+            alibi,
+            attn_mask_startend_row_indices,
+            use_reentrant=self.config.recompute_use_reentrant,
+        )
+
+        return hidden_states
 
     def forward(
         self,
@@ -905,21 +939,23 @@ class YuanModel(YuanPreTrainedModel):
 
             past_key_value = past_key_values[idx] if past_key_values is not None else None
 
-            if self.gradient_checkpointing and self.training:
-
-                def create_custom_forward(module):
-                    def custom_forward(*inputs):
-                        # None for past_key_value
-                        return module(*inputs, output_attentions, None)
-
-                    return custom_forward
-
-                layer_outputs = paddle.incubate.checkpoint(
-                    create_custom_forward(decoder_layer),
+            has_gradient = not hidden_states.stop_gradient
+            if (
+                self.enable_recompute
+                and idx not in self.no_recompute_layers
+                and has_gradient
+                and self.recompute_granularity == "full"
+            ):
+                layer_outputs = self.recompute_training_full(
+                    decoder_layer,
                     hidden_states,
-                    attention_mask,
                     position_ids,
-                    None,
+                    attention_mask,
+                    output_attentions,
+                    past_key_value,
+                    use_cache,
+                    alibi=None,
+                    attn_mask_startend_row_indices=None,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -954,7 +990,7 @@ class YuanModel(YuanPreTrainedModel):
         )
 
 
-class YuanForCausalLM(YuanPreTrainedModel):
+class YuanForCausalLM(YuanPretrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.eod_token = config.eod_token
