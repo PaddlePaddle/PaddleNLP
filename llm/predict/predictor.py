@@ -347,7 +347,6 @@ class StaticGraphPredictor(BasePredictor):
         super().__init__(config, tokenizer)
 
         params_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdiparams")
-
         if paddle.framework.use_pir_api():
             model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".json")
         else:
@@ -363,7 +362,6 @@ class StaticGraphPredictor(BasePredictor):
             inference_config.disable_gpu()
         inference_config.disable_glog_info()
         inference_config.enable_new_executor()
-
         if in_pir_executor_mode():
             inference_config.enable_new_ir()
             if in_cinn_mode():
@@ -377,6 +375,7 @@ class StaticGraphPredictor(BasePredictor):
     def _preprocess(self, input_text: str | list[str]):
         inputs = super()._preprocess(input_text)
         inputs["max_new_tokens"] = np.array(self.config.max_length, dtype="int64")
+
         inputs["top_p"] = np.array(self.config.top_p, dtype="float32")
         inputs["temperature"] = np.array(self.config.temperature, dtype="float32")
         inputs["top_k"] = np.array(self.config.top_k, dtype="int64")
