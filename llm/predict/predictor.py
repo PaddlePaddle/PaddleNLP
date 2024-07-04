@@ -361,15 +361,13 @@ class StaticGraphPredictor(BasePredictor):
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
             inference_config.disable_gpu()
-        # inference_config.disable_glog_info()
+        inference_config.disable_glog_info()
         inference_config.enable_new_executor()
 
         if in_pir_executor_mode():
             inference_config.enable_new_ir()
             if in_cinn_mode():
                 inference_config.enable_cinn()
-        # if use optimized_model to inference
-        # inference_config.use_optimized_model(True)
 
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)
