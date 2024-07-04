@@ -67,7 +67,7 @@ install_paddlenlp(){
 install_external_ops(){
     echo -e "\033[31m ---- Install extern_ops  \033"
     export PYTHONPATH=${nlp_dir}:$PYTHONPATH
-    cd ${nlp_dir}/model_zoo/gpt-3/external_ops
+    cd ${nlp_dir}/legacy/model_zoo/gpt-3/external_ops
     python setup.py install
     python -c "import fused_ln;";
 }
