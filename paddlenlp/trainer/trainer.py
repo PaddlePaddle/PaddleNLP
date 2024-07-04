@@ -1148,6 +1148,8 @@ class Trainer:
                         self.optimizer.step()
 
                     if self.args.offload_optim:
+                        # Only offloading the optimizer state to the pinned memory is required without explicit reloading.
+                        # Paddle implicitly moves the optimizer state to the GPU device when invoking optimizer update operations.
                         self._offload_optimizer()
 
                     self.timers and self.timers("optimizer-step").stop()
