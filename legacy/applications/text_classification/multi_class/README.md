@@ -35,7 +35,7 @@
 
 对于大多数多分类任务，我们推荐使用预训练模型微调作为首选的文本分类方案，多分类项目中还提供通用文本分类(UTC)和语义索引的两种方案满足不同开发者需求，更多技术细节请参见[文本分类技术特色介绍](../README.md)。
 
-- 【零样本、小样本场景】 👉 [通用文本分类(UTC)方案](../../zero_shot_text_classification)
+- 【零样本、小样本场景】 👉 [通用文本分类(UTC)方案](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/zero_shot_text_classification)
 
 - 【标签类别不固定、标签类别众多】 👉 [语义索引分类方案](./retrieval_based)
 

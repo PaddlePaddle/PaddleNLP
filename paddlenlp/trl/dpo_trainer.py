@@ -177,8 +177,8 @@ class DPOTrainer(Trainer):
             }
             if "attention_mask" in batch:
                 dpo_inputs["attention_mask"] = batch["attention_mask"]
-            if "attn_mask_start_row_indices" in batch:
-                dpo_inputs["attn_mask_start_row_indices"] = batch["attn_mask_start_row_indices"]
+            if "attn_mask_startend_row_indices" in batch:
+                dpo_inputs["attn_mask_startend_row_indices"] = batch["attn_mask_startend_row_indices"]
             if self.reference_free:
                 reference_chosen_logps, reference_rejected_logps = None, None
             else:
@@ -194,8 +194,8 @@ class DPOTrainer(Trainer):
             }
             if "attention_mask" in batch:
                 dpo_inputs["attention_mask"] = batch["attention_mask"]
-            if "attn_mask_start_row_indices" in batch:
-                dpo_inputs["attn_mask_start_row_indices"] = batch["attn_mask_start_row_indices"]
+            if "attn_mask_startend_row_indices" in batch:
+                dpo_inputs["attn_mask_startend_row_indices"] = batch["attn_mask_startend_row_indices"]
             if self.reference_free:
                 reference_chosen_logps, reference_rejected_logps = None, None
             else:
@@ -522,7 +522,7 @@ def prepare_pipeline_dpo_inputs_func(inputs):
     else:
         first_stage_keys = [
             "input_ids",
-            "attn_mask_start_row_indices",
+            "attn_mask_startend_row_indices",
             "position_ids",
         ]
 

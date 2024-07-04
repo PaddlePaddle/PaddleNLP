@@ -22,7 +22,7 @@ export root_path=/workspace/PaddleNLP
 export gpt_case_path=$root_path/legacy/model_zoo/gpt-3
 export gpt_data_path=/fleetx_data
 
-export llm_gpt_case_path=$root_path/llm/gpt-3
+export llm_gpt_case_path=$root_path/llm
 export llm_gpt_data_path=/llm_gpt_data
 
 unset CUDA_VISIBLE_DEVICES

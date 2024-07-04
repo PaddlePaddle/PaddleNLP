@@ -12,7 +12,7 @@
 
 ## 2. 产品功能介绍
 
-本项目提供了低成本搭建端到端问答系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的问答系统模型(召回模型、排序模型、阅读理解模型)快速搭建一个针对自己业务数据的问答系统，并可以提供基于[Streamlit](https://streamlit.io/) 的 Web 可视化服务。以下是使用预置模型的教程，如果用户想训练并接入自己训练的模型，对于召回和排序模型训练可以参考[Neural Search](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/neural_search),对于其中的答案抽取模型，训练教程请参考[machine_reading_comprehension](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_reading_comprehension/DuReader-robust)，召回和排序模型接入流程参考语义检索的Neural Search接入流程即可，阅读理解模型只需要在加载模型的时候，把模型名称换成您的模型的路径即可。
+本项目提供了低成本搭建端到端问答系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的问答系统模型(召回模型、排序模型、阅读理解模型)快速搭建一个针对自己业务数据的问答系统，并可以提供基于[Streamlit](https://streamlit.io/) 的 Web 可视化服务。以下是使用预置模型的教程，如果用户想训练并接入自己训练的模型，对于召回和排序模型训练可以参考[Neural Search](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/applications/neural_search),对于其中的答案抽取模型，训练教程请参考[machine_reading_comprehension](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/machine_reading_comprehension/DuReader-robust)，召回和排序模型接入流程参考语义检索的Neural Search接入流程即可，阅读理解模型只需要在加载模型的时候，把模型名称换成您的模型的路径即可。
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/12107462/190298926-a1fc92f3-5ec7-4265-8357-ab860cc1fed2.gif" width="500px">

@@ -54,17 +54,17 @@ python ./predict/predictor.py --model_name_or_path ./inference --data_file ./dat
 
 PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 
-| Model                       | Inference Model | PTuning | WINT8 | PTQ-A8W8 |
-|-----------------------------|-----------------|---------|-------|-----|
-| [LLaMA1/2](../llama)         | ✅               | ✅       | ✅     | ✅   |
-| [ChatGLM](../chatglm)        | ✅               | ✅       | ✅     | ❌   |
-| [ChatGLM2](../chatglm2)      | ✅               | ❌       | ❌     | ❌   |
-| [Bloom](../bloom)            | ✅               | ✅       | ✅     | ❌   |
-| [GPT-3](../gpt-3)            | ✅               | ❌       | ❌     | ❌   |
-| [Qwen](../qwen)              | ✅               | ❌       | ❌     | ❌   |
-| [BaiChuan-7B](../llama)     | ✅               | ✅       | ✅     | 🚧   |
-| [BaiChuan2-7B](../llama)     | ✅               | ✅       | ✅     | 🚧   |
-| [BaiChuan2-13B](../llama) | 🚧               | 🚧       | 🚧     | 🚧   |
+| Model                            | Inference Model | PTuning | WINT8 | PTQ-A8W8 |
+|----------------------------------|-----------------|---------|-------|----------|
+| [LLaMA1/2](../config/llama)      | ✅               | ✅       | ✅     | ✅        |
+| [ChatGLM](../config/chatglm)     | ✅               | ✅       | ✅     | ❌        |
+| [ChatGLM2](../config/chatglm2)   | ✅               | ❌       | ❌     | ❌        |
+| [Bloom](../config/bloom)         | ✅               | ✅       | ✅     | ❌        |
+| [GPT-3](../config/gpt-3)         | ✅               | ❌       | ❌     | ❌        |
+| [Qwen](../config/qwen)           | ✅               | ❌       | ❌     | ❌        |
+| [BaiChuan-7B](../config/baichuan)   | ✅               | ✅       | ✅     | 🚧       |
+| [BaiChuan2-7B](../config/baichuan)  | ✅               | ✅       | ✅     | 🚧       |
+| [BaiChuan2-13B](../config/baichuan) | 🚧              | 🚧      | 🚧    | 🚧       |
 
 * ✅: Supported
 * 🚧: In Progress
@@ -97,6 +97,9 @@ cd ./paddlenlp/csrc/xpu/src && sh cmake_build.sh
 # 动态图模型推理命令参考
 python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16
 
+#Cpu设备使用avx指令动态图推理参考
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float32 --avx_mode --avx_type "fp16" --device "cpu"
+
 # PrefixTuning动态图推理参考
 python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --export_precache true --prefix_path ./checkpoints/llama_prefix_ckpts
 
@@ -107,7 +110,7 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 python ./predict/predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --dtype float16
 ```
 **Note**：
-1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/merge_lora_params.py)。
+1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/tools/merge_lora_params.py)。
 2. PrefixTuning推理需要传入相应的pre_cache，需要额外设置`export_precache`为`true`，并且传入对应的PrefixTuning参数保存路径`prefix_path`。
 3. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
 
@@ -116,6 +119,9 @@ python ./predict/predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts -
 ```shell
 # 动转静命令参考
 python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16
+
+# Cpu动转静avx指令动转静参考
+python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float32 --avx_mode --avx_type "fp16" --device "cpu"
 
 # PrefixTuning动转静命令参考
 python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --export_precache true
@@ -127,7 +133,7 @@ python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat
 python ./predict/export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --output_path ./inference --dtype float16
 ```
 **Note**：
-1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/merge_lora_params.py)。
+1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/tools/merge_lora_params.py)。
 2. PrefixTuning推理需要传入相应的pre_cache，需要额外设置`export_precache`为`true`。
 3. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
 4. A8W8推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。
@@ -136,6 +142,9 @@ python ./predict/export_model.py --model_name_or_path checkpoints/llama_ptq_ckpt
 ```shell
 # 静态图推理命令参考
 python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static"
+
+#Cpu使用avx指令静态图推理参考
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --avx_mode --avx_type "fp16" --dtype "float32" --mode "static" --device "cpu"
 
 # PrefixTuning静态图推理命令参考
 python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static" --export_precache true --prefix_path ./checkpoints/llama_prefix_ckpts
@@ -152,7 +161,7 @@ export FLAGS_cache_inference_while_scope=1
 python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static"
 ```
 **Note**：
-1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/merge_lora_params.py)。
+1. LoRA 模型在推理之前是需要合并参数，详细可见：[合并 LoRA 参数](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/tools/merge_lora_params.py)。
 2. PrefixTuning推理需要传入相应的pre_cache，需要额外设置`export_precache`为`true`，并且传入对应的PrefixTuning参数保存路径`prefix_path`。
 3. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
 4. A8W8推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。

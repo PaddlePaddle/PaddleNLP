@@ -44,6 +44,8 @@ def validate_pdmodel(model_path, model_prefix, device):
     paddle.enable_static()
     if device == "gpu":
         place = paddle.CUDAPlace(0)
+    elif device == "cpu":
+        place = paddle.CPUPlace()
     else:
         place = paddle.CustomPlace(device, 0)
     exe = paddle.static.Executor(place)
@@ -54,11 +56,14 @@ def validate_pdmodel(model_path, model_prefix, device):
             os.path.join(model_path, model_prefix), exe
         )
 
-        for block in net_program.blocks:
-            ops: list[paddle.framework.Operator] = block.ops
-            for op in tqdm(ops, desc="checking the validation of ops"):
-                if op.type.lower() == "print":
-                    logger.warning(f"UNEXPECTED OP<{op.type}> which will reduce the performace of the static model")
+        if not paddle.framework.use_pir_api():
+            for block in net_program.blocks:
+                ops: list[paddle.framework.Operator] = block.ops
+                for op in tqdm(ops, desc="checking the validation of ops"):
+                    if op.type.lower() == "print":
+                        logger.warning(
+                            f"UNEXPECTED OP<{op.type}> which will reduce the performace of the static model"
+                        )
 
 
 def main():
@@ -93,6 +98,7 @@ def main():
         },
     )
     predictor.model.config.save_pretrained(export_args.output_path)
+    predictor.model.generation_config.save_pretrained(export_args.output_path)
     predictor.tokenizer.save_pretrained(export_args.output_path)
     generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 
@@ -101,7 +107,7 @@ def main():
     validate_pdmodel(export_args.output_path, predictor_args.model_prefix, predictor_args.device)
 
     if predictor_args.device == "npu":
-        from llama.npu.export_utils import process_params
+        from npu.llama.export_utils import process_params
 
         process_params(os.path.join(export_args.output_path, predictor_args.model_prefix))
 

@@ -57,6 +57,7 @@ def get_args():
             "LlamaTokenizer",
             "ElectraTokenizer",
             "T5Tokenizer",
+            "Qwen2Tokenizer"
         ],
         help="What type of tokenizer to use.",
     )
