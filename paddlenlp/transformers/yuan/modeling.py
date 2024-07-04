@@ -24,6 +24,7 @@ import paddle.distributed.fleet.meta_parallel as mpu
 from einops import rearrange
 from paddle import Tensor, nn
 from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.nn import CrossEntropyLoss
 
@@ -66,7 +67,7 @@ class YuanRMSNorm(nn.Layer):
         super().__init__()
         self.weight = paddle.create_parameter(
             shape=[hidden_size],
-            dtype=paddle.get_default_dtype,
+            dtype=paddle.get_default_dtype(),
             default_initializer=paddle.nn.initializer.Assign(paddle.ones([hidden_size])),
         )
         self.variance_epsilon = eps
@@ -344,16 +345,54 @@ class YuanPretrainedModel(PretrainedModel):
 
         return mappings
 
-    def _init_weights(self, module):
-        std = self.config.initializer_range
-        if isinstance(module, nn.Linear):
-            module.weight.data.normal_(mean=0.0, std=std)
-            if module.bias is not None:
-                module.bias.data.zero_()
-        elif isinstance(module, nn.Embedding):
-            module.weight.data.normal_(mean=0.0, std=std)
-            if module._padding_idx is not None:
-                module.weight.data[module._padding_idx].zero_()
+    def _init_weights(self, layer):
+        """Initialization hook"""
+        if self.config.tensor_parallel_degree > 1:
+            rng_tracker = get_rng_state_tracker().rng_state
+        if isinstance(
+            layer,
+            (
+                nn.Linear,
+                nn.Embedding,
+                mpu.VocabParallelEmbedding,
+                mpu.ColumnParallelLinear,
+                mpu.RowParallelLinear,
+                ColumnSequenceParallelLinear,
+                RowSequenceParallelLinear,
+            ),
+        ):
+            # In the dygraph mode, use the `set_value` to reset the parameter directly,
+            # and reset the `state_dict` to update parameter in static mode.
+            if isinstance(layer.weight, paddle.Tensor):
+                if layer.weight.is_distributed:
+                    with rng_tracker():
+                        layer.weight.set_value(
+                            paddle.tensor.normal(
+                                mean=0.0,
+                                std=self.config.initializer_range
+                                if hasattr(self.config, "initializer_range")
+                                else self.llama.config.initializer_range,
+                                shape=layer.weight.shape,
+                            )
+                        )
+                else:
+                    layer.weight.set_value(
+                        paddle.tensor.normal(
+                            mean=0.0,
+                            std=self.config.initializer_range
+                            if hasattr(self.config, "initializer_range")
+                            else self.llama.config.initializer_range,
+                            shape=layer.weight.shape,
+                        )
+                    )
+
+        with paddle.no_grad():
+            if isinstance(layer, YuanMLP):
+                factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
+                layer.down_proj.weight.scale_(factor)
+            if isinstance(layer, YuanAttention):
+                factor = 1 / math.sqrt(2 * self.config.num_hidden_layers)
+                layer.o_proj.weight.scale_(factor)
 
     def _post_init(self, *args, **kwargs):
         with paddle.no_grad():
