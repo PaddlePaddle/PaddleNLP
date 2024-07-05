@@ -40,7 +40,7 @@ all_P0case_dic=("msra_ner"]=15
     ["transformer"]=5
     ["question_matching"]=5 ["ernie-csc"]=5  ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5
     ["fast_generation"]=10 ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5
-["ernie"]=2 ["ernie_layout"]=5 ["ernie_csc"]=5 ["ernie_ctm"]=5 ["segment_parallel_utils"]=5 ["ring_flash_attention"]=5)
+    ["ernie"]=2 ["ernie_layout"]=5 ["ernie_csc"]=5 ["ernie_ctm"]=5 ["segment_parallel_utils"]=5 ["ring_flash_attention"]=5)
 ####################################
 
 python -m pip config --user set global.index http://pip.baidu-int.com/search/
