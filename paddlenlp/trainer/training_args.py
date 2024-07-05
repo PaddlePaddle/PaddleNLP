@@ -889,6 +889,10 @@ class TrainingArguments:
         default=None,
         metadata={"help": "The intervals to skip, pass start global step and end global step at each interval"},
     )
+    offload_optim: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Offload optimizer after optimizer.step()"},
+    )
 
     def __post_init__(self):
         if in_auto_parallel_align_mode():
