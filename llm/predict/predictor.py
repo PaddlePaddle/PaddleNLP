@@ -347,7 +347,10 @@ class StaticGraphPredictor(BasePredictor):
         super().__init__(config, tokenizer)
 
         params_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdiparams")
-        model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdmodel")
+        if paddle.framework.use_pir_api():
+            model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".json")
+        else:
+            model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdmodel")
         inference_config = paddle.inference.Config(model_path, params_path)
 
         if self.config.device == "gpu":
