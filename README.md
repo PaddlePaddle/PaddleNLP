@@ -69,7 +69,7 @@ Unified Checkpoint大模型存储格式在模型参数分布上支持动态扩�
 | [Qwen](./llm/config/qwen)                   |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      🚧      |       ✅        |
 | [Mixtral](./llm/config/mixtral)             |    ✅     |  ✅  |  ✅   |       ❌       | 🚧  |  🚧  |      🚧      |       🚧       |
 | [Baichuan/Baichuan2](./llm/config/baichuan) |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      ✅       |       ✅        |
-| [ChatGLM-6B](./llm/config/chatglm)          |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |     ··✅      |       ❌        |
+| [ChatGLM-6B](./llm/config/chatglm)          |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ❌        |
 | [ChatGLM2/ChatGLM3](./llm/config/chatglm2)  |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅        |
 | [Bloom](./llm/config/bloom)                 |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅        |
 | [GPT-3](./llm/config/gpt-3)                 |    ✅     |  ✅  |  🚧  |      🚧       | 🚧  |  🚧  |      🚧      |       ✅        |
