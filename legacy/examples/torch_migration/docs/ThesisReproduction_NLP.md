@@ -721,7 +721,7 @@ if paddle.distributed.get_world_size() > 1:
 
 #### 3.12.4 程序启动方式
 
-对于单机单卡，启动脚本如下所示。[https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/bert](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/bert)
+对于单机单卡，启动脚本如下所示。[单机单卡](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/examples/benchmark/glue)
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
@@ -765,7 +765,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3" run_glue.py \
 
 **【实战】**
 
-本部分可以参考paddlenlp库中的例子：[单机多卡训练](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/language_model/bert)。
+本部分可以参考paddlenlp库中的例子：[单机多卡训练](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/bert)。
 
 <a name="4"></a>
 ## 4. 论文复现注意事项与FAQ

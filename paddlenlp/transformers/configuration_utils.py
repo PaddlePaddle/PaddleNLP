@@ -1033,6 +1033,8 @@ class PretrainedConfig:
             output["model_type"] = self.__class__.model_type
         if "_auto_class" in output:
             del output["_auto_class"]
+        if "moe_group" in output:
+            del output["moe_group"]
 
         # PaddleNLP version when serializing the model
         output["paddlenlp_version"] = __version__

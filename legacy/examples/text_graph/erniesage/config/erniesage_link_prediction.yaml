@@ -1,0 +1,40 @@
+# Global Environment Settings 
+
+# trainer config ------
+device: "gpu" # use cpu or gpu devices to train.
+seed: 2020
+
+task: "link_prediction"
+model_name_or_path: "ernie-tiny" # ernie-tiny or ernie-1.0 avaiable
+sample_workers: 1
+optimizer_type: "adam"
+lr: 0.00005
+batch_size: 32
+CPU_NUM: 10
+epoch: 30
+log_per_step: 10
+save_per_step: 200
+output_path: "./output"
+
+# data config ------
+train_data: "./example_data/graph_data.txt"
+graph_data: "./example_data/train_data.txt"
+graph_work_path: "./graph_workdir"
+input_type: "text"
+encoding: "utf8"
+
+# model config ------
+samples: [10]
+model_type: "ErnieSageV2"
+max_seqlen: 40
+num_layers: 1
+hidden_size: 128
+final_fc: true
+final_l2_norm: true
+loss_type: "hinge"
+margin: 0.1
+neg_type: "batch_neg"
+
+# infer config ------
+infer_model: "./output/last"
+infer_batch_size: 128

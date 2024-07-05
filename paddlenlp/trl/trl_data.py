@@ -159,8 +159,8 @@ def preprocess_preference_data(data, tokenizer, data_args, model_args):
     }
 
     # attention mask
-    if model_args.use_attn_mask_start_row_indices:
-        output_dict["attn_mask_start_row_indices"] = (
+    if model_args.flash_mask:
+        output_dict["attn_mask_startend_row_indices"] = (
             [seq_len] * prompt_len + [prompt_len + chosen_len] * chosen_len + [seq_len] * rejected_len
         )
     else:
@@ -183,14 +183,14 @@ def preference_collate_fn(batch, max_seq_len=None):
         "response_indexs": [],
     }
     sequence = batch[0]
-    if "attn_mask_start_row_indices" in sequence:
-        input_dict["attn_mask_start_row_indices"] = []
-        use_attn_mask_start_row_indices = True
+    if "attn_mask_startend_row_indices" in sequence:
+        input_dict["attn_mask_startend_row_indices"] = []
+        use_attn_mask_startend_row_indices = True
     elif "attention_mask" in sequence:
         input_dict["attention_mask"] = []
-        use_attn_mask_start_row_indices = False
+        use_attn_mask_startend_row_indices = False
     else:
-        raise ValueError("attention_mask and attn_mask_start_row_indices are both None.")
+        raise ValueError("attention_mask and attn_mask_startend_row_indices are both None.")
 
     for i, sequence in enumerate(batch):
         difference = max_seq_len - len(sequence["input_ids"])
@@ -199,9 +199,12 @@ def preference_collate_fn(batch, max_seq_len=None):
         input_dict["position_ids"].append(sequence["position_ids"] + [0] * difference)
         input_dict["chosen_labels"].append(sequence["chosen_labels"] + [0] * difference)
         input_dict["rejected_labels"].append(sequence["rejected_labels"] + [0] * difference)
-        if use_attn_mask_start_row_indices:
-            input_dict["attn_mask_start_row_indices"].append(
-                [sequence["attn_mask_start_row_indices"] + [sequence["attn_mask_start_row_indices"][-1]] * difference]
+        if use_attn_mask_startend_row_indices:
+            input_dict["attn_mask_startend_row_indices"].append(
+                [
+                    sequence["attn_mask_startend_row_indices"]
+                    + [sequence["attn_mask_startend_row_indices"][-1]] * difference
+                ]
             )
         else:
             input_dict["attention_mask"].append(
@@ -225,7 +228,7 @@ def preference_collate_fn(batch, max_seq_len=None):
     for key in input_dict:
         if key == "attention_mask":
             input_dict[key] = np.array(input_dict[key], dtype=bool)
-        elif key == "attn_mask_start_row_indices":
+        elif key == "attn_mask_startend_row_indices":
             input_dict[key] = np.array(input_dict[key], dtype=np.int32)
         else:
             input_dict[key] = np.array(input_dict[key])

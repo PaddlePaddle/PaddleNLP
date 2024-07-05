@@ -62,17 +62,18 @@ class LoraTest(LLMTest, unittest.TestCase):
         lora_config["use_quick_lora"] = True
 
         with argv_context_guard(lora_config):
-            from finetune_generation import main
+            from run_finetune import main
 
             main()
 
         # merge weights
         merge_lora_weights_config = {
             "lora_path": lora_config["output_dir"],
-            "merge_lora_model_path": lora_config["output_dir"],
+            "model_name_or_path": lora_config["model_name_or_path"],
+            "output_path": lora_config["output_dir"],
         }
         with argv_context_guard(merge_lora_weights_config):
-            from merge_lora_params import merge
+            from tools.merge_lora_params import merge
 
             merge()
 
@@ -91,17 +92,18 @@ class LoraTest(LLMTest, unittest.TestCase):
         lora_config["dataset_name_or_path"] = self.data_dir
 
         with argv_context_guard(lora_config):
-            from finetune_generation import main
+            from run_finetune import main
 
             main()
 
         # merge weights
         merge_lora_weights_config = {
             "lora_path": lora_config["output_dir"],
-            "merge_lora_model_path": lora_config["output_dir"],
+            "model_name_or_path": lora_config["model_name_or_path"],
+            "output_path": lora_config["output_dir"],
         }
         with argv_context_guard(merge_lora_weights_config):
-            from merge_lora_params import merge
+            from tools.merge_lora_params import merge
 
             merge()
 
@@ -170,7 +172,7 @@ class LoraTest(LLMTest, unittest.TestCase):
 #         lora_config["output_dir"] = self.output_dir
 
 #         with argv_context_guard(lora_config):
-#             from finetune_generation import main
+#             from run_finetune import main
 
 #             main()
 
@@ -181,7 +183,7 @@ class LoraTest(LLMTest, unittest.TestCase):
 #             "merge_model_path": lora_config["output_dir"],
 #         }
 #         with argv_context_guard(merge_lora_weights_config):
-#             from merge_lora_params import merge
+#             from tools.merge_lora_params import merge
 
 #             merge()
 

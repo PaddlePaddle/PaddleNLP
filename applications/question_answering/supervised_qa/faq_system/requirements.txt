@@ -1,5 +1,0 @@
-pymilvus==1.1.1
-pandas==0.25.1
-paddlenlp>=2.3.7
-hnswlib>=0.5.2
-pybind11

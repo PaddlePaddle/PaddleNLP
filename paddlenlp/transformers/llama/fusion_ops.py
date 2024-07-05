@@ -116,12 +116,16 @@ def fusion_rope(
     return query_states, key_states
 
 
-def rms_norm_fused(x_in, w, eps):
-    fused_ln = try_import("fused_ln")
-    return fused_ln.fused_rms_norm(x_in, w, eps)[0]
+def rms_norm_fused(x_in, w, eps, use_fast_ln=False):
+    if use_fast_ln:
+        fast_ln = try_import("fast_ln")
+        return fast_ln.fast_rms_norm(x_in, w, eps)[0]
+    else:
+        fused_ln = try_import("fused_ln")
+        return fused_ln.fused_rms_norm(x_in, w, eps)[0]
 
 
-def fusion_rms_norm(hidden_states, weight, variance_epsilon):
+def fusion_rms_norm(hidden_states, weight, variance_epsilon, use_fast_ln=False):
     if get_env_device() == "npu":
         return core.eager._run_custom_op("rms_norm_npu", hidden_states, weight, variance_epsilon)[0]
     elif get_env_device() == "gcu":
@@ -135,7 +139,7 @@ def fusion_rms_norm(hidden_states, weight, variance_epsilon):
             raise NotImplementedError(
                 f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
             )
-    return rms_norm_fused(hidden_states, weight, variance_epsilon)
+    return rms_norm_fused(hidden_states, weight, variance_epsilon, use_fast_ln)
 
 
 def fusion_flash_attention(
@@ -146,6 +150,7 @@ def fusion_flash_attention(
     attention_mask,
     output_attentions,
     alibi=None,
+    attn_mask_startend_row_indices=None,
     sequence_parallel=False,
     reshard_layer=None,
     npu_is_casual=False,
@@ -208,13 +213,25 @@ def fusion_flash_attention(
                     is_causal=True,
                 )
             else:
-                attn_output = F.scaled_dot_product_attention(
-                    query_states,
-                    key_states,
-                    value_states,
-                    attn_mask=attention_mask,
-                    is_causal=attention_mask is None,
-                )
+                if attn_mask_startend_row_indices is not None:
+                    assert alibi is None, "flash_attention_with_sparse_mask not support alibi"
+                    if len(attn_mask_startend_row_indices.shape) == 2:
+                        attn_mask_startend_row_indices = paddle.unsqueeze(attn_mask_startend_row_indices, axis=1)
+                    attn_output = F.flash_attention_with_sparse_mask(
+                        query_states,
+                        key_states,
+                        value_states,
+                        attn_mask_start_row_indices=attn_mask_startend_row_indices,
+                        is_causal=True,
+                    )
+                else:
+                    attn_output = F.scaled_dot_product_attention(
+                        query_states,
+                        key_states,
+                        value_states,
+                        attn_mask=attention_mask,
+                        is_causal=attention_mask is None,
+                    )
         attn_weights = None
 
     if reshard_layer is not None:

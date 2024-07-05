@@ -1,35 +1,35 @@
 ## 🚣‍♂️ 飞桨大模型套件介绍 🚣
-飞桨大模型套件秉承了一站式体验、性能极致、生态兼容的设计理念，旨在提供业界主流大模型预训练、精调（含SFT、PEFT）、量化、推理等统一流程， 帮助开发者低成本、低门槛、快速实现大语言模型定制化。
+飞桨大模型套件以一站式体验、极致性能和生态兼容性为设计理念，致力于为开发者提供业界主流的大模型预训练、精调（包含SFT、PEFT技术）、对齐、量化和推理等全方位服务。开发者能够以便捷、低成本的方式快速实现大语言模型的定制化需求。
 
 <div align="center">
-    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/da10e972-260c-4925-bf49-1e0aefd2a65c">
+    <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/4e61647b-8d66-4870-ba45-77a57990523c">
 </div>
 
 
 ##  💪🏼 大模型套件特色 💪🏼
 
--  **飞桨4D并行分布式策略**。 PaddleNLP Trainer 封装支持飞桨4D并行配置（数据并行、张量并行、流水线并行、 分组参数切分并行），屏蔽多硬件编程复杂性，用户可以修改Trainer配置组合多种预训练或精调过程的分布式策略，充分组合大模型4D并行训练能力，能有效提升在多模型、多硬件下的训练性能。
+-  **飞桨4D并行分布式策略**。 PaddleNLP Trainer通过封装支持飞桨的4D并行配置，即数据并行、张量并行、流水线并行以及分组参数切分并行，从而简化了多硬件编程的复杂性。用户仅需通过修改Trainer的配置，就能灵活组合各种预训练或精调过程中的分布式策略，充分发挥大模型的4D并行训练能力，进而在多模型、多硬件环境下显著提升训练性能。
 
--  **高效精调策略**。飞桨大模型套件提供SFT、PEFT等多种精调策略，搭载自研Zero Padding零填充优化策略有效减少训练数据中pad token的占比，提高模型训练效率。独创PEFT结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛。
+-  **高效精调对齐策略**。飞桨大模型套件提供了包括SFT、DPO、RLHF在内的多种精调对齐方法。套件中自研的Zero Padding零填充优化技术，有效降低了训练数据中无效填充标记（pad token）的比例，进一步增强了模型训练的效率。同时，独创的PEFT技术结合低比特和分布式并行方法，显著降低了进行大模型精调对齐的硬件要求。
 
-- **大模型无损量化**。大模型套件内置了PaddleSlim团队自研的自适应Shift-SmoothQuant的A8W8量化算法和业界主流GPTQ的W4量化算法，实现了主流大模型的无损量化，有效加速模型推理。
+- **大模型无损量化**。大模型套件预先集成了PaddleSlim LLM.PTQ量化算法，以及业界广泛采用的GPTQ和AWQ的W4量化方法，成功实现了对主流大模型的无损量化处理，显著加速了模型的推理速度。
 
-- **高性能推理**。大模型套件高性能推理模块内置动态插入和全环节算子融合策略，极大加快并行推理的速度。同时隐藏了底层实现的细节，实现了开箱即用高性能并行推理能力。
-
+- **高性能推理**。大模型套件的高性能推理模块内置了动态插入和全环节算子融合的高级策略，这极大地提升了并行推理的速度。同时，该模块隐藏了底层技术细节，为用户提供了开箱即用的高性能并行推理功能。
 
 ##  🛠️ 支持模型列表 🛠️
 
-| Model | Pretrain | SFT | LoRA | Prefix Tuning |  Quantization | Weight convert |
-| --- | --- | --- | --- | --- | --- |  --- |
-| [LLaMA/LLaMA2](./llama) | ✅  | ✅ | ✅ | ✅ | ✅  | ✅  |
-| [Baichuan/Baichuan2](./llama) | ✅  | ✅ | ✅ | ✅ | ✅  | ✅  |
-| [ChatGLM-6B](./chatglm) |  ❌  |  ✅  |    ✅  |  ✅  |  ✅  | ❌  |
-| [ChatGLM2/ChatGLM3](./chatglm2) |  ❌  |    ✅  |  ✅  |  ✅  |  ✅  | ✅  |
-| [Qwen](./qwen) | ✅ | ✅ | ✅ | ✅ |  🚧 | ✅  |j
-| [Bloom](./bloom) | ❌  | ✅ | ✅ |  ✅ | ✅ | ✅  |
-| [GPT-3](./gpt-3) |   ✅  |  ✅  |    🚧  | 🚧  | 🚧 | ✅  |
-| [OPT](./opt) | 🚧 | ✅ | ✅ | 🚧 |  🚧 | ✅  |
-| [GLM](./glm) | ❌  | ✅ | ✅ | 🚧 |   🚧 | ✅  |
+| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Torch convert |
+|----------------------------------------|----------|-----|------|---------------|-----|--------------|----------------|----------------|
+| [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅  | ✅  | ✅            | ✅              |
+| [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅  | 🚧   | 🚧           | ✅              |
+| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | 🚧  | 🚧  | 🚧           | 🚧             |
+| [Mistral](./config/mistral)            | ❌        | ✅   | ✅    | ✅             | ✅  | 🚧  | 🚧           | ✅             |
+| [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅  | 🚧   | ✅            | ✅              |
+| [ChatGLM-6B](./config/chatglm)         | ❌        | ✅   | ✅    | ✅             | 🚧 | 🚧   | ✅            | ❌              |
+| [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅    | ✅             | 🚧 | 🚧   | ✅            | ✅              |
+| [Bloom](./config/bloom)                | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧  | ✅            | ✅              |
+| [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧  | 🚧  | 🚧           | ✅              |
+| [OPT](./config/opt)                    | 🚧       | ✅   | ✅    | 🚧            | 🚧 | 🚧   | 🚧           | ✅              |
 
 * ✅: Supported
 * 🚧: In Progress
@@ -39,7 +39,7 @@
 ##  🚀 快速开始 🚀
 
 ### 1. 预训练
-PaddleNLP将飞桨4D并行策略加入到Trainer API中， 用户只需修改Trainer配置即可使用不同的分布式策略。目前工具链提供[LLaMA/LLaMA2](./llama)、[GPT-3](./gpt-3)、[Qwen](./qwen)、[Baichuan/Baichuan2](./llama) 等模型预训练功能，更多模型支持持续更新中。
+PaddleNLP将飞桨4D并行策略加入到Trainer API中， 用户只需修改Trainer配置即可使用不同的分布式策略。目前工具链提供[LLaMA/LLaMA2/LLaMA3](./config/llama)、[GPT-3](./config/gpt-3)、[Qwen](./config/qwen)、[Baichuan/Baichuan2](./config/baichuan)、[Mixtral](./config/mixtral) 等模型预训练功能，更多模型支持持续更新中。
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/a2f0261d-7f76-4faf-ae01-cc9d37d5fcc0">
@@ -51,10 +51,10 @@ PaddleNLP将飞桨4D并行策略加入到Trainer API中， 用户只需修改Tra
 </div>
 
 
-我们在此处提供了更详细的[预训练数据制作]()，[分布式策略支持情况]( https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-performance)，参见: https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html. 大模型权重列表参见[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-weight)
+我们在此处提供了更详细的[预训练数据制作]()，[分布式策略支持情况](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-performance)，参见: https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html. 大模型权重列表参见[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-weight)
 
 
-此项目支持了LLaMA、GPT-3、BaiChuan、Qwen 等大模型的预训练。用户切换配置config文件，即可一键运行。
+此项目支持了LLaMA、GPT-3、BaiChuan、Qwen、Mixtral 等大模型的预训练。用户切换配置config文件，即可一键运行。
 
 数据详细制作流程可参考[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/dataset.html) : https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/dataset.html
 
@@ -79,30 +79,26 @@ mv llama_openwebtext_100k.idx ./data
 
 ```shell
 # 编译自定义算子，可选
-cd ../model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
+cd ../legacy/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 
-# llama 模型预训练
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./llama/pretrain-llama2_7b-tp2sd4_stage2.json
-
-# Qwen 模型预训练
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./qwen/pretrain_argument_stage2.json
+# 模型预训练参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json
 ```
 
 注意：
 1. 建议使用paddle develop版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失whl包
 2. `use_flash_attention` 需要在A100机器开启，建议使用cuda11.8环境。
-3. `use_fused_rms_norm` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
+3. `use_fused_rms_norm` 需要安装自定义算子。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
 4. `continue_training` 表示从现有的预训练模型加载训练。7b模型初始loss大概为2.xx, 随机初始化模型loss从11.x左右下降。
-5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，请参考 `run_trainer_tp4pp2.sh`脚本。
-6. 多机训练时，若各机器使用的训练数据文件位置相同（例如挂载共享硬盘情况），请指定`--share_folder true`使全局0号卡制作缓存数据。否则默认各台机器的0号卡独立制作缓存数据，
-7. 若数据集文件夹中存在默认缓存文件夹`index-cache/`，则额外指定的`--data_cache`不生效，训练时优先加载默认缓存文件夹中的内容。
+5. 多机训练时，若各机器使用的训练数据文件位置相同（例如挂载共享硬盘情况），请指定`--share_folder true`使全局0号卡制作缓存数据。否则默认各台机器的0号卡独立制作缓存数据，
+6. 若数据集文件夹中存在默认缓存文件夹`index-cache/`，则额外指定的`--data_cache`不生效，训练时优先加载默认缓存文件夹中的内容。
 
 
 
 ### 2. 精调
 PaddleNLP支持多个主流大模型的SFT、LoRA、Prefix Tuning等精调策略，提供统一、高效精调方案：
 - **统一训练入口**。飞桨大模型套件精调方案可适配业界主流大模型，用户只需修改配置文件，即能在单卡或多卡（支持4D并行分布式策略）进行多种大模型精调。
-- **高效数据和分布式策略**。Zero Padding零填充优化策略有效减少了pad token的占比，提高模型训练效率高达100%。独创PEFT结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛，支持单卡（A100 80G）百亿模型微调、单机（A100 80G * 8）千亿模型微调。
+- **高效数据和分布式策略**。Zero Padding零填充优化策略结合FlashMask策略有效提升模型训练效率。独创PEFT结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛，支持单卡（A100 80G）百亿模型微调、单机（A100 80G * 8）千亿模型微调。
 - **支持多轮对话**。支持统一对话模板，支持多轮对话高效训练，详参[多轮对话文档](./docs/chat_template.md)。
 
 
@@ -137,27 +133,27 @@ tar -zxvf AdvertiseGen.tar.gz
 
 **全参精调：SFT**
 ```bash
-# 四卡llama SFT启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./llama/sft_argument.json
+# SFT启动命令参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py ./config/llama/sft_argument.json
 ```
 
 **LoRA**
 ```bash
-# 单卡llama LoRA启动命令参考
-python  finetune_generation.py ./llama/lora_argument.json
+# LoRA启动命令参考
+python  run_finetune.py ./config/llama/lora_argument.json
 ```
 
 **Prefix Tuning**
 ```bash
-# 单卡llama Prefix Tuning启动命令参考
-python  finetune_generation.py ./llama/pt_argument.json
+# Prefix Tuning启动命令参考
+python  run_finetune.py ./config/llama/pt_argument.json
 ```
 
 更多大模型精调分布式使用文档、训练细节和效果请参见[大模型精调教程](./docs/finetune.md)。
 
 ### 3. 对齐
-我们支持DPO等偏好对齐策略。
-
+我们支持DPO、RLHF等偏好对齐策略。DPO策略采用zero_padding策略，结合FlashMask策略，有效提升模型训练效率。
+#### 3.1 DPO
 **数据准备**：
 
 我们支持的精调数据格式是每行包含一个字典的json文件，每个字典包含以下字段：
@@ -189,15 +185,17 @@ wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.t
 tar -zxvf ultrafeedback_binarized.tar.gz
 ```
 
-**全参精调：SFT**
+**全参DPO**
 ```bash
-# 四卡llama SFT启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" dpo_train.py ./llama/dpo_argument.json
+# DPO启动命令参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
+#### 3.2 RLHF
+飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF文档](./docs/rlhf.md)。
 
 ### 4. 量化
 大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。工具链量化算法包含：
-- **PTQ**。PaddleSlim 团队自研的自适应Shift-SmoothQuant量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
+- **PTQ**。PaddleSlim 团队自研的自适应LLM.PTQ量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
 新增PieceWiseSearch参数搜索算法，对模型权重和激活分布进行调整，减少后续A8W8 PTQ量化损失。
 
 
@@ -215,10 +213,10 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" dpo_train.py ./
 
 ```
 # PTQ 量化启动命令参考
-python  finetune_generation.py ./llama/ptq_argument.json
+python  run_finetune.py ./config/llama/ptq_argument.json
 
 # GPTQ 量化启动命令参考
-python  finetune_generation.py ./llama/ptq_argument.json
+python  run_finetune.py ./config/llama/ptq_argument.json
 ```
 
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。
@@ -231,13 +229,13 @@ PaddleNLP除了提供常用模型推理外，还提供了高性能推理，内�
 
 ```shell
 # 动态图模型推理命令参考
-python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --data_file ./data/dev.json --dtype float16
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --data_file ./data/dev.json --dtype float16
 
 # 静态图模型推理命令参考
 # step1 : 静态图导出
-python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --output_path ./inference --dtype float16
+python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --output_path ./inference --dtype float16
 # step2: 静态图推理
-python predictor.py --model_name_or_path ./inference --data_file ./data/dev.json --dtype float16 --mode static
+python ./predict/predictor.py --model_name_or_path ./inference --data_file ./data/dev.json --dtype float16 --mode static
 ```
 
 - **InferenceModel 高性能推理**：PaddleNLP 还提供了高性能推理模型加快并行推理的速度，同时支持FP16、Prefix Tuning、WINT8、A8W8多种推理方式。
@@ -253,13 +251,13 @@ python predictor.py --model_name_or_path ./inference --data_file ./data/dev.json
 
 ```shell
 # 高性能动态图模型推理命令参考
-python predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16
 
 # 高性能静态图模型推理命令参考
 # step1 : 静态图导出
-python export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16
+python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16
 # step2: 静态图推理
-python predictor.py --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static"
+python ./predict/predictor.py --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static"
 ```
 
 更多常用模型推理和高性能模型使用方法详见[大模型推理文档](./docs/inference.md)。
@@ -277,7 +275,7 @@ python predictor.py --model_name_or_path ./inference --inference_model --dtype "
 我们提供了一套基于动态图推理的简单易用UI服务化部署脚本，用户可以快速部署服务化推理。
 
 ```
-python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_server.py \
     --model_name_or_path meta-llama/Llama-2-7b-chat \
     --port 8010 \
     --flask_port 8011 \
@@ -287,7 +285,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" flask_server.py \
 - `flask_port`: Flask服务端口号，默认8010。
 - 其他参数请参见[推理文档](./docs/inference.md)中推理参数配置。
 
-此外，如果想通过API脚本的方式跑推理，可参考：`./request_flask_server.py` 文件。
+此外，如果想通过API脚本的方式跑推理，可参考：`./predict/request_flask_server.py` 文件。
 
 </div></details>
 

@@ -1795,7 +1795,7 @@ class Trainer:
             self.args.warmup_steps if self.args.warmup_steps > 0 else int(self.args.warmup_ratio * num_training_steps)
         )
         decay_steps = num_training_steps
-        if hasattr(self.args, "decay_steps") and self.args.decay_steps > 0:
+        if getattr(self.args, "decay_steps", None) and self.args.decay_steps > 0:
             decay_steps = self.args.decay_steps
 
         if self.lr_scheduler is None:
