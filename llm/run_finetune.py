@@ -14,7 +14,6 @@
 import json
 import os
 import sys
-import inspect
 from functools import partial
 
 import paddle
@@ -42,7 +41,14 @@ from paddlenlp.datasets import (
     load_dataset,
 )
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
-from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM, VeRAConfig,VeRAModel
+from paddlenlp.peft import (
+    LoRAConfig,
+    LoRAModel,
+    PrefixConfig,
+    PrefixModelForCausalLM,
+    VeRAConfig,
+    VeRAModel,
+)
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
@@ -51,9 +57,9 @@ from paddlenlp.transformers import (
     AutoModelForCausalLMPipe,
     AutoTokenizer,
     Llama3Tokenizer,
-    LlamaTokenizer,
     LlamaForCausalLM,
     LlamaForCausalLMPipe,
+    LlamaTokenizer,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.utils.log import logger
@@ -82,7 +88,6 @@ def main():
         raise ValueError(
             "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
         )
-    
 
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
@@ -167,9 +172,7 @@ def main():
         model = model_class.from_config(model_config, dtype=dtype)
 
     if model_args.flash_mask and (not data_args.zero_padding or not model.config.use_flash_attention):
-        logger.warning(
-            "`flash_mask` must use with zero padding and flash attention."
-        )
+        logger.warning("`flash_mask` must use with zero padding and flash attention.")
         data_args.zero_padding = True
         model.config.use_flash_attention = True
 
@@ -345,12 +348,16 @@ def main():
                 "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM, QWen and Mistral so far."
             )
     train_ds = (
-        train_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask))
+        train_ds.map(
+            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
+        )
         if train_ds is not None
         else None
     )
     ptq_ds = (
-        ptq_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask))
+        ptq_ds.map(
+            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
+        )
         if ptq_ds is not None
         else None
     )
@@ -361,7 +368,14 @@ def main():
         )
         eval_zero_padding = False
     dev_ds = (
-        dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, zero_padding=eval_zero_padding, flash_mask=model_args.flash_mask))
+        dev_ds.map(
+            partial(
+                trans_func,
+                is_test=data_args.eval_with_do_generation,
+                zero_padding=eval_zero_padding,
+                flash_mask=model_args.flash_mask,
+            )
+        )
         if dev_ds is not None
         else None
     )
@@ -490,13 +504,13 @@ def main():
         vera_config = VeRAConfig(
             target_modules=target_modules,
             r=model_args.lora_rank,
-            vera_alpha = model_args.lora_rank,
+            vera_alpha=model_args.lora_rank,
             merge_weights=False,
             tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
             do_qat=quant_args.do_qat,
             base_model_name_or_path=model_args.model_name_or_path,
-            pissa_init=True
+            pissa_init=True,
         )
         model = VeRAModel(model, vera_config)
         model.mark_only_vera_as_trainable(notfreezeB=True)

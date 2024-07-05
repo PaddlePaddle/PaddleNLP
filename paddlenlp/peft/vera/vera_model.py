@@ -13,32 +13,20 @@
 # limitations under the License.
 
 import copy
-import math
 import os
 import re
-import tempfile
 from collections import OrderedDict
-from functools import partial
 from typing import Dict, List, Union
 
-
-import aistudio_sdk
 import numpy as np
 import paddle
 import paddle.nn as nn
-from paddle.distributed.fleet.meta_parallel import (
-    ColumnParallelLinear,
-    PipelineLayer,
-    RowParallelLinear,
-)
+from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
-from ...transformers.conversion_utils import ConversionMixin
 from ...transformers.model_utils import PretrainedModel, _add_variant, dtype_guard
 from ...transformers.utils import weight_name_suffix
-from ...utils.distributed import distributed_gather
 from ...utils.env import VERA_WEIGHTS_NAME
 from ...utils.log import logger
-
 from .vera_config import VeRAConfig
 from .vera_layers import VeRALinear
 
@@ -61,10 +49,9 @@ class VeRAModel(nn.Layer):
             self.is_pipelinemodel = True
             self.model._single_to_pp_mapping = None
 
-        if vera_config.tensor_parallel_degree > 1: 
+        if vera_config.tensor_parallel_degree > 1:
             raise NotImplementedError("vera don't support tensor parallel now")
         self.forward = self.model.forward
-
 
     @classmethod
     def from_pretrained(cls, model, vera_path, **kwargs):
@@ -75,7 +62,6 @@ class VeRAModel(nn.Layer):
         # define a new variable to conserve original vera_config.tensor_parallel_degree value which will update while initializing vera model
         vera_config_tensor_parallel_degree = vera_config.tensor_parallel_degree
         vera_model = cls(model, vera_config)
-        
 
         # define vera weight name
         if vera_config_tensor_parallel_degree > 1:
@@ -85,11 +71,11 @@ class VeRAModel(nn.Layer):
 
         # load and set vera weight parameter
         vera_weight_path = os.path.join(vera_path, vera_weight_name)
-        logger.info('vera_weight_path', vera_weight_path)
+        logger.info("vera_weight_path", vera_weight_path)
         if os.path.exists(vera_weight_path):
             # load vera weight parameter
-            logger.info('vera_weight_path existed, loading vera weight parameter')
-            
+            logger.info("vera_weight_path existed, loading vera weight parameter")
+
             vera_state_dict = paddle.load(vera_weight_path, return_numpy=True)
             logger.info(f"Loading the VeRA weights from {vera_weight_path}")
 
@@ -117,10 +103,9 @@ class VeRAModel(nn.Layer):
         self.model.set_state_dict(state_dict)
         logger.info("Load vera weight successfully")
 
-
     def save_pretrained(self, save_directory: str, merge_tensor_parallel: bool = False, **kwargs):
-        
-        logger.info('save vera pretrained')
+
+        logger.info("save vera pretrained")
         save_model_config = kwargs.get("save_model_config", True)
 
         if self.is_pipelinemodel:
@@ -145,9 +130,8 @@ class VeRAModel(nn.Layer):
         os.makedirs(save_directory, exist_ok=True)
 
         vera_config_to_save = VeRAConfig(**self.vera_config.to_dict())
-        
-        print('vera_config_to_save', vera_config_to_save)
 
+        print("vera_config_to_save", vera_config_to_save)
 
         trainable_state_dict = self.get_trainable_state_dict()
         if vera_config_to_save.tensor_parallel_degree > 1:
@@ -187,9 +171,9 @@ class VeRAModel(nn.Layer):
                     vera_dropout=vera_config.vera_dropout,
                     merge_weights=vera_config.merge_weights,
                     bias_attr=False if module.bias is None else None,
-                    pissa_init=vera_config.pissa_init
+                    pissa_init=vera_config.pissa_init,
                 )
- 
+
         if vera_module is None:
             raise ValueError(
                 f"VeRA strategy only supports paddle.nn.Linear or paddle.distributed.fleet.meta_parallel.ColumnParallelLinear. {module}({module_name}) is not supported。"
@@ -197,7 +181,7 @@ class VeRAModel(nn.Layer):
 
         if module.bias is not None:
             vera_module.bias = module.bias
-            
+
         setattr(parent_module, attribute_chain[-1], vera_module)
 
     def _find_and_restore_module(self, module_name):
@@ -239,12 +223,12 @@ class VeRAModel(nn.Layer):
                 for name, weight in layer.state_dict().items():
                     if self.vera_config.trainable_bias in ["lora", "all"] and "bias" in name:
                         weight.stop_gradient = False
-                    elif "lora" in name or 'vera' in name:
+                    elif "lora" in name or "vera" in name:
                         # freezeB=True, vera_b, vera_d, lora_B可训练
                         # freezeB=False, vera_b, vera_d 可训练
-                        if 'vera' in name:
+                        if "vera" in name:
                             weight.stop_gradient = False
-                        elif 'lora_B' in name and notfreezeB:
+                        elif "lora_B" in name and notfreezeB:
                             weight.stop_gradient = False
                         else:
                             weight.stop_gradient = True
@@ -342,4 +326,3 @@ class VeRAModel(nn.Layer):
         for layer in self.model.sublayers():
             layer.training = False
             layer.eval()
-

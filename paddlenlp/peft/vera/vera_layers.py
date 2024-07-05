@@ -13,13 +13,10 @@
 # limitations under the License.
 
 import math
-from typing import List, Optional
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.distributed.fleet.layers.mpu import mp_ops
-
 
 
 class VeRALinear(nn.Linear):
@@ -33,12 +30,12 @@ class VeRALinear(nn.Linear):
         vera_alpha: int = 1,
         vera_dropout: float = 0.0,
         merge_weights: bool = True,
-        pissa_init : bool = False,
+        pissa_init: bool = False,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
         self.weight.set_value(base_linear_module.weight)
-        
+
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")
         self.r = r
@@ -73,7 +70,9 @@ class VeRALinear(nn.Linear):
                 shape=[in_features, r],
                 dtype=self._dtype,
                 is_bias=False,
-                default_initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu"),
+                default_initializer=nn.initializer.KaimingUniform(
+                    negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
+                ),
             )
             self.lora_B = self.create_parameter(
                 shape=[r, out_features],
@@ -82,25 +81,23 @@ class VeRALinear(nn.Linear):
                 default_initializer=nn.initializer.Constant(value=0.0),
             )
         self.scaling = self.vera_alpha / self.r
-        
+
         self.vera_b = self.create_parameter(
-                shape=[out_features],
-                dtype=self._dtype,
-                is_bias=False,
-                default_initializer=nn.initializer.Constant(value=1.0),
+            shape=[out_features],
+            dtype=self._dtype,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(value=1.0),
         )
-        
+
         self.vera_d = self.create_parameter(
-                shape=[r],
-                dtype=self._dtype,
-                is_bias=False,
-                default_initializer=nn.initializer.Constant(value=1.0),
+            shape=[r],
+            dtype=self._dtype,
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(value=1.0),
         )
 
         # Freezing the pre-trained weight matrix and bias vector
         self.weight.stop_gradient = True
-
-        
 
     def pissa_init(self, r):
         weight = self.weight
@@ -110,20 +107,19 @@ class VeRALinear(nn.Linear):
             weight = weight.astype(paddle.float32)
 
         U, S, Vh = paddle.linalg.svd(weight.data, full_matrices=False)
-        
+
         Ur = U[:, :r]
         Sr = S[:r]
         Vhr = Vh[:r]
-        
-        lora_A = (Ur @ paddle.diag(paddle.sqrt(Sr)))
-        lora_B = (paddle.diag(paddle.sqrt(Sr)) @ Vhr)
+
+        lora_A = Ur @ paddle.diag(paddle.sqrt(Sr))
+        lora_B = paddle.diag(paddle.sqrt(Sr)) @ Vhr
 
         self.lora_A.set_value(lora_A.astype(dtype))
         self.lora_B.set_value(lora_B.astype(dtype))
         res = weight.data - lora_A @ lora_B
         weight = res.astype(dtype)
-        self.weight.set_value(weight) 
-        
+        self.weight.set_value(weight)
 
     def train(self):
         super().train()
@@ -157,5 +153,3 @@ class VeRALinear(nn.Linear):
     def extra_repr(self):
         name = f", name={self.name}" if self.name else ""
         return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
-
-

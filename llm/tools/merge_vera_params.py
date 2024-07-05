@@ -1,21 +1,34 @@
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
-import copy
 import os
+
 import paddle
+
 from paddlenlp.peft import VeRAConfig, VeRAModel
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
-from paddlenlp.transformers.utils import device_guard
 from paddlenlp.utils.env import CONFIG_NAME
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name_or_path", default=None, help="The directory of pretrained model.")
-    parser.add_argument(
-        "--vera_path", default='',  help="The directory of VeRA parameters. Default to None"
-    )
+    parser.add_argument("--vera_path", default="", help="The directory of VeRA parameters. Default to None")
     parser.add_argument(
         "--merge_vera_model_path",
-        default='',
+        default="",
         help="The directory of merged parameters. Default to None",
     )
     parser.add_argument("--device", type=str, default="gpu", help="Device")
@@ -25,7 +38,7 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def weight_process(name,vera_config, state_dict):
+def weight_process(name, vera_config, state_dict):
     weight = state_dict.pop(name + ".weight").cuda()
     lora_A = state_dict.pop(name + ".lora_A").cuda()
     lora_B = state_dict.pop(name + ".lora_B").cuda()
@@ -78,10 +91,9 @@ def merge():
     for key in model_state_dict.keys():
         if "lora_A" in key:
             lora_name_list.append(key[:-7])
-    print('lora_name_list', lora_name_list)
+    print("lora_name_list", lora_name_list)
     for name in lora_name_list:
         weight_process(name, vera_config, model_state_dict)
-
 
     model.model.save_pretrained(args.merge_vera_model_path, state_dict=model_state_dict)
     tokenizer = AutoTokenizer.from_pretrained(vera_config.base_model_name_or_path)

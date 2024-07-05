@@ -433,7 +433,11 @@ class Trainer:
         if train_dataset is not None and not isinstance(train_dataset, collections.abc.Sized) and args.max_steps <= 0:
             raise ValueError("train_dataset does not implement __len__, max_steps has to be specified")
 
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM) or isinstance(self.model, VeRAModel):
+        if (
+            isinstance(self.model, LoRAModel)
+            or isinstance(self.model, PrefixModelForCausalLM)
+            or isinstance(self.model, VeRAModel)
+        ):
             if self.args.unified_checkpoint and "skip_save_model_weight" in self.args.unified_checkpoint_config:
                 self.args.unified_checkpoint_config.remove("skip_save_model_weight")
                 logger.warning(
