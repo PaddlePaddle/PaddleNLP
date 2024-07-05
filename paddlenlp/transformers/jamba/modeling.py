@@ -617,7 +617,7 @@ class JambaMambaMixer(nn.Layer):
         self.activation = config.hidden_act
         self.act = ACT2FN[config.hidden_act]
 
-        self.use_fast_kernels = config.use_mamba_kernels
+        self.use_fast_kernels = config.use_mamba_kernels and is_fast_path_available
 
         # projection of the input hidden states
         self.in_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=self.use_bias)
@@ -1400,6 +1400,7 @@ class JambaModel(JambaPretrainedModel):
                     output_router_logits,
                     use_cache,
                     cache_position,
+                    use_reentrant=self.config.recompute_use_reentrant,
                 )
             else:
                 layer_outputs = decoder_layer(
