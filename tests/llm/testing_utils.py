@@ -71,11 +71,11 @@ class LLMTest:
         with lock:
             # to avoid the same parameter
             self.disable_static()
-            if "predictor" in sys.modules.keys():
-                del sys.modules["predictor"]
+            if "predict" in sys.modules.keys():
+                del sys.modules["predict"]
 
             with argv_context_guard(predict_config):
-                from predictor import predict
+                from predict.predictor import predict
 
                 predict()
             self.disable_static()
@@ -91,11 +91,11 @@ class LLMTest:
         with lock:
             # to static
             self.disable_static()
-            if "export_model" in sys.modules.keys():
-                del sys.modules["export_model"]
+            if "predict" in sys.modules.keys():
+                del sys.modules["predict"]
 
             with argv_context_guard(config):
-                from export_model import main
+                from predict.export_model import main
 
                 main()
             self.disable_static()
@@ -107,11 +107,11 @@ class LLMTest:
         config_params.pop("model_name_or_path", None)
         config.update(config_params)
         with lock:
-            if "predictor" in sys.modules.keys():
-                del sys.modules["predictor"]
+            if "predict" in sys.modules.keys():
+                del sys.modules["predict"]
             self.disable_static()
             with argv_context_guard(config):
-                from predictor import predict
+                from predict.predictor import predict
 
                 predict()
             self.disable_static()
