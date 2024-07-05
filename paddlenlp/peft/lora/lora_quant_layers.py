@@ -43,7 +43,6 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
 
         # Mark the weight as unmerged
         self.merged = False
-        self.merge_weights = layer.merge_weights
 
         # For FakeQuant
 
@@ -53,10 +52,11 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
             self.weight_quanter = q_config.weight._instance(layer)
         if q_config.activation is not None:
             self.activation_quanter = q_config.activation._instance(layer)
+        self.disable_lora = False
 
     def forward(self, input):
 
-        if self.merge_weights and self.merged:
+        if self.merged or self.disable_lora:
             weight = self.weight
         else:
             weight = self.weight + self.lora_A @ self.lora_B * self.scaling
@@ -71,17 +71,15 @@ class QuantedLoRALinear(ConvertibleQuantedLayer):
         out = F.linear(x=input, weight=weight, bias=self.bias, name=self.name)
         return out
 
-    def train(self):
-        super().train()
-        if self.merge_weights and self.merged:
+    def unmerge(self):
+        if self.merged:
             # Make sure that the weights are not merged
             new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = False
 
-    def eval(self):
-        super().eval()
-        if self.merge_weights and not self.merged:
+    def merge(self):
+        if not self.merged:
             # Merge the weights and mark it
             new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
@@ -122,7 +120,6 @@ class ColumnParallelQuantedLoRALinear(ConvertibleQuantedLayer):
 
         # Mark the weight as unmerged
         self.merged = False
-        self.merge_weights = layer.merge_weights
 
         # For FakeQuant
         self.weight_quanter = None
@@ -131,10 +128,11 @@ class ColumnParallelQuantedLoRALinear(ConvertibleQuantedLayer):
             self.weight_quanter = q_config.weight._instance(layer)
         if q_config.activation is not None:
             self.activation_quanter = q_config.activation._instance(layer)
+        self.disable_lora = False
 
     def forward(self, input):
 
-        if self.merge_weights and self.merged:
+        if self.merged or self.disable_lora:
             weight = self.weight
         else:
             weight = (
@@ -160,17 +158,15 @@ class ColumnParallelQuantedLoRALinear(ConvertibleQuantedLayer):
             result = result_mp
         return result
 
-    def train(self):
-        super().train()
-        if self.merge_weights and self.merged:
+    def unmerge(self):
+        if self.merged:
             # Make sure that the weights are not merged
             new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = False
 
-    def eval(self):
-        super().eval()
-        if self.merge_weights and not self.merged:
+    def merge(self):
+        if not self.merged:
             # Merge the weights and mark it
             new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
@@ -211,7 +207,6 @@ class RowParallelQuantedLoRALinear(ConvertibleQuantedLayer):
 
         # Mark the weight as unmerged
         self.merged = False
-        self.merge_weights = layer.merge_weights
 
         # For FakeQuant
         self.weight_quanter = None
@@ -220,10 +215,11 @@ class RowParallelQuantedLoRALinear(ConvertibleQuantedLayer):
             self.weight_quanter = q_config.weight._instance(layer)
         if q_config.activation is not None:
             self.activation_quanter = q_config.activation._instance(layer)
+        self.disable_lora = False
 
     def forward(self, input):
 
-        if self.merge_weights and self.merged:
+        if self.merged or self.disable_lora:
             weight = self.weight
         else:
             weight = (
@@ -255,17 +251,15 @@ class RowParallelQuantedLoRALinear(ConvertibleQuantedLayer):
         output = output + self.bias if self.bias is not None else output
         return output
 
-    def train(self):
-        super().train()
-        if self.merge_weights and self.merged:
+    def unmerge(self):
+        if self.merged:
             # Make sure that the weights are not merged
             new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = False
 
-    def eval(self):
-        super().eval()
-        if self.merge_weights and not self.merged:
+    def merge(self):
+        if not self.merged:
             # Merge the weights and mark it
             new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
