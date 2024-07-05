@@ -79,7 +79,7 @@ Unified Checkpoint大模型存储格式在模型参数分布上支持动态扩�
 * 🚧: In Progress
 * ❌: Not Supported
 
-|                模型系列                | 模型名称                                                                                                                                                                                                                                                                                                                                                                                    |
+|              模型系列              | 模型参数                                                                                                                                                                                                                                                                                                                                                                                      |
 |:----------------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 |    [LLaMA](./llm/config/llama)     | facebook/llama-7b, facebook/llama-13b, facebook/llama-30b, facebook/llama-65b                                                                                                                                                                                                                                                                                                                 |
 |    [LLama2](./llm/config/llama)    | meta-llama/Llama-2-7b, meta-llama/Llama-2-7b-chat, meta-llama/Llama-2-13b, meta-llama/Llama-2-13b-chat, meta-llama/Llama-2-70b, meta-llama/Llama-2-70b-chat                                                                                                                                                                                                                                   |
@@ -98,8 +98,8 @@ Unified Checkpoint大模型存储格式在模型参数分布上支持动态扩�
 |   [Qwen1.5](./llm/config/qwen/)    | Qwen/Qwen1.5-0.5B, Qwen/Qwen1.5-0.5B-Chat, Qwen/Qwen1.5-1.8B, Qwen/Qwen1.5-1.8B-Chat, Qwen/Qwen1.5-4B, Qwen/Qwen1.5-4B-Chat, Qwen/Qwen1.5-7B, Qwen/Qwen1.5-7B-Chat, Qwen/Qwen1.5-14B, Qwen/Qwen1.5-14B-Chat, Qwen/Qwen1.5-32B, Qwen/Qwen1.5-32B-Chat, Qwen/Qwen1.5-72B, Qwen/Qwen1.5-72B-Chat, Qwen/Qwen1.5-110B, Qwen/Qwen1.5-110B-Chat, Qwen/Qwen1.5-MoE-A2.7B, Qwen/Qwen1.5-MoE-A2.7B-Chat |
 |    [Qwen2](./llm/config/qwen/)     | Qwen/Qwen2-0.5B, Qwen/Qwen2-0.5B-Instruct, Qwen/Qwen2-1.5B, Qwen/Qwen2-1.5B-Instruct, Qwen/Qwen2-7B, Qwen/Qwen2-7B-Instruct, Qwen/Qwen2-72B, Qwen/Qwen2-72B-Instruct, Qwen/Qwen2-57B-A14B, Qwen/Qwen2-57B-A14B-Instruct                                                                                                                                                                       |
 
-
 详细列表👉[模型参数支持](https://github.com/PaddlePaddle/PaddleNLP/issues/8663)
+
 ------------------------------------------------------------------------------------------
 
 
