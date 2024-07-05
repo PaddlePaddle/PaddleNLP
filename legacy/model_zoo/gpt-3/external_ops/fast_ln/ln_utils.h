@@ -20,6 +20,8 @@
 #pragma once
 
 #include <cassert>
+#include <stdint.h>
+#include <stdio.h>
 
 #include <cuda_bf16.h>  // NOLINT
 #include <cuda_fp16.h>  // NOLINT
@@ -332,6 +334,13 @@ struct Vec {
   };
 
   Alias_type data;
+
+  inline __device__ void init(Elt_type value) {
+#pragma unroll
+    for (int it = 0; it < NUM_ELT; it++) {
+      this->data.elt[it] = value;
+    }    
+  }
 
   template <typename S>
   inline __device__ void to(Vec<S, NUM_ELT> &other) {  // NOLINT
@@ -652,10 +661,10 @@ struct Stats {
         lane_(lane) {}
 
   template <uint32_t N>
-  inline __device__ stats_t compute(const T (&elts)[N], const T rn) {
+  inline __device__ stats_t compute(const T (&elts)[N], const T rn, bool is_rmsnorm) {
     constexpr T ELTS_PER_ROW_PER_CTA = N * WARPS_N * THREADS_PER_WARP;
     constexpr T block_rn = 1.f / T(ELTS_PER_ROW_PER_CTA);
-    stats_t block_stats = block_stats_.compute(elts, block_rn);
+    stats_t block_stats = block_stats_.compute(elts, block_rn, is_rmsnorm);
 
     stats_t *workspace = inter_cta_.phase_counter_ & 0x1 ? w1_ : w0_;
 
@@ -721,12 +730,12 @@ struct Stats<T, 1, WARPS_M, WARPS_N> {
   }
 
   template <uint32_t N>
-  inline __device__ stats_t compute(const T (&elts)[N], const T rn) {
+  inline __device__ stats_t compute(const T (&elts)[N], const T rn, bool is_rmsnorm) {
     stats_t *smem = use0_ ? smem0_ : smem1_;
     use0_ = !use0_;
     // Compute warp local for all WARPS_N
     constexpr T warp_rn = 1.f / T(N * THREADS_PER_WARP);
-    stats_t warp_stats = warp_stats_.compute(elts, warp_rn);
+    stats_t warp_stats = warp_stats_.compute(elts, warp_rn, is_rmsnorm);
 
     // Each warp warp leader stores its stats
     const auto warp_n = warp_stats_.reducer_.warp_n_;
@@ -781,7 +790,7 @@ struct Stats<T, 1, WARPS_M, 1> {
       : reducer_(params, bidm, bidn, warp_m, warp_n, lane, smem) {}
 
   template <uint32_t N>
-  inline __device__ stats_t compute(const T (&elts)[N], const T rn) {
+  inline __device__ stats_t compute(const T (&elts)[N], const T rn, bool is_rmsnorm) {
     auto sum = Sum<T>();
 
     T m = Zeros<T>::get();
@@ -794,8 +803,12 @@ struct Stats<T, 1, WARPS_M, 1> {
     T m2 = Zeros<T>::get();
 #pragma unroll
     for (int it = 0; it < N; it++) {
-      T diff = (elts[it] - m);
-      m2 += diff * diff;
+      if (is_rmsnorm) {
+        m2 += elts[it] * elts[it];
+      } else {
+        T diff = (elts[it] - m);
+        m2 += diff * diff;
+      }
     }
     m2 = reducer_.allreduce(m2, sum);
 
