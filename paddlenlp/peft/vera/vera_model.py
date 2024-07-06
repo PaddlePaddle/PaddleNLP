@@ -71,7 +71,7 @@ class VeRAModel(nn.Layer):
 
         # load and set vera weight parameter
         vera_weight_path = os.path.join(vera_path, vera_weight_name)
-        logger.info("vera_weight_path", vera_weight_path)
+        logger.info(f"vera weight path is {vera_weight_path}")
         if os.path.exists(vera_weight_path):
             # load vera weight parameter
             logger.info("vera_weight_path existed, loading vera weight parameter")
@@ -131,7 +131,7 @@ class VeRAModel(nn.Layer):
 
         vera_config_to_save = VeRAConfig(**self.vera_config.to_dict())
 
-        print("vera_config_to_save", vera_config_to_save)
+        logger.info(f"vera config to save is {vera_config_to_save}")
 
         trainable_state_dict = self.get_trainable_state_dict()
         if vera_config_to_save.tensor_parallel_degree > 1:
@@ -306,8 +306,6 @@ class VeRAModel(nn.Layer):
 
     def __getattr__(self, name: str):
         """Forward missing attributes to the wrapped module."""
-        # print('-'* 100)
-        # print('_getattr__', name)
         try:
             return super().__getattr__(name)  # defer to nn.Layer's logic
         except AttributeError:

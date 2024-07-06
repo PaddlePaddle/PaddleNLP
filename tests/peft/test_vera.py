@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+out_features=16# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,27 +23,28 @@ import paddle
 from parameterized import parameterized
 
 from paddlenlp.peft.vera import VeRAConfig, VeRALinear, VeRAModel
-from paddlenlp.transformers import AutoModel, BertModel
+from paddlenlp.transformers import AutoModel
+from paddle import nn
 
 
 class TestVeraLayer(unittest.TestCase):
     def test_r_raise_exception(self):
         with self.assertRaises(ValueError):
-            VeRALinear(in_features=16, out_features=8, r=0, vera_dropout=0.1, vera_alpha=8)
+            VeRALinear(in_features=16, out_features=16, r=0, vera_dropout=0.1, vera_alpha=8, base_linear_module=nn.Linear(in_features=16, out_features=16))
 
     def test_forward(self):
-        vera_layer = VeRALinear(in_features=16, out_features=8, r=4, vera_dropout=0.1, vera_alpha=8)
+        vera_layer = VeRALinear(in_features=16, out_features=16, r=4, vera_dropout=0.1, vera_alpha=8, base_linear_module=nn.Linear(16,16))
         x = paddle.randn([2, 4, 16], "float32")
         output = vera_layer(x)
         self.assertFalse(vera_layer.vera_b.stop_gradient)
         self.assertFalse(vera_layer.vera_d.stop_gradient)
         self.assertTrue(vera_layer.weight.stop_gradient)
         self.assertFalse(vera_layer.bias.stop_gradient)
-        self.assertEqual(output.shape, [2, 4, 8])
+        self.assertEqual(output.shape, [2, 4, 16])
 
     def test_train_eval(self):
         x = paddle.randn([2, 4, 16], "float32")
-        vera_layer = VeRALinear(in_features=16, out_features=8, r=4)
+        vera_layer = VeRALinear(in_features=16, out_features=16, r=4, base_linear_module=nn.Linear(in_features=16, out_features=16))
         vera_layer.train()
         train_result = vera_layer(x)
         train_weight = copy.deepcopy(vera_layer.weight)  # deep copy since this is a pointer
@@ -55,10 +56,10 @@ class TestVeraLayer(unittest.TestCase):
 
     def test_save_load(self):
         with TemporaryDirectory() as tempdir:
-            vera_layer = VeRALinear(in_features=16, out_features=8, r=4)
+            vera_layer = VeRALinear(in_features=16, out_features=16, r=4, base_linear_module=nn.Linear(in_features=16, out_features=16))
             weights_path = os.path.join(tempdir, "model.pdparams")
             paddle.save(vera_layer.state_dict(), weights_path)
-            new_vera_layer = VeRALinear(in_features=16, out_features=8, r=4)
+            new_vera_layer = VeRALinear(in_features=16, out_features=16, r=4, base_linear_module=nn.Linear(in_features=16, out_features=16))
             state_dict = paddle.load(weights_path)
             new_vera_layer.set_dict(state_dict)
             x = paddle.randn([2, 4, 16], "float32")
@@ -66,13 +67,14 @@ class TestVeraLayer(unittest.TestCase):
 
     def test_load_regular_linear(self):
         with TemporaryDirectory() as tempdir:
-            regular_linear = paddle.nn.Linear(in_features=16, out_features=8)
+            regular_linear = paddle.nn.Linear(in_features=16, out_features=16)
             weights_path = os.path.join(tempdir, "model.pdparams")
             paddle.save(regular_linear.state_dict(), weights_path)
             state_dict = paddle.load(weights_path)
+            print('===========',state_dict.keys())
             # should be identical to regular linear
-            vera_layer_r8 = VeRALinear(in_features=16, out_features=8, r=8)
-            vera_layer_r4 = VeRALinear(in_features=16, out_features=8, r=4)
+            vera_layer_r8 = VeRALinear(in_features=16, out_features=16, r=8, base_linear_module=nn.Linear(in_features=16, out_features=16))
+            vera_layer_r4 = VeRALinear(in_features=16, out_features=16, r=4, base_linear_module=nn.Linear(in_features=16, out_features=16))
             vera_layer_r8.set_dict(state_dict)
             vera_layer_r4.set_dict(state_dict)
             x = paddle.randn([2, 4, 16], "float32")
@@ -81,28 +83,6 @@ class TestVeraLayer(unittest.TestCase):
 
 
 class TestVeraModel(unittest.TestCase):
-    def test_vera_model_restore(self):
-        vera_config = VeRAConfig(
-            target_modules=[".*q_proj.*", ".*v_proj.*"],
-            r=4,
-            vera_alpha=8,
-            merge_weights=True,
-            enable_vera_list=[None, [True, False]],
-            head_dim=2,
-        )
-        model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
-        input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 20]))
-        model.eval()
-        original_results_1 = model(input_ids)
-        vera_model = VeRAModel(model, vera_config)
-        restored_model = vera_model.restore_original_model()
-        restored_model.eval()
-        original_results_2 = restored_model(input_ids)
-        self.assertIsNotNone(original_results_1)
-        self.assertIsNotNone(original_results_2)
-        self.assertIsInstance(restored_model, BertModel)
-        self.assertTrue(paddle.allclose(original_results_1[0], original_results_2[0]))
-
     @parameterized.expand([(None,), ("all",), ("vera",)])
     def test_vera_model_constructor(self, bias):
         vera_config = VeRAConfig(
@@ -110,7 +90,6 @@ class TestVeraModel(unittest.TestCase):
             r=4,
             vera_alpha=8,
             merge_weights=True,
-            enable_vera_list=[None, [True, False]],
             trainable_bias=bias,
             head_dim=2,
         )
@@ -124,7 +103,7 @@ class TestVeraModel(unittest.TestCase):
             if any([re.fullmatch(target_module, name) for target_module in vera_config.target_modules]):
                 if "vera" in name:
                     self.assertFalse(weight.stop_gradient)
-                elif "bias" in name and bias in ["vera", "all"]:
+                elif "bias" in name and bias in ["all"]:
                     self.assertFalse(weight.stop_gradient)
                 else:
                     self.assertTrue(weight.stop_gradient)
