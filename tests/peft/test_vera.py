@@ -1,4 +1,4 @@
-out_features=16# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+out_features = 16  # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,20 +20,29 @@ from tempfile import TemporaryDirectory
 
 import numpy as np
 import paddle
+from paddle import nn
 from parameterized import parameterized
 
 from paddlenlp.peft.vera import VeRAConfig, VeRALinear, VeRAModel
 from paddlenlp.transformers import AutoModel
-from paddle import nn
 
 
 class TestVeraLayer(unittest.TestCase):
     def test_r_raise_exception(self):
         with self.assertRaises(ValueError):
-            VeRALinear(in_features=16, out_features=16, r=0, vera_dropout=0.1, vera_alpha=8, base_linear_module=nn.Linear(in_features=16, out_features=16))
+            VeRALinear(
+                in_features=16,
+                out_features=16,
+                r=0,
+                vera_dropout=0.1,
+                vera_alpha=8,
+                base_linear_module=nn.Linear(in_features=16, out_features=16),
+            )
 
     def test_forward(self):
-        vera_layer = VeRALinear(in_features=16, out_features=16, r=4, vera_dropout=0.1, vera_alpha=8, base_linear_module=nn.Linear(16,16))
+        vera_layer = VeRALinear(
+            in_features=16, out_features=16, r=4, vera_dropout=0.1, vera_alpha=8, base_linear_module=nn.Linear(16, 16)
+        )
         x = paddle.randn([2, 4, 16], "float32")
         output = vera_layer(x)
         self.assertFalse(vera_layer.vera_b.stop_gradient)
@@ -44,7 +53,9 @@ class TestVeraLayer(unittest.TestCase):
 
     def test_train_eval(self):
         x = paddle.randn([2, 4, 16], "float32")
-        vera_layer = VeRALinear(in_features=16, out_features=16, r=4, base_linear_module=nn.Linear(in_features=16, out_features=16))
+        vera_layer = VeRALinear(
+            in_features=16, out_features=16, r=4, base_linear_module=nn.Linear(in_features=16, out_features=16)
+        )
         vera_layer.train()
         train_result = vera_layer(x)
         train_weight = copy.deepcopy(vera_layer.weight)  # deep copy since this is a pointer
@@ -56,10 +67,14 @@ class TestVeraLayer(unittest.TestCase):
 
     def test_save_load(self):
         with TemporaryDirectory() as tempdir:
-            vera_layer = VeRALinear(in_features=16, out_features=16, r=4, base_linear_module=nn.Linear(in_features=16, out_features=16))
+            vera_layer = VeRALinear(
+                in_features=16, out_features=16, r=4, base_linear_module=nn.Linear(in_features=16, out_features=16)
+            )
             weights_path = os.path.join(tempdir, "model.pdparams")
             paddle.save(vera_layer.state_dict(), weights_path)
-            new_vera_layer = VeRALinear(in_features=16, out_features=16, r=4, base_linear_module=nn.Linear(in_features=16, out_features=16))
+            new_vera_layer = VeRALinear(
+                in_features=16, out_features=16, r=4, base_linear_module=nn.Linear(in_features=16, out_features=16)
+            )
             state_dict = paddle.load(weights_path)
             new_vera_layer.set_dict(state_dict)
             x = paddle.randn([2, 4, 16], "float32")
@@ -71,10 +86,14 @@ class TestVeraLayer(unittest.TestCase):
             weights_path = os.path.join(tempdir, "model.pdparams")
             paddle.save(regular_linear.state_dict(), weights_path)
             state_dict = paddle.load(weights_path)
-            print('===========',state_dict.keys())
+            print("===========", state_dict.keys())
             # should be identical to regular linear
-            vera_layer_r8 = VeRALinear(in_features=16, out_features=16, r=8, base_linear_module=nn.Linear(in_features=16, out_features=16))
-            vera_layer_r4 = VeRALinear(in_features=16, out_features=16, r=4, base_linear_module=nn.Linear(in_features=16, out_features=16))
+            vera_layer_r8 = VeRALinear(
+                in_features=16, out_features=16, r=8, base_linear_module=nn.Linear(in_features=16, out_features=16)
+            )
+            vera_layer_r4 = VeRALinear(
+                in_features=16, out_features=16, r=4, base_linear_module=nn.Linear(in_features=16, out_features=16)
+            )
             vera_layer_r8.set_dict(state_dict)
             vera_layer_r4.set_dict(state_dict)
             x = paddle.randn([2, 4, 16], "float32")
