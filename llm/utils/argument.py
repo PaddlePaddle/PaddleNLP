@@ -201,6 +201,48 @@ class ModelArgument:
     prefix_path: str = field(default=None, metadata={"help": "Initialize prefix state dict."})
     num_prefix_tokens: int = field(default=128, metadata={"help": "Number of prefix tokens"})
 
+    # reft related parameter
+    reft: bool = field(
+        default=False,
+    )
+    model_name: str = field(
+        default="/home/ldn/.paddlenlp/models/meta-llama/Llama-2-7b",
+    )
+    layers: str = field(default="all", metadata={"help": "Layer configuration for the model."})
+    rank: int = field(default=8, metadata={"help": "Rank parameter for model."})
+    position: str = field(default="f7+l7", metadata={"help": "Position parameter for model."})
+    epochs: int = field(default=1, metadata={"help": "Number of training epochs."})
+    save_model: bool = field(default=True, metadata={"help": "Flag indicating whether to save the model."})
+    max_n_train_example: int = field(default=100, metadata={"help": "Maximum number of training examples."})
+    max_n_eval_example: int = field(default=20, metadata={"help": "Maximum number of evaluation examples."})
+    intervention_type: str = field(default="LoreftIntervention", metadata={"help": "Type of intervention."})
+    batch_size: int = field(default=8, metadata={"help": "Batch size for training."})
+    eval_batch_size: int = field(default=4, metadata={"help": "Batch size for evaluation."})
+    lr: float = field(default=1e-4, metadata={"help": "Learning rate."})
+    schedule: str = field(default="linear", metadata={"help": "Learning rate schedule type."})
+    dropout: float = field(default=0.0, metadata={"help": "Dropout rate."})
+    act_fn: str = field(default=None, metadata={"help": "Activation function."})
+    add_bias: bool = field(default=False, metadata={"help": "Flag indicating whether to add bias."})
+    test_split: str = field(default="test", metadata={"help": "Test split identifier."})
+    train_on_inputs: bool = field(default=False, metadata={"help": "Flag indicating whether to train on inputs."})
+    dtype: str = field(default="bfloat16")
+    share_weights: bool = field(default=True, metadata={"help": "Flag indicating whether to share weights."})
+    greedy_decoding: bool = field(default=True, metadata={"help": "Flag indicating whether to use greedy decoding."})
+    temperature: float = field(default=None, metadata={"help": "Temperature parameter for decoding."})
+    num_hidden_layers: int = field(default=32)
+    hidden_size: int = field(default=4096)
+    task: str = field(
+        default="commonsense",
+    )
+    data_dir: str = field(
+        default="/home/ldn/baidu/pyreft/paddle-version/loreft/datasets",
+    )
+    train_dataset: str = field(
+        default="commonsense_170k",
+    )
+    eval_datasets: str = field(default="boolq:piqa:social_i_qa:hellaswag:winogrande:ARC-Easy:ARC-Challenge:openbookqa")
+    trigger_tokens: str = field(default="the correct answer is ")
+
     from_aistudio: bool = field(default=False, metadata={"help": "Whether to load model from aistudio"})
     save_to_aistudio: bool = field(default=False, metadata={"help": "Whether to save model to aistudio"})
     aistudio_repo_id: str = field(default=None, metadata={"help": "The id of aistudio repo"})
@@ -209,9 +251,7 @@ class ModelArgument:
     aistudio_token: str = field(default=None, metadata={"help": "The token of aistudio"})
     neftune: bool = field(default=False, metadata={"help": "Whether to apply NEFT"})
     neftune_noise_alpha: float = field(default=5.0, metadata={"help": "NEFT noise alpha"})
-    flash_mask: bool = field(
-        default=False, metadata={"help": "Whether to use flash_mask in flash attention."}
-    )
+    flash_mask: bool = field(default=False, metadata={"help": "Whether to use flash_mask in flash attention."})
 
 
 @dataclass

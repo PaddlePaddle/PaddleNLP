@@ -1,0 +1,122 @@
+[
+    {
+        "instruction": "Please answer the following question with true or false, question: is garrison from the ranch a real place?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "false"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: are babies in the womb covered in hair?\n\nAnswer format: true/false",
+        "raw_generation": "false",
+        "generation": "false",
+        "answer": "true"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: is an administrative law judge a real judge?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "true"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: are there plants on the international space station?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "true"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: is hcf a not for profit health fund?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "true"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: does scotland have the same bank holidays as england?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "false"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: can i go to montenegro with a schengen visa?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "true"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: is the iphone se before the iphone 6?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "false"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: can a tree have more than one trunk?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "true"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: does a sim free phone lock to a network?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "false"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: is the film tully based on the book?\n\nAnswer format: true/false",
+        "raw_generation": "false",
+        "generation": "false",
+        "answer": "false"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: does the governor die on the walking dead?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "false"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: do college football players have to enter the draft?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "false"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: has any team won 3 championships in a row?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "true"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: is 22 magnum and 22 wmr the same?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "true"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: is durham university part of the russell group?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "true"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: is a crawfish and a crawdad the same thing?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "true"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: can you use .224 bullets in a .223?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "true"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: does a ruby and a sapphire make a garnet?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "true"
+    },
+    {
+        "instruction": "Please answer the following question with true or false, question: is soy sauce and worcester sauce the same?\n\nAnswer format: true/false",
+        "raw_generation": "",
+        "generation": "",
+        "answer": "false"
+    }
+]

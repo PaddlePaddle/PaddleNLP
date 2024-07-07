@@ -1,0 +1,33 @@
+{
+  "intervention_constant_sources": [
+    true
+  ],
+  "intervention_dimensions": [
+    4096
+  ],
+  "intervention_types": [
+    "<class 'pareft.interventions.TinyIntervention'>"
+  ],
+  "mode": "parallel",
+  "paddlenlp_version": null,
+  "representations": [
+    [
+      31,
+      "block_output",
+      "pos",
+      1,
+      8,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  ],
+  "sorted_keys": [
+    "layer.31.comp.block_output.unit.pos.nunit.1#0"
+  ]
+}

@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import json
 import os
 import sys
-import inspect
 from functools import partial
 
 import paddle
@@ -25,7 +25,7 @@ from utils.argument import (
     QuantArgument,
     TrainingArguments,
 )
-from utils.data import get_convert_example
+from utils.data import LoReftSupervisedDataset, get_convert_example
 from utils.utils import (
     CausalLMTrainer,
     ZeroPaddingIterDatasetCallback,
@@ -43,6 +43,13 @@ from paddlenlp.datasets import (
 )
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.reft.pareft import (
+    LoreftIntervention,
+    ReftConfig,
+    ReftDataCollator,
+    ReftTrainerForCausalLM,
+    get_reft_model,
+)
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
@@ -51,9 +58,9 @@ from paddlenlp.transformers import (
     AutoModelForCausalLMPipe,
     AutoTokenizer,
     Llama3Tokenizer,
-    LlamaTokenizer,
     LlamaForCausalLM,
     LlamaForCausalLMPipe,
+    LlamaTokenizer,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.utils.log import logger
@@ -82,7 +89,6 @@ def main():
         raise ValueError(
             "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
         )
-    
 
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
@@ -90,6 +96,196 @@ def main():
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
+
+    # reft method
+    if model_args.reft:
+        # load tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_args.model_name,
+            model_max_length=data_args.max_length,
+            padding_side="right",
+            # use_fast=False,
+        )
+        tokenizer.pad_token = tokenizer.unk_token
+        layers = None
+        if model_args.layers != "all":
+            layers = [int(l) for l in layers.split(";")]
+        else:
+            layers = [l for l in range(model_args.num_hidden_layers)]
+        train_dataset = LoReftSupervisedDataset(
+            model_args.task,
+            os.path.join(model_args.data_dir, model_args.train_dataset),
+            tokenizer,
+            data_split="train",
+            seed=42,
+            max_n_example=model_args.max_n_train_example,
+            **{
+                "num_interventions": len(layers),
+                "position": model_args.position,
+                "share_weights": model_args.share_weights,
+                "test_split": model_args.test_split,
+            },
+        )
+
+        all_eval_datasets = {}
+        eval_datasets = model_args.eval_datasets.split(":")
+        for eval_dataset in eval_datasets:
+            test_splits = model_args.test_split.split(";")
+            all_eval_datasets[eval_dataset] = {}
+            for split in test_splits:
+                raw_eval = LoReftSupervisedDataset(
+                    model_args.task,
+                    os.path.join(model_args.data_dir, eval_dataset),
+                    tokenizer,
+                    data_split=split,
+                    seed=42,
+                    max_n_example=model_args.max_n_eval_example,
+                    **{
+                        "num_interventions": len(layers),
+                        "position": model_args.position,
+                        "share_weights": model_args.share_weights,
+                    },
+                )
+                all_eval_datasets[eval_dataset][split] = [raw_eval, raw_eval.raw_dataset]
+        eval_datasets = all_eval_datasets
+
+        # loading model
+        model = AutoModelForCausalLM.from_pretrained(
+            model_args.model_name,
+            dtype=paddle.bfloat16,  # save memory
+        )
+        # config = model.config
+        data_collator_fn = DataCollatorForSeq2Seq(
+            tokenizer=tokenizer, model=model, label_pad_token_id=-100, padding="longest"
+        )
+        data_collator = ReftDataCollator(data_collator=data_collator_fn)
+
+        # intervention config based on model type
+        intervention_dtype = paddle.bfloat16
+
+        representations = [
+            {
+                "layer": l,
+                "component": "block_output",
+                "low_rank_dimension": model_args.rank,
+                "intervention": LoreftIntervention(
+                    embed_dim=model_args.hidden_size,
+                    low_rank_dimension=model_args.rank,
+                    dropout=model_args.dropout,
+                    dtype=intervention_dtype,
+                    act_fn=model_args.act_fn,
+                    device="gpu",
+                    add_bias=model_args.add_bias,
+                ),
+            }
+            for l in layers
+        ]
+        print(representations)
+        reft_config = ReftConfig(representations=representations)
+        reft_model = get_reft_model(model, reft_config, set_device=True)
+        reft_model.print_trainable_parameters()
+        reft_model.model.train()
+        n_params = reft_model.count_parameters(include_model=False)
+        # # training args
+        import datetime
+
+        current_time = datetime.datetime.now()
+        run_name = current_time.strftime("%Y-%m-%d_%H-%M-%S")
+        training_args = TrainingArguments(
+            output_dir=f"{training_args.output_dir}/{run_name}",
+            run_name=run_name,
+            num_train_epochs=model_args.epochs,
+            per_device_train_batch_size=model_args.batch_size,
+            per_device_eval_batch_size=model_args.eval_batch_size,
+            gradient_accumulation_steps=training_args.gradient_accumulation_steps,
+            evaluation_strategy="no",
+            save_strategy="no",
+            metric_for_best_model=None,
+            load_best_model_at_end=False,
+            logging_strategy="steps",
+            save_total_limit=1,
+            logging_steps=10,
+            lr_scheduler_type="linear",
+            learning_rate=training_args.learning_rate,
+            warmup_ratio=0.01,
+            optim="adamw",
+            weight_decay=0.00,
+            # use_cpu=False if device == "cuda" else True,
+            # use_cpu=False,
+            seed=42,
+            # until HF supports ReFT, this remains False! :)
+            remove_unused_columns=False,
+        )
+        trainer = ReftTrainerForCausalLM(
+            model=reft_model,
+            tokenizer=tokenizer,
+            args=training_args,
+            train_dataset=train_dataset,
+            eval_dataset=None,
+            data_collator=data_collator,
+            compute_metrics=None,
+        )
+        trainer.train()
+        print("train end and start eval")
+        # dump config
+        args_dict = vars(model_args)
+        args_dict["n_params"] = int(n_params)
+        json_file_name = f"{training_args.output_dir}/args.json"
+        with open(json_file_name, "w") as json_file:
+            json.dump(args_dict, json_file, indent=4)
+
+        # save model
+        if model_args.save_model:
+            reft_model.save(f"{training_args.output_dir}/{run_name}")
+
+        # ensure everything is in eval mode
+        reft_model.model.eval()
+        for k, v in reft_model.interventions.items():
+            _ = v[0].eval()
+
+        print({"n_params": n_params})
+        # do eval
+        eval_results = {}
+        from utils.compute_metrics import compute_metrics_reft
+
+        for dataset_name in eval_datasets:
+            # split evalset into chunks
+            print(f"Evaluating on {dataset_name}")
+            for split, (eval_dataset, data_items) in eval_datasets[dataset_name].items():
+
+                generations, stats = compute_metrics_reft(
+                    task=model_args.task,
+                    dataset_name=dataset_name,
+                    intervenable=reft_model,
+                    tokenizer=tokenizer,
+                    eval_dataset=eval_dataset,
+                    data_items=data_items,
+                    trigger_tokens=model_args.trigger_tokens,
+                    run_name=run_name,
+                    batch_size=model_args.eval_batch_size,
+                    data_collator=None,
+                    split=split,
+                    greedy_decoding=model_args.greedy_decoding,
+                    temperature=model_args.temperature,
+                    top_p=0.00,
+                    top_k=0.00,
+                )
+
+                # log
+                eval_results.update(stats)
+                generations = stats if generations is None else generations
+                result_json_file_name = f"{training_args.output_dir}/{dataset_name}_{split}_outputs.json"
+                with open(result_json_file_name, "w") as json_file:
+                    json.dump(generations, json_file, indent=4)
+
+        # log final eval stats
+        result_json_file_name = f"{training_args.output_dir}/eval_results.json"
+        eval_results["n_params"] = int(n_params)
+        with open(result_json_file_name, "w") as json_file:
+            json.dump(eval_results, json_file, indent=4)
+
+        print(f"Training results can be found in {training_args.output_dir}/{run_name}")
+        exit(0)
 
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -167,9 +363,7 @@ def main():
         model = model_class.from_config(model_config, dtype=dtype)
 
     if model_args.flash_mask and (not data_args.zero_padding or not model.config.use_flash_attention):
-        logger.warning(
-            "`flash_mask` must use with zero padding and flash attention."
-        )
+        logger.warning("`flash_mask` must use with zero padding and flash attention.")
         data_args.zero_padding = True
         model.config.use_flash_attention = True
 
@@ -345,12 +539,16 @@ def main():
                 "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM, QWen and Mistral so far."
             )
     train_ds = (
-        train_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask))
+        train_ds.map(
+            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
+        )
         if train_ds is not None
         else None
     )
     ptq_ds = (
-        ptq_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask))
+        ptq_ds.map(
+            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
+        )
         if ptq_ds is not None
         else None
     )
@@ -361,7 +559,14 @@ def main():
         )
         eval_zero_padding = False
     dev_ds = (
-        dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, zero_padding=eval_zero_padding, flash_mask=model_args.flash_mask))
+        dev_ds.map(
+            partial(
+                trans_func,
+                is_test=data_args.eval_with_do_generation,
+                zero_padding=eval_zero_padding,
+                flash_mask=model_args.flash_mask,
+            )
+        )
         if dev_ds is not None
         else None
     )

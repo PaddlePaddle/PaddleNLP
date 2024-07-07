@@ -1,0 +1,6 @@
+{
+    "eval/boolq": 0.05,
+    "eval/piqa": 0.9,
+    "eval/social_i_qa": 0.25,
+    "n_params": 2097408
+}

@@ -1,0 +1,11 @@
+{
+    "eval/boolq": 0.6155963302752293,
+    "eval/piqa": 0.6784548422198041,
+    "eval/social_i_qa": 0.5240532241555783,
+    "eval/hellaswag": 0.45887273451503685,
+    "eval/winogrande": 0.4940805051302289,
+    "eval/ARC-Easy": 0.6334175084175084,
+    "eval/ARC-Challenge": 0.4249146757679181,
+    "eval/openbookqa": 0.438,
+    "n_params": 69640
+}
