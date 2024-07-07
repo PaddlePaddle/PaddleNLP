@@ -195,6 +195,7 @@ class ModelArgument:
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
     lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+ technique"})
     pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
+    lqlora_quantize_cfg: str = field(default=None, metadata={"help": "Quantization algorithm for each matrix."})
 
     # prefix tuning related parameters
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
@@ -209,9 +210,7 @@ class ModelArgument:
     aistudio_token: str = field(default=None, metadata={"help": "The token of aistudio"})
     neftune: bool = field(default=False, metadata={"help": "Whether to apply NEFT"})
     neftune_noise_alpha: float = field(default=5.0, metadata={"help": "NEFT noise alpha"})
-    flash_mask: bool = field(
-        default=False, metadata={"help": "Whether to use flash_mask in flash attention."}
-    )
+    flash_mask: bool = field(default=False, metadata={"help": "Whether to use flash_mask in flash attention."})
 
 
 @dataclass
