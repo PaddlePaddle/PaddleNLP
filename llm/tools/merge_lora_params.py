@@ -121,6 +121,7 @@ def merge_old_lora(lora_config, args):
     model = LoRAModel.from_pretrained(model, args.lora_path)
     try:
         model.merge()
+        model.eval()
     except:
         model.eval()
     model_state_dict = model.model.state_dict()
