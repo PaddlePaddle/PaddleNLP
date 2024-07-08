@@ -2506,6 +2506,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             else:
                 save_function(shard, os.path.join(save_directory, shard_file))
 
+            parma_map = {}
+            for k, v in shard.items():
+                logger.info(f"{k}: {v.name}")
+                parma_map[k] = v.name
+            save_function(parma_map, os.path.join(save_directory, shard_file.replace(".pdparams", ".keymap")))
+
         if index is None:
             if not safe_serialization:
                 path_to_weights = os.path.join(save_directory, _add_variant(PADDLE_WEIGHTS_NAME, variant))

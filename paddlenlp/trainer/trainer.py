@@ -816,7 +816,8 @@ class Trainer:
                 self.model_wrapped = model
             if delay_optimizer_creation:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-            self._load_optimizer_and_scheduler(resume_from_checkpoint)
+            if not self.args.to_static:
+                self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
         logger.info(f"{self.runtime_timer.log()}")
 
@@ -1194,6 +1195,8 @@ class Trainer:
 
             if self.control.should_training_stop:
                 break
+
+            # exit()
 
         if args.past_index and hasattr(self, "_past"):
             # Clean the state at the end of training
