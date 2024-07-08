@@ -127,8 +127,8 @@ def merge():
             config=config,
             low_cpu_mem_usage=True,
         )
-        lora_config.merge_weights = True
         model = LoRAModel.from_pretrained(model=model, lora_path=args.lora_path, lora_config=lora_config)
+        model.merge()
         model.eval()
         model_state_dict = model.model.state_dict()
         for key in list(model_state_dict):

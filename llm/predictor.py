@@ -49,8 +49,8 @@ from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
-    ChatGLMv2Tokenizer,
     ChatGLMTokenizer,
+    ChatGLMv2Tokenizer,
     LlamaTokenizer,
     PretrainedModel,
     PretrainedTokenizer,
@@ -242,7 +242,8 @@ class BasePredictor:
             padding=True,
             # when use chat_template, it should not add special tokens
             # chatglm2 prefix-tokens can not be tokenized into ids
-            add_special_tokens=self.tokenizer.chat_template is None or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
+            add_special_tokens=self.tokenizer.chat_template is None
+            or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
         )
         return tokenized_source
 
@@ -272,7 +273,6 @@ class DygraphPredictor(BasePredictor):
         if config.lora_path is not None:
             lora_config = LoRAConfig.from_pretrained(config.lora_path)
             dtype = lora_config.dtype
-            lora_config.merge_weights = True
         elif config.prefix_path is not None:
             prefix_config = PrefixConfig.from_pretrained(config.prefix_path)
             dtype = prefix_config.dtype
@@ -289,6 +289,7 @@ class DygraphPredictor(BasePredictor):
                 tensor_parallel_degree=self.tensor_parallel_degree,
                 tensor_parallel_rank=self.tensor_parallel_rank,
             )
+            self.model.merge()
 
         if config.lora_path is not None:
             self.model = LoRAModel.from_pretrained(
