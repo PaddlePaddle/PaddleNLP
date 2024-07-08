@@ -131,6 +131,7 @@ def main():
     )
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
+    model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     # Config for model using dropout, such as GPT.
     if hasattr(model_config, "hidden_dropout_prob"):
