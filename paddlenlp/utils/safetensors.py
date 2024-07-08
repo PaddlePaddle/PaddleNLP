@@ -15,6 +15,7 @@
 import copy
 import json
 import mmap
+import sys
 from collections import OrderedDict
 
 import numpy as np
@@ -277,7 +278,10 @@ class fast_safe_open:
         self.filename = filename
         self.framework = framework
         self.file = open(self.filename, "rb")
-        self.file_mmap = mmap.mmap(self.file.fileno(), 0, flags=mmap.MAP_PRIVATE)
+        if sys.platform.startswith("win"):
+            self.file_mmap = mmap.mmap(self.file.fileno(), 0)
+        else:
+            self.file_mmap = mmap.mmap(self.file.fileno(), 0, flags=mmap.MAP_PRIVATE)
         self.base, self.tensors_decs, self.__metadata__ = read_metadata(self.file)
         self.tensors = OrderedDict()
         for key, info in self.tensors_decs.items():
