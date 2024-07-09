@@ -76,11 +76,11 @@ def is_package_available(package_name: str) -> bool:
 
 
 def is_fast_tokenizer_available() -> bool:
-    """check if `fast_tokenizer` ia avaliable
+    """check if `tokenizers` ia avaliable
     Returns:
-        bool: if `fast_tokenizer` is avaliable
+        bool: if `tokenizers` is avaliable
     """
-    return is_package_available("fast_tokenizer")
+    return is_package_available("tokenizers")
 
 
 def is_paddlenlp_ops_available() -> bool:

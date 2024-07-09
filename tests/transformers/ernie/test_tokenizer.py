@@ -16,6 +16,7 @@
 import os
 import unittest
 
+from paddlenlp.transformers.ernie.fast_tokenizer import ErnieTokenizerFast
 from paddlenlp.transformers.ernie.tokenizer import (
     BasicTokenizer,
     ErnieTokenizer,
@@ -32,6 +33,7 @@ from ...transformers.test_tokenizer_common import (
 class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = ErnieTokenizer
+    fast_tokenizer_class = ErnieTokenizerFast
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = True

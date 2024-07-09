@@ -16,6 +16,7 @@
 import os
 import unittest
 
+from paddlenlp.transformers.bert.fast_tokenizer import BertTokenizerFast
 from paddlenlp.transformers.bert.tokenizer import (
     BasicTokenizer,
     BertTokenizer,
@@ -35,6 +36,8 @@ from ...transformers.test_tokenizer_common import (
 class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = BertTokenizer
+    fast_tokenizer_class = BertTokenizerFast
+    test_fast_tokenizer = True
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = False

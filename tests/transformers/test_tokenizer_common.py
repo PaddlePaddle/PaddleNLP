@@ -27,7 +27,7 @@ from itertools import takewhile
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from paddlenlp.transformers import PretrainedTokenizer
+from paddlenlp.transformers import PretrainedTokenizer, PretrainedTokenizerFast
 from paddlenlp.transformers.tokenizer_utils import AddedToken, Trie
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
@@ -137,6 +137,9 @@ class TokenizerTesterMixin:
 
     def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
         return self.tokenizer_class.from_pretrained(self.tmpdirname, **kwargs)
+
+    def get_fast_tokenizer(self, **kwargs) -> PretrainedTokenizerFast:
+        return self.fast_tokenizer_class.from_pretrained(self.tmpdirname, **kwargs)
 
     def tokenizer_integration_test_util(
         self,

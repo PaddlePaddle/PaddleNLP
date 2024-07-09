@@ -19,3 +19,4 @@ protobuf==3.20.2
 pytest-retry
 gradio
 paddleslim
+tokenizers
