@@ -224,6 +224,9 @@ class AutoTokenizer:
                     class_name = cls._name_mapping[init_class]
                     import_class = import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
                     tokenizer_class = getattr(import_class, init_class)
+                    if use_fast:
+                        fast_tokenizer_class = cls._get_fast_tokenizer_class(init_class, class_name)
+                        tokenizer_class = fast_tokenizer_class if fast_tokenizer_class else tokenizer_class
                     break
             return tokenizer_class
 
@@ -272,17 +275,17 @@ class AutoTokenizer:
                 # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
         """
         # Default not to use fast tokenizer
-        use_faster = kwargs.pop("use_faster", None)
-        use_fast = kwargs.pop("use_fast", None)
-        if use_fast is not None or use_faster is not None:
-            raise ValueError("use_fast is deprecated")
-
+        use_fast = kwargs.pop("use_fast", False)
         cache_dir = kwargs.get("cache_dir", None)
         subfolder = kwargs.get("subfolder", "")
         if subfolder is None:
             subfolder = ""
         from_aistudio = kwargs.get("from_aistudio", False)
         from_hf_hub = kwargs.get("from_hf_hub", False)
+
+        if "use_faster" in kwargs:
+            use_fast = kwargs.pop("use_faster", False)
+            logger.warning("The keyword argument `use_faster` is deprecated in future, please use `use_fast` instead")
 
         all_tokenizer_names = []
         for names, tokenizer_class in cls._tokenizer_mapping.items():
