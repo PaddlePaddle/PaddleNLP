@@ -17,9 +17,9 @@ import math
 import paddle
 from paddle import nn
 from paddle.distributed.fleet.layers.mpu import mp_ops
-from paddle.nn.quant import weight_dequantize, weight_only_linear
+from paddle.nn.quant import weight_dequantize, weight_only_linear, weight_quantize
 
-from ...quantization.qlora import qlora_weight_dequantize
+from ...quantization.qlora import qlora_weight_dequantize, qlora_weight_quantize
 from ...quantization.quantization_linear import (
     ColumnParallelQuantizationLinear,
     QuantizationLinear,
@@ -56,10 +56,8 @@ class QuantizationLoRALinear(QuantizationLinear):
         r: int = 0,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
-        merge_weights: bool = True,
     ):
-        QuantizationLinear.__init__(
-            self,
+        super().__init__(
             in_features,
             out_features,
             quant_algo,
@@ -76,6 +74,7 @@ class QuantizationLoRALinear(QuantizationLinear):
             quant_scale_attr,
             llm_int8_threshold,
         )
+
         if not isinstance(r, int) or r <= 0:
             raise ValueError("Lora rank r should be a positive integer")
         if self.quant_algo == "llm.int8":
@@ -86,7 +85,6 @@ class QuantizationLoRALinear(QuantizationLinear):
         self.lora_alpha = lora_alpha
         # Mark the weight as unmerged
         self.merged = False
-        self.merge_weights = merge_weights
         # Optional dropout
         if lora_dropout > 0.0:
             self.lora_dropout = nn.Dropout(p=lora_dropout)
@@ -108,15 +106,11 @@ class QuantizationLoRALinear(QuantizationLinear):
         )
         self.weight = None
         self.scaling = self.lora_alpha / self.r
+        self.disable_lora = False
 
-    def init_float_weight(self):
-        self.weight = self.create_parameter(
-            shape=[self.in_features, self.out_features],
-            dtype=self._dtype,
-            is_bias=False,
-        )
+    def dequantize_weight(self):
         if self.quant_algo in ["fp4", "nf4"]:
-            qdq_weight = (
+            new_weight = (
                 qlora_weight_dequantize(
                     quant_weight=self.quant_weight,
                     quant_algo=self.quant_algo,
@@ -128,40 +122,61 @@ class QuantizationLoRALinear(QuantizationLinear):
                     double_quant_block_size=self.double_quant_block_size,
                 )
                 .cast(self._dtype)
-                .reshape(self.weight.shape)
+                .reshape([self.in_features, self.out_features])
             )
         elif self.quant_algo in ["weight_only_int8"]:
-            qdq_weight = weight_dequantize(self.quant_weight, self.quant_scale, self.quant_algo, self._dtype)
+            new_weight = weight_dequantize(self.quant_weight, self.quant_scale, self.quant_algo, self._dtype)
         else:
             raise NotImplementedError(f"{self.quant_algo} not yet support lora merge strategy.")
-        self.weight.set_value(qdq_weight)
+        return new_weight
 
-    def train(self):
-        super().train()
-        if self.merge_weights and self.merged:
+    def quantize_weight(self, new_weight):
+        if self.quant_algo in ["fp4", "nf4"]:
+            print("self.quant_weight", self.quant_weight)
+            quant_weight, quant_state = qlora_weight_quantize(
+                weight=new_weight,
+                quant_algo=self.quant_algo,
+                double_quant=self.double_quant,
+                block_size=self.block_size,
+                double_quant_block_size=self.double_quant_block_size,
+                return_dict=False,
+            )
+            print("quant_weight", quant_weight)
+            self.quant_weight.set_value(quant_weight)
+            if self.double_quant:
+                qquant_scale, double_quant_scale, quant_sacle_offset = quant_state
+                self.qquant_scale.set_value(qquant_scale)
+                self.double_quant_scale.set_value(double_quant_scale)
+                self.quant_sacle_offset.set_value(quant_sacle_offset)
+            else:
+                quant_scale = quant_state
+                self.quant_scale.set_value(quant_scale)
+        elif self.quant_algo in ["weight_only_int8"]:
+            quant_weight, quant_scale = weight_quantize(new_weight, self.quant_algo)
+            self.quant_weight.set_value(quant_weight)
+            self.quant_scale.set_value(quant_scale)
+        else:
+            raise NotImplementedError(f"{self.quant_algo} not yet support lora merge strategy.")
+
+    def unmerge(self):
+        if self.merged:
             # Make sure that the weights are not merged
-            new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
-            self.weight.set_value(new_weight)
+            new_weight = self.dequantize_weight()
+            new_weight -= self.lora_A @ self.lora_B * self.scaling
+            self.quantize_weight(new_weight)
             self.merged = False
 
-    def eval(self):
-        super().eval()
-        if self.merge_weights and not self.merged:
-            if self.weight is None:
-                self.init_float_weight()
+    def merge(self):
+        if not self.merged:
             # Merge the weights and mark it
-            new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
-            self.weight.set_value(new_weight)
+            new_weight = self.dequantize_weight()
+            new_weight += self.lora_A @ self.lora_B * self.scaling
+            self.quantize_weight(new_weight)
             self.merged = True
 
     def forward(self, x: paddle.Tensor):
-        if self.merge_weights:
-            if self.weight is None:
-                self.init_float_weight()
-            result = paddle.nn.functional.linear(x, self.weight, self.bias)
-        else:
-            result = super().forward(x)
-        if not self.merged:
+        result = super().forward(x)
+        if not self.merged and not self.disable_lora:
             result += (self.lora_dropout(x) @ self.lora_A @ self.lora_B) * self.scaling
         return result
 
@@ -235,20 +250,89 @@ class ColumnParallelQuantizationLoRALinear(ColumnParallelQuantizationLinear):
         self.lora_B.is_distributed = True
         self.lora_B.split_axis = 1
         self.scaling = self.lora_alpha / self.r
+        self.disable_lora = False
+        # Mark the weight as unmerged
+        self.merged = False
 
     def forward(self, x):
+
         result_mp = super().forward(x)
 
-        input_a = self.lora_dropout(x) @ self.lora_A
-        input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
-        delta_mp = (input_a_mp @ self.lora_B) * self.scaling
-        result_mp += delta_mp
+        if not self.disable_lora or not self.merged:
+            input_a = self.lora_dropout(x) @ self.lora_A
+            input_a_mp = mp_ops._c_identity(input_a, group=self.model_parallel_group)
+            delta_mp = (input_a_mp @ self.lora_B) * self.scaling
+            result_mp += delta_mp
 
         if self.gather_output and self.is_mp:
             result = mp_ops._c_concat(result_mp, group=self.model_parallel_group)
         else:
             result = result_mp
         return result
+
+    def dequantize_weight(self):
+        if self.quant_algo in ["fp4", "nf4"]:
+            new_weight = (
+                qlora_weight_dequantize(
+                    quant_weight=self.quant_weight,
+                    quant_algo=self.quant_algo,
+                    state=(self.qquant_scale, self.double_quant_scale, self.quant_scale_offset)
+                    if self.double_quant
+                    else self.quant_scale,
+                    double_quant=self.double_quant,
+                    block_size=self.block_size,
+                    double_quant_block_size=self.double_quant_block_size,
+                )
+                .cast(self._dtype)
+                .reshape([self.in_features, self.out_features])
+            )
+        elif self.quant_algo in ["weight_only_int8"]:
+            new_weight = weight_dequantize(self.quant_weight, self.quant_scale, self.quant_algo, self._dtype)
+        else:
+            raise NotImplementedError(f"{self.quant_algo} not yet support lora merge strategy.")
+        return new_weight
+
+    def quantize_weight(self, new_weight):
+        if self.quant_algo in ["fp4", "nf4"]:
+            quant_weight, quant_state = qlora_weight_quantize(
+                weight=new_weight,
+                quant_algo=self.quant_algo,
+                double_quant=self.double_quant,
+                block_size=self.block_size,
+                double_quant_block_size=self.double_quant_block_size,
+                return_dict=False,
+            )
+            self.quant_weight.set_value(quant_weight)
+            if self.double_quant:
+                qquant_scale, double_quant_scale, quant_sacle_offset = quant_state
+                self.qquant_scale.set_value(qquant_scale)
+                self.double_quant_scale.set_value(double_quant_scale)
+                self.quant_sacle_offset.set_value(quant_sacle_offset)
+            else:
+                quant_scale = quant_state
+                self.quant_scale.set_value(quant_scale)
+        elif self.quant_algo in ["weight_only_int8"]:
+            quant_weight, quant_scale = weight_quantize(new_weight, self.quant_algo)
+            self.quant_weight.set_value(quant_weight)
+            self.quant_scale.set_value(quant_scale)
+        else:
+            raise NotImplementedError(f"{self.quant_algo} not yet support lora merge strategy.")
+
+    def unmerge(self):
+        if self.merged:
+            # Make sure that the weights are not merged
+            new_weight = self.dequantize_weight()
+            new_weight -= self.lora_A @ self.lora_B * self.scaling
+            self.quantize_weight(new_weight)
+            self.merged = False
+
+    def merge(self):
+        if not self.merged:
+            # Merge the weights and mark it
+            new_weight = self.dequantize_weight()
+            new_weight += self.lora_A @ self.lora_B * self.scaling
+            self.quantize_weight(new_weight)
+            self.merged = True
 
 
 class RowParallelQuantizationLoRALinear(RowParallelQuantizationLinear):
@@ -320,6 +404,8 @@ class RowParallelQuantizationLoRALinear(RowParallelQuantizationLinear):
         self.lora_A.split_axis = 0
         self.lora_B.is_distributed = False
         self.scaling = self.lora_alpha / self.r
+        self.disable_lora = False
+        self.merged = False
 
     def forward(self, x: paddle.Tensor):
         if not self.input_is_parallel:
@@ -337,18 +423,82 @@ class RowParallelQuantizationLoRALinear(RowParallelQuantizationLinear):
             use_calc_stream=True,
             use_model_parallel=True,
         )
-
-        # x @ A: [bz, in_f/ ws] ===> [bz, r]
-        input_mp = self.lora_dropout(input_mp) @ self.lora_A
-        # all reduce to keep Lora B's gradient on different gpu consistent
-        input_dup = mp_ops._mp_allreduce(
-            input_mp,
-            group=self.model_parallel_group,
-            use_calc_stream=True,
-            use_model_parallel=True,
-        )
-        #  @ B: [bz, r] ===> [bz, out_f]
-        delta_mp = (input_dup @ self.lora_B) * self.scaling
-        output += delta_mp
+        if not self.disable_lora or not self.merged:
+            # x @ A: [bz, in_f/ ws] ===> [bz, r]
+            input_mp = self.lora_dropout(input_mp) @ self.lora_A
+            # all reduce to keep Lora B's gradient on different gpu consistent
+            input_dup = mp_ops._mp_allreduce(
+                input_mp,
+                group=self.model_parallel_group,
+                use_calc_stream=True,
+                use_model_parallel=True,
+            )
+            #  @ B: [bz, r] ===> [bz, out_f]
+            delta_mp = (input_dup @ self.lora_B) * self.scaling
+            output += delta_mp
         output = output + self.bias if self.bias is not None else output
         return output
+
+    def dequantize_weight(self):
+        if self.quant_algo in ["fp4", "nf4"]:
+            new_weight = (
+                qlora_weight_dequantize(
+                    quant_weight=self.quant_weight,
+                    quant_algo=self.quant_algo,
+                    state=(self.qquant_scale, self.double_quant_scale, self.quant_scale_offset)
+                    if self.double_quant
+                    else self.quant_scale,
+                    double_quant=self.double_quant,
+                    block_size=self.block_size,
+                    double_quant_block_size=self.double_quant_block_size,
+                )
+                .cast(self._dtype)
+                .reshape([self.in_features, self.out_features])
+            )
+        elif self.quant_algo in ["weight_only_int8"]:
+            new_weight = weight_dequantize(self.quant_weight, self.quant_scale, self.quant_algo, self._dtype)
+        else:
+            raise NotImplementedError(f"{self.quant_algo} not yet support lora merge strategy.")
+        return new_weight
+
+    def quantize_weight(self, new_weight):
+        if self.quant_algo in ["fp4", "nf4"]:
+            quant_weight, quant_state = qlora_weight_quantize(
+                weight=new_weight,
+                quant_algo=self.quant_algo,
+                double_quant=self.double_quant,
+                block_size=self.block_size,
+                double_quant_block_size=self.double_quant_block_size,
+                return_dict=False,
+            )
+            self.quant_weight.set_value(quant_weight)
+            if self.double_quant:
+                qquant_scale, double_quant_scale, quant_sacle_offset = quant_state
+                self.qquant_scale.set_value(qquant_scale)
+                self.double_quant_scale.set_value(double_quant_scale)
+                self.quant_sacle_offset.set_value(quant_sacle_offset)
+            else:
+                quant_scale = quant_state
+                self.quant_scale.set_value(quant_scale)
+        elif self.quant_algo in ["weight_only_int8"]:
+            quant_weight, quant_scale = weight_quantize(new_weight, self.quant_algo)
+            self.quant_weight.set_value(quant_weight)
+            self.quant_scale.set_value(quant_scale)
+        else:
+            raise NotImplementedError(f"{self.quant_algo} not yet support lora merge strategy.")
+
+    def unmerge(self):
+        if self.merged:
+            # Make sure that the weights are not merged
+            new_weight = self.dequantize_weight()
+            new_weight -= self.lora_A @ self.lora_B * self.scaling
+            self.quantize_weight(new_weight)
+            self.merged = False
+
+    def merge(self):
+        if not self.merged:
+            # Merge the weights and mark it
+            new_weight = self.dequantize_weight()
+            new_weight += self.lora_A @ self.lora_B * self.scaling
+            self.quantize_weight(new_weight)
+            self.merged = True

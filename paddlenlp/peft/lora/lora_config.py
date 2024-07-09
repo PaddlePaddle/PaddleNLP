@@ -94,6 +94,11 @@ class LoRAConfig:
                 "We will automatically set `use_quick_lora` to `False` to avoid potential inconsistencies."
             )
             self.use_quick_lora = False
+        if self.merge_weights:
+            logger.error(
+                "'merge_weights' is deprecated and will be removed in a future version. "
+                "Please apply model.merge() or model.unmerge() to merge/unmerge LoRA weight to base model."
+            )
 
     @property
     def scaling(self):
