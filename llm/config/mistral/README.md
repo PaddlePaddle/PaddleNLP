@@ -9,8 +9,6 @@
 | mistralai/Mistral-7B-Instruct-v0.3   |
 | mistralai/Mistral-7B-v0.1            |
 
-
-
 使用方法：
 
 ```python
