@@ -293,8 +293,6 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_ser
 
 此外，如果想通过 API 脚本的方式跑推理，可参考：`./predict/request_flask_server.py` 文件。
 
-</div></details>
-
 ### 7. PyTorch 模型权重转换
 
 PaddleNLP 提供了可自动将 PyTorch 相关的权重转化为 Paddle 权重的接口，代码如下：
