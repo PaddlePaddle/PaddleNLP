@@ -21,7 +21,6 @@ from typing import List, Optional, Tuple, Union
 
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
-from einops import rearrange
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
@@ -623,7 +622,12 @@ class YuanAttention(nn.Layer):
             batch_size, seqlen_q = query_states.shape[0], query_states.shape[1]
             seqlen_k = key_states.shape[1]
 
-            q, k, v = [rearrange(x, "b s ... -> (b s) ...") for x in [query_states, key_states, value_states]]
+            # q, k, v = [rearrange(x, "b s ... -> (b s) ...") for x in [query_states, key_states, value_states]]
+            b, s = query_states.shape[:2]
+            new_shape = (b * s,) + query_states.shape[2:]
+            q = paddle.reshape(query_states, new_shape)
+            k = paddle.reshape(key_states, new_shape)
+            v = paddle.reshape(value_states, new_shape)
 
             cu_seqlens_q = paddle.arange(0, (batch_size + 1) * seqlen_q, step=seqlen_q, dtype="int32")
 
@@ -638,7 +642,10 @@ class YuanAttention(nn.Layer):
             output = flash_attn_unpadded(
                 q, k, v, cu_seqlens_q, cu_seqlens_k, seqlen_q, seqlen_k, self.dropout, causal=is_causal
             )
-            attn_output = rearrange(output[0], "(b s) ... -> b s ...", b=batch_size)
+            # attn_output = rearrange(output[0], '(b s) ... -> b s ...', b=batch_size)
+            seq_length = output[0].shape[0] // batch_size
+            new_shape = (batch_size, seq_length) + output[0].shape[1:]
+            attn_output = paddle.reshape(output[0], new_shape)
         else:
             attn_weights = paddle.matmul(
                 query_states, key_states.transpose([0, 1, 3, 2, *range(4, len(key_states.shape))])
