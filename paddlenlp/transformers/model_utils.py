@@ -20,6 +20,7 @@ import inspect
 import json
 import os
 import re
+import sys
 import tempfile
 import warnings
 from contextlib import contextmanager
@@ -108,12 +109,13 @@ def unwrap_optimizer(optimizer, optimizer_instances=()):
 
 
 if is_safetensors_available():
-
-    # from safetensors import safe_open
     from safetensors.numpy import load_file as safe_load_file
     from safetensors.numpy import save_file as safe_save_file
 
-    from paddlenlp.utils.safetensors import fast_safe_open as safe_open
+    if sys.platform.startswith("win"):
+        from safetensors import safe_open
+    else:
+        from paddlenlp.utils.safetensors import fast_safe_open as safe_open
 
 
 def prune_linear_layer(layer: nn.Linear, index: paddle.Tensor, dim: int = 0) -> nn.Linear:
