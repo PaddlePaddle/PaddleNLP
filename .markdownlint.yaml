@@ -1,0 +1,23 @@
+---
+default: true
+
+# default indent = 4 spaces
+MD007:
+  indent: 2
+# MD030:
+#     ul_single: 3
+#     ul_multi: 3
+
+# MD013/line-length - Line length
+MD013: false
+
+MD024:
+  # Allow heading duplication if under different parent headings
+  siblings_only: true
+
+MD033:
+  # Allow inline html
+  allowed_elements: [h1,h2,h3,h4,div,img,a,p]
+
+MD041: false
+MD045: false

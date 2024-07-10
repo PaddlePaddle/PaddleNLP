@@ -18,7 +18,6 @@
     <a href="https://github.com/PaddlePaddle/PaddleNLP/stargazers"><img src="https://img.shields.io/github/stars/PaddlePaddle/PaddleNLP?color=ccf"></a>
 </p>
 
-
 <h4 align="center">
   <a href=#特性> 特性 </a> |
   <a href=#模型支持> 模型支持 </a> |
@@ -39,7 +38,6 @@
 
 * **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**： 发布[全流程大模型工具链](./llm)，涵盖预训练，精调，压缩，推理以及部署等各个环节，为用户提供端到端的大模型方案和一站式的开发体验；内置[4D并行分布式Trainer](./docs/trainer.md)，[高效微调算法LoRA/Prefix Tuning](./llm#33-lora), [自研INT8/INT4量化算法](./llm#6-量化)等等；全面支持[LLaMA 1/2](./llm/config/llama), [BLOOM](./llm/config/bloom), [ChatGLM 1/2](./llm/config/chatglm), [OPT](./llm/config/opt)等主流大模型
 
-
 ## 特性
 
 <div align="center">
@@ -47,56 +45,25 @@
 </div>
 
 ### <a href=#多硬件训推一体> 🔧 多硬件训推一体 </a>
+
 支持英伟达GPU、昆仑XPU、昇腾NPU、燧原GCU和海光DCU等多个硬件的大模型训练和推理，套件接口支持硬件快速切换，大幅降低硬件切换研发成本。
 
 ### <a href=#高效易用的预训练> 🚀 高效易用的预训练 </a>
+
 支持数据、分片、张量、流水线并行的4D高性能训练，Trainer支持分布式策略配置化，降低复杂分布式组合带来的使用成本；
 Unified Checkpoint大模型存储格式在模型参数分布上支持动态扩缩容训练，降低硬件切换带来的迁移成本。
 
 ### <a href=#高效精调与高效对齐> 🤗 高效精调与高效对齐 </a>
+
 精调和对齐算法深度结合零填充数据流和FlashMask高性能算子，降低训练无效数据填充和计算，大幅提升精调和对齐训练吞吐。
 
 ### <a href=#无损压缩和高性能推理> 🎛️ 无损压缩和高性能推理 </a>
+
 大模型套件高性能推理模块内置动态插入和全环节算子融合策略，极大加快并行推理速度。底层实现细节封装化，实现开箱即用的高性能并行推理能力。
 
 ------------------------------------------------------------------------------------------
 
 ## 模型支持
-
-| Model                                       | Pretrain | SFT | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Weight convert |
-|---------------------------------------------|:--------:|:---:|:----:|:-------------:|:---:|:----:|:------------:|:--------------:|
-| [LLaMA](./llm/config/llama)                 |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  ✅   |      ✅       |       ✅        |
-| [Qwen](./llm/config/qwen)                   |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      🚧      |       ✅        |
-| [Mixtral](./llm/config/mixtral)             |    ✅     |  ✅  |  ✅   |       ❌       | 🚧  |  🚧  |      🚧      |       🚧       |
-| [Baichuan/Baichuan2](./llm/config/baichuan) |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      ✅       |       ✅        |
-| [ChatGLM-6B](./llm/config/chatglm)          |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ❌        |
-| [ChatGLM2/ChatGLM3](./llm/config/chatglm2)  |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅        |
-| [Bloom](./llm/config/bloom)                 |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅        |
-| [GPT-3](./llm/config/gpt-3)                 |    ✅     |  ✅  |  🚧  |      🚧       | 🚧  |  🚧  |      🚧      |       ✅        |
-| [OPT](./llm/config/opt)                     |    🚧    |  ✅  |  ✅   |      🚧       | 🚧  |  🚧  |      🚧      |       ✅        |
-
-* ✅: Supported
-* 🚧: In Progress
-* ❌: Not Supported
-
-|              模型系列              | 模型参数                                                                                                                                                                                                                                                                                                                                                                                      |
-|:----------------------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-|    [LLaMA](./llm/config/llama)     | facebook/llama-7b, facebook/llama-13b, facebook/llama-30b, facebook/llama-65b                                                                                                                                                                                                                                                                                                                 |
-|    [LLama2](./llm/config/llama)    | meta-llama/Llama-2-7b, meta-llama/Llama-2-7b-chat, meta-llama/Llama-2-13b, meta-llama/Llama-2-13b-chat, meta-llama/Llama-2-70b, meta-llama/Llama-2-70b-chat                                                                                                                                                                                                                                   |
-|    [LLama3](./llm/config/llama)    | meta-llama/Meta-Llama-3-8B, meta-llama/Meta-Llama-3-8B-Instruct, meta-llama/Meta-Llama-3-70B, meta-llama/Meta-Llama-3-70B-Instruct                                                                                                                                                                                                                                                            |
-| [Baichuan](./llm/config/baichuan)  | baichuan-inc/Baichuan-7B, baichuan-inc/Baichuan-13B-Base, baichuan-inc/Baichuan-13B-Chat                                                                                                                                                                                                                                                                                                      |
-| [Baichuan2](./llm/config/baichuan) | baichuan-inc/Baichuan2-7B-Base, baichuan-inc/Baichuan2-7B-Chat, baichuan-inc/Baichuan2-13B-Base, baichuan-inc/Baichuan2-13B-Chat                                                                                                                                                                                                                                                              |
-|    [Bloom](./llm/config/bloom)     | bigscience/bloom-560m, bigscience/bloom-560m-bf16, bigscience/bloom-1b1, bigscience/bloom-3b, bigscience/bloom-7b1, bigscience/bloomz-560m, bigscience/bloomz-1b1, bigscience/bloomz-3b, bigscience/bloomz-7b1-mt, bigscience/bloomz-7b1-p3, bigscience/bloomz-7b1, bellegroup/belle-7b-2m                                                                                                    |
-|  [ChatGLM](./llm/config/chatglm/)  | THUDM/chatglm-6b, THUDM/chatglm-6b-v1.1                                                                                                                                                                                                                                                                                                                                                       |
-| [ChatGLM2](./llm/config/chatglm2)  | THUDM/chatglm2-6b                                                                                                                                                                                                                                                                                                                                                                             |
-| [ChatGLM3](./llm/config/chatglm2)  | THUDM/chatglm3-6b                                                                                                                                                                                                                                                                                                                                                                             |
-|    [Gemma](./llm/config/gemma)     | google/gemma-7b, google/gemma-7b-it, google/gemma-2b, google/gemma-2b-it                                                                                                                                                                                                                                                                                                                      |
-|  [Mistral](./llm/config/mistral)   | mistralai/Mistral-7B-Instruct-v0.3, mistralai/Mistral-7B-v0.1                                                                                                                                                                                                                                                                                                                                 |
-|  [Mixtral](./llm/config/mixtral)   | mistralai/Mixtral-8x7B-Instruct-v0.1                                                                                                                                                                                                                                                                                                                                                          |
-|      [OPT](./llm/config/opt)       | facebook/opt-125m, facebook/opt-350m, facebook/opt-1.3b, facebook/opt-2.7b, facebook/opt-6.7b, facebook/opt-13b, facebook/opt-30b, facebook/opt-66b, facebook/opt-iml-1.3b, opt-iml-max-1.3b                                                                                                                                                                                                  |
-|     [Qwen](./llm/config/qwen/)     | qwen/qwen-7b, qwen/qwen-7b-chat, qwen/qwen-14b, qwen/qwen-14b-chat, qwen/qwen-72b, qwen/qwen-72b-chat,                                                                                                                                                                                                                                                                                        |
-|   [Qwen1.5](./llm/config/qwen/)    | Qwen/Qwen1.5-0.5B, Qwen/Qwen1.5-0.5B-Chat, Qwen/Qwen1.5-1.8B, Qwen/Qwen1.5-1.8B-Chat, Qwen/Qwen1.5-4B, Qwen/Qwen1.5-4B-Chat, Qwen/Qwen1.5-7B, Qwen/Qwen1.5-7B-Chat, Qwen/Qwen1.5-14B, Qwen/Qwen1.5-14B-Chat, Qwen/Qwen1.5-32B, Qwen/Qwen1.5-32B-Chat, Qwen/Qwen1.5-72B, Qwen/Qwen1.5-72B-Chat, Qwen/Qwen1.5-110B, Qwen/Qwen1.5-110B-Chat, Qwen/Qwen1.5-MoE-A2.7B, Qwen/Qwen1.5-MoE-A2.7B-Chat |
-|    [Qwen2](./llm/config/qwen/)     | Qwen/Qwen2-0.5B, Qwen/Qwen2-0.5B-Instruct, Qwen/Qwen2-1.5B, Qwen/Qwen2-1.5B-Instruct, Qwen/Qwen2-7B, Qwen/Qwen2-7B-Instruct, Qwen/Qwen2-72B, Qwen/Qwen2-72B-Instruct, Qwen/Qwen2-57B-A14B, Qwen/Qwen2-57B-A14B-Instruct                                                                                                                                                                       |
 
 详细列表👉[模型参数支持](https://github.com/PaddlePaddle/PaddleNLP/issues/8663)
 
@@ -106,13 +73,13 @@ Unified Checkpoint大模型存储格式在模型参数分布上支持动态扩�
 
 ### 环境依赖
 
-- python >= 3.8
-- paddlepaddle >= 3.0.0b0
+* python >= 3.8
+* paddlepaddle >= 3.0.0b0
 
 ### pip安装
 
 ```shell
-pip install --upgrade paddlenlp
+pip install --upgrade paddlenlp==3.0.0b0
 ```
 
 或者可通过以下命令安装最新 develop 分支代码：
@@ -142,6 +109,7 @@ PaddleNLP提供了方便易用的Auto API，能够快速的加载模型和Tokeni
 ```
 
 ### 大模型预训练
+
 ```shell
 mkdir -p llm/data && cd llm/data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
@@ -151,6 +119,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py 
 ```
 
 ### 大模型SFT精调
+
 ```shell
 mkdir -p llm/data && cd llm/data
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz && tar -zxvf AdvertiseGen.tar.gz
@@ -161,18 +130,16 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py 
 更多大模型全流程步骤，请参考[大模型全流程工具链](./llm)。
 
 更多PaddleNLP内容可参考：
-- [精选模型库](./legacy/model_zoo)，包含优质预训练模型的端到端全流程使用。
-- [多场景示例](./legacy/examples)，了解如何使用PaddleNLP解决NLP多种技术问题，包含基础技术、系统应用与拓展应用。
-- [交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，在🆓免费算力平台AI Studio上快速学习PaddleNLP。
+
+* [精选模型库](./legacy/model_zoo)，包含优质预训练模型的端到端全流程使用。
+* [多场景示例](./legacy/examples)，了解如何使用PaddleNLP解决NLP多种技术问题，包含基础技术、系统应用与拓展应用。
+* [交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，在🆓免费算力平台AI Studio上快速学习PaddleNLP。
 
 ------------------------------------------------------------------------------------------
 
 ## 社区交流
 
-- 微信扫描二维码并填写问卷，回复小助手关键词（NLP）之后，即可加入交流群领取福利
-
-  - 与众多社区开发者以及官方团队深度交流。
-  - 10G重磅NLP学习大礼包！
+* 微信扫描二维码并填写问卷，即可加入交流群与众多社区开发者以及官方团队深度交流.
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11987277/245085922-0aa68d24-00ff-442e-9c53-2f1e898151ce.png" width="150" height="150" />
@@ -182,7 +149,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py 
 
 如果PaddleNLP对您的研究有帮助，欢迎引用
 
-```
+```bibtex
 @misc{=paddlenlp,
     title={PaddleNLP: An Easy-to-use and High Performance NLP Library},
     author={PaddleNLP Contributors},
