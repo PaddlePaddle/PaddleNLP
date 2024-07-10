@@ -957,7 +957,6 @@ class TrainingArguments:
                         strategy.hybrid_configs["sharding_configs"].comm_overlap = True
                         strategy.hybrid_configs["sharding_configs"].accumulate_steps = self.gradient_accumulation_steps
 
-                paddle.device.cuda.synchronize()
                 start_time = time.time()
                 fleet.init(is_collective=True, strategy=strategy)
                 paddle.device.cuda.synchronize()
