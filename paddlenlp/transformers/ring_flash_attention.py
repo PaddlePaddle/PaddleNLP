@@ -88,9 +88,11 @@ def update_out_and_lse(old_out, old_lse, block_out, block_lse, second_chunk_only
         old_lse[:, old_lse.shape[1] // 2 :, :, :] = second_chunk_lse
         return old_out, old_lse
     else:
-        return old_out - (old_out - block_out) * F.sigmoid(block_lse - old_lse), old_lse - F.log_sigmoid(
-            old_lse - block_lse
-        )
+        block_out, block_lse = block_out.to("float32"), block_lse.to("float32")
+        with paddle.amp.auto_cast(enable=False):
+            return old_out - (old_out - block_out) * F.sigmoid(block_lse - old_lse), old_lse - F.log_sigmoid(
+                old_lse - block_lse
+            )
 
 
 def get_chunk_id(rank, cp_size):
@@ -195,7 +197,7 @@ def balanced_ring_flash_attention_fwd_func(
         #     comm_buffer.wait()
         paddle.device.synchronize()
 
-    return out.to(local_query.dtype), paddle.transpose_(paddle.squeeze(lse, axis=-1), [0, 2, 1])
+    return paddle.cast(out, local_query.dtype), paddle.transpose_(paddle.squeeze(lse, axis=-1), [0, 2, 1])
 
 
 def balanced_ring_flash_attention_bwd_func(
@@ -298,8 +300,7 @@ def balanced_ring_flash_attention_bwd_func(
     grad_comm_buffer.wait()
     key_grad_buffer, value_grad_buffer = grad_comm_buffer.get_buffers()
 
-    dtype = local_query.dtype
-    return query_grad_buffer.to(dtype), key_grad_buffer.to(dtype), value_grad_buffer.to(dtype)
+    return query_grad_buffer, key_grad_buffer, value_grad_buffer
 
 
 class RingFlashAttention(PyLayer):
