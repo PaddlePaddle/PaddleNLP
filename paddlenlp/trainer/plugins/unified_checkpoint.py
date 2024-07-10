@@ -17,6 +17,7 @@ import gc
 import json
 import multiprocessing
 import os
+import sys
 
 import numpy as np
 import paddle
@@ -67,10 +68,12 @@ from paddlenlp.utils.nested import nested_copy, nested_copy_place
 from paddlenlp.utils.tools import get_env_device
 
 if is_safetensors_available():
-    # from safetensors import safe_open
     from safetensors.numpy import save_file as safe_save_file
 
-    from paddlenlp.utils.safetensors import fast_safe_open as safe_open
+    if sys.platform.startswith("win"):
+        from safetensors import safe_open
+    else:
+        from paddlenlp.utils.safetensors import fast_safe_open as safe_open
 
 FP32_MASTER = "fp32_master_0"
 optimizer_scalar_name = [
