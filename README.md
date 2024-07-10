@@ -30,11 +30,11 @@
 
 ## News 📢
 
-* **2024.06.27 [PaddleNLP v3.0 Beta](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta0)**：拥抱大模型，体验全升级。统一大模型工具链，实现国产计算芯片全流程接入；全面支持飞桨4D 并行配置、高效精调策略、高效对齐算法、高性能推理等大模型产业级应用流程；自研极致收敛的 RsLoRA+算法、自动扩缩容存储机制 Unified Checkpoint 和通用化支持 FastFFN、FusedQKV 助力大模型训推；主流模型持续支持更新，提供高效解决方案。
+* **2024.06.27 [PaddleNLP v3.0 Beta](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta0)**：拥抱大模型，体验全升级。统一大模型工具链，实现国产计算芯片全流程接入；全面支持飞桨4D并行配置、高效精调策略、高效对齐算法、高性能推理等大模型产业级应用流程；自研极致收敛的RsLoRA+算法、自动扩缩容存储机制Unified Checkpoint和通用化支持FastFFN、FusedQKV助力大模型训推；主流模型持续支持更新，提供高效解决方案。
 
-* **2024.04.24 [PaddleNLP v2.8](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.8.0)**：自研极致收敛的 RsLoRA+算法，大幅提升 PEFT 训练收敛速度以及训练效果；引入高性能生成加速到 RLHF PPO 算法，打破 PPO 训练中生成速度瓶颈，PPO 训练性能大幅领先。通用化支持 FastFFN、FusedQKV 等多个大模型训练性能优化方式，大模型训练更快、更稳定。
+* **2024.04.24 [PaddleNLP v2.8](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.8.0)**：自研极致收敛的RsLoRA+算法，大幅提升PEFT训练收敛速度以及训练效果；引入高性能生成加速到RLHF PPO算法，打破 PPO 训练中生成速度瓶颈，PPO训练性能大幅领先。通用化支持 FastFFN、FusedQKV等多个大模型训练性能优化方式，大模型训练更快、更稳定。
 
-* **2024.01.04 [PaddleNLP v2.7](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.7.1)**： 大模型体验全面升级，统一工具链大模型入口。统一预训练、精调、压缩、推理以及部署等环节的实现代码，到 `PaddleNLP/llm`目录。全新[大模型工具链文档](https://paddlenlp.readthedocs.io/zh/latest/)，一站式指引用户从大模型入门到业务部署上线。自动扩缩容存储机制 Unified Checkpoint，大大提高大模型存储的通用性。高效微调升级，支持了高效微调+LoRA 同时使用，支持了 QLoRA 等算法。
+* **2024.01.04 [PaddleNLP v2.7](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.7.1)**： 大模型体验全面升级，统一工具链大模型入口。统一预训练、精调、压缩、推理以及部署等环节的实现代码，到 `PaddleNLP/llm`目录。全新[大模型工具链文档](https://paddlenlp.readthedocs.io/zh/latest/)，一站式指引用户从大模型入门到业务部署上线。自动扩缩容存储机制 Unified Checkpoint，大大提高大模型存储的通用性。高效微调升级，支持了高效微调+LoRA同时使用，支持了QLoRA等算法。
 
 * **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**： 发布[全流程大模型工具链](./llm)，涵盖预训练，精调，压缩，推理以及部署等各个环节，为用户提供端到端的大模型方案和一站式的开发体验；内置[4D 并行分布式 Trainer](./docs/trainer.md)，[高效微调算法 LoRA/Prefix Tuning](./llm#33-lora), [自研 INT8/INT4量化算法](./llm#6-量化)等等；全面支持[LLaMA 1/2](./llm/config/llama), [BLOOM](./llm/config/bloom), [ChatGLM 1/2](./llm/config/chatglm), [OPT](./llm/config/opt)等主流大模型
 
