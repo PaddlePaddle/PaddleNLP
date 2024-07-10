@@ -131,15 +131,10 @@ def fusion_rms_norm(hidden_states, weight, variance_epsilon, use_fast_ln=False):
     elif get_env_device() == "gcu":
         return core.eager._run_custom_op("rms_norm_gcu", hidden_states, weight, variance_epsilon)[0]
     elif get_env_device() == "xpu":
-        try:
-            import paddle_xpu_nn  # noqa: F821
-
-            return paddle_xpu_nn.xpu_rms_norm(hidden_states, weight, variance_epsilon)[0]
-        except ImportError:
-            raise NotImplementedError(
-                f"Implementation of fused_rms_norm is not available on {get_env_device()}. Please install paddle_xpu to use this feature"
-            )
-    return rms_norm_fused(hidden_states, weight, variance_epsilon, use_fast_ln)
+        return paddle.incubate.nn.functional.fused_rms_norm(
+            hidden_states, weight, None, variance_epsilon, len(hidden_states.shape) - 1
+        )[0]
+    return rms_norm_fused(hidden_states, weight, variance_epsilon)
 
 
 def fusion_flash_attention(
