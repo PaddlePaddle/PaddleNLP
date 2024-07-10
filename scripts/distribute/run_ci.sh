@@ -21,12 +21,15 @@ export log_path=/workspace/case_logs
 export case_list=()
 
 target_lists_for_gpt=(
-    "model_zoo/gpt-3"
+    "llm/llama/auto_parallel/gpt-3"
+    "paddlenlp/transformers/gpt/modeling.py"
+    "paddlenlp/transformers/gpt/modeling_pp.py"
+    "paddlenlp/transformers/gpt/modeling_auto.py"
     "scripts/distribute"
 )
 
 target_lists_for_llama=(
-    "llm/llama/auto_parallel"
+    "llm/llama/auto_parallel/llama"
     "paddlenlp/trainer/auto_trainer.py"
     "paddlenlp/transformers/llama/modeling_auto_static.py"
     "paddlenlp/transformers/llama/modeling_auto.py"
@@ -150,13 +153,6 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         let case_num++
     fi
     if [[ $(contain_case gpt-3_auto ${case_list[@]}; echo $?) -eq 1 ]];then
-        echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_auto \033"
-        bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh gpt_case_list_auto $FLAGS_install_deps $FLAGS_download_data
-        print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` gpt-3_auto
-        export FLAGS_install_deps=1
-        export FLAGS_download_data="gpt ""$FLAGS_download_data"
-        let case_num++
-
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_auto \033"
         bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh llm_gpt_case_list_auto $FLAGS_install_deps $FLAGS_download_data
         print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` gpt-3_auto

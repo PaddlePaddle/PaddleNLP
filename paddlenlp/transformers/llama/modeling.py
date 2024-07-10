@@ -255,7 +255,7 @@ def scaled_dot_product_attention(
             alibi = alibi.reshape([bsz, num_heads, 1, -1])
             attn_weights = attn_weights + alibi
 
-        if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
+        if paddle.in_dynamic_mode() and attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
                 f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
                 f" {attn_weights.shape}"
@@ -271,7 +271,7 @@ def scaled_dot_product_attention(
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
-        if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
+        if paddle.in_dynamic_mode() and attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
             raise ValueError(
                 f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
             )
@@ -367,7 +367,9 @@ class LlamaRMSNorm(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
-            return fusion_ops.fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon)
+            return fusion_ops.fusion_rms_norm(
+                hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm
+            )
 
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):

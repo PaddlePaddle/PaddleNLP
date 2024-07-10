@@ -85,6 +85,14 @@ def get_prefix_tuning_params(model):
         hidden_size = model.config.hidden_size
         postprocess_past_key_value = llama_postprocess_past_key_value
         multi_query_group_num = None
+    elif model.base_model_prefix == "mistral":
+        from paddlenlp.peft.prefix import mistral_postprocess_past_key_value
+
+        num_attention_heads = model.config.num_attention_heads
+        num_hidden_layers = model.config.num_hidden_layers
+        hidden_size = model.config.hidden_size
+        postprocess_past_key_value = mistral_postprocess_past_key_value
+        multi_query_group_num = model.config.num_key_value_heads
     elif model.base_model_prefix == "qwen":
         from paddlenlp.peft.prefix import qwen_postprocess_past_key_value
 
@@ -190,6 +198,17 @@ def get_lora_target_modules(model):
             ".*w2.*",
             ".*w3.*",
         ]
+    elif model.base_model_prefix == "mistral":
+        target_modules = [
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*o_proj.*",
+            ".*gate.*",
+            ".*w1.*",
+            ".*w2.*",
+            ".*w3.*",
+        ]
     elif model.base_model_prefix == "qwen2_moe":
         target_modules = [
             ".*q_proj.*",
@@ -279,6 +298,7 @@ class CausalLMTrainer(Trainer):
             )[0]
             all_preds = []
             for pred_tokens in generated_tokens:
+                pred_tokens = pred_tokens.numpy()
                 pred_tokens = pred_tokens[pred_tokens != self.tokenizer.pad_token_id].tolist()
                 all_preds.append(pred_tokens)
             max_pred_length = max([len(x) for x in all_preds])
