@@ -113,7 +113,7 @@ PaddleNLP 使用 [Git 分支模型](http://nvie.com/posts/a-successful-git-branc
    ```
 
    我们的工具将自动修复大部分样式错误，但是有些错误需要手动解决。幸运的是，错误信息一般通俗易懂，很容易修复。
-   解决错误后，您可以再次运行 git add \<files\> 和 git commit ，这将再次触发 pre-commit 。
+   解决错误后，您可以再次运行 `git add <files>` 和 `git commit`，这将再次触发 pre-commit 。
    一旦 pre-commit 检查通过，您就可以推送代码了。
 
    [Google](https://google.com/) 或 [StackOverflow](https://stackoverflow.com/) 是帮助您了解代码风格错误的好工具。

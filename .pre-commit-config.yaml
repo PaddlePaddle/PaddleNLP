@@ -15,18 +15,10 @@ repos:
     rev: 4.0.1
     hooks:
     -   id: flake8
--   repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.41.0
+-   repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.13.0
     hooks:
-      - id: markdownlint
-        args: ["-f"]
-        stages: [commit]
-# - repo: https://github.com/adrienverge/yamllint.git
-#     rev: v1.32.0
-#     hooks:
-#       - id: yamllint
-#         args: [-c=.yamllint.yaml]
-#         stages: [commit]
+    -   id: markdownlint-cli2
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.1.0
     hooks:
