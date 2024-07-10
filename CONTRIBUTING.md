@@ -9,11 +9,11 @@
 
 我们欢迎不同的向`PaddleNLP`做出贡献的方式，例如：
 
-- 修复已知的Issue
-- 提交新的Issue，例如提出功能需求或者bug报告
+- 修复已知的 Issue
+- 提交新的 Issue，例如提出功能需求或者 bug 报告
 - 实现新的模型结构
 
-如果您不知道从哪里开始，请查看Issues板块中的`Good First Issue`标签。它为您提供一个对初学者友好的已知Issue列表，可以降低贡献的门槛，帮助您开始为开源做出贡献。您只需在您想处理的Issue中告知我们您想负责此Issue即可。
+如果您不知道从哪里开始，请查看 Issues 板块中的`Good First Issue`标签。它为您提供一个对初学者友好的已知 Issue 列表，可以降低贡献的门槛，帮助您开始为开源做出贡献。您只需在您想处理的 Issue 中告知我们您想负责此 Issue 即可。
 
 ## 开发流程
 
@@ -21,11 +21,11 @@ PaddleNLP 使用 [Git 分支模型](http://nvie.com/posts/a-successful-git-branc
 
 ### 1. Fork
 
-   因为PaddleNLP的开发社区一直在发展，如果每位贡献者都直接向官方Repo提交commit将会难以管理。因此，请从您的分支中提交 Pull Requests。建议您通过GitHub的[“Fork”按钮](https://help.github.com/articles/fork-a-repo/)来创建您的Fork分支。
+   因为 PaddleNLP 的开发社区一直在发展，如果每位贡献者都直接向官方 Repo 提交 commit 将会难以管理。因此，请从您的分支中提交 Pull Requests。建议您通过 GitHub 的[“Fork”按钮](https://help.github.com/articles/fork-a-repo/)来创建您的 Fork 分支。
 
 ### 2. Clone
 
-   请运行一下命令将您的分支clone到本地
+   请运行一下命令将您的分支 clone 到本地
 
    ```bash
    git clone https://github.com/<your-github-account>/PaddleNLP
@@ -119,28 +119,28 @@ PaddleNLP 使用 [Git 分支模型](http://nvie.com/posts/a-successful-git-branc
    [Google](https://google.com/) 或 [StackOverflow](https://stackoverflow.com/) 是帮助您了解代码风格错误的好工具。
    如果您仍然无法弄清楚，请不要担心。您可以使用 `git commit -m "style error" --no-verify` 提交，我们很乐意在您创建 Pull Request 后帮助您。
 
-### 7. git pull与代码冲突
+### 7. git pull 与代码冲突
 
-   有经验的 Git 用户经常从官方Repo中git pull。因为这样子他们会及早注意到与其他人的代码冲突，并且让代码冲突更容易解决
+   有经验的 Git 用户经常从官方 Repo 中 git pull。因为这样子他们会及早注意到与其他人的代码冲突，并且让代码冲突更容易解决
 
    ```bash
    git remote add upstream https://github.com/PaddlePaddle/PaddleNLP
    git pull upstream develop
    ```
 
-### 8. git push与提交Pull Request
+### 8. git push 与提交 Pull Request
 
-   您可以将您的本地开发分支中的工作 push 到您的fork的分支中：
+   您可以将您的本地开发分支中的工作 push 到您的 fork 的分支中：
 
    ```bash
    git push origin my-cool-stuff
    ```
 
-   git push之后，您可以提交Pull Request，请求[官方repo](https://github.com/PaddlePaddle/PaddleNLP) 采纳您的开发工作。请您依照[这些步骤](https://help.github.com/articles/creating-a-pull-request/)创建Pull Request。
+   git push 之后，您可以提交 Pull Request，请求[官方 repo](https://github.com/PaddlePaddle/PaddleNLP) 采纳您的开发工作。请您依照[这些步骤](https://help.github.com/articles/creating-a-pull-request/)创建 Pull Request。
 
 ### 9. 删除已经合入的本地和远程分支
 
-   为了保持您本地的工作区和fork分支的干净整洁，建议您在Pull Request合入之后删除本地的残余分支：
+   为了保持您本地的工作区和 fork 分支的干净整洁，建议您在 Pull Request 合入之后删除本地的残余分支：
 
    ```bash
    git push origin my-cool-stuff
@@ -149,10 +149,10 @@ PaddleNLP 使用 [Git 分支模型](http://nvie.com/posts/a-successful-git-branc
    git branch -d my-cool-stuff
    ```
 
-## 代码Review
+## 代码 Review
 
-- 在您的Pull Request能够顺利通过本地测试以及CI的情况下，您可以在Pull Request中 @ 相关的Reviewer，提醒他们尽快对您的Pull Request进行Review。
+- 在您的 Pull Request 能够顺利通过本地测试以及 CI 的情况下，您可以在 Pull Request 中 @ 相关的 Reviewer，提醒他们尽快对您的 Pull Request 进行 Review。
 
-- 请处理Reviewer的每一条评论。如果您已按照评论修改，请回复“完成”；否则，可以在评论下展开讨论。
+- 请处理 Reviewer 的每一条评论。如果您已按照评论修改，请回复“完成”；否则，可以在评论下展开讨论。
 
-- 如果您不希望您的Reviewer被电子邮件通知淹没，您可以[批量回复](https://help.github.com/articles/reviewing-proposed-changes-in-a-pull-request/)。
+- 如果您不希望您的 Reviewer 被电子邮件通知淹没，您可以[批量回复](https://help.github.com/articles/reviewing-proposed-changes-in-a-pull-request/)。

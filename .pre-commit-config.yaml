@@ -15,10 +15,6 @@ repos:
     rev: 4.0.1
     hooks:
     -   id: flake8
--   repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.13.0
-    hooks:
-    -   id: markdownlint-cli2
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.1.0
     hooks:
@@ -48,3 +44,16 @@ repos:
         entry: python .copyright.hook
         language: system
         files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto|xpu|kps|py|sh)$
+# For Markdown files
+-   repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.41.0
+    hooks:
+    -   id: markdownlint
+-   repo: local
+    hooks:
+    -   id: add-spaces-between-chinese-and-english
+        name: Add spaces between Chinese and English characters
+        entry: python scripts/codestyle/check_spaces.py
+        language: python
+        files: \.(md|markdown)$  # 只检查 Markdown 文件，你可以根据需要修改此正则表达式
+        pass_filenames: true  # 传递文件名给钩子脚本
