@@ -196,11 +196,11 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
 
-### 3.2 RLHF
+#### 3.2 RLHF
 
 飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF 文档](./docs/rlhf.md)。
 
-## 4. 量化
+### 4. 量化
 
 大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。工具链量化算法包含：
 
@@ -226,7 +226,7 @@ python  run_finetune.py ./config/llama/ptq_argument.json
 
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。
 
-## 5. 推理
+### 5. 推理
 
 PaddleNLP 除了提供常用模型推理外，还提供了高性能推理，内置动态插入和全环节算子融合策略，极大加快并行推理的速度。
 
@@ -267,15 +267,15 @@ python ./predict/predictor.py --model_name_or_path ./inference --inference_model
 
 更多常用模型推理和高性能模型使用方法详见[大模型推理文档](./docs/inference.md)。
 
-## 6. 服务化部署
+### 6. 服务化部署
 
-### 6.1 环境准备
+#### 6.1 环境准备
 
 - python >= 3.8
 - gradio
 - flask
 
-### 6.2 Flask & Gradio UI 服务化部署
+#### 6.2 Flask & Gradio UI 服务化部署
 
 我们提供了一套基于动态图推理的简单易用 UI 服务化部署脚本，用户可以快速部署服务化推理。
 
@@ -295,7 +295,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_ser
 
 </div></details>
 
-## 7. PyTorch 模型权重转换
+### 7. PyTorch 模型权重转换
 
 PaddleNLP 提供了可自动将 PyTorch 相关的权重转化为 Paddle 权重的接口，代码如下：
 
