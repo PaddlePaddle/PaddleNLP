@@ -270,7 +270,6 @@ class DygraphPredictor(BasePredictor):
         if config.lora_path is not None:
             lora_config = LoRAConfig.from_pretrained(config.lora_path)
             dtype = lora_config.dtype
-            lora_config.merge_weights = True
         elif config.prefix_path is not None:
             prefix_config = PrefixConfig.from_pretrained(config.prefix_path)
             dtype = prefix_config.dtype
@@ -292,6 +291,7 @@ class DygraphPredictor(BasePredictor):
             self.model = LoRAModel.from_pretrained(
                 model=self.model, lora_path=config.lora_path, lora_config=lora_config
             )
+            self.model.merge()
         if config.prefix_path is not None:
             prefix_tuning_params = get_prefix_tuning_params(self.model)
             self.model = PrefixModelForCausalLM.from_pretrained(
@@ -347,7 +347,10 @@ class StaticGraphPredictor(BasePredictor):
         super().__init__(config, tokenizer)
 
         params_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdiparams")
-        model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdmodel")
+        if paddle.framework.use_pir_api():
+            model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".json")
+        else:
+            model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdmodel")
         inference_config = paddle.inference.Config(model_path, params_path)
 
         if self.config.device == "gpu":

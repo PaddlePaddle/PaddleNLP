@@ -365,7 +365,9 @@ class LlamaRMSNorm(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
-            return fusion_ops.fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon)
+            return fusion_ops.fusion_rms_norm(
+                hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm
+            )
 
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
