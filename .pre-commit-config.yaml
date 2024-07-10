@@ -55,5 +55,5 @@ repos:
         name: Add spaces between Chinese and English characters
         entry: python scripts/codestyle/check_spaces.py
         language: python
-        files: \.(md|markdown)$  # 只检查 Markdown 文件，你可以根据需要修改此正则表达式
-        pass_filenames: true  # 传递文件名给钩子脚本
+        files: \.(md|markdown)$
+        pass_filenames: true
