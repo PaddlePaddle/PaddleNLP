@@ -37,8 +37,25 @@ try:
     ColumnSequenceParallelLinear = sequence_parallel_utils.ColumnSequenceParallelLinear
     RowSequenceParallelLinear = sequence_parallel_utils.RowSequenceParallelLinear
 except:
-    ColumnSequenceParallelLinear = None
-    RowSequenceParallelLinear = None
+
+    class ColumnSequenceParallelLinearPass(object):
+        """
+        A dummy class for ColumnSequenceParallelLinear, used when the actual class
+        cannot be imported from sequence_parallel_utils.
+        """
+
+        pass
+
+    class RowSequenceParallelLinearPass(object):
+        """
+        A dummy class for RowSequenceParallelLinear, used when the actual class
+        cannot be imported from sequence_parallel_utils.
+        """
+
+        pass
+
+    ColumnSequenceParallelLinear = ColumnSequenceParallelLinearPass
+    RowSequenceParallelLinear = RowSequenceParallelLinearPass
 
 if get_env_device() == "npu":
     if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:

@@ -35,9 +35,7 @@ except ImportError:
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-        ColumnSequenceParallelLinear,
         GatherOp,
-        RowSequenceParallelLinear,
         ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
@@ -54,6 +52,8 @@ from paddlenlp.transformers.model_outputs import (
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
+from .. import linear_utils
+from ..linear_utils import Linear
 from ..segment_parallel_utils import ReshardLayer
 from .configuration import (
     GEMMA_PRETRAINED_INIT_CONFIGURATION,
@@ -422,11 +422,11 @@ class GemmaMLP(nn.Layer):
         self.tensor_parallel_degree = config.tensor_parallel_degree
 
         if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            ColumnParallelLinear = mpu.ColumnParallelLinear
-            RowParallelLinear = mpu.RowParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             self.gate_proj = ColumnParallelLinear(
@@ -448,9 +448,9 @@ class GemmaMLP(nn.Layer):
                 has_bias=False,
             )
         else:
-            self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-            self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+            self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+            self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
+            self.down_proj = Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
 
     def forward(self, x):
         # GeGLU
@@ -509,11 +509,11 @@ class GemmaAttention(nn.Layer):
                 self.use_fused_rope = False
 
         if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            ColumnParallelLinear = mpu.ColumnParallelLinear
-            RowParallelLinear = mpu.RowParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             self.q_proj = ColumnParallelLinear(
@@ -537,29 +537,29 @@ class GemmaAttention(nn.Layer):
                     gather_output=False,
                 )
             else:
-                self.k_proj = nn.Linear(
+                self.k_proj = Linear(
                     self.hidden_size,
                     self.config.num_key_value_heads * self.head_dim,
                     bias_attr=False,
                 )
-                self.v_proj = nn.Linear(
+                self.v_proj = Linear(
                     self.hidden_size,
                     self.config.num_key_value_heads * self.head_dim,
                     bias_attr=False,
                 )
 
         else:
-            self.q_proj = nn.Linear(
+            self.q_proj = Linear(
                 self.hidden_size,
                 self.config.num_attention_heads * self.head_dim,
                 bias_attr=False,
             )
-            self.k_proj = nn.Linear(
+            self.k_proj = Linear(
                 self.hidden_size,
                 self.config.num_key_value_heads * self.head_dim,
                 bias_attr=False,
             )
-            self.v_proj = nn.Linear(
+            self.v_proj = Linear(
                 self.hidden_size,
                 self.config.num_key_value_heads * self.head_dim,
                 bias_attr=False,
@@ -573,7 +573,7 @@ class GemmaAttention(nn.Layer):
                 input_is_parallel=True,
             )
         else:
-            self.o_proj = nn.Linear(
+            self.o_proj = Linear(
                 self.config.num_attention_heads * self.head_dim,
                 self.hidden_size,
                 bias_attr=False,
@@ -992,10 +992,11 @@ class GemmaPretrainedModel(PretrainedModel):
                 nn.Linear,
                 nn.Embedding,
                 mpu.VocabParallelEmbedding,
-                mpu.ColumnParallelLinear,
                 mpu.RowParallelLinear,
-                ColumnSequenceParallelLinear,
-                RowSequenceParallelLinear,
+                mpu.ColumnParallelLinear,
+                linear_utils.RowSequenceParallelLinear,
+                linear_utils.ColumnSequenceParallelLinear,
+                GemmaLMHead,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,

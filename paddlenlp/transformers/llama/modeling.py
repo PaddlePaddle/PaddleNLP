@@ -47,9 +47,7 @@ except ImportError:
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-        ColumnSequenceParallelLinear,
         GatherOp,
-        RowSequenceParallelLinear,
         ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
@@ -1333,11 +1331,11 @@ class LlamaPretrainedModel(PretrainedModel):
                 nn.Linear,
                 nn.Embedding,
                 mpu.VocabParallelEmbedding,
-                mpu.ColumnParallelLinear,
                 mpu.RowParallelLinear,
+                mpu.ColumnParallelLinear,
+                linear_utils.RowSequenceParallelLinear,
+                linear_utils.ColumnSequenceParallelLinear,
                 LlamaLMHead,
-                ColumnSequenceParallelLinear,
-                RowSequenceParallelLinear,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
