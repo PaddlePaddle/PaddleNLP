@@ -562,6 +562,8 @@ class FusedMultiTransformerBase(Layer):
         return self._dtype
 
     def compute_layernorm_before_qkv(self, src, i):
+        # print("self.ln_scales",i, self.ln_scales[i])
+        # print("self.ln_biases",i, self.ln_biases[i])
         if i == 0:
             ln_out = self.norm_func(src, self.ln_scales[i], self.ln_biases[i], self._epsilon, begin_norm_axis=1)
         else:
@@ -570,6 +572,8 @@ class FusedMultiTransformerBase(Layer):
         return ln_out
 
     def compute_qkv_linear(self, ln_out, i):
+        # print("self.qkv_weights",i, self.qkv_weights[i])
+        # print("self.qkv_biases",i, self.qkv_biases[i])
         if paddle.version.cuda() == "False" or float(paddle.version.cuda()) < 11.6:
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
             if self.qkv_biases[i] is not None:
@@ -643,6 +647,7 @@ class FusedMultiTransformerBase(Layer):
             mask=attn_mask,
             scale=float(self.head_dim**-0.5),
         )
+        import pdb;pdb.set_trace()
 
         return transpose_remove_padding(qktv_out, seq_lens, padding_offset)
 
@@ -658,6 +663,7 @@ class FusedMultiTransformerBase(Layer):
         )[0]
 
     def compute_out_linear(self, fmha_out, i):
+        # print("self.linear_weights",i, self.linear_weights[i])
         return paddle.matmul(fmha_out, self.linear_weights[i])
 
     def compute_attn(
@@ -700,6 +706,8 @@ class FusedMultiTransformerBase(Layer):
         return out_linear_out
 
     def compute_ffn_layernorm(self, out_linear_out, residual_input, i):
+        # print("self.ffn_ln_scales",i, self.ffn_ln_scales[i])
+        # print("self.ffn_ln_biases",i, self.ffn_ln_biases[i])
         norm_out = self.norm_func(
             out_linear_out,
             norm_weight=self.ffn_ln_scales[i],
@@ -717,9 +725,11 @@ class FusedMultiTransformerBase(Layer):
         return fused_act_bias_wrapper(ffn1_out, self.ffn1_biases[i], act_method=self.activation)
 
     def compute_ffn1(self, tmp_out, i):
+        # print("self.ffn1_weights",i, self.ffn1_weights[i])
         return paddle.matmul(tmp_out, self.ffn1_weights[i])
 
     def compute_ffn2(self, ffn1_out, i):
+        # print("self.ffn2_weights",i, self.ffn2_weights[i])
         return paddle.matmul(ffn1_out, self.ffn2_weights[i])
 
     def compute_bias_residual_layernorm(self, ffn2_out, residual_input, i, num_layers):
@@ -850,16 +860,22 @@ class FusedMultiTransformerBase(Layer):
             # all_reduce
             if self.nranks > 1:
                 dist.all_reduce(out_linear_out)
+                
+            # print("out_linear_out: ", out_linear_out)
 
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
+            
+            # print("ffn layernorm tmp_out: ", tmp_out)
 
             # ffn1 matmul
             ffn1_out = self.compute_ffn1(tmp_out, i)
             ffn1_out = self.compute_activation(ffn1_out, i)
+            # print("ffn1 matmul: ", ffn1_out)
 
             # ffn2 matmul
             ffn2_out = self.compute_ffn2(ffn1_out, i)
+            # print("ffn2 matmul: ", ffn2_out)
 
             # all_reduce
             if self.nranks > 1:
@@ -870,6 +886,8 @@ class FusedMultiTransformerBase(Layer):
                 ffn2_out, residual_input, i, self.num_layers
             )
             src = tmp_out
+            # print("final tmp_out: ", tmp_out)
+            # print("residual_input: ", residual_input)
 
         kwargs["time_step"] = time_step
         kwargs["multi_block_output"] = tmp_out

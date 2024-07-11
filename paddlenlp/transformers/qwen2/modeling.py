@@ -1037,7 +1037,7 @@ class Qwen2Model(Qwen2PretrainedModel):
             if is_casual:
                 attention_mask = None
         hidden_states = inputs_embeds
-
+        # print("inputs_embeds:", inputs_embeds)
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
@@ -1087,7 +1087,9 @@ class Qwen2Model(Qwen2PretrainedModel):
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
 
+        # print("hidden_states", hidden_states)
         hidden_states = self.norm(hidden_states)
+        # print("hidden_states_ln", hidden_states)
 
         # add hidden states from the last decoder layer
         if output_hidden_states:
