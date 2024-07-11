@@ -17,6 +17,7 @@ import gc
 import json
 import multiprocessing
 import os
+import time
 
 import numpy as np
 import paddle
@@ -45,9 +46,7 @@ from paddlenlp.utils.distributed import distributed_allgather, distributed_gathe
 from paddlenlp.utils.env import (
     LORA_WEIGHTS_NAME,
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
-    PADDLE_MASTER_WEIGHTS_NAME,
     PADDLE_OPTIMIZER_INDEX_NAME,
-    PADDLE_OPTIMIZER_NAME,
     PADDLE_PEFT_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
@@ -67,7 +66,6 @@ from paddlenlp.utils.nested import nested_copy, nested_copy_place
 from paddlenlp.utils.tools import get_env_device
 
 if is_safetensors_available():
-    # from safetensors import safe_open
     from safetensors.numpy import save_file as safe_save_file
 
     from paddlenlp.utils.safetensors import fast_safe_open as safe_open
@@ -92,6 +90,9 @@ __all__ = [
 ]
 
 async_save_queue = []
+g_cpu_model_state_dict = {}
+g_cpu_master_weight_state_dict = {}
+g_cpu_optim_state_dict = {}
 
 
 DEST_PLACE = paddle.CPUPlace()
@@ -161,8 +162,14 @@ def save_unified_checkpoint(args, model, optimizer, output_dir, safe_serializati
         is_sync_save = True
         if "async_save" in args.unified_checkpoint_config:
             is_sync_save = False
+        saved_signal_path = os.path.join(save_directory, f"saved_signal_{dist.get_rank()}")
+        if not is_sync_save:
+            global g_cpu_model_state_dict
+            g_cpu_model_state_dict.clear()
+        g_cpu_model_state_dict = state_dict
+        clear_async_save_task_queue()
         file_save_async_or_sync(
-            state_dict, os.path.join(save_directory, shard_file), safe_serialization, is_sync=is_sync_save
+            g_cpu_model_state_dict, os.path.join(save_directory, shard_file), saved_signal_path, is_sync=is_sync_save
         )
 
         if sharded_index is not None:
@@ -400,34 +407,23 @@ def save_unified_optimizer(args, model, optimizer, output_dir, safe_serializatio
         save_single_card_optimizer(args, model, optimizer, output_dir)
         return
 
-    # Split into naive optimizer params and master weights.
-    results = unified_optimizer_into_shards(args, model, optimizer, safe_serialization=safe_serialization)
-    master_weight_state_dict = None
-    if len(results) == 1:
-        optim_state_dict, shard_optim_file, sharded_optim_index = results[0]
-    else:
-        optim_state_dict, shard_optim_file, sharded_optim_index = results[0]
-        master_weight_state_dict, shard_master_weight_file, sharded_master_weight_index = results[1]
-
-    paddle.device.cuda.empty_cache()
-
     save_directory = output_dir
     os.makedirs(save_directory, exist_ok=True)
-
     is_sync_save = True
     if "async_save" in args.unified_checkpoint_config:
         is_sync_save = False
 
-    file_save_async_or_sync(
-        optim_state_dict, os.path.join(save_directory, shard_optim_file), safe_serialization, is_sync=is_sync_save
-    )
-    if master_weight_state_dict is not None:
-        file_save_async_or_sync(
-            master_weight_state_dict,
-            os.path.join(save_directory, shard_master_weight_file),
-            safe_serialization,
-            is_sync=is_sync_save,
-        )
+    # Split into naive optimizer params and master weights.
+    # We move disk saving steps into `unified_optimizer_into_shards`` due to asynchronous saving.
+    results = unified_optimizer_into_shards(args, model, optimizer, save_directory, is_sync_save)
+    master_weight_state_dict = None
+    if len(results) == 1:
+        _, _, sharded_optim_index = results[0]
+    else:
+        _, _, sharded_optim_index = results[0]
+        master_weight_state_dict, _, sharded_master_weight_index = results[1]
+
+    paddle.device.cuda.empty_cache()
 
     if sharded_optim_index is not None:
         optimizer_index_name = SAFE_OPTIMIZER_INDEX_NAME if safe_serialization else PADDLE_OPTIMIZER_INDEX_NAME
@@ -598,7 +594,8 @@ def unified_optimizer_into_shards(
     args,
     model,
     optimizer,
-    safe_serialization=False,
+    save_directory,
+    is_sync_save,
 ):
     """Get optimizer state dict and master weight state dict.
 
@@ -642,6 +639,7 @@ def unified_optimizer_into_shards(
 
     tp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
     tp_size = tp_group.nranks
+    tp_actions = None
 
     if tp_size > 1:
         # get tp_actions
@@ -656,6 +654,43 @@ def unified_optimizer_into_shards(
             tp_actions = model.get_tensor_parallel_convert_actions(
                 model.config, model_keys, is_split=False, ignore_error=True
             )
+        if master_weights is not None:
+            logger.info("Unified master weight tensor parallel in shards")
+            master_weights = merge_tensor_parallel_for_optimizer(
+                master_weights,
+                tp_actions,
+                filter_master_keys,
+            )
+        paddle.device.cuda.empty_cache()
+
+    # build master weight index json file
+    index_master_weight_file = {}
+    total_master_weight_size = 0
+    if master_weights is not None:
+        master_weights_name = SAFE_MASTER_WEIGHTS_NAME
+        if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
+            master_weights_name = SAFE_WEIGHTS_NAME
+        shard_master_weight_file = get_sharded_file_name(args, master_weights_name, is_optimizer=True)
+        for key, weight in master_weights.items():
+            index_master_weight_file[key] = shard_master_weight_file
+            total_master_weight_size += weight.numel().item() * dtype_byte_size(weight.dtype)
+
+    # Save master_weights to disk.
+    saved_signal_path = os.path.join(save_directory, f"saved_signal_{dist.get_rank()}")
+    if master_weights is not None:
+        if not is_sync_save:
+            global g_cpu_master_weight_state_dict
+            g_cpu_master_weight_state_dict.clear()
+        g_cpu_master_weight_state_dict = master_weights
+        clear_async_save_task_queue()
+        file_save_async_or_sync(
+            g_cpu_master_weight_state_dict,
+            os.path.join(save_directory, shard_master_weight_file),
+            saved_signal_path,
+            is_sync=is_sync_save,
+        )
+
+    if tp_size > 1:
         logger.info("Unified optimizer tensor parallel in shards")
         optim_state_dict = merge_tensor_parallel_for_optimizer(
             optim_state_dict,
@@ -664,43 +699,38 @@ def unified_optimizer_into_shards(
         )
         paddle.device.cuda.empty_cache()
 
-        if master_weights is not None:
-            logger.info("Unified master weight tensor parallel in shards")
-            master_weights = merge_tensor_parallel_for_optimizer(
-                master_weights,
-                tp_actions,
-                filter_master_keys,
-            )
-            paddle.device.cuda.empty_cache()
-
     # build index json file
-    index_optimizer_file, index_master_weight_file = {}, {}
-    total_optim_size, total_master_weight_size = 0, 0
-    optimizer_name = SAFE_OPTIMIZER_NAME if safe_serialization else PADDLE_OPTIMIZER_NAME
-    master_weights_name = SAFE_MASTER_WEIGHTS_NAME if safe_serialization else PADDLE_MASTER_WEIGHTS_NAME
-    if UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value in args.unified_checkpoint_config:
-        master_weights_name = SAFE_WEIGHTS_NAME if safe_serialization else PADDLE_WEIGHTS_NAME
+    index_optimizer_file = {}
+    total_optim_size = 0
+    optimizer_name = SAFE_OPTIMIZER_NAME
     shard_optimizer_file = get_sharded_file_name(args, optimizer_name, is_optimizer=True)
-    shard_master_weight_file = get_sharded_file_name(args, master_weights_name, is_optimizer=True)
-
     for key, weight in optim_state_dict.items():
         index_optimizer_file[key] = shard_optimizer_file
         total_optim_size += weight.numel().item() * dtype_byte_size(weight.dtype)
 
-    if master_weights is not None:
-        for key, weight in master_weights.items():
-            index_master_weight_file[key] = shard_master_weight_file
-            total_master_weight_size += weight.numel().item() * dtype_byte_size(weight.dtype)
-
-    index_optimizer_filelist, total_optim_size_list = gather_sharded_object(
-        index_optimizer_file, total_optim_size, is_optimizer=True
+    # Save optimizers to disk.
+    if not is_sync_save:
+        global g_cpu_optim_state_dict
+        g_cpu_optim_state_dict.clear()
+    g_cpu_optim_state_dict = optim_state_dict
+    file_save_async_or_sync(
+        optim_state_dict,
+        os.path.join(save_directory, shard_optimizer_file),
+        saved_signal_path,
+        is_sync=is_sync_save,
     )
-    sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
+
+    # Gather global index json.
     if master_weights is not None:
         index_master_weight_filelist, total_master_weight_size_list = gather_sharded_object(
             index_master_weight_file, total_master_weight_size, is_optimizer=True
         )
         sharded_master_weight_index = get_sharded_index(index_master_weight_filelist, total_master_weight_size_list)
+
+    index_optimizer_filelist, total_optim_size_list = gather_sharded_object(
+        index_optimizer_file, total_optim_size, is_optimizer=True
+    )
+    sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
 
     if sharded_optim_index is not None:
         if master_weights is not None:
@@ -927,7 +957,7 @@ def save_single_card_checkpoint(args, model_to_save, output_dir):
         json.dump(sharded_index_json, f, indent=4)
 
     # save checkpoint
-    file_save_async_or_sync(state_dict, os.path.join(output_dir, weight_filename), safe_serialization=True)
+    file_save_async_or_sync(state_dict, os.path.join(output_dir, weight_filename))
 
     if isinstance(model_to_save, PrefixModelForCausalLM):
         save_prefix_past_key_value(model_to_save, output_dir)
@@ -997,13 +1027,13 @@ def save_single_card_optimizer(args, model, optimizer, output_dir):
 
     # save optimizer state dict
     file_save_async_or_sync(
-        optim_state_dict, os.path.join(output_dir, "optimizer-00001-of-00001.safetensors"), safe_serialization=True
+        optim_state_dict,
+        os.path.join(output_dir, "optimizer-00001-of-00001.safetensors"),
     )
     if master_weights is not None:
         file_save_async_or_sync(
             master_weights,
             os.path.join(output_dir, "master_weights-00001-of-00001.safetensors"),
-            safe_serialization=True,
         )
 
 
@@ -1922,7 +1952,7 @@ def clear_async_save_task_queue():
     while len(async_save_queue) > 0:
         task = async_save_queue.pop()
         if task and task.is_alive():
-            task.join(timeout=60)
+            task.join(timeout=120)
             if task.is_alive():
                 logger.error("Error: save ckpt process timeout!!!")
                 async_save_queue.append(task)
@@ -1932,25 +1962,25 @@ def clear_async_save_task_queue():
             check_exitcode(task)
 
 
-def file_save_async_or_sync(state_dict, path, safe_serialization, is_sync=True):
-    if safe_serialization:
+def safe_save_file_async(state_dict, path, saved_signal_path):
+    for k in list(state_dict.keys()):
+        if isinstance(state_dict[k], paddle.Tensor):
+            state_dict[k] = state_dict.pop(k).cpu().numpy()
+    safe_save_file(state_dict, path, {"format": "np"})
+    with open(saved_signal_path, mode="a+") as f:
+        f.write(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())))
+        f.write("\n")
+
+
+def file_save_async_or_sync(state_dict, path, saved_signal_path=None, is_sync=True):
+    if is_sync:
         for k in list(state_dict.keys()):
             if isinstance(state_dict[k], paddle.Tensor):
                 state_dict[k] = state_dict.pop(k).cpu().numpy()
-
-    if is_sync:
-        if safe_serialization:
-            safe_save_file(state_dict, path, metadata={"format": "np"})
-        else:
-            paddle.save(state_dict, path)
-
+        safe_save_file(state_dict, path, metadata={"format": "np"})
     else:
-        clear_async_save_task_queue()
         ctx = multiprocessing.get_context("spawn")
-        if safe_serialization:
-            p = ctx.Process(target=safe_save_file, args=(state_dict, path, {"format": "np"}))
-        else:
-            p = ctx.Process(target=paddle.save, args=(state_dict, path))
+        p = ctx.Process(target=safe_save_file_async, args=(state_dict, path, saved_signal_path))
         logger.info(f"Async save {path}")
         p.start()
         async_save_queue.append(p)
