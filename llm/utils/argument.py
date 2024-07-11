@@ -12,13 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import List, Optional
 
 from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import IntervalStrategy
 from paddlenlp.transformers.configuration_utils import llmmetaclass
 from paddlenlp.utils.log import logger
 
+from enum import Enum
+
+class QuantType(Enum):
+    WINT8AINT8 = 0
+    WEIGHT_ONLY_INT4 = 1
+    WEIGHT_ONLY_INT8 = 2
+    WFP8AFP8 = 3
 
 def add_start_docstrings(*docstr):
     def docstring_decorator(fn):
@@ -221,8 +228,8 @@ class ModelArgument:
 @dataclass
 class QuantArgument:
     quant_type: str = field(
-        default="a8w8",
-        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
+        default=QuantType.WINT8AINT8,
+        metadata={"help": "Quantization type. Supported values: WINT8AINT8, WEIGHT_ONLY_INT4, WEIGHT_ONLY_INT8, WFP8AFP8"},
     )
 
     # QAT related parameters

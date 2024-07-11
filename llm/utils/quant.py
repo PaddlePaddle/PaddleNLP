@@ -59,7 +59,7 @@ from paddlenlp.peft.lora.lora_quant_layers import (
     RowParallelQuantedLoRALinear,
 )
 from paddlenlp.utils.log import logger
-
+from argument import QuantType
 
 def create_qat_model(quant_args, model, dtype):
     from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
@@ -72,13 +72,13 @@ def create_qat_model(quant_args, model, dtype):
     q_config.add_qat_layer_mapping(LoRALinear, QuantedLoRALinear)
     q_config.add_qat_layer_mapping(RowParallelLoRALinear, RowParallelQuantedLoRALinear)
     q_config.add_qat_layer_mapping(ColumnParallelLoRALinear, ColumnParallelQuantedLoRALinear)
-    if quant_args.quant_type == "a8w8":
+    if quant_args.quant_type == QuantType.WINT8AINT8:
         activation = PACTQuanter(quanter=FakeQuanterWithAbsMaxObserver(), init_value=20.0, dtype=dtype)
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
-    elif quant_args.quant_type == "weight_only_int4":
+    elif quant_args.quant_type == QuantType.WEIGHT_ONLY_INT4:
         activation = None
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=4, dtype="float32")
-    elif quant_args.quant_type == "weight_only_int8":
+    elif quant_args.quant_type == QuantType.WEIGHT_ONLY_INT8:
         activation = None
         weight = FakeQuanterChannelWiseAbsMaxObserver(bit_length=8, dtype="float32")
     else:
@@ -196,18 +196,20 @@ def apply_ptq(quant_args, trainer, ptq_dataloader):
         weight_observer = GroupWiseWeightObserver
     else:
         raise ValueError("weight_quant_method should be one of ['abs_max_channel_wise', 'groupwise']")
-
-    if quant_args.quant_type == "a8w8":
-        activation = AVGObserver(quant_bits=8)
-        weight = weight_observer(quant_bits=8)
-    elif quant_args.quant_type == "weight_only_int4":
+    if quant_args.quant_type == QuantType.WINT8AINT8:
+        activation = AbsmaxObserver(quant_bits=8) #INT8
+        weight = AbsmaxObserver(quant_bits=8) #INT8
+    elif quant_args.quant_type == QuantType.WEIGHT_ONLY_INT4:
         activation = None
         weight = weight_observer(quant_bits=4)
-    elif quant_args.quant_type == "weight_only_int8":
+    elif quant_args.quant_type == QuantType.WEIGHT_ONLY_INT8:
         activation = None
         weight = weight_observer(quant_bits=8)
+    elif quant_args.quant_type == QuantType.WFP8AFP8:
+        activation = AbsmaxObserver(quant_bits=(4,3)) #FP8
+        weight = weight_observer(quant_bits=(4,3))
     else:
-        raise ValueError("quant_type should be one of ['a8w8', 'weight_only_int4', 'weight_only_int8']")
+        raise ValueError("quant_type should be one of ['wint8aint8','wfp8afp8',  'weight_only_int4', 'weight_only_int8']")
 
     q_config.add_qat_layer_mapping(ColumnParallelLinear, QuantizedColumnParallelLinear)
     q_config.add_qat_layer_mapping(RowParallelLinear, QuantizedRowParallelLinear)
