@@ -65,7 +65,7 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 
 ## 模型支持
 
-详细列表👉[模型参数支持](https://github.com/PaddlePaddle/PaddleNLP/issues/8663)
+当前 PaddleNLP 已全面支持 LLaMA 系列、Baichuan 系列、Bloom 系列、ChatGLM 系列、Gemma 系列、Mistral 系列、OPT 系列、Qwen 系列，详细列表👉[[LLM]模型支持列表](https://github.com/PaddlePaddle/PaddleNLP/issues/8663)
 
 ------------------------------------------------------------------------------------------
 
