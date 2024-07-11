@@ -27,15 +27,9 @@ from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
-from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    GatherOp,
-    RowSequenceParallelLinear,
-    ScatterOp,
-    mark_as_sequence_parallel_parameter,
-)
 
 from ...utils.log import logger
+from .. import linear_utils
 from ..activations import ACT2FN
 from ..conversion_utils import StateDictNameMapping, init_name_mappings
 from ..model_outputs import MoECausalLMOutputWithPast, MoEModelOutputWithPast
@@ -46,6 +40,15 @@ try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
     fused_rotary_position_embedding = None
+
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        GatherOp,
+        ScatterOp,
+        mark_as_sequence_parallel_parameter,
+    )
+except ImportError:
+    pass
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
@@ -434,11 +437,11 @@ class Qwen2MoeMLP(nn.Layer):
         self.tensor_parallel_degree = config.tensor_parallel_degree
 
         if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-            RowParallelLinear = fleet.meta_parallel.RowParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             self.gate_proj = ColumnParallelLinear(
@@ -536,11 +539,11 @@ class Qwen2MoeAttention(nn.Layer):
                 self.use_fused_rope = False
 
         if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-            RowParallelLinear = fleet.meta_parallel.RowParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             self.q_proj = ColumnParallelLinear(self.hidden_size, self.hidden_size, has_bias=True, gather_output=False)
@@ -1006,8 +1009,8 @@ class Qwen2MoePretrainedModel(PretrainedModel):
                 mpu.ColumnParallelLinear,
                 mpu.RowParallelLinear,
                 Qwen2MoeLMHead,
-                ColumnSequenceParallelLinear,
-                RowSequenceParallelLinear,
+                linear_utils.ColumnSequenceParallelLinear,
+                linear_utils.RowSequenceParallelLinear,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
