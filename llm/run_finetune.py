@@ -131,6 +131,7 @@ def main():
     )
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
+    model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     # Config for model using dropout, such as GPT.
     if hasattr(model_config, "hidden_dropout_prob"):
@@ -338,11 +339,11 @@ def main():
 
     if data_args.zero_padding:
         if (
-            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen"]
+            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen", "mistral"]
             and training_args.pipeline_parallel_degree < 1
         ):
             raise NotImplementedError(
-                "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM and QWen so far."
+                "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM, QWen and Mistral so far."
             )
     train_ds = (
         train_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask))
