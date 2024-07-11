@@ -1,5 +1,0 @@
-cc_library(utils SRCS utils.cc DEPS icuuc icudata)
-cc_library(trie SRCS trie.cc DEPS dart utils)
-cc_library(failure SRCS failure.cc DEPS trie utils)
-cc_library(sentencepiece_normalizer SRCS sentencepiece_normalizer.cc DEPS trie icuuc icudata utils)
-cc_library(lattice SRCS lattice.cc DEPS utils)

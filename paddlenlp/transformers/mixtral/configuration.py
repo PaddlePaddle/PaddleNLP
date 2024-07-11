@@ -78,8 +78,6 @@ class MixtralConfig(PretrainedConfig):
             allow the model to output the auxiliary loss. See [here]() for more details
         router_aux_loss_coef (`float`, *optional*, defaults to 0.001):
             The aux loss factor for the total loss.
-        use_fused_rope(`bool`, *optional*, defaults to False):
-            Enable rope fusion or not.
         num_key_value_heads (`int`, *optional*, defaults to 8):
             This is the number of key_value heads that should be used to implement Grouped Query Attention. If
             `num_key_value_heads=num_attention_heads`, the model will use Multi Head Attention (MHA), if
@@ -119,16 +117,8 @@ class MixtralConfig(PretrainedConfig):
         initializer_range=0.02,
         rms_norm_eps=1e-5,
         use_cache=True,
-        use_recompute=False,
-        recompute_granularity="full",
-        no_recompute_layers=None,
-        use_flash_attention=False,
         attention_dropout=0.0,
-        use_fused_rope=False,
         rope_theta=1e6,
-        tensor_parallel_output=True,
-        sequence_parallel=False,
-        fuse_sequence_parallel_allreduce=False,
         pad_token_id=0,
         bos_token_id=1,
         eos_token_id=2,
@@ -158,19 +148,11 @@ class MixtralConfig(PretrainedConfig):
         self.rms_norm_eps = rms_norm_eps
 
         self.use_cache = use_cache
-        self.use_recompute = use_recompute
-        self.recompute_granularity = recompute_granularity
-        self.no_recompute_layers = no_recompute_layers
-        self.use_flash_attention = use_flash_attention
-        self.tensor_parallel_output = tensor_parallel_output
-        self.sequence_parallel = sequence_parallel
-        self.fuse_sequence_parallel_allreduce = fuse_sequence_parallel_allreduce
 
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
 
-        self.use_fused_rope = use_fused_rope
         self.rope_theta = rope_theta
 
         # ----------------- Experts -------------------- #
@@ -186,6 +168,5 @@ class MixtralConfig(PretrainedConfig):
             bos_token_id=bos_token_id,
             eos_token_id=eos_token_id,
             tie_word_embeddings=tie_word_embeddings,
-            tensor_parallel_output=tensor_parallel_output,
             **kwargs,
         )

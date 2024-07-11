@@ -17,24 +17,32 @@ import tempfile
 import unittest
 
 import numpy as np
-
-# from safetensors import safe_open
 from safetensors.numpy import load_file, save_file
 
 from paddlenlp.utils.safetensors import fast_load_file, fast_safe_open
+
+from ..testing_utils import skip_platform
 
 
 class FastSafetensors(unittest.TestCase):
     def setUp(self):
         super().setUp()
         self.weigth_map = {}
-        tensors = [([10, 10], "float32"), ([8], "float16"), ([5, 5, 5], "int32")]
+        tensors = [
+            ([10, 1, 10], "float32"),
+            ([1, 1, 10], "float32"),
+            ([1, 1, 1, 10], "float32"),
+            ([10, 10], "float32"),
+            ([8], "float16"),
+            ([5, 5, 5], "int32"),
+        ]
         count = 0
         for shape, dtype in tensors:
             self.weigth_map[f"weight_{count}"] = (np.random.random(shape) * 100).astype(dtype)
             count += 1
         print(self.weigth_map)
 
+    @skip_platform("win32", "cygwin")
     def test_load_file(self):
         with tempfile.TemporaryDirectory() as tmpdirname:
             path = os.path.join(tmpdirname, "test.safetensors")
@@ -45,6 +53,7 @@ class FastSafetensors(unittest.TestCase):
                 np.testing.assert_equal(v, sf_load[k])
                 np.testing.assert_equal(v, fs_sf_load[k])
 
+    @skip_platform("win32", "cygwin")
     def test_safe_open(self):
         with tempfile.TemporaryDirectory() as tmpdirname:
             path = os.path.join(tmpdirname, "test.safetensors")
@@ -53,5 +62,10 @@ class FastSafetensors(unittest.TestCase):
             with fast_safe_open(path, framework="np") as f:
                 for key in f.keys():
                     safe_slice = f.get_slice(key)
+                    # np.testing.assert_equal(self.weigth_map[key][2:1, ...], safe_slice[2:1, ...])
+                    np.testing.assert_equal(self.weigth_map[key][0, ...], safe_slice[0, ...])
+                    np.testing.assert_equal(self.weigth_map[key][0:1, ...], safe_slice[0:1, ...])
+                    np.testing.assert_equal(self.weigth_map[key][..., 2:], safe_slice[..., 2:])
+                    np.testing.assert_equal(self.weigth_map[key][..., 1], safe_slice[..., 1])
                     np.testing.assert_equal(self.weigth_map[key][:2, ...], safe_slice[:2, ...])
                     np.testing.assert_equal(self.weigth_map[key][..., :4], safe_slice[..., :4])

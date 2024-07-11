@@ -25,6 +25,7 @@ import paddle.distributed as dist
 from paddle.distributed import fleet
 
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.nested import nested_broadcast_tensor_with_empty  # noqa: F401
 from paddlenlp.utils.nested import (
     nested_broadcast_tensor,
     nested_empty_tensor,
@@ -225,4 +226,63 @@ def broadcast_dp_optimizer(state_dict):
 
     state_dict = nested_broadcast_tensor(state_dict, src=src_rank, group=dp_group)
 
+    return state_dict
+
+
+def broadcast_moe_optimizer(state_dict, broadcast_dp=True):
+
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        dp_group = hcg.get_data_parallel_group()
+        src_rank = hcg.get_data_parallel_group_src_rank()
+        data_parallel_rank = hcg.get_data_parallel_rank()
+        # Don't broadcast optimizer for dp rank is 1.
+        if dp_group.nranks <= 1:
+            return state_dict
+    except:
+        dp_group = None
+        src_rank = 0
+        data_parallel_rank = 0
+
+    def _broadcast_moe_optimizer_state(state_dict):
+        # boardcast_keys
+        base_state_dict = {"master_weights": {}}
+        buf = [
+            {i: j.shape for i, j in state_dict.items() if i not in ["master_weights", "LR_Scheduler"]},
+            {i: j.shape for i, j in state_dict["master_weights"].items()},
+            {"LR_Scheduler": state_dict.get("LR_Scheduler", {})},
+        ]
+
+        dist.broadcast_object_list(buf, src=src_rank, group=dp_group)
+        # logger.info(f"moe-optimizer-gather-keys{buf}")
+        for k, s in buf[0].items():
+            v = state_dict.get(k, paddle.zeros(s, "float32")).cuda()
+            v.name = k
+            # k = k.replace("_fp32_master_0", "")
+            dist.broadcast(v, src=src_rank, group=dp_group)
+            logger.info(f"broadcast moe optimizer {k} from {src_rank}")
+            base_state_dict[k] = v.cpu()
+        for k, s in buf[1].items():
+            v = state_dict["master_weights"].get(k, paddle.zeros(s, "float32")).cuda()
+            v.name = k
+            dist.broadcast(v, src=src_rank, group=dp_group)
+            logger.info(f"broadcast moe optimizer-master_weights {k} from {src_rank}")
+            base_state_dict["master_weights"][k] = v.cpu()
+        base_state_dict.update(buf[2])
+        return base_state_dict
+
+    if broadcast_dp:
+        base_state_dict = broadcast_dp_optimizer(state_dict)
+    else:
+        base_state_dict = _broadcast_moe_optimizer_state(state_dict)
+    if data_parallel_rank > 0:
+        master_weight = state_dict.pop("master_weights", {})
+        base_state_dict.update(state_dict)
+        if master_weight:
+            if "master_weights" in base_state_dict:
+                base_state_dict["master_weights"].update(master_weight)
+            else:
+                base_state_dict["master_weights"] = master_weight
+        state_dict = base_state_dict
+        del base_state_dict
     return state_dict

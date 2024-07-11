@@ -16,15 +16,15 @@ python -m pip install -r ../requirements.txt
 python -m pip install -r ../requirements-dev.txt
 
 # install fused_ln custom ops
-cd ../model_zoo/gpt-3/external_ops/
+cd ../legacy/model_zoo/gpt-3/external_ops/
 python setup.py install
+cd -
 
 # install tool_helpers
-cd ../../../llm/llama
+cd ../llm/auto_parallel/llama
 python -m pip install tool_helpers
 
 # download data
-cd auto_parallel
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
 mkdir data

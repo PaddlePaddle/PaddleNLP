@@ -157,16 +157,16 @@ class PySafeSlice:
 
         out_start, out_stop, out_step = copy.deepcopy((self.start, self.stop, self.step))
         for i, (start, stop, step, slice_) in enumerate(zip(self.start, self.stop, self.step, index)):
-            out_start[i] = slice_.start or 0
-            out_step[i] = slice_.step or 1
-            out_stop[i] = slice_.stop or stop - start
+            out_start[i] = slice_.start if slice_.start is not None else 0
+            out_step[i] = slice_.step if slice_.step is not None else 1
+            out_stop[i] = slice_.stop if slice_.stop is not None else stop - start
             out_stop[i] = min(stop, out_stop[i])
 
         target_shape = []
-        for x, y, z in zip(out_start, out_stop, out_step):
+        for x, y, z, sli in zip(out_start, out_stop, out_step, index):
             assert z == 1, "only support step = 1"
-            if y - x > 1:
-                target_shape.append(int(y - x))
+            if y - x > 1 or sli.step is None:
+                target_shape.append(max(int(y - x), 0))
 
         if len(target_shape) == 0:
             if self.shape == [1]:
@@ -177,7 +177,7 @@ class PySafeSlice:
         span = self.bits
         for i, (start, stop, step) in enumerate(zip(out_start[::-1], out_stop[::-1], out_step[::-1])):
             if len(indices) == 0:
-                if start == 0 and stop == self.shape[i]:
+                if start == 0 and stop == self.shape[::-1][i]:
                     pass
                     #  We haven't started to slice yet, just increase the span
                 else:
@@ -194,7 +194,7 @@ class PySafeSlice:
                         newindices.append((old_start + offset, old_stop + offset))
                 indices = newindices
                 assert len(indices) == capacity, f"error {capacity} {len(indices)}"
-            span *= self.shape[-(i + 1)]
+            span *= self.shape[::-1][i]
 
         if len(indices) == 0:
             indices.append((0, self.nbytes))

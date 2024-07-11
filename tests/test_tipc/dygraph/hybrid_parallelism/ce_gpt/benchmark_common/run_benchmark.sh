@@ -178,7 +178,7 @@ function _train(){
         workerlog_id=0
         ;;
     esac
-    cd ../llm/gpt-3
+    cd ../llm
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
         ${train_cmd} > ${log_file} 2>&1
@@ -203,7 +203,7 @@ export FLAGS_cudnn_deterministic=True
 export FLAGS_cudnn_deterministic=1
 export FLAGS_embedding_deterministic=1
 
-export PYTHONPATH="../../../PaddleNLP/"
+export PYTHONPATH="../../PaddleNLP/"
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
 #_train       # 如果只产出训练log,不解析,可取消注释

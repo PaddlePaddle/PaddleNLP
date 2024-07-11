@@ -18,7 +18,11 @@ This file is used for replacing Paddle's native Linear implementations with vend
 
 import paddle.distributed.fleet.meta_parallel as mpu
 from paddle import nn
-from paddle.distributed.fleet.utils import sequence_parallel_utils
+
+try:
+    from paddle.distributed.fleet.utils import sequence_parallel_utils
+except:
+    sequence_parallel_utils = None
 
 from paddlenlp.transformers.mc2_parallel_linear import (
     MC2ColumnSeqParallelLinear,
@@ -29,8 +33,29 @@ from paddlenlp.utils.tools import get_env_device
 Linear = nn.Linear
 ColumnParallelLinear = mpu.ColumnParallelLinear
 RowParallelLinear = mpu.RowParallelLinear
-ColumnSequenceParallelLinear = sequence_parallel_utils.ColumnSequenceParallelLinear
-RowSequenceParallelLinear = sequence_parallel_utils.RowSequenceParallelLinear
+try:
+    ColumnSequenceParallelLinear = sequence_parallel_utils.ColumnSequenceParallelLinear
+    RowSequenceParallelLinear = sequence_parallel_utils.RowSequenceParallelLinear
+except:
+
+    class ColumnSequenceParallelLinearPass(object):
+        """
+        A dummy class for ColumnSequenceParallelLinear, used when the actual class
+        cannot be imported from sequence_parallel_utils.
+        """
+
+        pass
+
+    class RowSequenceParallelLinearPass(object):
+        """
+        A dummy class for RowSequenceParallelLinear, used when the actual class
+        cannot be imported from sequence_parallel_utils.
+        """
+
+        pass
+
+    ColumnSequenceParallelLinear = ColumnSequenceParallelLinearPass
+    RowSequenceParallelLinear = RowSequenceParallelLinearPass
 
 if get_env_device() == "npu":
     if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:

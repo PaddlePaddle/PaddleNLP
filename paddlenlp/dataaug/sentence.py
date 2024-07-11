@@ -195,7 +195,7 @@ class SentenceBackTranslate:
         num_beams (int): The number of beams in the "beam_search"
             strategy. Default to 4.
         use_faster: (bool): Whether to use faster entry of model
-            for FasterGeneration. Default to False.
+            for FasterGeneration. Default to False (already deprecated).
         decode_strategy (str, optional): The decoding strategy in generation.
             Currently, there are three decoding strategies supported:
             "greedy_search", "sampling" and "beam_search". Default to
@@ -219,7 +219,6 @@ class SentenceBackTranslate:
         self.max_length = max_length
         self.batch_size = batch_size
         self.num_beams = num_beams
-        self.use_faster = use_faster
         self.decode_strategy = decode_strategy
         self.from_model_name = from_model_name
         self.to_model_name = to_model_name
@@ -324,7 +323,6 @@ class SentenceBackTranslate:
                 decode_strategy=self.decode_strategy,
                 num_beams=self.num_beams,
                 max_length=self.max_length,
-                use_faster=self.use_faster,
             )[0]
             for output in outputs:
                 eos = np.where(output.cpu().numpy() == eos_id)[0]
@@ -459,7 +457,7 @@ class SentenceContinue:
             "greedy_search", "sampling" and "beam_search". Default to
             "beam_search".
         use_faster: (bool): Whether to use faster entry of model
-            for FasterGeneration. Default to False.
+            for FasterGeneration. Default to False (already deprecated).
         create_n (int):
             Number of augmented sequences.
         batch_size(int):
@@ -491,7 +489,6 @@ class SentenceContinue:
         self.model_name = model_name
         self.max_length = max_length
         self.decode_strategy = decode_strategy
-        self.use_faster = use_faster
         self.create_n = create_n
         self.top_k = top_k
         self.temperature = temperature
@@ -530,7 +527,6 @@ class SentenceContinue:
                 **tokenized_inputs,
                 max_length=self.max_length,
                 decode_strategy=self.decode_strategy,
-                use_faster=self.use_faster,
                 num_return_sequences=self.create_n,
                 top_k=self.top_k,
                 temperature=self.temperature,
