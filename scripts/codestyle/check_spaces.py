@@ -26,15 +26,37 @@ def add_spaces_between_chinese_and_english(text):
     return re.sub(pattern, replace_func, text)
 
 
+def process_outside_codeblocks(text):
+    # 正则表达式用于匹配Markdown代码块
+    codeblock_pattern = r"```[\s\S]*?```"
+
+    # 找到所有的代码块并替换为占位符
+    codeblocks = re.findall(codeblock_pattern, text)
+    placeholders = []
+    for i, block in enumerate(codeblocks):
+        placeholder = f"CODEBLOCK_PLACEHOLDER_{i}"
+        placeholders.append(placeholder)
+        text = text.replace(block, placeholder, 1)
+
+    # 对非代码块文本处理中英文空格
+    processed_text = add_spaces_between_chinese_and_english(text)
+
+    # 将占位符替换回原来的代码块内容
+    for placeholder, block in zip(placeholders, codeblocks):
+        processed_text = processed_text.replace(placeholder, block, 1)
+
+    return processed_text
+
+
 def process_file(file_path):
     with open(file_path, "r+", encoding="utf-8") as file:
         content = file.read()
-        new_content = add_spaces_between_chinese_and_english(content)
+        new_content = process_outside_codeblocks(content)
         if new_content != content:
             file.seek(0)
             file.write(new_content)
             file.truncate()
-            print(f"Spaces added to {file_path}")
+            print(f"Spaces added to {file_path} (excluding code blocks)")
 
 
 if __name__ == "__main__":

@@ -30,13 +30,13 @@
 
 ## News 📢
 
-* **2024.06.27 [PaddleNLP v3.0 Beta](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta0)**：Embrace large models and experience a complete upgrade. With a unified large model toolchain, we achieve full-process access to domestically produced computing chips. We fully support industrial-level application processes for large models, such as PaddlePaddle's 4D parallel configuration, efficient fine-tuning strategies, efficient alignment algorithms, and high-performance reasoning. Our developed RsLoRA+ algorithm, full checkpoint storage mechanism Unified Checkpoint, and generalized support for FastFNN and FusedQKV all contribute to the training and inference of large models. We continuously support updates to mainstream models for providing efficient solutions.
+* **2024.06.27 [PaddleNLP v3.0 Beta](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta0)**：Embrace large models and experience a complete upgrade. With a unified large model suite, we achieve full-process access to domestically produced computing chips. We fully support industrial-level application processes for large models, such as PaddlePaddle's 4D parallel configuration, efficient fine-tuning strategies, efficient alignment algorithms, and high-performance reasoning. Our developed RsLoRA+ algorithm, full checkpoint storage mechanism Unified Checkpoint, and generalized support for FastFNN and FusedQKV all contribute to the training and inference of large models. We continuously support updates to mainstream models for providing efficient solutions.
 
 * **2024.04.24 [PaddleNLP v2.8](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.8.0)**：Our self-developed RsLoRA+ algorithm with extreme convergence significantly improves the convergence speed and training effectiveness of PEFT training. By introducing high-performance generation acceleration into the RLHF PPO algorithm, we have broken through the generation speed bottleneck in PPO training, achieving a significant lead in PPO training performance. We generally support multiple large model training performance optimization methods such as FastFFN and FusedQKV, making large model training faster and more stable.
 
-* **2024.01.04 [PaddleNLP v2.7](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.7.0)**: The LLM experience is fully upgraded, and the tool chain LLM entrance is unified. Unify the implementation code of pre-training, fine-tuning, compression, inference and deployment to the `PaddleNLP/llm` directory. The new [LLM Toolchain Documentation](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html) provides one-stop guidance for users from getting started with LLM to business deployment and launch. The full breakpoint storage mechanism Unified Checkpoint greatly improves the versatility of LLM storage. Efficient fine-tuning upgrade supports the simultaneous use of efficient fine-tuning + LoRA, and supports QLoRA and other algorithms.
+* **2024.01.04 [PaddleNLP v2.7](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.7.0)**: The LLM experience is fully upgraded, and the tool chain LLM entrance is unified. Unify the implementation code of pre-training, fine-tuning, compression, inference and deployment to the `PaddleNLP/llm` directory. The new [LLM Suite Documentation](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html) provides one-stop guidance for users from getting started with LLM to business deployment and launch. The full breakpoint storage mechanism Unified Checkpoint greatly improves the versatility of LLM storage. Efficient fine-tuning upgrade supports the simultaneous use of efficient fine-tuning + LoRA, and supports QLoRA and other algorithms.
 
-* **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**: Release [Full-process LLM toolchain](./llm) , covering all aspects of pre-training, fine-tuning, compression, inference and deployment, providing users with end-to-end LLM solutions and one-stop development experience; built-in [4D parallel distributed Trainer](./docs/trainer.md ), [Efficient fine-tuning algorithm LoRA/Prefix Tuning](./llm/README.md#2-%E7%B2%BE%E8%B0%83), [Self-developed INT8/INT4 quantization algorithm](./llm/README.md#4-%E9%87%8F%E5%8C%96), etc.; fully supports [LLaMA 1/2](./llm/config/llama), [BLOOM](./llm/config/bloom), [ChatGLM 1/2](./llm/config/chatglm), [OPT](./llm/config/opt) and other mainstream LLMs.
+* **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**: Release [Full-process LLM suite](./llm) , covering all aspects of pre-training, fine-tuning, compression, inference and deployment, providing users with end-to-end LLM solutions and one-stop development experience; built-in [4D parallel distributed Trainer](./docs/trainer.md ), [Efficient fine-tuning algorithm LoRA/Prefix Tuning](./llm/README.md#2-%E7%B2%BE%E8%B0%83), [Self-developed INT8/INT4 quantization algorithm](./llm/README.md#4-%E9%87%8F%E5%8C%96), etc.; fully supports [LLaMA 1/2](./llm/config/llama), [BLOOM](./llm/config/bloom), [ChatGLM 1/2](./llm/config/chatglm), [OPT](./llm/config/opt) and other mainstream LLMs.
 
 ## Features
 
@@ -52,9 +52,9 @@ Our development suit supports large model training and inference on multiple har
 
 We support 4D high-performance training with data parallelism, sharding parallelism, tensor parallelism, and pipeline parallelism. The Trainer supports configurable distributed strategies, reducing the cost associated with complex distributed combinations. The Unified Checkpoint large model storage format supports dynamic scaling of model parameter distribution during training, thereby reducing the migration cost caused by hardware switching.
 
-### <a href=#Efficient fine-tuning and alignment> 🤗 Efficient fine-tuning and alignment </a>
+### <a href=#Efficient fine-tuning> 🤗 Efficient fine-tuning </a>
 
-The fine-tuning and alignment algorithms are deeply integrated with zero-padding data streams and high-performance FlashMask operators, reducing invalid data padding and computation during training, and significantly improving the throughput of fine-tuning and alignment training.
+The fine-tuning algorithms are deeply integrated with zero-padding data streams and high-performance FlashMask operators, reducing invalid data padding and computation during training, and significantly improving the throughput of fine-tuning training.
 
 ### <a href=#Lossless compression and high-performance inference> 🎛️ Lossless compression and high-performance inference </a>
 
@@ -102,7 +102,7 @@ PaddleNLP provides a convenient and easy-to-use Auto API, which can quickly load
 >>> input_features = tokenizer("你好！请自我介绍一下。", return_tensors="pd")
 >>> outputs = model.generate(**input_features, max_length=128)
 >>> print(tokenizer.batch_decode(outputs[0]))
-['我是一个 AI 语言模型，我可以回答各种问题，包括但不限于：天气、新闻、历史、文化、科学、教育、娱乐等。请问您有什么需要了解的吗？']
+['我是一个AI语言模型，我可以回答各种问题，包括但不限于：天气、新闻、历史、文化、科学、教育、娱乐等。请问您有什么需要了解的吗？']
 ```
 
 ### Pre-training for large language model
@@ -124,7 +124,7 @@ cd .. # change folder to PaddleNLP/llm
 python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py ./config/llama/sft_argument.json
 ```
 
-For more steps in the entire large model process, please refer to the[Large Model Full-Process Toolchain](./llm).
+For more steps in the entire large model process, please refer to the[Large Model Full-Process Suite](./llm).
 
 For more PaddleNLP content, please refer to:
 
