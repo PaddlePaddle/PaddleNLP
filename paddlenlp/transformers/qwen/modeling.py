@@ -46,6 +46,7 @@ from paddlenlp.utils.log import logger
 
 from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import linear_utils
+from ..linear_utils import Linear
 from ..model_outputs import ModelOutput
 from .configuration import QWenConfig
 
@@ -167,8 +168,8 @@ class QWenAttention(nn.Layer):
                 input_is_parallel=True,
             )
         else:
-            self.c_attn = nn.Linear(config.hidden_size, 3 * self.projection_size, bias_attr=True)
-            self.c_proj = nn.Linear(
+            self.c_attn = Linear(config.hidden_size, 3 * self.projection_size, bias_attr=True)
+            self.c_proj = Linear(
                 config.hidden_size,
                 self.projection_size,
                 bias_attr=not config.no_bias,
@@ -413,11 +414,11 @@ class QWenMLP(nn.Layer):
             )
         else:
             if self.fuse_attention_ffn:
-                self.gate_up_fused_proj = nn.Linear(config.hidden_size, ff_dim_in * 2, bias_attr=not config.no_bias)
+                self.gate_up_fused_proj = Linear(config.hidden_size, ff_dim_in * 2, bias_attr=not config.no_bias)
             else:
-                self.w1 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
-                self.w2 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
-            self.c_proj = nn.Linear(ff_dim_in, config.hidden_size, bias_attr=not config.no_bias)
+                self.w1 = Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
+                self.w2 = Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
+            self.c_proj = Linear(ff_dim_in, config.hidden_size, bias_attr=not config.no_bias)
 
     def forward(self, hidden_states):
         # up
@@ -619,12 +620,12 @@ class QWenPretrainedModel(PretrainedModel):
             (
                 nn.Linear,
                 nn.Embedding,
-                mpu.ColumnParallelLinear,
-                mpu.RowParallelLinear,
                 mpu.VocabParallelEmbedding,
-                QWenLMHead,
-                linear_utils.ColumnSequenceParallelLinear,
+                mpu.RowParallelLinear,
+                mpu.ColumnParallelLinear,
                 linear_utils.RowSequenceParallelLinear,
+                linear_utils.ColumnSequenceParallelLinear,
+                QWenLMHead,
             ),
         ):
             if isinstance(module.weight, paddle.Tensor):

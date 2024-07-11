@@ -22,6 +22,7 @@ from functools import partial
 
 import numpy as np
 import paddle
+import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -32,9 +33,7 @@ from paddle.distributed.fleet.utils import recompute
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-        ColumnSequenceParallelLinear,
         GatherOp,
-        RowSequenceParallelLinear,
         ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
@@ -45,7 +44,8 @@ from paddle.utils import try_import
 
 from ...utils.converter import StateDictNameMapping
 from ...utils.log import logger
-from .. import PretrainedModel, register_base_model
+from .. import PretrainedModel, linear_utils, register_base_model
+from ..linear_utils import Linear
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -210,11 +210,11 @@ class MultiHeadAttention(nn.Layer):
         self.num_attention_heads = config.num_attention_heads  # default, without tensor parallel
 
         if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-            RowParallelLinear = fleet.meta_parallel.RowParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             assert config.num_attention_heads % config.tensor_parallel_degree == 0
@@ -262,13 +262,13 @@ class MultiHeadAttention(nn.Layer):
             )
         else:
             if self.config.fuse_attention_qkv:
-                self.qkv_proj = nn.Linear(config.hidden_size, 3 * config.hidden_size, bias_attr=True)
+                self.qkv_proj = Linear(config.hidden_size, 3 * config.hidden_size, bias_attr=True)
             else:
-                self.q_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
-                self.k_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
-                self.v_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
+                self.q_proj = Linear(config.hidden_size, config.hidden_size, bias_attr=True)
+                self.k_proj = Linear(config.hidden_size, config.hidden_size, bias_attr=True)
+                self.v_proj = Linear(config.hidden_size, config.hidden_size, bias_attr=True)
 
-            self.out_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
+            self.out_proj = Linear(config.hidden_size, config.hidden_size, bias_attr=True)
 
     def _fuse_prepare_qkv(self, query, use_cache=False, past_key_value=None):
         if self.config.sequence_parallel:
@@ -583,11 +583,11 @@ class GPTDecoderLayer(nn.Layer):
         self.self_attn = MultiHeadAttention(config=config)
 
         if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-            RowParallelLinear = fleet.meta_parallel.RowParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         # TODO:config.fuse_attention_ffn @DrownFish19
         if config.tensor_parallel_degree > 1:
@@ -607,8 +607,8 @@ class GPTDecoderLayer(nn.Layer):
                 fuse_matmul_bias=self.config.use_fused_linear,
             )
         else:
-            self.linear1 = nn.Linear(config.hidden_size, config.intermediate_size, bias_attr=True)
-            self.linear2 = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
+            self.linear1 = Linear(config.hidden_size, config.intermediate_size, bias_attr=True)
+            self.linear2 = Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
 
         self.norm1 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
         self.norm2 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
@@ -980,11 +980,11 @@ class GPTPretrainedModel(PretrainedModel):
             (
                 nn.Linear,
                 nn.Embedding,
-                fleet.meta_parallel.VocabParallelEmbedding,
-                fleet.meta_parallel.ColumnParallelLinear,
-                fleet.meta_parallel.RowParallelLinear,
-                ColumnSequenceParallelLinear,
-                RowSequenceParallelLinear,
+                mpu.VocabParallelEmbedding,
+                mpu.RowParallelLinear,
+                mpu.ColumnParallelLinear,
+                linear_utils.RowSequenceParallelLinear,
+                linear_utils.ColumnSequenceParallelLinear,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -1295,7 +1295,7 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
         super(GPTPretrainingCriterion, self).__init__()
         self.config = config
         if config.tensor_parallel_degree > 1 and config.tensor_parallel_output:
-            self.loss_func = fleet.meta_parallel.ParallelCrossEntropy(ignore_index=config.ignore_index)
+            self.loss_func = mpu.ParallelCrossEntropy(ignore_index=config.ignore_index)
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
 
@@ -1660,7 +1660,7 @@ class GPTForTokenClassification(GPTPretrainedModel):
         self.gpt = GPTModel(config)  # allow gpt to be config
         dropout_p = config.hidden_dropout_prob if config.classifier_dropout is None else config.classifier_dropout
         self.dropout = nn.Dropout(dropout_p)
-        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+        self.classifier = Linear(config.hidden_size, config.num_labels)
 
     def forward(
         self,
@@ -1774,7 +1774,7 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         super(GPTForSequenceClassification, self).__init__(config)
         self.num_labels = config.num_labels
         self.gpt = GPTModel(config)
-        self.score = nn.Linear(config.hidden_size, config.num_labels, bias_attr=False)
+        self.score = Linear(config.hidden_size, config.num_labels, bias_attr=False)
 
     def forward(
         self,
