@@ -383,7 +383,7 @@ class Trainer:
         if self.args.pipeline_parallel_degree > 1:
             from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
-            assert isinstance(
+            assert (isinstance(model, LoRAModel) and isinstance(model.model, PipelineLayer)) or isinstance(
                 model, PipelineLayer
             ), "Only support pipeline parallel mode when model is PipelineLayer!!!"
 
@@ -521,6 +521,22 @@ class Trainer:
             state_dict = self.load_state_dict_from_checkpoint_with_reshard(resume_from_checkpoint)
             if self.args.bf16:
                 state_dict = self.recover_params_from_master_weights(state_dict)
+
+            for p in self.model.parameters():
+                if p.name in self.optimizer._master_weights:
+                    del self.optimizer._master_weights[p.name]
+                    logger.info(f'del {p.name} from self.optimizer._master_weights')
+
+                if hasattr(self.optimizer, "_accumulators") and hasattr(self.optimizer, "_moment1_acc_str") \
+                    and p.name in self.optimizer._accumulators[self.optimizer._moment1_acc_str]:
+                    del self.optimizer._accumulators[self.optimizer._moment1_acc_str][p.name]
+                    logger.info(f'del {p.name} from self.optimizer._accumulators[self.optimizer._moment1_acc_str]')
+
+                if hasattr(self.optimizer, "_accumulators") and hasattr(self.optimizer, "_moment2_acc_str") \
+                    and p.name in self.optimizer._accumulators[self.optimizer._moment2_acc_str]:
+                    del self.optimizer._accumulators[self.optimizer._moment2_acc_str][p.name]
+                    logger.info(f'del {p.name} from self.optimizer._accumulators[self.optimizer._moment2_acc_str]')
+
         else:
             if self.args.dataset_rank == 0 or self.args.use_moe:
                 state_dict = self.load_one_state_dict_from_checkpoint(
