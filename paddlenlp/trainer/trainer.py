@@ -2699,7 +2699,7 @@ class Trainer:
 
         if self.state.epoch is not None:
             logs["progress_or_epoch"] = round(self.state.epoch, 4)
-	
+
         if strtobool(os.getenv("FLAG_INTERNAL_USAGE", "False")):
             self.state.log_history = []
         else:
