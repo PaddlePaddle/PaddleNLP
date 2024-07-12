@@ -26,20 +26,19 @@ from paddle.distributed.fleet.meta_parallel import (
 
 from ...transformers import linear_utils
 
+ColumnSequenceParallelLinear = linear_utils.ColumnSequenceParallelLinear
+RowSequenceParallelLinear = linear_utils.RowSequenceParallelLinear
+
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
         AllGatherOp,
-        ColumnSequenceParallelLinear,
         ReduceScatterOp,
-        RowSequenceParallelLinear,
         mark_as_sequence_parallel_parameter,
     )
 except:
     AllGatherOp = None
     ReduceScatterOp = None
     mark_as_sequence_parallel_parameter = None
-    ColumnSequenceParallelLinear = linear_utils.ColumnSequenceParallelLinear
-    RowSequenceParallelLinear = linear_utils.RowSequenceParallelLinear
 
 
 from ...transformers.mc2_parallel_linear import (
