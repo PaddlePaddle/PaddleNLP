@@ -45,7 +45,7 @@ python -u  -m paddle.distributed.launch \
     --amp_master_grad \
     --load_sharded_model true \
     --save_sharded_model true \
-    --pipeline_parallel_degree 0 \
+    --pipeline_parallel_degree 1 \
     --ignore_data_skip 0 \
     --force_reshard_pp true \
     --tensor_parallel_config "enable_mp_async_allreduce enable_mp_skip_c_identity" \
