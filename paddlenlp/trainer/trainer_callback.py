@@ -359,9 +359,9 @@ class CallbackHandler(TrainerCallback):
     def on_init_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl):
         return self.call_event("on_init_end", args, state, control)
 
-    def on_train_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl):
+    def on_train_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, wrapped_model=None):
         control.should_training_stop = False
-        return self.call_event("on_train_begin", args, state, control)
+        return self.call_event("on_train_begin", args, state, control, wrapped_model=wrapped_model)
 
     def on_train_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl):
         return self.call_event("on_train_end", args, state, control)

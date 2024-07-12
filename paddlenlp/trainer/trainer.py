@@ -841,7 +841,7 @@ class Trainer:
         self.state.is_local_process_zero = self.is_local_process_zero()
         self.state.is_world_process_zero = self.is_world_process_zero()
 
-        self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
+        self.control = self.callback_handler.on_train_begin(args, self.state, self.control, wrapped_model=model)
 
         tr_loss = None
         self._total_loss_scalar = 0.0
