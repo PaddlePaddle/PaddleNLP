@@ -1924,7 +1924,7 @@ class Trainer:
         if not hasattr(model._layers._loss_fn, "info"):
             return loss.detach(), outputs
 
-        if model.is_pipeline_last_stage():
+        if model.is_pipeline_last_stage(ignore_virtual=True):
             buf = [
                 map_structure(
                     lambda v: (v.item() if isinstance(v, paddle.Tensor) else v)
