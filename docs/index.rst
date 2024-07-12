@@ -49,12 +49,13 @@
    :caption: 飞桨大模型
 
    大模型预训练文档 <llm/pretraining/index.rst>
-   大模型精调文档 <llm/finetune.md>
-   大模型量化教程 <llm/quantization.md>
-   大模型推理教程 <llm/inference.md>
-   大模型统一存储文档 <llm/unified_checkpoint.md>
-   混合并行训练教程 <llm/llm_trainer.rst>
-   模型权重转换教程 <llm/torch2paddle.md>
+   大模型精调文档 <llm/docs/finetune.md>
+   大模型RLHF文档 <llm/docs/rlhf.md>
+   大模型量化教程 <llm/docs/quantization.md>
+   大模型推理教程 <llm/docs/inference.md>
+   大模型统一存储文档 <llm/docs/unified_checkpoint.md>
+   混合并行训练教程 <llm/docs/llm_trainer.rst>
+   模型权重转换教程 <llm/docs/torch2paddle.md>
 
 .. toctree::
    :maxdepth: 1
