@@ -249,7 +249,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
 
 class YuanPretrainedModel(PretrainedModel):
     config_class = YuanConfig
-    base_model_prefix = "model"
+    base_model_prefix = "yuan"
     supports_gradient_checkpointing = True
     _no_split_modules = ["YuanDecoderLayer"]
     _skip_keys_device_placement = "past_key_values"
@@ -261,6 +261,7 @@ class YuanPretrainedModel(PretrainedModel):
         model_mappings = [
             ["embed_tokens.weight"],
             ["norm.weight"],
+        
         ]
         for layer_index in range(config.num_hidden_layers):
             layer_mappings = [
@@ -274,6 +275,11 @@ class YuanPretrainedModel(PretrainedModel):
                 [f"layers.{layer_index}.mlp.up_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.input_layernorm.weight"],
                 [f"layers.{layer_index}.post_attention_layernorm.weight"],
+                [f"layers.{layer_index}.self_attn.lf_gate.conv1.bias"],
+                [f"layers.{layer_index}.self_attn.lf_gate.conv1.weight"],
+                [f"layers.{layer_index}.self_attn.lf_gate.conv2.bias"],
+                [f"layers.{layer_index}.self_attn.lf_gate.conv2.weight"],
+                [f"layers.{layer_index}.self_attn.lf_gate.output_layernorm.weight"],
             ]
             model_mappings.extend(layer_mappings)
 
@@ -282,7 +288,7 @@ class YuanPretrainedModel(PretrainedModel):
         if "YuanModel" not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
-                mapping[1] = "yuan." + mapping[1]
+                mapping[1] = "model." + mapping[1]
             model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
