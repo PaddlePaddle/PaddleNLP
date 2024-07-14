@@ -63,6 +63,7 @@ import json
 import os
 
 import numpy as np
+import paddle
 
 
 def setup_args():
@@ -113,79 +114,91 @@ if __name__ == "__main__":
         model_config = json.load(model_config_file)
         nums_layers = model_config["num_hidden_layers"]
 
-    # linear_weights_name = '.self_attn.o_proj.weight'
-    # linear_bias_name = '.self_attn.o_proj.bias'
+    linear_weights_name = ".self_attn.o_proj.weight"
+    linear_bias_name = ".self_attn.o_proj.bias"
 
-    # ffn1_0_weights_name = '.mlp.gate_proj.weight'
-    # ffn1_1_weights_name = '.mlp.up_proj.weight'
+    ffn1_0_weights_name = ".mlp.gate_proj.weight"
+    ffn1_1_weights_name = ".mlp.up_proj.weight"
 
-    # ffn2_weights_name = '.mlp.down_proj.weight'
-    # ffn2_bias_name = '.mlp.down_proj.bias'
+    ffn2_weights_name = ".mlp.down_proj.weight"
+    ffn2_bias_name = ".mlp.down_proj.bias"
 
-    # # qkv_weights_name = '.self_attn.qkv_proj.weight'
-    # q_weights_name = '.self_attn.q_proj.weight'
-    # k_weights_name = '.self_attn.k_proj.weight'
-    # v_weights_name = '.self_attn.v_proj.weight'
+    # qkv_weights_name = '.self_attn.qkv_proj.weight'
+    q_weights_name = ".self_attn.q_proj.weight"
+    k_weights_name = ".self_attn.k_proj.weight"
+    v_weights_name = ".self_attn.v_proj.weight"
 
-    # params_states = paddle.load(os.path.join(path_name, "model_state.pdparams"))
-    # new_path = os.path.join(path_name, "model_state.pdparams")
+    params_states = paddle.load(os.path.join(path_name, "model_state.pdparams"))
+    new_path = os.path.join(path_name, "model_state.pdparams")
 
-    # scale_map_dict = FP8_PTQ_SCALES_MAP
-    # act_scale_map_dict = scale_map_dict["act_scale"]
+    scale_map_dict = FP8_PTQ_SCALES_MAP
+    act_scale_map_dict = scale_map_dict["act_scale"]
 
-    # act_scale_json_path = os.path.join(path_name+"/act_scales.json")
+    act_scale_json_path = os.path.join(path_name + "/act_scales.json")
 
-    # act_scales = LoadActScaleJson(
-    #     act_scale_json_path, act_scale_map_dict, num_of_layers=nums_layers
-    # )
+    act_scales = LoadActScaleJson(act_scale_json_path, act_scale_map_dict, num_of_layers=nums_layers)
 
-    # new_weight_scale ={}
+    new_weight_scale = {}
 
-    # for i in range(0, nums_layers):
-    #     linear_weights = params_states['llama.layers.'+str(i)+linear_weights_name]
-    #     # linear_bias = params_states['llama.layers.'+str(i)+linear_bias_name]
-    #     ffn1_weights_0 = params_states['llama.layers.'+str(i)+ffn1_0_weights_name]
-    #     ffn1_weights_1 = params_states['llama.layers.'+str(i)+ffn1_1_weights_name]
-    #     ffn2_weights = params_states['llama.layers.'+str(i)+ffn2_weights_name]
-    #     # ffn2_bias = params_states['llama.layers.'+str(i)+ffn2_bias_name]
+    for i in range(0, nums_layers):
+        linear_weights = params_states["llama.layers." + str(i) + linear_weights_name]
+        # linear_bias = params_states['llama.layers.'+str(i)+linear_bias_name]
+        ffn1_weights_0 = params_states["llama.layers." + str(i) + ffn1_0_weights_name]
+        ffn1_weights_1 = params_states["llama.layers." + str(i) + ffn1_1_weights_name]
+        ffn2_weights = params_states["llama.layers." + str(i) + ffn2_weights_name]
+        # ffn2_bias = params_states['llama.layers.'+str(i)+ffn2_bias_name]
 
-    #     q_weights = params_states['llama.layers.'+str(i)+q_weights_name]
-    #     k_weights = params_states['llama.layers.'+str(i)+k_weights_name]
-    #     v_weights = params_states['llama.layers.'+str(i)+v_weights_name]
+        q_weights = params_states["llama.layers." + str(i) + q_weights_name]
+        k_weights = params_states["llama.layers." + str(i) + k_weights_name]
+        v_weights = params_states["llama.layers." + str(i) + v_weights_name]
 
-    #     new_weight_scale["llama.layers."+str(i)+".self_attn.o_proj.weight_quanter"] = paddle.cast(linear_weights,'float').numpy().max()
-    #     new_linear_weights = paddle.cast(linear_weights *448/linear_weights.max(), 'float8_e4m3fn')
-    #     new_weight_scale["llama.layers."+str(i)+".mlp.gate_proj.weight_quanter"] = paddle.cast(ffn1_weights_0,'float').numpy().max()
-    #     new_weight_scale["llama.layers."+str(i)+".mlp.up_proj.weight_quanter"] = paddle.cast(ffn1_weights_1,'float').numpy().max()
+        new_weight_scale["llama.layers." + str(i) + ".self_attn.o_proj.weight_quanter"] = (
+            paddle.cast(linear_weights, "float").numpy().max()
+        )
+        new_linear_weights = paddle.cast(linear_weights * 448 / linear_weights.max(), "float8_e4m3fn")
+        new_weight_scale["llama.layers." + str(i) + ".mlp.gate_proj.weight_quanter"] = (
+            paddle.cast(ffn1_weights_0, "float").numpy().max()
+        )
+        new_weight_scale["llama.layers." + str(i) + ".mlp.up_proj.weight_quanter"] = (
+            paddle.cast(ffn1_weights_1, "float").numpy().max()
+        )
 
-    #     params_states['llama.layers.'+str(i)+ffn1_0_weights_name] = paddle.cast(ffn1_weights_0*448/ ffn1_weights_0.max(), 'float8_e4m3fn')
-    #     params_states['llama.layers.'+str(i)+ffn1_1_weights_name] = paddle.cast(ffn1_weights_1*448/ ffn1_weights_1.max(), 'float8_e4m3fn')
+        params_states["llama.layers." + str(i) + ffn1_0_weights_name] = paddle.cast(
+            ffn1_weights_0 * 448 / ffn1_weights_0.max(), "float8_e4m3fn"
+        )
+        params_states["llama.layers." + str(i) + ffn1_1_weights_name] = paddle.cast(
+            ffn1_weights_1 * 448 / ffn1_weights_1.max(), "float8_e4m3fn"
+        )
 
-    #     new_weight_scale["llama.layers."+str(i)+".mlp.down_proj.weight_quanter"] = paddle.cast(ffn2_weights,'float').numpy().max()
-    #     new_ffn2_weights = paddle.cast(ffn2_weights*448/ ffn2_weights.max(), 'float8_e4m3fn')
+        new_weight_scale["llama.layers." + str(i) + ".mlp.down_proj.weight_quanter"] = (
+            paddle.cast(ffn2_weights, "float").numpy().max()
+        )
+        new_ffn2_weights = paddle.cast(ffn2_weights * 448 / ffn2_weights.max(), "float8_e4m3fn")
 
-    #     qkv_weight_scale = max(paddle.cast(q_weights, 'float').numpy().max(),
-    #                            paddle.cast(k_weights, 'float').numpy().max(),
-    #                            paddle.cast(v_weights, 'float').numpy().max())
+        qkv_weight_scale = max(
+            paddle.cast(q_weights, "float").numpy().max(),
+            paddle.cast(k_weights, "float").numpy().max(),
+            paddle.cast(v_weights, "float").numpy().max(),
+        )
 
-    #     new_weight_scale["llama.layers."+str(i)+".self_attn.qkv_proj.weight_quanter"] = qkv_weight_scale
+        new_weight_scale["llama.layers." + str(i) + ".self_attn.qkv_proj.weight_quanter"] = qkv_weight_scale
 
-    #     qkv_weights_max = max(q_weights.max(), k_weights.max(), v_weights.max())
+        qkv_weights_max = max(q_weights.max(), k_weights.max(), v_weights.max())
 
-    #     new_q_weights = paddle.cast(q_weights*448/ qkv_weights_max, 'float8_e4m3fn')
-    #     new_k_weights = paddle.cast(k_weights*448/ qkv_weights_max, 'float8_e4m3fn')
-    #     new_v_weights = paddle.cast(v_weights*448/ qkv_weights_max, 'float8_e4m3fn')
+        new_q_weights = paddle.cast(q_weights * 448 / qkv_weights_max, "float8_e4m3fn")
+        new_k_weights = paddle.cast(k_weights * 448 / qkv_weights_max, "float8_e4m3fn")
+        new_v_weights = paddle.cast(v_weights * 448 / qkv_weights_max, "float8_e4m3fn")
 
-    #     params_states['llama.layers.'+str(i)+linear_weights_name] = new_linear_weights
-    #     params_states['llama.layers.'+str(i)+ffn2_weights_name] = new_ffn2_weights
-    #     params_states['llama.layers.'+str(i)+q_weights_name] = new_q_weights
-    #     params_states['llama.layers.'+str(i)+k_weights_name] = new_k_weights
-    #     params_states['llama.layers.'+str(i)+v_weights_name] = new_v_weights
-    #     # params_states['llama.layers.'+str(i)+linear_bias_name] = linear_bias
-    #     # params_states['llama.layers.'+str(i)+ffn2_bias_name] = ffn2_bias
+        params_states["llama.layers." + str(i) + linear_weights_name] = new_linear_weights
+        params_states["llama.layers." + str(i) + ffn2_weights_name] = new_ffn2_weights
+        params_states["llama.layers." + str(i) + q_weights_name] = new_q_weights
+        params_states["llama.layers." + str(i) + k_weights_name] = new_k_weights
+        params_states["llama.layers." + str(i) + v_weights_name] = new_v_weights
+        # params_states['llama.layers.'+str(i)+linear_bias_name] = linear_bias
+        # params_states['llama.layers.'+str(i)+ffn2_bias_name] = ffn2_bias
 
-    # with open(path_name+'/weight_scales.json', 'w') as weight_scales_file:
-    #     json.dump(new_weight_scale, weight_scales_file)
+    with open(path_name + "/weight_scales.json", "w") as weight_scales_file:
+        json.dump(new_weight_scale, weight_scales_file)
 
     with open(config_path, "w") as model_config_file:
         model_config["quantization_config"] = {"quant_type": "a8w8_fp8"}
