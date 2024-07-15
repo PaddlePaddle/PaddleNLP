@@ -2186,9 +2186,6 @@ class FusedMultiTransformerFP8(Layer):
         For fake parameter
         """
         linear_weight = paddle.view(self.linear_weights[i], "float8_e4m3fn")
-        fmha_out = paddle.cast(fmha_out, "float8_e4m3fn")
-        # print(fmha_out)
-        # print(linear_weight)
         return paddle.linalg.fp8_fp8_half_gemm_fused(
             fmha_out,
             linear_weight,
