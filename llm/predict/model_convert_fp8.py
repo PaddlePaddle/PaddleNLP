@@ -204,4 +204,4 @@ if __name__ == "__main__":
         model_config["quantization_config"] = {"quant_type": "a8w8_fp8"}
         json.dump(model_config, model_config_file)
 
-    # paddle.save(params_states,new_path)
+    paddle.save(params_states, new_path)
