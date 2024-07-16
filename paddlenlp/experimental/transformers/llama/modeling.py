@@ -26,6 +26,7 @@ from paddle.nn.quant import weight_quantize
 from paddlenlp.experimental.model_utils import (
     ActScalesLoader,
     CacheScaleLoader,
+    PerTensorWeightScalesLoader,
     WeightScalesLoader,
 )
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
@@ -36,6 +37,8 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerAvx,
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
+    FusedMultiTransformerFP8,
+    FusedMultiTransformerFP8Config,
     FusedMultiTransformerWeightOnly,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
@@ -406,12 +409,30 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         ffn_ln_scale_attrs = [
             paddle.ParamAttr(name="fusellama.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
         ]
-        ffn1_weight_attrs = [
-            paddle.ParamAttr(
-                name="fusellama.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
-            )
-            for i in range(self.num_layers)
-        ]
+
+        if self.quant_type == "a8w8_fp8":
+            ffn1_0_weight_attrs = [
+                paddle.ParamAttr(
+                    name="fusellama.{}.ffn1_0_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                )
+                for i in range(self.num_layers)
+            ]
+            ffn1_1_weight_attrs = [
+                paddle.ParamAttr(
+                    name="fusellama.{}.ffn1_1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                )
+                for i in range(self.num_layers)
+            ]
+            ffn1_0_bias_attrs = None
+            ffn1_1_bias_attrs = None
+        else:
+            ffn1_weight_attrs = [
+                paddle.ParamAttr(
+                    name="fusellama.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                )
+                for i in range(self.num_layers)
+            ]
+
         ffn2_weight_attrs = [
             paddle.ParamAttr(
                 name="fusellama.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
@@ -521,50 +542,112 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 paddle.ParamAttr(name="fusellama.{}.cache_v_out_scale".format(i)) for i in range(self.num_layers)
             ]
 
-        transformer_config = FusedMultiTransformerConfig(
-            embed_dim=self.hidden_size,
-            num_heads=self.num_attention_heads,
-            kv_num_heads=self.num_key_value_heads,
-            dim_feedforward=self.intermediate_size,
-            weight_only_quant_bits=self.weight_only_quant_bits,
-            activation="swiglu",
-            num_layers=config.num_hidden_layers,
-            nranks=config.tensor_parallel_degree,
-            ring_id=ring_id,
-            ln_scale_attrs=ln_scale_attrs,
-            qkv_weight_attrs=qkv_weight_attrs,
-            qkv_weight_scale_attrs=qkv_weight_scale_attrs,
-            linear_weight_attrs=out_proj_weight_attrs,
-            linear_weight_scale_attrs=out_proj_weight_scale_attrs,
-            ffn_ln_scale_attrs=ffn_ln_scale_attrs,
-            ffn1_weight_attrs=ffn1_weight_attrs,
-            ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
-            ffn2_weight_attrs=ffn2_weight_attrs,
-            ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
-            qkv_out_scale_attrs=qkv_out_scale_attrs,
-            linear_out_scale_attrs=linear_out_scale_attrs,
-            ffn1_out_scale_attrs=ffn1_out_scale_attrs,
-            ffn2_out_scale_attrs=ffn2_out_scale_attrs,
-            linear_shift_attrs=linear_shift_attrs,
-            linear_smooth_attrs=linear_smooth_attrs,
-            ffn2_shift_attrs=ffn2_shift_attrs,
-            ffn2_smooth_attrs=ffn2_smooth_attrs,
-            ln_bias_attrs=ln_bias_attrs,
-            qkv_bias_attrs=qkv_bias_attrs,
-            linear_bias_attrs=out_proj_bias_attrs,
-            ffn_ln_bias_attrs=ffn_ln_bias_attrs,
-            ffn1_bias_attrs=ffn1_bias_attrs,
-            ffn2_bias_attrs=ffn2_bias_attrs,
-            cache_k_scale_attrs=cache_k_scale_attrs,
-            cache_v_scale_attrs=cache_v_scale_attrs,
-            cache_k_out_scale_attrs=cache_k_out_scale_attrs,
-            cache_v_out_scale_attrs=cache_v_out_scale_attrs,
-            epsilon=self.epsilon,
-            norm_type="rmsnorm",
-            use_neox_rotary_style=True,
-            use_dynamic_cachekv_quant=config.use_cachekv_int8 == "dynamic",
-            rank_id=config.tensor_parallel_rank,
-        )
+        if self.quant_type == "a8w8_fp8":
+            current_work_dir = os.path.dirname(__file__)
+            scale_map_file = f"{current_work_dir}/ptq_fp8_scales_map.json"
+
+            with open(scale_map_file) as json_file:
+                scale_map_dict = json.load(json_file)
+                act_scale_map_dict = scale_map_dict["act_scale"]
+                weight_scale_map_dict = scale_map_dict["weight_scale"]
+                act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
+                weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
+                if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
+                    act_scale_json_path = os.path.join(
+                        self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
+                    )
+                    weight_scale_json_path = os.path.join(
+                        self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
+                    )
+                act_scales = ActScalesLoader(
+                    act_scale_json_path, act_scale_map_dict, num_of_layers=self.config.num_hidden_layers
+                )
+
+                weight_scales = PerTensorWeightScalesLoader(
+                    weight_scale_json_path,
+                    weight_scale_map_dict,
+                    num_of_layers=self.config.num_hidden_layers,
+                )
+
+                for weight_name in weight_scales.scale:
+                    weight_scales.scale[weight_name] = weight_scales.scale[weight_name].astype(np.float32)
+
+            transformer_config = FusedMultiTransformerFP8Config(
+                embed_dim=self.hidden_size,
+                num_heads=self.num_attention_heads,
+                dim_feedforward=self.intermediate_size,
+                activation="swiglu",
+                num_layers=config.num_hidden_layers,
+                nranks=config.tensor_parallel_degree,
+                ring_id=ring_id,
+                ln_scale_attrs=ln_scale_attrs,
+                ln_bias_attrs=ln_bias_attrs,
+                qkv_weight_attrs=qkv_weight_attrs,
+                qkv_bias_attrs=qkv_bias_attrs,
+                linear_weight_attrs=out_proj_weight_attrs,
+                linear_bias_attrs=out_proj_bias_attrs,
+                ffn_ln_scale_attrs=ffn_ln_scale_attrs,
+                ffn_ln_bias_attrs=ffn_ln_bias_attrs,
+                cache_k_scale_attrs=cache_k_scale_attrs,
+                cache_v_scale_attrs=cache_v_scale_attrs,
+                cache_k_out_scale_attrs=cache_k_out_scale_attrs,
+                cache_v_out_scale_attrs=cache_v_out_scale_attrs,
+                ffn1_0_weight_attrs=ffn1_0_weight_attrs,
+                ffn1_1_weight_attrs=ffn1_1_weight_attrs,
+                ffn1_0_bias_attrs=ffn1_0_bias_attrs,
+                ffn1_1_bias_attrs=ffn1_1_bias_attrs,
+                ffn2_weight_attrs=ffn2_weight_attrs,
+                ffn2_bias_attrs=ffn2_bias_attrs,
+                act_scales=act_scales,
+                weight_scales=weight_scales,
+                norm_type="rmsnorm",
+            )
+
+        else:
+            transformer_config = FusedMultiTransformerConfig(
+                embed_dim=self.hidden_size,
+                num_heads=self.num_attention_heads,
+                kv_num_heads=self.num_key_value_heads,
+                dim_feedforward=self.intermediate_size,
+                weight_only_quant_bits=self.weight_only_quant_bits,
+                activation="swiglu",
+                num_layers=config.num_hidden_layers,
+                nranks=config.tensor_parallel_degree,
+                ring_id=ring_id,
+                ln_scale_attrs=ln_scale_attrs,
+                qkv_weight_attrs=qkv_weight_attrs,
+                qkv_weight_scale_attrs=qkv_weight_scale_attrs,
+                linear_weight_attrs=out_proj_weight_attrs,
+                linear_weight_scale_attrs=out_proj_weight_scale_attrs,
+                ffn_ln_scale_attrs=ffn_ln_scale_attrs,
+                ffn1_weight_attrs=ffn1_weight_attrs,
+                ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
+                ffn2_weight_attrs=ffn2_weight_attrs,
+                ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
+                qkv_out_scale_attrs=qkv_out_scale_attrs,
+                linear_out_scale_attrs=linear_out_scale_attrs,
+                ffn1_out_scale_attrs=ffn1_out_scale_attrs,
+                ffn2_out_scale_attrs=ffn2_out_scale_attrs,
+                linear_shift_attrs=linear_shift_attrs,
+                linear_smooth_attrs=linear_smooth_attrs,
+                ffn2_shift_attrs=ffn2_shift_attrs,
+                ffn2_smooth_attrs=ffn2_smooth_attrs,
+                ln_bias_attrs=ln_bias_attrs,
+                qkv_bias_attrs=qkv_bias_attrs,
+                linear_bias_attrs=out_proj_bias_attrs,
+                ffn_ln_bias_attrs=ffn_ln_bias_attrs,
+                ffn1_bias_attrs=ffn1_bias_attrs,
+                ffn2_bias_attrs=ffn2_bias_attrs,
+                cache_k_scale_attrs=cache_k_scale_attrs,
+                cache_v_scale_attrs=cache_v_scale_attrs,
+                cache_k_out_scale_attrs=cache_k_out_scale_attrs,
+                cache_v_out_scale_attrs=cache_v_out_scale_attrs,
+                epsilon=self.epsilon,
+                norm_type="rmsnorm",
+                use_neox_rotary_style=True,
+                use_dynamic_cachekv_quant=config.use_cachekv_int8 == "dynamic",
+                rank_id=config.tensor_parallel_rank,
+            )
 
         self.set_transformer_block(transformer_config)
         self.norm = FusedLlamaRMSNorm(config)
@@ -579,6 +662,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
         elif self.quant_type == "a8w8":
             self.transformer_block = FusedMultiTransformerA8W8(transformer_config)
+        elif self.quant_type == "a8w8_fp8":
+            self.transformer_block = FusedMultiTransformerFP8(transformer_config)
         else:
             self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
@@ -782,6 +867,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 concated_ffn1_weight = np.concatenate(
                     [unfused_state_dict["mlp.gate_proj.weight"], unfused_state_dict["mlp.up_proj.weight"]], axis=-1
                 )
+                if self.quant_type == "a8w8_fp8":
+                    ffn1_0_weight = unfused_state_dict["mlp.gate_proj.weight"]
+                    ffn1_1_weight = unfused_state_dict["mlp.up_proj.weight"]
+
             ffn1_weight_tensor = paddle.to_tensor(concated_ffn1_weight)
 
             qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight)
@@ -800,6 +889,14 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.transformer_block.qkv_weights[idx].set_value(
                     paddle.cast(paddle.to_tensor(concated_qkv_weight), "int8")
                 )
+            elif self.quant_type == "a8w8_fp8":
+                weight = paddle.to_tensor(concated_qkv_weight)
+                weight = weight.view("float8_e4m3fn")
+                # print(weight)
+                # print(self.transformer_block.qkv_weights[idx])
+                self.transformer_block.qkv_weights[idx].set_value(weight)
+                # print(self.transformer_block.qkv_weights[idx])
+                # print(self.transformer_block.qkv_weights[idx].view("float8_e4m3fn"))
             else:
                 self.transformer_block.qkv_weights[idx].set_value(
                     qkv_weight_tensor.cast(self.transformer_block.qkv_weights[idx].dtype)
@@ -824,6 +921,15 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         "int8",
                     )
                 )
+            elif self.quant_type == "a8w8_fp8":
+                self.transformer_block.linear_weights[idx].set_value(
+                    paddle.view(
+                        paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)]).transpose(
+                            (1, 0)
+                        ),
+                        "float8_e4m3fn",
+                    )
+                )
             else:
                 self.transformer_block.linear_weights[idx].set_value(
                     linear_weight_tensor.cast(self.transformer_block.linear_weights[idx].dtype)
@@ -841,6 +947,13 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             elif self.quant_type == "a8w8":
                 self.transformer_block.ffn1_weights[idx].set_value(
                     paddle.cast(paddle.to_tensor(concated_ffn1_weight).transpose((1, 0)), "int8")
+                )
+            elif self.quant_type == "a8w8_fp8":
+                self.transformer_block.ffn1_0_weights[idx].set_value(
+                    paddle.view(paddle.to_tensor(ffn1_0_weight), "float8_e4m3fn")
+                )
+                self.transformer_block.ffn1_1_weights[idx].set_value(
+                    paddle.view(paddle.to_tensor(ffn1_1_weight), "float8_e4m3fn")
                 )
             else:
                 self.transformer_block.ffn1_weights[idx].set_value(
@@ -864,6 +977,14 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                             (1, 0)
                         ),
                         "int8",
+                    )
+                )
+
+            elif self.quant_type == "a8w8_fp8":
+                self.transformer_block.ffn2_weights[idx].set_value(
+                    paddle.view(
+                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)]),
+                        "float8_e4m3fn",
                     )
                 )
             else:
@@ -1069,6 +1190,8 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
         elif self.quant_type == "a8w8":
             self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
+        elif self.quant_type == "a8w8_fp8":
+            self.transformer_block = FusedMultiTransformerFP8(transformer_config)
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
