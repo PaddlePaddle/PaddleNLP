@@ -874,8 +874,6 @@ class YuanModel(YuanPretrainedModel):
         output_attentions: bool,
         past_key_value: Tensor,
         use_cache: bool,
-        alibi=None,
-        attn_mask_startend_row_indices=None,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -886,13 +884,11 @@ class YuanModel(YuanPretrainedModel):
         hidden_states = recompute(
             create_custom_forward(layer_module),
             hidden_states,
-            position_ids,
             attention_mask,
-            output_attentions,
+            position_ids,
             past_key_value,
+            output_attentions,
             use_cache,
-            alibi,
-            attn_mask_startend_row_indices,
             use_reentrant=self.config.recompute_use_reentrant,
         )
 
@@ -998,13 +994,11 @@ class YuanModel(YuanPretrainedModel):
                 layer_outputs = self.recompute_training_full(
                     decoder_layer,
                     hidden_states,
-                    position_ids,
-                    attention_mask,
-                    output_attentions,
-                    past_key_value,
-                    use_cache,
-                    alibi=None,
-                    attn_mask_startend_row_indices=None,
+                    position_ids=position_ids,
+                    attention_mask=attention_mask,
+                    output_attentions=output_attentions,
+                    past_key_value=past_key_value,
+                    use_cache=use_cache,
                 )
             else:
                 layer_outputs = decoder_layer(
