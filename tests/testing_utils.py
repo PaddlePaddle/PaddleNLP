@@ -296,6 +296,22 @@ def require_package(*package_names):
     return decorator
 
 
+def skip_platform(*platform):
+    """decorator which can detect that it will skip the specific platform
+
+    Args:
+        platform (str): the name of platform, including win32, cygwin, linux, and darwin
+    """
+
+    def decorator(func):
+        for plat in platform:
+            if sys.platform.startswith(plat):
+                return unittest.skip(f"platform<{plat}> matched, so to skip this test")(func)
+        return func
+
+    return decorator
+
+
 def is_slow_test() -> bool:
     """check whether is the slow test
 

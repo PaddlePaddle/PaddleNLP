@@ -91,8 +91,8 @@ class QuantizationLinear(nn.Layer):
                 raise ImportError(
                     "Please run the following commands to install: qlora related package first\n"
                     "1) git clone https://github.com/PaddlePaddle/PaddleSlim \n"
-                    "2) cd PaddleSlim/csrc \n"
-                    "3) python ./setup_cuda.py install"
+                    "2) cd PaddleSlim && pip install -e .\n"
+                    "3) cd csrc &&  python ./setup_cuda.py install"
                 )
             self.quant_weight = self.create_parameter(
                 shape=[out_features * in_features // 2, 1],

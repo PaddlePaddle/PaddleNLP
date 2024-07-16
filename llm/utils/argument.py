@@ -145,6 +145,10 @@ class ModelArgument:
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
+    use_fast_layer_norm: bool = field(
+        default=False,
+        metadata={"help": "GPT3 model, use fast layernorm"},
+    )
     fuse_attention_qkv: bool = field(
         default=None,
         metadata={"help": "whether to fuse attention qkv"},
