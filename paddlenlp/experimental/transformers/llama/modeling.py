@@ -571,6 +571,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
                 for weight_name in weight_scales.scale:
                     weight_scales.scale[weight_name] = weight_scales.scale[weight_name].astype(np.float32)
+                for act_name in act_scales.scale:
+                    act_scales.scale[act_name] = act_scales.scale[act_name].astype(np.float32)
 
             transformer_config = FusedMultiTransformerFP8Config(
                 embed_dim=self.hidden_size,
@@ -600,6 +602,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 ffn2_bias_attrs=ffn2_bias_attrs,
                 act_scales=act_scales,
                 weight_scales=weight_scales,
+                epsilon=self.epsilon,
                 norm_type="rmsnorm",
             )
 
