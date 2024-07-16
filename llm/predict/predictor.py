@@ -346,9 +346,7 @@ class StaticGraphPredictor(BasePredictor):
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         super().__init__(config, tokenizer)
 
-        params_path = self.config.model_prefix
-        model_path = self.config.model_name_or_path
-        inference_config = paddle.inference.Config(model_path, params_path)
+        inference_config = paddle.inference.Config(self.config.model_name_or_path, self.config.model_prefix)
 
         if self.config.device == "gpu":
             # set GPU configs accordingly
