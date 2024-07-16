@@ -1022,6 +1022,13 @@ class TrainingArguments:
                 logger.warning("set amp_master_grad to false since amp is disabled.")
                 self.amp_master_grad = False
 
+        def split_parallel_config(parallel_config):
+            if "," in parallel_config:
+                parallel_config = set(parallel_config.split(","))
+            else:
+                parallel_config = set(parallel_config.split(" "))
+            return parallel_config
+
         # use_hybrid_parallel
         if self.use_hybrid_parallel:
 
@@ -1039,10 +1046,7 @@ class TrainingArguments:
                 strategy = fleet.DistributedStrategy()
                 assert self.data_parallel_config == "", "data_parallle_config is not supported in hybrid parallel"
                 if self.pipeline_parallel_degree > 1:
-                    if " " in self.pipeline_parallel_config:
-                        pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
-                    else:
-                        pipeline_parallel_config = set(self.pipeline_parallel_config.split(","))
+                    pipeline_parallel_config = split_parallel_config(self.pipeline_parallel_config)
                     for x in pipeline_parallel_config:
                         if len(x) > 0:
                             if x not in [
@@ -1116,10 +1120,7 @@ class TrainingArguments:
                 if self.tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
 
-                    if " " in self.tensor_parallel_config:
-                        mp_config = set(self.tensor_parallel_config.split(" "))
-                    else:
-                        mp_config = set(self.tensor_parallel_config.split(","))
+                    mp_config = split_parallel_config(self.tensor_parallel_config)
 
                     for x in mp_config:
                         if len(x) > 0:
@@ -1225,10 +1226,8 @@ class TrainingArguments:
                 strategy.hybrid_configs = hybrid_configs
 
                 if self.sharding_parallel_degree > 1:
-                    if " " in self.sharding_parallel_config:
-                        sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
-                    else:
-                        sharding_parallel_config = set(self.sharding_parallel_config.split(","))
+                    sharding_parallel_config = split_parallel_config(self.sharding_parallel_config)
+
                     for x in sharding_parallel_config:
                         if len(x) > 0:
                             if x not in [
@@ -1384,10 +1383,7 @@ class TrainingArguments:
 
             # navie-pp: pipeline_parallel_degree > 1 and gradient_accumulation_steps == 1
             if self.pipeline_parallel_degree > 1 and self.gradient_accumulation_steps > 1:
-                if " " in self.pipeline_parallel_config:
-                    pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
-                else:
-                    pipeline_parallel_config = set(self.pipeline_parallel_config.split(","))
+                pipeline_parallel_config = split_parallel_config(self.pipeline_parallel_config)
                 for x in pipeline_parallel_config:
                     if len(x) > 0:
                         if x not in [
@@ -1436,11 +1432,7 @@ class TrainingArguments:
 
             if self.tensor_parallel_degree > 1:
                 mp_optimization = strategy.mp_optimization
-
-                if " " in self.tensor_parallel_config:
-                    mp_config = set(self.tensor_parallel_config.split(" "))
-                else:
-                    mp_config = set(self.tensor_parallel_config.split(","))
+                mp_config = split_parallel_config(self.tensor_parallel_config)
 
                 for x in mp_config:
                     if len(x) > 0:
@@ -1473,10 +1465,7 @@ class TrainingArguments:
                 elif ShardingOption.FULL_SHARD in self.sharding:
                     sharding.stage = 3
 
-                if " " in self.sharding_parallel_config:
-                    sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
-                else:
-                    sharding_parallel_config = set(self.sharding_parallel_config.split(","))
+                sharding_parallel_config = split_parallel_config(self.sharding_parallel_config)
                 for x in sharding_parallel_config:
                     if len(x) > 0:
                         if x not in [
