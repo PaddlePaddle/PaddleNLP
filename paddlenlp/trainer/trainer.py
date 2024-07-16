@@ -721,27 +721,6 @@ class Trainer:
         args = self.args
         self.is_in_train = True
 
-        logger.info(f"Starting training from resume_from_checkpoint : {resume_from_checkpoint}")
-
-        # The resume_from_checkpoint could be None in some machine node.
-        # Here we reset None to temp directory.
-        if args.world_size > 1:
-            is_resume_from_checkpoint = paddle.to_tensor([resume_from_checkpoint is not None], dtype="int32")
-            paddle.distributed.all_reduce(is_resume_from_checkpoint)
-            is_resume_from_checkpoint = is_resume_from_checkpoint.item()
-            if is_resume_from_checkpoint > 0 and is_resume_from_checkpoint < paddle.distributed.get_world_size():
-                if resume_from_checkpoint is None:
-                    resume_from_checkpoint = os.path.join(self.args.output_dir, "local_tempdir")
-                    if os.path.exists(resume_from_checkpoint) and self.args.local_rank == 0:
-                        shutil.rmtree(resume_from_checkpoint)
-                    os.makedirs(resume_from_checkpoint, exist_ok=True)
-                    logger.info(f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}")
-
-        # memory metrics - must set up as early as possible
-        self._memory_tracker.start()
-        if not self.args.should_load_sharding_stage1_model:
-            self._load_from_checkpoint(resume_from_checkpoint)
-
         train_dataloader = self.get_train_dataloader()
 
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
@@ -792,10 +771,10 @@ class Trainer:
 
         self.state = TrainerState()
 
-        if self.args.should_load_sharding_stage1_model:
+        if not self.args.enable_auto_parallel and self.args.should_load_sharding_stage1_model:
             model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
 
-        elif self.args.should_save_sharding_stage1_model:
+        elif not self.args.enable_auto_parallel and self.args.should_save_sharding_stage1_model:
             # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
             # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
             model = self._wrap_model(self.model_wrapped)
@@ -816,10 +795,29 @@ class Trainer:
                 self.model_wrapped = model
             if delay_optimizer_creation:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-            self._load_optimizer_and_scheduler(resume_from_checkpoint)
+            if not self.args.enable_auto_parallel:
+                self._load_optimizer_and_scheduler(resume_from_checkpoint)
+
+        logger.info(f"Starting training from resume_from_checkpoint : {resume_from_checkpoint}")
+        # The resume_from_checkpoint could be None in some machine node.
+        # Here we reset None to temp directory.
+        if args.world_size > 1:
+            is_resume_from_checkpoint = paddle.to_tensor([resume_from_checkpoint is not None], dtype="int32")
+            paddle.distributed.all_reduce(is_resume_from_checkpoint)
+            is_resume_from_checkpoint = is_resume_from_checkpoint.item()
+            if is_resume_from_checkpoint > 0 and is_resume_from_checkpoint < paddle.distributed.get_world_size():
+                if resume_from_checkpoint is None:
+                    resume_from_checkpoint = os.path.join(self.args.output_dir, "local_tempdir")
+                    if os.path.exists(resume_from_checkpoint) and self.args.local_rank == 0:
+                        shutil.rmtree(resume_from_checkpoint)
+                    os.makedirs(resume_from_checkpoint, exist_ok=True)
+                    logger.info(f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}")
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+        if not self.args.should_load_sharding_stage1_model:
+            self._load_from_checkpoint(resume_from_checkpoint)
 
         logger.info(f"{self.runtime_timer.log()}")
-
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
         logger.info(f"  Num Epochs = {num_train_epochs}")

@@ -584,13 +584,9 @@ class AutoTrainer(Trainer):
         rng_states = {
             "python": random.getstate(),
             "numpy": np.random.get_state(),
-            "cuda": [k.current_seed() for k in paddle.get_rng_state()],
-            "cpu": paddle.framework.core.default_cpu_generator().get_state().current_seed(),
+            "cuda": paddle.get_rng_state(),
+            "cpu": paddle.framework.core.default_cpu_generator().get_state(),
         }
-        # if self.args.use_hybrid_parallel:
-        #     rng_states[
-        #         "hybrid_parallel_rng_state_tracker"
-        #     ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
 
         if self.args.world_size > 1:
             rng_states_list = []
