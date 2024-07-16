@@ -248,16 +248,19 @@ class BasePredictor:
     def _infer(self, inputs):
         raise NotImplementedError
 
-    def _postprocess(self, predictions):
+    def _postprocess(self, predictions, return_tokens=False):
         decoded_predictions = self.tokenizer.batch_decode(
             predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )
-        return decoded_predictions
+        if return_tokens:
+            return decoded_predictions, predictions
+        else:
+            return decoded_predictions
 
-    def predict(self, input_texts: str | list[str]):
+    def predict(self, input_texts: str | list[str], return_tokens=False):
         tokenized_source = self._preprocess(input_texts)
         predictions = self._infer(tokenized_source)
-        decoded_predictions = self._postprocess(predictions)
+        decoded_predictions = self._postprocess(predictions, return_tokens=return_tokens)
         return decoded_predictions
 
 
@@ -475,13 +478,16 @@ class InferencePredictorMixin:
             )
             self.generation_config = None
 
-    def _postprocess(self, predictions):
+    def _postprocess(self, predictions, return_tokens=False):
         if paddle.distributed.get_rank() == 0:
             tokens: np.ndarray = load_real_time_tokens()
             decoded_predictions = self.tokenizer.batch_decode(
                 tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
-            return decoded_predictions
+            if return_tokens:
+                return decoded_predictions, tokens.tolist()
+            else:
+                return decoded_predictions
         else:
             return None
 
@@ -1038,7 +1044,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor
         )
 
     @paddle.no_grad()
-    def predict(self, input_texts: str | list[str]):
+    def predict(self, input_texts: str | list[str], return_tokens=False):
         self._preprocess(input_texts)
 
         result_queue = mp.Queue()
@@ -1059,9 +1065,15 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor
             self.used_list[i] = []
 
         outputs = []
+        output_tokens = []
         while len(outputs) < self.batch_size:
-            outputs.append(result_queue.get(timeout=1)[-1])
-        return outputs
+            result = result_queue.get(timeout=1)
+            outputs.append(result[-1])
+            output_tokens.append(result[-2])
+        if return_tokens:
+            return outputs, output_tokens
+        else:
+            return outputs
 
 
 class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor):
@@ -1184,7 +1196,7 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
     def _infer(self):
         self.predictor.run()
 
-    def predict(self, input_texts: str | list[str]):
+    def predict(self, input_texts: str | list[str], return_tokens=False):
 
         s_time = time.time()
         self._preprocess(input_texts)
@@ -1217,9 +1229,15 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
             self.used_list[i] = []
 
         outputs = []
+        output_tokens = []
         while len(outputs) < self.batch_size:
-            outputs.append(result_queue.get(timeout=1)[-1])
-        return outputs
+            result = result_queue.get(timeout=1)
+            outputs.append(result[-1])
+            output_tokens.append(result[-2])
+        if return_tokens:
+            return outputs, output_tokens
+        else:
+            return outputs
 
     def _preprocess(self, source):
         BlockInferencePredictorMixin._preprocess(self, source)
@@ -1685,8 +1703,8 @@ def benchmark(predictor, predictor_args, model_args):
     output_tokens = 0
     for _ in range(test_time):
         for bs, batch_source_text in enumerate(batch_benchmark_texts):
-            outputs = predictor.predict(batch_source_text)
-            output_tokens += sum([len(output) for output in outputs])
+            outputs, batch_tokens = predictor.predict(batch_source_text, return_tokens=True)
+            output_tokens += sum([len(tokens) for tokens in batch_tokens])
     end = time.perf_counter()
     print("Avg Elapse time is: ", (end - start) / test_time)
     print("Output tokens is: ", output_tokens)
