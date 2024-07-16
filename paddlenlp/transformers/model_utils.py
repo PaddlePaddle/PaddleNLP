@@ -1365,8 +1365,17 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # update init_config
         self._update_init_config(self.init_config, "vocab_size", new_num_tokens)
 
-        # Tie the weights between the input embeddings and the output embeddings if needed.
-        self.tie_weights()
+        if self.get_output_embeddings() is not None:
+            if self.config.tie_word_embeddings:
+                # Tie the weights between the input embeddings and the output embeddings if needed.
+                self.tie_weights()
+            else:
+                old_lm_head = self.get_output_embeddings()
+                if isinstance(old_lm_head, nn.Embedding):
+                    new_lm_head = self._get_resized_embeddings(old_lm_head, new_num_tokens)
+                else:
+                    new_lm_head = self._get_resized_lm_head(old_lm_head, new_num_tokens)
+                self.set_output_embeddings(new_lm_head)
 
         return new_embeddings
 
@@ -1437,6 +1446,83 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             new_embeddings.weight[:n, :] = old_embeddings.weight[:n, :]
 
         return new_embeddings
+
+    def _get_resized_lm_head(
+        self, old_lm_head: nn.Layer, new_num_tokens: Optional[int] = None, transposed: Optional[bool] = False
+    ) -> nn.Linear:
+        """
+        Build a resized Linear Module from a provided old Linear Module. Increasing the size will add newly initialized
+        vectors at the end. Reducing the size will remove vectors from the end
+
+        Args:
+            old_lm_head (`nn.Linear`):
+                Old lm head liner layer to be resized.
+            new_num_tokens (`int`, *optional*):
+                New number of tokens in the linear matrix.
+
+                Increasing the size will add newly initialized vectors at the end. Reducing the size will remove
+                vectors from the end. If not provided or `None`, just returns a pointer to the input tokens
+                `nn.Linear` module of the model without doing anything. transposed (`bool`, *optional*, defaults
+                to `False`): Whether `old_lm_head` is transposed or not. If True `old_lm_head.size()` is `lm_head_dim,
+                vocab_size` else `vocab_size, lm_head_dim`.
+
+        Return:
+            `nn.Linear`: Pointer to the resized Linear Module or the old Linear Module if `new_num_tokens` is
+            `None`
+        """
+        if new_num_tokens is None:
+            return old_lm_head
+
+        if not transposed:
+            old_lm_head_dim, old_num_tokens = old_lm_head.weight.shape
+        else:
+            old_num_tokens, old_lm_head_dim = old_lm_head.weight.shape
+
+        if old_num_tokens == new_num_tokens:
+            return old_lm_head
+
+        # Build new lm head
+        new_lm_head_shape = (old_lm_head_dim, new_num_tokens) if not transposed else (new_num_tokens, old_lm_head_dim)
+        has_new_lm_head_bias = getattr(old_lm_head, "bias", None) is not None
+        old_dtype = old_lm_head.weight.dtype
+
+        new_lm_head = nn.Linear(
+            *new_lm_head_shape,
+            bias_attr=has_new_lm_head_bias,
+        )
+        # initialize new lm head (in particular added tokens)
+        self._init_weights(new_lm_head)
+
+        # make sure that new_embeddings's dtype is same as the old embeddings' dtype
+        if new_lm_head.weight.dtype != old_dtype:
+            new_lm_head.to(dtype=old_dtype)
+
+        num_tokens_to_copy = min(old_num_tokens, new_num_tokens)
+        self._copy_lm_head_original_to_resized(
+            new_lm_head, old_lm_head, num_tokens_to_copy, transposed, has_new_lm_head_bias
+        )
+
+        if isinstance(old_lm_head, nn.Linear):
+            return new_lm_head
+        else:
+            old_lm_head.weight = old_lm_head.weight
+            if has_new_lm_head_bias:
+                old_lm_head.bias = old_lm_head.bias
+            return old_lm_head
+
+    def _copy_lm_head_original_to_resized(
+        self, new_lm_head, old_lm_head, num_tokens_to_copy, transposed, has_new_lm_head_bias
+    ):
+        with paddle.no_grad():
+            # Copy old lm head weights to new lm head
+            if not transposed:
+                new_lm_head.weight[:, :num_tokens_to_copy] = old_lm_head.weight[:, :num_tokens_to_copy]
+            else:
+                new_lm_head.weight[:num_tokens_to_copy, :] = old_lm_head.weight[:num_tokens_to_copy, :]
+
+            # Copy bias weights to new lm head
+            if has_new_lm_head_bias:
+                new_lm_head.bias[:num_tokens_to_copy] = old_lm_head.bias[:num_tokens_to_copy]
 
     def __setattr__(self, name, value):
         value = adapt_stale_fwd_patch(self, name, value)
