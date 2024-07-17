@@ -37,8 +37,6 @@
 | FlagAlpha/Llama2-Chinese-7b-Chat     |
 | FlagAlpha/Llama2-Chinese-13b-Chat    |
 
-
-
 使用方法：
 
 ```python

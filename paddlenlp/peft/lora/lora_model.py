@@ -31,11 +31,8 @@ from paddle.distributed.fleet.meta_parallel import (
     PipelineLayer,
     RowParallelLinear,
 )
-from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    RowSequenceParallelLinear,
-)
 
+from ...transformers import linear_utils
 from ...transformers.conversion_utils import ConversionMixin
 from ...transformers.model_utils import (
     PretrainedModel,
@@ -100,7 +97,7 @@ LoRAConv2D = lora_layers["LoRAConv2D"]
 LoRALinear = lora_layers["LoRALinear"]
 RowParallelLoRALinear = lora_layers["RowParallelLoRALinear"]
 RowSequenceParallelLoRALinear = lora_layers["RowSequenceParallelLoRALinear"]
-AVALIABLE_LAYERS = [
+AVAILABLE_LAYERS = [
     ColumnParallelLoRALinear,
     ColumnSequenceParallelLoRALinear,
     LoRAConv2D,
@@ -120,7 +117,7 @@ try:
         RowParallelQuantizationLoRALinear,
     )
 
-    AVALIABLE_LAYERS += [
+    AVAILABLE_LAYERS += [
         ColumnParallelQuantizationLoRALinear,
         QuantizationLoRALinear,
         RowParallelQuantizationLoRALinear,
@@ -510,7 +507,7 @@ class LoRAModel(nn.Layer):
                 self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=False)
                 self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
                 self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
-        elif isinstance(module, ColumnSequenceParallelLinear):
+        elif isinstance(module, linear_utils.ColumnSequenceParallelLinear):
             # recover the original output_features
             output_features = module.weight.shape[1] * module.world_size
             lora_module = ColumnSequenceParallelLoRALinear(
@@ -536,7 +533,7 @@ class LoRAModel(nn.Layer):
                 self.add_lora_split_mapping(module_name + ".weight_quanter._scale", is_column=True)
                 self.add_lora_split_mapping(module_name + ".activation_quanter._scale", is_column=False)
                 self.add_lora_split_mapping(module_name + ".activation_quanter.quanter._scale", is_column=False)
-        elif isinstance(module, RowSequenceParallelLinear):
+        elif isinstance(module, linear_utils.RowSequenceParallelLinear):
             # recover the original output_features
             lora_module = RowSequenceParallelLoRALinear(
                 in_features=module.weight.shape[0] * module.world_size,
@@ -842,20 +839,20 @@ class LoRAModel(nn.Layer):
 
     def disable_lora(self):
         for _, layer in self.model.named_sublayers():
-            if any(isinstance(layer, lora_layer) for lora_layer in AVALIABLE_LAYERS):
+            if any(isinstance(layer, lora_layer) for lora_layer in AVAILABLE_LAYERS):
                 layer.disable_lora = True
 
     def enable_lora(self):
         for _, layer in self.model.named_sublayers():
-            if any(isinstance(layer, lora_layer) for lora_layer in AVALIABLE_LAYERS):
+            if any(isinstance(layer, lora_layer) for lora_layer in AVAILABLE_LAYERS):
                 layer.disable_lora = False
 
     def merge(self):
         for _, layer in self.model.named_sublayers():
-            if any(isinstance(layer, lora_layer) for lora_layer in AVALIABLE_LAYERS):
+            if any(isinstance(layer, lora_layer) for lora_layer in AVAILABLE_LAYERS):
                 layer.merge()
 
     def unmerge(self):
         for _, layer in self.model.named_sublayers():
-            if any(isinstance(layer, lora_layer) for lora_layer in AVALIABLE_LAYERS):
+            if any(isinstance(layer, lora_layer) for lora_layer in AVAILABLE_LAYERS):
                 layer.unmerge()

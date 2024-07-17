@@ -44,3 +44,16 @@ repos:
         entry: python .copyright.hook
         language: system
         files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto|xpu|kps|py|sh)$
+# For Markdown files
+-   repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.41.0
+    hooks:
+    -   id: markdownlint
+-   repo: local
+    hooks:
+    -   id: add-spaces-between-chinese-and-english
+        name: Add spaces between Chinese and English characters
+        entry: python scripts/codestyle/check_spaces.py
+        language: python
+        files: \.(md|markdown)$
+        pass_filenames: true
