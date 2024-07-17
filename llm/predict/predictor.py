@@ -969,6 +969,7 @@ class BlockInferencePredictorMixin:
                 text,
                 return_tensors="np",
                 padding=True,
+                truncation=True,
                 max_length=self.config.src_length,
                 # if use chat_template, it will not add special_tokens
                 add_special_tokens=self.tokenizer.chat_template is None
@@ -1219,7 +1220,7 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
     def _preprocess(self, source):
         BlockInferencePredictorMixin._preprocess(self, source)
         for i, text in enumerate(source):
-            tokens = self.tokenizer(text, return_tensors="np", padding=False, max_length=(self.config.src_length))
+            tokens = self.tokenizer(text, return_tensors="np", padding=False, truncation=True, max_length=(self.config.src_length))
             input_ids = tokens["input_ids"][0]
             length = len(input_ids)
             need_block_nums = (
