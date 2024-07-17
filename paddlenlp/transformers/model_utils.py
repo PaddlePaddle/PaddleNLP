@@ -42,6 +42,7 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
+from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel.parallel_layers import (
     PipelineLayer,
     SharedLayerDesc,
@@ -1351,12 +1352,30 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         Returns:
             paddle.nn.Embedding: The input tokens Embeddings Module of the model.
         """
-        old_embeddings: nn.Embedding = self.get_input_embeddings()
-        if not new_num_tokens or new_num_tokens == old_embeddings.weight.shape[0]:
-            return old_embeddings
+        tp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
+        tp_size = tp_group.nranks
+        tp_rank = tp_group.rank
 
-        new_embeddings = self._get_resized_embeddings(old_embeddings, new_num_tokens)
-        self.set_input_embeddings(new_embeddings)
+        if tp_rank == tp_size - 1:
+            # Only the last rank will resize the token embeddings matrix
+            old_embeddings: nn.Embedding = self.get_input_embeddings()
+            if not new_num_tokens or new_num_tokens == old_embeddings.weight.shape[0]:
+                return old_embeddings
+
+            new_embeddings = self._get_resized_embeddings(old_embeddings, new_num_tokens)
+            self.set_input_embeddings(new_embeddings)
+
+            if self.get_output_embeddings() is not None:
+                if self.config.tie_word_embeddings:
+                    # Tie the weights between the input embeddings and the output embeddings if needed.
+                    self.tie_weights()
+                else:
+                    old_lm_head = self.get_output_embeddings()
+                    if isinstance(old_lm_head, nn.Embedding):
+                        new_lm_head = self._get_resized_embeddings(old_lm_head, new_num_tokens)
+                    else:
+                        new_lm_head = self._get_resized_lm_head(old_lm_head, new_num_tokens)
+                    self.set_output_embeddings(new_lm_head)
 
         # 2. Update vocab_size
         self.base_model.config["vocab_size"] = new_num_tokens
@@ -1364,19 +1383,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # update init_config
         self._update_init_config(self.init_config, "vocab_size", new_num_tokens)
-
-        if self.get_output_embeddings() is not None:
-            if self.config.tie_word_embeddings:
-                # Tie the weights between the input embeddings and the output embeddings if needed.
-                self.tie_weights()
-            else:
-                old_lm_head = self.get_output_embeddings()
-                if isinstance(old_lm_head, nn.Embedding):
-                    new_lm_head = self._get_resized_embeddings(old_lm_head, new_num_tokens)
-                else:
-                    new_lm_head = self._get_resized_lm_head(old_lm_head, new_num_tokens)
-                self.set_output_embeddings(new_lm_head)
-
         return new_embeddings
 
     def _update_init_config(self, init_config: dict, key: str, value: Any):
