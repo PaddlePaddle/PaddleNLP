@@ -1,9 +1,9 @@
 {
     "act_scale":{
         "qkv_in_scale": "llama.layers.#.self_attn.q_proj.activation_quanter", 
-        "out_linear_in_scale": "llama.layers.#.self_attn.o_proj.layer.activation_quanter", 
+        "out_linear_in_scale": "llama.layers.#.self_attn.o_proj.activation_quanter", 
         "ffn1_in_scale": "llama.layers.#.mlp.gate_proj.activation_quanter", 
-        "ffn2_in_scale": "llama.layers.#.mlp.down_proj.layer.activation_quanter"
+        "ffn2_in_scale": "llama.layers.#.mlp.down_proj.activation_quanter"
     },
     "weight_scale":{
         "qkv_weight_scale":"llama.layers.#.self_attn.qkv_proj.weight_quanter",

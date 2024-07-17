@@ -719,6 +719,7 @@ class FusedMultiTransformerBase(Layer):
         return fused_act_bias_wrapper(ffn1_out, self.ffn1_biases[i], act_method=self.activation)
 
     def compute_ffn1(self, tmp_out, i):
+        # print('ffn1_weights', self.ffn1_weights[i])
         return paddle.matmul(tmp_out, self.ffn1_weights[i])
 
     def compute_ffn2(self, ffn1_out, i):
@@ -834,6 +835,9 @@ class FusedMultiTransformerBase(Layer):
         residual_input = src
         for i in range(self.num_layers):
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
+            # print('qkv_out', qkv_out)
+            # print("rotary_embs", rotary_embs)
+
             out_linear_out = self.compute_attn(
                 time_step,
                 qkv_out,
@@ -853,15 +857,21 @@ class FusedMultiTransformerBase(Layer):
             if self.nranks > 1:
                 dist.all_reduce(out_linear_out)
 
+            # print("origin out_linear_out:", out_linear_out)
+
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
+            # print("origin compute_ffn_layernorm:", tmp_out, residual_input)
 
             # ffn1 matmul
             ffn1_out = self.compute_ffn1(tmp_out, i)
+            # print("origin ffn1_out:", ffn1_out)
             ffn1_out = self.compute_activation(ffn1_out, i)
+            # print("origin ffn1_out_silu:", ffn1_out)
 
             # ffn2 matmul
             ffn2_out = self.compute_ffn2(ffn1_out, i)
+            # print("origin ffn2_out:", ffn2_out)
 
             # all_reduce
             if self.nranks > 1:
@@ -872,6 +882,8 @@ class FusedMultiTransformerBase(Layer):
                 ffn2_out, residual_input, i, self.num_layers
             )
             src = tmp_out
+            # print("origin compute_bias_residual_layernorm:", src)
+            # import sys;sys.exit()
 
         kwargs["time_step"] = time_step
         kwargs["multi_block_output"] = tmp_out
@@ -1692,6 +1704,9 @@ class FusedMultiTransformerFP8Config:
         ffn1_1_weight_scale_attrs=None,
         ffn1_0_bias_attrs=None,
         ffn1_1_bias_attrs=None,
+        ffn1_weight_attrs=None,
+        ffn1_weight_scale_attrs=None,
+        ffn1_bias_attrs=None,
         ffn2_weight_attrs=None,
         ffn2_weight_scale_attrs=None,
         ffn2_bias_attrs=None,
@@ -1713,7 +1728,7 @@ class FusedMultiTransformerFP8Config:
         quant_round_type=0,
         quant_max_bound=448.0,
         quant_min_bound=-448.0,
-        epsilon=1e-5,
+        epsilon=1e-6,
         residual_alpha=1.0,
         num_layers=-1,
         nranks=1,
@@ -1754,6 +1769,9 @@ class FusedMultiTransformerFP8Config:
         self.ffn1_1_weight_scale_attrs = ffn1_1_weight_scale_attrs
         self.ffn1_0_bias_attrs = ffn1_0_bias_attrs
         self.ffn1_1_bias_attrs = ffn1_1_bias_attrs
+        self.ffn1_weight_attrs = ffn1_weight_attrs
+        self.ffn1_weight_scale_attrs = ffn1_weight_scale_attrs
+        self.ffn1_bias_attrs = ffn1_bias_attrs
         self.ffn2_weight_attrs = ffn2_weight_attrs
         self.ffn2_weight_scale_attrs = ffn2_weight_scale_attrs
         self.ffn2_bias_attrs = ffn2_bias_attrs
@@ -1851,6 +1869,7 @@ class FusedMultiTransformerFP8(Layer):
         self.ffn_ln_scales, self.ffn_ln_biases = [], []
         self.ffn1_0_weights, self.ffn1_0_biases = [], []
         self.ffn1_1_weights, self.ffn1_1_biases = [], []
+        self.ffn1_weights, self.ffn1_biases = [], []
         self.ffn2_weights, self.ffn2_biases = [], []
         self.cache_k_scales, self.cache_v_scales = [], []
         self.cache_k_out_scales, self.cache_v_out_scales = [], []
@@ -1872,6 +1891,8 @@ class FusedMultiTransformerFP8(Layer):
             ffn1_1_bias_attr = self.get_attr(config.ffn1_1_bias_attrs, i)
             ffn2_weight_attr = self.get_attr(config.ffn2_weight_attrs, i)
             ffn2_bias_attr = self.get_attr(config.ffn2_bias_attrs, i)
+            ffn1_weight_attr = self.get_attr(config.ffn1_weight_attrs, i)
+            ffn1_bias_attr = self.get_attr(config.ffn1_bias_attrs, i)
 
             cache_k_scale_attr = self.get_attr(config.cache_k_scale_attrs, i)
             cache_v_scale_attr = self.get_attr(config.cache_v_scale_attrs, i)
@@ -1957,6 +1978,20 @@ class FusedMultiTransformerFP8(Layer):
                 is_bias=False,
             )
 
+            ffn1_weight = self.create_parameter(
+                shape=self.ffn1_weight_shape,
+                attr=ffn1_weight_attr,
+                dtype=self.create_params_type,
+                is_bias=False,
+            )
+
+            ffn1_bias = self.create_parameter(
+                shape=[self.dim_feedforward * 2] if config.activation.endswith("glu") else [self.dim_feedforward],
+                attr=ffn1_bias_attr,
+                dtype=self._dtype,
+                is_bias=True,
+            )
+
             ffn1_0_bias = None
             if ffn1_0_bias_attr:
                 ffn1_0_bias = self.create_parameter(
@@ -2034,6 +2069,8 @@ class FusedMultiTransformerFP8(Layer):
                 _set_var_distributed(qkv_bias)
                 _set_var_distributed(ffn1_0_weight)
                 _set_var_distributed(ffn1_1_weight)
+                _set_var_distributed(ffn1_weight)
+                _set_var_distributed(ffn1_bias)
                 _set_var_distributed(ffn1_0_bias)
                 _set_var_distributed(ffn1_1_bias)
                 # row parallel
@@ -2051,6 +2088,8 @@ class FusedMultiTransformerFP8(Layer):
             self.ffn_ln_biases.append(ffn_ln_bias)
             self.ffn1_0_weights.append(ffn1_0_weight)
             self.ffn1_1_weights.append(ffn1_1_weight)
+            self.ffn1_weights.append(ffn1_weight)
+            self.ffn1_biases.append(ffn1_bias)
             self.ffn1_0_biases.append(ffn1_0_bias)
             self.ffn1_1_biases.append(ffn1_1_bias)
             self.ffn2_weights.append(ffn2_weight)
@@ -2072,6 +2111,8 @@ class FusedMultiTransformerFP8(Layer):
             self._add_parameter(ffn_ln_bias)
             self._add_parameter(ffn1_0_weight)
             self._add_parameter(ffn1_1_weight)
+            self._add_parameter(ffn1_weight)
+            self._add_parameter(ffn1_bias)
             self._add_parameter(ffn1_0_bias)
             self._add_parameter(ffn1_1_bias)
             self._add_parameter(ffn2_weight)
@@ -2115,11 +2156,16 @@ class FusedMultiTransformerFP8(Layer):
         self.qkv_weight_shape = (
             [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim, self.embed_dim]
             if config.trans_qkvw
-            else [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim, self.embed_dim]
+            else [self.embed_dim, (self.num_heads + 2 * self.kv_num_heads) * self.head_dim]
         )
         self.linear_weight_shape = [self.num_heads * self.head_dim, self.embed_dim]
         self.ffn1_0_weight_shape = [self.embed_dim, self.dim_feedforward]
         self.ffn1_1_weight_shape = [self.embed_dim, self.dim_feedforward]
+        self.ffn1_weight_shape = (
+            [self.embed_dim, 2 * self.dim_feedforward]
+            if self.activation.endswith("glu")
+            else [self.embed_dim, self.dim_feedforward]
+        )
         self.ffn2_weight_shape = [self.dim_feedforward, self.embed_dim]
 
     def get_weight_create_dype(self):
@@ -2255,6 +2301,10 @@ class FusedMultiTransformerFP8(Layer):
             k_dequant_scales = self.cache_k_out_scales
             v_dequant_scales = self.cache_v_out_scales
 
+        # print('qkv_out', qkv_out)
+        # print('caches[2 * i]', caches[2 * i])
+        # print('caches[2 * i + 1]', caches[2 * i + 1])
+
         fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
             qkv_out,
             caches[2 * i],
@@ -2281,7 +2331,7 @@ class FusedMultiTransformerFP8(Layer):
             kwargs.get("max_dec_len_this_time", None),
             rotary_embs,
             attn_mask,
-            None,  # tgt_mask
+            kwargs.get("tgt_mask", None),  # tgt_mask
             kwargs.get("max_input_length", -1),
             kwargs.get("block_size", 64),
             self.use_neox_rotary_style,
@@ -2316,14 +2366,40 @@ class FusedMultiTransformerFP8(Layer):
 
         return tmp_out, residual_input
 
+    def compute_activation(self, ffn1_out, i):
+        return paddle.cast(
+            fused_act_bias_wrapper(ffn1_out, self.ffn1_biases[i], act_method=self.activation), "float8_e4m3fn"
+        )
+
     def compute_ffn1(self, tmp_out, i):
         """
         For fake parameter
 
         Fuse case:
         """
+
+        # ff1_weight = paddle.view(self.ffn1_weights[i], "float8_e4m3fn")
+        # weight_scale = max(self.weight_scales.scale["ffn1_0_weight_scale"][i], self.weight_scales.scale["ffn1_1_weight_scale"][i])
+
+        # ffn1 = paddle.linalg.fp8_fp8_half_gemm_fused(
+        #     tmp_out,
+        #     ff1_weight,
+        #     False,
+        #     False,
+        #     scale=weight_scale / (self.act_scales.scale["ffn1_in_scale"][i] * 448 * 448),
+        #     # bias=self.ffn1_0_biases[i],
+        #     output_dtype="float16",
+        # )
+        # return ffn1
+        # return paddle.matmul(tmp_out, ff1_weight, False, True)
+
         ffn1_0_weight = paddle.view(self.ffn1_0_weights[i], "float8_e4m3fn")
         ffn1_1_weight = paddle.view(self.ffn1_1_weights[i], "float8_e4m3fn")
+
+        # print('ffn1_0_weight', ffn1_0_weight)
+        # print('ffn1_1_weight', ffn1_1_weight)
+        # print('tmp_out', tmp_out.max())
+
         tem_0 = paddle.linalg.fp8_fp8_half_gemm_fused(
             tmp_out,
             ffn1_0_weight,
@@ -2346,11 +2422,16 @@ class FusedMultiTransformerFP8(Layer):
             output_dtype="float16",
         )
 
-        from paddle.incubate.nn.functional import swiglu
+        # print('tem_0', tem_0)
+        # print('tem_1', tem_1)
 
-        tem = swiglu(paddle.cast(tem_0, "float32"), paddle.cast(tem_1, "float32"))
+        return paddle.concat([tem_0, tem_1], axis=-1)
 
-        return paddle.cast(tem * self.act_scales.scale["ffn2_in_scale"][i] * 448, "float8_e4m3fn")
+        # from paddle.incubate.nn.functional import swiglu
+
+        # tem = swiglu(paddle.cast(tem_0, "float32"), paddle.cast(tem_1, "float32"))
+
+        # return paddle.cast(tem * self.act_scales.scale["ffn2_in_scale"][i] * 448, "float8_e4m3fn")
 
         """
         res = paddle.linalg.fp8_fp8_half_gemm_fused(
@@ -2510,6 +2591,9 @@ class FusedMultiTransformerFP8(Layer):
         residual_input = src
         for i in range(self.num_layers):
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
+            # print('qkv_out', qkv_out)
+            # print("rotary_embs", rotary_embs)
+
             out_linear_out = self.compute_attn(
                 time_step,
                 qkv_out,
@@ -2525,18 +2609,25 @@ class FusedMultiTransformerFP8(Layer):
                 i,
                 **kwargs,
             )
+            # print('out_linear_out', out_linear_out)
+            # import sys;sys.exit()
             # all_reduce
             if self.nranks > 1:
                 dist.all_reduce(out_linear_out)
 
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
+            # print("origin compute_ffn_layernorm:", tmp_out)
 
             # ffn1 matmul
             ffn1_out = self.compute_ffn1(tmp_out, i)
+            # print("origin ffn1_out:", ffn1_out)
+            ffn1_out = self.compute_activation(ffn1_out, i)
+            # print("origin ffn1_out_silu:", ffn1_out)
 
             # ffn2 matmul
             ffn2_out = self.compute_ffn2(ffn1_out, i)
+            # print("origin ffn2_out:", ffn2_out)
 
             # all_reduce
             if self.nranks > 1:
@@ -2547,6 +2638,8 @@ class FusedMultiTransformerFP8(Layer):
                 ffn2_out, residual_input, i, self.num_layers
             )
             src = tmp_out
+            # print("origin compute_bias_residual_layernorm:", src)
+            # import sys;sys.exit()
 
         kwargs["time_step"] = time_step
         kwargs["multi_block_output"] = tmp_out

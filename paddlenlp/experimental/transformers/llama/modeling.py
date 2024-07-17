@@ -425,6 +425,12 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             ]
             ffn1_0_bias_attrs = None
             ffn1_1_bias_attrs = None
+            ffn1_weight_attrs = [
+                paddle.ParamAttr(
+                    name="fusellama.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                )
+                for i in range(self.num_layers)
+            ]
         else:
             ffn1_weight_attrs = [
                 paddle.ParamAttr(
@@ -571,8 +577,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
                 for weight_name in weight_scales.scale:
                     weight_scales.scale[weight_name] = weight_scales.scale[weight_name].astype(np.float32)
+                    # print(weight_name, weight_scales.scale[weight_name])
                 for act_name in act_scales.scale:
                     act_scales.scale[act_name] = act_scales.scale[act_name].astype(np.float32)
+                    # print(act_name, act_scales.scale[act_name])
 
             transformer_config = FusedMultiTransformerFP8Config(
                 embed_dim=self.hidden_size,
@@ -598,12 +606,17 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 ffn1_1_weight_attrs=ffn1_1_weight_attrs,
                 ffn1_0_bias_attrs=ffn1_0_bias_attrs,
                 ffn1_1_bias_attrs=ffn1_1_bias_attrs,
+                ffn1_weight_attrs=ffn1_weight_attrs,
+                ffn1_bias_attrs=ffn1_bias_attrs,
                 ffn2_weight_attrs=ffn2_weight_attrs,
                 ffn2_bias_attrs=ffn2_bias_attrs,
                 act_scales=act_scales,
                 weight_scales=weight_scales,
                 epsilon=self.epsilon,
                 norm_type="rmsnorm",
+                use_neox_rotary_style=True,
+                use_dynamic_cachekv_quant=config.use_cachekv_int8 == "dynamic",
+                rank_id=config.tensor_parallel_rank,
             )
 
         else:
@@ -957,6 +970,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 )
                 self.transformer_block.ffn1_1_weights[idx].set_value(
                     paddle.view(paddle.to_tensor(ffn1_1_weight), "float8_e4m3fn")
+                )
+                self.transformer_block.ffn1_weights[idx].set_value(
+                    paddle.view(paddle.to_tensor(ffn1_weight_tensor), "float8_e4m3fn")
                 )
             else:
                 self.transformer_block.ffn1_weights[idx].set_value(
