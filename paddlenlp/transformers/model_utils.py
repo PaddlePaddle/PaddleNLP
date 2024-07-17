@@ -31,7 +31,6 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union
 import aistudio_sdk
 import numpy as np
 import paddle
-import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn as nn
 import six
 from huggingface_hub import (
@@ -1353,6 +1352,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             paddle.nn.Embedding: The input tokens Embeddings Module of the model.
         """
 
+        if self.config.tensor_parallel_degree > 1:
+            raise ValueError("Resizing token embeddings is currently only supported for single GPU training.")
+
         old_embeddings: nn.Embedding = self.get_input_embeddings()
         if not new_num_tokens or new_num_tokens == old_embeddings.weight.shape[0]:
             return old_embeddings
@@ -1366,11 +1368,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if isinstance(old_lm_head, nn.Embedding):
                 new_lm_head = self._get_resized_embeddings(old_lm_head, new_num_tokens)
             else:
-                if self.config.tensor_parallel_degree > 1:
-                    assert (
-                        new_num_tokens % self.config.tensor_parallel_degree == 0
-                    ), "new tokens must be divisible by tensor_parallel_degree"
-                    new_num_tokens = new_num_tokens // self.config.tensor_parallel_degree
                 new_lm_head = self._get_resized_lm_head(old_lm_head, new_num_tokens, transpose_y)
             self.set_output_embeddings(new_lm_head)
 
@@ -1428,6 +1425,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if old_num_tokens == new_num_tokens:
             return old_embeddings
 
+        if not isinstance(old_embeddings, nn.Embedding):
+            raise TypeError(
+                f"Old embeddings are of type {type(old_embeddings)}, which is not an instance of {nn.Embedding}. You"
+                " should either use a different resize function or make sure that old_embeddings are an instance of"
+                f" {nn.Embedding}."
+            )
+
         if isinstance(old_embeddings, nn.Embedding):
             # Build new embeddings
             new_embeddings = nn.Embedding(
@@ -1435,17 +1439,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 old_embedding_dim,
                 padding_idx=old_embeddings._padding_idx,
                 sparse=old_embeddings._sparse,
-            )
-        elif isinstance(old_embeddings, mpu.VocabParallelEmbedding):
-            new_embeddings = mpu.VocabParallelEmbedding(
-                new_num_tokens,
-                old_embedding_dim,
-            )
-        else:
-            raise TypeError(
-                f"Old embeddings are of type {type(old_embeddings)}, which is not an instance of {nn.Embedding} or {mpu.VocabParallelEmbedding}. You"
-                " should either use a different resize function or make sure that old_embeddings are an instance of"
-                f" {nn.Embedding} or {mpu.VocabParallelEmbedding}."
             )
 
         # make sure that new_embeddings's dtype is same as the old embeddings' dtype
