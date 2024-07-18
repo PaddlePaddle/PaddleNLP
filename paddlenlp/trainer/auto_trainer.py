@@ -101,11 +101,12 @@ class AutoTrainer(Trainer):
             meshes.append(_get_mesh(self.args.pipeline_parallel_degree - 1))
         return meshes
 
-    def _wrap_for_dist_loader(self, train_dataloader):
+    def _wrap_for_dist_loader(self, train_dataloader, is_dataset_splitted=False):
         dist_loader = dist.shard_dataloader(
             dataloader=train_dataloader,
             meshes=self._get_meshes_for_loader(),
             shard_dims="dp",
+            is_dataset_splitted=is_dataset_splitted,
         )
         return dist_loader
 
