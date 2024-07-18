@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Yuan model tools"""
+""" Yuan2.0 model tools"""
 
-import paddle
-
+import torch
 
 def rearrange_model_weights(model_path, save_path, tp_degree, hidden_layers):
 
     print("load yuan weights ......")
-    model = paddle.load(model_path)
+    model = torch.load(model_path)
     print("load yuan weights finish ......")
 
     size = model["model.layers.0.self_attn.q_proj.weight"].shape[0]
@@ -29,25 +28,25 @@ def rearrange_model_weights(model_path, save_path, tp_degree, hidden_layers):
 
         q = model[f"model.layers.{i}.self_attn.q_proj.weight"]
         k = model[f"model.layers.{i}.self_attn.k_proj.weight"]
-        q_slices = [q[:, i : i + step] for i in range(0, size, step)]
-        k_slices = [k[:, i : i + step] for i in range(0, size, step)]
-        q1 = paddle.concat(q_slices[0::2], 1)
-        q2 = paddle.concat(k_slices[0::2], 1)
-        k1 = paddle.concat(q_slices[1::2], 1)
-        k2 = paddle.concat(k_slices[1::2], 1)
+        q_slices = [q[i:i+step,:] for i in range(0, size, step)]
+        k_slices = [k[i:i+step,:] for i in range(0, size, step)]
+        q1=torch.cat(q_slices[0::2],0)
+        q2=torch.cat(k_slices[0::2],0)
+        k1=torch.cat(q_slices[1::2],0)
+        k2=torch.cat(k_slices[1::2],0)
 
-        model[f"model.layers.{i}.self_attn.q_proj.weight"] = paddle.concat([q1, q2], 1)
-        model[f"model.layers.{i}.self_attn.k_proj.weight"] = paddle.concat([k1, k2], 1)
+        model[f"model.layers.{i}.self_attn.q_proj.weight"]=torch.cat([q1,q2],0)
+        model[f"model.layers.{i}.self_attn.k_proj.weight"]=torch.cat([k1,k2],0)
         print(i, " layer is finished ......")
 
-    paddle.save(model, save_path)
+    torch.save(model, save_path)
     print("Model weights saved.")
 
 
 # Example usage:
 rearrange_model_weights(
-    model_path="/workspace/model_state.pdparams",
-    save_path="/workspace/yuan_paddle/model_state.pdparams",
+    model_path="/workspace/pytorch_model.bin",
+    save_path="/workspace/yuan_paddle_tp2/pytorch_model.bin",
     tp_degree=2,  # set tensor parallel degree
     hidden_layers=24,  # set the number of hidden_layers, from config.json
 )
