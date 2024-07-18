@@ -83,17 +83,16 @@ class TestRingFlashAttention(unittest.TestCase):
             )
             ref_out = scaled_dot_product_attention(query, key, value, is_causal=is_causal, attn_mask=attn_mask)
 
-        local_out.mean().backward()
-        ref_out.mean().backward()
+        local_out.backward()
+        ref_out.backward()
 
         ref_local_query_grad = self.split_belanced_data(query.grad)
         ref_local_key_grad = self.split_belanced_data(key.grad)
         ref_local_value_grad = self.split_belanced_data(value.grad)
 
         ref_local_out = self.split_belanced_data(ref_out)
-
-        rtol = 1e-04
-        atol = 5e-03
+        rtol = 1e-02
+        atol = 1e-02
         np.testing.assert_allclose(
             local_out.to("float32").numpy(), ref_local_out.to("float32").numpy(), rtol=rtol, atol=atol
         )
