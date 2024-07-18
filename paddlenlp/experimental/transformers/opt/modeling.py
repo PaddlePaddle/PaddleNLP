@@ -15,6 +15,8 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import paddle
 import paddle.nn as nn
@@ -26,13 +28,21 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
+from paddlenlp.experimental.transformers.utils import load_tp_checkpoint
 from paddlenlp.transformers import OPTPretrainedModel
 from paddlenlp.transformers.model_utils import (
+    dtype_guard,
     dy2st_nocheck_guard_context,
+    no_init_weights,
     register_base_model,
 )
 from paddlenlp.transformers.opt.configuration import OPTConfig
 from paddlenlp.transformers.opt.modeling import OPTEmbeddings, OPTLMHead
+from paddlenlp.transformers.utils import (
+    ContextManagers,
+    is_paddle_support_lazy_init,
+    is_safetensors_available,
+)
 
 __all__ = ["OPTForCausalLMInferenceModel", "OPTForBlip2InferenceModel"]
 
@@ -329,9 +339,47 @@ class OPTForCausalLMInferenceModel(GenerationInferenceModel, OPTPretrainedModel)
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        # TODO: Support safetensors loading.
-        kwargs["use_safetensors"] = kwargs.get("use_safetensors", False)
-        return super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+        config = kwargs.pop("config", None)
+        cache_dir = kwargs.pop("cache_dir", None)
+        dtype = kwargs.pop("dtype", None)
+        if dtype is None:
+            dtype = config.dtype
+        subfolder = kwargs.pop("subfolder", None)
+        if subfolder is None:
+            subfolder = ""
+        variant = kwargs.pop("variant", None)
+        use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
+        low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+
+        init_contexts = []
+        if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
+            # Instantiate model.
+            init_contexts.append(no_init_weights(_enable=True))
+            if is_paddle_support_lazy_init():
+                init_contexts.append(paddle.LazyGuard())
+        if dtype:
+            init_contexts.append(dtype_guard(dtype))
+
+        # init the model
+        with ContextManagers(init_contexts):
+            model = cls(config)
+
+        resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded = cls._resolve_model_file_path(
+            pretrained_model_name_or_path,
+            cache_dir=cache_dir,
+            subfolder=subfolder,
+            from_hf_hub=False,
+            from_aistudio=False,
+            config=config,
+            convert_from_torch=False,
+            use_safetensors=use_safetensors,
+            variant=variant,
+        )
+
+        model_path = os.path.dirname(resolved_archive_file)
+        state_dict = load_tp_checkpoint(model_path, cls, config)
+        model.set_state_dict(state_dict)
+        return model
 
     @classmethod
     def get_cache_kvs_shape(
