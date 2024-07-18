@@ -58,7 +58,7 @@ __all__ = [
     "FusedBlockMultiTransformer",
     "FusedBlockMultiTransformerWeightOnly",
     "FusedBlockMultiTransformerA8W8",
-    "FusedMultiTransformerFP8",
+    "FusedBlockMultiTransformerFP8",
 ]
 
 
@@ -1790,7 +1790,7 @@ class FusedMultiTransformerFP8Config:
         self.ring_id = ring_id
 
 
-class FusedMultiTransformerFP8(Layer):
+class FusedBlockMultiTransformerFP8(Layer):
     def __init__(self, config: FusedMultiTransformerFP8Config):
         """"""
         super().__init__()
@@ -2154,16 +2154,15 @@ class FusedMultiTransformerFP8(Layer):
         """
         For fake parameter
         """
-        qkv_weight = paddle.view(self.qkv_weights[i], "float8_e4m3fn")
         if paddle.is_compiled_with_rocm() or float(paddle.version.cuda()) < 11.6:
-            qkv_out = paddle.matmul(ln_out, qkv_weight, False, True)
+            qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
             if self.qkv_biases[i] is not None:
                 qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
             return qkv_out
         else:
             qkv_out = paddle.linalg.fp8_fp8_half_gemm_fused(
                 ln_out,
-                qkv_weight,
+                self.qkv_weights[i],
                 transpose_x=False,
                 transpose_y=True,
                 bias=self.qkv_biases[i],
@@ -2186,10 +2185,9 @@ class FusedMultiTransformerFP8(Layer):
         """
         For fake parameter
         """
-        linear_weight = paddle.view(self.linear_weights[i], "float8_e4m3fn")
         return paddle.linalg.fp8_fp8_half_gemm_fused(
             fmha_out,
-            linear_weight,
+            self.linear_weights[i],
             bias=None,
             transpose_x=False,
             transpose_y=True,
@@ -2321,13 +2319,9 @@ class FusedMultiTransformerFP8(Layer):
         """
         For fake parameter
         """
-
-        ffn1_0_weight = paddle.view(self.ffn1_0_weights[i], "float8_e4m3fn")
-        ffn1_1_weight = paddle.view(self.ffn1_1_weights[i], "float8_e4m3fn")
-
         tem_0 = paddle.linalg.fp8_fp8_half_gemm_fused(
             tmp_out,
-            ffn1_0_weight,
+            self.ffn1_0_weights[i],
             False,
             True,
             scale=self.weight_scales.scale["ffn1_0_weight_scale"][i]
@@ -2338,7 +2332,7 @@ class FusedMultiTransformerFP8(Layer):
 
         tem_1 = paddle.linalg.fp8_fp8_half_gemm_fused(
             tmp_out,
-            ffn1_1_weight,
+            self.ffn1_1_weights[i],
             False,
             True,
             scale=self.weight_scales.scale["ffn1_1_weight_scale"][i]
@@ -2356,10 +2350,9 @@ class FusedMultiTransformerFP8(Layer):
         """
         For fake parameter
         """
-        ffn2_weight = paddle.view(self.ffn2_weights[i], "float8_e4m3fn")
         return paddle.linalg.fp8_fp8_half_gemm_fused(
             ffn1_out,
-            ffn2_weight,
+            self.ffn2_weights[i],
             bias=None,
             transpose_x=False,
             transpose_y=True,
@@ -2372,7 +2365,6 @@ class FusedMultiTransformerFP8(Layer):
         """
         For fake parameter
         """
-
         if i != num_layers - 1:
             norm_out = self.norm_func(
                 ffn2_out,

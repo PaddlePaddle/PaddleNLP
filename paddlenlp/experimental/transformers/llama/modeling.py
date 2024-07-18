@@ -13,13 +13,19 @@
 # limitations under the License.
 from __future__ import annotations
 
+import inspect
 import json
+import logging
 import os
 from functools import partial
 
 import numpy as np
 import paddle
 from paddle import nn
+from paddle.base import core
+from paddle.base.executor import Executor, global_scope
+from paddle.base.framework import _current_expected_place as _get_device
+from paddle.base.framework import in_dygraph_mode
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
 
@@ -32,12 +38,12 @@ from paddlenlp.experimental.model_utils import (
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerA8W8,
+    FusedBlockMultiTransformerFP8,
     FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerA8W8,
     FusedMultiTransformerAvx,
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
-    FusedMultiTransformerFP8,
     FusedMultiTransformerFP8Config,
     FusedMultiTransformerWeightOnly,
 )
@@ -668,8 +674,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
         elif self.quant_type == "a8w8":
             self.transformer_block = FusedMultiTransformerA8W8(transformer_config)
-        elif self.quant_type == "a8w8_fp8":
-            self.transformer_block = FusedMultiTransformerFP8(transformer_config)
         else:
             self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
@@ -873,9 +877,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 concated_ffn1_weight = np.concatenate(
                     [unfused_state_dict["mlp.gate_proj.weight"], unfused_state_dict["mlp.up_proj.weight"]], axis=-1
                 )
-                if self.quant_type == "a8w8_fp8":
-                    ffn1_0_weight = unfused_state_dict["mlp.gate_proj.weight"]
-                    ffn1_1_weight = unfused_state_dict["mlp.up_proj.weight"]
 
             ffn1_weight_tensor = paddle.to_tensor(concated_ffn1_weight)
 
@@ -895,10 +896,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.transformer_block.qkv_weights[idx].set_value(
                     paddle.cast(paddle.to_tensor(concated_qkv_weight), "int8")
                 )
-            elif self.quant_type == "a8w8_fp8":
-                weight = paddle.to_tensor(concated_qkv_weight)
-                weight = weight.view("float8_e4m3fn")
-                self.transformer_block.qkv_weights[idx].set_value(weight)
             else:
                 self.transformer_block.qkv_weights[idx].set_value(
                     qkv_weight_tensor.cast(self.transformer_block.qkv_weights[idx].dtype)
@@ -923,15 +920,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         "int8",
                     )
                 )
-            elif self.quant_type == "a8w8_fp8":
-                self.transformer_block.linear_weights[idx].set_value(
-                    paddle.view(
-                        paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)]).transpose(
-                            (1, 0)
-                        ),
-                        "float8_e4m3fn",
-                    )
-                )
             else:
                 self.transformer_block.linear_weights[idx].set_value(
                     linear_weight_tensor.cast(self.transformer_block.linear_weights[idx].dtype)
@@ -949,13 +937,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             elif self.quant_type == "a8w8":
                 self.transformer_block.ffn1_weights[idx].set_value(
                     paddle.cast(paddle.to_tensor(concated_ffn1_weight).transpose((1, 0)), "int8")
-                )
-            elif self.quant_type == "a8w8_fp8":
-                self.transformer_block.ffn1_0_weights[idx].set_value(
-                    paddle.view(paddle.to_tensor(ffn1_0_weight).transpose((1, 0)), "float8_e4m3fn")
-                )
-                self.transformer_block.ffn1_1_weights[idx].set_value(
-                    paddle.view(paddle.to_tensor(ffn1_1_weight).transpose((1, 0)), "float8_e4m3fn")
                 )
             else:
                 self.transformer_block.ffn1_weights[idx].set_value(
@@ -982,15 +963,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     )
                 )
 
-            elif self.quant_type == "a8w8_fp8":
-                self.transformer_block.ffn2_weights[idx].set_value(
-                    paddle.view(
-                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)]).transpose(
-                            (1, 0)
-                        ),
-                        "float8_e4m3fn",
-                    )
-                )
             else:
                 self.transformer_block.ffn2_weights[idx].set_value(
                     ffn2_weight_tensor.cast(self.transformer_block.ffn2_weights[idx].dtype)
@@ -1181,6 +1153,210 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                                 )
                             )
 
+    def set_state_dict_fp8(self, state_dict: dict[str, np.ndarray | paddle.Tensor], use_structured_name=True):
+        """transpose qkv shape & cast dtype for layernorm
+
+        Args:
+            state_dict (dict[str, np.ndarray | paddle.Tensor]): the state dict of model
+            use_structured_name (bool, optional): _description_. Defaults to True.
+        """
+        unfused_state_dict = {}
+        head_size = self.hidden_size // self.num_attention_heads
+        split_fn = split_param_func()
+
+        self.embed_tokens.weight.set_value(
+            paddle.to_tensor(state_dict["llama.embed_tokens.weight"]).cast(self.embed_tokens.weight.dtype)
+        )
+        self.norm.weight.set_value(paddle.to_tensor(state_dict["llama.norm.weight"]).cast(self.norm.weight.dtype))
+
+        for key in state_dict.keys():
+            state_dict[key] = paddle.to_tensor(state_dict[key])
+
+        for key in list(state_dict.keys()):
+            if "llama.layers" in key:
+                state_dict[key.replace("llama.layers", "transformer_block.fusellama")] = state_dict.pop(key)
+
+        for idx in range(self.config.num_hidden_layers):
+            if "transformer_block.fusellama.{}.self_attn.qkv_proj.weight".format(idx) in list(state_dict.keys()):
+                concated_qkv_weight = paddle.concat(
+                    split_fn(
+                        state_dict["transformer_block.fusellama.{}.self_attn.qkv_proj.weight".format(idx)],
+                        is_qkv=True,
+                        num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                        num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
+                    ),
+                    axis=-1,
+                ).transpose([1, 0])
+            else:
+                unfused_state_dict = {}
+                unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
+                    "transformer_block.fusellama.{}.self_attn.q_proj.weight".format(idx)
+                ]
+                unfused_state_dict["self_attn.k_proj.weight"] = state_dict[
+                    "transformer_block.fusellama.{}.self_attn.k_proj.weight".format(idx)
+                ]
+                unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
+                    "transformer_block.fusellama.{}.self_attn.v_proj.weight".format(idx)
+                ]
+                concated_qkv_weight = (
+                    paddle.concat(
+                        [
+                            unfused_state_dict["self_attn.q_proj.weight"],
+                            unfused_state_dict["self_attn.k_proj.weight"],
+                            unfused_state_dict["self_attn.v_proj.weight"],
+                        ],
+                        axis=-1,
+                    )
+                    .transpose([1, 0])
+                    .reshape(
+                        [
+                            (
+                                self.num_attention_heads // self.config.tensor_parallel_degree
+                                + 2 * self.num_key_value_heads // self.config.tensor_parallel_degree
+                            )
+                            * (head_size),
+                            self.hidden_size,
+                        ]
+                    )
+                )
+                state_dict[
+                    "transformer_block.fusellama.{}.self_attn.qkv_proj.weight".format(idx)
+                ] = concated_qkv_weight
+
+        for key in list(state_dict.keys()):
+            if key.endswith(".input_layernorm.weight"):
+                state_dict[key.replace(".input_layernorm.weight", ".ln_scale")] = state_dict.pop(key).cast(
+                    self.transformer_block.ln_scales[idx].dtype
+                )
+            elif key.endswith(".post_attention_layernorm.weight"):
+                state_dict[key.replace(".post_attention_layernorm.weight", ".ffn_ln_scale")] = state_dict.pop(
+                    key
+                ).cast(self.transformer_block.ffn_ln_scales[idx].dtype)
+            elif key.endswith(".self_attn.qkv_proj.weight"):
+                state_dict[key.replace(".self_attn.qkv_proj.weight", ".qkv_weight")] = state_dict.pop(key).view(
+                    "float8_e4m3fn"
+                )
+            elif key.endswith(".self_attn.o_proj.weight"):
+                state_dict[key.replace(".self_attn.o_proj.weight", ".out_proj_weight")] = (
+                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                )
+            elif key.endswith(".mlp.gate_proj.weight"):
+                state_dict[key.replace(".mlp.gate_proj.weight", ".ffn1_0_weight")] = (
+                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                )
+            elif key.endswith(".mlp.up_proj.weight"):
+                state_dict[key.replace(".mlp.up_proj.weight", ".ffn1_1_weight")] = (
+                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                )
+            elif key.endswith(".mlp.down_proj.weight"):
+                state_dict[key.replace(".mlp.down_proj.weight", ".ffn2_weight")] = (
+                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                )
+
+        self.set_state_dict_to_params(state_dict, True)
+        return self
+
+    @paddle.no_grad()
+    def set_state_dict_to_params(self, state_dict: dict[str, np.ndarray | paddle.Tensor], use_structured_name=True):
+        """
+        set_state_dict_to_params
+        """
+        if in_dygraph_mode:
+            for k, v in self.state_dict(use_hook=False).items():
+                if k in state_dict:
+                    v_new = state_dict.pop(k)
+                    if v_new.shape != v.shape:
+                        logger.warning(
+                            f"key {k} has diff shape between "
+                            + f"state_dict and model params: {v_new.shape} vs {v.shape}."
+                        )
+                    v.copy_(v_new, False)
+                else:
+                    logger.warning(f"key {k} is not found in state_dict.")
+        else:
+            # static mode code copy from nn.layers.Layer.set_state_dict
+            logger.warning("set_state_dict_to_params in static mode.")
+            missing_keys = []
+            match_keys = set()
+            unexpected_keys = []
+
+            def _check_match(key, param):
+                state = state_dict.get(key, None)
+                if state is None:
+                    missing_keys.append(key)
+                    raise ValueError(f"{key} is not found in the provided dict.")
+                if isinstance(state, (dict, list)):
+                    if len(state) != len(param):
+                        missing_keys.append(key)
+                        raise ValueError(
+                            "{} receieves the length of {}, "
+                            "but the expected shape is {}".format(key, len(state), len(param))
+                        )
+                    else:
+                        match_keys.add(key)
+                        return param, state
+                else:
+                    state_shape = state.shape() if inspect.ismethod(state.shape) else state.shape
+
+                    if list(state_shape) != list(param.shape):
+                        missing_keys.append(key)
+                        raise ValueError(
+                            "{} receives a shape {}, but the expected shape is {}.".format(
+                                key, list(state_shape), list(param.shape)
+                            )
+                        )
+                    match_keys.add(key)
+                    return param, state
+
+            matched_param_state = []
+            for key, param in self._state_dict_impl(use_hook=False).items():
+                key_name = key if use_structured_name else param.name
+                try:
+                    match_res = _check_match(key_name, param)
+                    matched_param_state.append(match_res)
+                except ValueError as err:
+                    logging.warning(f"Skip loading for {key}. " + str(err))
+            for key in state_dict.keys():
+                if key not in match_keys:
+                    unexpected_keys.append(key)
+
+            def _set_var(var, ndarray):
+                t = global_scope().find_var(var.name).get_tensor()
+                p = t._place()
+                if p.is_cpu_place():
+                    place = core.CPUPlace()
+                elif p.is_cuda_pinned_place():
+                    place = core.CUDAPinnedPlace()
+                elif p.is_xpu_place():
+                    p = core.Place()
+                    p.set_place(t._place())
+                    place = core.XPUPlace(p.xpu_device_id())
+                else:
+                    p = core.Place()
+                    p.set_place(t._place())
+                    place = core.CUDAPlace(p.gpu_device_id())
+                t.set(ndarray, place)
+
+            try:
+                executor = Executor(_get_device())._default_executor
+                # restore parameter states
+                core._create_loaded_parameter(
+                    [param for param, state in matched_param_state],
+                    global_scope(),
+                    executor,
+                )
+                for param, state in matched_param_state:
+                    _set_var(param, state)
+            except ValueError:
+                raise ValueError(
+                    "This error might happens in dy2static, "
+                    + "while calling 'set_state_dict' dynamicly in 'forward', "
+                    + "which is not supported. "
+                    + "If you only need call 'set_state_dict' once, "
+                    + "move it to '__init__'."
+                )
+        return self
+
 
 @register_base_model
 class LlamaBlockInferenceModel(LlamaInferenceModel):
@@ -1195,7 +1371,7 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         elif self.quant_type == "a8w8":
             self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
         elif self.quant_type == "a8w8_fp8":
-            self.transformer_block = FusedMultiTransformerFP8(transformer_config)
+            self.transformer_block = FusedBlockMultiTransformerFP8(transformer_config)
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
@@ -1765,7 +1941,10 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             self.lm_head.weight.set_value(
                 paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
             )
-        self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+        if self.llama.quant_type == "a8w8_fp8":
+            self.llama.set_state_dict_fp8({k: state_dict[k] for k in state_dict.keys()})
+        else:
+            self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
 
 class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
