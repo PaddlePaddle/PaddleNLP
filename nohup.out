@@ -1,8 +1,0 @@
-Traceback (most recent call last):
-  File "/home/ldn/baidu/pyreft/paddle-version/mypr/0705/PaddleNLP/llm/predict/predictor.py", line 29, in <module>
-    from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
-ImportError: cannot import name 'in_cinn_mode' from 'paddle.base.framework' (/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/base/framework.py)
-Traceback (most recent call last):
-  File "/home/ldn/baidu/pyreft/paddle-version/mypr/0705/PaddleNLP/llm/predict/predictor.py", line 29, in <module>
-    from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
-ImportError: cannot import name 'in_cinn_mode' from 'paddle.base.framework' (/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/base/framework.py)
