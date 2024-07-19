@@ -22,8 +22,18 @@ import paddle
 from tqdm import tqdm
 
 from paddlenlp.transformers import AutoConfig
-from paddlenlp.transformers.model_utils import _add_variant, load_state_dict
-from paddlenlp.transformers.utils import paddlenlp_load
+from paddlenlp.transformers.model_utils import (
+    _add_variant,
+    dtype_guard,
+    load_state_dict,
+    no_init_weights,
+)
+from paddlenlp.transformers.utils import (
+    ContextManagers,
+    is_paddle_support_lazy_init,
+    is_safetensors_available,
+    paddlenlp_load,
+)
 from paddlenlp.utils.env import (
     PADDLE_WEIGHTS_INDEX_NAME,
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
@@ -162,3 +172,51 @@ def load_tp_checkpoint(folder, cls, config, return_numpy=False):
                 if not isinstance(state_dict[k], np.ndarray):
                     state_dict[k] = state_dict.pop(k).cpu().numpy()
     return state_dict
+
+
+def infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs):
+    r"""
+    Instantiate a pretrained model configuration from a pre-trained model name or path.
+    """
+    config = kwargs.pop("config", None)
+    cache_dir = kwargs.pop("cache_dir", None)
+    dtype = kwargs.pop("dtype", None)
+    if dtype is None:
+        dtype = config.dtype
+    subfolder = kwargs.pop("subfolder", None)
+    if subfolder is None:
+        subfolder = ""
+    variant = kwargs.pop("variant", None)
+    use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
+    low_cpu_mem_usage = kwargs.pop("low_cpu_mem_usage", False)
+
+    init_contexts = []
+    if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
+        # Instantiate model.
+        init_contexts.append(no_init_weights(_enable=True))
+        if is_paddle_support_lazy_init():
+            init_contexts.append(paddle.LazyGuard())
+    if dtype:
+        init_contexts.append(dtype_guard(dtype))
+
+    # init the model
+    with ContextManagers(init_contexts):
+        model = cls(config)
+
+    resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded = cls._resolve_model_file_path(
+        pretrained_model_name_or_path,
+        cache_dir=cache_dir,
+        subfolder=subfolder,
+        from_hf_hub=False,
+        from_aistudio=False,
+        config=config,
+        convert_from_torch=False,
+        use_safetensors=use_safetensors,
+        variant=variant,
+    )
+
+    model_path = os.path.dirname(resolved_archive_file)
+    state_dict = load_tp_checkpoint(model_path, cls, config, return_numpy=True)
+    model.set_state_dict(state_dict)
+
+    return model
