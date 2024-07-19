@@ -814,8 +814,8 @@ class Trainer:
                     logger.info(f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}")
         # memory metrics - must set up as early as possible
         self._memory_tracker.start()
-        if not self.args.should_load_sharding_stage1_model:
-            self._load_from_checkpoint(resume_from_checkpoint)
+        if self.args.enable_auto_parallel and not self.args.to_static:
+            self._load_from_checkpoint(model,resume_from_checkpoint)
 
         logger.info(f"{self.runtime_timer.log()}")
         logger.info("***** Running training *****")

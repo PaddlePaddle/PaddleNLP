@@ -216,7 +216,6 @@ class AutoTrainer(Trainer):
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
                 steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
-                steps_trained_in_current_epoch *= args.gradient_accumulation_steps
             else:
                 steps_trained_in_current_epoch = 0
 
@@ -270,6 +269,9 @@ class AutoTrainer(Trainer):
         train_dataloader = dist_loader()
 
         self.timers and self.timers("read-data").start()
+
+        if self.args.enable_auto_parallel and self.args.to_static:
+            self._load_from_checkpoint(model,resume_from_checkpoint)
 
         for epoch in range(epochs_trained, num_train_epochs):
 
@@ -546,8 +548,13 @@ class AutoTrainer(Trainer):
                 optim_state_dict = self.optimizer.state_dict()
                 optim_state_dict.pop("LR_Scheduler", None)
 
+                if not self.args.to_static:
+                    model_state_dict = self.model.state_dict()
+                else:
+                    model_state_dict = model.state_dict()
+
                 state_dict = {
-                    MODEL_NAME: self.model.state_dict(),
+                    MODEL_NAME: model_state_dict,
                     OPTIMIZER_NAME: optim_state_dict,
                 }
 
@@ -619,7 +626,7 @@ class AutoTrainer(Trainer):
             self._save_ckpt_func(self.model.state_dict(), os.path.join(output_dir, MODEL_NAME))
             logger.info(f"Model weights saved in {output_dir}/{MODEL_NAME}")
 
-    def _load_from_checkpoint(self, resume_from_checkpoint=None):
+    def _load_from_checkpoint(self, model, resume_from_checkpoint=None):
 
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
 
@@ -641,7 +648,7 @@ class AutoTrainer(Trainer):
                         )
                     else:
                         raise ValueError(
-                            f"scheduler-file not found, scheduler:{os.path.join(resume_from_checkpoint, SCHEDULER_NAME)}"
+                            f"scheduler-fiNones.path.join(resume_from_checkpoint, SCHEDULER_NAME)"
                         )
 
                     if self.do_grad_scaling and distributed_isfile(os.path.join(resume_from_checkpoint, SCALER_NAME)):
@@ -658,9 +665,14 @@ class AutoTrainer(Trainer):
 
             optim_state_dict = self.optimizer.state_dict()
             optim_state_dict.pop("LR_Scheduler", None)
+            
+            if not self.args.to_static:
+                model_state_dict = self.model.state_dict()
+            else:
+                model_state_dict = model.state_dict()
 
             state_dict = {
-                MODEL_NAME: self.model.state_dict(),
+                MODEL_NAME: model_state_dict,
                 OPTIMIZER_NAME: optim_state_dict,
             }
 
