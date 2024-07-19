@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import random
+
 import numpy as np
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
@@ -197,9 +199,7 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, zero_pad
             features["position_ids"] = list(range(seq_length))
         if zero_padding:
             if flash_mask:
-                features["attn_mask_startend_row_indices"] = (
-                    [seq_length] * seq_length
-                )
+                features["attn_mask_startend_row_indices"] = [seq_length] * seq_length
             else:
                 features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
 
@@ -235,12 +235,9 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, z
     features = {"input_ids": input_ids, "labels": labels}
     if zero_padding:
         if flash_mask:
-            features["attn_mask_startend_row_indices"] = (
-                [seq_length] * seq_length
-            )
+            features["attn_mask_startend_row_indices"] = [seq_length] * seq_length
         else:
             features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
-
 
     if "position_ids" in rounds_inputs:
         rounds_inputs["position_ids"] = rounds_inputs["position_ids"][:-1]
@@ -251,9 +248,7 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, z
 
 def convert_example_chatglm(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False):
     if flash_mask:
-        raise ValueError(
-            "chatglm does not support flash mask for now!"
-        )
+        raise ValueError("chatglm does not support flash mask for now!")
     if tokenizer.chat_template is not None:
         # chatglm only support single-round finetune
         example = convert_multi_rounds_to_single_round(example, tokenizer)
@@ -294,3 +289,37 @@ def convert_example_chatglm(example, tokenizer, data_args, is_test=True, zero_pa
             features["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
 
         return features
+
+
+def get_example_pose(example, tokenizer, data_args):
+    if "text" in example:
+        source = example["text"]
+    else:
+        raise DataFormatError(f"Example format is wrong, please check: {example}. ")
+    tokenized_source = tokenizer(
+        source,
+        max_length=data_args.scaled_max_length,  # !!!!!!!修改配置参数
+        truncation=True,
+        add_special_tokens=True,
+    )
+    ids = tokenized_source["input_ids"]
+    len_chunk = min(len(ids), data_args.max_length)
+    if len(tokenized_source["input_ids"]) <= data_args.max_length:
+        tokenized_source["input_ids"] += [tokenizer.eos_token_id]
+
+    len_input = len(ids)
+
+    lt1 = 0  # chunk1 start pos
+    rt1 = random.randint(1, (len_chunk) // 2)  # chunk1 end pos
+
+    rt2 = random.randint(lt1 + len_chunk, len_input - 1)  # chunk2 end pos
+    lt2 = rt2 - (len_chunk - (rt1 - lt1))  # chunk2 start pos
+    chunked_ids = ids[lt1:rt1] + ids[lt2:rt2]
+    labels = ids[lt1 + 1 : rt1 + 1] + ids[lt2 + 1 : rt2 + 1]
+
+    pos_ids = range(len(chunked_ids))
+    pos_ids = [x + lt1 if i < rt1 - lt1 else x + (lt2 - (rt1 - lt1)) for i, x in enumerate(pos_ids)]
+
+    features = {"input_ids": chunked_ids, "labels": labels, "position_ids": pos_ids}
+
+    return features

@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# import inspect
 import json
 import os
 import sys
-import inspect
 from functools import partial
 
 import paddle
@@ -51,9 +51,9 @@ from paddlenlp.transformers import (
     AutoModelForCausalLMPipe,
     AutoTokenizer,
     Llama3Tokenizer,
-    LlamaTokenizer,
     LlamaForCausalLM,
     LlamaForCausalLMPipe,
+    LlamaTokenizer,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.utils.log import logger
@@ -82,7 +82,6 @@ def main():
         raise ValueError(
             "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
         )
-    
 
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
@@ -148,6 +147,23 @@ def main():
 
     model_config.seq_length = data_args.max_length
 
+    # Config for model useing long sequence strategy
+    if model_args.use_long_sequence_strategies:
+        data_args.scaled_max_length = int(data_args.max_length * model_args.rope_scaling_factor)
+        model_config.use_long_sequence_strategies = True
+        model_config.long_sequence_strategy_type = model_args.strategy_type
+        model_config.long_sequence_strategy_name = model_args.strategy_name
+        model_config.rope_scaling_type = model_args.rope_scaling_type
+        model_config.rope_scaling_factor = model_args.rope_scaling_factor
+        model_config.long_sequence_init_args = {
+            "dim": int(model_config.hidden_size / model_config.num_attention_heads),
+            "max_position_embeddings": data_args.scaled_max_length,  # extended context window
+            "base": 10000,
+            "scaling_factor": model_args.rope_scaling_factor,
+        }
+        if model_args.rope_scaling_type == "yarn":
+            model_config.long_sequence_init_args["original_max_position_embeddings"] = data_args.max_length
+
     logger.info(f"Final model config: {model_config}")
 
     model_class = AutoModelForCausalLM
@@ -168,9 +184,7 @@ def main():
         model = model_class.from_config(model_config, dtype=dtype)
 
     if model_args.flash_mask and (not data_args.zero_padding or not model.config.use_flash_attention):
-        logger.warning(
-            "`flash_mask` must use with zero padding and flash attention."
-        )
+        logger.warning("`flash_mask` must use with zero padding and flash attention.")
         data_args.zero_padding = True
         model.config.use_flash_attention = True
 
@@ -330,7 +344,11 @@ def main():
         )
         train_ds = train_ds.skip(consumed_samples)
 
-    if training_args.pipeline_parallel_degree > 1:
+    if data_args.use_pose_convert:
+        from utils.data import get_example_pose
+
+        trans_func = partial(get_example_pose, tokenizer=tokenizer, data_args=data_args)
+    elif training_args.pipeline_parallel_degree > 1:
         from utils.data import convert_example_common
 
         trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
@@ -346,12 +364,16 @@ def main():
                 "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM, QWen and Mistral so far."
             )
     train_ds = (
-        train_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask))
+        train_ds.map(
+            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
+        )
         if train_ds is not None
         else None
     )
     ptq_ds = (
-        ptq_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask))
+        ptq_ds.map(
+            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
+        )
         if ptq_ds is not None
         else None
     )
@@ -362,7 +384,14 @@ def main():
         )
         eval_zero_padding = False
     dev_ds = (
-        dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, zero_padding=eval_zero_padding, flash_mask=model_args.flash_mask))
+        dev_ds.map(
+            partial(
+                trans_func,
+                is_test=data_args.eval_with_do_generation,
+                zero_padding=eval_zero_padding,
+                flash_mask=model_args.flash_mask,
+            )
+        )
         if dev_ds is not None
         else None
     )
