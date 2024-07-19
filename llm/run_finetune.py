@@ -54,7 +54,6 @@ from paddlenlp.transformers import (
     LlamaTokenizer,
     LlamaForCausalLM,
     LlamaForCausalLMPipe,
-    YuanTokenizer,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.utils.log import logger
@@ -205,7 +204,7 @@ def main():
     if tokenizer.chat_template is not None:
         data_args.eval_with_do_generation = False
 
-    if isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer) or isinstance(tokenizer, YuanTokenizer):
+    if isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if data_args.dataset_name_or_path is None:

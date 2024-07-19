@@ -61,6 +61,7 @@ class YuanTokenizer(PretrainedTokenizer):
         self.decode_with_prefix_space = decode_with_prefix_space
         self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
         self.sp_model.Load(vocab_file)
+        self.pad_token_id = self.eos_token_id
 
     @property
     def vocab_size(self):
