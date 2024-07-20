@@ -80,7 +80,3 @@ class VeraTest(LLMTest, unittest.TestCase):
             self.run_predictor({"inference_model": True})
 
         self.run_predictor({"inference_model": False})
-
-
-if __name__ == "__main__":
-    unittest.main()

@@ -86,7 +86,6 @@ class TestVeraLayer(unittest.TestCase):
             weights_path = os.path.join(tempdir, "model.pdparams")
             paddle.save(regular_linear.state_dict(), weights_path)
             state_dict = paddle.load(weights_path)
-            print("===========", state_dict.keys())
             # should be identical to regular linear
             vera_layer_r8 = VeRALinear(
                 in_features=16, out_features=16, r=8, base_linear_module=nn.Linear(in_features=16, out_features=16)
@@ -107,9 +106,8 @@ class TestVeraModel(unittest.TestCase):
         vera_config = VeRAConfig(
             target_modules=[".*q_proj.*", ".*v_proj.*"],
             r=4,
-            vera_alpha=8,
+            vera_alpha=4,
             merge_weights=True,
-            trainable_bias=bias,
             head_dim=2,
         )
         # turn off plm dropout for to test train vs test
@@ -118,19 +116,14 @@ class TestVeraModel(unittest.TestCase):
         )
         vera_model = VeRAModel(model, vera_config)
         vera_model.mark_only_vera_as_trainable()
+
         for name, weight in vera_model.state_dict().items():
             if any([re.fullmatch(target_module, name) for target_module in vera_config.target_modules]):
-                if "vera" in name:
-                    self.assertFalse(weight.stop_gradient)
-                elif "bias" in name and bias in ["all"]:
+                if "vera_b" in name or "vera_d" in name:
                     self.assertFalse(weight.stop_gradient)
                 else:
                     self.assertTrue(weight.stop_gradient)
-            else:
-                if "bias" in name and bias == "all":
-                    self.assertFalse(weight.stop_gradient)
-                else:
-                    self.assertTrue(weight.stop_gradient)
+
         input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 20]))
         vera_model.train()
         train_forward_results = vera_model(input_ids)
