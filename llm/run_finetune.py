@@ -503,12 +503,10 @@ def main():
         target_modules = get_lora_target_modules(model)
         vera_config = VeRAConfig(
             target_modules=target_modules,
-            r=model_args.lora_rank,
-            vera_alpha=model_args.lora_rank,
+            r=model_args.vera_rank,
+            vera_alpha=model_args.vera_rank,
             merge_weights=False,
-            tensor_parallel_degree=training_args.tensor_parallel_degree,
             dtype=dtype,
-            do_qat=quant_args.do_qat,
             base_model_name_or_path=model_args.model_name_or_path,
             pissa_init=True,
         )

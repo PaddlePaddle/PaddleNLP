@@ -52,12 +52,12 @@ class VeRALinear(nn.Linear):
         if pissa_init:
             assert self.vera_alpha == self.r, "pissa method requires vera_alpha=r, scaling=1"
             self.scaling = 1.0
-            self.lora_A = self.create_parameter(
+            self.vera_A = self.create_parameter(
                 shape=[in_features, r],
                 dtype=self._dtype,
                 is_bias=False,
             )
-            self.lora_B = self.create_parameter(
+            self.vera_B = self.create_parameter(
                 shape=[r, out_features],
                 dtype=self._dtype,
                 is_bias=False,
@@ -66,7 +66,7 @@ class VeRALinear(nn.Linear):
 
         else:
             # Actual trainable parameters
-            self.lora_A = self.create_parameter(
+            self.vera_A = self.create_parameter(
                 shape=[in_features, r],
                 dtype=self._dtype,
                 is_bias=False,
@@ -74,7 +74,7 @@ class VeRALinear(nn.Linear):
                     negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
                 ),
             )
-            self.lora_B = self.create_parameter(
+            self.vera_B = self.create_parameter(
                 shape=[r, out_features],
                 dtype=self._dtype,
                 is_bias=False,
@@ -112,42 +112,38 @@ class VeRALinear(nn.Linear):
         Sr = S[:r]
         Vhr = Vh[:r]
 
-        lora_A = Ur @ paddle.diag(paddle.sqrt(Sr))
-        lora_B = paddle.diag(paddle.sqrt(Sr)) @ Vhr
+        vera_A = Ur @ paddle.diag(paddle.sqrt(Sr))
+        vera_B = paddle.diag(paddle.sqrt(Sr)) @ Vhr
 
-        self.lora_A.set_value(lora_A.astype(dtype))
-        self.lora_B.set_value(lora_B.astype(dtype))
-        res = weight.data - lora_A @ lora_B
+        self.vera_A.set_value(vera_A.astype(dtype))
+        self.vera_B.set_value(vera_B.astype(dtype))
+        res = weight.data - vera_A @ vera_B
         weight = res.astype(dtype)
         self.weight.set_value(weight)
 
-    def train(self):
-        super().train()
-        if self.merge_weights and self.merged:
-            # Make sure that the weights are not merged
+    def merge(self):
+        if not self.merged:
             diag_b = paddle.diag(self.vera_b)
             diag_d = paddle.diag(self.vera_d)
-            new_weight = self.weight - self.lora_A @ diag_d @ self.lora_B @ diag_b * self.scaling
-            self.weight.set_value(new_weight)
-            self.merged = False
-
-    def eval(self):
-        super().eval()
-        if self.merge_weights and not self.merged:
-            # Merge the weights and mark it
-            diag_b = paddle.diag(self.vera_b)
-            diag_d = paddle.diag(self.vera_d)
-            new_weight = self.weight + self.lora_A @ diag_d @ self.lora_B @ diag_b * self.scaling
+            new_weight = self.weight + self.vera_A @ diag_d @ self.vera_B @ diag_b * self.scaling
             self.weight.set_value(new_weight)
             self.merged = True
+
+    def unmerge(self):
+        if self.merged:
+            diag_b = paddle.diag(self.vera_b)
+            diag_d = paddle.diag(self.vera_d)
+            new_weight = self.weight - self.vera_A @ diag_d @ self.vera_B @ diag_b * self.scaling
+            self.weight.set_value(new_weight)
+            self.merged = False
 
     def forward(self, input: paddle.Tensor, *args, **kwargs):
         result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
         if not self.merged:
-            # result += (self.vera_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
+            # result += (self.vera_dropout(input) @ self.vera_A @ self.vera_B) * self.scaling
             diag_b = paddle.diag(self.vera_b)
             diag_d = paddle.diag(self.vera_d)
-            result += (self.vera_dropout(input) @ self.lora_A @ diag_d @ self.lora_B @ diag_b) * self.scaling
+            result += (self.vera_dropout(input) @ self.vera_A @ diag_d @ self.vera_B @ diag_b) * self.scaling
         return result
 
     def extra_repr(self):

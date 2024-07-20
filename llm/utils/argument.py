@@ -198,6 +198,7 @@ class ModelArgument:
 
     # vera related parameters
     vera: bool = field(default=False, metadata={"help": "Whether to use vera technique"})
+    vera_rank: int = field(default=8, metadata={"help": "Vera attention dimension"})
 
     # prefix tuning related parameters
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})

@@ -46,9 +46,7 @@ class VeRAModel(nn.Layer):
             self.model = self.get_vera_model(model, vera_config)
         self.is_pipelinemodel = False
         if issubclass(type(self.model), PipelineLayer):
-            self.is_pipelinemodel = True
-            self.model._single_to_pp_mapping = None
-
+            raise NotImplementedError("vera don't support pipeline parallel now")
         if vera_config.tensor_parallel_degree > 1:
             raise NotImplementedError("vera don't support tensor parallel now")
         self.forward = self.model.forward
@@ -63,11 +61,7 @@ class VeRAModel(nn.Layer):
         vera_config_tensor_parallel_degree = vera_config.tensor_parallel_degree
         vera_model = cls(model, vera_config)
 
-        # define vera weight name
-        if vera_config_tensor_parallel_degree > 1:
-            vera_weight_name = _add_variant(VERA_WEIGHTS_NAME, f"tp{model.config.tensor_parallel_rank:0>2d}")
-        else:
-            vera_weight_name = VERA_WEIGHTS_NAME
+        vera_weight_name = VERA_WEIGHTS_NAME
 
         # load and set vera weight parameter
         vera_weight_path = os.path.join(vera_path, vera_weight_name)
@@ -200,8 +194,8 @@ class VeRAModel(nn.Layer):
     def get_trainable_state_dict(self):
         trainable_state_dict = OrderedDict()
         for name, weight in self.model.state_dict().items():
-            # get vera parameter & QAT scale parameter
-            if not weight.stop_gradient or "activation_quanter" in name or "weight_quanter" in name:
+            # get vera parameter
+            if not weight.stop_gradient:
                 trainable_state_dict[name] = weight
         return trainable_state_dict
 
@@ -221,14 +215,14 @@ class VeRAModel(nn.Layer):
         for _, layer in self.model.named_sublayers():
             if isinstance(layer, VeRALinear):
                 for name, weight in layer.state_dict().items():
-                    if self.vera_config.trainable_bias in ["lora", "all"] and "bias" in name:
+                    if self.vera_config.trainable_bias in ["vera", "all"] and "bias" in name:
                         weight.stop_gradient = False
-                    elif "lora" in name or "vera" in name:
-                        # freezeB=True, vera_b, vera_d, lora_B可训练
-                        # freezeB=False, vera_b, vera_d 可训练
-                        if "vera" in name:
+                    elif "vera" in name:
+                        # notfreezeB=True, vera_b, vera_d, vera_B is trainable
+                        # notfreezeB=False, vera_b, vera_d is trainable
+                        if "vera_b" in name or "vera_d" in name:
                             weight.stop_gradient = False
-                        elif "lora_B" in name and notfreezeB:
+                        elif "vera_B" in name and notfreezeB:
                             weight.stop_gradient = False
                         else:
                             weight.stop_gradient = True

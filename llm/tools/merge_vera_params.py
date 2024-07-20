@@ -40,15 +40,15 @@ def parse_arguments():
 
 def weight_process(name, vera_config, state_dict):
     weight = state_dict.pop(name + ".weight").cuda()
-    lora_A = state_dict.pop(name + ".lora_A").cuda()
-    lora_B = state_dict.pop(name + ".lora_B").cuda()
+    vera_A = state_dict.pop(name + ".vera_A").cuda()
+    vera_B = state_dict.pop(name + ".vera_B").cuda()
     vera_b = state_dict.pop(name + ".vera_b").cuda()
     vera_d = state_dict.pop(name + ".vera_d").cuda()
     diag_b = paddle.diag(vera_b)
     diag_d = paddle.diag(vera_d)
 
-    scaling = vera_config.lora_alpha / vera_config.r
-    state_dict[name + ".weight"] = (weight + lora_A @ diag_d @ lora_B @ diag_b * scaling).cpu()
+    scaling = vera_config.vera_alpha / vera_config.r
+    state_dict[name + ".weight"] = (weight + vera_A @ diag_d @ vera_B @ diag_b * scaling).cpu()
 
 
 def merge():
@@ -87,12 +87,12 @@ def merge():
 
     model.eval()
     model_state_dict = model.model.state_dict()
-    lora_name_list = []
+    vera_name_list = []
     for key in model_state_dict.keys():
-        if "lora_A" in key:
-            lora_name_list.append(key[:-7])
-    print("lora_name_list", lora_name_list)
-    for name in lora_name_list:
+        if "vera_A" in key:
+            vera_name_list.append(key[:-7])
+
+    for name in vera_name_list:
         weight_process(name, vera_config, model_state_dict)
 
     model.model.save_pretrained(args.merge_vera_model_path, state_dict=model_state_dict)
