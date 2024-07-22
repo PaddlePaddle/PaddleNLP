@@ -23,44 +23,39 @@ from ...utils.env import VERA_CONFIG_NAME
 @dataclass
 class VeRAConfig:
     """
-    This is the configuration class to store the configuration of a [`LoRAModel`].
+    This is the configuration class to store the configuration of a [`VeRAModel`].
     Args:
-        r (`int`): Lora attention dimension
-        target_modules (`Union[List[str],str]`): The names of the modules to apply Lora to.
-        trainable_modules (`List[str]`): The names of the modules to train when applying Lora.
-        lora_alpha (`float`): The alpha parameter for Lora scaling.
-        lora_dropout (`float`): The dropout probability for Lora layers.
-        merge_weights (`bool`):
-            Whether to merge the weights of the Lora layers with the base transformer model in `eval` mode.
+        r (`int`): vera attention dimension
+        target_modules (`Union[List[str],str]`): The names of the modules to apply vera to.
+        trainable_modules (`List[str]`): The names of the modules to train when applying vera.
+        vera_alpha (`float`): The alpha parameter for vera scaling.
+        vera_dropout (`float`): The dropout probability for vera layers.
     """
 
-    r: int = field(default=8, metadata={"help": "Lora attention dimension"})
+    r: int = field(default=8, metadata={"help": "vera attention dimension"})
     target_modules: Optional[Union[List[str], str]] = field(
         default=None,
         metadata={
-            "help": "List of module names or regex expression of the module names to replace with Lora."
+            "help": "List of module names or regex expression of the module names to replace with vera."
             "For example, ['q', 'v'] or '.*decoder.*(SelfAttention|EncDecAttention).*(q|v)$' "
         },
     )
     trainable_modules: Optional[List[str]] = field(
         default=None,
         metadata={
-            "help": "List of module names or regex expression of the module names to train when applying with Lora."
+            "help": "List of module names or regex expression of the module names to train when applying with vera."
             "For example, ['q', 'v'] or '.*decoder.*(SelfAttention|EncDecAttention).*(q|v)$' "
         },
     )
-    vera_alpha: int = field(default=8, metadata={"help": "Lora alpha"})
-    vera_dropout: float = field(default=0.0, metadata={"help": "Lora dropout"})
-    merge_weights: bool = field(
-        default=False, metadata={"help": "Merge weights of the original model and the Lora model"}
-    )
+    vera_alpha: int = field(default=8, metadata={"help": "vera alpha"})
+    vera_dropout: float = field(default=0.0, metadata={"help": "vera dropout"})
     trainable_bias: Optional[str] = field(
-        default=None, metadata={"help": "Define trainable bias parameters for the Lora model."}
+        default=None, metadata={"help": "Define trainable bias parameters for the vera model."}
     )
     enable_vera_list: Optional[Union[List[bool], List[Optional[List[bool]]]]] = field(
         default=None,
         metadata={
-            "help": "Provides fine-grained control over `MergedLoRALinear`. If None, `LoRALinear` is used instead."
+            "help": "Provides fine-grained control over `MergedveraLinear`. If None, `veraLinear` is used instead."
         },
     )
     tensor_parallel_degree: int = field(default=-1, metadata={"help": "1 for not use tensor parallel"})
@@ -68,14 +63,14 @@ class VeRAConfig:
     head_dim: Optional[int] = field(
         default=None,
         metadata={
-            "help": "The model multi head dimension.Only for LoRAMergedLinear and ColumnParallelLoRAMergedLinear."
+            "help": "The model multi head dimension.Only for veraMergedLinear and ColumnParallelveraMergedLinear."
         },
     )
-    do_qat: bool = field(default=False, metadata={"help": "Whether the lora model would do quant-aware training"})
+    do_qat: bool = field(default=False, metadata={"help": "Whether the vera model would do quant-aware training"})
     base_model_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "The name of the base model to use."}
     )
-    pissa_init: bool = field(default=False, metadata={"help": "Whether the lora weight initialized by pissa"})
+    pissa_init: bool = field(default=False, metadata={"help": "Whether the vera weight initialized by pissa"})
 
     @property
     def __dict__(self):

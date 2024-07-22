@@ -74,7 +74,7 @@ def merge():
     if (
         vera_config.dtype == "bfloat16" or config.quantization_config.weight_quantize_algo in ["nf4", "fp4"]
     ) and args.device == "cpu":
-        raise ValueError("We can not apply bfloat16 or nf4/fp4 lora merge on cpu.")
+        raise ValueError("We can not apply bfloat16 or nf4/fp4 vera merge on cpu.")
 
     vera_config.merge_weights = False
     # with device_guard(): 会导致svd无法进行分解

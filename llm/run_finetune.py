@@ -505,7 +505,6 @@ def main():
             target_modules=target_modules,
             r=model_args.vera_rank,
             vera_alpha=model_args.vera_rank,
-            merge_weights=False,
             dtype=dtype,
             base_model_name_or_path=model_args.model_name_or_path,
             pissa_init=True,

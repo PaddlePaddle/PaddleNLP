@@ -29,7 +29,6 @@ class VeRALinear(nn.Linear):
         r: int = 0,
         vera_alpha: int = 1,
         vera_dropout: float = 0.0,
-        merge_weights: bool = True,
         pissa_init: bool = False,
         **kwargs
     ):
@@ -37,7 +36,7 @@ class VeRALinear(nn.Linear):
         self.weight.set_value(base_linear_module.weight)
 
         if not isinstance(r, int) or r <= 0:
-            raise ValueError("Lora rank r should be a positive integer")
+            raise ValueError("Vora rank r should be a positive integer")
         self.r = r
         self.vera_alpha = vera_alpha
         # Optional dropout
@@ -47,7 +46,6 @@ class VeRALinear(nn.Linear):
             self.vera_dropout = lambda x: x
         # Mark the weight as unmerged
         self.merged = False
-        self.merge_weights = merge_weights
 
         if pissa_init:
             assert self.vera_alpha == self.r, "pissa method requires vera_alpha=r, scaling=1"

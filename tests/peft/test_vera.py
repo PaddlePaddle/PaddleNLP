@@ -35,13 +35,13 @@ class TestVeraLayer(unittest.TestCase):
                 out_features=16,
                 r=0,
                 vera_dropout=0.1,
-                vera_alpha=8,
+                vera_alpha=4,
                 base_linear_module=nn.Linear(in_features=16, out_features=16),
             )
 
     def test_forward(self):
         vera_layer = VeRALinear(
-            in_features=16, out_features=16, r=4, vera_dropout=0.1, vera_alpha=8, base_linear_module=nn.Linear(16, 16)
+            in_features=16, out_features=16, r=4, vera_dropout=0.1, vera_alpha=4, base_linear_module=nn.Linear(16, 16)
         )
         x = paddle.randn([2, 4, 16], "float32")
         output = vera_layer(x)
@@ -107,7 +107,6 @@ class TestVeraModel(unittest.TestCase):
             target_modules=[".*q_proj.*", ".*v_proj.*"],
             r=4,
             vera_alpha=4,
-            merge_weights=True,
             head_dim=2,
         )
         # turn off plm dropout for to test train vs test
@@ -139,8 +138,7 @@ class TestVeraModel(unittest.TestCase):
             vera_config = VeRAConfig(
                 target_modules=[".*q_proj.*", ".*v_proj.*"],
                 r=4,
-                vera_alpha=8,
-                merge_weights=True,
+                vera_alpha=4,
             )
             model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
             vera_model = VeRAModel(model, vera_config)
@@ -162,8 +160,7 @@ class TestVeraModel(unittest.TestCase):
         vera_config = VeRAConfig(
             target_modules=[".*norm1.*"],
             r=4,
-            vera_alpha=8,
-            merge_weights=True,
+            vera_alpha=4,
             enable_vera_list=None,
         )
         model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
@@ -178,3 +175,7 @@ class TestVeRAConfig(unittest.TestCase):
             vera_config.save_pretrained(tempdir)
             loaded_vera_config = VeRAConfig.from_pretrained(tempdir)
             self.assertEqual(vera_config, loaded_vera_config)
+
+
+if __name__ == "__main__":
+    unittest.main()

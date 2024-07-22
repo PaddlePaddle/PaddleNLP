@@ -16,7 +16,7 @@ import copy
 import os
 import re
 from collections import OrderedDict
-from typing import Dict, List, Union
+from typing import Dict, Union
 
 import numpy as np
 import paddle
@@ -156,14 +156,13 @@ class VeRAModel(nn.Layer):
         if enable_vera is None:
             if isinstance(module, nn.Linear):
                 vera_module = VeRALinear(
-                    # 将要替换的层传递过去
+                    # pass the base linear module
                     base_linear_module=module,
                     in_features=module.weight.shape[0],
                     out_features=module.weight.shape[1],
                     r=vera_config.r,
                     vera_alpha=vera_config.vera_alpha,
                     vera_dropout=vera_config.vera_dropout,
-                    merge_weights=vera_config.merge_weights,
                     bias_attr=False if module.bias is None else None,
                     pissa_init=vera_config.pissa_init,
                 )
@@ -247,10 +246,7 @@ class VeRAModel(nn.Layer):
             return model
         elif isinstance(vera_config.target_modules, str):
             target_modules = [vera_config.target_modules]
-            if vera_config.enable_vera_list is None or (
-                isinstance(vera_config.enable_vera_list, List)
-                and all(isinstance(item, bool) for item in vera_config.enable_vera_list)
-            ):
+            if vera_config.enable_vera_list is None:
                 enable_vera_list = [vera_config.enable_vera_list]
             else:
                 raise TypeError(
@@ -260,20 +256,6 @@ class VeRAModel(nn.Layer):
             target_modules = vera_config.target_modules
             if vera_config.enable_vera_list is None:
                 enable_vera_list = [None for _ in range(len(target_modules))]
-            elif isinstance(vera_config.enable_vera_list, List):
-                enable_vera_list = vera_config.enable_vera_list
-                if len(enable_vera_list) != len(target_modules):
-                    raise TypeError(
-                        f"Invalid vera_config.enable_vera_list value: {vera_config.enable_vera_list}. Since vera_config.target_modules is `List[str]`, `enable_vera_list` should have the same length as `target_modules`"
-                    )
-                for enable_vera in enable_vera_list:
-                    if not (
-                        enable_vera is None
-                        or (isinstance(enable_vera, List) and all(isinstance(item, bool) for item in enable_vera))
-                    ):
-                        raise TypeError(
-                            f"Invalid `enable_vera_list` value: {vera_config.enable_vera_list}. Since `target_modules` is `List[str]`, `enable_vera_list` must be `None` or  `List[Optional[List[bool]]]`"
-                        )
             else:
                 raise TypeError(
                     f"Invalid `enable_vera_list` value: {vera_config.enable_vera_list}. Since `target_modules` is `List[str]`, `enable_vera_list` must be `None` or `List[Optional[List[bool]]]`"
