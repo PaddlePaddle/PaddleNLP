@@ -33,6 +33,7 @@ class YuanTokenizer(PretrainedTokenizer):
     """
     YuanTokenizer is equivalent to LlamaTokenizer
     """
+
     model_input_names = ["input_ids", "attention_mask", "position_ids"]
     resource_files_names = {
         "vocab_file": "tokenizer.model",

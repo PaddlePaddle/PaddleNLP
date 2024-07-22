@@ -261,7 +261,6 @@ class YuanPretrainedModel(PretrainedModel):
         model_mappings = [
             ["embed_tokens.weight"],
             ["norm.weight"],
-        
         ]
         for layer_index in range(config.num_hidden_layers):
             layer_mappings = [
