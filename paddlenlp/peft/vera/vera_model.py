@@ -24,7 +24,6 @@ import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
 from ...transformers.model_utils import PretrainedModel, _add_variant, dtype_guard
-from ...transformers.utils import weight_name_suffix
 from ...utils.env import VERA_WEIGHTS_NAME
 from ...utils.log import logger
 from .vera_config import VeRAConfig
@@ -128,9 +127,6 @@ class VeRAModel(nn.Layer):
         logger.info(f"vera config to save is {vera_config_to_save}")
 
         trainable_state_dict = self.get_trainable_state_dict()
-        if vera_config_to_save.tensor_parallel_degree > 1:
-            if variant is None:
-                variant = weight_name_suffix()
 
         # save vera weight
         vera_weight_name = _add_variant(VERA_WEIGHTS_NAME, variant)
@@ -269,10 +265,6 @@ class VeRAModel(nn.Layer):
         return model
 
     def restore_original_model(self):
-        # make sure W and vera weights are not merged before we restore the original model
-        if self.vera_config.merge_weights:
-            self.train()
-
         for layer_name, layer in self.model.named_sublayers():
             if isinstance(layer, VeRALinear):
                 self._find_and_restore_module(layer_name)

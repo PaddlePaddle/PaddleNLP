@@ -1,0 +1,15 @@
+{
+  "base_model_name_or_path": null,
+  "do_qat": false,
+  "dtype": null,
+  "enable_vera_list": null,
+  "head_dim": null,
+  "pissa_init": false,
+  "r": 8,
+  "target_modules": null,
+  "tensor_parallel_degree": -1,
+  "trainable_bias": null,
+  "trainable_modules": null,
+  "vera_alpha": 8,
+  "vera_dropout": 0.0
+}

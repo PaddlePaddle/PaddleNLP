@@ -16,7 +16,7 @@ import copy
 import os
 import re
 import unittest
-from tempfile import TemporaryDirectory
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 import numpy as np
 import paddle
@@ -41,7 +41,13 @@ class TestVeraLayer(unittest.TestCase):
 
     def test_forward(self):
         vera_layer = VeRALinear(
-            in_features=16, out_features=16, r=4, vera_dropout=0.1, vera_alpha=4, base_linear_module=nn.Linear(16, 16)
+            in_features=16,
+            out_features=16,
+            r=4,
+            vera_dropout=0.1,
+            vera_alpha=4,
+            base_linear_module=nn.Linear(16, 16),
+            pissa_init=True,
         )
         x = paddle.randn([2, 4, 16], "float32")
         output = vera_layer(x)
@@ -104,10 +110,7 @@ class TestVeraModel(unittest.TestCase):
     @parameterized.expand([(None,), ("all",), ("vera",)])
     def test_vera_model_constructor(self, bias):
         vera_config = VeRAConfig(
-            target_modules=[".*q_proj.*", ".*v_proj.*"],
-            r=4,
-            vera_alpha=4,
-            head_dim=2,
+            target_modules=[".*q_proj.*", ".*v_proj.*"], r=4, vera_alpha=4, head_dim=2, pissa_init=True
         )
         # turn off plm dropout for to test train vs test
         model = AutoModel.from_pretrained(
@@ -156,6 +159,17 @@ class TestVeraModel(unittest.TestCase):
             config_loaded_results = config_loaded_vera_model(input_ids)
             self.assertTrue(paddle.allclose(original_results[0], config_loaded_results[0]))
 
+    def test_restore_original_model(self):
+        vera_config = VeRAConfig(
+            target_modules=[".*q_proj.*", ".*v_proj.*"],
+            r=4,
+            vera_alpha=4,
+        )
+        model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
+        vera_model = VeRAModel(model, vera_config)
+        with self.assertRaises(NotImplementedError):
+            vera_model.restore_original_model()
+
     def test_vera_module_raise_exception(self):
         vera_config = VeRAConfig(
             target_modules=[".*norm1.*"],
@@ -175,6 +189,17 @@ class TestVeRAConfig(unittest.TestCase):
             vera_config.save_pretrained(tempdir)
             loaded_vera_config = VeRAConfig.from_pretrained(tempdir)
             self.assertEqual(vera_config, loaded_vera_config)
+
+    def test_save_load_err(self):
+        with NamedTemporaryFile("w+t") as f:
+            with self.assertRaises(ValueError):
+                VeRAConfig.from_pretrained(f.name)
+
+    def test_save_pretrained_file_error(self):
+        with NamedTemporaryFile("w+t") as f:
+            vera_config = VeRAConfig()
+            with self.assertRaises(AssertionError):
+                vera_config.save_pretrained(f.name)
 
 
 if __name__ == "__main__":
