@@ -61,9 +61,9 @@ except ImportError:
 
 try:
     from mamba_ssm_paddle.ops.causal_conv1d_interface import (
-        causal_conv1d_fn,
-        causal_conv1d_update,
+        causal_conv1d_ref as causal_conv1d_fn,  # currently, we donot use fast conv1d
     )
+    from mamba_ssm_paddle.ops.causal_conv1d_interface import causal_conv1d_update
 except ImportError:
     causal_conv1d_fn, causal_conv1d_update = None, None
 
@@ -98,6 +98,43 @@ def get_triangle_upper_mask(x, mask=None):
     mask = paddle.triu(mask, diagonal=1)
     mask.stop_gradient = True
     return mask
+
+
+def is_casual_mask(attention_mask):
+    """
+    Upper triangular of attention_mask equals to attention_mask is casual
+    """
+    return (paddle.triu(attention_mask) == attention_mask).all().item()
+
+
+def _make_causal_mask(input_ids_shape, past_key_values_length):
+    """
+    Make causal mask used for self-attention
+    """
+    batch_size, target_length = input_ids_shape  # target_length: seq_len
+
+    mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
+
+    if past_key_values_length > 0:
+        # [tgt_len, tgt_len + past_len]
+        mask = paddle.concat([paddle.ones([target_length, past_key_values_length], dtype="bool"), mask], axis=-1)
+
+    # [bs, 1, tgt_len, tgt_len + past_len]
+    return mask[None, None, :, :].expand([batch_size, 1, target_length, target_length + past_key_values_length])
+
+
+def _expand_2d_mask(mask, dtype, tgt_length):
+    """
+    Expands attention_mask from `[batch_size, src_length]` to `[batch_size, 1, tgt_length, src_length]`.
+    """
+    batch_size, src_length = mask.shape[0], mask.shape[-1]
+    tgt_length = tgt_length if tgt_length is not None else src_length
+
+    mask = mask[:, None, None, :].astype("bool")
+    mask.stop_gradient = True
+    expanded_mask = mask.expand([batch_size, 1, tgt_length, src_length])
+
+    return expanded_mask
 
 
 def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
@@ -169,55 +206,43 @@ def load_balancing_loss_func(
 
     expert_mask = paddle.nn.functional.one_hot(selected_experts, num_experts)
 
-    if attention_mask is None:
+    if attention_mask is None or attention_mask.ndim == 4:
         # Compute the percentage of tokens routed to each experts
         tokens_per_expert = paddle.mean(expert_mask.cast("float32"), axis=0)
 
         # Compute the average probability of routing to these experts
         router_prob_per_expert = paddle.mean(routing_weights, axis=0)
     else:
-        batch_size, sequence_length = attention_mask.shape
-        num_hidden_layers = concatenated_router_logits.shape[0] // (batch_size * sequence_length)
+        if attention_mask.ndim == 2:
+            batch_size, sequence_length = attention_mask.shape
+            num_hidden_layers = concatenated_router_logits.shape[0] // (batch_size * sequence_length)
 
-        # Compute the mask that masks all padding tokens as 0 with the same shape of expert_mask
-        expert_attention_mask = (
-            attention_mask[None, :, :, None, None]
-            .expand((num_hidden_layers, batch_size, sequence_length, top_k, num_experts))
-            .reshape([-1, top_k, num_experts])
-        )
+            # Compute the mask that masks all padding tokens as 0 with the same shape of expert_mask
+            expert_attention_mask = (
+                attention_mask[None, :, :, None, None]
+                .expand((num_hidden_layers, batch_size, sequence_length, top_k, num_experts))
+                .reshape([-1, top_k, num_experts])
+            )
 
-        # Compute the percentage of tokens routed to each experts
-        tokens_per_expert = paddle.sum(expert_mask.cast("float32") * expert_attention_mask, axis=0) / paddle.sum(
-            expert_attention_mask, axis=0
-        )
+            # Compute the percentage of tokens routed to each experts
+            tokens_per_expert = paddle.sum(expert_mask.cast("float32") * expert_attention_mask, axis=0) / paddle.sum(
+                expert_attention_mask, axis=0
+            )
 
-        # Compute the mask that masks all padding tokens as 0 with the same shape of tokens_per_expert
-        router_per_expert_attention_mask = (
-            attention_mask[None, :, :, None]
-            .expand((num_hidden_layers, batch_size, sequence_length, num_experts))
-            .reshape([-1, num_experts])
-        )
+            # Compute the mask that masks all padding tokens as 0 with the same shape of tokens_per_expert
+            router_per_expert_attention_mask = (
+                attention_mask[None, :, :, None]
+                .expand((num_hidden_layers, batch_size, sequence_length, num_experts))
+                .reshape([-1, num_experts])
+            )
 
-        # Compute the average probability of routing to these experts
-        router_prob_per_expert = paddle.sum(routing_weights * router_per_expert_attention_mask, axis=0) / paddle.sum(
-            router_per_expert_attention_mask, axis=0
-        )
+            # Compute the average probability of routing to these experts
+            router_prob_per_expert = paddle.sum(
+                routing_weights * router_per_expert_attention_mask, axis=0
+            ) / paddle.sum(router_per_expert_attention_mask, axis=0)
 
     overall_loss = paddle.sum(tokens_per_expert * router_prob_per_expert.unsqueeze(0))
     return overall_loss * num_experts
-
-
-# # Copied from transformers.models.llama.modeling_llama._get_unpad_data
-# def _get_unpad_data(attention_mask):
-#     seqlens_in_batch = attention_mask.sum(axis=-1, dtype=paddle.int32)
-#     indices = paddle.nonzero(attention_mask.flatten(), as_tuple=False).flatten()
-#     max_seqlen_in_batch = seqlens_in_batch.max().item()
-#     cu_seqlens = F.pad(paddle.cumsum(seqlens_in_batch, axis=0, dtype=paddle.int32), (1, 0), data_format="NCL")
-#     return (
-#         indices,
-#         cu_seqlens,
-#         max_seqlen_in_batch,
-#     )
 
 
 # Copied from transformers.models.llama.modeling_llama.LlamaRMSNorm with Llama->Jamba
@@ -467,6 +492,15 @@ class JambaAttention(nn.Layer):
 
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
+
+        # [bs, num_heads, kv_seq_len, head_dim]
+        kv_seq_len = value_states.shape[2]
+
+        attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
+        if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
+            raise ValueError(
+                f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
+            )
         attn_weights = attn_weights + attention_mask
         # upcast attention to fp32
         attn_weights = nn.functional.softmax(attn_weights, axis=-1, dtype=paddle.float32).cast(query_states.dtype)
@@ -571,8 +605,8 @@ class JambaFlashAttention2(JambaAttention):
             query_states,
             key_states,
             value_states,
-            attn_mask=None,
-            is_causal=True,
+            attn_mask=attention_mask,
+            is_causal=attention_mask is None,
             dropout_p=dropout_rate,
             training=self.training,
         )
@@ -934,7 +968,7 @@ class JambaSparseMoeBlock(nn.Layer):
             # Index the correct hidden states and compute the expert hidden state for
             # the current expert. We need to make sure to multiply the output hidden
             # states by `routing_weights` on the corresponding tokens (top-1 and top-2)
-            current_state = paddle.gather(hidden_states, top_x.squeeze())
+            current_state = paddle.gather(hidden_states, top_x.squeeze(-1))
             current_hidden_states = expert_layer(current_state) * routing_weights[top_x, idx]
 
             top_x = top_x.squeeze()
@@ -1289,6 +1323,11 @@ class JambaModel(JambaPretrainedModel):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
+        # new added
+        if config.tensor_parallel_degree > 1 and config.sequence_parallel:
+            logger.warning_once("Currently we donot support sequence parallelism yet!")
+        self.recompute_granularity = config.recompute_granularity
+        self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
 
         if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
             self.embed_tokens = mpu.VocabParallelEmbedding(
@@ -1321,6 +1360,68 @@ class JambaModel(JambaPretrainedModel):
 
     def set_input_embeddings(self, value):
         self.embed_tokens = value
+
+    @staticmethod
+    def _prepare_decoder_attention_mask(attention_mask, input_shape, past_key_values_length, dtype):
+        if attention_mask is not None:
+            # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
+            if len(attention_mask.shape) == 2:
+                expanded_attn_mask = _expand_2d_mask(attention_mask, dtype, tgt_length=input_shape[-1])
+                # For decoding phase in generation, seq_length = 1, we don't need to add causal mask
+                if input_shape[-1] > 1:
+                    combined_attention_mask = _make_causal_mask(
+                        input_shape,
+                        past_key_values_length=past_key_values_length,
+                    )
+                    expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+            # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
+            elif len(attention_mask.shape) == 3:
+                expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
+            # if attention_mask is already 4-D, do nothing
+            else:
+                expanded_attn_mask = attention_mask
+        else:
+            expanded_attn_mask = _make_causal_mask(
+                input_shape,
+                past_key_values_length=past_key_values_length,
+            )
+        # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
+        expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+        return expanded_attn_mask
+
+    @paddle.jit.not_to_static
+    def recompute_training_full(
+        self,
+        layer_module: nn.Layer,
+        hidden_states: paddle.Tensor,
+        attention_mask: paddle.Tensor,
+        position_ids: paddle.Tensor = None,
+        past_key_values: HybridMambaAttentionDynamicCache = None,
+        output_attentions: bool = False,
+        output_router_logits: bool = False,
+        use_cache: bool = False,
+        cache_position: paddle.Tensor = None,
+    ):
+        def create_custom_forward(module):
+            def custom_forward(*inputs):
+                return module(*inputs)
+
+            return custom_forward
+
+        hidden_states = recompute(
+            create_custom_forward(layer_module),
+            hidden_states,
+            attention_mask,
+            position_ids,
+            past_key_values,
+            output_attentions,
+            output_router_logits,
+            use_cache,
+            cache_position,
+            use_reentrant=self.config.recompute_use_reentrant,
+        )
+
+        return hidden_states
 
     def forward(
         self,
@@ -1358,7 +1459,6 @@ class JambaModel(JambaPretrainedModel):
 
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
-        hidden_states = inputs_embeds
 
         if use_cache and past_key_values is None:
             logger.warning_once(
@@ -1368,30 +1468,45 @@ class JambaModel(JambaPretrainedModel):
         if not use_cache and past_key_values is not None:
             past_key_values = None
 
-        # prepare attention mask with causal mask
-        # bool 4D mask
-        # past_length = 0
-        # if past_key_values is not None:
-        #     past_length = past_key_values.get_seq_length()
-        # attention_mask = self.get_masks(
-        #     hidden_states.shape[0], hidden_states.shape[1], past_length, padding_mask=attention_mask
-        # )
-        # zero = paddle.zeros(attention_mask.shape, dtype=hidden_states.dtype)
-        # neg_inf = paddle.full_like(attention_mask, paddle.finfo(hidden_states.dtype).min, dtype=hidden_states.dtype)
-        # # attention_mask = paddle.where(attention_mask, zero, neg_inf)
-        attention_mask = None
+        batch_size, seq_length = inputs_embeds.shape[:2]
+        seq_length_with_past = seq_length
+        cache_length = 0
+        if past_key_values is not None:
+            cache_length = past_key_values.get_seq_length()
+            seq_length_with_past += cache_length
+
+        # embed positions
+        if attention_mask is None:
+            # [bs, seq_len]
+            attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+
+        attention_mask = self._prepare_decoder_attention_mask(
+            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+        )  # [bs, 1, seq_len, seq_len]
+        if self.config.use_flash_attention:
+            is_casual = is_casual_mask(attention_mask)
+            if is_casual:
+                attention_mask = None
+
+        hidden_states = inputs_embeds
 
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         all_router_logits = () if output_router_logits else None
 
-        for decoder_layer in self.layers:
+        for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
-            if self.enable_recompute and self.training and not hidden_states.stop_gradient:
-                layer_outputs = recompute(
-                    decoder_layer.__call__,
+            has_gradient = not hidden_states.stop_gradient
+            if (
+                self.enable_recompute
+                and idx not in self.no_recompute_layers
+                and has_gradient
+                and self.recompute_granularity == "full"
+            ):
+                layer_outputs = self.recompute_training_full(
+                    decoder_layer,
                     hidden_states,
                     attention_mask,
                     position_ids,
@@ -1400,7 +1515,6 @@ class JambaModel(JambaPretrainedModel):
                     output_router_logits,
                     use_cache,
                     cache_position,
-                    use_reentrant=self.config.recompute_use_reentrant,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -1450,34 +1564,6 @@ class JambaModel(JambaPretrainedModel):
             attentions=all_self_attns,
             router_logits=all_router_logits,
         )
-
-    def get_masks(self, batch_size, seq_length, past_length, padding_mask=None):
-        # casual mask
-        casual_mask = paddle.tril(paddle.ones([batch_size, 1, seq_length, seq_length], dtype="bool"))
-        if past_length > 0:
-            casual_mask = paddle.concat(
-                [paddle.ones([batch_size, 1, seq_length, past_length], dtype="bool"), casual_mask], axis=-1
-            )
-
-        # seq_mask
-        if padding_mask is None:
-            padding_mask = paddle.ones((batch_size, 1, seq_length, seq_length + past_length), dtype="bool")
-        if len(padding_mask.shape) == 2:
-            # from Tokenizer
-            padding_mask = (
-                padding_mask.unsqueeze(axis=[1, 2])
-                .expand([batch_size, 1, seq_length, seq_length + past_length])
-                .astype("bool")
-            )
-        elif len(padding_mask.shape) == 3:
-            # [batch_size,tgt_length, src_length] -> [batch_size, 1, tgt_length, src_length]
-            padding_mask = padding_mask.unsqueeze(1).astype("bool")
-        elif len(padding_mask.shape) == 4:
-            padding_mask = padding_mask.astype("bool")
-
-        casual_mask = casual_mask & padding_mask
-
-        return casual_mask
 
 
 class JambaPretrainingCriterion(nn.Layer):
@@ -1748,6 +1834,28 @@ class JambaForCausalLM(JambaPretrainedModel):
             }
         )
         return model_inputs
+
+    @staticmethod
+    def update_model_kwargs_for_generation(outputs, model_kwargs, is_encoder_decoder=False):
+        # update cache
+        if isinstance(outputs, tuple) and len(outputs) > 1 and not isinstance(outputs[1], paddle.Tensor):
+            model_kwargs["past_key_values"] = outputs[1]
+
+        if isinstance(outputs, MoECausalLMOutputWithPast) and "past_key_values" in outputs:
+            model_kwargs["past_key_values"] = outputs.past_key_values
+
+        # update position_ids
+        if "position_ids" in model_kwargs and model_kwargs["position_ids"] is not None:
+            position_ids = model_kwargs["position_ids"]
+            model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[..., -1:] + 1], axis=-1)
+
+        if not is_encoder_decoder and "attention_mask" in model_kwargs:
+            attention_mask = model_kwargs["attention_mask"]
+            model_kwargs["attention_mask"] = paddle.concat(
+                [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
+            )
+
+        return model_kwargs
 
     @staticmethod
     def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
