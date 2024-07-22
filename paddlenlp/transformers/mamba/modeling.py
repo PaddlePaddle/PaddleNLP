@@ -47,9 +47,9 @@ except ImportError:
 
 try:
     from mamba_ssm_paddle.ops.causal_conv1d_interface import (
-        causal_conv1d_fn,
-        causal_conv1d_update,
+        causal_conv1d_ref as causal_conv1d_fn,
     )
+    from mamba_ssm_paddle.ops.causal_conv1d_interface import causal_conv1d_update
 except ImportError:
     causal_conv1d_fn, causal_conv1d_update = None, None
 
@@ -58,11 +58,6 @@ is_fast_path_available = all(
 )
 
 from paddlenlp.utils.log import logger
-
-if is_fast_path_available:
-    logger.info("mamba_ssm_paddle is installed. Using mamba_ssm_paddle!")
-else:
-    logger.warning_once("mamba_ssm_paddle is not installed. Please install it with `pip install mamba_ssm_paddle`.")
 
 ########################################################################################################################
 
@@ -759,13 +754,13 @@ class MambaForCausalLM(MambaPretrainedModel):
         loss = None
         if labels is not None:
             # Shift so that tokens < n predict n
-            shift_logits = logits[..., :-1, :]
-            shift_labels = labels[..., 1:]
+            # shift_logits = logits[..., :-1, :]
+            # shift_labels = labels[..., 1:]
             # Flatten the tokens
             loss_fct = CrossEntropyLoss()
             loss = loss_fct(
-                shift_logits.reshape([-1, shift_logits.shape[-1]]),
-                shift_labels.reshape(
+                logits.reshape([-1, logits.shape[-1]]),
+                labels.reshape(
                     [
                         -1,
                     ]
