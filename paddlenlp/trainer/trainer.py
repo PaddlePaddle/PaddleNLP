@@ -1083,17 +1083,13 @@ class Trainer:
                         fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     # Pipeline parallel mode,  handle gradient reduce here to overlap
-                    pipeline_parallel_config = (
-                        set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
-                    )
-                    sharding_parallel_config = (
-                        set(args.sharding_parallel_config.split(" ")) if args.sharding_parallel_degree > 1 else set()
-                    )
-                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
-                    enable_release_grads = (
-                        "enable_release_grads" in pipeline_parallel_config
-                        or "enable_release_grads" in sharding_parallel_config
-                    )
+                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in args.pipeline_parallel_config
+
+                    enable_release_grads = False
+                    if args.sharding_parallel_degree > 1:
+                        enable_release_grads = "enable_release_grads" in args.sharding_parallel_config
+                    if not enable_release_grads and args.pipeline_parallel_degree > 1:
+                        enable_release_grads = "enable_release_grads" in args.pipeline_parallel_config
 
                     # Case 3: Pipeline parallel mode, overlap with dp
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
@@ -2003,8 +1999,7 @@ class Trainer:
                         "please upgrade your paddle (using nightly version)."
                     )
 
-                sharding_parallel_config = set(self.args.sharding_parallel_config.split(" "))
-                if level == "os_g" and "enable_stage2_overlap" in sharding_parallel_config:
+                if level == "os_g" and "enable_stage2_overlap" in self.args.sharding_parallel_config:
                     model._set_reduce_overlap(True)
                     optimizer._set_broadcast_overlap(True, model)
 
@@ -2144,9 +2139,9 @@ class Trainer:
     def _enable_delay_scale_loss(self):
         key = "enable_delay_scale_loss"
         if self.args.pipeline_parallel_degree > 1:
-            return key in self.args.pipeline_parallel_config.split(" ")
+            return key in self.args.pipeline_parallel_config
         elif self.args.tensor_parallel_degree > 1:
-            return key in self.args.tensor_parallel_config.split(" ")
+            return key in self.args.tensor_parallel_config
         else:
             return False
 

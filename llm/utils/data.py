@@ -50,6 +50,7 @@ def get_convert_example(model):
         "opt",
         "qwen",
         "mixtral",
+        "mistral",
         "gemma",
         "qwen2",
         "qwen2_moe",
@@ -197,9 +198,7 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, zero_pad
             features["position_ids"] = list(range(seq_length))
         if zero_padding:
             if flash_mask:
-                features["attn_mask_startend_row_indices"] = (
-                    [seq_length] * seq_length
-                )
+                features["attn_mask_startend_row_indices"] = [seq_length] * seq_length
             else:
                 features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
 
@@ -235,12 +234,9 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, z
     features = {"input_ids": input_ids, "labels": labels}
     if zero_padding:
         if flash_mask:
-            features["attn_mask_startend_row_indices"] = (
-                [seq_length] * seq_length
-            )
+            features["attn_mask_startend_row_indices"] = [seq_length] * seq_length
         else:
             features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
-
 
     if "position_ids" in rounds_inputs:
         rounds_inputs["position_ids"] = rounds_inputs["position_ids"][:-1]
@@ -251,9 +247,7 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, z
 
 def convert_example_chatglm(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False):
     if flash_mask:
-        raise ValueError(
-            "chatglm does not support flash mask for now!"
-        )
+        raise ValueError("chatglm does not support flash mask for now!")
     if tokenizer.chat_template is not None:
         # chatglm only support single-round finetune
         example = convert_multi_rounds_to_single_round(example, tokenizer)

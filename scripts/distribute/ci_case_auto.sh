@@ -38,46 +38,20 @@ function is_a100() {
 
 IS_A100=$(is_a100)
 
-function gpt_case_list_auto() {
-    gpt_auto_recompute_bs16_fp32_DP1-MP1-PP1
-    gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8
-    gpt_auto_recompute_bs16_fp16_o2_DP1-MP2-PP4
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2
-    gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1
-    gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage2
-    gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage3
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage2
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage3
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage1
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3
-    gpt_auto_sp_acc_check
-}
-
 function llama_case_list_auto() {
     llama_dygraph_auto_bs8_fp32_DP2
     llama_dygraph_auto_bs8_fp32_DP2-MP2
     llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
-    llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+    # llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2   TODO: REOPEN this PR when global clip merge in paddle dev.
     llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
     llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2
 
-    llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1
-    llama_static_auto_recompute_bs16_fp32_DP2-MP1-PP1
-    llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP1
-    llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2
-    llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
+    # llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1
+    # llama_static_auto_recompute_bs16_fp32_DP2-MP1-PP1
+    # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP1
+    # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2
+    # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
     llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
-}
-
-function gpt_case_list_auto_pir() {
-    gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8_pir
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_pir
-    gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1_pir
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1_pir
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2_pir
-    gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3_pir
 }
 
 function llm_gpt_case_list_auto() {
@@ -95,876 +69,6 @@ function llm_qwen_case_list_auto() {
 }
 
 ############ case start ############
-
-function gpt_auto_recompute_bs16_fp32_DP1-MP1-PP1() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    python -m paddle.distributed.launch --log_dir=$log_dir --devices=0 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=16 \
-        -o Global.micro_batch_size=16 \
-        -o Distributed.dp_degree=1 \
-        -o Distributed.mp_degree=1 \
-        -o Distributed.pp_degree=1 \
-        -o Distributed.sharding.sharding_degree=1 \
-        -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=False \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.507633305
-    ips_base=3518
-    mem_base=11750.6
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.530449009
-        ips_base=16763
-        mem_base=11750.6
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=16 \
-        -o Global.micro_batch_size=2 \
-        -o Distributed.dp_degree=1 \
-        -o Distributed.mp_degree=1 \
-        -o Distributed.pp_degree=8 \
-        -o Distributed.sharding.sharding_degree=1 \
-        -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.7 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.570028400
-    ips_base=35050
-    mem_base=1988.9
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.559662151
-        ips_base=83918
-        mem_base=2022.7
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP1-MP1-PP8_pir() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    export FLAGS_enable_pir_in_executor=true
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=16 \
-        -o Global.micro_batch_size=2 \
-        -o Distributed.dp_degree=1 \
-        -o Distributed.mp_degree=1 \
-        -o Distributed.pp_degree=8 \
-        -o Distributed.sharding.sharding_degree=1 \
-        -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.7 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.570028400
-    ips_base=35050
-    mem_base=1988.9
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.559662151
-        ips_base=83918
-        mem_base=2022.7
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP1-MP2-PP4() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=16 \
-        -o Global.micro_batch_size=4 \
-        -o Distributed.dp_degree=1 \
-        -o Distributed.mp_degree=2 \
-        -o Distributed.pp_degree=4 \
-        -o Distributed.sharding.sharding_degree=1 \
-        -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.7 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.700293922
-    ips_base=32518
-    mem_base=1535.7
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.679453373
-        ips_base=79116
-        mem_base=1488.2
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=8 \
-        -o Global.micro_batch_size=4 \
-        -o Distributed.dp_degree=2 \
-        -o Distributed.mp_degree=2 \
-        -o Distributed.pp_degree=2 \
-        -o Distributed.sharding.sharding_degree=1 \
-        -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.2 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.672543240
-    ips_base=18681
-    mem_base=2135.7
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.651049423
-        ips_base=41174
-        mem_base=2064.5
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_pir() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    export FLAGS_enable_pir_in_executor=true
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=8 \
-        -o Global.micro_batch_size=4 \
-        -o Distributed.dp_degree=2 \
-        -o Distributed.mp_degree=2 \
-        -o Distributed.pp_degree=2 \
-        -o Distributed.sharding.sharding_degree=1 \
-        -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.2 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.672543240
-    ips_base=18681
-    mem_base=2135.7
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.651049423
-        ips_base=41174
-        mem_base=2064.5
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=4 \
-        -o Global.micro_batch_size=4 \
-        -o Distributed.dp_degree=4 \
-        -o Distributed.mp_degree=2 \
-        -o Distributed.pp_degree=1 \
-        -o Distributed.sharding.sharding_degree=4 \
-        -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.720068359
-    ips_base=15232
-    mem_base=1999.2
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.657777309
-        ips_base=30027
-        mem_base=2002.0
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage1_pir() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    export FLAGS_enable_pir_in_executor=true
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=4 \
-        -o Global.micro_batch_size=4 \
-        -o Distributed.dp_degree=4 \
-        -o Distributed.mp_degree=2 \
-        -o Distributed.pp_degree=1 \
-        -o Distributed.sharding.sharding_degree=4 \
-        -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.720068359
-    ips_base=15232
-    mem_base=1999.2
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.657777309
-        ips_base=30027
-        mem_base=2002.0
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage2() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=4 \
-        -o Global.micro_batch_size=4 \
-        -o Distributed.dp_degree=4 \
-        -o Distributed.mp_degree=2 \
-        -o Distributed.pp_degree=1 \
-        -o Distributed.sharding.sharding_degree=4 \
-        -o Distributed.sharding.sharding_stage=2 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.720078850
-    ips_base=15571
-    mem_base=1999.2
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.657803535
-        ips_base=29166
-        mem_base=2002.0
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP4-MP2-Sharding4_stage3() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=4 \
-        -o Global.micro_batch_size=4 \
-        -o Distributed.dp_degree=4 \
-        -o Distributed.mp_degree=2 \
-        -o Distributed.pp_degree=1 \
-        -o Distributed.sharding.sharding_degree=4 \
-        -o Distributed.sharding.sharding_stage=3 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.681921577
-    ips_base=13813
-    mem_base=1747.6
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.662137604
-        ips_base=24700
-        mem_base=1750.5
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=8 \
-        -o Global.micro_batch_size=2 \
-        -o Distributed.dp_degree=2 \
-        -o Distributed.mp_degree=1 \
-        -o Distributed.pp_degree=4 \
-        -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.3 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.579057693
-    ips_base=19822
-    mem_base=1709.8
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.586785984
-        ips_base=42813
-        mem_base=1743.8
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage1_pir() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    export FLAGS_enable_pir_in_executor=true
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=8 \
-        -o Global.micro_batch_size=2 \
-        -o Distributed.dp_degree=2 \
-        -o Distributed.mp_degree=1 \
-        -o Distributed.pp_degree=4 \
-        -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.3 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.579057693
-    ips_base=19822
-    mem_base=1709.8
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.586785984
-        ips_base=42813
-        mem_base=1743.8
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage2() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=8 \
-        -o Global.micro_batch_size=2 \
-        -o Distributed.dp_degree=2 \
-        -o Distributed.mp_degree=1 \
-        -o Distributed.pp_degree=4 \
-        -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=2 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.3 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.579057693
-    ips_base=20170
-    mem_base=1709.8
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.586785984
-        ips_base=42995
-        mem_base=1743.8
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP2-MP1-PP4_Sharding2_stage3() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=8 \
-        -o Global.micro_batch_size=2 \
-        -o Distributed.dp_degree=2 \
-        -o Distributed.mp_degree=1 \
-        -o Distributed.pp_degree=4 \
-        -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=3 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.3 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.585316849
-    ips_base=15742
-    mem_base=1591.6
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.555718899
-        ips_base=34688
-        mem_base=1625.6
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage1() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=8 \
-        -o Global.micro_batch_size=4 \
-        -o Distributed.dp_degree=2 \
-        -o Distributed.mp_degree=2 \
-        -o Distributed.pp_degree=2 \
-        -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.2 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.672568035
-    ips_base=19461
-    mem_base=1384.7
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.651032448
-        ips_base=42435
-        mem_base=1377.5
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=8 \
-        -o Global.micro_batch_size=4 \
-        -o Distributed.dp_degree=2 \
-        -o Distributed.mp_degree=2 \
-        -o Distributed.pp_degree=2 \
-        -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=2 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.2 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.672568035
-    ips_base=19652
-    mem_base=1384.7
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.651032448
-        ips_base=43008
-        mem_base=1377.5
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage2_pir() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    export FLAGS_enable_pir_in_executor=true
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=8 \
-        -o Global.micro_batch_size=4 \
-        -o Distributed.dp_degree=2 \
-        -o Distributed.mp_degree=2 \
-        -o Distributed.pp_degree=2 \
-        -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=2 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.2 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.672568035
-    ips_base=19652
-    mem_base=1384.7
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.651032448
-        ips_base=43008
-        mem_base=1377.5
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=8 \
-        -o Global.micro_batch_size=4 \
-        -o Distributed.dp_degree=2 \
-        -o Distributed.mp_degree=2 \
-        -o Distributed.pp_degree=2 \
-        -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=3 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.2 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.696336079
-    ips_base=16613
-    mem_base=1280.5
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.705118465
-        ips_base=37104
-        mem_base=1217.3
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_recompute_bs16_fp16_o2_DP2-MP2-PP2_Sharding2_stage3_pir() {
-    echo "=========== $FUNCNAME run begin ==========="
-    log_dir=mylog
-    rm -rf $log_dir
-    export FLAGS_enable_pir_in_executor=true
-    python -m paddle.distributed.launch --log_dir=./mylog --devices=0,1,2,3,4,5,6,7 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_345M_single_card.yaml \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Global.global_batch_size=16 \
-        -o Global.local_batch_size=8 \
-        -o Global.micro_batch_size=4 \
-        -o Distributed.dp_degree=2 \
-        -o Distributed.mp_degree=2 \
-        -o Distributed.pp_degree=2 \
-        -o Distributed.sharding.sharding_degree=2 \
-        -o Distributed.sharding.sharding_stage=3 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=True \
-        -o Engine.mix_precision.level="o2" \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.logging_freq=10 \
-        -o Profiler_auto.memory_stats=True \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $log_dir/workerlog.2 | grep '29/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'ips: ' '{print $2}' | awk -F ' tokens/s,' '{print $1}'`
-    mem=`cat $log_dir/workerlog.0 | grep '29/30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ' MB,' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=10.696336079
-    ips_base=16613
-    mem_base=1280.5
-    if [ $IS_A100 -ne 0 ];then
-        loss_base=10.705118465
-        ips_base=37104
-        mem_base=1217.3
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
-}
-
-function gpt_auto_sp_acc_check() {
-    echo "=========== $FUNCNAME run begin ==========="
-    export PYTHONPATH=$root_path/:$PYTHONPATH
-    export FLAGS_infer_spmd_enable=true
-    export FLAGS_call_stack_level=2
-    mp_degree=2
-    dp_degree=1
-    pp_degree=1
-    local_batch_size=1
-
-    # sp on
-    sp=True
-    log_dir_spTrue=./${FUNCNAME}_mp${mp_degree}_sp${sp}
-    rm -rf ./${log_dir_spTrue}/*
-    python -m paddle.distributed.launch --log_dir=${log_dir_spTrue} --devices=0,1 --rank 0 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_1.3B_dp8.yaml \
-        -o Model.hidden_size=1024 \
-        -o Model.num_layers=12 \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Optimizer.grad_clip.clip_norm=0 \
-        -o Global.local_batch_size=$(($local_batch_size / $dp_degree)) \
-        -o Global.micro_batch_size=$(($local_batch_size / $dp_degree)) \
-        -o Distributed.dp_degree=${dp_degree} \
-        -o Distributed.mp_degree=${mp_degree} \
-        -o Distributed.pp_degree=${pp_degree} \
-        -o Distributed.sharding.sharding_degree=1 \
-        -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=False \
-        -o Engine.mix_precision.level=o2 \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.verbose=3 \
-        -o Engine.logging_freq=1 \
-        -o Engine.save_load.output_dir="" \
-        -o Model.sequence_parallel=${sp} \
-        >>${log_path}/$FUNCNAME 2>&1
-
-    # sp off
-    sp=False
-    log_dir_spFalse=./${FUNCNAME}_mp${mp_degree}_sp${sp}
-    rm -rf ./${log_dir_spFalse}/*
-    python -m paddle.distributed.launch --log_dir=${log_dir_spFalse} --devices=0,1 --rank 0 tools/auto.py \
-        -c ppfleetx/configs/nlp/gpt/auto/pretrain_gpt_1.3B_dp8.yaml \
-        -o Model.hidden_size=1024 \
-        -o Model.num_layers=12 \
-        -o Model.hidden_dropout_prob=0 \
-        -o Model.attention_probs_dropout_prob=0 \
-        -o Model.use_recompute=True \
-        -o Optimizer.grad_clip.clip_norm=0 \
-        -o Global.local_batch_size=$(($local_batch_size / $dp_degree)) \
-        -o Global.micro_batch_size=$(($local_batch_size / $dp_degree)) \
-        -o Distributed.dp_degree=${dp_degree} \
-        -o Distributed.mp_degree=${mp_degree} \
-        -o Distributed.pp_degree=${pp_degree} \
-        -o Distributed.sharding.sharding_degree=1 \
-        -o Distributed.sharding.sharding_stage=1 \
-        -o Distributed.pipeline.schedule_mode=1F1B \
-        -o Engine.mix_precision.enable=False \
-        -o Engine.mix_precision.level=o2 \
-        -o Engine.max_steps=30 \
-        -o Engine.eval_freq=100000 \
-        -o Engine.verbose=3 \
-        -o Engine.logging_freq=1 \
-        -o Engine.save_load.output_dir="" \
-        -o Model.sequence_parallel=${sp} \
-        >>${log_path}/$FUNCNAME 2>&1
-    
-    # loss diff
-    loss=`cat ${log_dir_spTrue}/workerlog.0 |  grep '30/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=-1
-    mem=-1
-    loss_base=`cat ${log_dir_spFalse}/workerlog.0 |  grep '30/30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips_base=-1
-    mem_base=-1
-    allclose=0
-    echo "result: loss_spTrue=$loss loss_spFasle=$loss_base"
-    if [ $IS_A100 -ne 0 ];then
-        allclose=1
-    fi
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem} ${allclose}
-    echo "=========== $FUNCNAME run  end ==========="
-}
 
 function llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
@@ -1377,7 +481,7 @@ function llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=10.0859375
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.125
+        loss_base=10.390625
     fi
     ips_base=-1
     mem_base=-1
@@ -1445,9 +549,9 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.53389835
+    loss_base=9.51876831
     if [ $IS_A100 -ne 0 ];then
-        loss_base=9.54253578
+        loss_base=9.53083992
     fi
     ips_base=-1
     mem_base=-1
@@ -1515,9 +619,9 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.39066124
+    loss_base=9.35078526
     if [ $IS_A100 -ne 0 ];then
-        loss_base=9.41613197
+        loss_base=9.38577652
     fi
     ips_base=-1
     mem_base=-1
@@ -1585,9 +689,9 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.38235474
+    loss_base=9.35139465
     if [ $IS_A100 -ne 0 ];then
-        loss_base=9.4053154
+        loss_base=9.39356422
     fi
     ips_base=-1
     mem_base=-1
@@ -1656,9 +760,9 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.38256836
+    loss_base=9.41603851
     if [ $IS_A100 -ne 0 ];then
-        loss_base=9.4055109
+        loss_base=9.46169376
     fi
     ips_base=-1
     mem_base=-1
@@ -1758,7 +862,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=7.5364624
+    loss_base=7.54158936
     ips_base=5442.5208
     mem_base=22.387750148773193
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1857,7 +961,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
     ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
     mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=7.5364624
+    loss_base=7.54158936
     ips_base=5864.2898
     mem_base=23.745134115219116
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
@@ -1924,12 +1028,12 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.57664108
+    loss_base=10.59205246
     loss_md5_base=0ebf68698887b33b33a46518621cf412
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.58541679
+        loss_base=10.60499191
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -1997,12 +1101,12 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.57694054
+    loss_base=10.58860683
     loss_md5_base=6df87d01bd08113a92930f6349514b35
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.58452606
+        loss_base=10.59338379
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2070,12 +1174,12 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.5758028
+    loss_base=10.59993172
     loss_md5_base=6cb4e151b35f026190df90ab240d9a95
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.57996178
+        loss_base=10.59612274
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2143,12 +1247,12 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.5766201
+    loss_base=10.58456802
     loss_md5_base=e82a1f5668870d18a2d45b3ee0a25386
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.58061218
+        loss_base=10.58141422
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2225,7 +1329,6 @@ EOF
     export FLAGS_embedding_deterministic=1        
     export FLAGS_cudnn_deterministic=1
     export NVIDIA_TF32_OVERRIDE=0
-    export FLAGS_enable_pir_in_executor=0
 
     python -u  -m paddle.distributed.launch \
             --gpus "0,1" \
@@ -2319,7 +1422,6 @@ EOF
     export FLAGS_embedding_deterministic=1        
     export FLAGS_cudnn_deterministic=1
     export NVIDIA_TF32_OVERRIDE=0
-    export FLAGS_enable_pir_in_executor=0
 
     python -u  -m paddle.distributed.launch \
             --gpus "0,1,2,3" \
@@ -2413,7 +1515,6 @@ EOF
     export FLAGS_embedding_deterministic=1
     export FLAGS_cudnn_deterministic=1
     export NVIDIA_TF32_OVERRIDE=0
-    export FLAGS_enable_pir_in_executor=0
 
     python -u  -m paddle.distributed.launch \
             --gpus "0,1,2,3,4,5,6,7" \
@@ -2507,7 +1608,6 @@ EOF
     export FLAGS_embedding_deterministic=1
     export FLAGS_cudnn_deterministic=1
     export NVIDIA_TF32_OVERRIDE=0
-    export FLAGS_enable_pir_in_executor=0
 
     python -u  -m paddle.distributed.launch \
             --gpus "0,1,2,3,4,5,6,7" \

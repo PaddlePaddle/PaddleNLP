@@ -13,5 +13,4 @@ ChatGLM2-6B 是开源中英双语对话模型 [ChatGLM-6B](https://github.com/TH
 
 ## 2. 模型协议
 
-
 ChatGLM2-6B 模型的权重的使用需要遵循[License](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/transformers/chatglm_v2/LICENSE)。
