@@ -18,12 +18,4 @@ model_path=${1:-"/path/to/ckpt"}
 
 python ./predict/model_convert_fp8.py  \
         --model_name_or_path ${model_path} 
-
-python ./predict/export_model.py \
-        --model_name_or_path ${model_path} \
-        --output_path ${model_path}/export \
-        --dtype float16 \
-        --quant_type a8w8_fp8 \
-        --inference_model \
-        --block_attn
         
