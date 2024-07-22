@@ -1878,7 +1878,7 @@ class Trainer:
         # Multi-gpu training
         if self.args.world_size > 1 and (not self.args.use_hybrid_parallel):
             # MOE use DDP to broadcaset parameters.
-            model = paddle.DataParallel(model)
+            model = paddle.DataParallel(model, find_unused_parameters=self.args.dp_find_unused_parameters)
             # Distributed training (should be after fp16 initialization)
 
             if self.args.amp_master_grad:

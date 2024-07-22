@@ -1297,13 +1297,30 @@ class JambaPretrainedModel(PretrainedModel):
     @paddle.no_grad()
     def _init_weights(self, module):
         std = self.config.initializer_range
-        if isinstance(module, (nn.Linear, nn.Conv1D)):
-            normal_(module.weight, mean=0.0, std=std)
-            if module.bias is not None:
-                zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            normal_(module.weight, mean=0.0, std=std)
-            if hasattr(module, "padding_idx"):
+        if self.config.tensor_parallel_degree > 1:
+            rng_tracker = get_rng_state_tracker().rng_state
+        if isinstance(
+            module,
+            (
+                nn.Linear,
+                nn.Conv1D,
+                nn.Embedding,
+                mpu.VocabParallelEmbedding,
+                mpu.ColumnParallelLinear,
+                mpu.RowParallelLinear,
+            ),
+        ):
+            if isinstance(module.weight, paddle.Tensor):
+                if module.weight.is_distributed:
+                    with rng_tracker():
+                        normal_(module.weight, mean=0.0, std=std)
+                else:
+                    normal_(module.weight, mean=0.0, std=std)
+
+            if isinstance(module, (nn.Linear, nn.Conv1D)):
+                if module.bias is not None:
+                    zeros_(module.bias)
+            elif isinstance(module, nn.Embedding) and hasattr(module, "padding_idx"):
                 module.weight[module.padding_idx] = 0.0
 
 

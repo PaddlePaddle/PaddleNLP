@@ -758,6 +758,15 @@ class TrainingArguments:
     report_to: Optional[List[str]] = field(
         default=None, metadata={"help": "The list of integrations to report the results and logs to."}
     )
+    dp_find_unused_parameters: Optional[bool] = field(
+        default=None,
+        metadata={
+            "help": (
+                "When using distributed training, the value of the flag `find_unused_parameters` passed to "
+                "`DataParallel`."
+            )
+        },
+    )
     wandb_api_key: Optional[str] = field(
         default=None,
         metadata={"help": "Weights & Biases (WandB) API key(s) for authentication with the WandB service."},
