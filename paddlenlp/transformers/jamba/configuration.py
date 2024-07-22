@@ -161,6 +161,7 @@ class JambaConfig(PretrainedConfig):
         mamba_proj_bias=False,
         **kwargs,
     ):
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(
             pad_token_id=pad_token_id,
             bos_token_id=bos_token_id,

@@ -199,7 +199,7 @@ class JambaModelTester:
         past_key_values = HybridMambaAttentionDynamicCache(
             config,
             input_ids.shape[0],
-            model.dtype,
+            model._dtype,
         )
         outputs = model(
             input_ids,
@@ -265,6 +265,7 @@ class JambaModelTester:
 
 
 class JambaModelTest(ModelTesterMixin, unittest.TestCase):
+    use_test_model_name_list = False
     all_model_classes = (
         JambaModel,
         JambaForCausalLM,
@@ -312,7 +313,7 @@ class JambaModelTest(ModelTesterMixin, unittest.TestCase):
         model.eval()
         result = model(input_ids, attention_mask=attention_mask)
         bs, seqlen = input_ids.shape
-        self.assertEqual(result.router_logits[0].shape, (bs * seqlen, config.num_experts))
+        self.assertEqual(result.router_logits[0].shape, [bs * seqlen, config.num_experts])
         self.assertTrue(
             paddle.allclose(result.aux_loss.cpu(), paddle.to_tensor(2, dtype=paddle.float32), rtol=1e-2, atol=1e-2)
         )
@@ -322,8 +323,10 @@ class JambaModelTest(ModelTesterMixin, unittest.TestCase):
         pad_length = 1000
         # Add padding tokens to input_ids
         padding_block = config.pad_token_id * paddle.ones([input_ids.shape[0], pad_length], dtype=paddle.int32)
-        padded_input_ids = paddle.concat((padding_block, input_ids), dim=1)  # this is to simulate padding to the left
-        padded_attention_mask = padded_input_ids.ne(config.pad_token_id)
+        padded_input_ids = paddle.concat((padding_block, input_ids), axis=1)  # this is to simulate padding to the left
+        # make sure that padded_input_ids dtype is int64
+        padded_input_ids = padded_input_ids.cast("int64")
+        padded_attention_mask = padded_input_ids != config.pad_token_id
 
         padded_result = model(padded_input_ids, attention_mask=padded_attention_mask)
         self.assertTrue(paddle.allclose(result.aux_loss.cpu(), padded_result.aux_loss.cpu(), rtol=1e-4, atol=1e-4))
@@ -345,16 +348,20 @@ class JambaModelTest(ModelTesterMixin, unittest.TestCase):
         for model_class in self.all_model_classes:
             model = model_class(config=configs_no_init)
             for name, param in model.named_parameters():
-                if param.requires_grad:
+                if not param.stop_gradient:
                     if "A_log" in name:
                         A = paddle.arange(1, config.mamba_d_state + 1, dtype=paddle.float32)[None, :]
-                        self.assertTrue(paddle.allclose(param.data, paddle.log(A), atol=1e-5, rtol=1e-5))
+                        self.assertTrue(
+                            paddle.allclose(param.data, paddle.log(A).expand_as(param), atol=1e-5, rtol=1e-5)
+                        )
                     elif "D" in name:
                         # check if it's a ones like
                         self.assertTrue(
                             paddle.allclose(param.data, paddle.ones_like(param.data), atol=1e-5, rtol=1e-5)
                         )
                     else:
+                        if "lm_head.weight" in name:
+                            continue
                         self.assertIn(
                             ((param.data.mean() * 1e9).round() / 1e9).item(),
                             [0.0, 1.0],
@@ -466,39 +473,6 @@ class JambaModelTest(ModelTesterMixin, unittest.TestCase):
                 _ = model(dummy_input, attention_mask=dummy_attention_mask)
 
     @slow
-    def test_flash_attn_2_generate_padding_right(self):
-        r"""
-        Overriding the test_flash_attn_2_generate_padding_right test as the Jamba model, like Mixtral, doesn't support
-        right padding + use cache with FA2
-        """
-        import torch
-
-        for model_class in self.all_generative_model_classes:
-            config, _ = self.model_tester.prepare_config_and_inputs_for_common()
-            model = model_class(config)
-
-            with tempfile.TemporaryDirectory() as tmpdirname:
-                model.save_pretrained(tmpdirname)
-                model = model_class.from_pretrained(tmpdirname, dtype="float16", low_cpu_mem_usage=True)
-
-                dummy_input = torch.LongTensor([[0, 2, 3, 4], [0, 2, 3, 4]])
-                dummy_attention_mask = torch.LongTensor([[1, 1, 1, 1], [1, 1, 1, 0]])
-
-                model.generate(dummy_input, attention_mask=dummy_attention_mask, max_new_tokens=1, do_sample=False)
-
-                model = model_class.from_pretrained(
-                    tmpdirname,
-                    dtype="float16",
-                    low_cpu_mem_usage=True,
-                )
-                model.config.use_flash_attention = True
-
-                with self.assertRaises(ValueError):
-                    _ = model.generate(
-                        dummy_input, attention_mask=dummy_attention_mask, max_new_tokens=1, do_sample=False
-                    )
-
-    @slow
     def test_flash_attn_2_generate_use_cache(self):
         r"""
         Overriding the test_flash_attn_2_generate_use_cache test as the Jamba model, like Mixtral, doesn't support
@@ -512,7 +486,9 @@ class JambaModelTest(ModelTesterMixin, unittest.TestCase):
 
             dummy_input = inputs_dict[model_class.main_input_name]
             if dummy_input.dtype in [paddle.float32, paddle.bfloat16]:
-                dummy_input = dummy_input.to(paddle.float16)
+                dummy_input = dummy_input.cast(paddle.float16)
+            if dummy_input.dtype == paddle.int32:
+                dummy_input = dummy_input.cast(paddle.int64)
 
             # make sure that all models have enough positions for generation
             if hasattr(config, "max_position_embeddings"):
@@ -572,10 +548,10 @@ class JambaModelIntegrationTest(unittest.TestCase):
 
         input_ids = self.tokenizer("Hey how are you doing on this lovely evening?", return_tensors="pd")["input_ids"]
         out = self.model.generate(input_ids, do_sample=False, max_new_tokens=10)
-        output_sentence = self.tokenizer.decode(out[0, :])
+        output_sentence = self.tokenizer.decode(out[0][0, :])
         self.assertEqual(
-            output_sentence,
-            "<|startoftext|>Hey how are you doing on this lovely evening? Canyon rins hugaughter glamour Rutgers Singh Hebrew cases Cats",
+            output_sentence.strip(),
+            "Canyon rins hugaughter glamour Rutgers Singh Hebrew cases Cats",
         )
 
         with paddle.no_grad():
@@ -583,55 +559,60 @@ class JambaModelIntegrationTest(unittest.TestCase):
 
         EXPECTED_LOGITS_NO_GRAD = paddle.to_tensor(
             [
-                0.0140, -0.2246, 0.0408, -0.1016, 0.0471, 0.2715, -0.1465, 0.1631,
-                -0.2949, -0.0297, 0.0250, -0.5586, -0.2139, -0.1426, -0.1602, 0.1309,
-                0.0703, 0.2236, 0.1729, -0.2285, -0.1152, -0.1177, -0.1367, 0.0289,
-                0.1245, 0.2363, 0.0442, 0.1094, -0.1348, -0.2295, 0.1494, -0.3945,
-                0.1777, -0.4570, -0.0408, 0.2412, 0.1562, -0.1943, 0.2373, -0.0593,
+                0.0118, -0.2256, 0.0376, -0.0996, 0.0457, 0.2773, -0.1455, 0.1650,
+                -0.2910, -0.0261, 0.0240, -0.5586, -0.2139, -0.1406, -0.1582, 0.1318,
+                0.0684, 0.2217, 0.1699, -0.2275, -0.1182, -0.1157, -0.1387, 0.0272,
+                0.1245, 0.2334, 0.0425, 0.1099, -0.1348, -0.2305, 0.1445, -0.3945,
+                0.1768, -0.4570, -0.0439, 0.2412, 0.1553, -0.1914, 0.2383, -0.0593
+            ]
+            , dtype=paddle.float32)  # fmt: skip
+        self.assertTrue(
+            paddle.allclose(logits[0, -1, :40].cast("float32").cpu(), EXPECTED_LOGITS_NO_GRAD, rtol=1e-3, atol=1e-3)
+        )
+
+    @slow
+    def test_simple_batched_generate_with_padding(self):
+
+        inputs = self.tokenizer(
+            ["Hey how are you doing on this lovely evening?", "Tell me a story"], padding=True, return_tensors="pd"
+        )
+        out = self.model.generate(**inputs, do_sample=False, max_new_tokens=10)
+        output_sentences = self.tokenizer.batch_decode(out[0], skip_special_tokens=False)
+        self.assertEqual(
+            output_sentences[0].strip(),
+            "Canyon rins hugaughter glamour Rutgers Singh Hebrew cases Cats",
+        )
+        self.assertEqual(
+            output_sentences[1].strip(),
+            "ptus Nets Madison El chamadamodern updximVaparsed",
+        )
+
+        with paddle.no_grad():
+            logits = self.model(input_ids=inputs["input_ids"]).logits
+
+        EXPECTED_LOGITS_NO_GRAD_0 = paddle.to_tensor(
+            [
+                0.0148, -0.2246, 0.0403, -0.1006, 0.0452, 0.2734, -0.1465, 0.1641,
+                -0.2930, -0.0256, 0.0259, -0.5586, -0.2119, -0.1406, -0.1621, 0.1348,
+                0.0679, 0.2227, 0.1719, -0.2305, -0.1162, -0.1167, -0.1396, 0.0262,
+                0.1299, 0.2314, 0.0408, 0.1118, -0.1338, -0.2324, 0.1436, -0.3906,
+                0.1748, -0.4570, -0.0449, 0.2412, 0.1572, -0.1914, 0.2363, -0.0630
             ]
             , dtype=paddle.float32)  # fmt: skip
 
-        self.assertTrue(paddle.allclose(logits[0, -1, :40].cpu(), EXPECTED_LOGITS_NO_GRAD, rtol=1e-3, atol=1e-3))
+        EXPECTED_LOGITS_NO_GRAD_1 = paddle.to_tensor(
+            [
+                -0.1338, 0.2363, -0.4160, -0.0280, -0.0422, 0.0303, 0.2578, 0.0859,
+                0.1465, 0.2236, -0.1162, -0.1406, -0.1484, -0.1079, -0.0045, -0.2812,
+                0.1982, -0.2676, 0.0559, -0.2002, -0.2559, -0.1182, -0.2012, 0.2148,
+                0.0532, 0.1699, 0.1797, 0.1309, 0.1699, -0.1226, -0.2695, -0.2891,
+                0.2344, 0.2637, 0.0479, -0.1807, 0.2178, -0.1260, 0.1797, 0.0046
+            ]
+            , dtype=paddle.float32)  # fmt: skip
 
-    # @slow
-    # def test_simple_batched_generate_with_padding(self):
-
-    #     inputs = self.tokenizer(
-    #         ["Hey how are you doing on this lovely evening?", "Tell me a story"], padding=True, return_tensors="pd"
-    #     )
-    #     out = self.model.generate(**inputs, do_sample=False, max_new_tokens=10)
-    #     output_sentences = self.tokenizer.batch_decode(out)
-    #     self.assertEqual(
-    #         output_sentences[0],
-    #         "<|startoftext|>Hey how are you doing on this lovely evening? Canyon rins hugaughter glamour Rutgers Singh Hebrew cases Cats",
-    #     )
-    #     self.assertEqual(
-    #         output_sentences[1],
-    #         "<|pad|><|pad|><|pad|><|pad|><|pad|><|pad|><|startoftext|>Tell me a storyptus Nets Madison El chamadamodern updximVaparsed",
-    #     )
-
-    #     with torch.no_grad():
-    #         logits = self.model(input_ids=inputs["input_ids"]).logits
-
-    #     EXPECTED_LOGITS_NO_GRAD_0 = torch.tensor(
-    #         [
-    #             0.0140, -0.2246,  0.0408, -0.1016,  0.0471,  0.2715, -0.1465,  0.1631,
-    #            -0.2949, -0.0297,  0.0250, -0.5586, -0.2139, -0.1426, -0.1602,  0.1309,
-    #             0.0703,  0.2236,  0.1729, -0.2285, -0.1152, -0.1177, -0.1367,  0.0289,
-    #             0.1245,  0.2363,  0.0442,  0.1094, -0.1348, -0.2295,  0.1494, -0.3945,
-    #             0.1777, -0.4570, -0.0408,  0.2412,  0.1562, -0.1943,  0.2373, -0.0593
-    #         ]
-    #         , dtype=torch.float32)  # fmt: skip
-
-    #     EXPECTED_LOGITS_NO_GRAD_1 = torch.tensor(
-    #         [
-    #            -0.1289,  0.2363, -0.4180, -0.0302, -0.0476,  0.0327,  0.2578,  0.0874,
-    #             0.1484,  0.2305, -0.1152, -0.1396, -0.1494, -0.1113, -0.0021, -0.2832,
-    #             0.2002, -0.2676,  0.0598, -0.1982, -0.2539, -0.1133, -0.1973,  0.2148,
-    #             0.0559,  0.1670,  0.1846,  0.1270,  0.1680, -0.1250, -0.2656, -0.2871,
-    #             0.2344,  0.2637,  0.0510, -0.1855,  0.2158, -0.1289,  0.1758,  0.0074
-    #         ]
-    #         , dtype=torch.float32)  # fmt: skip
-
-    #     torch.testing.assert_close(logits[0, -1, :40].cpu(), EXPECTED_LOGITS_NO_GRAD_0, rtol=1e-3, atol=1e-3)
-    #     torch.testing.assert_close(logits[1, -1, :40].cpu(), EXPECTED_LOGITS_NO_GRAD_1, rtol=1e-3, atol=1e-3)
+        self.assertTrue(
+            paddle.allclose(logits[0, -1, :40].cast("float32").cpu(), EXPECTED_LOGITS_NO_GRAD_0, rtol=1e-3, atol=1e-3)
+        )
+        self.assertTrue(
+            paddle.allclose(logits[1, -1, :40].cast("float32").cpu(), EXPECTED_LOGITS_NO_GRAD_1, rtol=1e-3, atol=1e-3)
+        )

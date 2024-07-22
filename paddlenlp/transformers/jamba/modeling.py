@@ -216,7 +216,8 @@ def load_balancing_loss_func(
         if attention_mask.ndim == 2:
             batch_size, sequence_length = attention_mask.shape
             num_hidden_layers = concatenated_router_logits.shape[0] // (batch_size * sequence_length)
-
+            if attention_mask.dtype == paddle.bool:
+                attention_mask = attention_mask.cast("float32")
             # Compute the mask that masks all padding tokens as 0 with the same shape of expert_mask
             expert_attention_mask = (
                 attention_mask[None, :, :, None, None]
