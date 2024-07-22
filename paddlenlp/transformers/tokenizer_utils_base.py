@@ -1559,7 +1559,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             # use pretrained_init_configuration as `init_kwargs` to init which
             # does not include the vocab file in it, thus add vocab file into
             # args.
-            if args_name not in init_kwargs:
+            if args_name not in init_kwargs or init_kwargs[args_name] is None:
                 init_kwargs[args_name] = file_path
             # when `pretrained_model_name_or_path` is a pretrained model dir,
             # use tokenizer_config_file.json as `init_kwargs` to init which

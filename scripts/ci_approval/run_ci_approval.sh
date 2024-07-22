@@ -40,7 +40,7 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
     dir3=${arr_file_name[2]}
     dir4=${arr_file_name[3]}
     echo "file_name:"${file_name}, "dir1:"${dir1}, "dir2:"${dir2},"dir3:"${dir3},".xx:" ${file_name##*.}
-    if [[ ${file_name} =~ "paddlenlp/trainer/training_args.py" ]] || [[ ${file_name} =~ "paddlenlp/trainer/trainer.py" ]] || [[ ${file_name} =~ "llm/run_pretrain.py" ]] || [[ ${file_name} =~ "llm/finetune_generation.py" ]];then
+    if [[ ${file_name} =~ "paddlenlp/trainer/training_args.py" ]] || [[ ${file_name} =~ "paddlenlp/trainer/trainer.py" ]] || [[ ${file_name} =~ "llm/run_pretrain.py" ]] || [[ ${file_name} =~ "llm/run_finetune.py" ]];then
         echo_line="You must have two RD: one from(ZHUI, wawltor),one from(ForFishes,sneaxiy,zhiqiu) approval for the changes of training_args.py/trainer.py/run_pretrain.py "
         check_approval 2 ZHUI wawltor ForFishes sneaxiy zhiqiu
     elif [[ ${dir1} =~ "paddlenlp" ]];then

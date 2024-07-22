@@ -1,0 +1,53 @@
+#include "xpu/kernel/xtdk.h"
+#include "xpu/kernel/xtdk_math.h"
+#include "xpu/kernel/xtdk_simd.h"
+#include "xpu/kernel/cluster.h"
+
+namespace xpu2 {
+namespace plugin {
+
+// assert batch <= 512
+template <typename T, typename TID>
+__global__ void get_value_by_id(const T* logits,
+                                const TID* ids,
+                                T* logits_out,
+                                int batch,
+                                int seq_len,
+                                int hidden_dim) {
+  int tid = core_id() * cluster_num() + cluster_id();
+  int nthreads = core_num() * cluster_num();
+  constexpr int buf_size = 1024;
+  __simd__ T lm_buf[buf_size];
+  __simd__ TID lm_ids[batch];
+  int block_cnt = roundup_div(hidden_dim, buf_size);
+  GM2LM(ids, lm_ids, batch * sizeof(TID));
+
+  for (int i = tid; i < batch * block_cnt; i += nthreads) {
+    int curr_bs = i / block_cnt;
+    int curr_block = i % block_cnt;
+    TID curr_id = lm_ids[curr_bs];
+    if (curr_id == -1) {
+      curr_id = 0;
+    }
+    int src_offset = curr_bs * seq_len * hidden_dim + curr_id * hidden_dim +
+                     curr_block * buf_size;
+    int dst_offset = curr_bs * hidden_dim + curr_block * buf_size;
+    int read_len = min(buf_size, hidden_dim - curr_block * buf_size);
+    GM2LM(logits + src_offset, lm_buf, read_len * sizeof(T));
+    LM2GM(lm_buf, logits_out + dst_offset, read_len * sizeof(T));
+  }
+}
+
+#define _XPU_DEF__GET_VALUE_BY_ID_(DTYPE, IDTYPE)                              \
+  template __global__ void get_value_by_id<DTYPE, IDTYPE>(const DTYPE* logits, \
+                                                          const IDTYPE* ids,   \
+                                                          DTYPE* logits_out,   \
+                                                          int batch,           \
+                                                          int seq_len,         \
+                                                          int hidden_dim);
+
+_XPU_DEF__GET_VALUE_BY_ID_(float, int);
+_XPU_DEF__GET_VALUE_BY_ID_(float16, int);
+
+}  // namespace plugin
+}  // namespace xpu2

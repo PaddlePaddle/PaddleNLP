@@ -17,7 +17,7 @@ import os
 import sys
 import time
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Optional
 
 import paddle
 
@@ -34,7 +34,6 @@ from paddlenlp.trainer import (
     set_seed,
     speed_metrics,
 )
-from paddlenlp.trainer.trainer_utils import IntervalStrategy
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
@@ -44,6 +43,7 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     register_sequence_parallel_allreduce_hooks,
 )
+from paddlenlp.transformers.configuration_utils import LlmMetaConfig, llmmetaclass
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
@@ -61,6 +61,7 @@ def add_start_docstrings(*docstr):
 
 
 @dataclass
+@llmmetaclass
 @add_start_docstrings(TrainingArguments.__doc__)
 class PreTrainingArguments(TrainingArguments):
     min_learning_rate: float = field(
@@ -79,16 +80,25 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
-
     # NOTE(gongenlei): new add autotuner_benchmark
     autotuner_benchmark: bool = field(
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
     )
+    unified_checkpoint: bool = field(
+        default=False,
+        metadata={"help": "Enable fused linear grad add strategy."},
+    )
+    unified_checkpoint_config: Optional[str] = field(
+        default="",
+        metadata={"help": "Configs to unify hybrid parallel checkpoint.\n"},
+    )
 
     def __post_init__(self):
         super().__post_init__()
         # NOTE(gongenlei): new add autotuner_benchmark
+        from paddlenlp.trainer.trainer_utils import IntervalStrategy
+
         if self.autotuner_benchmark:
             self.max_steps = 5
             self.do_train = True
@@ -151,76 +161,28 @@ class ModelArguments:
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
 
-    use_flash_attention: bool = field(
-        default=False,
-        metadata={"help": "Whether to use flash attention"},
-    )
-    use_fused_rms_norm: bool = field(
-        default=False,
-        metadata={"help": "llama or other model, use_fused_rms_norm"},
-    )
     use_fast_layer_norm: bool = field(
         default=False,
         metadata={"help": "GPT3 model, use fast layernorm"},
     )
-    use_fused_linear: bool = field(
-        default=False,
-        metadata={"help": "GPT3 model, use fused linear layer"},
-    )
-    use_fused_dropout_add: bool = field(
-        default=False,
-        metadata={"help": "GPT3 model, use fused `dropout + residual add` op"},
-    )
+
+    hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
+    attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
+
     fuse_attention_qkv: bool = field(
-        default=False,
+        default=None,
         metadata={"help": "whether to fuse attention qkv"},
     )
     fuse_attention_ffn: bool = field(
-        default=False,
+        default=None,
         metadata={"help": "whether to fuse first up and gate proj in mlp block"},
     )
-    recompute_granularity: str = field(
-        default="full",
-        metadata={"help": "Choose among ['full', 'core_attn', 'full_attn']"},
-    )
-    virtual_pp_degree: int = field(
-        default=1,
-        metadata={"help": "virtual_pp_degree"},
-    )
-    hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
-    attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
 
     continue_training: bool = field(
         default=False,
         metadata={
             "help": "Pre-training from existing paddlenlp model weights. Default False and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models."
         },
-    )
-    sequence_parallel: bool = field(
-        default=False,
-        metadata={"help": "whether to use sequence parallel"},
-    )
-    fuse_sequence_parallel_allreduce: bool = field(
-        default=False,
-        metadata={"help": "whether to use fuse sequence parallel allreduce"},
-    )
-    use_fused_rope: Optional[bool] = field(
-        default=False,
-        metadata={"help": "Enable rope fusion or not."},
-    )
-    no_recompute_layers: Optional[List[int]] = field(
-        default=None,
-        metadata={"help": "Specify the full transformer layers that should not be recomputed."},
-    )
-    pp_recompute_interval: int = field(
-        default=1,
-        metadata={
-            "help": "The interval for the number of layers at which recomputation occurs. A value of 0 indicates no recomputation. Default is 0."
-        },
-    )
-    recompute_use_reentrant: bool = field(
-        default=False,
-        metadata={"help": "recompute_use_reentrant"},
     )
     num_hidden_layers: Optional[int] = field(
         default=None,
@@ -402,8 +364,11 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    if training_args.no_recompute_layers is not None:
+        training_args.no_recompute_layers.sort()
+
     if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
+        from utils.fused_layers import mock_layers
 
         mock_layers()
 
@@ -446,6 +411,9 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
     config = AutoConfig.from_pretrained(model_args.model_name_or_path)
+    # set all llm config
+    LlmMetaConfig.set_llm_config(config, training_args)
+    config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
@@ -456,43 +424,37 @@ def main():
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
         logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
 
-    if model_args.no_recompute_layers is not None:
-        model_args.no_recompute_layers.sort()
-
     config.num_hidden_layers = (
         model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
     )
-    config.use_flash_attention = model_args.use_flash_attention
-    config.use_fused_rms_norm = model_args.use_fused_rms_norm
-    config.use_fast_layer_norm = model_args.use_fast_layer_norm
-    config.use_fused_linear = model_args.use_fused_linear
-    config.use_fused_dropout_add = model_args.use_fused_dropout_add
-    config.fuse_attention_qkv = model_args.fuse_attention_qkv
-    config.fuse_attention_ffn = model_args.fuse_attention_ffn
-    config.recompute_granularity = model_args.recompute_granularity
-    config.virtual_pp_degree = model_args.virtual_pp_degree
-    config.sequence_parallel = model_args.sequence_parallel
-    config.fuse_sequence_parallel_allreduce = model_args.fuse_sequence_parallel_allreduce
-    config.use_fused_rope = model_args.use_fused_rope
-
-    config.no_recompute_layers = model_args.no_recompute_layers
-    config.pp_recompute_interval = model_args.pp_recompute_interval
-    config.recompute_use_reentrant = model_args.recompute_use_reentrant
-    config.use_recompute = training_args.recompute
-
-    config.tensor_parallel_degree = training_args.tensor_parallel_degree
-    config.tensor_parallel_rank = training_args.tensor_parallel_rank
-
     # Config for model using dropout, such as GPT.
-    config.hidden_dropout_prob = model_args.hidden_dropout_prob
-    config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
+    if hasattr(config, "hidden_dropout_prob"):
+        config.hidden_dropout_prob = model_args.hidden_dropout_prob
+    if hasattr(config, "attention_probs_dropout_prob"):
+        config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
+    if model_args.fuse_attention_qkv is not None:
+        config.fuse_attention_qkv = model_args.fuse_attention_qkv
+    if model_args.fuse_attention_ffn is not None:
+        config.fuse_attention_ffn = model_args.fuse_attention_ffn
 
-    config.sep_parallel_degree = training_args.sep_parallel_degree
     if config.sequence_parallel:
         assert config.tensor_parallel_degree > 1, "tensor_parallel_degree must be larger than 1 for sequence parallel."
     assert (
         config.num_attention_heads % config.sep_parallel_degree == 0
     ), f"num_attention_heads:{config.num_attention_heads} must be divisible by sep_parallel_degree {config.sep_parallel_degree}"
+    assert (
+        config.seq_length % config.context_parallel_degree == 0
+    ), f"seq_length:{config.seq_length} must be divisible by context_parallel_degree {config.context_parallel_degree}"
+
+    if training_args.sharding_parallel_config is not None:
+        # for stage1 overlap optimization
+        if (
+            "enable_stage1_allgather_overlap" in training_args.sharding_parallel_config
+            or "enable_stage1_broadcast_overlap" in training_args.sharding_parallel_config
+        ):
+            from paddle.io.reader import use_pinned_memory
+
+            use_pinned_memory(False)
 
     if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
         try:
@@ -519,7 +481,7 @@ def main():
         model_class = AutoModelForCausalLMPipe
         if "LLama" in str(config.architectures):
             try:
-                from register_reshard import register_pp_reshard_information
+                from utils.register_reshard import register_pp_reshard_information
 
                 register_pp_reshard_information(config.num_hidden_layers)
             except:
@@ -538,9 +500,9 @@ def main():
     else:
         model = model_class.from_config(config, dtype=dtype)
 
-    if model_args.sequence_parallel:
+    if training_args.sequence_parallel:
         register_sequence_parallel_allreduce_hooks(
-            model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
+            model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
         )
 
     if training_args.recompute:

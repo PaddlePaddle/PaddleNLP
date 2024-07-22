@@ -230,6 +230,10 @@ class TrainingArguments:
             The paddle sequence parallel strategy. It can reduce the GPU memory of activation to 1/sep, and it is orthogonal to
             data parallel, sharding stage1, tensor parallel and pipeline parallel strategy.
         )
+        context_parallel_degree (`int`, *optional*, defaults to `-1`)(
+            Context parallelism is a parallel method that segments training data in the sequence dimension.
+            This method uses Ring FlashAttention to ensure the correctness of the Attention result after segmentation. The complete attention score is obtained through ring communication and iterative updates.
+        )
         data_parallel_config (`str`, *optional*)(
             Some additional configs which affect data parallel performance, we provide some option to config it.
             following config is support:
@@ -266,6 +270,7 @@ class TrainingArguments:
               enable_stage1_broadcast_overlap, overlap stage1 V1 broadcast with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap forward compute and no other sync could be called during the training for broadcast overlap.
               enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap.
               disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.
+              enable_release_graHEADds, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -585,6 +590,15 @@ class TrainingArguments:
             )
         },
     )
+    context_parallel_degree: int = field(
+        default=-1,
+        metadata={
+            "help": (
+                "The paddle context parallel strategy. It can reduce the GPU memory of activation to 1/cp, and it is orthogonal to "
+                "data parallel, sharding stage1, tensor parallel and pipeline parallel strategy. "
+            )
+        },
+    )
     data_parallel_config: str = field(
         default="",
         metadata={
@@ -763,6 +777,10 @@ class TrainingArguments:
         default=True,
         metadata={"help": "Whether use lazy data processing."},
     )
+    use_async_save: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to use async_save instead of paddle.save."},
+    )
     skip_profile_timer: Optional[bool] = field(
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl."},
@@ -926,16 +944,24 @@ class TrainingArguments:
         if world_size > 1:
             tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
             sep_parallel_degree = max(self.sep_parallel_degree, 1)
+            context_parallel_degree = max(self.context_parallel_degree, 1)
             pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
 
             assert (
                 world_size % (self.tensor_parallel_degree * self.pipeline_parallel_degree) == 0
             ), f"Total world_size:{world_size} shoule be devided by tensor_parallel_degree: {self.tensor_parallel_degree} and pipeline_parallel_degree: {self.pipeline_parallel_degree}."
 
+            assert not (
+                sep_parallel_degree > 1 and context_parallel_degree > 1
+            ), f"sep parallel and context parallel cannot be used together, sep_parallel_degree:{sep_parallel_degree}, context_parallel_degree:{context_parallel_degree}."
+
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
                     self.sharding_parallel_degree = world_size // (
-                        tensor_parallel_degree * sep_parallel_degree * pipeline_parallel_degree
+                        tensor_parallel_degree
+                        * sep_parallel_degree
+                        * context_parallel_degree
+                        * pipeline_parallel_degree
                     )
 
             sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
@@ -944,7 +970,11 @@ class TrainingArguments:
                 self.sharding = []
 
             self.data_parallel_degree = world_size // (
-                sharding_parallel_degree * tensor_parallel_degree * sep_parallel_degree * pipeline_parallel_degree
+                sharding_parallel_degree
+                * tensor_parallel_degree
+                * sep_parallel_degree
+                * context_parallel_degree
+                * pipeline_parallel_degree
             )
 
             if (
@@ -952,12 +982,14 @@ class TrainingArguments:
                 or tensor_parallel_degree > 1
                 or pipeline_parallel_degree > 1
                 or self.sep_parallel_degree > 1
+                or self.context_parallel_degree > 1
             ):
                 self.use_hybrid_parallel = True
                 self.sharding_parallel_degree = sharding_parallel_degree
                 self.tensor_parallel_degree = tensor_parallel_degree
                 self.pipeline_parallel_degree = pipeline_parallel_degree
                 self.sep_parallel_degree = sep_parallel_degree
+                self.context_parallel_degree = context_parallel_degree
 
             if not self.use_hybrid_parallel:
                 self.sharding = []
@@ -965,6 +997,7 @@ class TrainingArguments:
                 self.tensor_parallel_degree = -1
                 self.pipeline_parallel_degree = -1
                 self.sep_parallel_degree = -1
+                self.context_parallel_degree = -1
 
         if self.hybrid_parallel_topo_order is None:
             self.hybrid_parallel_topo_order = "pp_first"
@@ -989,6 +1022,13 @@ class TrainingArguments:
                 logger.warning("set amp_master_grad to false since amp is disabled.")
                 self.amp_master_grad = False
 
+        def split_parallel_config(parallel_config):
+            if "," in parallel_config:
+                parallel_config = set(parallel_config.split(","))
+            else:
+                parallel_config = set(parallel_config.split(" "))
+            return parallel_config
+
         # use_hybrid_parallel
         if self.use_hybrid_parallel:
 
@@ -1006,7 +1046,7 @@ class TrainingArguments:
                 strategy = fleet.DistributedStrategy()
                 assert self.data_parallel_config == "", "data_parallle_config is not supported in hybrid parallel"
                 if self.pipeline_parallel_degree > 1:
-                    pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
+                    pipeline_parallel_config = split_parallel_config(self.pipeline_parallel_config)
                     for x in pipeline_parallel_config:
                         if len(x) > 0:
                             if x not in [
@@ -1080,10 +1120,7 @@ class TrainingArguments:
                 if self.tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
 
-                    if " " in self.tensor_parallel_config:
-                        mp_config = set(self.tensor_parallel_config.split(" "))
-                    else:
-                        mp_config = set(self.tensor_parallel_config.split(","))
+                    mp_config = split_parallel_config(self.tensor_parallel_config)
 
                     for x in mp_config:
                         if len(x) > 0:
@@ -1167,7 +1204,9 @@ class TrainingArguments:
                         "mp_degree": self.tensor_parallel_degree,
                         "pp_degree": self.pipeline_parallel_degree,
                         "sharding_degree": self.sharding_parallel_degree,
-                        "sep_degree": self.sep_parallel_degree,
+                        "sep_degree": self.sep_parallel_degree
+                        if self.sep_parallel_degree > 1
+                        else self.context_parallel_degree,
                         "order": order,
                     }
                 else:
@@ -1187,7 +1226,8 @@ class TrainingArguments:
                 strategy.hybrid_configs = hybrid_configs
 
                 if self.sharding_parallel_degree > 1:
-                    sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
+                    sharding_parallel_config = split_parallel_config(self.sharding_parallel_config)
+
                     for x in sharding_parallel_config:
                         if len(x) > 0:
                             if x not in [
@@ -1198,6 +1238,7 @@ class TrainingArguments:
                                 "disable_stage1_reduce_avg",
                                 "enable_stage1_broadcast_overlap",
                                 "enable_stage1_allgather_overlap",
+                                "enable_release_grads",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, "
@@ -1217,6 +1258,9 @@ class TrainingArguments:
                     try:
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
+
+                        if "enable_release_grads" in sharding_parallel_config:
+                            strategy.hybrid_configs["sharding_configs"].release_gradients = True
 
                         if self.pipeline_parallel_degree == 1:
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
@@ -1282,6 +1326,7 @@ class TrainingArguments:
         elif self.enable_auto_parallel:
             self.tensor_parallel_degree = max(self.tensor_parallel_degree, 1)
             self.sep_parallel_degree = max(self.sep_parallel_degree, 1)
+            self.context_parallel_degree = max(self.context_parallel_degree, 1)
             self.pipeline_parallel_degree = max(self.pipeline_parallel_degree, 1)
 
             assert (
@@ -1291,7 +1336,10 @@ class TrainingArguments:
             if self.sharding_parallel_degree == -1:
                 if len(self.sharding) > 0:
                     self.sharding_parallel_degree = world_size // (
-                        self.tensor_parallel_degree * self.sep_parallel_degree * self.pipeline_parallel_degree
+                        self.tensor_parallel_degree
+                        * self.sep_parallel_degree
+                        * self.context_parallel_degree
+                        * self.pipeline_parallel_degree
                     )
 
             self.sharding_parallel_degree = max(self.sharding_parallel_degree, 1)
@@ -1303,6 +1351,7 @@ class TrainingArguments:
                 self.sharding_parallel_degree
                 * self.tensor_parallel_degree
                 * self.sep_parallel_degree
+                * self.context_parallel_degree
                 * self.pipeline_parallel_degree
             )
 
@@ -1334,7 +1383,7 @@ class TrainingArguments:
 
             # navie-pp: pipeline_parallel_degree > 1 and gradient_accumulation_steps == 1
             if self.pipeline_parallel_degree > 1 and self.gradient_accumulation_steps > 1:
-                pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
+                pipeline_parallel_config = split_parallel_config(self.pipeline_parallel_config)
                 for x in pipeline_parallel_config:
                     if len(x) > 0:
                         if x not in [
@@ -1383,11 +1432,7 @@ class TrainingArguments:
 
             if self.tensor_parallel_degree > 1:
                 mp_optimization = strategy.mp_optimization
-
-                if " " in self.tensor_parallel_config:
-                    mp_config = set(self.tensor_parallel_config.split(" "))
-                else:
-                    mp_config = set(self.tensor_parallel_config.split(","))
+                mp_config = split_parallel_config(self.tensor_parallel_config)
 
                 for x in mp_config:
                     if len(x) > 0:
@@ -1420,7 +1465,7 @@ class TrainingArguments:
                 elif ShardingOption.FULL_SHARD in self.sharding:
                     sharding.stage = 3
 
-                sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
+                sharding_parallel_config = split_parallel_config(self.sharding_parallel_config)
                 for x in sharding_parallel_config:
                     if len(x) > 0:
                         if x not in [
@@ -1489,7 +1534,7 @@ class TrainingArguments:
             if world_size > 1:
                 if not paddle.distributed.parallel.parallel_helper._is_parallel_ctx_initialized():
                     if self.unified_checkpoint:
-                        self.use_hybrid_parallel = True
+                        # DP use hybrid group
                         strategy = fleet.DistributedStrategy()
                         fleet.init(is_collective=True, strategy=strategy)
                     else:
@@ -1671,7 +1716,7 @@ class TrainingArguments:
             return 0
 
     def _format_name(self, prefix, rank, degree):
-        size = max(2, len(str(degree)))
+        size = 2
         return f"{prefix}{rank:0>{size}d}"
 
     @property
