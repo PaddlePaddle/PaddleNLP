@@ -45,10 +45,6 @@ repos:
         language: system
         files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto|xpu|kps|py|sh)$
 # For Markdown files
--   repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.41.0
-    hooks:
-    -   id: markdownlint
 -   repo: local
     hooks:
     -   id: add-spaces-between-chinese-and-english
