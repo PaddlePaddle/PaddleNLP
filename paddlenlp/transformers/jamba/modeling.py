@@ -1595,7 +1595,11 @@ class JambaPretrainingCriterion(nn.Layer):
         super().__init__()
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
-        self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
+        self.enable_parallel_cross_entropy = (
+            config.tensor_parallel_degree > 1
+            and config.vocab_size % config.tensor_parallel_degree == 0
+            and config.tensor_parallel_output
+        )
 
         if self.enable_parallel_cross_entropy:  # and False: # and lm_head is distributed
             self.loss_func = mpu.ParallelCrossEntropy(ignore_index=self.ignore_index)
@@ -1613,8 +1617,16 @@ class JambaPretrainingCriterion(nn.Layer):
         with paddle.amp.auto_cast(False):
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
             # skip ignore_index which loss == 0
-            masked_lm_loss = masked_lm_loss[masked_lm_loss > 0].astype("float32")
-            loss = paddle.mean(masked_lm_loss)
+            # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
+            # loss = paddle.mean(masked_lm_loss)
+            binary_sequence = paddle.where(
+                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+            )
+            count = paddle.sum(binary_sequence)
+            if count == 0:
+                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            else:
+                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
 
         return loss
 
@@ -1651,7 +1663,7 @@ class JambaLMHead(nn.Layer):
         #     hidden_states = paddle.reshape_(hidden_states, [-1, seq_length, self.config.hidden_size])
 
         if tensor_parallel_output is None:
-            tensor_parallel_output = self.config.tensor_parallel_output
+            tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
         logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
