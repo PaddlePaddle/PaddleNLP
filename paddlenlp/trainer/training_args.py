@@ -344,7 +344,7 @@ class TrainingArguments:
             `"none"` for no integrations.
         ddp_find_unused_parameters (`bool`, *optional*):
             When using distributed training, the value of the flag `find_unused_parameters` passed to
-            `paddle.DataParallel`. Default is `None`.
+            `paddle.DataParallel`. Will default to `False` if recompute is used, `True` otherwise.
         wandb_api_key (`str`, *optional*):
             Weights & Biases (WandB) API key(s) for authentication with the WandB service.
         resume_from_checkpoint (`str`, *optional*):
