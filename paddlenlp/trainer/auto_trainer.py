@@ -271,6 +271,9 @@ class AutoTrainer(Trainer):
 
         self.timers and self.timers("read-data").start()
 
+        if self.args.enable_auto_parallel and self.args.to_static:
+            self._load_from_checkpoint(model, resume_from_checkpoint)
+
         for epoch in range(epochs_trained, num_train_epochs):
 
             step_control = 0  # used in loop control, reset to 0 after every step
@@ -542,7 +545,6 @@ class AutoTrainer(Trainer):
             logger.info(f"Saving checkpoinit files into {output_dir}")
 
             if self.args.should_save_model_state:
-
                 if self.args.to_static:
                     state_dict = model.state_dict()
                 else:
@@ -646,7 +648,7 @@ class AutoTrainer(Trainer):
             self._save_ckpt_func(self.model.state_dict(), os.path.join(output_dir, MODEL_NAME))
             logger.info(f"Model weights saved in {output_dir}/{MODEL_NAME}")
 
-    def _load_from_checkpoint(self, resume_from_checkpoint=None):
+    def _load_from_checkpoint(self, model, resume_from_checkpoint=None):
 
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
 
