@@ -135,7 +135,7 @@ def load_tp_checkpoint(folder, cls, config, return_numpy=False):
     """
 
     config = AutoConfig.from_pretrained(folder)
-    if config.tensor_parallel_degree == 1:
+    if config.tensor_parallel_degree == 1 or config.tensor_parallel_degree == -1:
         return load_sharded_checkpoint(folder, return_numpy=return_numpy)
     else:
         rank_model_path = os.path.join(folder, f"model_state.tp0{config.tensor_parallel_rank}.pdparams")
