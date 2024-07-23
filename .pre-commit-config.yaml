@@ -44,6 +44,7 @@ repos:
         entry: python .copyright.hook
         language: system
         files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto|xpu|kps|py|sh)$
+# For Markdown files
 -   repo: local
     hooks:
     -   id: add-spaces-between-chinese-and-english
