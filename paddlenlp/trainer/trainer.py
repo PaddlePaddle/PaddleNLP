@@ -81,7 +81,7 @@ from ..data import (
     DistDataLoader,
     default_data_collator,
 )
-from ..peft import LoRAModel, PrefixModelForCausalLM
+from ..peft import LoRAModel, PrefixModelForCausalLM, VeRAModel
 
 try:
     from ..quantization.quantization_linear import QuantizationLinear
@@ -107,6 +107,7 @@ from ..utils.env import (
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
+    VERA_WEIGHTS_NAME,
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
@@ -433,7 +434,11 @@ class Trainer:
         if train_dataset is not None and not isinstance(train_dataset, collections.abc.Sized) and args.max_steps <= 0:
             raise ValueError("train_dataset does not implement __len__, max_steps has to be specified")
 
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+        if (
+            isinstance(self.model, LoRAModel)
+            or isinstance(self.model, PrefixModelForCausalLM)
+            or isinstance(self.model, VeRAModel)
+        ):
             if self.args.unified_checkpoint and "skip_save_model_weight" in self.args.unified_checkpoint_config:
                 self.args.unified_checkpoint_config.remove("skip_save_model_weight")
                 logger.warning(
@@ -572,6 +577,8 @@ class Trainer:
                 weights_file = os.path.join(resume_from_checkpoint, PREFIX_WEIGHTS_NAME)
                 if self.model.prefix_config.tensor_parallel_degree > 1:
                     convert_tp = True
+            elif isinstance(self.model, VeRAModel):
+                weights_file = os.path.join(resume_from_checkpoint, VERA_WEIGHTS_NAME)
             if self.args.dataset_rank == 0:
                 logger.info(f"Loading model from {resume_from_checkpoint} .")
 
@@ -626,7 +633,11 @@ class Trainer:
                     self.runtime_timer.stop()
                     return
 
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+        if (
+            isinstance(self.model, LoRAModel)
+            or isinstance(self.model, PrefixModelForCausalLM)
+            or isinstance(self.model, VeRAModel)
+        ):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
             self.runtime_timer.stop()
             return
@@ -2509,7 +2520,11 @@ class Trainer:
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
         # peft model
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+        if (
+            isinstance(self.model, LoRAModel)
+            or isinstance(self.model, PrefixModelForCausalLM)
+            or isinstance(self.model, VeRAModel)
+        ):
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,
