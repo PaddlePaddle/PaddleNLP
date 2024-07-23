@@ -19,11 +19,9 @@ from dataclasses import dataclass, field
 import paddle
 from paddle.distributed import fleet
 from predict.predictor import ModelArgument, PredictorArgument, create_predictor
-from tqdm import tqdm
 from utils.utils import generate_rank_mapping, get_infer_model_path
 
 from paddlenlp.trainer import PdArgumentParser
-from paddlenlp.utils.log import logger
 
 
 @dataclass
@@ -38,32 +36,6 @@ def load_inference_model(model_path, model_name, param_name, exe):
         return paddle.static.io.load_inference_model(model_path, exe, model_name, param_name)
     else:
         return paddle.static.io.load_inference_model(model_path, exe)
-
-
-def validate_pdmodel(model_path, model_prefix, device):
-    paddle.enable_static()
-    if device == "gpu":
-        place = paddle.CUDAPlace(0)
-    elif device == "cpu":
-        place = paddle.CPUPlace()
-    else:
-        place = paddle.CustomPlace(device, 0)
-    exe = paddle.static.Executor(place)
-    scope = paddle.static.Scope()
-
-    with paddle.static.scope_guard(scope):
-        net_program, feed_target_names, fetch_targets = paddle.static.io.load_inference_model(
-            os.path.join(model_path, model_prefix), exe
-        )
-
-        if not paddle.framework.use_pir_api():
-            for block in net_program.blocks:
-                ops: list[paddle.framework.Operator] = block.ops
-                for op in tqdm(ops, desc="checking the validation of ops"):
-                    if op.type.lower() == "print":
-                        logger.warning(
-                            f"UNEXPECTED OP<{op.type}> which will reduce the performace of the static model"
-                        )
 
 
 def main():
@@ -104,7 +76,6 @@ def main():
 
     if tensor_parallel_degree > 1:
         export_args.output_path = os.path.join(export_args.output_path, f"rank_{tensor_parallel_rank}")
-    validate_pdmodel(export_args.output_path, predictor_args.model_prefix, predictor_args.device)
 
     if predictor_args.device == "npu":
         from npu.llama.export_utils import process_params
