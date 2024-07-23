@@ -19,9 +19,10 @@ import unittest
 
 import paddle
 from parameterized import parameterized_class
-from testing_utils import LLMTest
 
 from tests.testing_utils import argv_context_guard, load_test_config
+
+from .testing_utils import LLMTest
 
 
 @parameterized_class(
