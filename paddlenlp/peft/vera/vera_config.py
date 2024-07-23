@@ -52,12 +52,6 @@ class VeRAConfig:
     trainable_bias: Optional[str] = field(
         default=None, metadata={"help": "Define trainable bias parameters for the vera model."}
     )
-    enable_vera_list: Optional[Union[List[bool], List[Optional[List[bool]]]]] = field(
-        default=None,
-        metadata={
-            "help": "Provides fine-grained control over `MergedveraLinear`. If None, `veraLinear` is used instead."
-        },
-    )
     tensor_parallel_degree: int = field(default=-1, metadata={"help": "1 for not use tensor parallel"})
     dtype: Optional[str] = field(default=None, metadata={"help": "The data type of tensor"})
     head_dim: Optional[int] = field(

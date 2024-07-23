@@ -48,6 +48,7 @@ class VeRALinear(nn.Linear):
         self.merged = False
 
         if pissa_init:
+            assert self.vera_alpha == self.r, "pissa method requires vera_alpha=r, scaling=1"
             self.scaling = 1.0
             self.vera_A = self.create_parameter(
                 shape=[in_features, r],

@@ -242,20 +242,10 @@ class VeRAModel(nn.Layer):
             return model
         elif isinstance(vera_config.target_modules, str):
             target_modules = [vera_config.target_modules]
-            if vera_config.enable_vera_list is None:
-                enable_vera_list = [vera_config.enable_vera_list]
-            else:
-                raise TypeError(
-                    f"Invalid `enable_vera_list` value: {vera_config.enable_vera_list}. Since `target_modules` is `str`, `enable_vera_list` must be `None` or `List[bool]`"
-                )
+            enable_vera_list = [None]
         else:
             target_modules = vera_config.target_modules
-            if vera_config.enable_vera_list is None:
-                enable_vera_list = [None for _ in range(len(target_modules))]
-            else:
-                raise TypeError(
-                    f"Invalid `enable_vera_list` value: {vera_config.enable_vera_list}. Since `target_modules` is `List[str]`, `enable_vera_list` must be `None` or `List[Optional[List[bool]]]`"
-                )
+            enable_vera_list = [None for _ in range(len(target_modules))]
 
         for target_module, enable_vera in zip(target_modules, enable_vera_list):
             for i in model.named_sublayers():

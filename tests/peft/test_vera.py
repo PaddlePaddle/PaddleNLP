@@ -171,14 +171,15 @@ class TestVeraModel(unittest.TestCase):
             vera_model.restore_original_model()
 
     def test_vera_module_raise_exception(self):
-        vera_config = VeRAConfig(
-            target_modules=[".*norm1.*"],
-            r=4,
-            vera_alpha=4,
-            enable_vera_list=None,
-        )
+        vera_config = VeRAConfig(target_modules=[".*norm1.*"], r=4, vera_alpha=4)
         model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
         with self.assertRaises(ValueError):
+            VeRAModel(model, vera_config)
+
+    def test_pissa_raise_exception(self):
+        vera_config = VeRAConfig(target_modules=[".*q_proj.*"], r=4, vera_alpha=8, pissa_init=True)
+        model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
+        with self.assertRaises(AssertionError):
             VeRAModel(model, vera_config)
 
 
@@ -200,7 +201,3 @@ class TestVeRAConfig(unittest.TestCase):
             vera_config = VeRAConfig()
             with self.assertRaises(AssertionError):
                 vera_config.save_pretrained(f.name)
-
-
-if __name__ == "__main__":
-    unittest.main()

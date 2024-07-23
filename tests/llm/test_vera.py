@@ -15,14 +15,15 @@ from __future__ import annotations
 
 import os
 import sys
+
+sys.path.append("/home/ldn/baidu/pyreft/paddle-version/mypr/0705/PaddleNLP")
 import unittest
 
 import paddle
 from parameterized import parameterized_class
 
+from tests.llm.testing_utils import LLMTest
 from tests.testing_utils import argv_context_guard, load_test_config
-
-from .testing_utils import LLMTest
 
 
 @parameterized_class(
@@ -80,3 +81,7 @@ class VeraTest(LLMTest, unittest.TestCase):
             self.run_predictor({"inference_model": True})
 
         self.run_predictor({"inference_model": False})
+
+
+if __name__ == "__main__":
+    unittest.main()
