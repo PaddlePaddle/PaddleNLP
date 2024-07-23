@@ -29,15 +29,6 @@ class ExportArgument:
     output_path: str = field(default=None, metadata={"help": "The output path of model."})
 
 
-def load_inference_model(model_path, model_name, param_name, exe):
-    model_abs_path = os.path.join(model_path, model_name)
-    param_abs_path = os.path.join(model_path, param_name)
-    if os.path.exists(model_abs_path) and os.path.exists(param_abs_path):
-        return paddle.static.io.load_inference_model(model_path, exe, model_name, param_name)
-    else:
-        return paddle.static.io.load_inference_model(model_path, exe)
-
-
 def main():
     parser = PdArgumentParser((PredictorArgument, ModelArgument, ExportArgument))
     predictor_args, model_args, export_args = parser.parse_args_into_dataclasses()
