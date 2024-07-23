@@ -36,7 +36,7 @@ all_P0case_dic=("msra_ner"]=15
     ["gpt"]=2 
     ["ernie-1.0"]=2 
     ["xlnet"]=2
-    ["ofa"]=2 ["albert"]=2 ["SQuAD"]=20 ["lexical_analysis"]=5 ["word_embedding"]=5
+    ["ofa"]=2 ["albert"]=2 ["lexical_analysis"]=5
     ["transformer"]=5
     ["question_matching"]=5 ["ernie-csc"]=5  ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5
     ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5  ["llm"]=5

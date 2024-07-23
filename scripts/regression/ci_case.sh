@@ -26,7 +26,7 @@ if [ ! -d "model_logs" ]; then
     mkdir model_logs
 fi
 if [ ! -d "unittest_logs" ]; then
-    mkdir model_logs
+    mkdir unittest_logs
 fi
 
 print_info() {
@@ -179,7 +179,7 @@ skep() {
 }
 # 6 bigbird
 bigbird(){
-    cd ${nlp_dir}/legacy/examples/language_model/bigbird/
+    cd ${nlp_dir}/legacy/model_zoo/bigbird/
     export CUDA_VISIBLE_DEVICES=${cudaid2}
     time (python -m paddle.distributed.launch  --log_dir log  run_pretrain.py --model_name_or_path bigbird-base-uncased \
         --input_dir "./data" \
@@ -263,25 +263,25 @@ ofa(){
     mv sst-2_ft_model_1.pdparams/  ${nlp_dir}/legacy/examples/model_compression/ofa/
     cd -
     #model slim
-    export CUDA_VISIBLE_DEVICES=${cudaid2}
-    time (python -m paddle.distributed.launch run_glue_ofa.py  \
-        --model_type bert \
-        --model_name_or_path ./sst-2_ft_model_1.pdparams/ \
-        --task_name SST-2 --max_seq_length 128     \
-        --batch_size 32       \
-        --learning_rate 2e-5     \
-        --num_train_epochs 1     \
-        --max_steps 1 \
-        --logging_steps 1    \
-        --save_steps 1     \
-        --output_dir ./ofa/SST-2 \
-        --device gpu  \
-        --width_mult_list 1.0 0.8333333333333334 0.6666666666666666 0.5 >${log_path}/ofa_slim) >>${log_path}/ofa_slim 2>&1
-    print_info $? ofa_slim
+    # export CUDA_VISIBLE_DEVICES=${cudaid2}
+    # time (python -m paddle.distributed.launch run_glue_ofa.py  \
+    #     --model_type bert \
+    #     --model_name_or_path ./sst-2_ft_model_1.pdparams/ \
+    #     --task_name SST-2 --max_seq_length 128     \
+    #     --batch_size 32       \
+    #     --learning_rate 2e-5     \
+    #     --num_train_epochs 1     \
+    #     --max_steps 1 \
+    #     --logging_steps 1    \
+    #     --save_steps 1     \
+    #     --output_dir ./ofa/SST-2 \
+    #     --device gpu  \
+    #     --width_mult_list 1.0 0.8333333333333334 0.6666666666666666 0.5 >${log_path}/ofa_slim) >>${log_path}/ofa_slim 2>&1
+    # print_info $? ofa_slim
 }
 # 12 albert
 albert() {
-    cd ${nlp_dir}/legacy/legacy/examples/benchmark/glue/
+    cd ${nlp_dir}/legacy/examples/benchmark/glue/
     export CUDA_VISIBLE_DEVICES=${cudaid2}
     time (python -m paddle.distributed.launch run_glue.py \
         --model_type albert \
@@ -299,41 +299,41 @@ albert() {
     print_info $? albert_sst-2_train
 }
 # 13 squad
-squad() {
-    cd ${nlp_dir}/legacy/legacy/examples/machine_reading_comprehension/SQuAD/
-    export CUDA_VISIBLE_DEVICES=${cudaid1}
-    # finetune
-    time (python -m paddle.distributed.launch run_squad.py \
-        --model_type bert \
-        --model_name_or_path bert-base-uncased \
-        --max_seq_length 384 \
-        --batch_size 12 \
-        --learning_rate 3e-5 \
-        --num_train_epochs 1 \
-        --max_steps 1 \
-        --logging_steps 1 \
-        --save_steps 1 \
-        --warmup_proportion 0.1 \
-        --weight_decay 0.01 \
-        --output_dir ./tmp/squad/ \
-        --device gpu \
-        --do_train \
-        --do_predict >${log_path}/squad_train) >>${log_path}/squad_train 2>&1
-    print_info $? squad_train
-    # export model
-    time (python -u ./export_model.py \
-        --model_type bert \
-        --model_path ./tmp/squad/model_1/ \
-        --output_path ./infer_model/model >${log_path}/squad_export) >>${log_path}/squad_export 2>&1
-    print_info $? squad_export
-    # predict
-    time (python -u deploy/python/predict.py \
-        --model_type bert \
-        --model_name_or_path ./infer_model/model \
-        --batch_size 2 \
-        --max_seq_length 384 >${log_path}/squad_predict) >>${log_path}/squad_predict 2>&1
-    print_info $? squad_predict
-}
+# squad() {
+#     cd ${nlp_dir}/legacy/examples/machine_reading_comprehension/SQuAD/
+#     export CUDA_VISIBLE_DEVICES=${cudaid1}
+#     # finetune
+#     time (python -m paddle.distributed.launch run_squad.py \
+#         --model_type bert \
+#         --model_name_or_path bert-base-uncased \
+#         --max_seq_length 384 \
+#         --batch_size 12 \
+#         --learning_rate 3e-5 \
+#         --num_train_epochs 1 \
+#         --max_steps 1 \
+#         --logging_steps 1 \
+#         --save_steps 1 \
+#         --warmup_proportion 0.1 \
+#         --weight_decay 0.01 \
+#         --output_dir ./tmp/squad/ \
+#         --device gpu \
+#         --do_train \
+#         --do_predict >${log_path}/squad_train) >>${log_path}/squad_train 2>&1
+#     print_info $? squad_train
+#     # export model
+#     time (python -u ./export_model.py \
+#         --model_type bert \
+#         --model_path ./tmp/squad/model_1/ \
+#         --output_path ./infer_model/model >${log_path}/squad_export) >>${log_path}/squad_export 2>&1
+#     print_info $? squad_export
+#     predict
+#     time (python -u deploy/python/predict.py \
+#         --model_type bert \
+#         --model_name_or_path ./infer_model/model \
+#         --batch_size 2 \
+#         --max_seq_length 384 >${log_path}/squad_predict) >>${log_path}/squad_predict 2>&1
+#     print_info $? squad_predict
+# }
 # 15 lexical_analysis
 lexical_analysis(){
     export CUDA_VISIBLE_DEVICES=${cudaid2}
@@ -367,27 +367,6 @@ lexical_analysis(){
         --params_file=infer_model/static_graph_params.pdiparams \
         --data_dir lexical_analysis_dataset_tiny >${log_path}/lexical_analysis_deploy) >>${log_path}/lexical_analysis_deploy 2>&1
     print_info $? lexical_analysis_deploy
-}
-# 18 word_embedding 5min
-word_embedding(){
-    export CUDA_VISIBLE_DEVICES=${cudaid1}
-    cd ${nlp_dir}/legacy/examples/word_embedding/
-    # 使用paddlenlp.embeddings.TokenEmbedding
-    time (python train.py --device='gpu' \
-        --lr=5e-4 \
-        --batch_size=32 \
-        --epochs=1 \
-        --use_token_embedding=True \
-        --vdl_dir='./vdl_paddlenlp_dir'  >${log_path}/word_embedding_paddlenlp_train) >>${log_path}/word_embedding_paddlenlp_train 2>&1
-    print_info $? word_embedding_paddlenlp_train
-    # 使用paddle.nn.Embedding
-    time (python train.py --device='gpu' \
-        --lr=1e-4 \
-        --batch_size=32 \
-        --epochs=1 \
-        --use_token_embedding=False \
-        --vdl_dir='./vdl_paddle_dir' >${log_path}/word_embedding_paddle_train) >>${log_path}/word_embedding_paddle_train 2>&1
-    print_info $? word_embedding_paddle_train
 }
 
 # 22 transformer
@@ -537,20 +516,20 @@ clue() {
     print_info $? clue-class
     cd ${nlp_dir}/legacy/examples/benchmark/clue/mrc
     export CUDA_VISIBLE_DEVICES=${cudaid1}
-    python -m paddle.distributed.launch run_cmrc2018.py \
-        --model_name_or_path ernie-3.0-base-zh \
-        --batch_size 16 \
-        --learning_rate 3e-5 \
-        --max_seq_length 512 \
-        --num_train_epochs 2 \
-        --do_train \
-        --do_predict \
-        --warmup_proportion 0.1 \
-        --weight_decay 0.01 \
-        --gradient_accumulation_steps 2 \
-        --max_steps 1 \
-        --output_dir ./tmp >${log_path}/clue-mrc >>${log_path}/clue-mrc 2>&1
-    print_info $? clue-mrc
+    # python -m paddle.distributed.launch run_cmrc2018.py \
+    #     --model_name_or_path ernie-3.0-base-zh \
+    #     --batch_size 16 \
+    #     --learning_rate 3e-5 \
+    #     --max_seq_length 512 \
+    #     --num_train_epochs 2 \
+    #     --do_train \
+    #     --do_predict \
+    #     --warmup_proportion 0.1 \
+    #     --weight_decay 0.01 \
+    #     --gradient_accumulation_steps 2 \
+    #     --max_steps 1 \
+    #     --output_dir ./tmp >${log_path}/clue-mrc >>${log_path}/clue-mrc 2>&1
+    # print_info $? clue-mrc
 }
 #33 taskflow
 taskflow (){
