@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import math
 import os
 import sys
-import inspect
 from functools import partial
 
 import paddle
@@ -25,7 +25,8 @@ from utils.argument import (
     QuantArgument,
     TrainingArguments,
 )
-from utils.data import get_convert_example
+from utils.attention_forward_replace import replace_llama2_attn, replace_qwen2_attn
+from utils.data import tokenize_autogressive
 from utils.utils import (
     CausalLMTrainer,
     ZeroPaddingIterDatasetCallback,
@@ -35,7 +36,7 @@ from utils.utils import (
     init_chat_template,
 )
 
-from paddlenlp.data import DataCollatorForSeq2Seq
+from paddlenlp.data import DataCollatorForLanguageModeling, DataCollatorForSeq2Seq
 from paddlenlp.datasets import (
     ZeroPaddingIterableDataset,
     ZeroPaddingMapDataset,
@@ -51,9 +52,9 @@ from paddlenlp.transformers import (
     AutoModelForCausalLMPipe,
     AutoTokenizer,
     Llama3Tokenizer,
-    LlamaTokenizer,
     LlamaForCausalLM,
     LlamaForCausalLMPipe,
+    LlamaTokenizer,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.utils.log import logger
@@ -78,11 +79,16 @@ def main():
     training_args.print_config(quant_args, "Quant")
     training_args.print_config(gen_args, "Generation")
 
+    if training_args.use_shift_sparse_attention:
+        if model_args.model_name_or_path == "Qwen/Qwen2-1.5B":
+            replace_qwen2_attn(use_flash_attn=False, use_full=False, inference=False)
+        elif model_args.model_name_or_path == "meta-llama/Llama-2-7b":
+            replace_llama2_attn(use_flash_attn=False, use_full=False, inference=False)
+
     if sum([quant_args.do_ptq, quant_args.do_qat, quant_args.do_gptq, training_args.do_train]) > 1:
         raise ValueError(
             "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
         )
-    
 
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
@@ -129,6 +135,17 @@ def main():
         from_aistudio=model_args.from_aistudio,
         quantization_config=quantization_config,
     )
+    orig_rope_scaling = getattr(model_config, "rope_scaling", None)
+
+    orig_rope_scaling_factor = orig_rope_scaling["factor"] if "factor" in orig_rope_scaling.keys() else 1
+    orig_ctx_len = getattr(model_config, "max_position_embeddings", None)
+
+    if orig_ctx_len:
+        orig_ctx_len *= orig_rope_scaling_factor
+        if data_args.max_length > orig_ctx_len:
+            scaling_factor = float(math.ceil(data_args.max_length / orig_ctx_len))
+            model_config.rope_scaling_type = "linear"
+            model_config.rope_scaling_factor = scaling_factor
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
@@ -168,9 +185,7 @@ def main():
         model = model_class.from_config(model_config, dtype=dtype)
 
     if model_args.flash_mask and (not data_args.zero_padding or not model.config.use_flash_attention):
-        logger.warning(
-            "`flash_mask` must use with zero padding and flash attention."
-        )
+        logger.warning("`flash_mask` must use with zero padding and flash attention.")
         data_args.zero_padding = True
         model.config.use_flash_attention = True
 
@@ -331,11 +346,10 @@ def main():
         train_ds = train_ds.skip(consumed_samples)
 
     if training_args.pipeline_parallel_degree > 1:
-        from utils.data import convert_example_common
 
-        trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
+        trans_func = partial(tokenize_autogressive, tokenizer=tokenizer, data_args=data_args)
     else:
-        trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
+        trans_func = partial(tokenize_autogressive, tokenizer=tokenizer, data_args=data_args)
 
     if data_args.zero_padding:
         if (
@@ -345,13 +359,9 @@ def main():
             raise NotImplementedError(
                 "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM, QWen and Mistral so far."
             )
-    train_ds = (
-        train_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask))
-        if train_ds is not None
-        else None
-    )
+    train_ds = train_ds.map(trans_func, batched=True, remove_columns=train_ds["train"].column_names)
     ptq_ds = (
-        ptq_ds.map(partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask))
+        ptq_ds.map(trans_func, batched=True, remove_columns=train_ds["train"].column_names)
         if ptq_ds is not None
         else None
     )
@@ -362,7 +372,7 @@ def main():
         )
         eval_zero_padding = False
     dev_ds = (
-        dev_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation, zero_padding=eval_zero_padding, flash_mask=model_args.flash_mask))
+        dev_ds.map(trans_func, batched=True, remove_columns=dev_ds["train"].column_names)
         if dev_ds is not None
         else None
     )
@@ -502,14 +512,13 @@ def main():
     else:
         metrics = compute_metrics
 
-    trainer = CausalLMTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_ds,
-        eval_dataset=dev_ds,
-        tokenizer=tokenizer,
-        compute_metrics=metrics,
-        data_collator=DataCollatorForSeq2Seq(
+    if training_args.use_shift_sparse_attention:
+        data_collator = DataCollatorForLanguageModeling(
+            tokenizer=tokenizer,
+            mlm=False,
+        )
+    else:
+        data_collator = DataCollatorForSeq2Seq(
             tokenizer=tokenizer,
             max_length=max_length,
             padding=padding,
@@ -517,7 +526,15 @@ def main():
             return_tensors="np",
             return_attention_mask=not model_args.flash_mask,
             pad_to_multiple_of=data_args.pad_to_multiple_of,
-        ),
+        )
+    trainer = CausalLMTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_ds,
+        eval_dataset=dev_ds,
+        tokenizer=tokenizer,
+        compute_metrics=metrics,
+        data_collator=data_collator,
         do_generation=data_args.eval_with_do_generation,
         callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
         gen_args=gen_args,

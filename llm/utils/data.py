@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import numpy as np
+import paddle
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 
@@ -65,6 +66,29 @@ def get_convert_example(model):
 
 class DataFormatError(ValueError):
     pass
+
+
+def tokenize_autogressive(tokenizer, example, data_args):
+    if "text" in example:
+        source = example["text"][0] if isinstance(example["text"], list) else example["text"]
+    else:
+        raise DataFormatError(
+            f"Example format is wrong, please check: {example} or rewrite tokenize_example in data.py "
+        )
+    outputs = tokenizer(
+        source,
+        max_length=data_args.max_length,
+        truncation=False,
+        return_tensors="pd",
+        padding=True,
+        pad_to_multiple_of=data_args.max_length,
+    )
+
+    input_batch = paddle.split(
+        outputs["input_ids"], num_or_sections=outputs["input_ids"].shape[1] // data_args.max_length, axis=1
+    )
+    input_batch = [paddle.squeeze(input_batch[0])]
+    return {"input_ids": input_batch}
 
 
 def tokenize_example(tokenizer, example, data_args):
@@ -197,9 +221,7 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, zero_pad
             features["position_ids"] = list(range(seq_length))
         if zero_padding:
             if flash_mask:
-                features["attn_mask_startend_row_indices"] = (
-                    [seq_length] * seq_length
-                )
+                features["attn_mask_startend_row_indices"] = [seq_length] * seq_length
             else:
                 features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
 
@@ -235,12 +257,9 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, z
     features = {"input_ids": input_ids, "labels": labels}
     if zero_padding:
         if flash_mask:
-            features["attn_mask_startend_row_indices"] = (
-                [seq_length] * seq_length
-            )
+            features["attn_mask_startend_row_indices"] = [seq_length] * seq_length
         else:
             features["attention_mask"] = np.tri(seq_length, seq_length, dtype=bool)
-
 
     if "position_ids" in rounds_inputs:
         rounds_inputs["position_ids"] = rounds_inputs["position_ids"][:-1]
@@ -251,9 +270,7 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, z
 
 def convert_example_chatglm(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False):
     if flash_mask:
-        raise ValueError(
-            "chatglm does not support flash mask for now!"
-        )
+        raise ValueError("chatglm does not support flash mask for now!")
     if tokenizer.chat_template is not None:
         # chatglm only support single-round finetune
         example = convert_multi_rounds_to_single_round(example, tokenizer)
