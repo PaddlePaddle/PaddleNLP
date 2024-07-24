@@ -359,9 +359,21 @@ def main():
             raise NotImplementedError(
                 "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM, QWen and Mistral so far."
             )
-    train_ds = train_ds.map(trans_func, batched=True, remove_columns=train_ds["train"].column_names)
+    train_ds = (
+        train_ds.map(
+            trans_func,
+            batched=True,
+            remove_columns=train_ds["train"].column_names,
+        )
+        if train_ds is not None
+        else None
+    )
     ptq_ds = (
-        ptq_ds.map(trans_func, batched=True, remove_columns=train_ds["train"].column_names)
+        ptq_ds.map(
+            trans_func,
+            batched=True,
+            remove_columns=train_ds["train"].column_names,
+        )
         if ptq_ds is not None
         else None
     )
