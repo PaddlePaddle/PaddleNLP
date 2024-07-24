@@ -1,7 +1,7 @@
 {
-    "model_name_or_path": "/workspace/yuan",
-    "tokenizer_name_or_path": "/workspace/yuan",
-    "input_dir": "./data_pre",
+    "model_name_or_path": "IEITYuan/Yuan2-2B-hf",
+    "tokenizer_name_or_path": "IEITYuan/Yuan2-2B-hf",
+    "input_dir": "./data",
     "output_dir": "./checkpoints/pretrain_ckpts",
     "per_device_train_batch_size": 1,
     "gradient_accumulation_steps": 1,
