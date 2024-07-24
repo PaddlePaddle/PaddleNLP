@@ -178,7 +178,6 @@ class YaRNScalingRotaryEmbedding(nn.Layer):
 
     def forward(self, seq_len=None, ntk_alpha=None):
         if seq_len > self.max_seq_len_cached:
-            print("*****Yarn notice******")
             self._scale_cos_sin(seq_len=seq_len)
 
         return self.cos_cached[:, :], self.sin_cached[:, :]

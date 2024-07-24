@@ -298,7 +298,7 @@ def get_example_pose(example, tokenizer, data_args):
         raise DataFormatError(f"Example format is wrong, please check: {example}. ")
     tokenized_source = tokenizer(
         source,
-        max_length=data_args.scaled_max_length,  # !!!!!!!修改配置参数
+        max_length=data_args.scaled_max_length,
         truncation=True,
         add_special_tokens=True,
     )
