@@ -331,9 +331,9 @@ class DygraphPredictor(BasePredictor):
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
             pad_token_id=self.tokenizer.pad_token_id,
-            decode_strategy="greedy_search"
-            if self.config.top_k == 1 and self.config.top_p == 1.0
-            else self.config.decode_strategy,
+            decode_strategy=(
+                "greedy_search" if self.config.top_k == 1 and self.config.top_p == 1.0 else self.config.decode_strategy
+            ),
             temperature=self.config.temperature,
             top_k=self.config.top_k,
             top_p=self.config.top_p,
@@ -1238,7 +1238,9 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
     def _preprocess(self, source):
         BlockInferencePredictorMixin._preprocess(self, source)
         for i, text in enumerate(source):
-            tokens = self.tokenizer(text, return_tensors="np", padding=False, truncation=True, max_length=(self.config.src_length))
+            tokens = self.tokenizer(
+                text, return_tensors="np", padding=False, truncation=True, max_length=(self.config.src_length)
+            )
             input_ids = tokens["input_ids"][0]
             length = len(input_ids)
             need_block_nums = (
@@ -1650,8 +1652,8 @@ def predict():
                     target_texts.append("")
 
     else:
-        source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
-        target_texts = ["", ""]
+        source_texts = ["你好，请问你是谁?"] * predictor_args.batch_size
+        target_texts = [""] * predictor_args.batch_size
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
