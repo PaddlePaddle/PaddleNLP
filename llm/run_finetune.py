@@ -80,9 +80,9 @@ def main():
     training_args.print_config(gen_args, "Generation")
 
     if training_args.use_shift_sparse_attention:
-        if model_args.model_name_or_path == "Qwen/Qwen2-1.5B":
+        if "Qwen" in model_args.model_name_or_path:
             replace_qwen2_attn(use_flash_attn=False, use_full=False, inference=False)
-        elif model_args.model_name_or_path == "meta-llama/Llama-2-7b":
+        elif "llama" in model_args.model_name_or_path:
             replace_llama2_attn(use_flash_attn=False, use_full=False, inference=False)
 
     if sum([quant_args.do_ptq, quant_args.do_qat, quant_args.do_gptq, training_args.do_train]) > 1:
