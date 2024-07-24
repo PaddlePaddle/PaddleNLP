@@ -30,9 +30,9 @@ from .testing_utils import LLMTest
     [["llama"], ["qwen"]],
 )
 class LoraTest(LLMTest, unittest.TestCase):
-    config_path: str = "./tests/fixtures/llm/longlora.yaml"  # 配置文件
+    config_path: str = "./tests/fixtures/llm/longlora.yaml"
     model_dir: str = None
-    data_dir: str = "./tests/fixtures/llm/longlora_data"  # 数据是否需要自定义？
+    data_dir: str = "./tests/fixtures/llm/longlora_data"
 
     def setUp(self) -> None:
         LLMTest.setUp(self)
