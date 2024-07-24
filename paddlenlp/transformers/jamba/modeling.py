@@ -559,7 +559,7 @@ class JambaFlashAttention2(JambaAttention):
         # Flash attention requires the input to have the shape
         # batch_size x seq_length x head_dim x hidden_dim
         # therefore we just need to keep the original shape
-        query_states = query_states.reshape([bsz, q_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
+        query_states = query_states.reshape([bsz, q_len, self.num_heads, self.head_dim])
         key_states = key_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim]).transpose([0, 2, 1, 3])
         value_states = value_states.reshape([bsz, q_len, self.num_key_value_heads, self.head_dim]).transpose(
             [0, 2, 1, 3]
@@ -603,7 +603,6 @@ class JambaFlashAttention2(JambaAttention):
             value_states = value_states.cast(target_dtype)
 
         # Reashape to the expected shape for Flash Attention
-        query_states = query_states.transpose([0, 2, 1, 3])
         key_states = key_states.transpose([0, 2, 1, 3])
         value_states = value_states.transpose([0, 2, 1, 3])
 
@@ -1837,6 +1836,7 @@ class JambaForCausalLM(JambaPretrainedModel):
         inputs_embeds=None,
         output_router_logits=False,
         cache_position=None,
+        use_cache=True,
         **kwargs,
     ):
         empty_past_kv = past_key_values is None
@@ -1855,13 +1855,12 @@ class JambaForCausalLM(JambaPretrainedModel):
         if inputs_embeds is not None and empty_past_kv:
             model_inputs = {"inputs_embeds": inputs_embeds}
         else:
-            model_inputs = {"input_ids": input_ids}
-
+            model_inputs = {"input_ids": input_ids.contiguous()}  # `contiguous()` needed for compilation use cases
         model_inputs.update(
             {
                 "position_ids": None,
                 "past_key_values": past_key_values,
-                "use_cache": kwargs.get("use_cache"),
+                "use_cache": use_cache,
                 "attention_mask": attention_mask,
                 "output_router_logits": output_router_logits,
                 "num_logits_to_keep": self.config.num_logits_to_keep,
