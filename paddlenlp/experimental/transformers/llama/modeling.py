@@ -564,6 +564,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             use_neox_rotary_style=True,
             use_dynamic_cachekv_quant=config.use_cachekv_int8 == "dynamic",
             rank_id=config.tensor_parallel_rank,
+            trans_qkvw=(True if not paddle.is_compiled_with_rocm() else False),
         )
 
         self.set_transformer_block(transformer_config)
@@ -751,25 +752,42 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
                     "llama.layers.{}.self_attn.v_proj.weight".format(idx)
                 ]
-                concated_qkv_weight = (
-                    np.concatenate(
+                if paddle.is_compiled_with_rocm():
+                    concated_qkv_weight = np.concatenate(
                         [
                             unfused_state_dict["self_attn.q_proj.weight"],
                             unfused_state_dict["self_attn.k_proj.weight"],
                             unfused_state_dict["self_attn.v_proj.weight"],
                         ],
                         axis=-1,
-                    )
-                    .transpose(1, 0)
-                    .reshape(
+                    ).reshape(
+                        self.hidden_size,
                         (
                             self.num_attention_heads // self.config.tensor_parallel_degree
                             + 2 * self.num_key_value_heads // self.config.tensor_parallel_degree
                         )
                         * (head_size),
-                        self.hidden_size,
                     )
-                )
+                else:
+                    concated_qkv_weight = (
+                        np.concatenate(
+                            [
+                                unfused_state_dict["self_attn.q_proj.weight"],
+                                unfused_state_dict["self_attn.k_proj.weight"],
+                                unfused_state_dict["self_attn.v_proj.weight"],
+                            ],
+                            axis=-1,
+                        )
+                        .transpose(1, 0)
+                        .reshape(
+                            (
+                                self.num_attention_heads // self.config.tensor_parallel_degree
+                                + 2 * self.num_key_value_heads // self.config.tensor_parallel_degree
+                            )
+                            * (head_size),
+                            self.hidden_size,
+                        )
+                    )
             if "llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx) in state_dict.keys():
                 concated_ffn1_weight = np.concatenate(
                     split_fn(state_dict["llama.layers.{}.mlp.gate_up_fused_proj.weight".format(idx)]), axis=-1
@@ -816,14 +834,21 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight_tensor)
                 self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale_tensor)
             elif self.quant_type == "a8w8":
-                self.transformer_block.linear_weights[idx].set_value(
-                    paddle.cast(
-                        paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)]).transpose(
-                            (1, 0)
-                        ),
-                        "int8",
+                if paddle.is_compiled_with_rocm():
+                    self.transformer_block.linear_weights[idx].set_value(
+                        paddle.cast(
+                            paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)]), "int8"
+                        )
                     )
-                )
+                else:
+                    self.transformer_block.linear_weights[idx].set_value(
+                        paddle.cast(
+                            paddle.to_tensor(
+                                state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)]
+                            ).transpose((1, 0)),
+                            "int8",
+                        )
+                    )
             else:
                 self.transformer_block.linear_weights[idx].set_value(
                     linear_weight_tensor.cast(self.transformer_block.linear_weights[idx].dtype)
@@ -839,9 +864,14 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
                 self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
             elif self.quant_type == "a8w8":
-                self.transformer_block.ffn1_weights[idx].set_value(
-                    paddle.cast(paddle.to_tensor(concated_ffn1_weight).transpose((1, 0)), "int8")
-                )
+                if paddle.is_compiled_with_rocm():
+                    self.transformer_block.ffn1_weights[idx].set_value(
+                        paddle.cast(paddle.to_tensor(concated_ffn1_weight), "int8")
+                    )
+                else:
+                    self.transformer_block.ffn1_weights[idx].set_value(
+                        paddle.cast(paddle.to_tensor(concated_ffn1_weight).transpose((1, 0)), "int8")
+                    )
             else:
                 self.transformer_block.ffn1_weights[idx].set_value(
                     ffn1_weight_tensor.cast(self.transformer_block.ffn1_weights[idx].dtype)
@@ -858,14 +888,21 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
                 self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
             elif self.quant_type == "a8w8":
-                self.transformer_block.ffn2_weights[idx].set_value(
-                    paddle.cast(
-                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)]).transpose(
-                            (1, 0)
-                        ),
-                        "int8",
+                if paddle.is_compiled_with_rocm():
+                    self.transformer_block.ffn2_weights[idx].set_value(
+                        paddle.cast(
+                            paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)]), "int8"
+                        )
                     )
-                )
+                else:
+                    self.transformer_block.ffn2_weights[idx].set_value(
+                        paddle.cast(
+                            paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)]).transpose(
+                                (1, 0)
+                            ),
+                            "int8",
+                        )
+                    )
             else:
                 self.transformer_block.ffn2_weights[idx].set_value(
                     ffn2_weight_tensor.cast(self.transformer_block.ffn2_weights[idx].dtype)
