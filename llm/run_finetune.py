@@ -143,7 +143,8 @@ def main():
         quantization_config=quantization_config,
     )
     orig_rope_scaling = getattr(model_config, "rope_scaling", None)
-
+    if orig_rope_scaling is None:
+        orig_rope_scaling = {"factor": 1}
     orig_rope_scaling_factor = orig_rope_scaling["factor"] if "factor" in orig_rope_scaling.keys() else 1
     orig_ctx_len = getattr(model_config, "max_position_embeddings", None)
 
