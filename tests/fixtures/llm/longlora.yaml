@@ -26,6 +26,7 @@ lora:
     tensor_parallel_degree: 1
     pipeline_parallel_degree: 1
     lora: true
+    use_shift_sparse_attention: true
 
   default:
     llama:

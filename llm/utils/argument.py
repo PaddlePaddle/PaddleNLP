@@ -54,6 +54,10 @@ class TrainingArguments(TrainingArguments):
         default="",
         metadata={"help": "Configs to unify hybrid parallel checkpoint.\n"},
     )
+    use_shift_sparse_attention: bool = field(
+        default=False,
+        metadata={"help": "Whether to use ShiftSparseAttention."},
+    )
 
     def __post_init__(self):
         super().__post_init__()
