@@ -115,7 +115,7 @@ if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 else:
     formatted_date = datetime.now().date().strftime("%Y%m%d")
-    __version__ = __version__.replace(".post", ".dev{}".format(formatted_date))
+    __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
 
 
 extras = {}
