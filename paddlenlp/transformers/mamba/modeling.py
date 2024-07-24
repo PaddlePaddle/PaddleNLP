@@ -47,9 +47,9 @@ except ImportError:
 
 try:
     from mamba_ssm_paddle.ops.causal_conv1d_interface import (
-        causal_conv1d_ref as causal_conv1d_fn,
+        causal_conv1d_fn,
+        causal_conv1d_update,
     )
-    from mamba_ssm_paddle.ops.causal_conv1d_interface import causal_conv1d_update
 except ImportError:
     causal_conv1d_fn, causal_conv1d_update = None, None
 
@@ -354,6 +354,9 @@ class MambaRMSNorm(nn.Layer):
         variance = hidden_states.pow(2).mean(-1, keepdim=True)
         hidden_states = hidden_states * paddle.rsqrt(variance + self.variance_epsilon)
         return self.weight * hidden_states.cast(input_dtype)
+
+    def extra_repr(self):
+        return f"{self.weight.shape[0]}, eps={self.variance_epsilon}"
 
 
 class MambaBlock(nn.Layer):
@@ -704,7 +707,12 @@ class MambaForCausalLM(MambaPretrainedModel):
         return model_kwargs
 
     def prepare_inputs_for_generation(
-        self, input_ids, cache: Optional[MambaCache] = None, inputs_embeds=None, attention_mask=None, **kwargs
+        self,
+        input_ids,
+        inputs_embeds=None,
+        use_cache=True,
+        cache: Optional[MambaCache] = None,
+        **kwargs,
     ):
         # only last token for inputs_ids if the state is passed along.
         if cache is not None:
@@ -716,8 +724,7 @@ class MambaForCausalLM(MambaPretrainedModel):
             model_inputs = {"input_ids": input_ids}
 
         model_inputs["cache"] = cache
-        if "use_cache" in kwargs:
-            model_inputs["use_cache"] = kwargs["use_cache"]
+        model_inputs["use_cache"] = use_cache
         return model_inputs
 
     def forward(
