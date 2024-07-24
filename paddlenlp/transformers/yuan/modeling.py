@@ -57,6 +57,12 @@ try:
 except:
     flash_attention = None
 
+__all__ = [
+    "YuanModel",
+    "YuanPretrainedModel",
+    "YuanForCausalLM",
+]
+
 
 class YuanRMSNorm(nn.Layer):
     def __init__(self, hidden_size, eps=1e-6):
@@ -287,7 +293,7 @@ class YuanPretrainedModel(PretrainedModel):
         if "YuanModel" not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
-                mapping[1] = "model." + mapping[1]
+                mapping[1] = "yuan." + mapping[1]
             model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
@@ -1038,7 +1044,7 @@ class YuanForCausalLM(YuanPretrainedModel):
         self.eod_token = config.eod_token
         self.sep_token = config.sep_token
         self.use_loss_mask = config.use_loss_mask
-        self.model = YuanModel(config)
+        self.yuan = YuanModel(config)
         if config.sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
         else:
@@ -1057,10 +1063,10 @@ class YuanForCausalLM(YuanPretrainedModel):
         self._post_init()
 
     def get_input_embeddings(self):
-        return self.model.embed_tokens
+        return self.yuan.embed_tokens
 
     def set_input_embeddings(self, value):
-        self.model.embed_tokens = value
+        self.yuan.embed_tokens = value
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -1069,10 +1075,10 @@ class YuanForCausalLM(YuanPretrainedModel):
         self.lm_head = new_embeddings
 
     def set_decoder(self, decoder):
-        self.model = decoder
+        self.yuan = decoder
 
     def get_decoder(self):
-        return self.model
+        return self.yuan
 
     def get_loss_mask(self, input_ids, labels, eod_token, sep_token):
         micro_batch_size, seq_length = input_ids.shape
@@ -1180,7 +1186,7 @@ class YuanForCausalLM(YuanPretrainedModel):
         )
 
         return_dict = True
-        outputs = self.model(
+        outputs = self.yuan(
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
