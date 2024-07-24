@@ -68,7 +68,7 @@ class DataFormatError(ValueError):
     pass
 
 
-def tokenize_autogressive(tokenizer, example, data_args):
+def tokenize_autogressive(tokenizer, example, data_args, is_test=True, zero_padding=False, flash_mask=False):
     if "text" in example:
         source = example["text"][0] if isinstance(example["text"], list) else example["text"]
     else:

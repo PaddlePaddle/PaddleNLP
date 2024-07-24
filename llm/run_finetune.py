@@ -26,7 +26,7 @@ from utils.argument import (
     TrainingArguments,
 )
 from utils.attention_forward_replace import replace_llama2_attn, replace_qwen2_attn
-from utils.data import tokenize_autogressive
+from utils.data import get_convert_example
 from utils.utils import (
     CausalLMTrainer,
     ZeroPaddingIterDatasetCallback,
@@ -43,7 +43,14 @@ from paddlenlp.datasets import (
     load_dataset,
 )
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
-from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft import (
+    LoRAConfig,
+    LoRAModel,
+    PrefixConfig,
+    PrefixModelForCausalLM,
+    VeRAConfig,
+    VeRAModel,
+)
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
@@ -346,10 +353,11 @@ def main():
         train_ds = train_ds.skip(consumed_samples)
 
     if training_args.pipeline_parallel_degree > 1:
+        from utils.data import convert_example_common
 
-        trans_func = partial(tokenize_autogressive, tokenizer=tokenizer, data_args=data_args)
+        trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
     else:
-        trans_func = partial(tokenize_autogressive, tokenizer=tokenizer, data_args=data_args)
+        trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
 
     if data_args.zero_padding:
         if (
@@ -361,18 +369,14 @@ def main():
             )
     train_ds = (
         train_ds.map(
-            trans_func,
-            batched=True,
-            remove_columns=train_ds["train"].column_names,
+            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
         )
         if train_ds is not None
         else None
     )
     ptq_ds = (
         ptq_ds.map(
-            trans_func,
-            batched=True,
-            remove_columns=train_ds["train"].column_names,
+            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
         )
         if ptq_ds is not None
         else None
@@ -384,7 +388,14 @@ def main():
         )
         eval_zero_padding = False
     dev_ds = (
-        dev_ds.map(trans_func, batched=True, remove_columns=dev_ds["train"].column_names)
+        dev_ds.map(
+            partial(
+                trans_func,
+                is_test=data_args.eval_with_do_generation,
+                zero_padding=eval_zero_padding,
+                flash_mask=model_args.flash_mask,
+            )
+        )
         if dev_ds is not None
         else None
     )
@@ -507,6 +518,20 @@ def main():
             "rougel": rougel.score(),
             "bleu4": bleu4.score(),
         }
+
+    if model_args.vera:
+        target_modules = get_lora_target_modules(model)
+        vera_config = VeRAConfig(
+            target_modules=target_modules,
+            r=model_args.vera_rank,
+            vera_alpha=model_args.vera_rank,
+            dtype=dtype,
+            base_model_name_or_path=model_args.model_name_or_path,
+            pissa_init=True,
+        )
+        model = VeRAModel(model, vera_config)
+        model.mark_only_vera_as_trainable(notfreezeB=True)
+        model.print_trainable_parameters()
 
     # Create trainer
     max_length = (
