@@ -61,9 +61,9 @@ except ImportError:
 
 try:
     from mamba_ssm_paddle.ops.causal_conv1d_interface import (
-        causal_conv1d_ref as causal_conv1d_fn,  # currently, we donot use fast conv1d
+        causal_conv1d_fn,
+        causal_conv1d_update,
     )
-    from mamba_ssm_paddle.ops.causal_conv1d_interface import causal_conv1d_update
 except ImportError:
     causal_conv1d_fn, causal_conv1d_update = None, None
 
@@ -77,6 +77,12 @@ from paddlenlp.utils.log import logger
 _flash_supports_window_size = False
 
 _CONFIG_FOR_DOC = "JambaConfig"
+
+
+def is_autocast_enabled():
+    tracer = paddle.framework._dygraph_tracer()
+    return False if tracer._amp_level == paddle.core.AmpLevel.O0 else True
+
 
 if hasattr(paddle, "masked_fill"):
     masked_fill = paddle.masked_fill
@@ -104,7 +110,7 @@ def is_casual_mask(attention_mask):
     """
     Upper triangular of attention_mask equals to attention_mask is casual
     """
-    return (paddle.triu(attention_mask) == attention_mask).all().item()
+    return (paddle.triu(attention_mask) == attention_mask).all()
 
 
 def _make_causal_mask(input_ids_shape, past_key_values_length):
@@ -578,9 +584,8 @@ class JambaFlashAttention2(JambaAttention):
         # cast them back in float16 just to be sure everything works as expected.
         input_dtype = query_states.dtype
         if input_dtype == paddle.float32:
-            amp_dtype = amp_global_state().amp_dtype
-            if amp_dtype != "float32":
-                target_dtype = amp_dtype
+            if is_autocast_enabled():
+                target_dtype = amp_global_state().amp_dtype
             # Handle the case where the model is quantized
             elif hasattr(self.config, "_pre_quantization_dtype"):
                 target_dtype = self.config._pre_quantization_dtype
