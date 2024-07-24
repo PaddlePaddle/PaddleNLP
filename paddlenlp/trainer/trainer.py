@@ -2379,10 +2379,10 @@ class Trainer:
                     else:
                         if self.args.data_parallel_rank > 0 and self.args.use_expert_parallel:
                             self._save_ckpt_func(
-                                self._filter_moe_no_sync_optimizer_params(), os.path.join(output_dir, OPTIMIZER_NAME)
+                                self._filter_moe_no_sync_optimizer_params(), os.path.join(output_dir, optimizer_name)
                             )
                         else:
-                            self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                            self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
 
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
