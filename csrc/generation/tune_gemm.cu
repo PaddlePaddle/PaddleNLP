@@ -781,31 +781,30 @@ void TuneCublasltGemm(const paddle::Tensor& M,
   int M_size = M.numel();
   int K_size = K.numel();
 
-  for (int j = 0; j < M_size; j++) {
-    int m = (int)M_data[j];
-    for (int i = 0; i < K_size; ++i) {
-      int n = (int)N_data[i];
-      int k = (int)K_data[i];
-      auto A = std::vector<int8_t>(m * k);
-      auto B = std::vector<int8_t>(k * n);
-      auto C = std::vector<int32_t>(m * n);
+  int m = (int)M_data[0];
+  
+  for (int i = 0; i < K_size; ++i) {
+    int n = (int)N_data[i];
+    int k = (int)K_data[i];
+    auto A = std::vector<int8_t>(m * k);
+    auto B = std::vector<int8_t>(k * n);
+    auto C = std::vector<int32_t>(m * n);
 
-      if (dtype == "int8") {
-        CUBLASLTContext dev_ctx;
-        GEMMInt8(dev_ctx,
-                A,
-                B,
-                C,
-                m,
-                k,
-                n,
-                true /*is_test*/,
-                false /*is_read_from_csv*/,
-                path);
-      }else { 
-        // other dtype
-        std::cout<<"Not currently supported"<<std::endl;
-      }
+    if (dtype == "int8") {
+      CUBLASLTContext dev_ctx;
+      GEMMInt8(dev_ctx,
+              A,
+              B,
+              C,
+              m,
+              k,
+              n,
+              true /*is_test*/,
+              false /*is_read_from_csv*/,
+              path);
+    }else { 
+      // other dtype
+      std::cout<<"Not currently supported"<<std::endl;
     }
   }
 }

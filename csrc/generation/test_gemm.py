@@ -15,23 +15,14 @@
 from paddlenlp_ops import tune_cublaslt_gemm
 import paddle
 
-M = []
 K = []
 N = []
 
 # Shape initialization
-M.extend(range(1, 4, 1))
-M.extend(range(4, 16, 4))
-M.extend(range(16, 64, 16))
-M.extend(range(64, 256, 32))
-M.extend(range(256, 512, 64))
-M.extend(range(512, 1024, 128))
-M.extend(range(1024, 8193, 1024))
-
 K.extend([1024, 2048])
 N.extend([4096, 8192])
 
-M_tensor = paddle.to_tensor(M)
+M_tensor = paddle.to_tensor([1024])
 K_tensor = paddle.to_tensor(K)
 N_tensor = paddle.to_tensor(N)
 
