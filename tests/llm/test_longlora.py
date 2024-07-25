@@ -32,7 +32,6 @@ from .testing_utils import LLMTest
 class LoraTest(LLMTest, unittest.TestCase):
     config_path: str = "./tests/fixtures/llm/longlora.yaml"
     model_dir: str = None
-    data_dir: str = "./tests/fixtures/llm/longlora_data"
 
     def setUp(self) -> None:
         LLMTest.setUp(self)

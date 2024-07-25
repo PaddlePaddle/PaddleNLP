@@ -30,5 +30,6 @@
     "zero_padding": false,
     "use_flash_attention": false,
     "unified_checkpoint": true,
-    "pissa": false
+    "pissa": false,
+    "use_shift_sparse_attention": true
   }
