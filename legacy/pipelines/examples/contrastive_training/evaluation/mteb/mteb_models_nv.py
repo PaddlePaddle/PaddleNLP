@@ -78,35 +78,33 @@ class LatentModel(PretrainedModel):
     def __init__(self, config):
         super().__init__(config)
 
-        self.cross_attend_blocks_0_fn_to_kv = paddle.nn.Linear(in_features=4096, out_features=65536, bias_attr=False)
-        self.cross_attend_blocks_0_fn_to_out = paddle.nn.Linear(in_features=32768, out_features=4096, bias_attr=False)
-        self.cross_attend_blocks_0_fn_to_q = paddle.nn.Linear(in_features=4096, out_features=32768, bias_attr=False)
-        self.cross_attend_blocks_0_norm = paddle.nn.LayerNorm(4096)
-        self.cross_attend_blocks_0_norm_context = paddle.nn.LayerNorm(4096)
+        self.cross_attend_blocks_0_fn_to_kv = paddle.nn.Linear(in_features=config.hidden_size, out_features=2*config.max_position_embeddings, bias_attr=False)
+        self.cross_attend_blocks_0_fn_to_out = paddle.nn.Linear(in_features=config.max_position_embeddings, out_features=config.hidden_size, bias_attr=False)
+        self.cross_attend_blocks_0_fn_to_q = paddle.nn.Linear(in_features=config.hidden_size, out_features=config.max_position_embeddings, bias_attr=False)
+        self.cross_attend_blocks_0_norm = paddle.nn.LayerNorm(config.hidden_size)
+        self.cross_attend_blocks_0_norm_context = paddle.nn.LayerNorm(config.hidden_size)
 
-        self.cross_attend_blocks_1_fn_net_0 = paddle.nn.Linear(in_features=4096, out_features=32768)
-        self.cross_attend_blocks_1_fn_net_2 = paddle.nn.Linear(in_features=16384, out_features=4096)
-        self.cross_attend_blocks_1_norm = paddle.nn.LayerNorm(4096)
+        self.cross_attend_blocks_1_fn_net_0 = paddle.nn.Linear(in_features=config.hidden_size, out_features=config.max_position_embeddings)
+        self.cross_attend_blocks_1_fn_net_2 = paddle.nn.Linear(in_features=config.max_position_embeddings//2, out_features=config.hidden_size)
+        self.cross_attend_blocks_1_norm = paddle.nn.LayerNorm(config.hidden_size)
 
-        self.latents = paddle.nn.Linear(in_features=4096, out_features=512, bias_attr=False)
+        self.latents = paddle.nn.Linear(in_features=config.hidden_size, out_features=512, bias_attr=False)
 
     def forward(self, last_hidden_states, pool_mask):
-        latents = paddle.stack([self.latents.weight.T for _ in range(last_hidden_states.shape[0])])  # bs*512*4096
+        latents = paddle.stack([self.latents.weight.T for _ in range(last_hidden_states.shape[0])]) 
 
-        normed_x = self.cross_attend_blocks_0_norm(last_hidden_states)  # bs*len*4096
-        normed_context = self.cross_attend_blocks_0_norm_context(latents)  # bs*512*4096
+        normed_x = self.cross_attend_blocks_0_norm(last_hidden_states) 
+        normed_context = self.cross_attend_blocks_0_norm_context(latents) 
 
-        q = self.cross_attend_blocks_0_fn_to_q(normed_x)  # bs*len*32768
-        kv = self.cross_attend_blocks_0_fn_to_kv(normed_context)  # bs*512*65536
-        k = kv[:, :, :32768]  # 2*512*32768
-        v = kv[:, :, 32768:]  # 2*512*32768
+        q = self.cross_attend_blocks_0_fn_to_q(normed_x) 
+        kv = self.cross_attend_blocks_0_fn_to_kv(normed_context) 
+        k = kv[:, :, :self.config.max_position_embeddings]
+        v = kv[:, :, self.config.max_position_embeddings:] 
 
-        q, k, v = map(
-            lambda t: rearrange(t, "b n (h d) -> b n h d", h=8), (q, k, v)
-        )  # [bs, len, 8, 4096], [bs, 512, 8, 4096], [bs, 512, 8, 4096]
-
-        out = paddle.nn.functional.scaled_dot_product_attention(q, k, v)  # [bs, len, 8, 4096]
-        out = rearrange(out, "b n h d -> b n (h d)", h=8)  # bs*len*32768
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b n h d', h=self.config.num_key_value_heads), (q, k, v)) 
+        
+        out = paddle.nn.functional.scaled_dot_product_attention(q, k, v) 
+        out = rearrange(out, 'b n h d -> b n (h d)', h=self.config.num_key_value_heads) 
 
         out_of_layer1 = self.cross_attend_blocks_0_fn_to_out(out) + last_hidden_states
 
@@ -114,17 +112,17 @@ class LatentModel(PretrainedModel):
 
         before_geglu = self.cross_attend_blocks_1_fn_net_0(normed_x)
 
-        x_in_gegle = before_geglu[:, :, :16384]  # bs*len*16384
-        gate_in_geglu = before_geglu[:, :, 16384:]  # bs*len*16384
-        x_after_geglu = x_in_gegle * paddle.nn.functional.gelu(gate_in_geglu)  # bs*len*16384
+        x_in_gegle = before_geglu[:, :, :self.config.max_position_embeddings//2] 
+        gate_in_geglu = before_geglu[:, :, self.config.max_position_embeddings//2:] 
+        x_after_geglu = x_in_gegle * paddle.nn.functional.gelu(gate_in_geglu)
 
         after_geglu = self.cross_attend_blocks_1_fn_net_2(x_after_geglu)
 
-        out_of_layer2 = after_geglu + out_of_layer1  # bs*len*4096
+        out_of_layer2 = after_geglu + out_of_layer1 
 
-        s = paddle.sum(out_of_layer2 * pool_mask.unsqueeze(-1), axis=1)  # bs*4096
+        s = paddle.sum(out_of_layer2 * pool_mask.unsqueeze(-1), axis=1) 
         d = paddle.sum(pool_mask, axis=1, keepdim=True)
-        hiddens = s / d  # ([bs, 4096])
+        hiddens = s / d 
         hiddens = paddle.nn.functional.normalize(hiddens, p=2, axis=-1)
 
         return hiddens

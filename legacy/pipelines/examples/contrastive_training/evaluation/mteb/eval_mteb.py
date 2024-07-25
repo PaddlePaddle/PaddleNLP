@@ -35,8 +35,8 @@ def get_model(peft_model_name, base_model_name):
         assert k.startswith(
             "llama."
         ), f"You Must Manually Replace 'model' to 'llama'. Please Refer to do_replace_model_llama.py"
-        hf_model = LoRAModel.from_pretrained(base_model, peft_model_name, lora_config=lora_config, dtype="bfloat16")
-        return hf_model
+        model = LoRAModel.from_pretrained(base_model, peft_model_name, lora_config=lora_config, dtype="bfloat16")
+        return model
     else:
         base_model = AutoModel.from_pretrained(base_model_name)
         return base_model
