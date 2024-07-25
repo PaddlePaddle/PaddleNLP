@@ -43,6 +43,7 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
     GenerationInferenceModel,
 )
+from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
 from paddlenlp.transformers import LlamaConfig, LlamaPretrainedModel
 from paddlenlp.transformers.conversion_utils import split_param_func
 from paddlenlp.transformers.llama.modeling import LlamaLMHead
@@ -1163,9 +1164,7 @@ class LlamaForCausalLMAvxInferenceModel(GenerationAvxInferenceModel, LlamaPretra
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        # TODO: Support safetensors loading.
-        kwargs["use_safetensors"] = False
-        return super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+        return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -1262,9 +1261,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        # TODO: Support safetensors loading.
-        kwargs["use_safetensors"] = False
-        return super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+        return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -1501,55 +1498,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        # TODO: Support safetensors loading.
-        kwargs["use_safetensors"] = False
-        from paddlenlp.transformers.utils import (
-            ContextManagers,
-            is_safetensors_available,
-        )
-
-        from_hf_hub = kwargs.pop("from_hf_hub", False)
-        config = kwargs.pop("config", None)
-        from_aistudio = kwargs.get("from_aistudio", False)
-        subfolder = kwargs.get("subfolder", None)
-        variant = kwargs.pop("variant", None)
-        use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
-        convert_from_torch = kwargs.pop("convert_from_torch", None)
-        cache_dir = kwargs.pop("cache_dir", None)
-
-        init_contexts = []
-        with ContextManagers(init_contexts):
-            model = cls(config)
-
-        if not config.single_card_ptq:
-            resolved_archive_file = pretrained_model_name_or_path
-        else:
-            resolved_archive_file = cls._resolve_model_file_path(
-                pretrained_model_name_or_path,
-                cache_dir=cache_dir,
-                subfolder=subfolder,
-                from_hf_hub=from_hf_hub,
-                from_aistudio=from_aistudio,
-                config=config,
-                convert_from_torch=convert_from_torch,
-                use_safetensors=use_safetensors,
-                variant=variant,
-            )[0]
-        logger.info(f"Load model form {resolved_archive_file}")
-
-        if config.tensor_parallel_degree > 1 and config.single_card_ptq:
-            logger.info(f"convert_tensor_parallel {config.tensor_parallel_degree}")
-            model.state_dict = model.convert_tensor_parallel(resolved_archive_file, config)
-        elif config.tensor_parallel_degree > 1:
-            resolved_archive_file = os.path.join(
-                resolved_archive_file, f"mp_{config.tensor_parallel_rank:0>2d}_sharding_00_pp_00", "model.pdparams"
-            )
-            model.state_dict = paddle.load(resolved_archive_file, return_numpy=True)
-        else:
-            model.state_dict = paddle.load(resolved_archive_file, return_numpy=True)
-        model.set_state_dict(model.state_dict)
-
-        return model
+        return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
