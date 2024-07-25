@@ -628,7 +628,7 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(CUBLASLTContext dev_ctx,
         }
       }
       if (find_cnt == 0) {
-        std::cout << "Please use test mode to select. Now we use default params"
+        std::cout << "the file is empty. Now we use default params"
                   << std::endl;
         using_default_config();
       }
@@ -675,7 +675,6 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(CUBLASLTContext dev_ctx,
   CUDA_CHECK(cublasLtMatmulAlgoConfigSetAttribute(
       &algo, CUBLASLT_ALGO_CONFIG_STAGES_ID, &(stages), sizeof(stages)));
 
-  cublasStatus_t status;
   auto start = std::chrono::high_resolution_clock::now();
   const int repeats = 10;
   for (int loop = 0; loop < repeats; loop++) {
@@ -713,12 +712,10 @@ void TuneCublasltGemm(const paddle::Tensor& M,
                       bool is_test,
                       bool is_read_from_file,
                       const std::string& path) {
-  std::ofstream outfile;
-  outfile.open(path, std::ios::out);
-  outfile.close();
 
-  // Ensure that M, K, and N are all one-dimensional Tensors
+  // Ensure that M, K, and N are all one-dimensional Tensors. is_test != is_read_from_file
   assert(M.dims().size() == 1 && K.dims().size() == 1 && N.dims().size() == 1);
+  assert(is_test != is_read_from_file);
 
   auto M_cpu = M.copy_to(paddle::CPUPlace(), false);
   auto K_cpu = K.copy_to(paddle::CPUPlace(), false);
