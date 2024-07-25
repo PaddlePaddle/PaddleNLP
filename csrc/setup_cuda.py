@@ -49,7 +49,7 @@ def get_gencode_flags():
 
 
 gencode_flags = get_gencode_flags()
-library_path = os.environ.get('LD_LIBRARY_PATH')
+library_path = os.environ.get('LD_LIBRARY_PATH', '/usr/local/cuda/lib64')
 
 setup(
     name="paddlenlp_ops",

@@ -11,8 +11,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#pragma once
-
 #include "helper.h"
 #include <cublasLt.h>
 #include <cublas_v2.h>
@@ -24,9 +22,35 @@ limitations under the License. */
 #include <vector>
 #include <list>
 #include <sys/time.h>
-#if defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 890)
-#include <cuda_fp8.h>
-#endif
+                       
+template <typename T>
+void handleError(T status, const char* file, int line) {
+    printf("Unknown error type at %s:%d\n", file, line);
+    exit(1);
+}
+
+// for cudaError_t
+template <>
+void handleError<cudaError_t>(cudaError_t status, const char* file, int line) {
+    if (status != cudaSuccess) {
+        printf("CUDA error at %s:%d - %s\n", file, line, cudaGetErrorString(status));
+        exit(1);
+    }
+}
+
+// for cublasStatus_t
+template <>
+void handleError<cublasStatus_t>(cublasStatus_t status, const char* file, int line) {
+    if (status != CUBLAS_STATUS_SUCCESS) {
+        printf("cuBLAS error at %s:%d - %d\n", file, line, static_cast<int>(status));
+        exit(1);
+    }
+}
+
+#define CUDA_CHECK(call)                                  \
+    do {                                                  \
+        handleError((call), __FILE__, __LINE__);          \
+    } while (0)
 
 typedef struct {
   cublasLtMatmulAlgo_t algo;
@@ -93,9 +117,10 @@ static cublasStatus_t TestMatmulRun(cublasLtHandle_t ltHandle,
   if (algoStatus == CUBLAS_STATUS_SUCCESS) {
     cudaError_t err;
     ScaleT alpha = static_cast<ScaleT>(1), beta = static_cast<ScaleT>(0);
-    void *workSpace;
-    cudaMalloc(&workSpace, heurResult.workspaceSize);
+    paddle::Tensor workspace = paddle::empty({static_cast<int64_t>(heurResult.workspaceSize)}, paddle::DataType::UINT8, paddle::GPUPlace());
+    void* workspace_ptr = workspace.data<uint8_t>();
     err = cudaEventRecord(startEvent, stream);
+    CUDA_CHECK(err);
     int repeats = 100;
     for (int loop = 0; loop < repeats; loop++) {
       cublasStatus_t currStatus = cublasLtMatmul(ltHandle,
@@ -111,14 +136,14 @@ static cublasStatus_t TestMatmulRun(cublasLtHandle_t ltHandle,
                                                  C,
                                                  C_desc,
                                                  &algo,
-                                                 workSpace,
+                                                 workspace_ptr,
                                                  heurResult.workspaceSize,
                                                  stream);
       if (currStatus != CUBLAS_STATUS_SUCCESS) {
         algoStatus = currStatus;
         break;
       }
-      cudaDeviceSynchronize();
+      CUDA_CHECK(cudaDeviceSynchronize());
     }
     err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {
@@ -139,7 +164,6 @@ static cublasStatus_t TestMatmulRun(cublasLtHandle_t ltHandle,
       perfResults.workspaceSize = heurResult.workspaceSize;
       perfResults.wavesCount = heurResult.wavesCount;
     }
-    cudaFree(workSpace);
   } else {
     std::cerr << "not enough workspace! current workspace is "
               << heurResult.workspaceSize;
@@ -193,11 +217,11 @@ std::vector<customMatmulPerf_t> FindAlgo(cublasLtHandle_t ltHandle,
     return perfResultsTmp;
   }
 
-  std::clog << "get " << nbAlgoIds << " algoIds";
+  std::clog<< std::endl << "get " << nbAlgoIds << " algoIds" << std::endl;
 
   for (int idx = 0; idx < nbAlgoIds; idx++) {
     cublasLtMatmulAlgo_t algo;
-    std::clog << "Process algo " << algoIdA[idx];
+    std::clog << "Process algo: " << algoIdA[idx]<<" ";
 
     /* Initialize algo structure with given Algp ID */
     // https://docs.nvidia.com/cuda/cublas/index.html#cublasLtMatmulAlgoInit
@@ -229,46 +253,46 @@ std::vector<customMatmulPerf_t> FindAlgo(cublasLtHandle_t ltHandle,
       nbTiles = sizeWritten / sizeof(tileA[0]);
     }
     // Query the stages enums supported by that algo (cuda must >= 11.0)
-    cublasLtMatmulAlgoCapGetAttribute(
-        &algo, CUBLASLT_ALGO_CAP_STAGES_IDS, NULL, 0, &sizeWritten);
+    CUDA_CHECK(cublasLtMatmulAlgoCapGetAttribute(
+        &algo, CUBLASLT_ALGO_CAP_STAGES_IDS, NULL, 0, &sizeWritten));
     int nbStages = int(sizeWritten / sizeof(uint32_t));
     std::vector<uint32_t> stagesA(nbStages == 0 ? 1 : nbStages);
     if (nbStages == 0) {
       stagesA[0] = CUBLASLT_MATMUL_STAGES_UNDEFINED;
       nbStages = 1;
     } else {
-      cublasLtMatmulAlgoCapGetAttribute(&algo,
+      CUDA_CHECK(cublasLtMatmulAlgoCapGetAttribute(&algo,
                                         CUBLASLT_ALGO_CAP_STAGES_IDS,
                                         stagesA.data(),
                                         sizeof(uint32_t) * nbStages,
-                                        &sizeWritten);
+                                        &sizeWritten));
     }
 
     // Retrieve Other Algo Capabilities attributes
     int32_t splitkSupport, customOptionMax;
     uint32_t redMask, swizzlingMax;
     // cublasLtMatmulInnerShape_t innerShape;
-    cublasLtMatmulAlgoCapGetAttribute(&algo,
+    CUDA_CHECK(cublasLtMatmulAlgoCapGetAttribute(&algo,
                                       CUBLASLT_ALGO_CAP_SPLITK_SUPPORT,
                                       &splitkSupport,
                                       sizeof(splitkSupport),
-                                      &sizeWritten);
-    std::clog << "splitkSupport " << splitkSupport;
-    cublasLtMatmulAlgoCapGetAttribute(&algo,
+                                      &sizeWritten));
+    std::clog << "splitkSupport: " << splitkSupport<<std::endl;
+    CUDA_CHECK(cublasLtMatmulAlgoCapGetAttribute(&algo,
                                       CUBLASLT_ALGO_CAP_REDUCTION_SCHEME_MASK,
                                       &redMask,
                                       sizeof(redMask),
-                                      &sizeWritten);
-    cublasLtMatmulAlgoCapGetAttribute(&algo,
+                                      &sizeWritten));
+    CUDA_CHECK(cublasLtMatmulAlgoCapGetAttribute(&algo,
                                       CUBLASLT_ALGO_CAP_CTA_SWIZZLING_SUPPORT,
                                       &swizzlingMax,
                                       sizeof(swizzlingMax),
-                                      &sizeWritten);
-    cublasLtMatmulAlgoCapGetAttribute(&algo,
+                                      &sizeWritten));
+    CUDA_CHECK(cublasLtMatmulAlgoCapGetAttribute(&algo,
                                       CUBLASLT_ALGO_CAP_CUSTOM_OPTION_MAX,
                                       &customOptionMax,
                                       sizeof(customOptionMax),
-                                      &sizeWritten);
+                                      &sizeWritten));
 
     /* Loop over the different tiles */
     for (int tileIdx = 0; tileIdx < nbTiles && AlgoCount < AlgoCombinations;
@@ -299,6 +323,7 @@ std::vector<customMatmulPerf_t> FindAlgo(cublasLtHandle_t ltHandle,
                   CUBLASLT_ALGO_CONFIG_TILE_ID,
                   &tileA[tileIdx],
                   sizeof(tileA[tileIdx]));
+              CUDA_CHECK(algo_status);
               if (status != CUBLAS_STATUS_SUCCESS) {
                 std::cerr
                     << "GG cublasLtMatmulAlgoConfigSetAttribute with status "
@@ -309,6 +334,7 @@ std::vector<customMatmulPerf_t> FindAlgo(cublasLtHandle_t ltHandle,
                   CUBLASLT_ALGO_CONFIG_STAGES_ID,
                   &stagesA[stagesIdx],
                   sizeof(stagesA[stagesIdx]));
+              CUDA_CHECK(algo_status);
               if (status != CUBLAS_STATUS_SUCCESS) {
                 std::cerr
                     << "GG cublasLtMatmulAlgoConfigSetAttribute with status "
@@ -319,6 +345,7 @@ std::vector<customMatmulPerf_t> FindAlgo(cublasLtHandle_t ltHandle,
                   CUBLASLT_ALGO_CONFIG_CUSTOM_OPTION,
                   &customOption,
                   sizeof(customOption));
+              CUDA_CHECK(algo_status);
               if (status != CUBLAS_STATUS_SUCCESS) {
                 std::cerr
                     << "GG cublasLtMatmulAlgoConfigSetAttribute with status "
@@ -326,6 +353,7 @@ std::vector<customMatmulPerf_t> FindAlgo(cublasLtHandle_t ltHandle,
               }
               algo_status = cublasLtMatmulAlgoConfigSetAttribute(
                   &algo, CUBLASLT_ALGO_CONFIG_CTA_SWIZZLING, &k, sizeof(k));
+              CUDA_CHECK(algo_status);
               if (status != CUBLAS_STATUS_SUCCESS) {
                 std::cerr << "cublasLtMatmulAlgoConfigSetAttribute with status "
                           << status;
@@ -338,6 +366,7 @@ std::vector<customMatmulPerf_t> FindAlgo(cublasLtHandle_t ltHandle,
                   CUBLASLT_ALGO_CONFIG_SPLITK_NUM,
                   &splitK_val,
                   sizeof(splitK_val));
+              CUDA_CHECK(algo_status);
               if (status != CUBLAS_STATUS_SUCCESS) {
                 std::cerr << "cublasLtMatmulAlgoConfigSetAttribute with status "
                           << status;
@@ -348,6 +377,7 @@ std::vector<customMatmulPerf_t> FindAlgo(cublasLtHandle_t ltHandle,
                   CUBLASLT_ALGO_CONFIG_REDUCTION_SCHEME,
                   &redScheme,
                   sizeof(int));
+              CUDA_CHECK(algo_status);
               if (status != CUBLAS_STATUS_SUCCESS) {
                 std::cerr << "cublasLtMatmulAlgoConfigSetAttribute with status "
                           << status;
@@ -355,20 +385,20 @@ std::vector<customMatmulPerf_t> FindAlgo(cublasLtHandle_t ltHandle,
               }
               if (l > 0) {  // Split-K case
                 splitK_val = splitKSequenceA[l - 1];
-                cublasLtMatmulAlgoConfigSetAttribute(
+                CUDA_CHECK(cublasLtMatmulAlgoConfigSetAttribute(
                     &algo,
                     CUBLASLT_ALGO_CONFIG_SPLITK_NUM,
                     &splitKSequenceA[l - 1],
-                    sizeof(splitKSequenceA[l - 1]));
+                    sizeof(splitKSequenceA[l - 1])));
                 for (redScheme = 0;
                      redScheme < (int)CUBLASLT_REDUCTION_SCHEME_MASK &&
                      (AlgoCount < AlgoCombinations);
                      redScheme++) {
-                  cublasLtMatmulAlgoConfigSetAttribute(
+                      CUDA_CHECK(cublasLtMatmulAlgoConfigSetAttribute(
                       &algo,
                       CUBLASLT_ALGO_CONFIG_REDUCTION_SCHEME,
                       &redScheme,
-                      sizeof(redScheme));
+                      sizeof(redScheme)));
 
                   cublasLtMatmulHeuristicResult_t heurResult;
                   cublasStatus_t algoStatus =
@@ -433,7 +463,7 @@ std::vector<customMatmulPerf_t> FindAlgo(cublasLtHandle_t ltHandle,
       }
     }
   }
-  std::clog << "Got " << AlgoCount << " algos";
+  std::clog << "Got " << AlgoCount << " algos" <<std::endl;
   cudaEvent_t startEvent;
   cudaEvent_t stopEvent;
   std::vector<customMatmulPerf_t> perfResults(AlgoCount);
@@ -466,7 +496,7 @@ std::vector<customMatmulPerf_t> FindAlgo(cublasLtHandle_t ltHandle,
                 << " stages " << algos[i].stages << " splitK_val "
                 << algos[i].splitK_val;
       algos[i].time = std::numeric_limits<float>::max();
-      std::cerr << "TestMatmulRun with status " << status;
+      std::cerr << " TestMatmulRun with status " << status << std::endl;
       continue;
     }
   }
@@ -492,7 +522,7 @@ class CPUContext : public DevContext {};
 
 class CUBLASLTContext : public DevContext {
  public:
-  CUBLASLTContext() { cublasLtCreate(&handle_); }
+  CUBLASLTContext() { CUDA_CHECK(cublasLtCreate(&handle_)); }
 
   cublasLtHandle_t handle_;
 
@@ -529,26 +559,23 @@ void GEMMInt8<int8_t, int32_t, CPUContext>(CPUContext dev_ctx,
 
 template <>
 void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(CUBLASLTContext dev_ctx,
-                                            const std::vector<int8_t>& A,
-                                            const std::vector<int8_t>& B,
-                                            std::vector<int32_t>& C,
+                                            const std::vector<int8_t>& AVec,
+                                            const std::vector<int8_t>& BVec,
+                                            std::vector<int32_t>& CVec,
                                             int m,
                                             int k,
                                             int n,
                                             bool is_test,
                                             bool is_read_from_csv,
                                             std::string path) {
-  int8_t* A_dev;
-  int8_t* B_dev;
-  int32_t* C_dev;
-  char* workspace;
 
-  cudaMalloc((void**)&A_dev, A.size() * sizeof(int8_t));
-  cudaMalloc((void**)&B_dev, B.size() * sizeof(int8_t));
-  cudaMalloc((void**)&C_dev, m * n * sizeof(int32_t));
+  paddle::Tensor A = paddle::empty({static_cast<int64_t>(AVec.size())}, paddle::DataType::INT8, paddle::GPUPlace());
+  paddle::Tensor B = paddle::empty({static_cast<int64_t>(BVec.size())}, paddle::DataType::INT8, paddle::GPUPlace());
+  paddle::Tensor C = paddle::empty({static_cast<int64_t>(CVec.size())}, paddle::DataType::INT32, paddle::GPUPlace());
 
-  cudaMemcpy(A_dev, A.data(), A.size(), cudaMemcpyHostToDevice);
-  cudaMemcpy(B_dev, B.data(), B.size(), cudaMemcpyHostToDevice);
+  int8_t* A_dev = A.data<int8_t>();
+  int8_t* B_dev = B.data<int8_t>();
+  int32_t* C_dev = C.data<int32_t>();
 
   // init data structure
 
@@ -560,15 +587,15 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(CUBLASLTContext dev_ctx,
   int32_t beta_ = 0;
 
   cublasComputeType_t cudaComputeType = CUBLAS_COMPUTE_32I;
-  cublasLtMatmulDescCreate(&matmul_desc_, cudaComputeType, CUDA_R_32I);
+  CUDA_CHECK(cublasLtMatmulDescCreate(&matmul_desc_, cudaComputeType, CUDA_R_32I));
   cublasOperation_t op_transpose = CUBLAS_OP_T;
-  cublasLtMatmulDescSetAttribute(matmul_desc_,
+  CUDA_CHECK(cublasLtMatmulDescSetAttribute(matmul_desc_,
                                  CUBLASLT_MATMUL_DESC_TRANSA,
                                  &op_transpose,
-                                 sizeof(op_transpose));
-  cublasLtMatrixLayoutCreate(&B_desc_, CUDA_R_8I, k, n, k);
-  cublasLtMatrixLayoutCreate(&A_desc_, CUDA_R_8I, k, m, k);
-  cublasLtMatrixLayoutCreate(&C_desc_, CUDA_R_32I, n, m, n);
+                                 sizeof(op_transpose)));
+  CUDA_CHECK(cublasLtMatrixLayoutCreate(&B_desc_, CUDA_R_8I, k, n, k));
+  CUDA_CHECK(cublasLtMatrixLayoutCreate(&A_desc_, CUDA_R_8I, k, m, k));
+  CUDA_CHECK(cublasLtMatrixLayoutCreate(&C_desc_, CUDA_R_32I, n, m, n));
 
   cublasLtMatmulAlgo_t algo;
   int algoId;
@@ -627,40 +654,38 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(CUBLASLTContext dev_ctx,
     work_space_size = algos[i].workspaceSize;
   } else if (is_read_from_csv) {
     int m_tmp, k_tmp, n_tmp;
-    FILE* fp;
-    fp = fopen(path.c_str(), "r");
-    if (!fp) {
+    std::ifstream file(path);
+    if (!file.is_open()) {
       using_default_config();
     } else {
       bool match = false;
       int find_cnt = 0;
-      while (1) {
-        fscanf(fp,
-               "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%f",
-               &m_tmp,
-               &k_tmp,
-               &n_tmp,
-               &algoId,
-               &swizzle,
-               &customOption,
-               &tile,
-               &splitK_val,
-               &reductionScheme,
-               &stages,
-               &work_space_size,
-               &time_ref);
-        if (feof(fp)) break;
-        if (k_tmp == k && n_tmp == n && m <= m_tmp) {
-          match = true;
-          break;
-        }
-        find_cnt++;
+      std::string line;
+      while (std::getline(file, line)) {
+          std::istringstream iss(line);
+          char comma;
+          if (iss >> m_tmp >> comma
+                  >> k_tmp >> comma
+                  >> n_tmp >> comma
+                  >> algoId >> comma
+                  >> swizzle >> comma
+                  >> customOption >> comma
+                  >> tile >> comma
+                  >> splitK_val >> comma
+                  >> reductionScheme >> comma
+                  >> stages >> comma
+                  >> work_space_size >> comma
+                  >> time_ref) {
+                    if (k_tmp == k && n_tmp == n && m <= m_tmp) {
+                        match = true;
+                        break;
+                    }
+                    find_cnt++;
+                  }
       }
       if (find_cnt == 0) {
-        std::cout
-            << "Please use test mode to select\n, Now we use default params"
-            << std::endl;
-        using_default_config();
+          std::cout << "Please use test mode to select. Now we use default params" << std::endl;
+          using_default_config();
       }
     }
   } else {
@@ -669,8 +694,9 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(CUBLASLTContext dev_ctx,
     using_default_config();
   }
 
-  cudaMalloc((void**)&workspace, work_space_size);
-  cublasLtMatmulAlgoInit(dev_ctx.handle_,
+  paddle::Tensor workspace = paddle::empty({static_cast<int64_t>(work_space_size)}, paddle::DataType::UINT8, paddle::GPUPlace());
+  void* workspace_ptr = workspace.data<uint8_t>();
+  CUDA_CHECK(cublasLtMatmulAlgoInit(dev_ctx.handle_,
                          cudaComputeType,
                          CUDA_R_32I,
                          CUDA_R_8I,
@@ -678,32 +704,32 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(CUBLASLTContext dev_ctx,
                          CUDA_R_32I,
                          CUDA_R_32I,
                          algoId,
-                         &algo);
-  cublasLtMatmulAlgoConfigSetAttribute(&algo,
+                         &algo));
+  CUDA_CHECK(cublasLtMatmulAlgoConfigSetAttribute(&algo,
                                        CUBLASLT_ALGO_CONFIG_CUSTOM_OPTION,
                                        &(customOption),
-                                       sizeof(customOption));
-  cublasLtMatmulAlgoConfigSetAttribute(
-      &algo, CUBLASLT_ALGO_CONFIG_TILE_ID, &(tile), sizeof(tile));
-  cublasLtMatmulAlgoConfigSetAttribute(&algo,
+                                       sizeof(customOption)));
+  CUDA_CHECK(cublasLtMatmulAlgoConfigSetAttribute(
+      &algo, CUBLASLT_ALGO_CONFIG_TILE_ID, &(tile), sizeof(tile)));
+  CUDA_CHECK(cublasLtMatmulAlgoConfigSetAttribute(&algo,
                                        CUBLASLT_ALGO_CONFIG_SPLITK_NUM,
                                        &(splitK_val),
-                                       sizeof(splitK_val));
-  cublasLtMatmulAlgoConfigSetAttribute(
-      &algo, CUBLASLT_ALGO_CONFIG_CTA_SWIZZLING, &(swizzle), sizeof(swizzle));
-  cublasLtMatmulAlgoConfigSetAttribute(&algo,
+                                       sizeof(splitK_val)));
+  CUDA_CHECK(cublasLtMatmulAlgoConfigSetAttribute(
+      &algo, CUBLASLT_ALGO_CONFIG_CTA_SWIZZLING, &(swizzle), sizeof(swizzle)));
+  CUDA_CHECK(cublasLtMatmulAlgoConfigSetAttribute(&algo,
                                        CUBLASLT_ALGO_CONFIG_REDUCTION_SCHEME,
                                        &(reductionScheme),
-                                       sizeof(int));
-  cublasLtMatmulAlgoConfigSetAttribute(
-      &algo, CUBLASLT_ALGO_CONFIG_STAGES_ID, &(stages), sizeof(stages));
+                                       sizeof(int)));
+  CUDA_CHECK(cublasLtMatmulAlgoConfigSetAttribute(
+      &algo, CUBLASLT_ALGO_CONFIG_STAGES_ID, &(stages), sizeof(stages)));
 
   cublasStatus_t status;
   struct timeval start, end;
   gettimeofday(&start, NULL);
   const int repeats = 10;
   for (int loop = 0; loop < repeats; loop++) {
-    status = cublasLtMatmul(dev_ctx.handle_,
+         CUDA_CHECK(cublasLtMatmul(dev_ctx.handle_,
                             matmul_desc_,
                             &alpha_,
                             B_dev,
@@ -717,45 +743,49 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(CUBLASLTContext dev_ctx,
                             C_desc_,
                             &algo,
                             //  nullptr,
-                            (void*)workspace,
+                            workspace_ptr,
                             // 0,
                             work_space_size,
-                            0);
-    cudaDeviceSynchronize();
+                            0));
+    CUDA_CHECK(cudaDeviceSynchronize());
   }
-  if (status != cudaSuccess) {
-    std::cerr << "CUBLASLT runtime error " << status << std::endl;
-    exit(status);
-  }
-  cudaDeviceSynchronize();
-
+  CUDA_CHECK(cudaDeviceSynchronize());
   gettimeofday(&end, NULL);
   float time = diffTime(start, end);
   std::cout << "GEMM with cublaslt imma1 int8 spend " << time / repeats
             << " ms in " << m << ", " << k << ", " << n << std::endl;
 
-  cudaMemcpy(C.data(), C_dev, m * n * sizeof(int32_t), cudaMemcpyDeviceToHost);
-  cudaFree(A_dev);
-  cudaFree(B_dev);
-  cudaFree(C_dev);
 }
 
 
-void TestBench(const std::vector<int64_t>& M,
-                   const std::vector<int64_t>& K,
-                   const std::vector<int64_t>& N,
-                   const std::string dtype,
-                   const std::string path) {
+void TuneCublasltGemm(const paddle::Tensor& M,
+                      const paddle::Tensor& K,
+                      const paddle::Tensor& N,
+                      const std::string dtype,
+                      const std::string path) {
 
   std::ofstream outfile;
   outfile.open(path, std::ios::out);
   outfile.close();
 
-  for (int j = 0; j < M.size(); j++) {
-    int m = M[j];
-    for (int i = 0; i < K.size(); ++i) {
-      int n = N[i];
-      int k = K[i];
+  // Ensure that M, K, and N are all one-dimensional Tensors
+  assert(M.dims().size() == 1 && K.dims().size() == 1 && N.dims().size() == 1);
+
+  auto M_cpu = M.copy_to(paddle::CPUPlace(), false);
+  auto K_cpu = K.copy_to(paddle::CPUPlace(), false);
+  auto N_cpu = N.copy_to(paddle::CPUPlace(), false);
+  int64_t* M_data = M_cpu.data<int64_t>();
+  int64_t* K_data = K_cpu.data<int64_t>();
+  int64_t* N_data = N_cpu.data<int64_t>();
+
+  int M_size = M.numel();
+  int K_size = K.numel();
+
+  for (int j = 0; j < M_size; j++) {
+    int m = (int)M_data[j];
+    for (int i = 0; i < K_size; ++i) {
+      int n = (int)N_data[i];
+      int k = (int)K_data[i];
       auto A = std::vector<int8_t>(m * k);
       auto B = std::vector<int8_t>(k * n);
       auto C = std::vector<int32_t>(m * n);
@@ -780,12 +810,10 @@ void TestBench(const std::vector<int64_t>& M,
   }
 }
 
-PD_BUILD_OP(Tune_gemm)
-    .Inputs({})
+PD_BUILD_OP(tune_cublaslt_gemm)
+    .Inputs({"M", "K", "N"})
     .Outputs({})
-    .Attrs({"M :std::vector<int64_t>",
-            "K :std::vector<int64_t>",
-            "N :std::vector<int64_t>",
+     .Attrs({
             "dtype: std::string",
-            "path: std::string",})
-    .SetKernelFn(PD_KERNEL(TestBench));
+            "path: std::string"})
+    .SetKernelFn(PD_KERNEL(TuneCublasltGemm));

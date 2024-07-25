@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddlenlp_ops import Tune_gemm
+from paddlenlp_ops import tune_cublaslt_gemm
+import paddle
 
 M = []
 K = []
@@ -30,7 +31,11 @@ M.extend(range(1024, 8193, 1024))
 K.extend([1024, 2048])
 N.extend([4096, 8192])
 
-Dtype = "int8"
-Path = "./search.csv"
+M_tensor = paddle.to_tensor(M)
+K_tensor = paddle.to_tensor(K)
+N_tensor = paddle.to_tensor(N)
 
-Tune_gemm(M, K, N, Dtype, Path)
+Dtype = "int8"
+Path = "./search2.csv"
+
+tune_cublaslt_gemm(M_tensor, K_tensor, N_tensor, Dtype, Path)
