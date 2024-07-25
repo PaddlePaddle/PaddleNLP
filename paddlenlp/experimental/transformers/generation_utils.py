@@ -158,8 +158,10 @@ class GenerationInferenceModel(GenerationMixin):
         inputs_embeds=None,
         logits_processors=None,
         pre_caches=None,
-        **model_kwargs,
     ):
+        # paddle.incubate.jit.inference 不支持函数定义的时候使用 **model_kwargs 这样的形参，但调用的时候可以用**args这样传入作为实参。
+        # 为了兼容只能改成如下这样。
+        model_kwargs = {}
         model_kwargs["position_ids"] = position_ids
         model_kwargs["attention_mask"] = attention_mask
 

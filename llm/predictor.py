@@ -259,6 +259,7 @@ class BasePredictor:
     def predict(self, input_texts: str | list[str]):
         tokenized_source = self._preprocess(input_texts)
         predictions = self._infer(tokenized_source)
+
         decoded_predictions = self._postprocess(predictions)
         return decoded_predictions
 
@@ -707,6 +708,10 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
         BasePredictor.__init__(self, config, tokenizer)
         InferencePredictorMixin.__init__(self, config, tokenizer)
         self.model = model
+        # 只将genearate函数做动转静！
+        self.model.generate = paddle.incubate.jit.inference(self.model.generate, 
+                                                            save_model_dir = "/root/haha",
+                                                            cache_static_model=False)
 
     @paddle.no_grad()
     def _infer(self, inputs: dict[str, paddle.Tensor]):
