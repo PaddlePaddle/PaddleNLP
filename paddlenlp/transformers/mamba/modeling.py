@@ -95,6 +95,7 @@ class MambaCache:
     ):
         self.seqlen_offset = 0
         self.dtype = dtype
+        self.config = config
         intermediate_size = config.intermediate_size
         ssm_state_size = config.state_size
         conv_kernel_size = config.conv_kernel
@@ -107,6 +108,14 @@ class MambaCache:
             i: paddle.zeros([batch_size, intermediate_size, ssm_state_size], dtype=dtype)
             for i in range(config.num_hidden_layers)
         }
+
+    def reset(self):
+        """Resets the cache values while preserving the objects"""
+        for layer_idx in range(self.config.num_hidden_layers):
+            # In-place ops prevent breaking the static address
+            self.conv_states[layer_idx].zero_()
+            self.ssm_states[layer_idx].zero_()
+        self.seqlen_offset = 0
 
 
 class MambaMixer(nn.Layer):
@@ -148,7 +157,7 @@ class MambaMixer(nn.Layer):
         # S4D real initialization. These are not discretized!
         # The core is to load them, compute the discrete states, then write the updated state. Keeps the memory bounded
         A = paddle.arange(1, self.ssm_state_size + 1, dtype=paddle.float32)[None, :]
-        A = A.expand([self.intermediate_size, -1])
+        A = A.expand([self.intermediate_size, -1]).contiguous()
 
         self.A_log = self.create_parameter(
             shape=A.shape,
@@ -590,7 +599,7 @@ class MambaModel(MambaPretrainedModel):
         self.embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
         self.layers = nn.LayerList([MambaBlock(config, layer_idx=idx) for idx in range(config.num_hidden_layers)])
 
-        self.gradient_checkpointing = False
+        self.enable_recompute = False
         self.norm_f = MambaRMSNorm(config.hidden_size, eps=config.layer_norm_epsilon)
         # Initialize weights and apply final processing
         self.post_init()
@@ -625,7 +634,7 @@ class MambaModel(MambaPretrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.embeddings(input_ids)
 
-        if self.gradient_checkpointing and self.training and use_cache:
+        if self.enable_recompute and self.training and use_cache:
             use_cache = False
 
         if cache is None and use_cache:
@@ -634,7 +643,7 @@ class MambaModel(MambaPretrainedModel):
         hidden_states = inputs_embeds
         all_hidden_states = () if output_hidden_states else None
         for mixer_block in self.layers:
-            if self.gradient_checkpointing and self.training and not hidden_states.stop_gradient:
+            if self.enable_recompute and self.training and not hidden_states.stop_gradient:
 
                 def create_custom_forward(module):
                     def custom_forward(*inputs):
