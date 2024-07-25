@@ -230,7 +230,6 @@ def broadcast_dp_optimizer(state_dict):
 
 
 def broadcast_moe_optimizer(state_dict, broadcast_dp=True):
-
     try:
         hcg = fleet.get_hybrid_communicate_group()
         dp_group = hcg.get_data_parallel_group()
@@ -242,7 +241,7 @@ def broadcast_moe_optimizer(state_dict, broadcast_dp=True):
     except:
         dp_group = None
         src_rank = 0
-        data_parallel_rank = 0
+        data_parallel_rank = dist.get_rank()
 
     def _broadcast_moe_optimizer_state(state_dict):
         # boardcast_keys
