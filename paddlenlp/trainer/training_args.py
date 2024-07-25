@@ -245,6 +245,7 @@ class TrainingArguments:
               enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance.
               enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.
               enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true. It can accelerate model parallel further.
+              enable_sp_async_reduce_scatter, it supports async reduce_scatter in ColumnSequenceParallelLinear. It only works when set sp_async_reduce_scatter is True. It can accelerate sequence parallel further.
               enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
               sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
               sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
@@ -629,6 +630,7 @@ class TrainingArguments:
                 "enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance. \n"
                 "enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.\n"
                 "enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true.  It can accelerate model parallel further.\n"
+                "enable_sp_async_reduce_scatter, it supports async reduce_scatter in ColumnSequenceParallelLinear. It only works when set sp_async_reduce_scatter is True. It can accelerate sequence parallel further.\n"
                 "enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.\n"
                 "sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.\n"
                 "sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.\n"
@@ -1128,6 +1130,7 @@ class TrainingArguments:
                                 "enable_mp_async_allreduce",
                                 "enable_mp_skip_c_identity",
                                 "enable_mp_fused_linear_param_grad_add",
+                                "enable_sp_async_reduce_scatter",
                                 "enable_delay_scale_loss",
                                 "sync_param",
                                 "sync_grad",
@@ -1135,7 +1138,7 @@ class TrainingArguments:
                             ]:
                                 raise ValueError(
                                     f"Found unknown tensor parallell config {x}, "
-                                    f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity, enable_mp_fused_linear_param_grad_add, sync_param, sync_grad and sync_moment."
+                                    f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity, enable_mp_fused_linear_param_grad_add, enable_sp_async_reduce_scatter, enable_delay_scale_loss, sync_param, sync_grad and sync_moment."
                                 )
                     try:
                         if "enable_mp_async_allreduce" in mp_config:
@@ -1153,6 +1156,8 @@ class TrainingArguments:
                                 warnings.warn(
                                     "enable_mp_fused_linear_param_grad_add only works with enable_mp_async_allreduce. It will not work."
                                 )
+                        if "enable_sp_async_reduce_scatter" in mp_config:
+                            strategy.hybrid_configs["mp_configs"].sp_async_reduce_scatter = True
 
                         sync_param = "sync_param" in mp_config
                         sync_grad = "sync_grad" in mp_config
