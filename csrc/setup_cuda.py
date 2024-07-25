@@ -79,7 +79,7 @@ setup(
             "./generation/quant_int8.cu",
             "./generation/dequant_int8.cu",
             "./generation/flash_attn_bwd.cc",
-            "./generation/tune_gemm.cu",
+            "./generation/tune_cublaslt_gemm.cu",
         ],
         extra_compile_args={
             "cxx": ["-O3"],

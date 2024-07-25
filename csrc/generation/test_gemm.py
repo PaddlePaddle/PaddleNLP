@@ -15,18 +15,11 @@
 from paddlenlp_ops import tune_cublaslt_gemm
 import paddle
 
-K = []
-N = []
-
-# Shape initialization
-K.extend([1024, 2048])
-N.extend([4096, 8192])
-
 M_tensor = paddle.to_tensor([1024])
-K_tensor = paddle.to_tensor(K)
-N_tensor = paddle.to_tensor(N)
+K_tensor = paddle.to_tensor([1024, 2048])
+N_tensor = paddle.to_tensor([4096, 8192])
 
 Dtype = "int8"
 Path = "./search2.csv"
 
-tune_cublaslt_gemm(M_tensor, K_tensor, N_tensor, Dtype, Path)
+tune_cublaslt_gemm(M_tensor, K_tensor, N_tensor, Dtype, True, False, Path)
