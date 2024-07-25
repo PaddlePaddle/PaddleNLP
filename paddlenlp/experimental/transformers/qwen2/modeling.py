@@ -15,36 +15,38 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
+from functools import partial
+
 import numpy as np
 import paddle
 from paddle import nn
 from paddle.nn.quant import weight_quantize
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
+    FusedBlockMultiTransformer,
+    FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
-    FusedBlockMultiTransformer,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
     GenerationInferenceModel,
 )
 from paddlenlp.transformers import Qwen2Config, Qwen2PretrainedModel
-from paddlenlp.transformers.model_outputs import (
+from paddlenlp.transformers.model_outputs import (  # CausalLMOutputWithCrossAttentions,
     BaseModelOutputWithPast,
+    BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithPast,
 )
 from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
     register_base_model,
 )
-from paddlenlp.transformers.model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
-    CausalLMOutputWithCrossAttentions,
-)
 from paddlenlp.transformers.qwen2.modeling import Qwen2LMHead, Qwen2PretrainingCriterion
 from paddlenlp.utils.log import logger
+
 __all__ = ["Qwen2ForCausalLMInferenceModel", "Qwen2ForCausalLMBlockInferenceModel"]
 
 
@@ -198,20 +200,20 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         ln_f_weight = paddle.to_tensor(state_dict["qwen2.norm.weight"]).cast(self.ln_f.weight.dtype)
         self.wte.weight.set_value(wte_weight)
         self.ln_f.weight.set_value(ln_f_weight)
-        
+
         # print("wte.weight:", self.wte.weight)
         # print("ln_f.weight:", self.wte.weight)
-        
+
         # print("qwen2.embed_tokens.weight:", wte_weight)
         # print("qwen2.norm.weight:", ln_f_weight)
 
         for idx in range(self.num_layers):
             unfused_state_dict = {}
-            ln_scale = paddle.to_tensor(
-                state_dict["qwen2.layers.{}.input_layernorm.weight".format(idx)]
-            ).cast(self.transformer_block.ln_scales[idx].dtype)
+            ln_scale = paddle.to_tensor(state_dict["qwen2.layers.{}.input_layernorm.weight".format(idx)]).cast(
+                self.transformer_block.ln_scales[idx].dtype
+            )
             self.transformer_block.ln_scales[idx].set_value(ln_scale)
-            
+
             # print("qwen2.layers.{}.input_layernorm.weight".format(idx), ln_scale)
 
             unfused_state_dict["qwen2.self_attn.q_proj.weight"] = state_dict[
@@ -223,7 +225,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             unfused_state_dict["qwen2.self_attn.v_proj.weight"] = state_dict[
                 "qwen2.layers.{}.self_attn.v_proj.weight".format(idx)
             ]
-            
+
             # print("qwen2.layers.{}.self_attn.q_proj.weight".format(idx), unfused_state_dict["qwen2.self_attn.q_proj.weight"])
             # print("qwen2.layers.{}.self_attn.k_proj.weight".format(idx), unfused_state_dict["qwen2.self_attn.k_proj.weight"])
             # print("qwen2.layers.{}.self_attn.v_proj.weight".format(idx), unfused_state_dict["qwen2.self_attn.v_proj.weight"])
@@ -267,11 +269,11 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             unfused_state_dict["qwen2.self_attn.v_proj.bias"] = state_dict[
                 "qwen2.layers.{}.self_attn.v_proj.bias".format(idx)
             ]
-            
+
             # print("qwen2.layers.{}.self_attn.q_proj.bias".format(idx), unfused_state_dict["qwen2.self_attn.q_proj.bias"])
             # print("qwen2.layers.{}.self_attn.k_proj.bias".format(idx), unfused_state_dict["qwen2.self_attn.k_proj.bias"])
             # print("qwen2.layers.{}.self_attn.v_proj.bias".format(idx), unfused_state_dict["qwen2.self_attn.v_proj.bias"])
-            
+
             concated_qkv_biases = np.concatenate(
                 [
                     unfused_state_dict["qwen2.self_attn.q_proj.bias"],
@@ -283,13 +285,12 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             qkv_bias = paddle.to_tensor(concated_qkv_biases).cast(dtype)
             self.transformer_block.qkv_biases[idx].set_value(qkv_bias)
 
-            linear_weight = paddle.to_tensor(
-                state_dict["qwen2.layers.{}.self_attn.o_proj.weight".format(idx)]
-            ).cast(dtype)
-            
-            
+            linear_weight = paddle.to_tensor(state_dict["qwen2.layers.{}.self_attn.o_proj.weight".format(idx)]).cast(
+                dtype
+            )
+
             # print("qwen2.layers.{}.self_attn.o_proj.weight".format(idx), linear_weight)
-            
+
             if self.use_weight_only:
                 linear_quanted_weight, linear_weight_scale = weight_quantize(linear_weight, algo=self.quant_type)
                 self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight)
@@ -299,9 +300,11 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
 
             ffn_ln_scale = paddle.to_tensor(
                 state_dict["qwen2.layers.{}.post_attention_layernorm.weight".format(idx)],
-            ).cast(self.transformer_block.ffn_ln_scales[idx].dtype,)
+            ).cast(
+                self.transformer_block.ffn_ln_scales[idx].dtype,
+            )
             self.transformer_block.ffn_ln_scales[idx].set_value(ffn_ln_scale)
-            
+
             # print("qwen2.layers.{}.post_attention_layernorm.weight".format(idx), ffn_ln_scale)
 
             up_weight = paddle.to_tensor(state_dict["qwen2.layers.{}.mlp.up_proj.weight".format(idx)]).cast(dtype)
@@ -321,11 +324,11 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale)
             else:
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight)
-                
+
             # print("qwen2.layers.{}.mlp.up_proj.weight".format(idx), up_weight)
             # print("qwen2.layers.{}.mlp.gate_proj.weight".format(idx), gate_weight)
             # print("qwen2.layers.{}.mlp.down_proj.weight".format(idx), ffn2_weight)
-            
+
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
@@ -405,7 +408,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             # print("input_ids:", input_ids)
             # print("ids_remove_padding:", ids_remove_padding)
             # print("inputs_embeds wte:", inputs_embeds)
-                
+
         hidden_states = inputs_embeds
 
         # decoder layers
@@ -441,7 +444,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 rotary_emb_dims=1,
                 time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
             )
-        
+
         # print("hidden_states:", hidden_states)
 
         hidden_states = self.ln_f(hidden_states)
@@ -592,7 +595,6 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        
 
         hidden_states = outputs[0]
 
@@ -626,13 +628,14 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
             self.lm_head.weight.set_value(lm_head_weight)
         self.qwen2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
+
 @register_base_model
 class Qwen2BlockInferenceModel(Qwen2InferenceModel):
     def __init__(self, config: Qwen2Config):
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size
-        
+
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
@@ -671,9 +674,9 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
-        
+
         inputs_embeds = self.wte(ids_remove_padding)
-        import pdb;pdb.set_trace()
+        # import pdb;pdb.set_trace()
 
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
@@ -694,7 +697,8 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
             hidden_states=None,
             attentions=None,
         )
-        
+
+
 class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2PretrainedModel):
     """
     Dynamic Batching for Qwen2 Model with pretraining tasks on top.
@@ -735,7 +739,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
-            
+
             # Column Linear
             if config.fuse_attention_qkv:
                 base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)

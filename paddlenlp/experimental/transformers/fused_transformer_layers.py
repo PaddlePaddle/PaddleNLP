@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import paddle
 import paddle.distributed as dist
+import paddle.nn.functional as F
 from paddle.framework import LayerHelper, core, in_dynamic_mode
 from paddle.incubate.nn.functional import (
     fused_layer_norm,
@@ -73,6 +74,19 @@ def _set_var_distributed(var):
         main_block = paddle.static.default_main_program().current_block()
         startup_block._find_var_recursive(var.name).is_distributed = True
         main_block._find_var_recursive(var.name).is_distributed = True
+
+
+def get_triangle_upper_mask(x, mask=None):
+    if mask is not None:
+        return mask
+    # [bsz, n_head, q_len, kv_seq_len]
+    shape = x.shape
+    #  [bsz, 1, q_len, kv_seq_len]
+    shape[1] = 1
+    mask = paddle.full(shape, paddle.finfo(x.dtype).min, dtype=x.dtype)
+    mask = paddle.triu(mask, diagonal=1)
+    mask.stop_gradient = True
+    return mask
 
 
 def fused_act_bias_wrapper(
@@ -143,6 +157,19 @@ def fused_act_bias_wrapper(
         attrs=attrs,
     )
     return out
+
+
+def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
+    """
+    This is the equivalent of paddle.repeat_interleave(hidden_states, n_rep, axis=1). The hidden states go from (batch,
+    num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
+    """
+    batch, slen, num_key_value_heads, head_dim = hidden_states.shape
+    if n_rep == 1:
+        return hidden_states
+
+    hidden_states = hidden_states.unsqueeze(-2).tile([1, 1, 1, n_rep, 1])
+    return hidden_states.reshape([batch, slen, num_key_value_heads * n_rep, head_dim])
 
 
 class FusedMultiTransformerConfig:
@@ -637,17 +664,89 @@ class FusedMultiTransformerBase(Layer):
         # write cache kv (inplace)
         write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
 
+        num_key_value_groups = self.num_heads // self.kv_num_heads
+        # q_out = q_out.transpose([0, 2, 1, 3])
+        k_out = k_out.transpose([0, 2, 1, 3])
+        v_out = v_out.transpose([0, 2, 1, 3])
+        k_out = repeat_kv(k_out, num_key_value_groups)
+        v_out = repeat_kv(v_out, num_key_value_groups)
+        k_out = k_out.transpose([0, 2, 1, 3])
+        v_out = v_out.transpose([0, 2, 1, 3])
+
+        print("[fg] q_out", q_out)
+        print("[fg] k_out", k_out)
+        print("[fg] v_out", v_out)
+        print("q_out sum: ", paddle.sum(paddle.cast(q_out, dtype="float32"), axis=-1))
+        print("q_out mean: ", paddle.mean(paddle.cast(q_out, dtype="float32"), axis=-1))
+        print("q_out max: ", paddle.max(paddle.cast(q_out, dtype="float32"), axis=-1))
+
+        print("v_out sum: ", paddle.sum(paddle.cast(v_out, dtype="float32"), axis=-1))
+        print("v_out mean: ", paddle.mean(paddle.cast(v_out, dtype="float32"), axis=-1))
+        print("v_out max: ", paddle.max(paddle.cast(v_out, dtype="float32"), axis=-1))
+
+        bsz, num_heads, q_len, head_dim = q_out.shape
+        _, _, kv_seq_len, _ = v_out.shape
+        import math
+
+        attn_weights = paddle.matmul(q_out / math.sqrt(head_dim), k_out.transpose([0, 1, 3, 2]))
+        print("[fg] head_dim", head_dim)
+        print("[fg] attn_weights", attn_weights)
+
+        if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
+            raise ValueError(
+                f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
+                f" {attn_weights.shape}"
+            )
+
+        # if attn_mask is None:
+        attn_mask = get_triangle_upper_mask(attn_weights)
+        attn_mask = attn_mask.reshape([bsz, 1, q_len, kv_seq_len])
+        if attn_mask.shape != [bsz, 1, q_len, kv_seq_len]:
+            raise ValueError(
+                f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attn_mask.shape}"
+            )
+
+        attn_weights = attn_weights + attn_mask
+        print("[fg] attn_weights", attn_weights)
+        if not paddle.in_dynamic_mode():
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(q_out.dtype)
+        else:
+            with paddle.amp.auto_cast(False):
+                attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(q_out.dtype)
+
+        # attn_weights = F.dropout(attn_weights, p=config.attention_dropout, training=training)
+        print("[fg] attn_weights", attn_weights)
+        qktv_out = paddle.matmul(attn_weights, v_out)
+
+        print("[fg] qktv_out", qktv_out)
+
+        # from paddle.nn.functional.flash_attention import flash_attention
+
+        # qktv_out, _ = flash_attention(
+        #         q_out,
+        #         k_out,
+        #         v_out,
+        #         causal=True,
+        #         # return_softmax=output_attentions,
+        #     )
+        # qktv_out = paddle.transpose(qktv_out, perm=[0, 2, 1, 3])
+
         # cutlass fmha
-        qktv_out = variable_length_memory_efficient_attention(
-            q_out,
-            k_out,
-            v_out,
-            seq_lens,
-            seq_lens + pre_caches_length,
-            mask=attn_mask,
-            scale=float(self.head_dim**-0.5),
-        )
-        import pdb;pdb.set_trace()
+        # qktv_out = variable_length_memory_efficient_attention(
+        #     q_out,
+        #     k_out,
+        #     v_out,
+        #     seq_lens,
+        #     seq_lens + pre_caches_length,
+        #     mask=attn_mask,
+        #     scale=float(self.head_dim**-0.5),
+        # )
+        # qktv_out = qktv_out.transpose([0, 2, 1, 3])
+
+        # print("[fg] qktv_out", qktv_out)
+        # import sys; sys.exit()
+
+        # import pdb;pdb.set_trace()
 
         return transpose_remove_padding(qktv_out, seq_lens, padding_offset)
 
@@ -700,8 +799,11 @@ class FusedMultiTransformerBase(Layer):
 
         else:
             fmha_out = self.compute_mmha(qkv_out, caches, attn_mask, seq_lens, rotary_embs, rotary_emb_dims, i)
-
+        # print("fmha computed", fmha_out)
+        # import sys; sys.exit()
         out_linear_out = self.compute_out_linear(fmha_out, i)
+        # print("out_linear_out computed", out_linear_out)
+        # import sys; sys.exit()
 
         return out_linear_out
 
@@ -841,6 +943,7 @@ class FusedMultiTransformerBase(Layer):
 
         residual_input = src
         for i in range(self.num_layers):
+            print(i)
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
             out_linear_out = self.compute_attn(
                 time_step,
@@ -860,13 +963,16 @@ class FusedMultiTransformerBase(Layer):
             # all_reduce
             if self.nranks > 1:
                 dist.all_reduce(out_linear_out)
-                
-            # print("out_linear_out: ", out_linear_out)
+
+            print("attention out: ", out_linear_out)
+            print("sum: ", paddle.sum(paddle.cast(out_linear_out, dtype="float32"), axis=-1))
+            print("mean: ", paddle.mean(paddle.cast(out_linear_out, dtype="float32"), axis=-1))
+            print("max: ", paddle.max(paddle.cast(out_linear_out, dtype="float32"), axis=-1))
 
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
-            
-            # print("ffn layernorm tmp_out: ", tmp_out)
+
+            print("ffn layernorm tmp_out: ", tmp_out)
 
             # ffn1 matmul
             ffn1_out = self.compute_ffn1(tmp_out, i)
@@ -875,7 +981,7 @@ class FusedMultiTransformerBase(Layer):
 
             # ffn2 matmul
             ffn2_out = self.compute_ffn2(ffn1_out, i)
-            # print("ffn2 matmul: ", ffn2_out)
+            print("ffn2 matmul: ", ffn2_out)
 
             # all_reduce
             if self.nranks > 1:
@@ -886,8 +992,12 @@ class FusedMultiTransformerBase(Layer):
                 ffn2_out, residual_input, i, self.num_layers
             )
             src = tmp_out
-            # print("final tmp_out: ", tmp_out)
+            print("final tmp_out: ", tmp_out)
             # print("residual_input: ", residual_input)
+            # if i == 1:
+            import sys
+
+            sys.exit()
 
         kwargs["time_step"] = time_step
         kwargs["multi_block_output"] = tmp_out
