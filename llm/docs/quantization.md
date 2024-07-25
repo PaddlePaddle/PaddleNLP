@@ -75,7 +75,7 @@ python  run_finetune.py ./config/llama/awq_argument.json
 
 <div>
 
-- `quant_type`: PTQ,QAT 量化类型，默认为 A8W8。支持 A8W8,WINT4，WINT8：A8W8指对激活（输入）进行 INT8量化，对模型权重进行 INT8量化；WINT4指仅对模型权重进行 INT4量化，后续使用 WeightOnly 进行推理；WINT8指仅对模型权重进行 INT8量化，后续使用 WeightOnly 进行推理。
+- `quant_type`: PTQ，QAT 量化类型，默认为 A8W8。支持 A8W8，WINT4，WINT8：A8W8指对激活（输入）进行 INT8量化，对模型权重进行 INT8量化；WINT4指仅对模型权重进行 INT4量化，后续使用 WeightOnly 进行推理；WINT8指仅对模型权重进行 INT8量化，后续使用 WeightOnly 进行推理。
 - `do_ptq`: 是否进行 PTQ 量化，默认为 False。
 - `weight_quant_method`: 权重量化方式，现可选 groupwise 或者 abs_max_channel_wise。
 - `ptq_step`: PTQ 量化步数，也即模型前向次数，默认为32。
