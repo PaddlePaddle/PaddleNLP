@@ -81,7 +81,7 @@ from ..data import (
     DistDataLoader,
     default_data_collator,
 )
-from ..peft import LoRAModel, PrefixModelForCausalLM
+from ..peft import LoRAModel, PrefixModelForCausalLM, VeRAModel
 
 try:
     from ..quantization.quantization_linear import QuantizationLinear
@@ -107,6 +107,7 @@ from ..utils.env import (
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
+    VERA_WEIGHTS_NAME,
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
@@ -433,7 +434,11 @@ class Trainer:
         if train_dataset is not None and not isinstance(train_dataset, collections.abc.Sized) and args.max_steps <= 0:
             raise ValueError("train_dataset does not implement __len__, max_steps has to be specified")
 
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+        if (
+            isinstance(self.model, LoRAModel)
+            or isinstance(self.model, PrefixModelForCausalLM)
+            or isinstance(self.model, VeRAModel)
+        ):
             if self.args.unified_checkpoint and "skip_save_model_weight" in self.args.unified_checkpoint_config:
                 self.args.unified_checkpoint_config.remove("skip_save_model_weight")
                 logger.warning(
@@ -572,6 +577,8 @@ class Trainer:
                 weights_file = os.path.join(resume_from_checkpoint, PREFIX_WEIGHTS_NAME)
                 if self.model.prefix_config.tensor_parallel_degree > 1:
                     convert_tp = True
+            elif isinstance(self.model, VeRAModel):
+                weights_file = os.path.join(resume_from_checkpoint, VERA_WEIGHTS_NAME)
             if self.args.dataset_rank == 0:
                 logger.info(f"Loading model from {resume_from_checkpoint} .")
 
@@ -626,7 +633,11 @@ class Trainer:
                     self.runtime_timer.stop()
                     return
 
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+        if (
+            isinstance(self.model, LoRAModel)
+            or isinstance(self.model, PrefixModelForCausalLM)
+            or isinstance(self.model, VeRAModel)
+        ):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
             self.runtime_timer.stop()
             return
@@ -1083,17 +1094,13 @@ class Trainer:
                         fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     # Pipeline parallel mode,  handle gradient reduce here to overlap
-                    pipeline_parallel_config = (
-                        set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
-                    )
-                    sharding_parallel_config = (
-                        set(args.sharding_parallel_config.split(" ")) if args.sharding_parallel_degree > 1 else set()
-                    )
-                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
-                    enable_release_grads = (
-                        "enable_release_grads" in pipeline_parallel_config
-                        or "enable_release_grads" in sharding_parallel_config
-                    )
+                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in args.pipeline_parallel_config
+
+                    enable_release_grads = False
+                    if args.sharding_parallel_degree > 1:
+                        enable_release_grads = "enable_release_grads" in args.sharding_parallel_config
+                    if not enable_release_grads and args.pipeline_parallel_degree > 1:
+                        enable_release_grads = "enable_release_grads" in args.pipeline_parallel_config
 
                     # Case 3: Pipeline parallel mode, overlap with dp
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
@@ -1992,8 +1999,7 @@ class Trainer:
                         "please upgrade your paddle (using nightly version)."
                     )
 
-                sharding_parallel_config = set(self.args.sharding_parallel_config.split(" "))
-                if level == "os_g" and "enable_stage2_overlap" in sharding_parallel_config:
+                if level == "os_g" and "enable_stage2_overlap" in self.args.sharding_parallel_config:
                     model._set_reduce_overlap(True)
                     optimizer._set_broadcast_overlap(True, model)
 
@@ -2133,9 +2139,9 @@ class Trainer:
     def _enable_delay_scale_loss(self):
         key = "enable_delay_scale_loss"
         if self.args.pipeline_parallel_degree > 1:
-            return key in self.args.pipeline_parallel_config.split(" ")
+            return key in self.args.pipeline_parallel_config
         elif self.args.tensor_parallel_degree > 1:
-            return key in self.args.tensor_parallel_config.split(" ")
+            return key in self.args.tensor_parallel_config
         else:
             return False
 
@@ -2514,7 +2520,11 @@ class Trainer:
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
         # peft model
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+        if (
+            isinstance(self.model, LoRAModel)
+            or isinstance(self.model, PrefixModelForCausalLM)
+            or isinstance(self.model, VeRAModel)
+        ):
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,

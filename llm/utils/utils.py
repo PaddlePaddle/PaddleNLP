@@ -797,7 +797,7 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
             break
     output = np.concatenate(outputs, axis=1).tolist()
     seqs = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-    for i, seq in enumerate(seqs):
-        result_queue.put([i, seq])
+    for i, (out, seq) in enumerate(zip(output, seqs)):
+        result_queue.put([i, out, seq])
 
     logger.info("Finish read result message")
