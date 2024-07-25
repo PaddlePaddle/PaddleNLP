@@ -241,7 +241,7 @@ def broadcast_moe_optimizer(state_dict, model_state_dict=None, broadcast_dp=True
     except:
         dp_group = None
         src_rank = 0
-        data_parallel_rank = 0
+        data_parallel_rank = dist.get_rank()
 
     def _filter_sync_optimizer_state(model_state_dict, opt_state_dict):
         # get sync name
