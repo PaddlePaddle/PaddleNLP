@@ -39,6 +39,7 @@ if core.is_compiled_with_xpu() or core.is_compiled_with_cuda():
 
 if core.is_compiled_with_cuda():
     from paddlenlp_ops import (
+        cutlass_fp8_fp8_half_gemm_fused,
         dequant_int8,
         encode_rotary_qk,
         qkv_transpose_split,
@@ -2177,7 +2178,7 @@ class FusedBlockMultiTransformerFP8(Layer):
                 qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
             return qkv_out
         else:
-            qkv_out = paddle.linalg.fp8_fp8_half_gemm_fused(
+            qkv_out = cutlass_fp8_fp8_half_gemm_fused(
                 ln_out,
                 self.qkv_weights[i],
                 transpose_x=False,
@@ -2186,6 +2187,7 @@ class FusedBlockMultiTransformerFP8(Layer):
                 scale=self.weight_scales.scale["qkv_weight_scale"][i]
                 / (self.act_scales.scale["qkv_in_scale"][i] * 448 * 448),
                 output_dtype=self._dtype,
+                activation_type="identity",
             )
 
             return qkv_out
@@ -2202,7 +2204,7 @@ class FusedBlockMultiTransformerFP8(Layer):
         """
         For fake parameter
         """
-        return paddle.linalg.fp8_fp8_half_gemm_fused(
+        return cutlass_fp8_fp8_half_gemm_fused(
             fmha_out,
             self.linear_weights[i],
             bias=None,
@@ -2211,6 +2213,7 @@ class FusedBlockMultiTransformerFP8(Layer):
             scale=self.weight_scales.scale["out_linear_weight_scale"][i]
             / (self.act_scales.scale["out_linear_in_scale"][i] * 448 * 448),
             output_dtype=self._dtype,
+            activation_type="identity",
         )
 
     def compute_max_len(self, seq_lens_encoder, seq_lens_decoder, cum_offsets):
@@ -2336,26 +2339,28 @@ class FusedBlockMultiTransformerFP8(Layer):
         """
         For fake parameter
         """
-        tem_0 = paddle.linalg.fp8_fp8_half_gemm_fused(
+        tem_0 = cutlass_fp8_fp8_half_gemm_fused(
             tmp_out,
             self.ffn1_0_weights[i],
-            False,
-            True,
+            transpose_x=False,
+            transpose_y=True,
             scale=self.weight_scales.scale["ffn1_0_weight_scale"][i]
             / (self.act_scales.scale["ffn1_in_scale"][i] * 448 * 448),
             bias=self.ffn1_0_biases[i],
             output_dtype=self._dtype,
+            activation_type="identity",
         )
 
-        tem_1 = paddle.linalg.fp8_fp8_half_gemm_fused(
+        tem_1 = cutlass_fp8_fp8_half_gemm_fused(
             tmp_out,
             self.ffn1_1_weights[i],
-            False,
-            True,
+            transpose_x=False,
+            transpose_y=True,
             scale=self.weight_scales.scale["ffn1_1_weight_scale"][i]
             / (self.act_scales.scale["ffn1_in_scale"][i] * 448 * 448),
             bias=self.ffn1_1_biases[i],
             output_dtype=self._dtype,
+            activation_type="identity",
         )
 
         from paddle.incubate.nn.functional import swiglu
@@ -2367,7 +2372,7 @@ class FusedBlockMultiTransformerFP8(Layer):
         """
         For fake parameter
         """
-        return paddle.linalg.fp8_fp8_half_gemm_fused(
+        return cutlass_fp8_fp8_half_gemm_fused(
             ffn1_out,
             self.ffn2_weights[i],
             bias=None,
@@ -2376,6 +2381,7 @@ class FusedBlockMultiTransformerFP8(Layer):
             scale=self.weight_scales.scale["ffn2_weight_scale"][i]
             / (self.act_scales.scale["ffn2_in_scale"][i] * 448 * 448),
             output_dtype=self._dtype,
+            activation_type="identity",
         )
 
     def compute_bias_residual_layernorm(self, ffn2_out, residual_input, i, num_layers):
