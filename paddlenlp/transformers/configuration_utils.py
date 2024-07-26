@@ -297,7 +297,7 @@ class LlmMetaConfig:
         return ret
 
     @classmethod
-    def _get_nonsavable_keys(cls):
+    def _get_unsavable_keys(cls):
         ret = set()
         for attrs in [
             cls.op_fusion_attributes,
@@ -516,7 +516,7 @@ class PretrainedConfig:
     _auto_class: Optional[str] = None
 
     # Fix me, it is global for all config
-    _nonsavable_keys = set()
+    _unsavable_keys = set()
 
     def __setattr__(self, key, value):
         if key in super().__getattribute__("attribute_map"):
@@ -542,7 +542,8 @@ class PretrainedConfig:
         kwargs = attribute_map(self, kwargs=kwargs)
         kwargs.pop("transformers_version", None)
         llm_meta = LlmMetaConfig._get_defaults()
-        self._nonsavable_keys.update(LlmMetaConfig._get_nonsavable_keys())
+        self._unsavable_keys.update(LlmMetaConfig._get_unsavable_keys())
+        self._unsavable_keys.remove("tensor_parallel_degree")
 
         kwargs = set_expected_keys(self, llm_meta, kwargs)
         if self.sequence_parallel:
@@ -1011,14 +1012,14 @@ class PretrainedConfig:
 
         return serializable_config_dict
 
-    def register_nonsaveable_keys(self, keys):
+    def register_unsavable_keys(self, keys):
         # Save: not save it in any case
         # Print: show it if non defalut value
         if type(keys) == list or type(keys) == tuple:
             for key in keys:
-                self._nonsavable_keys.add(key)
+                self._unsavable_keys.add(key)
         else:
-            self._nonsavable_keys.add(keys)
+            self._unsavable_keys.add(keys)
 
     def to_dict(self, saving_file=False) -> Dict[str, Any]:
         """
@@ -1047,9 +1048,9 @@ class PretrainedConfig:
             output[key] = value
 
         # Fix for rewrited from_pretrained method, hasattr
-        if saving_file and hasattr(self, "_nonsavable_keys"):
+        if saving_file and hasattr(self, "_unsavable_keys"):
             for key in list(output.keys()):
-                if key in self._nonsavable_keys:
+                if key in self._unsavable_keys:
                     output.pop(key)
 
         if hasattr(self, "quantization_config"):

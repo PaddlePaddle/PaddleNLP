@@ -340,11 +340,11 @@ def full_training_step(self: Trainer, inputs: Dict[str, paddle.Tensor], **kwargs
             fused_allreduce_gradients(list(model.parameters()), None)
 
         # Pipeline parallel mode,  handle gradient reduce here to overlap
-        pipeline_parallel_config = (
-            set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
-        )
-        enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
-        enable_release_grads = "enable_release_grads" in pipeline_parallel_config
+        enable_dp_comm_overlap = False
+        enable_release_grads = False
+        if args.pipeline_parallel_degree > 1:
+            enable_dp_comm_overlap = "enable_dp_comm_overlap" in args.pipeline_parallel_config
+            enable_release_grads = "enable_release_grads" in args.pipeline_parallel_config
 
         # Case 3: Pipeline parallel mode, overlap with dp
         if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
