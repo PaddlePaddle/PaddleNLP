@@ -850,10 +850,7 @@ class GenerationMixin(object):
                 bos_token_id, encoder_output=model_kwargs["inputs_embeds"]
             )
 
-        if (
-            not model_kwargs.get("force_attention_mask_none", False)
-            and model_kwargs.get("attention_mask", None) is None
-        ):
+        if model_kwargs.get("attention_mask", None) is None:
             # TODO
             # Init `attention_mask` depending on `pad_token_id`
             model_kwargs["attention_mask"] = self.prepare_attention_mask_for_generation(

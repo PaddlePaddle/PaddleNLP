@@ -1038,8 +1038,7 @@ class LlamaAttention(nn.Layer):
             # reuse k, v, self_attention
             key_states = paddle.concat([past_key_value[0], key_states], axis=1)
             value_states = paddle.concat([past_key_value[1], value_states], axis=1)
-            paddle_version = float(paddle.__version__[:3])
-            if paddle_version == 0.0 or paddle_version > 2.6:
+            if self.config.immediate_clear_past_key_value:
                 past_key_value[0]._clear_data()
                 past_key_value[1]._clear_data()
 
@@ -1604,8 +1603,7 @@ class LlamaModel(LlamaPretrainedModel):
             raise NotImplementedError("Ring FlashAttention dosen't support attention_mask or alibi")
 
         # embed positions
-        force_attention_mask_none = kwargs.get("force_attention_mask_none", False)
-        if force_attention_mask_none:
+        if self.config.use_flash_attention_for_generation:
             attention_mask = None
         elif attn_mask_startend_row_indices is None and attention_mask is None:
             # [bs, seq_len]
@@ -1639,7 +1637,7 @@ class LlamaModel(LlamaPretrainedModel):
 
         use_casual_mask = get_use_casual_mask() and not self.config.alibi
 
-        if force_attention_mask_none or use_casual_mask:
+        if self.config.use_flash_attention_for_generation or use_casual_mask:
             attention_mask = None
         elif attn_mask_startend_row_indices is None:
             attention_mask = self._prepare_decoder_attention_mask(
@@ -1649,7 +1647,7 @@ class LlamaModel(LlamaPretrainedModel):
         is_casual = False
 
         if attn_mask_startend_row_indices is None and self.config.use_flash_attention and get_env_device() != "gcu":
-            if force_attention_mask_none or use_casual_mask:
+            if self.config.use_flash_attention_for_generation or use_casual_mask:
                 is_casual = True
             else:
                 is_casual = is_casual_mask(attention_mask)
@@ -1713,7 +1711,7 @@ class LlamaModel(LlamaPretrainedModel):
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
 
-        if use_cache:
+        if self.config.use_last_token_for_generation:
             hidden_states = paddle.unsqueeze(hidden_states[:, -1, :], 1)
 
         hidden_states = self.norm(hidden_states)
@@ -1900,7 +1898,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         batch_size, seq_length = input_ids.shape
         position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
         attention_mask = kwargs.get("attention_mask", None)
-        force_attention_mask_none = kwargs.get("force_attention_mask_none", False)
         if past_key_values:
             input_ids = input_ids[:, -1].unsqueeze(axis=-1)
             position_ids = position_ids[:, -1].unsqueeze(-1)
@@ -1917,7 +1914,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
                 "past_key_values": past_key_values,
                 "use_cache": use_cache,
                 "attention_mask": attention_mask,
-                "force_attention_mask_none": force_attention_mask_none,
             }
         )
         return model_inputs
@@ -1964,7 +1960,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         output_hidden_states=None,
         return_dict=None,
         attn_mask_startend_row_indices=None,
-        force_attention_mask_none=False,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1990,7 +1985,6 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
             attn_mask_startend_row_indices=attn_mask_startend_row_indices,
-            force_attention_mask_none=force_attention_mask_none,
         )
 
         hidden_states = outputs[0]  # [bs, seq_len, dim]
