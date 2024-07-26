@@ -816,7 +816,11 @@ class LlamaAttention(nn.Layer):
         self.config = config
 
     def _init_rope(self):
-        if self.config.rope_scaling is not None and self.config.rope_scaling.get("rope_type", None) == "llama3":
+        if (
+            "rope_scaling" in self.config
+            and self.config.rope_scaling is not None
+            and self.config.rope_scaling.get("rope_type", None) == "llama3"
+        ):
             self.rotary_emb = Llama3RotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
