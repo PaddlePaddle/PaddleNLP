@@ -516,6 +516,43 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
             return scale_cos_sin
 
 
+class Llama3RotaryEmbedding(LlamaRotaryEmbedding):
+    def __init__(
+        self,
+        dim,
+        max_position_embeddings=8192,
+        base=500000,
+        factor=8.0,
+        low_freq_factor=1.0,
+        high_freq_factor=4.0,
+        original_max_position_embeddings=8192,
+    ):
+        self.factor = factor
+        self.low_freq_factor = low_freq_factor
+        self.high_freq_factor = high_freq_factor
+        self.original_max_position_embeddings = original_max_position_embeddings
+        super().__init__(dim, max_position_embeddings, base)
+
+    def _set_cos_sin_cache(self, seq_len):
+        low_freq_wavelen = self.original_max_position_embeddings / self.low_freq_factor
+        high_freq_wavelen = self.original_max_position_embeddings / self.high_freq_factor
+        new_freqs = []
+        for freq in self.inv_freq:
+            wavelen = 2 * math.pi / freq
+            if wavelen < high_freq_wavelen:
+                new_freqs.append(freq)
+            elif wavelen > low_freq_wavelen:
+                new_freqs.append(freq / self.factor)
+            else:
+                assert low_freq_wavelen != high_freq_wavelen
+                smooth = (self.original_max_position_embeddings / wavelen - self.low_freq_factor) / (
+                    self.high_freq_factor - self.low_freq_factor
+                )
+                new_freqs.append((1 - smooth) * freq / self.factor + smooth * freq)
+        self.inv_freq = paddle.to_tensor(new_freqs, dtype=self.inv_freq.dtype)
+        super()._set_cos_sin_cache(seq_len=seq_len)
+
+
 def rotate_half(x):
     """Rotates half the hidden dims of the input."""
     x1 = x[..., : x.shape[-1] // 2]
@@ -779,7 +816,17 @@ class LlamaAttention(nn.Layer):
         self.config = config
 
     def _init_rope(self):
-        if self.config.rope_scaling_type is None:
+        if self.config.rope_scaling is not None and self.config.rope_scaling.get("rope_type", None) == "llama3":
+            self.rotary_emb = Llama3RotaryEmbedding(
+                self.head_dim,
+                max_position_embeddings=self.max_position_embeddings,
+                base=self.config.rope_theta,
+                factor=self.config.rope_scaling["factor"],
+                high_freq_factor=self.config.rope_scaling["high_freq_factor"],
+                low_freq_factor=self.config.rope_scaling["low_freq_factor"],
+                original_max_position_embeddings=self.config.rope_scaling["original_max_position_embeddings"],
+            )
+        elif self.config.rope_scaling_type is None:
             self.rotary_emb = LlamaRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
