@@ -1034,8 +1034,10 @@ class LlamaAttention(nn.Layer):
             # reuse k, v, self_attention
             key_states = paddle.concat([past_key_value[0], key_states], axis=1)
             value_states = paddle.concat([past_key_value[1], value_states], axis=1)
-            past_key_value[0]._clear_data()
-            past_key_value[1]._clear_data()
+            paddle_version = float(paddle.__version__[:3])
+            if paddle_version == 0.0 or paddle_version > 2.6:
+                past_key_value[0]._clear_data()
+                past_key_value[1]._clear_data()
 
         past_key_value = (key_states, value_states) if use_cache else None
         if self.kv_indices is not None:
