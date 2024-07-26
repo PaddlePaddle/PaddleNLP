@@ -2660,7 +2660,9 @@ class Trainer:
             dist.barrier()
         if self.args.use_expert_parallel:
             opt_state_dict = broadcast_moe_optimizer(
-                opt_state_dict, broadcast_dp=not self.args.should_load_sharding_stage1_model
+                opt_state_dict,
+                model_state_dict=self.model.state_dict(),
+                broadcast_dp=not self.args.should_load_sharding_stage1_model,
             )
         else:
             if not self.args.should_load_sharding_stage1_model:

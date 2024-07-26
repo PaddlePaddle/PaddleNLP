@@ -115,7 +115,7 @@ if is_safetensors_available():
 
     from paddlenlp.utils.safetensors import fast_load_file as safe_load_file
 
-    if sys.platform.startswith("cpu"):
+    if sys.platform.startswith("win"):
         from safetensors import safe_open
     else:
         from paddlenlp.utils.safetensors import fast_safe_open as safe_open
