@@ -20,6 +20,6 @@ K_tensor = paddle.to_tensor([1024, 2048])
 N_tensor = paddle.to_tensor([4096, 8192])
 
 Dtype = "int8"
-Path = "./search2.csv"
+Path = "./search.csv"
 
 tune_cublaslt_gemm(M_tensor, K_tensor, N_tensor, Dtype, True, False, Path)

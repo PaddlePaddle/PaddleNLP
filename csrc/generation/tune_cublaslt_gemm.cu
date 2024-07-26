@@ -729,30 +729,52 @@ void TuneCublasltGemm(const paddle::Tensor& M,
   int N_size = N.numel();
   assert(K_size == N_size);
 
-  int m = (int)M_data[0];
+  int m_data = (int)M_data[0];
+  assert(m_data > 0 && 4 <= 8192);
+  
+  std::vector<int> mm;
 
-  for (int i = 0; i < K_size; ++i) {
-    int n = (int)N_data[i];
-    int k = (int)K_data[i];
-    auto A = std::vector<int8_t>(m * k);
-    auto B = std::vector<int8_t>(k * n);
-    auto C = std::vector<int32_t>(m * n);
+  int m = 1, step = 1;
+  while (m <= m_data) { 
+    mm.push_back(m);
+    m += step;
 
-    if (dtype == "int8") {
-      CUBLASLTContext dev_ctx;
-      GEMMInt8(dev_ctx,
-               A,
-               B,
-               C,
-               m,
-               k,
-               n,
-               is_test,           /*is_test*/
-               is_read_from_file, /*is_read_from_file*/
-               path);
-    } else {
-      // other dtype
-      std::cout << "Not currently supported" << std::endl;
+    // update step
+    switch (m) {
+        case 4: step = 4; break;
+        case 16: step = 16; break;
+        case 64: step = 32; break;
+        case 256: step = 64; break;
+        case 512: step = 128; break;
+        case 1024: step = 1024; break;
+    }
+  }
+
+  for (int j = 0; j < mm.size(); j++) {
+    int m = mm[j];
+    for (int i = 0; i < K_size; ++i) {
+      int n = (int)N_data[i];
+      int k = (int)K_data[i];
+      auto A = std::vector<int8_t>(m * k);
+      auto B = std::vector<int8_t>(k * n);
+      auto C = std::vector<int32_t>(m * n);
+
+      if (dtype == "int8") {
+        CUBLASLTContext dev_ctx;
+        GEMMInt8(dev_ctx,
+                A,
+                B,
+                C,
+                m,
+                k,
+                n,
+                is_test,           /*is_test*/
+                is_read_from_file, /*is_read_from_file*/
+                path);
+      } else {
+        // other dtype
+        std::cout << "Not currently supported" << std::endl;
+      }
     }
   }
 }
