@@ -817,7 +817,7 @@ class LlamaAttention(nn.Layer):
 
     def _init_rope(self):
         if (
-            "rope_scaling" in self.config
+            hasattr(self.config, "rope_scaling")
             and self.config.rope_scaling is not None
             and self.config.rope_scaling.get("rope_type", None) == "llama3"
         ):
