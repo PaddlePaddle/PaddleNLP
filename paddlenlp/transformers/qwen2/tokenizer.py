@@ -155,6 +155,10 @@ class Qwen2Tokenizer(PretrainedTokenizer):
             logger.info("The `unk_token` parameter needs to be defined: we use `eos_token` by default.")
             unk_token = eos_token
 
+        if bos_token is None:
+            logger.info("The `unk_token` parameter needs to be defined: we use `eos_token` by default.")
+            bos_token = eos_token
+
         # Qwen vocab does not contain control tokens; added tokens need to be special
         bos_token = (
             AddedToken(bos_token, lstrip=False, rstrip=False, special=True, normalized=False)
@@ -288,7 +292,7 @@ class Qwen2Tokenizer(PretrainedTokenizer):
         text = bytearray([self.byte_decoder[c] for c in text]).decode("utf-8", errors=self.errors)
         return text
 
-    def _decode(
+    def decode(
         self,
         token_ids,
         skip_special_tokens: bool = False,
@@ -298,7 +302,7 @@ class Qwen2Tokenizer(PretrainedTokenizer):
     ) -> str:
         # `spaces_between_special_tokens` defaults to True for _decode in slow tokenizers
         # and cannot be configured elsewhere, but it should default to False for Qwen2Tokenizer
-        return super()._decode(
+        return super().decode(
             token_ids,
             skip_special_tokens=skip_special_tokens,
             clean_up_tokenization_spaces=clean_up_tokenization_spaces,
