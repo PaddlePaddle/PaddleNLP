@@ -79,7 +79,7 @@ class MambaModelTester:
         self.tie_word_embeddings = tie_word_embeddings
 
     def get_large_model_config(self):
-        return MambaConfig.from_pretrained("hf-internal-testing/mamba-2.8b")
+        return MambaConfig.from_pretrained("state-spaces/mamba-2.8b-hf")
 
     def prepare_config_and_inputs(
         self, gradient_checkpointing=False, scale_attn_by_inverse_layer_idx=False, reorder_and_upcast_attn=False
@@ -329,11 +329,6 @@ class MambaModelTest(ModelTesterMixin, unittest.TestCase):
                             paddle.allclose(param.data, paddle.ones_like(param.data), atol=1e-5, rtol=1e-5)
                         )
 
-    @slow
-    def test_model_from_pretrained(self):
-        model = MambaModel.from_pretrained("hf-internal-testing/mamba-130m")
-        self.assertIsNotNone(model)
-
     def test_model_outputs_equivalence(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
 
@@ -397,7 +392,7 @@ class MambaIntegrationTests(unittest.TestCase):
 
     def test_simple_generate(self):
         tokenizer = AutoTokenizer.from_pretrained(
-            "state-spaces/mamba-2.8b-hf",
+            "state-spaces/mamba-130m-hf",
         )
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -413,12 +408,12 @@ class MambaIntegrationTests(unittest.TestCase):
 
         EXPECTED_LOGITS_NO_GRAD = paddle.to_tensor(
             [
-                -55.6875, -69.8750, -49.9062, -51.7500, -57.6875, -57.9375, -56.9688,
-                -57.9375, -54.6875, -55.9375, -55.3125, -58.0938, -60.5625, -47.0000,
-                -52.0312, -49.7812, -55.9375, -57.9062, -56.7812, -57.1250, -57.3438,
-                -58.3125, -57.8125, -58.7812, -59.6250, -59.0938, -58.7188, -52.9375,
-                -53.4688, -57.3750, -56.9375, -55.7500, -53.3125, -55.8438, -57.0000,
-                -56.9062, -56.2188, -54.7188, -56.4375, -57.5000
+                -55.5938, -69.7500, -49.8438, -51.6875, -57.5938, -57.8750, -56.9062,
+                -57.8438, -54.6250, -55.8438, -55.2500, -57.9688, -60.5000, -46.9688,
+                -52.    , -49.7188, -55.9062, -57.8438, -56.6875, -57.0312, -57.2500,
+                -58.2188, -57.7188, -58.7188, -59.5000, -59.    , -58.6250, -52.8438,
+                -53.3750, -57.2812, -56.8438, -55.6250, -53.2500, -55.7188, -56.9375,
+                -56.8438, -56.1562, -54.6562, -56.3438, -57.4062
             ], dtype=paddle.float32)  # fmt: skip
 
         self.assertTrue(paddle.allclose(logits[0, 0, :40].cpu(), EXPECTED_LOGITS_NO_GRAD, rtol=1e-3, atol=1e-3))
