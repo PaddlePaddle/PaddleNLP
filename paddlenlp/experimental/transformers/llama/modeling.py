@@ -565,7 +565,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             use_neox_rotary_style=True,
             use_dynamic_cachekv_quant=config.use_cachekv_int8 == "dynamic",
             rank_id=config.tensor_parallel_rank,
-            trans_qkvw=(True if not paddle.is_compiled_with_rocm() else False),
+            trans_qkvw=(False if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8" else True),
         )
 
         self.set_transformer_block(transformer_config)
@@ -752,7 +752,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
                     "llama.layers.{}.self_attn.v_proj.weight".format(idx)
                 ]
-                if paddle.is_compiled_with_rocm():
+                if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8":
                     concated_qkv_weight = np.concatenate(
                         [
                             unfused_state_dict["self_attn.q_proj.weight"],

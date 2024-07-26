@@ -550,11 +550,7 @@ class FusedMultiTransformerBase(Layer):
             if config.trans_qkvw
             else [self.embed_dim, (self.num_heads + 2 * self.kv_num_heads) * self.head_dim]
         )
-        self.linear_weight_shape = (
-            [self.num_heads * self.head_dim, self.embed_dim]
-            if config.trans_qkvw
-            else [self.embed_dim, self.num_heads * self.head_dim]
-        )
+        self.linear_weight_shape = [self.num_heads * self.head_dim, self.embed_dim]
         self.ffn1_weight_shape = (
             [self.embed_dim, self.dim_feedforward * 2]
             if self.activation.endswith("glu")
