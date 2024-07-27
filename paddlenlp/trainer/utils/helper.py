@@ -229,8 +229,7 @@ def broadcast_dp_optimizer(state_dict):
     return state_dict
 
 
-def broadcast_moe_optimizer(state_dict, broadcast_dp=True):
-
+def broadcast_moe_optimizer(state_dict, model_state_dict=None, broadcast_dp=True):
     try:
         hcg = fleet.get_hybrid_communicate_group()
         dp_group = hcg.get_data_parallel_group()
@@ -242,7 +241,29 @@ def broadcast_moe_optimizer(state_dict, broadcast_dp=True):
     except:
         dp_group = None
         src_rank = 0
-        data_parallel_rank = 0
+        data_parallel_rank = dist.get_rank()
+
+    def _filter_sync_optimizer_state(model_state_dict, opt_state_dict):
+        # get sync name
+        sync_vname = []
+        for k, v in model_state_dict.items():
+            if not getattr(v, "no_sync", False):
+                sync_vname.append(v.name)
+
+        filter_opt_state_dict = {"master_weights": {}}
+        filter_opt_state_dict["LR_Scheduler"] = opt_state_dict.get("LR_Scheduler", {})
+        for op_k, op_v in opt_state_dict.items():
+            if op_k not in ["master_weights", "LR_Scheduler"]:
+                for sync_v in sync_vname:
+                    if op_k.startswith(sync_v):
+                        filter_opt_state_dict[op_k] = op_v
+                        break
+            elif op_k == "master_weights":
+                for k, v in op_v.items():
+                    for sync_v in sync_vname:
+                        if k.startswith(sync_v):
+                            filter_opt_state_dict["master_weights"][k] = v
+        return filter_opt_state_dict
 
     def _broadcast_moe_optimizer_state(state_dict):
         # boardcast_keys
@@ -272,9 +293,11 @@ def broadcast_moe_optimizer(state_dict, broadcast_dp=True):
         return base_state_dict
 
     if broadcast_dp:
-        base_state_dict = broadcast_dp_optimizer(state_dict)
+        filter_opt_state_dict = _filter_sync_optimizer_state(model_state_dict, state_dict)
+        base_state_dict = broadcast_dp_optimizer(filter_opt_state_dict)
     else:
         base_state_dict = _broadcast_moe_optimizer_state(state_dict)
+
     if data_parallel_rank > 0:
         master_weight = state_dict.pop("master_weights", {})
         base_state_dict.update(state_dict)
