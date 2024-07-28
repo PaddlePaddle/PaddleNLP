@@ -14,8 +14,4 @@
 
 from .models.configuration_intervenable_model import IntervenableConfig
 from .models.intervenable_base import IntervenableModel
-from .models.interventions import (
-    DistributedRepresentationIntervention,
-    SourcelessIntervention,
-    TrainableIntervention,
-)
+from .models.interventions import SourcelessIntervention

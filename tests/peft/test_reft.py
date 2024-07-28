@@ -16,15 +16,23 @@ import unittest
 
 import paddle
 
-from paddlenlp.reft.pareft import (
+from paddlenlp.peft.reft.pareft import (
     LoreftIntervention,
     LowRankRotateLayer,
     ReftConfig,
     TinyIntervention,
     get_reft_model,
 )
-from paddlenlp.reft.pareft.reft_model import ReftModel
+from paddlenlp.peft.reft.pareft.reft_model import ReftModel
+from paddlenlp.peft.reft.pavenv.models.basic_utils import get_type_from_string
 from paddlenlp.transformers import AutoModelForCausalLM
+
+
+class TestBasicUtils(unittest.TestCase):
+    def test_get_type_from_string(self):
+        class_str = "pareft.interventions.LoreftIntervention"
+        cls = get_type_from_string(class_str)
+        self.assertIsInstance(cls, type(LoreftIntervention))
 
 
 class TestLoReftIntervention(unittest.TestCase):
@@ -81,12 +89,10 @@ class TestTinyIntervention(unittest.TestCase):
         self.assertEqual(intervention.param_b.shape, [self.kwargs["embed_dim"]])
 
     def test_forward(self):
-        # 测试前向传播方法
-        base = paddle.randn([10, self.kwargs["embed_dim"]])  # 示例输入
+        base = paddle.randn([10, self.kwargs["embed_dim"]])
         intervention = TinyIntervention(**self.kwargs)
         output = intervention.forward(base)
 
-        # 添加具体的断言，验证前向传播的输出
         self.assertEqual(output.shape, base.shape)
         self.assertEqual(output.dtype, self.kwargs["dtype"])
 
@@ -94,8 +100,6 @@ class TestTinyIntervention(unittest.TestCase):
 class TestReftModel(unittest.TestCase):
     def test_get_reft_model(self):
         model = AutoModelForCausalLM.from_pretrained("__internal_testing__/tiny-random-llama")
-        print(model)
-
         layers = [0]
         representations = [
             {
@@ -145,3 +149,7 @@ class TestReftModel(unittest.TestCase):
         reft_model.print_trainable_parameters()
         outputs = reft_model.model(**{"input_ids": paddle.randint(low=1, high=100, shape=(5, 10))})
         self.assertTrue(outputs[0].shape, [5, 10, 32000])
+
+
+if __name__ == "__main__":
+    unittest.main()

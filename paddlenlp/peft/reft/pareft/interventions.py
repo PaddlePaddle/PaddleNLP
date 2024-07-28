@@ -18,13 +18,7 @@ import paddle
 import paddle.nn as nn
 from paddle import ParamAttr
 
-from paddlenlp.reft.pavenv import (
-    DistributedRepresentationIntervention,
-    SourcelessIntervention,
-    TrainableIntervention,
-)
-
-from .layers import LowRankRotateLayer
+from paddlenlp.peft.reft.pavenv import SourcelessIntervention
 
 
 def linear_act(x):
@@ -37,25 +31,32 @@ ACT2FN = {
 }
 
 
-class LoreftIntervention(SourcelessIntervention, TrainableIntervention, DistributedRepresentationIntervention):
-    """
-    LoReFT(h) = h + R^T(Wh + b − Rh)
-    """
+# A linear transformation with orthogonal initialization.
+class LowRankRotateLayer(nn.Layer):
+    def __init__(self, n, m):
+        super().__init__()
+        self.weight = self.create_parameter(
+            shape=[n, m],
+            attr=paddle.ParamAttr(initializer=paddle.nn.initializer.Orthogonal()),
+            is_bias=False,
+        )
 
+    def forward(self, x):
+        return paddle.matmul(x.astype(self.weight.dtype), self.weight)
+
+
+# existing methods  LoReFT(h) = h + R^T(Wh + b − Rh)
+class LoreftIntervention(SourcelessIntervention):
     def __init__(self, **kwargs):
         super().__init__(**kwargs, keep_last_dim=True)
-        print('kwargs["embed_dim"]', kwargs["embed_dim"])
-
-        print(type(self.embed_dim))
         rotate_layer = LowRankRotateLayer(kwargs["embed_dim"], kwargs["low_rank_dimension"])
-        self.rotate_layer = rotate_layer  # Paddle doesn't have a direct orthogonal parametrization utility
+        self.rotate_layer = rotate_layer
         self.learned_source = nn.Linear(
             kwargs["embed_dim"],
             kwargs["low_rank_dimension"],
             weight_attr=ParamAttr(initializer=nn.initializer.Orthogonal()),
         )
         if "dtype" in kwargs:
-            # print("kwargs['dtype']", kwargs["dtype"])
             self.learned_source = self.learned_source.astype(kwargs["dtype"])
         else:
             self.learned_source = self.learned_source.astype(paddle.bfloat16)
@@ -64,11 +65,11 @@ class LoreftIntervention(SourcelessIntervention, TrainableIntervention, Distribu
             ACT2FN["linear"] if "act_fn" not in kwargs or kwargs["act_fn"] is None else ACT2FN[kwargs["act_fn"]]
         )
 
-    def forward(self, base, source=None, subspaces=None):
-        # print("loreft invention forward")
-        # print("weight:", self.rotate_layer.weight[0][0:8])
+    def forward(
+        self,
+        base,
+    ):
         rotated_base = self.rotate_layer(base)
-        # print("self.act_fn", self.act_fn)
         output = base + paddle.matmul(
             (
                 self.act_fn(
@@ -82,21 +83,7 @@ class LoreftIntervention(SourcelessIntervention, TrainableIntervention, Distribu
         )
         return self.dropout(output.astype(base.dtype))
 
-    # def state_dict(self, *args, **kwargs):
-    #     """
-    #     Overwrite for data-efficiency.
-    #     """
-    #     state_dict = OrderedDict()
-    #     for k, v in self.learned_source.state_dict().items():
-    #         state_dict[k] = v
-    #     state_dict["rotate_layer"] = self.rotate_layer.weight.numpy()
-    #     return state_dict
-
     def load_state_dict(self, state_dict, *args, **kwargs):
-        """
-        Overwrite for data-efficiency.
-        """
-        # self.learned_source.set_state_dict(state_dict)
         self.learned_source.weight.data = state_dict["learned_source.weight"]
         self.learned_source.bias.data = state_dict["learned_source.bias"]
 
@@ -104,32 +91,21 @@ class LoreftIntervention(SourcelessIntervention, TrainableIntervention, Distribu
         overload_w_width = overload_w.shape[-1]
         with paddle.no_grad():
             self.rotate_layer.weight[:, :overload_w_width] = paddle.to_tensor(overload_w)
-        print("self.rotate_layer.weight", self.rotate_layer.weight)
         return
 
 
-class TinyIntervention(SourcelessIntervention, TrainableIntervention, DistributedRepresentationIntervention):
-    """
-    LoReFT(h) = h + R^T(Wh + b − Rh)
-    """
-
+# our proposed method
+class TinyIntervention(SourcelessIntervention):
     def __init__(self, **kwargs):
         super().__init__(**kwargs, keep_last_dim=True)
-        print('kwargs["embed_dim"]', kwargs["embed_dim"])
-
-        print(type(self.embed_dim))
-
         self.rank = kwargs["low_rank_dimension"]
         self.hidden_size = kwargs["embed_dim"]
-
         dropout = 0.0
         if dropout > 0.0:
             self.dropout = nn.Dropout(p=dropout)
         else:
             self.dropout = lambda x: x
-
         self.scaling = 1
-
         # Actual trainable parameters
         self.param_A = self.create_parameter(
             shape=[self.hidden_size, self.rank],
@@ -143,26 +119,25 @@ class TinyIntervention(SourcelessIntervention, TrainableIntervention, Distribute
             is_bias=False,
             default_initializer=nn.initializer.Constant(value=0.0),
         )
-
         self.param_a = self.create_parameter(
             shape=[self.rank],
             dtype=self._dtype,
             is_bias=False,
             default_initializer=nn.initializer.Constant(value=1),
         )
-
         self.param_b = self.create_parameter(
             shape=[self.hidden_size],
             dtype=self._dtype,
             is_bias=False,
             default_initializer=nn.initializer.Constant(value=1),
         )
-
-        # Freezing the A B  weight matrix and bias vector
         self.param_A.stop_gradient = False
         self.param_B.stop_gradient = False
 
-    def forward(self, base, source=None, subspaces=None):
+    def forward(
+        self,
+        base,
+    ):
         diag_b = paddle.diag(self.param_b)
         diag_a = paddle.diag(self.param_a)
         result = (self.dropout(base) @ self.param_A @ diag_a @ self.param_B @ diag_b) * self.scaling

@@ -17,8 +17,6 @@ from collections import namedtuple
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-from .interventions import VanillaIntervention
-
 RepresentationConfig = namedtuple(
     "RepresentationConfig",
     "layer component unit "
@@ -34,11 +32,9 @@ class IntervenableConfig(PretrainedConfig):
     def __init__(
         self,
         representations=[RepresentationConfig()],
-        intervention_types=VanillaIntervention,
-        mode="parallel",
+        intervention_types=None,
         sorted_keys=None,
         model_type=None,  # deprecating
-        # hidden fields for backlog
         intervention_dimensions=None,
         intervention_constant_sources=None,
         **kwargs,
@@ -73,38 +69,15 @@ class IntervenableConfig(PretrainedConfig):
                 overwrite_intervention_types += [type(reprs.intervention)]
             if reprs.intervention_type is not None and reprs.intervention is not None:
                 raise ValueError("Only one of the field should be provided: intervention_type, intervention")
-        if None in overwrite_intervention_types:
-            raise ValueError("intervention_type if used should be specified for all")
+
         if overwrite:
             self.intervention_types = overwrite_intervention_types
 
-        self.mode = mode
         self.sorted_keys = sorted_keys
         self.intervention_dimensions = intervention_dimensions
         self.intervention_constant_sources = intervention_constant_sources
         self.model_type = model_type
         super().__init__(**kwargs)
-
-    def add_intervention(self, representations):
-        if not isinstance(representations, list):
-            representations = [representations]
-
-        for reprs in representations:
-            if isinstance(reprs, RepresentationConfig):
-                self.representations += [reprs]
-            elif isinstance(reprs, list):
-                self.representations += [RepresentationConfig(*reprs)]
-            elif isinstance(reprs, dict):
-                self.representations += [RepresentationConfig(**reprs)]
-            else:
-                raise ValueError(f"{reprs} format in our representation list is not supported.")
-            if self.representations[-1].intervention_type is None:
-                raise ValueError("intervention_type should be provided.")
-
-            if self.representations[-1].intervention_type is not None:
-                self.intervention_types += [self.representations[-1].intervention_type]
-            elif self.representations[-1].intervention is not None:
-                self.intervention_types += [self.representations[-1].intervention]
 
     def __repr__(self):
         representations = []
@@ -122,7 +95,6 @@ class IntervenableConfig(PretrainedConfig):
             "model_type": str(self.model_type),
             "representations": tuple(representations),
             "intervention_types": str(self.intervention_types),
-            "mode": self.mode,
             "sorted_keys": tuple(self.sorted_keys) if self.sorted_keys is not None else str(self.sorted_keys),
             "intervention_dimensions": str(self.intervention_dimensions),
         }

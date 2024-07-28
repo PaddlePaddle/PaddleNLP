@@ -12,19 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddlenlp.reft.pavenv as pv
+import logging
+
+import paddlenlp.peft.reft.pavenv as pv
 
 
+# Count parameters of a model that require gradients
 def count_parameters(model):
-    """Count parameters of a model that require gradients"""
     return int(sum(p.numel() for p in model.parameters() if not p.stop_gradient))
 
 
+# Base model for Reft methods.
 class ReftModel(pv.IntervenableModel):
-    """
-    Base model for Reft methods.
-    """
-
     def __init__(self, config, model, **kwargs):
         super().__init__(config, model, **kwargs)
 
@@ -42,20 +41,9 @@ class ReftModel(pv.IntervenableModel):
         return ReftModel._convert_to_reft_model(model)
 
     def print_trainable_parameters(self):
-        """
-        Print trainable parameters.
-        """
-        _linked_key_set = set([])
         trainable_intervention_parameters = 0
-        print("self.interventions is:", self.interventions)
         for k, v in self.interventions.items():
-            if isinstance(v[0], pv.TrainableIntervention):
-                if k in self._intervention_reverse_link:
-                    if not self._intervention_reverse_link[k] in _linked_key_set:
-                        _linked_key_set.add(self._intervention_reverse_link[k])
-                        trainable_intervention_parameters += count_parameters(v[0])
-                else:
-                    trainable_intervention_parameters += count_parameters(v[0])
+            trainable_intervention_parameters += count_parameters(v[0])
 
         trainable_model_parameters = int(sum(p.numel() for p in self.model.parameters() if not p.stop_gradient))
 
@@ -63,12 +51,11 @@ class ReftModel(pv.IntervenableModel):
 
         total_trainable_parameters = trainable_intervention_parameters + trainable_model_parameters
 
-        print("trainable_intervention_parameters:", trainable_intervention_parameters)
-        print("trainable_model_parameters:", trainable_model_parameters)
-        print("all_model_parameters:", all_model_parameters)
-        print("total_trainable_parameters:", total_trainable_parameters)
-
-        print(
+        logging.info("trainable_intervention_parameters:", trainable_intervention_parameters)
+        logging.info("trainable_model_parameters:", trainable_model_parameters)
+        logging.info("all_model_parameters:", all_model_parameters)
+        logging.info("total_trainable_parameters:", total_trainable_parameters)
+        logging.info(
             f"trainable intervention params: {trainable_intervention_parameters:,d} || trainable model params: {trainable_model_parameters:,d}\n"
             f"model params: {all_model_parameters:,d} || trainable%: {100 * total_trainable_parameters / all_model_parameters}"
         )

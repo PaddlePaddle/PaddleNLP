@@ -68,7 +68,6 @@ llama_type_to_dimension_mapping = {
 """llama model with LM head"""
 llama_lm_type_to_module_mapping = {}
 for k, v in llama_type_to_module_mapping.items():
-    # print("mapping", k, v[0], v[1], type(v[0]), type(v[1]))
     llama_lm_type_to_module_mapping[k] = (f"llama.{v[0]}", v[1])
 
 
@@ -96,5 +95,4 @@ def create_llama(name="sharpbai/alpaca-7b-merged", cache_dir=None, dtype=paddle.
         cache_dir=cache_dir,
         dtype=dtype,  # save memory
     )
-    print("loaded model")
     return config, tokenizer, llama

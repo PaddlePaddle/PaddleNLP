@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddlenlp.reft.pavenv as pv
+import paddlenlp.peft.reft.pavenv as pv
 
 
 class ReftConfig(pv.IntervenableConfig):
