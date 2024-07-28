@@ -17,11 +17,11 @@ import tempfile
 import unittest
 
 import numpy as np
-
-# from safetensors import safe_open
 from safetensors.numpy import load_file, save_file
 
 from paddlenlp.utils.safetensors import fast_load_file, fast_safe_open
+
+from ..testing_utils import skip_platform
 
 
 class FastSafetensors(unittest.TestCase):
@@ -42,6 +42,7 @@ class FastSafetensors(unittest.TestCase):
             count += 1
         print(self.weigth_map)
 
+    @skip_platform("win32", "cygwin")
     def test_load_file(self):
         with tempfile.TemporaryDirectory() as tmpdirname:
             path = os.path.join(tmpdirname, "test.safetensors")
@@ -52,6 +53,7 @@ class FastSafetensors(unittest.TestCase):
                 np.testing.assert_equal(v, sf_load[k])
                 np.testing.assert_equal(v, fs_sf_load[k])
 
+    @skip_platform("win32", "cygwin")
     def test_safe_open(self):
         with tempfile.TemporaryDirectory() as tmpdirname:
             path = os.path.join(tmpdirname, "test.safetensors")

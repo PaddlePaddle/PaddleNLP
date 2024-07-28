@@ -248,16 +248,19 @@ class BasePredictor:
     def _infer(self, inputs):
         raise NotImplementedError
 
-    def _postprocess(self, predictions):
+    def _postprocess(self, predictions, return_tokens=False):
         decoded_predictions = self.tokenizer.batch_decode(
             predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False
         )
-        return decoded_predictions
+        if return_tokens:
+            return decoded_predictions, predictions
+        else:
+            return decoded_predictions
 
-    def predict(self, input_texts: str | list[str]):
+    def predict(self, input_texts: str | list[str], return_tokens=False):
         tokenized_source = self._preprocess(input_texts)
         predictions = self._infer(tokenized_source)
-        decoded_predictions = self._postprocess(predictions)
+        decoded_predictions = self._postprocess(predictions, return_tokens=return_tokens)
         return decoded_predictions
 
 
@@ -270,7 +273,6 @@ class DygraphPredictor(BasePredictor):
         if config.lora_path is not None:
             lora_config = LoRAConfig.from_pretrained(config.lora_path)
             dtype = lora_config.dtype
-            lora_config.merge_weights = True
         elif config.prefix_path is not None:
             prefix_config = PrefixConfig.from_pretrained(config.prefix_path)
             dtype = prefix_config.dtype
@@ -292,6 +294,7 @@ class DygraphPredictor(BasePredictor):
             self.model = LoRAModel.from_pretrained(
                 model=self.model, lora_path=config.lora_path, lora_config=lora_config
             )
+            self.model.merge()
         if config.prefix_path is not None:
             prefix_tuning_params = get_prefix_tuning_params(self.model)
             self.model = PrefixModelForCausalLM.from_pretrained(
@@ -328,9 +331,9 @@ class DygraphPredictor(BasePredictor):
             bos_token_id=self.tokenizer.bos_token_id,
             eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
             pad_token_id=self.tokenizer.pad_token_id,
-            decode_strategy="greedy_search"
-            if self.config.top_k == 1 and self.config.top_p == 1.0
-            else self.config.decode_strategy,
+            decode_strategy=(
+                "greedy_search" if self.config.top_k == 1 and self.config.top_p == 1.0 else self.config.decode_strategy
+            ),
             temperature=self.config.temperature,
             top_k=self.config.top_k,
             top_p=self.config.top_p,
@@ -346,12 +349,7 @@ class StaticGraphPredictor(BasePredictor):
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         super().__init__(config, tokenizer)
 
-        params_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdiparams")
-        if paddle.framework.use_pir_api():
-            model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".json")
-        else:
-            model_path = os.path.join(self.config.model_name_or_path, self.config.model_prefix + ".pdmodel")
-        inference_config = paddle.inference.Config(model_path, params_path)
+        inference_config = paddle.inference.Config(self.config.model_name_or_path, self.config.model_prefix)
 
         if self.config.device == "gpu":
             # set GPU configs accordingly
@@ -475,13 +473,16 @@ class InferencePredictorMixin:
             )
             self.generation_config = None
 
-    def _postprocess(self, predictions):
+    def _postprocess(self, predictions, return_tokens=False):
         if paddle.distributed.get_rank() == 0:
             tokens: np.ndarray = load_real_time_tokens()
             decoded_predictions = self.tokenizer.batch_decode(
                 tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
-            return decoded_predictions
+            if return_tokens:
+                return decoded_predictions, tokens.tolist()
+            else:
+                return decoded_predictions
         else:
             return None
 
@@ -849,8 +850,6 @@ class BlockInferencePredictorMixin:
         self.free_list = [i for i in range(self.max_block_nums)][::-1]
         self.used_list = [[] for _ in range(config.batch_size)]
 
-        self.benchmark = config.benchmark
-
     def init_inputs(self, config: PredictorArgument):
         self.inputs = {}
 
@@ -967,22 +966,20 @@ class BlockInferencePredictorMixin:
         return rot_emb
 
     def _preprocess(self, source):
-        if not self.benchmark and self.tokenizer.chat_template is not None:
+        if self.tokenizer.chat_template is not None:
             source = [source] if isinstance(source, str) else source
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
         for i, text in enumerate(source):
-            add_special_tokens = self.tokenizer.chat_template is None or isinstance(
-                self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)
-            )
-            add_special_tokens = add_special_tokens if not self.benchmark else False
             tokens = self.tokenizer(
                 text,
                 return_tensors="np",
                 padding=True,
+                truncation=True,
                 max_length=self.config.src_length,
                 # if use chat_template, it will not add special_tokens
-                add_special_tokens=add_special_tokens,
+                add_special_tokens=self.tokenizer.chat_template is None
+                or isinstance(self.tokenizer, (ChatGLMv2Tokenizer, ChatGLMTokenizer)),
             )
             input_ids = tokens["input_ids"][0]
             length = len(input_ids)
@@ -1043,7 +1040,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor
         )
 
     @paddle.no_grad()
-    def predict(self, input_texts: str | list[str]):
+    def predict(self, input_texts: str | list[str], return_tokens=False):
         self._preprocess(input_texts)
 
         result_queue = mp.Queue()
@@ -1064,9 +1061,15 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor
             self.used_list[i] = []
 
         outputs = []
+        output_tokens = []
         while len(outputs) < self.batch_size:
-            outputs.append(result_queue.get(timeout=1)[-1])
-        return outputs
+            result = result_queue.get(timeout=1)
+            outputs.append(result[-1])
+            output_tokens.append(result[-2])
+        if return_tokens:
+            return outputs, output_tokens
+        else:
+            return outputs
 
 
 class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor):
@@ -1189,7 +1192,7 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
     def _infer(self):
         self.predictor.run()
 
-    def predict(self, input_texts: str | list[str]):
+    def predict(self, input_texts: str | list[str], return_tokens=False):
 
         s_time = time.time()
         self._preprocess(input_texts)
@@ -1222,14 +1225,22 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
             self.used_list[i] = []
 
         outputs = []
+        output_tokens = []
         while len(outputs) < self.batch_size:
-            outputs.append(result_queue.get(timeout=1)[-1])
-        return outputs
+            result = result_queue.get(timeout=1)
+            outputs.append(result[-1])
+            output_tokens.append(result[-2])
+        if return_tokens:
+            return outputs, output_tokens
+        else:
+            return outputs
 
     def _preprocess(self, source):
         BlockInferencePredictorMixin._preprocess(self, source)
         for i, text in enumerate(source):
-            tokens = self.tokenizer(text, return_tensors="np", padding=False, max_length=(self.config.src_length))
+            tokens = self.tokenizer(
+                text, return_tensors="np", padding=False, truncation=True, max_length=(self.config.src_length)
+            )
             input_ids = tokens["input_ids"][0]
             length = len(input_ids)
             need_block_nums = (
@@ -1622,10 +1633,6 @@ def predict():
 
     predictor = create_predictor(predictor_args, model_args)
 
-    if predictor_args.benchmark:
-        benchmark(predictor, predictor_args, model_args)
-        return
-
     source_texts = []
     target_texts = []
     if model_args.data_file:
@@ -1645,8 +1652,8 @@ def predict():
                     target_texts.append("")
 
     else:
-        source_texts = ["解释一下“温故而知新”", "你好，请问你是谁?"]
-        target_texts = ["", ""]
+        source_texts = ["你好，请问你是谁?"] * predictor_args.batch_size
+        target_texts = [""] * predictor_args.batch_size
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
@@ -1669,12 +1676,14 @@ def predict():
                 out = {"src": source, "tgt": target, "output": output}
                 f.write(json.dumps(out, ensure_ascii=False) + "\n")
 
+    if predictor_args.benchmark:
+        benchmark(predictor, predictor_args, model_args)
+
 
 def benchmark(predictor, predictor_args, model_args):
     # Just construct a simple benchmark input. We pad input to the src_length.
-    benchmark_texts = [
-        predictor.tokenizer.pad_token * predictor_args.src_length for _ in range(predictor_args.batch_size)
-    ]
+    test_texts = "hello world, how are you?"
+    benchmark_texts = [test_texts + "<pad>" * predictor_args.src_length for _ in range(predictor_args.batch_size)]
 
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
@@ -1692,8 +1701,8 @@ def benchmark(predictor, predictor_args, model_args):
     output_tokens = 0
     for _ in range(test_time):
         for bs, batch_source_text in enumerate(batch_benchmark_texts):
-            outputs = predictor.predict(batch_source_text)
-            output_tokens += sum([len(output) for output in outputs])
+            outputs, batch_tokens = predictor.predict(batch_source_text, return_tokens=True)
+            output_tokens += sum([len(tokens) for tokens in batch_tokens])
     end = time.perf_counter()
     print("Avg Elapse time is: ", (end - start) / test_time)
     print("Output tokens is: ", output_tokens)

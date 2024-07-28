@@ -32,16 +32,11 @@ from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
-from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-    ColumnSequenceParallelLinear,
-    GatherOp,
-    RowSequenceParallelLinear,
-    ScatterOp,
-    mark_as_sequence_parallel_parameter,
-)
 
+from .. import linear_utils
 from ..activations import ACT2FN
 from ..conversion_utils import StateDictNameMapping, init_name_mappings
+from ..linear_utils import Linear
 from ..model_outputs import (
     BaseModelOutputWithPast,
     CausalLMOutputWithPast,
@@ -55,6 +50,15 @@ try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
     fused_rotary_position_embedding = None
+
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        GatherOp,
+        ScatterOp,
+        mark_as_sequence_parallel_parameter,
+    )
+except:
+    pass
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
@@ -370,11 +374,11 @@ class Qwen2MLP(nn.Layer):
         self.tensor_parallel_degree = config.tensor_parallel_degree
 
         if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-            RowParallelLinear = fleet.meta_parallel.RowParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             self.gate_proj = ColumnParallelLinear(
@@ -396,9 +400,9 @@ class Qwen2MLP(nn.Layer):
                 has_bias=False,
             )
         else:
-            self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w1
-            self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w3
-            self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)  # w2
+            self.gate_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w1
+            self.up_proj = Linear(self.hidden_size, self.intermediate_size, bias_attr=False)  # w3
+            self.down_proj = Linear(self.intermediate_size, self.hidden_size, bias_attr=False)  # w2
 
         self.act_fn = ACT2FN[config.hidden_act]
 
@@ -472,11 +476,11 @@ class Qwen2Attention(nn.Layer):
                 self.use_fused_rope = False
 
         if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-            RowParallelLinear = fleet.meta_parallel.RowParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             self.q_proj = ColumnParallelLinear(self.hidden_size, self.hidden_size, has_bias=True, gather_output=False)
@@ -484,10 +488,10 @@ class Qwen2Attention(nn.Layer):
             self.v_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False)  # fmt:skip
             self.o_proj = RowParallelLinear(self.hidden_size, self.hidden_size, has_bias=False, input_is_parallel=True)
         else:
-            self.q_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=True)
-            self.k_proj = nn.Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
-            self.v_proj = nn.Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
-            self.o_proj = nn.Linear(self.hidden_size, self.hidden_size, bias_attr=False)
+            self.q_proj = Linear(self.hidden_size, self.hidden_size, bias_attr=True)
+            self.k_proj = Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
+            self.v_proj = Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
+            self.o_proj = Linear(self.hidden_size, self.hidden_size, bias_attr=False)
 
         self.rotary_emb = Qwen2RotaryEmbedding(
             self.head_dim,
@@ -822,11 +826,11 @@ class Qwen2PretrainedModel(PretrainedModel):
                 nn.Linear,
                 nn.Embedding,
                 mpu.VocabParallelEmbedding,
-                mpu.ColumnParallelLinear,
                 mpu.RowParallelLinear,
+                mpu.ColumnParallelLinear,
+                linear_utils.RowSequenceParallelLinear,
+                linear_utils.ColumnSequenceParallelLinear,
                 Qwen2LMHead,
-                ColumnSequenceParallelLinear,
-                RowSequenceParallelLinear,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -1378,7 +1382,7 @@ class Qwen2ForSequenceClassification(Qwen2PretrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.qwen2 = Qwen2Model(config)
-        self.score = nn.Linear(config.hidden_size, self.num_labels, bias_attr=False)
+        self.score = Linear(config.hidden_size, self.num_labels, bias_attr=False)
 
     def get_input_embeddings(self):
         return self.qwen2.embed_tokens
@@ -1490,7 +1494,7 @@ class Qwen2ForTokenClassification(Qwen2PretrainedModel):
         else:
             classifier_dropout = 0.1
         self.dropout = nn.Dropout(classifier_dropout)
-        self.score = nn.Linear(config.hidden_size, config.num_labels)
+        self.score = Linear(config.hidden_size, config.num_labels)
 
     def get_input_embeddings(self):
         return self.qwen2.embed_tokens

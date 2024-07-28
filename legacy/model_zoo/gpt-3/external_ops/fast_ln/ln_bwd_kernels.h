@@ -127,9 +127,12 @@ __global__ __launch_bounds__(Ktraits::THREADS_PER_CTA) void ln_bwd_kernel(
     }
 
     reduce_t result = reducer.allreduce({mdy_local, mdyy_local}, sum);
-    mdy_local = layer_norm::Get<0>::of<reduce_t, compute_t>(result) * rn;
+    if (is_rmsnorm) {
+      mdy_local = 0.f;
+    } else {
+      mdy_local = layer_norm::Get<0>::of<reduce_t, compute_t>(result) * rn;
+    }
     mdyy_local = layer_norm::Get<1>::of<reduce_t, compute_t>(result) * rn;
-
     Ivec dx[LDGS];
     idx = row * Ktraits::VEC_COLS + c;
 #pragma unroll
@@ -138,12 +141,7 @@ __global__ __launch_bounds__(Ktraits::THREADS_PER_CTA) void ln_bwd_kernel(
       for (int jt = 0; jt < NUM_ELTS; jt++) {
         compute_t dy_tmp = dy[it * NUM_ELTS + jt];
         compute_t y_tmp = y[it * NUM_ELTS + jt];
-        compute_t dx_tmp;
-        if (is_rmsnorm) {
-          dx_tmp = rs_r * (dy_tmp - (mdyy_local * y_tmp));
-        } else {
-          dx_tmp = rs_r * (dy_tmp - (mdyy_local * y_tmp + mdy_local));
-        }
+        compute_t dx_tmp = rs_r * (dy_tmp - (mdyy_local * y_tmp + mdy_local));
         dx[it].data.elt[jt] = dx_tmp;
       }
       dx[it].store_to(params.dx, idx);

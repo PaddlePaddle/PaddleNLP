@@ -18,7 +18,6 @@
     <a href="https://github.com/PaddlePaddle/PaddleNLP/stargazers"><img src="https://img.shields.io/github/stars/PaddlePaddle/PaddleNLP?color=ccf"></a>
 </p>
 
-
 <h4 align="center">
     <a href=#Features> Features </a> |
     <a href=#Support-Models> Supported Models </a> |
@@ -31,13 +30,13 @@
 
 ## News 📢
 
-* **2024.06.27 [PaddleNLP v3.0 Beta](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0)**：Embrace large models and experience a complete upgrade. With a unified large model toolchain, we achieve full-process access to domestically produced computing chips. We fully support industrial-level application processes for large models, such as PaddlePaddle's 4D parallel configuration, efficient fine-tuning strategies, efficient alignment algorithms, and high-performance reasoning. Our developed RsLoRA+ algorithm, full checkpoint storage mechanism Unified Checkpoint, and generalized support for FastFNN and FusedQKV all contribute to the training and inference of large models. We continuously support updates to mainstream models for providing efficient solutions.
+* **2024.06.27 [PaddleNLP v3.0 Beta](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta0)**：Embrace large models and experience a complete upgrade. With a unified large model suite, we achieve full-process access to domestically produced computing chips. We fully support industrial-level application processes for large models, such as PaddlePaddle's 4D parallel configuration, efficient fine-tuning strategies, efficient alignment algorithms, and high-performance reasoning. Our developed RsLoRA+ algorithm, full checkpoint storage mechanism Unified Checkpoint, and generalized support for FastFNN and FusedQKV all contribute to the training and inference of large models. We continuously support updates to mainstream models for providing efficient solutions.
 
 * **2024.04.24 [PaddleNLP v2.8](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.8.0)**：Our self-developed RsLoRA+ algorithm with extreme convergence significantly improves the convergence speed and training effectiveness of PEFT training. By introducing high-performance generation acceleration into the RLHF PPO algorithm, we have broken through the generation speed bottleneck in PPO training, achieving a significant lead in PPO training performance. We generally support multiple large model training performance optimization methods such as FastFFN and FusedQKV, making large model training faster and more stable.
 
-* **2024.01.04 [PaddleNLP v2.7](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.7.0)**: The LLM experience is fully upgraded, and the tool chain LLM entrance is unified. Unify the implementation code of pre-training, fine-tuning, compression, inference and deployment to the `PaddleNLP/llm` directory. The new [LLM Toolchain Documentation](https://paddlenlp.readthedocs.io/zh/latest/llm/finetune.html) provides one-stop guidance for users from getting started with LLM to business deployment and launch. The full breakpoint storage mechanism Unified Checkpoint greatly improves the versatility of LLM storage. Efficient fine-tuning upgrade supports the simultaneous use of efficient fine-tuning + LoRA, and supports QLoRA and other algorithms.
+* **2024.01.04 [PaddleNLP v2.7](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.7.0)**: The LLM experience is fully upgraded, and the tool chain LLM entrance is unified. Unify the implementation code of pre-training, fine-tuning, compression, inference and deployment to the `PaddleNLP/llm` directory. The new [LLM Suite Documentation](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html) provides one-stop guidance for users from getting started with LLM to business deployment and launch. The full breakpoint storage mechanism Unified Checkpoint greatly improves the versatility of LLM storage. Efficient fine-tuning upgrade supports the simultaneous use of efficient fine-tuning + LoRA, and supports QLoRA and other algorithms.
 
-* **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**: Release [Full-process LLM toolchain](./llm) , covering all aspects of pre-training, fine-tuning, compression, inference and deployment, providing users with end-to-end LLM solutions and one-stop development experience; built-in [4D parallel distributed Trainer](./docs/trainer.md ), [Efficient fine-tuning algorithm LoRA/Prefix Tuning](./llm/README.md#2-%E7%B2%BE%E8%B0%83), [Self-developed INT8/INT4 quantization algorithm](./llm/README.md#4-%E9%87%8F%E5%8C%96), etc.; fully supports [LLaMA 1/2](./llm/config/llama), [BLOOM](./llm/config/bloom), [ChatGLM 1/2](./llm/config/chatglm), [OPT](./llm/config/opt) and other mainstream LLMs.
+* **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**: Release [Full-process LLM suite](./llm) , covering all aspects of pre-training, fine-tuning, compression, inference and deployment, providing users with end-to-end LLM solutions and one-stop development experience; built-in [4D parallel distributed Trainer](./docs/trainer.md ), [Efficient fine-tuning algorithm LoRA/Prefix Tuning](./llm/README.md#2-%E7%B2%BE%E8%B0%83), [Self-developed INT8/INT4 quantization algorithm](./llm/README.md#4-%E9%87%8F%E5%8C%96), etc.; fully supports [LLaMA 1/2](./llm/config/llama), [BLOOM](./llm/config/bloom), [ChatGLM 1/2](./llm/config/chatglm), [OPT](./llm/config/opt) and other mainstream LLMs.
 
 ## Features
 
@@ -46,36 +45,24 @@
 </div>
 
 ### <a href=#Integrated training and inference on multiple hardware platforms> 🔧 Integrated training and inference on multiple hardware platforms </a>
+
 Our development suit supports large model training and inference on multiple hardware platforms, including NVIDIA GPUs, Kunlun XPUs, Ascend NPUs, Enflame GCUs, and Hygon DCUs. The toolkit's interface allows for quick hardware switching, significantly reducing research and development costs associated with hardware transitions.
 
 ### <a href=Efficient and easy-to-use pre-training> 🚀 Efficient and easy-to-use pre-training </a>
+
 We support 4D high-performance training with data parallelism, sharding parallelism, tensor parallelism, and pipeline parallelism. The Trainer supports configurable distributed strategies, reducing the cost associated with complex distributed combinations. The Unified Checkpoint large model storage format supports dynamic scaling of model parameter distribution during training, thereby reducing the migration cost caused by hardware switching.
 
-### <a href=#Efficient fine-tuning and alignment> 🤗 Efficient fine-tuning and alignment </a>
-The fine-tuning and alignment algorithms are deeply integrated with zero-padding data streams and high-performance FlashMask operators, reducing invalid data padding and computation during training, and significantly improving the throughput of fine-tuning and alignment training.
+### <a href=#Efficient fine-tuning> 🤗 Efficient fine-tuning </a>
+
+The fine-tuning algorithms are deeply integrated with zero-padding data streams and high-performance FlashMask operators, reducing invalid data padding and computation during training, and significantly improving the throughput of fine-tuning training.
 
 ### <a href=#Lossless compression and high-performance inference> 🎛️ Lossless compression and high-performance inference </a>
+
 The high-performance inference module of the large model toolkit incorporates dynamic insertion and operator fusion strategies throughout the entire process, greatly accelerating parallel inference speed. The underlying implementation details are encapsulated, enabling out-of-the-box high-performance parallel inference capabilities.
 
 ------------------------------------------------------------------------------------------
 
 ## Support Models
-
-| Model                                      | Pretrain | SFT | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Weight convert |
-|--------------------------------------------|:--------:|:---:|:----:|:-------------:|:---:|:----:|:------------:|:--------------:|
-| [LLaMA](./llm/config/llama)                |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  ✅   |      ✅       |       ✅        |
-| [Qwen](./llm/config/qwen)                  |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      🚧      |       ✅        |
-| [Mixtral](./llm/config/mixtral)            |    ✅     |  ✅  |  ✅   |       ❌       | 🚧  |  🚧  |      🚧      |       🚧       |
-| [Baichuan/Baichuan2](./llm/config/llama)   |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      ✅       |       ✅        |
-| [ChatGLM-6B](./llm/config/chatglm)         |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ❌        |
-| [ChatGLM2/ChatGLM3](./llm/config/chatglm2) |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅        |
-| [Bloom](./llm/config/bloom)                |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅        |
-| [GPT-3](./llm/config/gpt-3)                |    ✅     |  ✅  |  🚧  |      🚧       | 🚧  |  🚧  |      🚧      |       ✅        |
-| [OPT](./llm/config/opt)                    |    🚧    |  ✅  |  ✅   |      🚧       | 🚧  |  🚧  |      🚧      |       ✅        |
-
-* ✅: Supported
-* 🚧: In Progress
-* ❌: Not Supported
 
 Detailed list 👉 [Supported Model List](https://github.com/PaddlePaddle/PaddleNLP/issues/8663)
 
@@ -83,13 +70,13 @@ Detailed list 👉 [Supported Model List](https://github.com/PaddlePaddle/Paddle
 
 ### Prerequisites
 
-- python >= 3.8
-- paddlepaddle >= 3.0.0b0
+* python >= 3.8
+* paddlepaddle >= 3.0.0b0
 
 ### Pip Installation
 
 ```shell
-pip install --upgrade paddlenlp
+pip install --upgrade paddlenlp==3.0.0b0
 ```
 
 or you can install the latest develop branch code with the following command:
@@ -114,11 +101,12 @@ PaddleNLP provides a convenient and easy-to-use Auto API, which can quickly load
 >>> model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2-0.5B", dtype="float16")
 >>> input_features = tokenizer("你好！请自我介绍一下。", return_tensors="pd")
 >>> outputs = model.generate(**input_features, max_length=128)
->>> tokenizer.batch_decode(outputs[0])
+>>> print(tokenizer.batch_decode(outputs[0]))
 ['我是一个AI语言模型，我可以回答各种问题，包括但不限于：天气、新闻、历史、文化、科学、教育、娱乐等。请问您有什么需要了解的吗？']
 ```
 
 ### Pre-training for large language model
+
 ```shell
 mkdir -p llm/data && cd llm/data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
@@ -128,6 +116,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py 
 ```
 
 ### SFT finetuning forlarge language model
+
 ```shell
 mkdir -p llm/data && cd llm/data
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz && tar -zxvf AdvertiseGen.tar.gz
@@ -135,12 +124,13 @@ cd .. # change folder to PaddleNLP/llm
 python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py ./config/llama/sft_argument.json
 ```
 
-For more steps in the entire large model process, please refer to the[Large Model Full-Process Toolchain](./llm).
+For more steps in the entire large model process, please refer to the[Large Model Full-Process Suite](./llm).
 
 For more PaddleNLP content, please refer to:
-- [Model Library](./legacy/model_zoo)，which includes end-to-end usage of high-quality pre-trained models.
-- [Multi-scenario Examples](./legacy/examples)，to understand how to use PaddleNLP to solve various NLP technical problems, including basic techniques, system applications, and extended applications.
-- [Interactive Tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，to quickly learn PaddleNLP on the free computing platform AI Studio.
+
+* [Model Library](./legacy/model_zoo)，which includes end-to-end usage of high-quality pre-trained models.
+* [Multi-scenario Examples](./legacy/examples)，to understand how to use PaddleNLP to solve various NLP technical problems, including basic techniques, system applications, and extended applications.
+* [Interactive Tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，to quickly learn PaddleNLP on the free computing platform AI Studio.
 
 ------------------------------------------------------------------------------------------
 
@@ -161,7 +151,8 @@ Scan the QR code below with your Wechat⬇️. You can access to official techni
 ## Citation
 
 If you find PaddleNLP useful in your research, please consider citing
-```
+
+```bibtext
 @misc{=paddlenlp,
     title={PaddleNLP: An Easy-to-use and High Performance NLP Library},
     author={PaddleNLP Contributors},
