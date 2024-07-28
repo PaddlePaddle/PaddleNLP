@@ -230,7 +230,7 @@ def fusion_flash_attention(
                         key_states,
                         value_states,
                         attn_mask=attention_mask,
-                        is_causal=attention_mask is None,
+                        is_causal=attention_mask is None and query_states.shape[1] != 1,
                     )
         attn_weights = None
 
