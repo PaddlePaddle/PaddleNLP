@@ -145,6 +145,10 @@ class ModelArgument:
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
+    use_fast_layer_norm: bool = field(
+        default=False,
+        metadata={"help": "GPT3 model, use fast layernorm"},
+    )
     fuse_attention_qkv: bool = field(
         default=None,
         metadata={"help": "whether to fuse attention qkv"},
@@ -196,6 +200,10 @@ class ModelArgument:
     lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+ technique"})
     pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
 
+    # vera related parameters
+    vera: bool = field(default=False, metadata={"help": "Whether to use vera technique"})
+    vera_rank: int = field(default=8, metadata={"help": "Vera attention dimension"})
+
     # prefix tuning related parameters
     prefix_tuning: bool = field(default=False, metadata={"help": "Whether to use Prefix technique"})
     prefix_path: str = field(default=None, metadata={"help": "Initialize prefix state dict."})
@@ -215,6 +223,7 @@ class ModelArgument:
     flash_mask: bool = field(default=False, metadata={"help": "Whether to use flash_mask in flash attention."})
 
 
+
 @dataclass
 class ReftArgument:
     layers: str = field(default="all", metadata={"help": "Layer configuration for the model."})
@@ -224,6 +233,7 @@ class ReftArgument:
     act_fn: str = field(default=None, metadata={"help": "Activation function."})
     add_bias: bool = field(default=False, metadata={"help": "Flag indicating whether to add bias."})
     dropout: float = field(default=0.0, metadata={"help": "Dropout rate."})
+
 
 
 @dataclass

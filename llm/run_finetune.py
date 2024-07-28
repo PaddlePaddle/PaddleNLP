@@ -45,6 +45,7 @@ from paddlenlp.datasets import (
     load_dataset,
 )
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
+
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.peft.reft.pareft import (
     LoreftIntervention,
@@ -55,6 +56,15 @@ from paddlenlp.peft.reft.pareft import (
     get_reft_model,
 )
 from paddlenlp.peft.reft.pareft.dataset import LoReftSupervisedDataset
+from paddlenlp.peft import (
+    LoRAConfig,
+    LoRAModel,
+    PrefixConfig,
+    PrefixModelForCausalLM,
+    VeRAConfig,
+    VeRAModel,
+)
+
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
@@ -145,6 +155,7 @@ def main():
     )
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
+    model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     # Config for model using dropout, such as GPT.
     if hasattr(model_config, "hidden_dropout_prob"):
@@ -384,8 +395,6 @@ def main():
     if not model_args.reft:
         if training_args.pipeline_parallel_degree > 1:
             from utils.data import convert_example_common
-
-            trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
         else:
             trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
 
@@ -579,6 +588,20 @@ def main():
             "rougel": rougel.score(),
             "bleu4": bleu4.score(),
         }
+
+    if model_args.vera:
+        target_modules = get_lora_target_modules(model)
+        vera_config = VeRAConfig(
+            target_modules=target_modules,
+            r=model_args.vera_rank,
+            vera_alpha=model_args.vera_rank,
+            dtype=dtype,
+            base_model_name_or_path=model_args.model_name_or_path,
+            pissa_init=True,
+        )
+        model = VeRAModel(model, vera_config)
+        model.mark_only_vera_as_trainable(notfreezeB=True)
+        model.print_trainable_parameters()
 
     # Create trainer
     max_length = (

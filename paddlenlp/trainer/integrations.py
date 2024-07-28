@@ -23,7 +23,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from ..peft import LoRAModel, PrefixModelForCausalLM
+from ..peft import LoRAModel, PrefixModelForCausalLM, VeRAModel
 from ..transformers import PretrainedModel
 from ..utils.log import logger
 from .trainer_callback import TrainerCallback
@@ -116,7 +116,11 @@ class VisualDLCallback(TrainerCallback):
             self.vdl_writer.add_text("args", args.to_json_string())
             if "model" in kwargs and logger.logger.level < 20:
                 model = kwargs["model"]
-                if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
+                if (
+                    isinstance(model, LoRAModel)
+                    or isinstance(model, PrefixModelForCausalLM)
+                    or isinstance(model, VeRAModel)
+                ):
                     model = kwargs["model"].model
                 if isinstance(model, PretrainedModel) and model.constructed_from_pretrained_config():
                     model.config.architectures = [model.__class__.__name__]

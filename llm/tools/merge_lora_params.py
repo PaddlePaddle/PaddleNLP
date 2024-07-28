@@ -113,13 +113,17 @@ def lora_process(name, lora_config, state_dict, device, lora_state_dict=None):
 
 
 def merge_old_lora(lora_config, args):
-    lora_config.merge_weight = True
+    lora_config.merge_weights = True
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name_or_path,
         dtype=lora_config.dtype,
     )
     model = LoRAModel.from_pretrained(model, args.lora_path)
-    model.eval()
+    try:
+        model.merge()
+        model.eval()
+    except:
+        model.eval()
     model_state_dict = model.model.state_dict()
     for key in list(model_state_dict):
         if "lora" in key:
