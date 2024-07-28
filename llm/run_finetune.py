@@ -41,13 +41,11 @@ from paddlenlp.datasets import (
     load_dataset,
 )
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
-from paddlenlp.peft import (
+from paddlenlp.peft import (  # VeRAConfig,; VeRAModel,
     LoRAConfig,
     LoRAModel,
     PrefixConfig,
     PrefixModelForCausalLM,
-    VeRAConfig,
-    VeRAModel,
 )
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
@@ -150,6 +148,11 @@ def main():
         model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
     if model_args.fuse_attention_ffn is not None:
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
+
+    if model_args.lqlora_quantize_cfg is not None:
+        model_config.lqlora_quantize_cfg = model_args.lqlora_quantize_cfg
+    if model_args.lqlora_state_dict is not None:
+        model_config.lqlora_state_dict = model_args.lqlora_state_dict
 
     model_config.seq_length = data_args.max_length
 
@@ -463,6 +466,7 @@ def main():
                 do_qat=quant_args.do_qat,
                 base_model_name_or_path=model_args.model_name_or_path,
                 use_quick_lora=model_args.use_quick_lora,
+                lqlora_state_dict=model_args.lqlora_state_dict,
             )
             model = LoRAModel(model, lora_config)
         else:
@@ -500,19 +504,19 @@ def main():
             "bleu4": bleu4.score(),
         }
 
-    if model_args.vera:
-        target_modules = get_lora_target_modules(model)
-        vera_config = VeRAConfig(
-            target_modules=target_modules,
-            r=model_args.vera_rank,
-            vera_alpha=model_args.vera_rank,
-            dtype=dtype,
-            base_model_name_or_path=model_args.model_name_or_path,
-            pissa_init=True,
-        )
-        model = VeRAModel(model, vera_config)
-        model.mark_only_vera_as_trainable(notfreezeB=True)
-        model.print_trainable_parameters()
+    # if model_args.vera:
+    #     target_modules = get_lora_target_modules(model)
+    #     vera_config = VeRAConfig(
+    #         target_modules=target_modules,
+    #         r=model_args.vera_rank,
+    #         vera_alpha=model_args.vera_rank,
+    #         dtype=dtype,
+    #         base_model_name_or_path=model_args.model_name_or_path,
+    #         pissa_init=True,
+    #     )
+    #     model = VeRAModel(model, vera_config)
+    #     model.mark_only_vera_as_trainable(notfreezeB=True)
+    #     model.print_trainable_parameters()
 
     # Create trainer
     max_length = (

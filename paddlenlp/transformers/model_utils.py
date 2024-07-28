@@ -788,6 +788,7 @@ def _load_state_dict_into_meta_model(
     dtype=None,
     is_safetensors=False,
     keep_in_fp32_modules=None,
+    lqlora_quantize_cfg=None,
 ):
     """
     This is somewhat similar to `_load_state_dict_into_model`, but deals with a model that has some or all of its
@@ -817,14 +818,22 @@ def _load_state_dict_into_meta_model(
         # # We convert floating dtypes to the `dtype` passed. We want to keep the buffers/params
         # # in int/uint/bool and not cast them.
         if dtype is not None and paddle.is_floating_point(param):
-            if (
-                keep_in_fp32_modules is not None
-                and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
-                and (dtype == paddle.float16 or dtype == paddle.bfloat16)
-            ):
-                param = param.astype(dtype=paddle.float32)
+            if lqlora_quantize_cfg is not None:
+                layer_name = param_name[: param_name.rfind(".")]
+                if layer_name in lqlora_quantize_cfg.keys() and lqlora_quantize_cfg[layer_name] not in [
+                    "nf4",
+                    "fp4",
+                ]:
+                    param = param.astype(dtype=dtype)
             else:
-                param = param.astype(dtype=dtype)
+                if (
+                    keep_in_fp32_modules is not None
+                    and any(module_to_keep_in_fp32 in param_name for module_to_keep_in_fp32 in keep_in_fp32_modules)
+                    and (dtype == paddle.float16 or dtype == paddle.bfloat16)
+                ):
+                    param = param.astype(dtype=paddle.float32)
+                else:
+                    param = param.astype(dtype=dtype)
 
         if dtype is None:
             old_param = model
@@ -1700,6 +1709,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         dtype=None,
         keep_in_fp32_modules=None,
         quantization_linear_list=None,
+        lqlora_quantize_cfg=None,
     ) -> Tuple[List[str]]:
         """load the state_dict into model, and do the following things:
 
@@ -1752,6 +1762,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             try:
                 from ..quantization.quantization_utils import (
                     convert_to_quantize_state_dict,
+                    convert_to_quantize_state_dict_lqlora,
                     update_loaded_state_dict_keys,
                 )
             except ImportError:
@@ -1770,12 +1781,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 )
             if keep_in_fp32_modules is None:
                 keep_in_fp32_modules = (
-                    ["quant_scale"] if config.quantization_config.weight_quantize_algo in ["nf4", "fp4"] else None
+                    ["quant_scale"]
+                    if config.quantization_config.weight_quantize_algo in ["nf4", "fp4", "lqlora"]
+                    else None
                 )
             else:
                 keep_in_fp32_modules = (
                     keep_in_fp32_modules + ["quant_scale"]
-                    if config.quantization_config.weight_quantize_algo in ["nf4", "fp4"]
+                    if config.quantization_config.weight_quantize_algo in ["nf4", "fp4", "lqlora"]
                     else keep_in_fp32_modules
                 )
 
@@ -1795,6 +1808,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         # Set some modules to fp32 if any
         if keep_in_fp32_modules is not None:
             for name, param in model.named_parameters():
+                if lqlora_quantize_cfg is not None:
+                    layer_name = name[: name.rfind(".")]
+                    if layer_name in lqlora_quantize_cfg.keys() and lqlora_quantize_cfg[layer_name] not in [
+                        "nf4",
+                        "fp4",
+                    ]:
+                        continue
                 if any(module_to_keep_in_fp32 in name for module_to_keep_in_fp32 in keep_in_fp32_modules):
                     if param.dtype != paddle.float32:
                         param = param.to(dtype=paddle.float32)
@@ -1894,6 +1914,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     dtype=dtype,
                     is_safetensors=is_safetensors,
                     keep_in_fp32_modules=keep_in_fp32_modules,
+                    lqlora_quantize_cfg=lqlora_quantize_cfg,
                 )
             else:
                 error_msgs = _load_state_dict_into_model(model_to_load, state_dict, start_prefix)
@@ -1909,6 +1930,19 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             resume_state_dict = {}
             if len(resolved_archive_file) > 1:
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
+
+            lqlora_state_dict = None
+            if config.lqlora_state_dict is not None:
+                print("load lqlora_state_dict from " + config.lqlora_state_dict)
+                lqlora_state_dict = paddle.load(config.lqlora_state_dict)
+
+                key_list = list(lqlora_state_dict.keys())
+                for key in key_list:
+                    print("replace:" + key)
+                    target_weight = lqlora_state_dict.pop(key)
+                    lqlora_state_dict[key] = target_weight.cpu()
+                    del target_weight
+                paddle.device.cuda.empty_cache()
 
             for shard_file in resolved_archive_file:
                 pre_tensor_parallel_split = False
@@ -1956,12 +1990,20 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 unexpected_keys = list(set(unexpected_keys) - set(fused_keys))
 
                 if config.quantization_config.is_weight_quantize():
-                    state_dict = convert_to_quantize_state_dict(
-                        state_dict,
-                        quantization_linear_list,
-                        config.quantization_config,
-                        dtype,
-                    )
+                    if lqlora_quantize_cfg is None:
+                        state_dict = convert_to_quantize_state_dict(
+                            state_dict,
+                            quantization_linear_list,
+                            config.quantization_config,
+                            dtype,
+                        )
+                    else:
+                        state_dict = convert_to_quantize_state_dict_lqlora(
+                            state_dict,
+                            config.quantization_config,
+                            dtype,
+                            lqlora_quantize_cfg,
+                        )
 
                 # Mistmatched keys contains tuples key/shape1/shape2 of weights in the checkpoint that have a shape not
                 # matching the weights in the model.
@@ -1992,6 +2034,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                         dtype=dtype,
                         is_safetensors=is_safetensors,
                         keep_in_fp32_modules=keep_in_fp32_modules,
+                        lqlora_quantize_cfg=lqlora_quantize_cfg,
                     )
                     error_msgs += new_error_msgs
                 else:
@@ -2308,6 +2351,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         else:
             keep_in_fp32_modules = []
 
+        lqlora_quantize_cfg = None
+        if config.lqlora_quantize_cfg is not None:
+            lqlora_quantize_cfg = paddle.load(config.lqlora_quantize_cfg)
+
         quantization_linear_list = None
         if config.quantization_config.is_weight_quantize():
             with ContextManagers(quantization_init_contexts):
@@ -2315,6 +2362,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     model=model,
                     quantization_config=config.quantization_config,
                     llm_int8_threshold=config.quantization_config.llm_int8_threshold,
+                    lqlora_quantize_cfg=lqlora_quantize_cfg,
                 )
                 quantization_linear_list = []
                 for key in model.state_dict().keys():
@@ -2333,6 +2381,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             dtype=dtype,
             keep_in_fp32_modules=keep_in_fp32_modules,
             quantization_linear_list=quantization_linear_list,
+            lqlora_quantize_cfg=lqlora_quantize_cfg,
         )
 
         # load generation_config.json
