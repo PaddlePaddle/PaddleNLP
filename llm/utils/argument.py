@@ -209,6 +209,9 @@ class ModelArgument:
     prefix_path: str = field(default=None, metadata={"help": "Initialize prefix state dict."})
     num_prefix_tokens: int = field(default=128, metadata={"help": "Number of prefix tokens"})
 
+    # reft related parameter
+    reft: bool = field(default=False, metadata={"help": "Whether using reft method"})
+
     from_aistudio: bool = field(default=False, metadata={"help": "Whether to load model from aistudio"})
     save_to_aistudio: bool = field(default=False, metadata={"help": "Whether to save model to aistudio"})
     aistudio_repo_id: str = field(default=None, metadata={"help": "The id of aistudio repo"})
@@ -218,6 +221,17 @@ class ModelArgument:
     neftune: bool = field(default=False, metadata={"help": "Whether to apply NEFT"})
     neftune_noise_alpha: float = field(default=5.0, metadata={"help": "NEFT noise alpha"})
     flash_mask: bool = field(default=False, metadata={"help": "Whether to use flash_mask in flash attention."})
+
+
+@dataclass
+class ReftArgument:
+    layers: str = field(default="all", metadata={"help": "Layer configuration for the model."})
+    position: str = field(default="f7+l7", metadata={"help": "Position parameter for model."})
+    intervention_type: str = field(default="LoreftIntervention", metadata={"help": "Type of intervention."})
+    rank: int = field(default=8, metadata={"help": "Rank parameter for model."})
+    act_fn: str = field(default=None, metadata={"help": "Activation function."})
+    add_bias: bool = field(default=False, metadata={"help": "Flag indicating whether to add bias."})
+    dropout: float = field(default=0.0, metadata={"help": "Dropout rate."})
 
 
 @dataclass

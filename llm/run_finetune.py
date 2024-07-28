@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import datetime
 import json
+import logging
 import os
 import sys
 from functools import partial
@@ -22,6 +25,7 @@ from utils.argument import (
     GenerateArgument,
     ModelArgument,
     QuantArgument,
+    ReftArgument,
     TrainingArguments,
 )
 from utils.data import get_convert_example
@@ -49,6 +53,14 @@ from paddlenlp.peft import (
     VeRAConfig,
     VeRAModel,
 )
+from paddlenlp.peft.reft.pareft import (
+    LoreftIntervention,
+    ReftConfig,
+    ReftDataCollator,
+    ReftTrainer,
+    get_reft_model,
+)
+from paddlenlp.peft.reft.pareft.dataset import LoReftSupervisedDataset
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
@@ -72,17 +84,20 @@ flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
 
 def main():
     # Arguments
-    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
+    parser = PdArgumentParser(
+        (GenerateArgument, QuantArgument, ModelArgument, ReftArgument, DataArgument, TrainingArguments)
+    )
     # Support format as "args.json --arg1 value1 --arg2 value2.”
     # In case of conflict, command line arguments take precedence.
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+        gen_args, quant_args, model_args, reft_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        gen_args, quant_args, model_args, reft_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     training_args.print_config(quant_args, "Quant")
     training_args.print_config(gen_args, "Generation")
+    training_args.print_config(reft_args, "Reft")
 
     if sum([quant_args.do_ptq, quant_args.do_qat, quant_args.do_gptq, training_args.do_train]) > 1:
         raise ValueError(
@@ -200,6 +215,21 @@ def main():
 
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
+    if model_args.reft:
+        # reft requires padding side right
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_args.model_name_or_path,
+            model_max_length=data_args.max_length,
+            padding_side="right",
+        )
+        # tokenizer.pad_token = tokenizer.unk_token
+        tokenizer.pad_token_id = tokenizer.unk_token_id
+        layers = None
+        if reft_args.layers != "all":
+            layers = [int(l) for l in layers.split(";")]
+        else:
+            layers = [l for l in range(model_config.num_hidden_layers)]
+        logging.info("Using reft with layers: ", layers)
     # init chat_template for tokenizer
     init_chat_template(tokenizer, model_args.model_name_or_path, data_args.chat_template)
 
@@ -207,7 +237,7 @@ def main():
     if tokenizer.chat_template is not None:
         data_args.eval_with_do_generation = False
 
-    if isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer):
+    if not model_args.reft and (isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer)):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if data_args.dataset_name_or_path is None:
@@ -217,7 +247,19 @@ def main():
         or os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev.json"))
         or os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json"))
     ):
-        if training_args.do_train or quant_args.do_qat:
+        if model_args.reft and training_args.do_train:
+            train_ds = LoReftSupervisedDataset(
+                data_args.dataset_name_or_path,
+                tokenizer,
+                data_split="train",
+                seed=42,
+                **{
+                    "num_interventions": len(layers),
+                    "position": reft_args.position,
+                    "trigger_tokens": "LLM Response: ",
+                },
+            )
+        elif training_args.do_train or quant_args.do_qat:
             train_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
@@ -225,7 +267,19 @@ def main():
             )[0]
         else:
             train_ds = None
-        if training_args.do_eval:
+        if model_args.reft:
+            dev_ds = LoReftSupervisedDataset(
+                data_args.dataset_name_or_path,
+                tokenizer,
+                data_split="dev",
+                seed=42,
+                **{
+                    "num_interventions": len(layers),
+                    "position": reft_args.position,
+                    "trigger_tokens": "LLM Response: ",
+                },
+            )
+        elif training_args.do_eval:
             dev_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
@@ -333,88 +387,94 @@ def main():
         )
         train_ds = train_ds.skip(consumed_samples)
 
-    if training_args.pipeline_parallel_degree > 1:
-        from utils.data import convert_example_common
+    # reft has different data process
+    if not model_args.reft:
+        if training_args.pipeline_parallel_degree > 1:
+            from utils.data import convert_example_common
 
-        trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
-    else:
-        trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
-
-    if data_args.zero_padding:
-        if (
-            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen", "mistral"]
-            and training_args.pipeline_parallel_degree < 1
-        ):
-            raise NotImplementedError(
-                "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM, QWen and Mistral so far."
-            )
-    train_ds = (
-        train_ds.map(
-            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
-        )
-        if train_ds is not None
-        else None
-    )
-    ptq_ds = (
-        ptq_ds.map(
-            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
-        )
-        if ptq_ds is not None
-        else None
-    )
-    eval_zero_padding = data_args.zero_padding
-    if data_args.zero_padding and data_args.eval_with_do_generation:
-        logger.warning(
-            "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
-        )
-        eval_zero_padding = False
-    dev_ds = (
-        dev_ds.map(
-            partial(
-                trans_func,
-                is_test=data_args.eval_with_do_generation,
-                zero_padding=eval_zero_padding,
-                flash_mask=model_args.flash_mask,
-            )
-        )
-        if dev_ds is not None
-        else None
-    )
-    if data_args.zero_padding:
-        if data_args.lazy:
-            intoken_dataset = ZeroPaddingIterableDataset
+            trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
         else:
-            intoken_dataset = ZeroPaddingMapDataset
-        logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
+            trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
+
+        if data_args.zero_padding:
+            if (
+                model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen", "mistral"]
+                and training_args.pipeline_parallel_degree < 1
+            ):
+                raise NotImplementedError(
+                    "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM, QWen and Mistral so far."
+                )
         train_ds = (
-            intoken_dataset(
-                train_ds,
-                tokenizer=tokenizer,
-                max_length=data_args.max_length,
+            train_ds.map(
+                partial(
+                    trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask
+                )
             )
             if train_ds is not None
             else None
         )
         ptq_ds = (
-            intoken_dataset(
-                ptq_ds,
-                tokenizer=tokenizer,
-                max_length=data_args.max_length,
+            ptq_ds.map(
+                partial(
+                    trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask
+                )
             )
             if ptq_ds is not None
             else None
         )
-
-        if eval_zero_padding:
-            dev_ds = (
+        eval_zero_padding = data_args.zero_padding
+        if data_args.zero_padding and data_args.eval_with_do_generation:
+            logger.warning(
+                "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
+            )
+            eval_zero_padding = False
+        dev_ds = (
+            dev_ds.map(
+                partial(
+                    trans_func,
+                    is_test=data_args.eval_with_do_generation,
+                    zero_padding=eval_zero_padding,
+                    flash_mask=model_args.flash_mask,
+                )
+            )
+            if dev_ds is not None
+            else None
+        )
+        if data_args.zero_padding:
+            if data_args.lazy:
+                intoken_dataset = ZeroPaddingIterableDataset
+            else:
+                intoken_dataset = ZeroPaddingMapDataset
+            logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
+            train_ds = (
                 intoken_dataset(
-                    dev_ds,
+                    train_ds,
                     tokenizer=tokenizer,
                     max_length=data_args.max_length,
                 )
-                if dev_ds is not None
+                if train_ds is not None
                 else None
             )
+            ptq_ds = (
+                intoken_dataset(
+                    ptq_ds,
+                    tokenizer=tokenizer,
+                    max_length=data_args.max_length,
+                )
+                if ptq_ds is not None
+                else None
+            )
+
+            if eval_zero_padding:
+                dev_ds = (
+                    intoken_dataset(
+                        dev_ds,
+                        tokenizer=tokenizer,
+                        max_length=data_args.max_length,
+                    )
+                    if dev_ds is not None
+                    else None
+                )
 
     if model_args.prefix_tuning:
         if training_args.pipeline_parallel_degree > 1:
@@ -469,6 +529,33 @@ def main():
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
 
         model.print_trainable_parameters()
+
+    if model_args.reft:
+        # intervention config based on model type
+        intervention_dtype = paddle.bfloat16
+        representations = [
+            {
+                "layer": l,
+                "component": "block_output",
+                "low_rank_dimension": reft_args.rank,
+                "intervention": LoreftIntervention(
+                    embed_dim=model_config.hidden_size,
+                    low_rank_dimension=reft_args.rank,
+                    dropout=reft_args.dropout,
+                    dtype=intervention_dtype,
+                    act_fn=reft_args.act_fn,
+                    device="gpu",
+                    add_bias=reft_args.add_bias,
+                ),
+            }
+            for l in layers
+        ]
+        reft_config = ReftConfig(representations=representations)
+        reft_model = get_reft_model(model, reft_config, set_device=True)
+        reft_model.print_trainable_parameters()
+        reft_model.model.train()
+        n_params = reft_model.count_parameters(include_model=False)
+        logging.info(f"Reft model has {n_params} trainable parameters.")
 
     def compute_metrics_do_generation(eval_preds):
         rouge1 = Rouge1()
@@ -530,30 +617,48 @@ def main():
     else:
         metrics = compute_metrics
 
-    trainer = CausalLMTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_ds,
-        eval_dataset=dev_ds,
-        tokenizer=tokenizer,
-        compute_metrics=metrics,
-        data_collator=DataCollatorForSeq2Seq(
+    if model_args.reft:
+        data_collator_fn = DataCollatorForSeq2Seq(
+            tokenizer=tokenizer, model=model, label_pad_token_id=-100, padding="longest"
+        )
+        data_collator = ReftDataCollator(data_collator=data_collator_fn)
+        trainer = ReftTrainer(
+            model=reft_model,
             tokenizer=tokenizer,
-            max_length=max_length,
-            padding=padding,
-            max_label_length=max_length,
-            return_tensors="np",
-            return_attention_mask=not model_args.flash_mask,
-            pad_to_multiple_of=data_args.pad_to_multiple_of,
-        ),
-        do_generation=data_args.eval_with_do_generation,
-        callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
-        gen_args=gen_args,
-        data_args=data_args,
-    )
+            args=training_args,
+            train_dataset=train_ds,
+            data_collator=data_collator,
+            eval_dataset=None,
+            compute_metrics=None,
+        )
+        trainer.train()
+        run_name = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        reft_model.save(f"{training_args.output_dir}/{run_name}")
+    else:
+        trainer = CausalLMTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_ds,
+            eval_dataset=dev_ds,
+            tokenizer=tokenizer,
+            compute_metrics=metrics,
+            data_collator=DataCollatorForSeq2Seq(
+                tokenizer=tokenizer,
+                max_length=max_length,
+                padding=padding,
+                max_label_length=max_length,
+                return_tensors="np",
+                return_attention_mask=not model_args.flash_mask,
+                pad_to_multiple_of=data_args.pad_to_multiple_of,
+            ),
+            do_generation=data_args.eval_with_do_generation,
+            callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
+            gen_args=gen_args,
+            data_args=data_args,
+        )
 
     # Train
-    if training_args.do_train:
+    if training_args.do_train and not model_args.reft:
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:
             checkpoint = training_args.resume_from_checkpoint
@@ -601,7 +706,7 @@ def main():
                 trainer.save_state()
 
     # QAT
-    if quant_args.do_qat:
+    if quant_args.do_qat and not model_args.reft:
         from utils.quant import create_qat_model
 
         trainer.model = create_qat_model(quant_args, trainer.model, dtype)
@@ -612,7 +717,7 @@ def main():
         trainer.save_state()
 
     # PTQ
-    if quant_args.do_ptq:
+    if quant_args.do_ptq and not model_args.reft:
         if isinstance(model, LoRAModel):
             raise NotImplementedError(
                 "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
@@ -648,7 +753,7 @@ def main():
         apply_ptq(quant_args, trainer, ptq_dataloader)
         trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
 
-    if quant_args.do_gptq:
+    if quant_args.do_gptq and not model_args.reft:
         if isinstance(model, LoRAModel):
             raise NotImplementedError(
                 "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
@@ -660,12 +765,12 @@ def main():
         trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
 
     # Evaluation dev set
-    if training_args.do_eval:
+    if training_args.do_eval and not model_args.reft:
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
 
     # Evaluation test set
-    if training_args.do_predict:
+    if training_args.do_predict and not model_args.reft:
         test_ds = load_dataset(
             "json",
             data_files=os.path.join(data_args.dataset_name_or_path, "test.json"),
