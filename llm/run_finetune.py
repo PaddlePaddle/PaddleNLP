@@ -45,8 +45,14 @@ from paddlenlp.datasets import (
     load_dataset,
 )
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
-
-from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft import (
+    LoRAConfig,
+    LoRAModel,
+    PrefixConfig,
+    PrefixModelForCausalLM,
+    VeRAConfig,
+    VeRAModel,
+)
 from paddlenlp.peft.reft.pareft import (
     LoreftIntervention,
     ReftConfig,
@@ -56,15 +62,6 @@ from paddlenlp.peft.reft.pareft import (
     get_reft_model,
 )
 from paddlenlp.peft.reft.pareft.dataset import LoReftSupervisedDataset
-from paddlenlp.peft import (
-    LoRAConfig,
-    LoRAModel,
-    PrefixConfig,
-    PrefixModelForCausalLM,
-    VeRAConfig,
-    VeRAModel,
-)
-
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
@@ -395,6 +392,8 @@ def main():
     if not model_args.reft:
         if training_args.pipeline_parallel_degree > 1:
             from utils.data import convert_example_common
+
+            trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
         else:
             trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
 
