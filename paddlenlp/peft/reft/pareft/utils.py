@@ -33,7 +33,7 @@ class TaskType(str, enum.Enum):
 
 
 # Create an instance of ReFT model.
-def get_reft_model(model, reft_config, set_device=True, disable_model_grads=True):
+def get_reft_model(model, reft_config, set_device=False, disable_model_grads=True):
     reft_model = ReftModel(reft_config, model)
     if set_device:
         device = paddle.set_device("gpu")

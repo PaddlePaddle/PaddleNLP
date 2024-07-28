@@ -551,7 +551,7 @@ def main():
             for l in layers
         ]
         reft_config = ReftConfig(representations=representations)
-        reft_model = get_reft_model(model, reft_config, set_device=True)
+        reft_model = get_reft_model(model, reft_config, set_device=False)
         reft_model.print_trainable_parameters()
         reft_model.model.train()
         n_params = reft_model.count_parameters(include_model=False)

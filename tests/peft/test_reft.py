@@ -109,7 +109,7 @@ class TestReftModel(unittest.TestCase):
             for l in layers
         ]
         reft_config = ReftConfig(representations=representations)
-        reft_model = get_reft_model(model, reft_config, set_device=True)
+        reft_model = get_reft_model(model, reft_config, set_device=False)
         reft_model.print_trainable_parameters()
         self.assertTrue(type(reft_model), ReftModel)
 
@@ -135,7 +135,7 @@ class TestReftModel(unittest.TestCase):
             for l in layers
         ]
         reft_config = ReftConfig(representations=representations)
-        reft_model = get_reft_model(model, reft_config, set_device=True)
+        reft_model = get_reft_model(model, reft_config, set_device=False)
         reft_model.print_trainable_parameters()
         outputs = reft_model.model(**{"input_ids": paddle.randint(low=1, high=100, shape=(5, 10))})
         self.assertTrue(outputs[0].shape, [5, 10, 32000])
