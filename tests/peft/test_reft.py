@@ -37,7 +37,6 @@ class TestBasicUtils(unittest.TestCase):
 
 class TestLoReftIntervention(unittest.TestCase):
     def setUp(self):
-        # 在每个测试方法执行前调用，用于初始化测试环境
         self.kwargs = {
             "embed_dim": 256,
             "low_rank_dimension": 64,
@@ -53,19 +52,15 @@ class TestLoReftIntervention(unittest.TestCase):
         self.assertEqual(intervention.dropout.p, self.kwargs["dropout"])
 
     def test_forward(self):
-        # 测试前向传播方法
-        base = paddle.randn([10, self.kwargs["embed_dim"]])  # 示例输入
+        base = paddle.randn([10, self.kwargs["embed_dim"]])
         intervention = LoreftIntervention(**self.kwargs)
         output = intervention.forward(base)
-
-        # 添加具体的断言，验证前向传播的输出
         self.assertEqual(output.shape, base.shape)
         self.assertEqual(output.dtype, self.kwargs["dtype"])
 
 
 class TestTinyIntervention(unittest.TestCase):
     def setUp(self):
-        # 在每个测试方法执行前调用，用于初始化测试环境
         self.kwargs = {
             "embed_dim": 256,
             "low_rank_dimension": 64,
@@ -75,14 +70,9 @@ class TestTinyIntervention(unittest.TestCase):
         }
 
     def test_initialization(self):
-        # 测试初始化过程
         intervention = TinyIntervention(**self.kwargs)
-
-        # 添加具体的断言，验证初始化的行为
         self.assertEqual(intervention.rank, self.kwargs["low_rank_dimension"])
         self.assertEqual(intervention.hidden_size, self.kwargs["embed_dim"])
-
-        # 验证参数的类型和形状
         self.assertEqual(intervention.param_A.shape, [self.kwargs["embed_dim"], self.kwargs["low_rank_dimension"]])
         self.assertEqual(intervention.param_B.shape, [self.kwargs["low_rank_dimension"], self.kwargs["embed_dim"]])
         self.assertEqual(intervention.param_a.shape, [self.kwargs["low_rank_dimension"]])
