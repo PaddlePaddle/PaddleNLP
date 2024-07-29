@@ -267,3 +267,45 @@ def convert_example_chatglm(example, tokenizer, data_args, is_test=True, intoken
             features["position_ids"] = np.stack([position_ids, block_position_ids], axis=0)
 
         return features
+
+
+def get_example_pose(example, tokenizer, scaled_max_position_embeddings, model_max_position_embeddings):
+    source = example["text"]
+    tokenized_source = tokenizer(
+        source, 
+        max_length=scaled_max_position_embeddings,
+        truncation=True, 
+        truncation_side="left",
+        add_special_tokens=True,
+    )       
+
+    ids = tokenized_source["input_ids"]
+    len_chunk = min(len(ids), model_max_position_embeddings)
+    if len_chunk <= model_max_position_embeddings:
+        len_chunk -= 1
+    len_input = len(ids)
+    lt1 = 0                     # chunk1 start pos
+    rt1 = random.randint(1, (len_chunk+1)//2)   # chunk1 end pos
+
+    rt2 = random.randint(lt1+len_chunk, len_input-1)  # chunk2 end pos
+    lt2 = rt2 - (len_chunk - (rt1-lt1))     # chunk2 start pos
+    chunked_ids = ids[lt1:rt1] + ids[lt2:rt2]
+    labels = ids[lt1+1:rt1+1] + ids[lt2+1:rt2+1]            # Revised
+
+    pos_ids = range(len(chunked_ids))      
+    pos_ids = [x + lt1 if i < rt1-lt1 else x + (lt2-(rt1-lt1)) for i, x in enumerate(pos_ids)]         # 修正了position id的计算公式
+  
+    features = {"input_ids": chunked_ids, "labels": labels, "position_ids": pos_ids}         # Revised
+
+    return features
+
+def test_preprocess_function(example, tokenizer, inference_length):
+
+    source = example["text"]
+    tokenized_source = tokenizer(source, padding=False, truncation=True, max_length=inference_length, return_dict=False)
+    input_ids = tokenized_source["input_ids"]
+    input_ids, labels = input_ids[:-1], input_ids[1:]
+    position_ids = list(range(len(input_ids)))
+    features = {"input_ids": input_ids, "position_ids": position_ids, "labels": labels}
+
+    return features
