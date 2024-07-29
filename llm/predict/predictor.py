@@ -1272,7 +1272,7 @@ def create_predictor(
 
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if (isinstance(tokenizer, (LlamaTokenizer, Llama3Tokenizer))) and not tokenizer.pad_token:
-        tokenizer.pad_token = tokenizer.bos_token
+        tokenizer.pad_token = tokenizer.eos_token
 
     config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
 
