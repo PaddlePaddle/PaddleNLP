@@ -31,6 +31,7 @@ from .testing_utils import LLMTest
     [
         ["llama"],
         ["qwen"],
+        ["qwen2"],
         ["gpt"],
     ],
 )
@@ -59,8 +60,8 @@ class PretrainTest(LLMTest, unittest.TestCase):
             del sys.modules["run_pretrain"]
 
         # Run pretrain
-        URL = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy"
-        URL2 = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz"
+        URL = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin"
+        URL2 = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx"
         get_path_from_url(URL, root_dir=self.dataset_dir)
         get_path_from_url(URL2, root_dir=self.dataset_dir)
 

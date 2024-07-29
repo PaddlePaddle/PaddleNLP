@@ -18,7 +18,6 @@ from __future__ import annotations
 import paddle
 from paddle import nn
 from paddle.nn.quant import weight_quantize
-from paddlenlp_ops import fused_get_rotary_embedding, get_padding_offset
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerBase,
@@ -28,6 +27,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
+from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
 from paddlenlp.transformers import QWenConfig, QWenPretrainedModel
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPast,
@@ -239,6 +239,8 @@ class QWenInferenceModel(QWenPretrainedModel):
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
+        from paddlenlp_ops import get_padding_offset
+
         ids_remove_padding, cum_offsets, padding_offset = get_padding_offset(
             input_ids, cum_offsets_now, token_num, seq_lens_this_time
         )
@@ -320,11 +322,14 @@ class QWenInferenceModel(QWenPretrainedModel):
         seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
 
         position_offset = 0
+        theta = 10000.0
         if not is_decoder and pre_caches is not None:
             position_offset = 128
 
+        from paddlenlp_ops import fused_get_rotary_embedding
+
         new_rope = fused_get_rotary_embedding(
-            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, True
+            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, theta, True
         )
 
         with dy2st_nocheck_guard_context():
@@ -373,12 +378,8 @@ class QWenForCausalLMInferenceModel(GenerationInferenceModel, QWenPretrainedMode
         self.lm_head = new_embeddings
 
     @classmethod
-    def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
-    ):
-        # TODO: Support safetensors loading.
-        kwargs["use_safetensors"] = False
-        return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+        return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(

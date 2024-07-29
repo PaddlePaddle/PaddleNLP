@@ -34,17 +34,12 @@ class QWenConfig(PretrainedConfig):
         max_position_embeddings=8192,
         scale_attn_weights=True,
         use_cache=True,
-        recompute_granularity="full",
         kv_channels=128,
         rotary_pct=1.0,
         rotary_emb_base=10000,
         use_dynamic_ntk=True,
         use_logn_attn=True,
-        use_flash_attention=False,
-        use_fused_rms_norm=False,
-        use_fused_rope=False,
         intermediate_size=22016,
-        tensor_parallel_output=True,
         no_bias=True,
         tie_word_embeddings=False,
         pad_token_id=0,
@@ -67,18 +62,14 @@ class QWenConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.scale_attn_weights = scale_attn_weights
         self.use_cache = use_cache
-        self.recompute_granularity = recompute_granularity
         self.max_position_embeddings = max_position_embeddings
         self.kv_channels = kv_channels
+
         self.rotary_pct = rotary_pct
         self.rotary_emb_base = rotary_emb_base
         self.use_dynamic_ntk = use_dynamic_ntk
         self.use_logn_attn = use_logn_attn
-        self.use_flash_attention = use_flash_attention
-        self.use_fused_rms_norm = use_fused_rms_norm
-        self.use_fused_rope = use_fused_rope
         self.no_bias = no_bias
-
         self.long_sequence_strategy_type = long_sequence_strategy_type
         self.long_sequence_strategy_name = long_sequence_strategy_name
         self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args

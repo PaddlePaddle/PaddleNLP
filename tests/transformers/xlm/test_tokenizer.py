@@ -25,7 +25,6 @@ from ..test_tokenizer_common import TokenizerTesterMixin
 
 class XLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = XLMTokenizer
-    test_fast_tokenizer = False
     test_offsets = False
 
     def setUp(self):

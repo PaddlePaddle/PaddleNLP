@@ -30,7 +30,7 @@ PEFT(Parameter-Efficient Fine-Tuning)相比于全量参数大大降低了所需�
 
 - **统一对话模板**
 
-当前开源Chat 类型模型越来越多，PaddleNLP 已经集成了 [LLaMA/LLaMA2](../llama)、[Baichuan/Baichuan2](../llama)、[ChatGLM](../chatglm)、[ChatGLM2/ChatGLM3](./chatglm2)、[Qwen](../qwen)、[Bloom](../bloom)、[GPT-3](./gpt-3)等系列模型，也支持[多轮对话 Prompt Template 推理](https://paddlenlp.readthedocs.io/zh/latest/get_started/chat_template.html)，只需要调用`apply_chat_template` 函数即可构造将对话历史和用户最新 query 按照模型指定规则拼接到一起，实现不同模型的定制化 Prompt 规则推理。
+当前开源Chat 类型模型越来越多，PaddleNLP 已经集成了 [LLaMA/LLaMA2](../config/llama)、[Baichuan/Baichuan2](../config/baichuan)、[ChatGLM](../config/chatglm)、[ChatGLM2/ChatGLM3](../config/chatglm2)、[Qwen](../config/qwen)、[Bloom](../config/bloom)、[GPT-3](../config/gpt-3)等系列模型，也支持[多轮对话 Prompt Template 推理](https://paddlenlp.readthedocs.io/zh/latest/get_started/chat_template.html)，只需要调用`apply_chat_template` 函数即可构造将对话历史和用户最新 query 按照模型指定规则拼接到一起，实现不同模型的定制化 Prompt 规则推理。
 
 此外多轮对话训练精调的应用场景也是越来越多，不同模型的多轮对话模板构造规则都不一致，为了在训练侧标准化前处理上的区别，设计了`chat_template`来解决此问题。只需要添加一个`chat_template` 的配置即可为该模型添加相应的多轮对话精调训练支持，具体的配置可看[多轮对话文档](./chat_template.md)。
 
@@ -70,28 +70,21 @@ git clone 代码到本地，即可开始。
 SFT（Supervised Fine-Tuning）模型全参微调依托飞桨提出的[4D混合分布式并行](https://ai.baidu.com/forum/topic/show/987996)能力，支持使用Trainer API轻松切换数据并行(DP)、[张量并行（TP, Tensor Parallelism）](https://arxiv.org/abs/1909.08053)、[流水线并行（PP, Pipeline Parallelism）](https://arxiv.org/abs/1811.06965)（目前仅支持Llama）等多种分布式训练策略。
 
 ```
-# 张量并行分布式训练（常用）
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./llama/sft_argument.json
-
-# 目前ChatGLM2、OPT不支持张量并行，默认使用Sharding策略
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./chatglm2/sft_argument.json
-
-# 张量并行&流水线并行分布式训练（目前仅支持Llama）
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3" finetune_generation.py ./llama/sft_pp_argument.json
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py ./config/llama/sft_argument.json
 ```
 
 1. `zero_padding`设为True有助于提高训练效率。建议将`per_device_train_batch_size`设为1，使用`gradient_accumulation_steps`控制batch size，适当调整`max_length`取值。
 2. 设置`use_flash_attention`为True使用FlashAttention。
+3. SFT API支持4D并行策略，可以通过控制`tensor_parallel_degree`、`pipeline_parallel_degree`、 `sharding`、`sharding_parallel_degree`调整
 
 ### 2.4 LoRA
 
 ```
 # 单卡训练
-python  finetune_generation.py ./llama/lora_argument.json
+python  run_finetune.py ./config/llama/lora_argument.json
 
-# 张量并行分布式训练（ChatGLM2、OPT不支持张量并行）
-# 将lora_argument.json中tensor_parallel_degree修改为2
-python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./llama/lora_argument.json
+# 张量并行分布式训练
+python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.py ./config/llama/lora_argument.json
 ```
 
 **Note:**
@@ -107,11 +100,10 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 
 ```
 # 单卡训练
-python  finetune_generation.py ./llama/pt_argument.json
+python  run_finetune.py ./llama/pt_argument.json
 
-# 张量并行分布式训练（ChatGLM2、OPT不支持张量并行）
-# 将pt_argument.json中tensor_parallel_degree修改为2
-python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./llama/pt_argument.json
+# 张量并行分布式训练
+python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.py ./llama/pt_argument.json
 ```
 
 **Note:**
@@ -198,11 +190,12 @@ python  -u  -m paddle.distributed.launch --gpus "0,1"  finetune_generation.py ./
 
 ## 4.分布式策略参数合并
 
-我们使用张量并行（TP，Tensor Parallelism）和 流水线并行（PP，Pipeline Parallelism）训练过程中，为了节省TP参数合并时间通常在中间checkpoint将参数存储为多个TP和PP参数分片，可以使用提供的分片合并参数脚本进行参数合并。
+**如果开启unified_checkpoint则不需要合参**。我们使用张量并行（TP，Tensor Parallelism）和 流水线并行（PP，Pipeline Parallelism）训练过程中，为了节省TP参数合并时间通常在中间checkpoint将参数存储为多个TP和PP参数分片，可以使用提供的分片合并参数脚本进行参数合并。
 
 ```
 python merge_tp_and_pp_params.py \
-    --model_name_or_path ./checkpoints/llama_sft_ckpts/checkpoint-100
+    --model_name_or_path ./checkpoints/llama_sft_ckpts/checkpoint-100 \
+    --pp 2 --tp 4
 ```
 
 <summary>&emsp; 脚本参数介绍</summary><div>
@@ -215,16 +208,18 @@ python merge_tp_and_pp_params.py \
 为了后续的**压缩**和**静态图推理**方便，我们提供LoRA参数合并脚本，可以将LoRA参数合并到主干模型并保存相应的权重。
 ```
 python merge_lora_params.py \
-    --lora_path ./checkpoints/llama_lora_ckpts \
-    --merge_lora_model_path ./checkpoints/llama_lora_merge \
+    --model_name_or_path ./checkpoints/sft_ckpts \
+    --lora_path ./checkpoints/lora_ckpts \
+    --output_path ./checkpoints/lora_merge \
     --device "gpu" \
-    --low_gpu_mem True
+    --safe_serialization True
 ```
 
 <summary>&emsp; 脚本参数介绍</summary><div>
 
 - `lora_path`: LoRA参数和配置路径，对LoRA参数进行初始化，默认为None。
+- `model_name_or_path`: 必须，主干模型参数路径，默认为None。
 - `merge_model_path`: 必须，合并参数后保存路径，默认为None。
 - `device`: 运行环境，默认为gpu。
-- `low_gpu_mem`:降低合参时候所需显存，默认为False。如果合参时显存不足，建议开启
+- `safe_serialization`: 是否保存为safetensor格式，默认为True。
 </div>

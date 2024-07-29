@@ -223,6 +223,10 @@ def slow(test):
     if not _run_slow_test:
         return unittest.skip("test spends too much time")(test)
     else:
+        import paddle
+
+        if paddle.device.is_compiled_with_cuda() and paddle.device.cuda.device_count() > 0:
+            paddle.device.cuda.empty_cache()
         return test
 
 
@@ -287,6 +291,22 @@ def require_package(*package_names):
         for package_name in package_names:
             if not is_package_available(package_name):
                 return unittest.skip(f"package<{package_name}> not found, so to skip this test")(func)
+        return func
+
+    return decorator
+
+
+def skip_platform(*platform):
+    """decorator which can detect that it will skip the specific platform
+
+    Args:
+        platform (str): the name of platform, including win32, cygwin, linux, and darwin
+    """
+
+    def decorator(func):
+        for plat in platform:
+            if sys.platform.startswith(plat):
+                return unittest.skip(f"platform<{plat}> matched, so to skip this test")(func)
         return func
 
     return decorator
@@ -372,7 +392,7 @@ def argv_context_guard(config: dict):
     argv = construct_argv(config)
     sys.argv = argv
     yield
-    sys.argv = old_argv
+    sys.argv = old_argv[:1]
 
 
 def update_params(json_file: str, params: dict):

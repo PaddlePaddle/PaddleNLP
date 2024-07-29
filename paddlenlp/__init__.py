@@ -14,13 +14,17 @@
 
 import os
 import sys
+from datetime import datetime
 
 PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
 
 
-__version__ = "2.7.1.post"
+__version__ = "3.0.0b0.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
+else:
+    formatted_date = datetime.now().date().strftime("%Y%m%d")
+    __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
 
 if "datasets" in sys.modules.keys():
     from paddlenlp.utils.log import logger
@@ -48,6 +52,7 @@ from . import (
     seq2vec,
     trainer,
     transformers,
+    trl,
     utils,
     version,
 )

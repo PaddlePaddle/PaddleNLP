@@ -58,7 +58,12 @@ void InvokeRebuildPadding(T *output_data,
                           const int *padding_offset,
                           const int token_num,
                           const int dim_embed,
-                          cudaStream_t stream) {
+#ifdef PADDLE_WITH_HIP
+                          hipStream_t stream
+#else
+                          cudaStream_t stream
+#endif
+                          ) {
   // src: [token_num, dim_embed]
   // dst: [batch_size * max_seq_len, dim_embed]
   RebuildPaddingKernel<<<token_num, 256, 0, stream>>>(

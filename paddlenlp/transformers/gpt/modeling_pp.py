@@ -161,6 +161,7 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     config_class = GPTConfig
 
     _get_tensor_parallel_mappings = GPTPretrainedModel._get_tensor_parallel_mappings
+    _get_fuse_or_split_param_mappings = GPTPretrainedModel._get_fuse_or_split_param_mappings
     _init_weights = GPTPretrainedModel._init_weights
 
     pretrained_init_configuration = GPTPretrainedModel.pretrained_init_configuration
@@ -203,7 +204,7 @@ class GPTForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         )
 
         recompute_interval = 0
-        # if use_recompute and recompute_granularity == "full":
+        # if self.config.recompute and recompute_granularity == "full":
         #    assert pp_recompute_interval <= config.num_hidden_layers // (
         #        virtual_pp_degree * get_hcg().topology().get_dim_size("pipe")
         #    ), "pp recompute interval should smaller than num layers of each pp chunk"

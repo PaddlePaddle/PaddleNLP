@@ -35,13 +35,13 @@ echo "pwd -> "
 cd ..
 
 echo "==============================run-dynamic-predictor=============================="
-python ./llm/predictor.py --model_name_or_path ${model_name} --mode dynamic --output_file ${output_path}/dynamic.json ${common_arguments}
+python ./llm/predict/predictor.py --model_name_or_path ${model_name} --mode dynamic --output_file ${output_path}/dynamic.json ${common_arguments}
 
 echo "==============================run-export-predictor=============================="
-python ./llm/export_model.py --model_name_or_path ${model_name} --output_path ${output_path} ${common_arguments}
+python ./llm/predict/export_model.py --model_name_or_path ${model_name} --output_path ${output_path} ${common_arguments}
 
 echo "==============================run-static-predictor=============================="
-python ./llm/predictor.py --model_name_or_path ${output_path} --mode static --output_file ${output_path}/static.json ${common_arguments}
+python ./llm/predict/predictor.py --model_name_or_path ${output_path} --mode static --output_file ${output_path}/static.json ${common_arguments}
 
 
 echo "==============================dynamic result=============================="

@@ -1559,7 +1559,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             # use pretrained_init_configuration as `init_kwargs` to init which
             # does not include the vocab file in it, thus add vocab file into
             # args.
-            if args_name not in init_kwargs:
+            if args_name not in init_kwargs or init_kwargs[args_name] is None:
                 init_kwargs[args_name] = file_path
             # when `pretrained_model_name_or_path` is a pretrained model dir,
             # use tokenizer_config_file.json as `init_kwargs` to init which
@@ -1575,6 +1575,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)
+        chat_template = init_kwargs.pop("chat_template", None)
+        if chat_template is not None:
+            tokenizer.init_chat_template(chat_template)
         special_tokens_map_file = resolved_vocab_files.pop("special_tokens_map_file", None)
         if special_tokens_map_file is not None:
             with open(special_tokens_map_file, encoding="utf-8") as special_tokens_map_handle:

@@ -630,14 +630,14 @@ class GPTEmbeddingsAuto(nn.Layer):
             raise ValueError("You cannot specify both `inputs_embeddings` and `position_ids`)")
 
         # if input_ids is not None:
-        #     input_shape = paddle.shape(input_ids)
+        #     input_shape = input_ids.shape
         #     inputs_embeddings = self.word_embeddings(input_ids)
 
         if input_ids is not None:
             input_shape = input_ids.shape
             inputs_embeddings = self.word_embeddings(input_ids)
         else:
-            input_shape = paddle.shape(inputs_embeddings)[:-1]
+            input_shape = inputs_embeddings.shape[:-1]
 
         if position_ids is None:
             ones = paddle.ones(input_shape, dtype="int64")
@@ -1025,7 +1025,7 @@ class GPTModelAuto(GPTPretrainedModelAuto):
             input_shape = input_ids.shape
             input_ids = input_ids.reshape((-1, input_shape[-1]))
         elif inputs_embeds is not None:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
+            input_shape = inputs_embeds.shape[:-1]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
         # input_shape => bs, seq_len
@@ -1037,7 +1037,7 @@ class GPTModelAuto(GPTPretrainedModelAuto):
             past_length = 0
             if past_key_values[0] is not None:
                 # bs, seq_len, num_head, head_dim
-                past_length = paddle.shape(past_key_values[0][0])[1]
+                past_length = past_key_values[0][0].shape[1]
             position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
             position_ids = paddle.expand(position_ids, input_shape)
@@ -1047,7 +1047,7 @@ class GPTModelAuto(GPTPretrainedModelAuto):
         # TODO, use registered buffer
         length = input_shape[-1]
         if past_key_values[0] is not None:
-            cache_length = paddle.shape(past_key_values[0][0])[1]
+            cache_length = past_key_values[0][0].shape[1]
             length = length + cache_length
         else:
             cache_length = 0
@@ -1138,10 +1138,17 @@ class GPTLMHeadAuto(nn.Layer):
             else:
                 vocab_size = config.vocab_size
 
-            self.weight = self.create_parameter(
-                shape=[vocab_size, config.hidden_size],
-                dtype=paddle.get_default_dtype(),
-            )
+            if vocab_size != config.vocab_size:
+                with get_rng_state_tracker().rng_state():
+                    self.weight = self.create_parameter(
+                        shape=[vocab_size, config.hidden_size],
+                        dtype=paddle.get_default_dtype(),
+                    )
+            else:
+                self.weight = self.create_parameter(
+                    shape=[vocab_size, config.hidden_size],
+                    dtype=paddle.get_default_dtype(),
+                )
             # Must set distributed attr for Tensor Parallel !
             self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
             if self.weight.is_distributed:

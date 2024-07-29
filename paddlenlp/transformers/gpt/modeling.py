@@ -22,6 +22,7 @@ from functools import partial
 
 import numpy as np
 import paddle
+import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -32,9 +33,7 @@ from paddle.distributed.fleet.utils import recompute
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-        ColumnSequenceParallelLinear,
         GatherOp,
-        RowSequenceParallelLinear,
         ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
@@ -45,7 +44,8 @@ from paddle.utils import try_import
 
 from ...utils.converter import StateDictNameMapping
 from ...utils.log import logger
-from .. import PretrainedModel, register_base_model
+from .. import PretrainedModel, linear_utils, register_base_model
+from ..linear_utils import Linear
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
@@ -126,7 +126,14 @@ def parallel_matmul(x: paddle.Tensor, y: paddle.Tensor, transpose_y=True, tensor
 
 
 def seed_guard_context(name=None):
-    if name in get_rng_state_tracker().states_:
+    if (
+        not isinstance(paddle.base.framework._current_expected_place(), paddle.core.CPUPlace)
+        and name in get_rng_state_tracker().states_
+    ):
+        # todo fix it
+        #  ValueError: Length of gpu state list should be equal to the gpu device count
+        #  /usr/local/lib/python3.10/dist-packages/paddle/incubate/framework/random.py:119: ValueError
+        # return contextlib.nullcontext()
         return get_rng_state_tracker().rng_state(name)
     else:
         return contextlib.nullcontext()
@@ -203,11 +210,11 @@ class MultiHeadAttention(nn.Layer):
         self.num_attention_heads = config.num_attention_heads  # default, without tensor parallel
 
         if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-            RowParallelLinear = fleet.meta_parallel.RowParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             assert config.num_attention_heads % config.tensor_parallel_degree == 0
@@ -255,13 +262,13 @@ class MultiHeadAttention(nn.Layer):
             )
         else:
             if self.config.fuse_attention_qkv:
-                self.qkv_proj = nn.Linear(config.hidden_size, 3 * config.hidden_size, bias_attr=True)
+                self.qkv_proj = Linear(config.hidden_size, 3 * config.hidden_size, bias_attr=True)
             else:
-                self.q_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
-                self.k_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
-                self.v_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
+                self.q_proj = Linear(config.hidden_size, config.hidden_size, bias_attr=True)
+                self.k_proj = Linear(config.hidden_size, config.hidden_size, bias_attr=True)
+                self.v_proj = Linear(config.hidden_size, config.hidden_size, bias_attr=True)
 
-            self.out_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
+            self.out_proj = Linear(config.hidden_size, config.hidden_size, bias_attr=True)
 
     def _fuse_prepare_qkv(self, query, use_cache=False, past_key_value=None):
         if self.config.sequence_parallel:
@@ -576,11 +583,11 @@ class GPTDecoderLayer(nn.Layer):
         self.self_attn = MultiHeadAttention(config=config)
 
         if config.sequence_parallel:
-            ColumnParallelLinear = ColumnSequenceParallelLinear
-            RowParallelLinear = RowSequenceParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
+            RowParallelLinear = linear_utils.RowSequenceParallelLinear
         else:
-            ColumnParallelLinear = fleet.meta_parallel.ColumnParallelLinear
-            RowParallelLinear = fleet.meta_parallel.RowParallelLinear
+            ColumnParallelLinear = linear_utils.ColumnParallelLinear
+            RowParallelLinear = linear_utils.RowParallelLinear
 
         # TODO:config.fuse_attention_ffn @DrownFish19
         if config.tensor_parallel_degree > 1:
@@ -600,8 +607,8 @@ class GPTDecoderLayer(nn.Layer):
                 fuse_matmul_bias=self.config.use_fused_linear,
             )
         else:
-            self.linear1 = nn.Linear(config.hidden_size, config.intermediate_size, bias_attr=True)
-            self.linear2 = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
+            self.linear1 = Linear(config.hidden_size, config.intermediate_size, bias_attr=True)
+            self.linear2 = Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
 
         self.norm1 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
         self.norm2 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
@@ -737,10 +744,10 @@ class GPTEmbeddings(nn.Layer):
 
     def forward(self, input_ids, position_ids=None, inputs_embeddings=None):
         if input_ids is not None:
-            input_shape = paddle.shape(input_ids)
+            input_shape = input_ids.shape
             inputs_embeddings = self.word_embeddings(input_ids)
         else:
-            input_shape = paddle.shape(inputs_embeddings)[:-1]
+            input_shape = inputs_embeddings.shape[:-1]
 
         if position_ids is None:
             ones = paddle.ones(input_shape, dtype="int64")
@@ -845,6 +852,49 @@ class GPTPretrainedModel(PretrainedModel):
         return mappings
 
     @classmethod
+    def _get_fuse_or_split_param_mappings(cls, config: GPTConfig, is_fuse=False):
+        # return parameter fuse utils
+        from paddlenlp.transformers.conversion_utils import split_or_fuse_func
+
+        fn = split_or_fuse_func(is_fuse=is_fuse)
+
+        # last key is fused key, other keys are to be fused.
+        fuse_qkv_keys = (
+            "decoder.layers.0.self_attn.q_proj.weight",
+            "decoder.layers.0.self_attn.k_proj.weight",
+            "decoder.layers.0.self_attn.v_proj.weight",
+            "decoder.layers.0.self_attn.qkv_proj.weight",
+        )
+        fuse_qkv_bias_keys = (
+            "decoder.layers.0.self_attn.q_proj.bias",
+            "decoder.layers.0.self_attn.k_proj.bias",
+            "decoder.layers.0.self_attn.v_proj.bias",
+            "decoder.layers.0.self_attn.qkv_proj.bias",
+        )
+        num_heads = config.num_attention_heads
+        num_key_value_heads = getattr(config, "num_key_value_heads", num_heads)
+        fuse_attention_qkv = getattr(config, "fuse_attention_qkv", False)
+
+        final_actions = {}
+        if is_fuse:
+            if fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    for keys in [fuse_qkv_keys, fuse_qkv_bias_keys]:
+                        new_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in keys])
+                        final_actions[new_keys] = partial(
+                            fn, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
+        else:
+            if not fuse_attention_qkv:
+                for i in range(config.num_hidden_layers):
+                    for keys in [fuse_qkv_keys, fuse_qkv_bias_keys]:
+                        new_keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in keys])
+                        final_actions[new_keys] = partial(
+                            fn, split_nums=3, is_qkv=True, num_heads=num_heads, num_key_value_heads=num_key_value_heads
+                        )
+        return final_actions
+
+    @classmethod
     def _get_name_mappings(cls, config: GPTConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
@@ -930,11 +980,11 @@ class GPTPretrainedModel(PretrainedModel):
             (
                 nn.Linear,
                 nn.Embedding,
-                fleet.meta_parallel.VocabParallelEmbedding,
-                fleet.meta_parallel.ColumnParallelLinear,
-                fleet.meta_parallel.RowParallelLinear,
-                ColumnSequenceParallelLinear,
-                RowSequenceParallelLinear,
+                mpu.VocabParallelEmbedding,
+                mpu.RowParallelLinear,
+                mpu.ColumnParallelLinear,
+                linear_utils.RowSequenceParallelLinear,
+                linear_utils.ColumnSequenceParallelLinear,
             ),
         ):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
@@ -1171,10 +1221,10 @@ class GPTModel(GPTPretrainedModel):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
-            input_shape = paddle.shape(input_ids)
+            input_shape = input_ids.shape
             input_ids = input_ids.reshape((-1, input_shape[-1]))
         elif inputs_embeds is not None:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
+            input_shape = inputs_embeds.shape[:-1]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
         # input_shape => bs, seq_len
@@ -1186,7 +1236,7 @@ class GPTModel(GPTPretrainedModel):
             past_length = 0
             if past_key_values[0] is not None:
                 # bs, seq_len, num_head, head_dim
-                past_length = paddle.shape(past_key_values[0][0])[1]
+                past_length = past_key_values[0][0].shape[1]
             position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
             position_ids = paddle.expand(position_ids, input_shape)
@@ -1197,7 +1247,7 @@ class GPTModel(GPTPretrainedModel):
         # TODO, use registered buffer
         length = input_shape[-1]
         if past_key_values[0] is not None:
-            cache_length = paddle.shape(past_key_values[0][0])[1]
+            cache_length = past_key_values[0][0].shape[1]
             length = length + cache_length
         else:
             cache_length = 0
@@ -1245,7 +1295,7 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
         super(GPTPretrainingCriterion, self).__init__()
         self.config = config
         if config.tensor_parallel_degree > 1 and config.tensor_parallel_output:
-            self.loss_func = fleet.meta_parallel.ParallelCrossEntropy(ignore_index=config.ignore_index)
+            self.loss_func = mpu.ParallelCrossEntropy(ignore_index=config.ignore_index)
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
 
@@ -1389,10 +1439,17 @@ class GPTLMHead(nn.Layer):
             else:
                 vocab_size = config.vocab_size
 
-            self.weight = self.create_parameter(
-                shape=[vocab_size, config.hidden_size],
-                dtype=paddle.get_default_dtype(),
-            )
+            if vocab_size != config.vocab_size:
+                with get_rng_state_tracker().rng_state():
+                    self.weight = self.create_parameter(
+                        shape=[vocab_size, config.hidden_size],
+                        dtype=paddle.get_default_dtype(),
+                    )
+            else:
+                self.weight = self.create_parameter(
+                    shape=[vocab_size, config.hidden_size],
+                    dtype=paddle.get_default_dtype(),
+                )
             # Must set distributed attr for Tensor Parallel !
             self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
             if self.weight.is_distributed:
@@ -1603,7 +1660,7 @@ class GPTForTokenClassification(GPTPretrainedModel):
         self.gpt = GPTModel(config)  # allow gpt to be config
         dropout_p = config.hidden_dropout_prob if config.classifier_dropout is None else config.classifier_dropout
         self.dropout = nn.Dropout(dropout_p)
-        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+        self.classifier = Linear(config.hidden_size, config.num_labels)
 
     def forward(
         self,
@@ -1717,7 +1774,7 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         super(GPTForSequenceClassification, self).__init__(config)
         self.num_labels = config.num_labels
         self.gpt = GPTModel(config)
-        self.score = nn.Linear(config.hidden_size, config.num_labels, bias_attr=False)
+        self.score = Linear(config.hidden_size, config.num_labels, bias_attr=False)
 
     def forward(
         self,
@@ -1804,16 +1861,14 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         if input_ids is not None:
             sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(axis=-1) - 1
         else:
-            inputs_shape = paddle.shape(inputs_embeds)[:-1]
+            inputs_shape = inputs_embeds.shape[:-1]
             sequence_lengths = paddle.ones(inputs_shape[:-1], dtype="int64") * (inputs_shape[1] - 1)
             logger.warning(
                 f"{self.__class__.__name__} will not detect padding tokens in `inputs_embeds`. Results may be "
                 "unexpected if using padding tokens in conjunction with `inputs_embeds.`"
             )
 
-        pooled_logits = logits.gather_nd(
-            paddle.stack([paddle.arange(paddle.shape(logits)[0]), sequence_lengths], axis=-1)
-        )
+        pooled_logits = logits.gather_nd(paddle.stack([paddle.arange(logits.shape[0]), sequence_lengths], axis=-1))
 
         loss = None
 

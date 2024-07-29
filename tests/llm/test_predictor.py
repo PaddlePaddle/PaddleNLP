@@ -185,7 +185,7 @@ class PredictorBaseTest(LLMTest, unittest.TestCase):
         return config
 
     def test_create_predictor_with_unexpected_length(self):
-        from predictor import predict
+        from predict.predictor import predict
 
         config = self.load_test_config()
         config.pop("src_length", None)
@@ -347,6 +347,7 @@ class QWenVLTest(LLMTest, unittest.TestCase):
         config.weight_only_quant_bits = None
 
         paddle.set_default_dtype("float16")
+        # need to use dtype guard
         model = QWenForQWenVLInferenceModel.from_pretrained(self.output_dir, config=config, dtype="float16")
 
         batch = 1
@@ -429,6 +430,6 @@ class QWenVLTest(LLMTest, unittest.TestCase):
         config["model_type"] = "qwen-img2txt"
 
         with argv_context_guard(config):
-            from export_model import main
+            from predict.export_model import main
 
             main()
