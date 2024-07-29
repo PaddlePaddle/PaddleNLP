@@ -73,6 +73,17 @@ inline cudaError_t GetNumBlocks(int64_t n, int* num_blocks) {
                                                     sm_count * tpm / kBlockSize * kNumWaves));
   return cudaSuccess;
 }
+
+inline int GetGPUComputeCapability(int id) {
+  int major, minor;
+  auto major_error_code =
+      cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, id);
+  auto minor_error_code =
+      cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, id);
+  return major * 10 + minor;
+}
+
+
 #endif
 
 template<typename T>

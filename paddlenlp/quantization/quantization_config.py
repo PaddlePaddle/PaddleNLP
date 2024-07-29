@@ -58,13 +58,14 @@ class QuantizationConfig:
             "weight_only_int4",
             "llm.int8",
             "a8w8",
+            "a8w8_fp8",
             "nf4",
             "fp4",
         ]:
             raise ValueError(
                 f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4']"
             )
-        if quant_type is not None and quant_type not in ["weight_only_int8", "weight_only_int4", "a8w8"]:
+        if quant_type is not None and quant_type not in ["weight_only_int8", "weight_only_int4", "a8w8", "a8w8_fp8"]:
             raise ValueError(
                 f"quant_type:{quant_type} not in supported list ['weight_only_int8', 'weight_only_int4', 'a8w8']"
             )
@@ -83,13 +84,21 @@ class QuantizationConfig:
         self.weight_double_quant_block_size = weight_double_quant_block_size
 
     def is_weight_quantize(self):
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "nf4", "fp4", "a8w8"]:
+        if self.weight_quantize_algo in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "llm.int8",
+            "nf4",
+            "fp4",
+            "a8w8",
+            "a8w8_fp8",
+        ]:
             return True
         else:
             return False
 
     def is_support_merge_tensor_parallel(self):
-        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8"]:
+        if self.weight_quantize_algo in ["weight_only_int8", "weight_only_int4", "llm.int8", "a8w8", "a8w8_fp8"]:
             return False
         else:
             return True
