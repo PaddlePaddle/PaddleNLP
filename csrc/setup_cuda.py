@@ -102,6 +102,7 @@ gencode_flags += [
     "-Igeneration/cutlass_kernels",
     "-Igeneration/cutlass_kernels/cutlass/include",
     "-Igeneration/fp8_gemm_with_cutlass",
+    "-Igeneration",
 ]
 cc = get_sm_version()
 

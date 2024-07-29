@@ -14,16 +14,8 @@
 
 #include <iostream>
 
-
 #include "fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.h"
 #include "fp8_common.h"  // NOLINT
-
-#include "paddle/phi/backends/gpu/gpu_context.h"
-#include "paddle/phi/common/memory_utils.h"
-#include "paddle/phi/core/dense_tensor.h"
-#include "paddle/phi/core/enforce.h"
-#include "paddle/phi/core/kernel_registry.h"
-
 
 std::vector<paddle::Tensor> cutlass_fp8_fp8_half_gemm(
     const paddle::Tensor& x,
@@ -42,7 +34,7 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_half_gemm(
   auto place = x.place();
   cudaStream_t stream = x.stream();
   int64_t device_id = place.GetDeviceId();
-  int sm_version = phi::backends::gpu::GetGPUComputeCapability(device_id);
+  int sm_version = GetGPUComputeCapability(device_id);
 
   int rank = x.dims().size();
   int M = 0;

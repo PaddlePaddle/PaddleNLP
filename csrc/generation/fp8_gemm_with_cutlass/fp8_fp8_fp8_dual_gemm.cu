@@ -17,13 +17,6 @@
 #include "fp8_gemm_fused/fp8_fp8_dual_gemm_scale_bias_act.h"
 #include "fp8_common.h"  // NOLINT
 
-#include "paddle/phi/backends/gpu/gpu_context.h"
-#include "paddle/phi/common/memory_utils.h"
-#include "paddle/phi/core/dense_tensor.h"
-#include "paddle/phi/core/enforce.h"
-#include "paddle/phi/core/kernel_registry.h"
-
-
 std::vector<paddle::Tensor> cutlass_fp8_fp8_fp8_dual_gemm(
     const paddle::Tensor& x,
     const paddle::Tensor& y0,
@@ -45,7 +38,7 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_fp8_dual_gemm(
   auto place = x.place();
   cudaStream_t stream = x.stream();
   int64_t device_id = place.GetDeviceId();
-  int sm_version = phi::backends::gpu::GetGPUComputeCapability(device_id);
+  int sm_version = GetGPUComputeCapability(device_id);
 
   int rank = x.dims().size();
   int M = 0;
@@ -162,19 +155,17 @@ std::vector<std::vector<int64_t>> CutlassFp8Fp8Fp8DualGemmFusedInferShape(
     const paddle::optional<std::vector<int64_t>>&  bias1_shape,
     bool trans_x,
     bool trans_y){
-  PADDLE_ENFORCE_EQ(x_shape.size(),
-                    y0_shape.size(),
-                    phi::errors::InvalidArgument(
-                      "The rank of input X and Y0 should be equal, but received X's rank is %d, Y0's rank is %d",
+  if(x_shape.size()!=y0_shape.size()){
+    PD_THROW("The rank of input X and Y0 should be equal, but received X's rank is %d, Y0's rank is %d",
                       x_shape.size(),
-                      y0_shape.size()));
+                      y0_shape.size());
+  }
 
-  PADDLE_ENFORCE_EQ(y0_shape.size(),
-                    y1_shape.size(),
-                    phi::errors::InvalidArgument(
-                      "The rank of input Y0 and Y1 should be equal, but received Y0's rank is %d, Y1's rank is %d.",
+  if(y0_shape.size()!=y1_shape.size()){
+    PD_THROW("The rank of input Y0 and Y1 should be equal, but received Y0's rank is %d, Y1's rank is %d.",
                       y0_shape.size(),
-                      y1_shape.size()));
+                      y1_shape.size());
+  }
 
   int rank = x_shape.size();
   int M = 0;
@@ -204,26 +195,25 @@ std::vector<paddle::DataType> CutlassFp8Fp8Fp8DualGemmFusedInferDtype(
     const paddle::optional<paddle::DataType>& bias0_type,
     const paddle::optional<paddle::DataType>& bias1_type) {
 
-    PADDLE_ENFORCE_EQ(x_type,
-                y0_type,
-                phi::errors::InvalidArgument(
-                    "The type of input X and Y0 should be equal, but received X's type is %s, Y0's type is %s.",
+
+    if(x_type != y0_type){
+      PD_THROW("The type of input X and Y0 should be equal, but received X's type is %s, Y0's type is %s.",
                     x_type,
-                    y0_type));
+                    y0_type);
+    }
 
-    PADDLE_ENFORCE_EQ(y0_type,
-                y1_type,
-                phi::errors::InvalidArgument(
-                    "The type of input Y0 and Y1 should be equal, but received Y0's type is %s, Y1's type is %s.",
+    if(y0_type != y1_type){
+      PD_THROW("The type of input Y0 and Y1 should be equal, but received Y0's type is %s, Y1's type is %s.",
                     y0_type,
-                    y1_type));
+                    y1_type);
+    }
 
-    PADDLE_ENFORCE_EQ(bias0_type,
-                    bias1_type,
-                    phi::errors::InvalidArgument(
-                      "The type of bias0 and bias1 should be equal, but received bias0's type is %s, bias1's type is %s.",
+    if(bias0_type != bias1_type){
+      PD_THROW("The type of bias0 and bias1 should be equal, but received bias0's type is %s, bias1's type is %s.",
                       bias0_type,
-                      bias1_type));
+                      bias1_type);
+    }
+
 
     paddle::DataType data_type;
     data_type = paddle::DataType::FLOAT8_E4M3FN;

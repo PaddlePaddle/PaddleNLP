@@ -17,6 +17,7 @@
 #include <iostream>
 #include "cuda.h"  // NOLINT
 
+#include "helper.h"
 #include "paddle/extension.h"
 #include "paddle/phi/api/include/context_pool.h"
 #include "paddle/phi/common/data_type.h"
