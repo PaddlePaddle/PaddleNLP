@@ -535,6 +535,7 @@ class AutoEngine(BasicEngine):
     def load(self):
         if self._auto_mode and self._output_dir and isinstance(self._output_dir, str) and os.path.exists(self._output_dir):
             ckpt_paths = [f.path for f in os.scandir(self._output_dir) if f.is_dir()]
+            ckpt_paths.sort()
             latest_ckpt_path = ckpt_paths[-1]
             prefix = os.path.basename(latest_ckpt_path)
             latest_ckpt_path = latest_ckpt_path + "/" +  prefix

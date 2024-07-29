@@ -8,7 +8,7 @@ Global:
 
 
 Engine:
-  max_steps: 100
+  max_steps: 25
   num_train_epochs: 1
   auto_mode: full_rule_based
   logging_freq: 1
@@ -21,10 +21,10 @@ Engine:
     custom_black_list: ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"]
     custom_white_list: ["lookup_table", "lookup_table_v2"]
   save_load:
-    save_steps: 60
+    save_steps: 20
     output_dir: ./output
-    ckpt_dir: ./output/epoch_0_step_50/epoch_0_step_50
-    # auto_mode: True
+    ckpt_dir: 
+    auto_mode: True
 
 Model:
   module: "GPTModuleAuto"

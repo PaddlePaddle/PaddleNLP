@@ -7,7 +7,7 @@ Global:
   micro_batch_size: 8
 
 Engine:
-  max_steps: 55
+  max_steps: 15
   num_train_epochs: 1
   auto_mode: full_rule_based
   logging_freq: 1
@@ -20,7 +20,7 @@ Engine:
     custom_black_list: ["reduce_sum", "c_softmax_with_cross_entropy", "elementwise_div"]
     custom_white_list: ["lookup_table", "lookup_table_v2"]
   save_load:
-    save_steps: 0
+    save_steps: 10
     output_dir: ./output
     ckpt_dir:
 

@@ -1,6 +1,12 @@
-source /root/paddlejob/workspace/zhichao/full_auto/venv/bin/activate
+# setup virtual env
+# source /home/full_auto/venv/bin/activate
 
-export FLAGS_nccl_dir=/opt/nccl2.15.5/usr/lib/x86_64-linux-gnu
+# setup paddlenlp env
+# PADDLENLP_PATH="/home/full_auto/PaddleNLP"
+# export PYTHONPATH=${PADDLENLP_PATH}:$PYTHONPATH 
+
+# setup nccl env
+# export FLAGS_nccl_dir=/opt/nccl2.15.5/usr/lib/x86_64-linux-gnu
 unset NCCL_DEBUG_FILE
 unset NCCL_DEBUG_SUBSYS
 unset NCCL_ERROR_FILE
