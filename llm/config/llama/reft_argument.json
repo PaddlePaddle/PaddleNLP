@@ -1,7 +1,7 @@
 {
     "model_name_or_path": "meta-llama/Llama-2-7b",
-    "dataset_name_or_path": "/home/ldn/baidu/pyreft/paddle-version/mypr/0705/PaddleNLP/tests/fixtures/llm/data",
-    "output_dir": "/home/ldn/baidu/pyreft/paddle-version/mypr/0705/reft-tests/reft_ckpts",
+    "dataset_name_or_path": "/home/ldn/baidu/pyreft/paddle-version/loreft/datasets/conmmontest/paddle-version",
+    "output_dir": "/home/ldn/baidu/pyreft/paddle-version/mypr/0705/reft-pr/test-reft/reft_ckpts",
     "per_device_train_batch_size": 2,
     "gradient_accumulation_steps": 2,
     "per_device_eval_batch_size": 8,
@@ -27,5 +27,6 @@
     "tensor_parallel_degree": 1,
     "pipeline_parallel_degree": 1,
     "zero_padding": false,
+    "recompute": false,
     "reft": true
 }
