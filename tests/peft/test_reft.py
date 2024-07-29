@@ -23,9 +23,15 @@ from paddlenlp.peft.reft.pareft import (
     TinyIntervention,
     get_reft_model,
 )
+from paddlenlp.peft.reft.pareft.dataset import (
+    LoReftSupervisedDataset,
+    ReftDataset,
+    get_intervention_locations,
+    parse_positions,
+)
 from paddlenlp.peft.reft.pareft.reft_model import ReftModel
 from paddlenlp.peft.reft.pavenv.models.basic_utils import get_type_from_string
-from paddlenlp.transformers import AutoModelForCausalLM
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 class TestBasicUtils(unittest.TestCase):
@@ -33,6 +39,38 @@ class TestBasicUtils(unittest.TestCase):
         class_str = "pareft.interventions.LoreftIntervention"
         cls = get_type_from_string(class_str)
         self.assertIsInstance(cls, type(LoreftIntervention))
+
+    def test_parse_positions(self):
+        positions = "f7+l7"
+        self.assertEqual(parse_positions(positions), (7, 7))
+
+    def test_get_intervention_locations(self):
+        kwargs = {"last_position": 10, "positions": "f7+l7", "num_interventions": 1}
+        intervention_locations1 = get_intervention_locations(**kwargs)
+        print(intervention_locations1)
+        kwargs = {"last_position": 10, "first_n": 7, "last_n": 7, "num_interventions": 1}
+        intervention_locations2 = get_intervention_locations(**kwargs)
+        self.assertEqual(intervention_locations1, intervention_locations2)
+
+    def test_reft_dataset(self):
+        tokenizer = AutoTokenizer.from_pretrained(
+            "__internal_testing__/tiny-random-llama",
+            model_max_length=512,
+            padding_side="right",
+        )
+        tokenizer.pad_token_id = tokenizer.unk_token_id
+        train_ds = LoReftSupervisedDataset(
+            "../../tests/fixtures/llm/data",
+            tokenizer,
+            data_split="train",
+            seed=42,
+            **{
+                "num_interventions": 2,
+                "position": "f7+l7",
+                "trigger_tokens": "LLM Response: ",
+            },
+        )
+        self.assertIsInstance(train_ds, ReftDataset)
 
 
 class TestLoReftIntervention(unittest.TestCase):
