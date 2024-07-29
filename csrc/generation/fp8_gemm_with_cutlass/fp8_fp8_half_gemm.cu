@@ -201,7 +201,7 @@ PD_BUILD_OP(cutlass_fp8_fp8_half_gemm_fused)
             "transpose_y: bool",
             "scale: float",
             "output_dtype: std::string",
-            "activation_type: std::string"})
+            "act: std::string"})
     .Outputs({"out"})
     .SetKernelFn(PD_KERNEL(cutlass_fp8_fp8_half_gemm))
     .SetInferShapeFn(PD_INFER_SHAPE(CutlassFp8Fp8HalfGemmFusedInferShape))

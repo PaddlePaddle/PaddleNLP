@@ -227,7 +227,7 @@ PD_BUILD_OP(cutlass_fp8_fp8_fp8_dual_gemm_fused)
             "scale0: float",
             "scale1: float",
             "scale_out: float",
-            "activation_type: std::string"})
+            "act: std::string"})
     .Outputs({"out"})
     .SetKernelFn(PD_KERNEL(cutlass_fp8_fp8_fp8_dual_gemm))
     .SetInferShapeFn(PD_INFER_SHAPE(CutlassFp8Fp8Fp8DualGemmFusedInferShape))

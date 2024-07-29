@@ -14,6 +14,8 @@
 
 export PYTHONPATH=$(dirname $(pwd)):$PYTHONPATH
 
+export FLAGS_CUTLASS_FP8_GEMM=False
+
 model_path=${1:-"/path/to/ckpt"}
         
 python ./predict/export_model.py \
