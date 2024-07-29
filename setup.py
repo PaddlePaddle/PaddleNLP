@@ -15,6 +15,7 @@ import errno
 import io
 import os
 import subprocess
+from datetime import datetime
 
 import setuptools
 
@@ -113,7 +114,8 @@ __version__ = "3.0.0b0.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 else:
-    __version__ = __version__.replace(".post", "+{}".format(commit[:7]))
+    formatted_date = datetime.now().date().strftime("%Y%m%d")
+    __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
 
 
 extras = {}

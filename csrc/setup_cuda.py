@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import subprocess
 
 import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
@@ -29,6 +30,20 @@ def strtobool(v):
         raise ValueError(
             f"Truthy value expected: got {v} but expected one of yes/no, true/false, t/f, y/n, 1/0 (case insensitive)."
         )
+
+
+def clone_git_repo(version, repo_url, destination_path):
+    try:
+        subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path], check=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def get_sm_version():
+    prop = paddle.device.cuda.get_device_properties()
+    cc = prop.major * 10 + prop.minor
+    return cc
 
 
 def get_gencode_flags():
@@ -50,35 +65,58 @@ def get_gencode_flags():
 
 gencode_flags = get_gencode_flags()
 
+
+sources = [
+    "./generation/save_with_output.cc",
+    "./generation/set_value_by_flags.cu",
+    "./generation/token_penalty_multi_scores.cu",
+    "./generation/token_penalty_multi_scores_v2.cu",
+    "./generation/stop_generation_multi_ends.cu",
+    "./generation/fused_get_rope.cu",
+    "./generation/get_padding_offset.cu",
+    "./generation/qkv_transpose_split.cu",
+    "./generation/rebuild_padding.cu",
+    "./generation/transpose_removing_padding.cu",
+    "./generation/write_cache_kv.cu",
+    "./generation/encode_rotary_qk.cu",
+    "./generation/get_padding_offset_v2.cu",
+    "./generation/rebuild_padding_v2.cu",
+    "./generation/set_value_by_flags_v2.cu",
+    "./generation/stop_generation_multi_ends_v2.cu",
+    "./generation/update_inputs.cu",
+    "./generation/get_output.cc",
+    "./generation/save_with_output_msg.cc",
+    "./generation/write_int8_cache_kv.cu",
+    "./generation/step.cu",
+    "./generation/quant_int8.cu",
+    "./generation/dequant_int8.cu",
+    "./generation/flash_attn_bwd.cc",
+]
+
+cutlass_dir = "./generation/cutlass_kernels/cutlass"
+if not os.path.exists(cutlass_dir) or not os.listdir(cutlass_dir):
+    if not os.path.exists(cutlass_dir):
+        os.makedirs(cutlass_dir)
+    clone_git_repo("v3.5.0", "https://github.com/NVIDIA/cutlass.git", cutlass_dir)
+gencode_flags += [
+    "-Igeneration/cutlass_kernels",
+    "-Igeneration/cutlass_kernels/cutlass/include",
+    "-Igeneration/fp8_gemm_with_cutlass",
+]
+cc = get_sm_version()
+
+if cc >= 89:
+    sources += [
+        "./generation/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
+        "./generation/cutlass_kernels/fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.cu",
+        "./generation/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
+        "./generation/cutlass_kernels/fp8_gemm_fused/fp8_fp8_dual_gemm_scale_bias_act.cu",
+    ]
+
 setup(
     name="paddlenlp_ops",
     ext_modules=CUDAExtension(
-        sources=[
-            "./generation/save_with_output.cc",
-            "./generation/set_value_by_flags.cu",
-            "./generation/token_penalty_multi_scores.cu",
-            "./generation/token_penalty_multi_scores_v2.cu",
-            "./generation/stop_generation_multi_ends.cu",
-            "./generation/fused_get_rope.cu",
-            "./generation/get_padding_offset.cu",
-            "./generation/qkv_transpose_split.cu",
-            "./generation/rebuild_padding.cu",
-            "./generation/transpose_removing_padding.cu",
-            "./generation/write_cache_kv.cu",
-            "./generation/encode_rotary_qk.cu",
-            "./generation/get_padding_offset_v2.cu",
-            "./generation/rebuild_padding_v2.cu",
-            "./generation/set_value_by_flags_v2.cu",
-            "./generation/stop_generation_multi_ends_v2.cu",
-            "./generation/update_inputs.cu",
-            "./generation/get_output.cc",
-            "./generation/save_with_output_msg.cc",
-            "./generation/write_int8_cache_kv.cu",
-            "./generation/step.cu",
-            "./generation/quant_int8.cu",
-            "./generation/dequant_int8.cu",
-            "./generation/flash_attn_bwd.cc",
-        ],
+        sources=sources,
         extra_compile_args={
             "cxx": ["-O3"],
             "nvcc": [

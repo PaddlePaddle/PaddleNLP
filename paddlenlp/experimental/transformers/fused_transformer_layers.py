@@ -39,6 +39,7 @@ if core.is_compiled_with_xpu() or core.is_compiled_with_cuda():
 
 if core.is_compiled_with_cuda():
     from paddlenlp_ops import (
+        cutlass_fp8_fp8_half_gemm_fused,
         dequant_int8,
         encode_rotary_qk,
         qkv_transpose_split,
@@ -58,7 +59,7 @@ __all__ = [
     "FusedBlockMultiTransformer",
     "FusedBlockMultiTransformerWeightOnly",
     "FusedBlockMultiTransformerA8W8",
-    "FusedMultiTransformerFP8",
+    "FusedBlockMultiTransformerFP8",
 ]
 
 
@@ -552,7 +553,11 @@ class FusedMultiTransformerBase(Layer):
             if config.trans_qkvw
             else [self.embed_dim, (self.num_heads + 2 * self.kv_num_heads) * self.head_dim]
         )
-        self.linear_weight_shape = [self.num_heads * self.head_dim, self.embed_dim]
+        self.linear_weight_shape = (
+            [self.num_heads * self.head_dim, self.embed_dim]
+            if config.trans_qkvw
+            else [self.embed_dim, self.num_heads * self.head_dim]
+        )
         self.ffn1_weight_shape = (
             [self.embed_dim, self.dim_feedforward * 2]
             if self.activation.endswith("glu")
@@ -834,6 +839,7 @@ class FusedMultiTransformerBase(Layer):
         residual_input = src
         for i in range(self.num_layers):
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
+
             out_linear_out = self.compute_attn(
                 time_step,
                 qkv_out,
@@ -1266,13 +1272,14 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
     def init_weight_shape(self, config):
         super().init_weight_shape(config)
 
-        self.linear_weight_shape = [self.embed_dim, self.num_heads * self.head_dim]
-        self.ffn1_weight_shape = (
-            [self.dim_feedforward * 2, self.embed_dim]
-            if self.activation.endswith("glu")
-            else [self.dim_feedforward, self.embed_dim]
-        )
-        self.ffn2_weight_shape = [self.embed_dim, self.dim_feedforward]
+        if not paddle.is_compiled_with_rocm():
+            self.linear_weight_shape = [self.embed_dim, self.num_heads * self.head_dim]
+            self.ffn1_weight_shape = (
+                [self.dim_feedforward * 2, self.embed_dim]
+                if self.activation.endswith("glu")
+                else [self.dim_feedforward, self.embed_dim]
+            )
+            self.ffn2_weight_shape = [self.embed_dim, self.dim_feedforward]
 
     def compute_layernorm_before_qkv(self, src, i):
         if i == 0:
@@ -1293,7 +1300,10 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         return ln_out
 
     def compute_qkv_linear(self, ln_out, i):
-        qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
+        if paddle.is_compiled_with_rocm():
+            qkv_out = paddle.matmul(ln_out, self.qkv_weights[i])
+        else:
+            qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
         return qkv_out
 
     def compute_fmha(
@@ -1386,7 +1396,10 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         )[0]
 
     def compute_out_linear(self, fmha_out, i):
-        out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
+        if paddle.is_compiled_with_rocm():
+            out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
+        else:
+            out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
         return dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
 
     def compute_ffn_layernorm(self, out_linear_out, residual_input, i):
@@ -1423,10 +1436,16 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         )
 
     def compute_ffn1(self, tmp_out, i):
-        return paddle.matmul(tmp_out, self.ffn1_weights[i], False, True)
+        if paddle.device.is_compiled_with_rocm():
+            return paddle.matmul(tmp_out, self.ffn1_weights[i])
+        else:
+            return paddle.matmul(tmp_out, self.ffn1_weights[i], False, True)
 
     def compute_ffn2(self, ffn1_out, i):
-        ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i], False, True)
+        if paddle.device.is_compiled_with_rocm():
+            ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i])
+        else:
+            ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i], False, True)
         ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
         return ffn2_out
 
@@ -1713,7 +1732,7 @@ class FusedMultiTransformerFP8Config:
         quant_round_type=0,
         quant_max_bound=448.0,
         quant_min_bound=-448.0,
-        epsilon=1e-5,
+        epsilon=1e-6,
         residual_alpha=1.0,
         num_layers=-1,
         nranks=1,
@@ -1789,7 +1808,7 @@ class FusedMultiTransformerFP8Config:
         self.ring_id = ring_id
 
 
-class FusedMultiTransformerFP8(Layer):
+class FusedBlockMultiTransformerFP8(Layer):
     def __init__(self, config: FusedMultiTransformerFP8Config):
         """"""
         super().__init__()
@@ -2115,12 +2134,12 @@ class FusedMultiTransformerFP8(Layer):
         self.qkv_weight_shape = (
             [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim, self.embed_dim]
             if config.trans_qkvw
-            else [(self.num_heads + 2 * self.kv_num_heads) * self.head_dim, self.embed_dim]
+            else [self.embed_dim, (self.num_heads + 2 * self.kv_num_heads) * self.head_dim]
         )
         self.linear_weight_shape = [self.num_heads * self.head_dim, self.embed_dim]
-        self.ffn1_0_weight_shape = [self.embed_dim, self.dim_feedforward]
-        self.ffn1_1_weight_shape = [self.embed_dim, self.dim_feedforward]
-        self.ffn2_weight_shape = [self.dim_feedforward, self.embed_dim]
+        self.ffn1_0_weight_shape = [self.dim_feedforward, self.embed_dim]
+        self.ffn1_1_weight_shape = [self.dim_feedforward, self.embed_dim]
+        self.ffn2_weight_shape = [self.embed_dim, self.dim_feedforward]
 
     def get_weight_create_dype(self):
         """
@@ -2153,22 +2172,22 @@ class FusedMultiTransformerFP8(Layer):
         """
         For fake parameter
         """
-        qkv_weight = paddle.view(self.qkv_weights[i], "float8_e4m3fn")
         if paddle.is_compiled_with_rocm() or float(paddle.version.cuda()) < 11.6:
-            qkv_out = paddle.matmul(ln_out, qkv_weight, False, True)
+            qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
             if self.qkv_biases[i] is not None:
                 qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
             return qkv_out
         else:
-            qkv_out = paddle.linalg.fp8_fp8_half_gemm_fused(
+            qkv_out = cutlass_fp8_fp8_half_gemm_fused(
                 ln_out,
-                qkv_weight,
+                self.qkv_weights[i],
                 transpose_x=False,
                 transpose_y=True,
                 bias=self.qkv_biases[i],
                 scale=self.weight_scales.scale["qkv_weight_scale"][i]
                 / (self.act_scales.scale["qkv_in_scale"][i] * 448 * 448),
-                output_dtype="float16",
+                output_dtype=self._dtype,
+                activation_type="identity",
             )
 
             return qkv_out
@@ -2185,16 +2204,16 @@ class FusedMultiTransformerFP8(Layer):
         """
         For fake parameter
         """
-        linear_weight = paddle.view(self.linear_weights[i], "float8_e4m3fn")
-        return paddle.linalg.fp8_fp8_half_gemm_fused(
+        return cutlass_fp8_fp8_half_gemm_fused(
             fmha_out,
-            linear_weight,
+            self.linear_weights[i],
             bias=None,
             transpose_x=False,
             transpose_y=True,
             scale=self.weight_scales.scale["out_linear_weight_scale"][i]
             / (self.act_scales.scale["out_linear_in_scale"][i] * 448 * 448),
-            output_dtype="float16",
+            output_dtype=self._dtype,
+            activation_type="identity",
         )
 
     def compute_max_len(self, seq_lens_encoder, seq_lens_decoder, cum_offsets):
@@ -2281,7 +2300,7 @@ class FusedMultiTransformerFP8(Layer):
             kwargs.get("max_dec_len_this_time", None),
             rotary_embs,
             attn_mask,
-            None,  # tgt_mask
+            kwargs.get("tgt_mask", None),  # tgt_mask
             kwargs.get("max_input_length", -1),
             kwargs.get("block_size", 64),
             self.use_neox_rotary_style,
@@ -2319,77 +2338,56 @@ class FusedMultiTransformerFP8(Layer):
     def compute_ffn1(self, tmp_out, i):
         """
         For fake parameter
-
-        Fuse case:
         """
-        ffn1_0_weight = paddle.view(self.ffn1_0_weights[i], "float8_e4m3fn")
-        ffn1_1_weight = paddle.view(self.ffn1_1_weights[i], "float8_e4m3fn")
-        tem_0 = paddle.linalg.fp8_fp8_half_gemm_fused(
+        tem_0 = cutlass_fp8_fp8_half_gemm_fused(
             tmp_out,
-            ffn1_0_weight,
-            False,
-            False,
+            self.ffn1_0_weights[i],
+            transpose_x=False,
+            transpose_y=True,
             scale=self.weight_scales.scale["ffn1_0_weight_scale"][i]
             / (self.act_scales.scale["ffn1_in_scale"][i] * 448 * 448),
             bias=self.ffn1_0_biases[i],
-            output_dtype="float16",
+            output_dtype=self._dtype,
+            activation_type="identity",
         )
 
-        tem_1 = paddle.linalg.fp8_fp8_half_gemm_fused(
+        tem_1 = cutlass_fp8_fp8_half_gemm_fused(
             tmp_out,
-            ffn1_1_weight,
-            False,
-            False,
+            self.ffn1_1_weights[i],
+            transpose_x=False,
+            transpose_y=True,
             scale=self.weight_scales.scale["ffn1_1_weight_scale"][i]
             / (self.act_scales.scale["ffn1_in_scale"][i] * 448 * 448),
             bias=self.ffn1_1_biases[i],
-            output_dtype="float16",
+            output_dtype=self._dtype,
+            activation_type="identity",
         )
 
         from paddle.incubate.nn.functional import swiglu
 
         tem = swiglu(paddle.cast(tem_0, "float32"), paddle.cast(tem_1, "float32"))
-
         return paddle.cast(tem * self.act_scales.scale["ffn2_in_scale"][i] * 448, "float8_e4m3fn")
-
-        """
-        res = paddle.linalg.fp8_fp8_half_gemm_fused(
-                        tmp_out,
-                        ffn1_0_weight,
-                        ffn1_1_weight,
-                        transpose_x=False,
-                        transpose_y=True,
-                        bias0=self.ffn1_0_biases[i],
-                        bias1=self.ffn1_1_biases[i],
-                        scale0=self.weight_scales.scale["ffn1_0_weight_scale"][i]/(self.act_scales.scale["ffn1_in_scale"][i]*448*448),
-                        scale1=self.weight_scales.scale["ffn1_1_weight_scale"][i]/(self.act_scales.scale["ffn1_in_scale"][i]*448*448),
-                        scale_out=self.act_scales.scale["ffn2_in_scale"][i]*448,
-                        activation_type="swiglu",
-                    )
-        return res
-        """
 
     def compute_ffn2(self, ffn1_out, i):
         """
         For fake parameter
         """
-        ffn2_weight = paddle.view(self.ffn2_weights[i], "float8_e4m3fn")
-        return paddle.linalg.fp8_fp8_half_gemm_fused(
+        return cutlass_fp8_fp8_half_gemm_fused(
             ffn1_out,
-            ffn2_weight,
+            self.ffn2_weights[i],
             bias=None,
             transpose_x=False,
-            transpose_y=False,
+            transpose_y=True,
             scale=self.weight_scales.scale["ffn2_weight_scale"][i]
             / (self.act_scales.scale["ffn2_in_scale"][i] * 448 * 448),
-            output_dtype="float16",
+            output_dtype=self._dtype,
+            activation_type="identity",
         )
 
     def compute_bias_residual_layernorm(self, ffn2_out, residual_input, i, num_layers):
         """
         For fake parameter
         """
-
         if i != num_layers - 1:
             norm_out = self.norm_func(
                 ffn2_out,
@@ -2510,6 +2508,7 @@ class FusedMultiTransformerFP8(Layer):
         residual_input = src
         for i in range(self.num_layers):
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
+
             out_linear_out = self.compute_attn(
                 time_step,
                 qkv_out,
