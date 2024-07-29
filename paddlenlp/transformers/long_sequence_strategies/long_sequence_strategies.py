@@ -37,6 +37,7 @@ class LongSequenceStrategies:
                        "LinearScalingRotaryEmbedding"、
                        "NTKScalingRotaryEmbedding"、
                        "DynamicNTKScalingRotaryEmbedding"、
+                       "YaRNScalingRotaryEmbedding"、
                        "AttentionWithLinearBias"
                        ...
 
