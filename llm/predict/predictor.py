@@ -1368,8 +1368,6 @@ def create_predictor(
                 config.quant_type = config.quantization_config.quant_type
                 if "c8" in config.quant_type:
                     config.cachekv_int8_type = "static"
-                if "a8w8" in config.quant_type:
-                    paddle.set_flags({"FLAGS_enable_blaslt_global_search": 1})
 
                 ptq_multicards_num = get_ptq_multicards_num(config.model_name_or_path)
                 logger.info(f"PTQ from {ptq_multicards_num} cards, so we will not split")

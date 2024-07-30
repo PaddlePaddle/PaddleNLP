@@ -154,8 +154,10 @@ python ./predict/predictor.py  --model_name_or_path ./inference --inference_mode
 
 # PTQ-A8W8静态图推理命令参考
 # 以下环境变量用于开启int8矩阵乘的算法选择以获得更快的推理速度，打开之后第一次执行会执行算法选择从而导致速度较慢。
-export FLAGS_use_autotune=1
-export FLAGS_cublaslt_exhaustive_search_times=10
+# 开启后会在计算int8 matmul时启用cuBLASLt全局搜索找寻最优配置
+export FLAGS_enable_blaslt_global_search=1
+# 开启后会在离线文件中加载int8 matmul配置(使用方式可参考https://github.com/PaddlePaddle/Paddle/pull/66132描述)
+export FLAGS_cublaslt_device_best_config=/path/to/file
 export FLAGS_cache_inference_while_scope=1
 
 python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static"
