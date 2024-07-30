@@ -87,7 +87,8 @@ def tokenize_autogressive(tokenizer, example, data_args, is_test=True, zero_padd
     input_batch = paddle.split(
         outputs["input_ids"], num_or_sections=outputs["input_ids"].shape[1] // data_args.max_length, axis=1
     )
-    input_batch = [paddle.squeeze(input_batch[0])]
+    input_batch = paddle.squeeze(input_batch[0]).numpy().tolist()
+    # input_batch = [paddle.squeeze(input_batch[0])]
     return {"input_ids": input_batch}
 
 
@@ -198,10 +199,13 @@ def tokenize_rounds_example(tokenizer, example, data_args, **kwargs):
     return tokenized_source, labels
 
 
-def convert_example_common(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False):
+def convert_example_common(
+    example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False, autogressive=False
+):
     if tokenizer.chat_template is not None:
         return convert_rounds_example_common(example, tokenizer, data_args, is_test, zero_padding, flash_mask)
-
+    if autogressive:
+        return tokenize_autogressive(tokenizer, example, data_args)
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
 
     if is_test:

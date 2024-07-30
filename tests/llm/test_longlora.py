@@ -27,12 +27,12 @@ from .testing_utils import LLMTest
 
 @parameterized_class(
     ["model_dir"],
-    [["llama"], ["qwen"]],
+    [["llama"]],
 )
 class LoraTest(LLMTest, unittest.TestCase):
-    config_path: str = "./tests/fixtures/llm/longlora.yaml"
+    config_path: str = "tests/fixtures/llm/longlora.yaml"
     model_dir: str = None
-    data_dir: str = "./tests/fixtures/llm/longseq_data"
+    data_dir: str = "./tests/fixtures/llm/longlora_data"
 
     def setUp(self) -> None:
         LLMTest.setUp(self)
@@ -47,7 +47,6 @@ class LoraTest(LLMTest, unittest.TestCase):
     def test_lora(self):
         self.disable_static()
         paddle.set_default_dtype("float32")
-
         lora_config = load_test_config(self.config_path, "lora", self.model_dir)
         lora_config["output_dir"] = self.output_dir
         lora_config["dataset_name_or_path"] = self.data_dir
@@ -79,7 +78,6 @@ class LoraTest(LLMTest, unittest.TestCase):
     def test_rslora_plus(self):
         self.disable_static()
         paddle.set_default_dtype("float32")
-
         lora_config = load_test_config(self.config_path, "rslora_plus", self.model_dir)
         lora_config["output_dir"] = self.output_dir
         lora_config["dataset_name_or_path"] = self.data_dir

@@ -85,7 +85,6 @@ def main():
     training_args.print_config(data_args, "Data")
     training_args.print_config(quant_args, "Quant")
     training_args.print_config(gen_args, "Generation")
-
     if training_args.use_shift_sparse_attention:
         if "Qwen" in model_args.model_name_or_path:
             replace_qwen2_attn(use_flash_attn=False, use_full=False, inference=False)
@@ -229,7 +228,6 @@ def main():
 
     if isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
-
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
     elif (
@@ -358,7 +356,12 @@ def main():
 
         trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
     else:
-        trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
+        trans_func = partial(
+            get_convert_example(model),
+            tokenizer=tokenizer,
+            data_args=data_args,
+            autogressive=training_args.use_shift_sparse_attention,
+        )
 
     if data_args.zero_padding:
         if (
