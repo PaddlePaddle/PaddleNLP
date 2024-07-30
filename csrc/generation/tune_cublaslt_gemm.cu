@@ -469,9 +469,8 @@ class CUBLASLTContext : public DevContext {
  public:
   CUBLASLTContext() { CUDA_CHECK(cublasLtCreate(&handle_)); }
 
-  cublasLtHandle_t handle_;
-
  private:
+  cublasLtHandle_t handle_;
 };
 
 template <typename InT, typename OutT, typename DevContext>
