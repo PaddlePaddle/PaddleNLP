@@ -344,6 +344,8 @@ class TrainingArguments:
             Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
         distributed_dataloader (`bool`, *optional*):
             Whether to use distributed dataloader. Default is `False`.
+        release_grads (`bool`, *optional*):
+            Whether to release gradients during training. Default is `False`.
     """
 
     output_dir: str = field(
@@ -790,6 +792,9 @@ class TrainingArguments:
     use_expert_parallel: Optional[bool] = field(
         default=False,
         metadata={"help": "Enable MoE (Mixture of Experts) expert parallel training"},
+    )
+    release_grads: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to release gradients during training. Default is `False`."}
     )
 
     def __post_init__(self):
