@@ -232,8 +232,9 @@ python ./predict/predictor.py  --model_name_or_path ./inference --inference_mode
 python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --cachekv_int8_type dynamic --block_attn
 ```
 **Note**：
-1. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
-2. A8W8推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。
+1. `quant_type`可选的数值有`weight_only_int8`，`weight_only_int4`，`a8w8`, `a8w8c8`。
+2. `a8w8`推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型，需要额外的act和weight的scale校准表。
+3. `cachekv_int8_type`可选`dynamic`和`static`两种，`static`需要额外的cache kv的scale校准表。
 
 
 ## 3. 推理参数介绍
