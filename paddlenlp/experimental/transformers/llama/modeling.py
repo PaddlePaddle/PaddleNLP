@@ -1441,7 +1441,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
 
-            if "a8w8" in self.quant_type:
+            if "a8w8" in config.quant_type:
                 if config.quantization_config.shift_smooth_all_linears:
                     base_actions["layers.0.self_attn.o_proj.shift_bias"] = partial(fn, is_column=True)
                     base_actions["layers.0.self_attn.o_proj.smooth_weight"] = partial(fn, is_column=True)
