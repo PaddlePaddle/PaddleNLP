@@ -290,6 +290,8 @@ class ShardingIO:
         else:
             one_shard_opt_state_dict = None
 
+        logger.info("reshard optimizer state")
+
         def load_model_slices():
             model_state = reshard_util.NodeModelState()
             for j in range(self.args.pipeline_parallel_rank, pp_degree, cur_pp_degree):
