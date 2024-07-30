@@ -274,7 +274,7 @@ class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
             self.assertGreaterEqual(count / len(result_0), 0.4)
 
     def test_cachekv_int8(self):
-        self.run_predictor({"inference_model": True, "block_attn": True, "cachekv_int8": True})
+        self.run_predictor({"inference_model": True, "block_attn": True, "cachekv_int8_type": "dynamic"})
         result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
         self.run_predictor({"inference_model": True, "block_attn": True})
         result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))

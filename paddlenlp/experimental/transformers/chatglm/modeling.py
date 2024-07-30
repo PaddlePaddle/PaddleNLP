@@ -127,17 +127,12 @@ class ChatGLMStackDyBatch(nn.Layer):
         self.world_size = 1
 
         self.use_weight_only = False
-        self.weight_only_quant_bits = config.weight_only_quant_bits
-        self.quant_algo = "weight_only_int" + str(self.weight_only_quant_bits)
-        if self.weight_only_quant_bits != -1:
+        if config.quant_type == "weight_only_int8":
             self.use_weight_only = True
-
-        if self.use_weight_only:
-            assert (
-                self.quant_algo == "weight_only_int8" or self.quant_algo == "weight_only_int4"
-            ), "Expected quant_algo equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
-                self.quant_algo
-            )
+            self.quant_algo = "weight_only_int8"
+        elif config.quant_type == "weight_only_int4":
+            self.use_weight_only = True
+            self.quant_algo = "weight_only_int4"
 
         try:
             self.current_rank = paddle.distributed.get_rank()
@@ -238,7 +233,6 @@ class ChatGLMStackDyBatch(nn.Layer):
             config.hidden_size,
             config.num_attention_heads,
             4 * config.hidden_size,
-            weight_only_quant_bits=self.weight_only_quant_bits,
             activation="gelu",
             num_layers=config.num_layers,
             nranks=config.tensor_parallel_degree,

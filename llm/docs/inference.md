@@ -185,7 +185,7 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 python ./predict/predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --dtype float16 --block_attn
 
 # CacheKV 动态量化推理命令参考
-python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --cachekv_int8
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --cachekv_int8_type dynamic
 ```
 
 #### 2.4.2 静态图推理
@@ -204,7 +204,7 @@ python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat
 python ./predict/export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --output_path ./inference --dtype float16 --block_attn
 
 # CacheKV 动态量化动转静命令参考
-python ./predict/export_model.py  --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn --cachekv_int8
+python ./predict/export_model.py  --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn --cachekv_int8_type dynamic
 ```
 
 **step2：静态图推理**
@@ -226,8 +226,8 @@ export FLAGS_cache_inference_while_scope=1
 
 python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn
 
-# CacheKV 动态量化8静态图推理命令参考
-python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --cachekv_int8 --block_attn
+# CacheKV 动态量化int8静态图推理命令参考
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --cachekv_int8_type dynamic --block_attn
 ```
 **Note**：
 1. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
@@ -254,4 +254,4 @@ python ./predict/predictor.py  --model_name_or_path ./inference --inference_mode
 - `inference_model`: 是否使用Inference Model 推理，默认值为 False。
 - `block_attn`: 是否使用Block Attention 推理， 默认值为False。
 - `block_size`: 如果使用Block Attention 推理，指定一个Block可以存储的token数量，默认值为64。
-- `cachekv_int8`: 是否使用cachekv int8量化用于节省显存，默认值为False。
+- `cachekv_int8_type`: 是否使用cachekv int8量化用于节省显存，可以是动态或者静态，默认值为None。
