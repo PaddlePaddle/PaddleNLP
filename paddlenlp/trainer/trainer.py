@@ -1062,11 +1062,12 @@ class Trainer:
                     if optimizer_was_run:
                         self.lr_scheduler.step()
 
-                    if enable_release_grads and args.pipeline_parallel_degree > 1:
+                    if args.release_grads or enable_release_grads:
                         self.optimizer.clear_grad(set_to_zero=False)
-                        for _, buffers in model._chunk_2_comm_buffers.items():
-                            for buffer in buffers:
-                                buffer._clear_grad_storage()
+                        if args.pipeline_parallel_degree > 1:
+                            for _, buffers in model._chunk_2_comm_buffers.items():
+                                for buffer in buffers:
+                                    buffer._clear_grad_storage()
                     else:
                         self.optimizer.clear_grad()
 
