@@ -21,9 +21,11 @@ import warnings
 from functools import partial
 from typing import Optional, Tuple
 
+import numpy as np
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
+import scipy
 from paddle import Tensor, nn
 from paddle.autograd import PyLayer
 from paddle.distributed import fleet
@@ -988,7 +990,10 @@ class LlamaAttention(nn.Layer):
         kv_seq_len = key_states.shape[-3]
 
         if past_key_value is not None:
-            kv_seq_len += past_key_value[0].shape[-3]
+            if hasattr(self.config, "kvcache_eviction"):
+                kv_seq_len += position_ids[0, 0]
+            else:
+                kv_seq_len += past_key_value[0].shape[-3]
 
         if self.config.rope:
             if self.reshard_layer is not None:
@@ -1042,7 +1047,6 @@ class LlamaAttention(nn.Layer):
                 past_key_value[0]._clear_data()
                 past_key_value[1]._clear_data()
 
-        past_key_value = (key_states, value_states) if use_cache else None
         if self.kv_indices is not None:
             key_states = paddle.index_select(key_states, self.kv_indices, axis=2)
             value_states = paddle.index_select(value_states, self.kv_indices, axis=2)
@@ -1090,6 +1094,16 @@ class LlamaAttention(nn.Layer):
                 reshard_layer=self.reshard_layer,
                 npu_is_casual=npu_is_casual,
             )
+
+        if (
+            past_key_value is None
+            and hasattr(self.config, "kvcache_eviction")
+            and key_states.shape[1] > self.config.kvcache_eviction["min_eviction_seqlen"]
+        ):
+            key_states, value_states = self.kvcache_eviction(query_states, key_states, value_states)
+
+        past_key_value = (key_states, value_states) if use_cache else None
+
         if output_attentions:
             attn_output, attn_weights = outputs
         else:
@@ -1114,6 +1128,89 @@ class LlamaAttention(nn.Layer):
             outputs = outputs[0]
 
         return outputs
+
+    def kvcache_eviction(self, query_states, key_states, value_states):
+        """
+        ACL2024
+        NACL: A General and Effective KV Cache Eviction Framework for LLM at Inference Time
+        """
+
+        q_len = key_states.shape[1]
+
+        proxy_tokens_ratio = self.config.kvcache_eviction["proxy_tokens_ratio"]
+        sink_tokens = self.config.kvcache_eviction["sink_tokens"]
+        proxy_token_keep_ratio = self.config.kvcache_eviction["proxy_token_keep_ratio"]
+        random_token_keep_ratio = self.config.kvcache_eviction["random_token_keep_ratio"]
+        token_protect_ratio = self.config.kvcache_eviction["token_protect_ratio"]
+
+        proxy_tokens = int(proxy_tokens_ratio * q_len)
+        recent_protect_tokens = int(token_protect_ratio * q_len) - sink_tokens
+        proxy_eviction_keep_tokens = int(proxy_token_keep_ratio * q_len)
+        random_eviction_keep_tokens = int(random_token_keep_ratio * q_len)
+
+        kvcache_buffer = sink_tokens + recent_protect_tokens + proxy_eviction_keep_tokens + random_eviction_keep_tokens
+
+        evict_tokens = key_states.shape[1] - kvcache_buffer
+        assert evict_tokens > 0, "number of evict_tokens must greater than 0"
+
+        proxy_start_pos = key_states.shape[1] - recent_protect_tokens
+
+        proxy_query_states = query_states[:, -proxy_tokens:, :]
+        (_, _, softmax_lse, _) = paddle._C_ops.flash_attn(
+            proxy_query_states,
+            key_states,
+            value_states,
+            (None,),  # fixed_seed_offset
+            None,  # attn_mask
+            0.0,  # dropout
+            False,  # causal
+            False,  # return_softmax
+            False,  # is_test
+            "",
+        )
+
+        proxy_score = paddle.nn.functional.flash_attention.calc_reduced_attention_scores(
+            proxy_query_states, key_states, softmax_lse
+        )
+
+        sink_keep_idx = np.arange(sink_tokens)
+        recent_keep_idx = np.arange(proxy_start_pos, proxy_start_pos + recent_protect_tokens)
+
+        index = []
+        for head_idx in range(key_states.shape[2]):
+            proxy_score_cur_head = proxy_score[:, head_idx].squeeze()
+            proxy_score_cur_head = proxy_score_cur_head[sink_tokens:-recent_protect_tokens]
+            topk_score, topk_idx = paddle.topk(proxy_score_cur_head, k=proxy_eviction_keep_tokens)
+            proxy_eviction_keep_idx = topk_idx.numpy()
+
+            to_evict_tokens_num = proxy_score_cur_head.shape[-1]
+            idx_item_proxy_removed = np.delete(list(range(to_evict_tokens_num)), proxy_eviction_keep_idx)
+            reserved_score = np.delete(proxy_score_cur_head.numpy(), proxy_eviction_keep_idx)
+            reserved_score = scipy.special.softmax(reserved_score)
+            random_eviction_keep_idx = np.random.choice(
+                idx_item_proxy_removed, size=random_eviction_keep_tokens, replace=False, p=reserved_score
+            )
+            proxy_eviction_keep_idx = proxy_eviction_keep_idx + sink_tokens
+            random_eviction_keep_idx = random_eviction_keep_idx + sink_tokens
+
+            index_item = np.concatenate(
+                [
+                    sink_keep_idx,
+                    np.sort(np.concatenate([proxy_eviction_keep_idx, random_eviction_keep_idx], axis=-1)),
+                    recent_keep_idx,
+                ],
+                axis=-1,
+            )
+            index.append(index_item)
+
+        index = paddle.to_tensor(index).reshape([1, len(index), kvcache_buffer, 1])
+
+        key_states = paddle.take_along_axis(key_states.transpose((0, 2, 1, 3)), index, axis=2).transpose((0, 2, 1, 3))
+        value_states = paddle.take_along_axis(value_states.transpose((0, 2, 1, 3)), index, axis=2).transpose(
+            (0, 2, 1, 3)
+        )
+
+        return key_states, value_states
 
 
 class LlamaDecoderLayer(nn.Layer):
