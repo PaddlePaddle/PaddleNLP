@@ -243,7 +243,7 @@ def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol
             g_cpu_optimizer_state_dict[k] = {}
             for kk, vv in v.items():
                 g_cpu_optimizer_state_dict[k][kk] = vv.pin_memory()
-                name_mapping["master_weights"][kk] = vv.name
+                name_mapping[k][kk] = vv.name
         elif k == "LR_Scheduler":
             g_cpu_optimizer_state_dict[k] = copy.deepcopy(v)
         else:
