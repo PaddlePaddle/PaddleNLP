@@ -558,7 +558,7 @@ class InferencePredictorMixin:
             alibi_slopes = get_alibi_slopes(self.model_config.n_head)
             inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
 
-            self.arange_tensor_encoder = paddle.arange(config.total_max_length, dtype=self.dtype)
+            self.arange_tensor_encoder = paddle.arange(self.config.total_max_length, dtype=self.dtype)
             alibi = alibi_slopes[None, :, None, None] * self.arange_tensor_encoder
 
             if self.model_config.tensor_parallel_degree > 1:
@@ -682,7 +682,7 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
 
         config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
-        # config.switch_ir_optim(True)
+        config.switch_ir_optim(True)
         # remove `gpu_cpu_map_matmul_v2_to_matmul_pass` to avoid mapping matmul_v2 -> matmul op
         if predictor_args.dtype == "bfloat16":
             config.delete_pass("gpu_cpu_map_matmul_v2_to_matmul_pass")
@@ -701,7 +701,7 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         else:
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
             config.enable_use_gpu(100, device_id)
-        # config.enable_new_executor()
+        config.enable_new_executor()
 
         if self.tensor_parallel_degree > 1:
             trainer_endpoints = fleet.worker_endpoints()
@@ -1357,7 +1357,6 @@ def create_predictor(
         else:
             raise ValueError("the `mode` should be one of [dynamic, static]")
     else:
-        
         if predictor_args.mode == "dynamic":
             # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
@@ -1503,7 +1502,7 @@ def create_predictor(
                 )
                 model.eval()
             elif "qwen2" in config.architectures[0].lower():
-                
+
                 if predictor_args.block_attn:
                     config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
@@ -1528,8 +1527,8 @@ def create_predictor(
                         config=config,
                         dtype=predictor_args.dtype,
                     )
-                    model.eval()
-                    
+                model.eval()
+
             elif "qwen" in config.architectures[0].lower():
                 if model_args.model_type == "qwen-img2txt":
                     # we use qwen for img2txt.
@@ -1632,12 +1631,12 @@ def create_predictor(
                     )
                 else:
                     from paddlenlp.experimental.transformers import (
-                        Qwen2ForCausalLMInferenceModel as Qwen2InferenceModel
+                        Qwen2ForCausalLMInferenceModel as Qwen2InferenceModel,
                     )
                 cache_kvs_shape = Qwen2InferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
-                
+
             elif "qwen" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     QWenForCausalLMInferenceModel,

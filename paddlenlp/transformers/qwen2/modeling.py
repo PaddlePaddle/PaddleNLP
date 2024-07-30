@@ -161,10 +161,6 @@ def scaled_dot_product_attention(
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
 
-    # print("[origin] query_states", query_states)
-    # print("[origin] key_states", key_states)
-    # print("[origin] value_states", value_states)
-
     if config.use_flash_attention and flash_attention:
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
@@ -179,7 +175,6 @@ def scaled_dot_product_attention(
                 causal=True,
                 return_softmax=output_attentions,
             )
-            # print("flash_attention")
         else:
             attn_output = F.scaled_dot_product_attention(
                 query_states,
@@ -191,9 +186,6 @@ def scaled_dot_product_attention(
                 training=training,
             )
             attn_weights = None
-
-        # print("[origin] attention out", attn_output)
-        # import sys; sys.exit()
 
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
@@ -207,21 +199,8 @@ def scaled_dot_product_attention(
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
-        print("[origin] query_states", query_states)
-        print("[origin] key_states", key_states)
-        print("[origin] value_states", value_states)
-        print("query_states sum: ", paddle.sum(paddle.cast(query_states, dtype="float32"), axis=-1))
-        print("query_states mean: ", paddle.mean(paddle.cast(query_states, dtype="float32"), axis=-1))
-        print("query_states max: ", paddle.max(paddle.cast(query_states, dtype="float32"), axis=-1))
-
-        print("value_states sum: ", paddle.sum(paddle.cast(value_states, dtype="float32"), axis=-1))
-        print("value_states mean: ", paddle.mean(paddle.cast(value_states, dtype="float32"), axis=-1))
-        print("value_states max: ", paddle.max(paddle.cast(value_states, dtype="float32"), axis=-1))
-
         # matmul and divide by sqrt(head_dim)
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
-        print("[origin] head_dim", head_dim)
-        print("[origin] attn_weights", attn_weights)
 
         if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
@@ -238,23 +217,16 @@ def scaled_dot_product_attention(
             )
 
         attn_weights = attn_weights + attention_mask
-        print("[origin] attn_weights", attn_weights)
         if not paddle.in_dynamic_mode():
             attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
         else:
             with paddle.amp.auto_cast(False):
                 attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
-        # print("[origin] attn_weights", attn_weights)
         attn_weights = F.dropout(attn_weights, p=config.attention_dropout, training=training)
-        print("[origin] attn_weights", attn_weights)
         attn_output = paddle.matmul(attn_weights, value_states)
 
-        print("[origin] attention out brefore transpose", attn_output)
         attn_output = attn_output.transpose([0, 2, 1, 3])
-
-        # print("[origin] attention out", attn_output)
-        # import sys; sys.exit()
 
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
@@ -620,13 +592,9 @@ class Qwen2Attention(nn.Layer):
         else:
             attn_output = outputs
 
-        # print("[origin] attn_output out", attn_output)
-        # import sys; sys.exit()
-
         # if sequence_parallel is true, out shape are [q_len / n, bs, num_head * head_dim]
         # else their shape are [bs, q_len, num_head * head_dim], n is mp parallelism.
         attn_output = self.o_proj(attn_output)
-        # print("[origin] attn_output out", attn_output)
 
         if not output_attentions:
             attn_weights = None
@@ -690,7 +658,6 @@ class Qwen2DecoderLayer(nn.Layer):
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)
-        print("[origin] input_layernorm out", hidden_states)
 
         # Self Attention
         has_gradient = not hidden_states.stop_gradient
@@ -731,22 +698,12 @@ class Qwen2DecoderLayer(nn.Layer):
         if use_cache:
             present_key_value = outputs[2 if output_attentions else 1]
 
-        print("[origin] attention out", hidden_states)
-        print("sum: ", paddle.sum(paddle.cast(hidden_states, dtype="float32"), axis=-1))
-        print("mean: ", paddle.mean(paddle.cast(hidden_states, dtype="float32"), axis=-1))
-        print("max: ", paddle.max(paddle.cast(hidden_states, dtype="float32"), axis=-1))
-
         hidden_states = residual + hidden_states
 
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        print("[origin] post_attention_layernorm out", hidden_states)
         hidden_states = self.mlp(hidden_states)
-        print("[origin] mlp out", hidden_states)
-        import sys
-
-        sys.exit()
 
         hidden_states = residual + hidden_states
 
@@ -761,7 +718,6 @@ class Qwen2DecoderLayer(nn.Layer):
         if type(outputs) is tuple and len(outputs) == 1:
             outputs = outputs[0]
 
-        # print("[origin] final out", outputs)
         return outputs
 
 
@@ -1086,16 +1042,12 @@ class Qwen2Model(Qwen2PretrainedModel):
             if is_casual:
                 attention_mask = None
         hidden_states = inputs_embeds
-        # print("inputs_embeds:", inputs_embeds)
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
 
         for idx, (decoder_layer) in enumerate(self.layers):
-            # if idx == 2:
-            #     import sys; sys.exit()
-            print(idx)
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
             past_key_value = past_key_values[idx] if past_key_values is not None else None
@@ -1139,15 +1091,7 @@ class Qwen2Model(Qwen2PretrainedModel):
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
 
-            # print("hidden_states", hidden_states)
-            # hidden_states = self.norm(hidden_states)
-            # print("hidden_states_ln", hidden_states)
-            # import sys; sys.exit()
-
-        # print("hidden_states", hidden_states)
         hidden_states = self.norm(hidden_states)
-        # print("hidden_states_ln", hidden_states)
-        # import sys; sys.exit()
 
         # add hidden states from the last decoder layer
         if output_hidden_states:
