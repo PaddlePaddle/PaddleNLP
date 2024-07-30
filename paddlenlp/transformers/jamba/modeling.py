@@ -916,6 +916,19 @@ class JambaMLP(nn.Layer):
         return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
 
 
+class FakeMLPForwardBackward(paddle.autograd.PyLayer):
+    @staticmethod
+    def forward(ctx, x, gate_weight, up_weight, down_weight):
+        assert not x.stop_gradient, "x should not be stop_gradient"
+        ctx.shape_list = [x.shape, gate_weight.shape, up_weight.shape, down_weight.shape]
+        ctx.dtype_list = [x.dtype, gate_weight.dtype, up_weight.dtype, down_weight.dtype]
+        return paddle.zeros_like(x)
+
+    @staticmethod
+    def backward(ctx, grad):
+        return tuple(paddle.zeros(shape, dtype=dtype) for shape, dtype in zip(ctx.shape_list, ctx.dtype_list))
+
+
 # Adapted from transformers.models.mixtral.modeling_mixtral.MixtralSparseMoeBlock with Mistral->Jamba
 class JambaSparseMoeBlock(nn.Layer):
     """
@@ -961,6 +974,28 @@ class JambaSparseMoeBlock(nn.Layer):
         # this will be used to easily index which expert is going to be sollicitated.
         # shape: [num_experts, top_k, batch_size * seq_len]
         expert_mask = F.one_hot(selected_experts, num_classes=self.num_experts).transpose([2, 1, 0])
+
+        # NOTE: we need to do some fake gradient for sharding parallel training.
+        try:
+            hcg = fleet.get_hybrid_communicate_group()
+            sharding_parallel_world_size = hcg.get_sharding_parallel_world_size()
+            if sharding_parallel_world_size > 1 and self.training:
+                logger.warning_once(
+                    f"Sharding parallel world size is {sharding_parallel_world_size}, we need to do some fake gradient."
+                )
+                for expert_id in range(self.num_experts):
+                    expert_layer = self.experts[expert_id]
+                    final_hidden_states += (
+                        FakeMLPForwardBackward.apply(
+                            hidden_states,
+                            expert_layer.gate_proj.weight,
+                            expert_layer.up_proj.weight,
+                            expert_layer.down_proj.weight,
+                        )
+                        * routing_weights[0, 0]
+                    )
+        except:
+            pass
 
         # Loop over all available experts in the model and perform the computation on each expert.
         for expert_id in range(self.num_experts):
