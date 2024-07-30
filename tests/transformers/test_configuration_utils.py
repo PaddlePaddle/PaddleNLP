@@ -96,7 +96,7 @@ class ConfigurationUtilsTest(unittest.TestCase):
 
         config.test_nonsave = "test"
         config.test_nonsave_2 = "test"
-        config.register_nonsaveable_keys(["test_nonsave"])
+        config.register_unsavable_keys(["test_nonsave"])
 
         with tempfile.TemporaryDirectory() as tp:
             config.save_pretrained(tp)
@@ -105,7 +105,7 @@ class ConfigurationUtilsTest(unittest.TestCase):
             loaded_config = json.load(open(os.path.join(tp, "config.json"), "r"))
             assert "fuse_attention_qkv" in loaded_config, "fuse qkv is need to save"
             assert "use_fused_rms_norm" not in loaded_config, "use_fused_rms_norm don't need to save"
-            assert "tensor_parallel_degree" not in loaded_config, "tensor_parallel_degree don't need to save"
+            assert "tensor_parallel_degree" in loaded_config, "tensor_parallel_degree need to save"
             assert "paddlenlp_version" in loaded_config, "always save paddlenlp_version"
             assert (
                 "quantization_config" in loaded_config and "quant_type" in loaded_config["quantization_config"]

@@ -214,7 +214,7 @@ def distributed_allgather(tensor: Any, group=None, offload=False):
                 x.reshape_(origin_shape)
 
         else:
-            distributed.all_gather(output_tensors, tensor)
+            distributed.all_gather(output_tensors, tensor, group=group)
 
         return output_tensors
 

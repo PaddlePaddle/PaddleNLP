@@ -37,7 +37,7 @@ from numpy import allclose, ndarray, transpose
 from paddle import Tensor
 from paddle.nn import Layer
 
-from paddlenlp.utils.distributed import distributed_gather
+from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
 from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME, PYTORCH_WEIGHTS_NAME
 from paddlenlp.utils.import_utils import (
     is_package_available,
@@ -46,6 +46,7 @@ from paddlenlp.utils.import_utils import (
 )
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.serialization import load_torch
+from paddlenlp.utils.tools import get_env_device
 
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedConfig, PretrainedModel
@@ -1269,7 +1270,10 @@ class ConversionMixin:
         for key in state_dict.keys():
             tensor = state_dict[key]
             if key in name_action_mappings:
-                ret = distributed_gather(tensor, group=mp_group, offload=True)
+                if get_env_device() == "xpu":
+                    ret = distributed_allgather(tensor, group=mp_group, offload=True)
+                else:
+                    ret = distributed_gather(tensor, group=mp_group, offload=True)
                 action = name_action_mappings.pop(key)
                 tensor = action(ret) if is_dst else None
             else:
@@ -1284,7 +1288,7 @@ class ConversionMixin:
 
         if len(name_action_mappings) > 0:
             for x in name_action_mappings.keys():
-                logger.warning(f"key <{x}> need to merge tensor parallel but we can't find in model state.")
+                logger.debug(f"key <{x}> need to merge tensor parallel but we can't find in model state.")
 
         return state_dict_to_save
 
@@ -1318,7 +1322,7 @@ class ConversionMixin:
                     break
             if key not in state_keys_map:
                 if not ignore_error:
-                    logger.error(f"tensor parallel conversion: could not find name {key} in loaded state dict!")
+                    logger.debug(f"tensor parallel conversion: could not find name {key} in loaded state dict!")
             else:
                 state_keys_real.remove(state_keys_map[key])
 

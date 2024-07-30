@@ -1392,13 +1392,14 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
     def init_weight_shape(self, config):
         super().init_weight_shape(config)
 
-        self.linear_weight_shape = [self.embed_dim, self.num_heads * self.head_dim]
-        self.ffn1_weight_shape = (
-            [self.dim_feedforward * 2, self.embed_dim]
-            if self.activation.endswith("glu")
-            else [self.dim_feedforward, self.embed_dim]
-        )
-        self.ffn2_weight_shape = [self.embed_dim, self.dim_feedforward]
+        if not paddle.is_compiled_with_rocm():
+            self.linear_weight_shape = [self.embed_dim, self.num_heads * self.head_dim]
+            self.ffn1_weight_shape = (
+                [self.dim_feedforward * 2, self.embed_dim]
+                if self.activation.endswith("glu")
+                else [self.dim_feedforward, self.embed_dim]
+            )
+            self.ffn2_weight_shape = [self.embed_dim, self.dim_feedforward]
 
     def compute_layernorm_before_qkv(self, src, i):
         if i == 0:
@@ -1419,7 +1420,10 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         return ln_out
 
     def compute_qkv_linear(self, ln_out, i):
-        qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
+        if paddle.is_compiled_with_rocm():
+            qkv_out = paddle.matmul(ln_out, self.qkv_weights[i])
+        else:
+            qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
         return qkv_out
 
     def compute_fmha(
@@ -1512,7 +1516,10 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         )[0]
 
     def compute_out_linear(self, fmha_out, i):
-        out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
+        if paddle.is_compiled_with_rocm():
+            out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
+        else:
+            out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
         return dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
 
     def compute_ffn_layernorm(self, out_linear_out, residual_input, i):
@@ -1549,10 +1556,16 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         )
 
     def compute_ffn1(self, tmp_out, i):
-        return paddle.matmul(tmp_out, self.ffn1_weights[i], False, True)
+        if paddle.device.is_compiled_with_rocm():
+            return paddle.matmul(tmp_out, self.ffn1_weights[i])
+        else:
+            return paddle.matmul(tmp_out, self.ffn1_weights[i], False, True)
 
     def compute_ffn2(self, ffn1_out, i):
-        ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i], False, True)
+        if paddle.device.is_compiled_with_rocm():
+            ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i])
+        else:
+            ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i], False, True)
         ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
         return ffn2_out
 

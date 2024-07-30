@@ -285,6 +285,8 @@ from .visualglm.image_processing import *
 from .rw.modeling import *
 from .rw.configuration import *
 from .rw.tokenizer import *
+from .mistral.modeling import *
+from .mistral.configuration import *
 from .qwen import *
 from .mixtral.modeling import *
 from .mixtral.configuration import *
@@ -296,3 +298,4 @@ from .deberta_v2.tokenizer import *
 from .deberta_v2.configuration import *
 from .qwen2 import *
 from .qwen2_moe import *
+from .yuan import *
