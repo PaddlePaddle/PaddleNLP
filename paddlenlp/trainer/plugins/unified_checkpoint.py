@@ -95,10 +95,6 @@ optimizer_non_scaler_name = [
 ]  # to be added
 
 
-__all__ = [
-    "load_unified_optimizer",
-]
-
 async_save_queue = []
 
 
@@ -119,6 +115,7 @@ class UnifiedCheckpointOption(ExplicitEnum):
     SKIP_SAVE_MODEL_WEIGHT = "skip_save_model_weight"
     MASTER_WEIGHT_COMPATIBLE = "master_weight_compatible"
     ASYNC_SAVE = "async_save"
+    IGNORE_MERGE_OPTIMIZER = "ignore_merge_optimizer"
 
 
 class UnifiedCheckpointHandler:
@@ -220,7 +217,7 @@ class UnifiedCheckpointHandler:
                 self.args, model_to_save, safe_serialization=True
             )
             is_sync_save = True
-            if "async_save" in self.args.unified_checkpoint_config:
+            if "async_save" in self.args.unified_checkpoint_config or self.args.use_async_save:
                 is_sync_save = False
             clear_async_save_task_queue()
             self._file_save_async_or_sync(
@@ -311,7 +308,7 @@ class UnifiedCheckpointHandler:
         os.makedirs(save_directory, exist_ok=True)
 
         is_sync_save = True
-        if "async_save" in self.args.unified_checkpoint_config:
+        if "async_save" in self.args.unified_checkpoint_config or self.args.use_async_save:
             is_sync_save = False
         self._file_save_async_or_sync(
             optim_state_dict,
@@ -344,6 +341,38 @@ class UnifiedCheckpointHandler:
                 if self.args.should_save:
                     with open(master_path, "w") as f:
                         json.dump(sharded_master_weight_index, f, indent=4)
+
+    def load_unified_optimizer(self, model, optimizer, resume_from_checkpoint):
+        """Load potential model checkpoint
+
+        Args:
+            model (PretrainedModel): Your model to load
+            resume_from_checkpoint (str): path of the checkpoint to load
+
+        Returns:
+            None
+        """
+
+        if paddle.distributed.get_world_size() <= 1:
+            optim_state_dict = load_single_card_optimizer(self.args, model, optimizer, resume_from_checkpoint)
+            return optim_state_dict
+
+        local_resume = check_unified_optimizer(
+            self.args, model, optimizer, resume_from_checkpoint, safe_serialization=True
+        )
+        if not local_resume:
+            logger.info("Begin to dynamically load unified optimizer!")
+            returned_optim_state_dict = load_unified_optimizer_dynamically(
+                self.args, model, optimizer, resume_from_checkpoint, safe_serialization=True
+            )
+            return returned_optim_state_dict
+
+        if self.args.data_parallel_rank == 0:
+            returned_optim_state_dict = load_unified_optimizer_locally(
+                self.args, model, optimizer, resume_from_checkpoint, safe_serialization=True
+            )
+            return returned_optim_state_dict
+        return None
 
     def save_single_card_checkpoint(self, model_to_save, output_dir):
         """Save checkpoint for non-distributed environment."""
@@ -639,37 +668,6 @@ def unified_checkpoint_into_shards(
     paddle.device.cuda.empty_cache()
 
     return state_dict, shard_file, sharded_index
-
-
-def load_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
-    """Load potential model checkpoint
-
-    Args:
-        model (PretrainedModel): Your model to load
-        resume_from_checkpoint (str): path of the checkpoint to load
-
-    Returns:
-        None
-    """
-
-    if paddle.distributed.get_world_size() <= 1:
-        optim_state_dict = load_single_card_optimizer(args, model, optimizer, resume_from_checkpoint)
-        return optim_state_dict
-
-    local_resume = check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_serialization)
-    if not local_resume:
-        logger.info("Begin to dynamically load unified optimizer!")
-        returned_optim_state_dict = load_unified_optimizer_dynamically(
-            args, model, optimizer, resume_from_checkpoint, safe_serialization
-        )
-        return returned_optim_state_dict
-
-    if args.data_parallel_rank == 0:
-        returned_optim_state_dict = load_unified_optimizer_locally(
-            args, model, optimizer, resume_from_checkpoint, safe_serialization
-        )
-        return returned_optim_state_dict
-    return None
 
 
 def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):

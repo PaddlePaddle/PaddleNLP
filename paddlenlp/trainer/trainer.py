@@ -114,7 +114,7 @@ from ..utils.log import logger
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import RuntimeTimer, get_timers, set_timers
-from .plugins.unified_checkpoint import UnifiedCheckpointHandler, load_unified_optimizer
+from .plugins.unified_checkpoint import UnifiedCheckpointHandler
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -2629,12 +2629,11 @@ class Trainer:
                 else:
                     opt_state_dict = None
             else:
-                opt_state_dict = load_unified_optimizer(
+                opt_state_dict = self.unified_checkpoint_handler.load_unified_optimizer(
                     args=self.args,
                     model=self.model,
                     optimizer=self.optimizer,
                     resume_from_checkpoint=checkpoint,
-                    safe_serialization=True,
                 )
 
         if self.args.ignore_load_lr_and_optim and opt_state_dict:
