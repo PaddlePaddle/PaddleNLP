@@ -167,7 +167,6 @@ def scaled_dot_product_attention(
 
         version = paddle.version.full_version
         if version != "0.0.0" and version <= "2.5.2":
-            # if version == "0.0.0":
             attn_output, attn_weights = flash_attention(
                 query_states,
                 key_states,
@@ -208,8 +207,8 @@ def scaled_dot_product_attention(
                 f" {attn_weights.shape}"
             )
 
-        # if attention_mask is None:
-        attention_mask = get_triangle_upper_mask(attn_weights)
+        if attention_mask is None:
+            attention_mask = get_triangle_upper_mask(attn_weights)
         attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
         if attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
             raise ValueError(
@@ -224,8 +223,8 @@ def scaled_dot_product_attention(
                 attn_weights = F.softmax(attn_weights, axis=-1, dtype="float32").astype(query_states.dtype)
 
         attn_weights = F.dropout(attn_weights, p=config.attention_dropout, training=training)
-        attn_output = paddle.matmul(attn_weights, value_states)
 
+        attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
 
         if sequence_parallel:
@@ -1042,6 +1041,7 @@ class Qwen2Model(Qwen2PretrainedModel):
             if is_casual:
                 attention_mask = None
         hidden_states = inputs_embeds
+
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
