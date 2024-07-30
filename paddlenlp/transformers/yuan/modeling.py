@@ -635,7 +635,7 @@ class YuanAttention(nn.Layer):
 
             # q, k, v = [rearrange(x, "b s ... -> (b s) ...") for x in [query_states, key_states, value_states]]
             b, s = query_states.shape[:2]
-            new_shape = (b * s,) + query_states.shape[2:]
+            new_shape = (b * s,) + tuple(query_states.shape[2:])
             q = paddle.reshape(query_states, new_shape)
             k = paddle.reshape(key_states, new_shape)
             v = paddle.reshape(value_states, new_shape)
