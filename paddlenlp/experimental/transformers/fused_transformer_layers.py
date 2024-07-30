@@ -41,6 +41,7 @@ if core.is_compiled_with_xpu() or core.is_compiled_with_cuda():
 
 if core.is_compiled_with_cuda():
     if os.getenv("FLAGS_CUTLASS_FP8_GEMM", "True") == "True":
+        logger.info("cutlass fp8 gemm is used. you can turn it off by setting FLAGS_CUTLASS_FP8_GEMM to False.")
         from paddlenlp_ops import (
             cutlass_fp8_fp8_fp8_dual_gemm_fused as fp8_dual_gemm_fused,
         )
