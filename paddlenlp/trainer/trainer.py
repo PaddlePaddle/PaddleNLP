@@ -197,10 +197,10 @@ g_cpu_optimizer_state_dict = {}
 def _save_func(obj, name_mapping, path, saved_signal_path, protocol):
     if isinstance(obj, dict):
         for k, v in obj.items():
-            if k == "master_weights" and isinstance(obj["master_weights"], dict):
-                for k, v in obj["master_weights"].items():
-                    if isinstance(v, paddle.Tensor):
-                        v.name = name_mapping["master_weights"][k]
+            if k == "master_weights" and isinstance(v, dict):
+                for kk, vv in v.items():
+                    if isinstance(vv, paddle.Tensor):
+                        vv.name = name_mapping["master_weights"][kk]
             else:
                 if k in name_mapping and isinstance(v, paddle.Tensor):
                     v.name = name_mapping[k]
@@ -2392,10 +2392,10 @@ class Trainer:
                     else:
                         if self.args.data_parallel_rank > 0 and self.args.use_expert_parallel:
                             self._save_ckpt_func(
-                                self._filter_moe_no_sync_optimizer_params(), os.path.join(output_dir, optimizer_name)
+                                self._filter_moe_no_sync_optimizer_params(), os.path.join(output_dir, OPTIMIZER_NAME)
                             )
                         else:
-                            self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
+                            self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
 
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))

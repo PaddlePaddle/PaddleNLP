@@ -19,6 +19,7 @@ from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
     HybridParallelOptimizer,
 )
 from paddle.distributed.fleet.model import PipelineParallel
+
 from paddlenlp.utils.log import logger
 
 from ....transformers.model_utils import unwrap_optimizer
@@ -214,11 +215,13 @@ def is_matched_optimizer_state_dict(opt_state_dict, optimizer, model, hcg=None, 
         if group is not None and group.nranks > 1:
             x = paddle.to_tensor([is_matched], dtype=paddle.int32)
             paddle.distributed.stream.all_reduce(x, op=ReduceOp.MIN, group=group, sync_op=True, use_calc_stream=True)
-            is_matched = int(x.numpy()[0])
-            print(f"is_matched: {is_matched}")
+            global_is_matched = int(x.numpy()[0])
+    else:
+        global_is_matched = is_matched
 
-    is_matched = (True if is_matched else False)
-    return is_matched
+    global_is_matched = True if global_is_matched else False
+    logger.info(f"Sharding reshard checkpoint: local_match = {is_matched} , global_match = {global_is_matched}")
+    return global_is_matched
 
 
 def is_bata(name):
