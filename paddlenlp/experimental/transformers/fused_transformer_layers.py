@@ -2177,6 +2177,8 @@ class FusedBlockMultiTransformerFP8(Layer):
                 quant_max_bound=self.config.quant_max_bound,
                 quant_min_bound=self.config.quant_min_bound,
             )
+            if in_dynamic_mode():
+                ln_out = ln_out[0]
         else:
             ln_out = src
 
