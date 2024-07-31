@@ -383,7 +383,16 @@ class StaticGraphPredictor(BasePredictor):
 
     def _infer(self, inputs: dict[str, np.ndarray]):
         for name in self.predictor.get_input_names():
-            self.predictor.get_input_handle(name).copy_from_cpu(inputs[name])
+            if name == "position_ids" and name not in inputs:
+                assert "input_ids" in inputs, "input_ids is required when position_ids is not provided"
+                batch_size, seq_length = inputs["input_ids"].shape
+                position_ids = np.broadcast_to(
+                    np.arange(seq_length, dtype="int64")[np.newaxis, :], (batch_size, seq_length)
+                )
+                _input = position_ids
+            else:
+                _input = inputs[name]
+            self.predictor.get_input_handle(name).copy_from_cpu(_input)
 
         self.predictor.run()
         output_names = self.predictor.get_output_names()
