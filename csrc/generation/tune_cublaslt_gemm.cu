@@ -575,7 +575,7 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(const CUBLASLTContext& dev_ctx,
   if (is_test) {
     std::vector<algoSelect_t> algos;
     // Select //
-    FindAlgo(dev_ctx.handle_,
+    FindAlgo(dev_ctx.handle,
              m,
              n,
              k,
@@ -644,7 +644,7 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(const CUBLASLTContext& dev_ctx,
                     paddle::DataType::UINT8,
                     paddle::GPUPlace());
   void* workspace_ptr = workspace.data<uint8_t>();
-  CUDA_CHECK(cublasLtMatmulAlgoInit(dev_ctx.handle_,
+  CUDA_CHECK(cublasLtMatmulAlgoInit(dev_ctx.handle,
                                     cudaComputeType,
                                     CUDA_R_32I,
                                     CUDA_R_8I,
@@ -678,7 +678,7 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(const CUBLASLTContext& dev_ctx,
   auto start = std::chrono::high_resolution_clock::now();
   const int repeats = 10;
   for (int loop = 0; loop < repeats; loop++) {
-    CUDA_CHECK(cublasLtMatmul(dev_ctx.handle_,
+    CUDA_CHECK(cublasLtMatmul(dev_ctx.handle,
                               matmul_desc_,
                               &alpha_,
                               B_dev,
