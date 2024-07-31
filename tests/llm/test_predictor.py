@@ -260,12 +260,19 @@ class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
 
         assert len(result_0) == len(result_1)
         count, full_match = 0, 0
-
+        i = 0
         for inference_item, no_inference_item in zip(result_0, result_1):
             min_length = min(len(inference_item), len(no_inference_item))
             count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
-
+            i += 1
+            if inference_item[:min_length] == no_inference_item[:min_length]:
+                print("***NO %d PASS***\n"%i)
+            else:
+                print("***NO %d FAIL***\n"%i)
+            
+        print(" **len** :",len(result_0))
+        print("***full_match: ***:", full_match)
         self.assertGreaterEqual(full_match / len(result_0), 0.75)
 
         if self.model_name_or_path == "__internal_testing__/tiny-fused-chatglm":

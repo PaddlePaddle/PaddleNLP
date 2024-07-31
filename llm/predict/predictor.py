@@ -1082,6 +1082,7 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
         self.cache_kvs_shape = cache_kvs_shape
         BasePredictor.__init__(self, config, tokenizer)
         BlockInferencePredictorMixin.__init__(self, config, tokenizer)
+        print("***Using StaticBlockInferencePredictor***")
 
         self.init_inputs(config)
 
@@ -1170,6 +1171,10 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
             config.set_dist_config(dist_config)
 
         self.predictor = paddle.inference.create_predictor(config)
+        def hook_func(op_type: str, tensor_name: str, tensor: paddle.Tensor):
+            print(op_type, tensor_name, tensor)
+        self.predictor.register_output_hook(hook_func)
+        
 
     def _share_data(self):
         """
