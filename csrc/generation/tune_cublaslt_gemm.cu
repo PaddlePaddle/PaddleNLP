@@ -174,7 +174,7 @@ static void TestMatmulRun(cublasLtHandle_t ltHandle,
 }
 
 template <typename InT, typename OutT, typename ScaleT = OutT>
-void FindAlgo(cublasLtHandle_t ltHandle,
+void FindAlgo(const cublasLtHandle_t& ltHandle,
               int m,
               int n,
               int k,
@@ -475,7 +475,7 @@ public:
 };
 
 template <typename InT, typename OutT, typename DevContext>
-void GEMMInt8(DevContext dev_ctx,
+void GEMMInt8(const DevContext& dev_ctx,
               const std::vector<InT>& A,
               const std::vector<InT>& B,
               std::vector<OutT>& C,
@@ -489,7 +489,7 @@ void GEMMInt8(DevContext dev_ctx,
 }
 
 template <>
-void GEMMInt8<int8_t, int32_t, CPUContext>(CPUContext dev_ctx,
+void GEMMInt8<int8_t, int32_t, CPUContext>(const CPUContext& dev_ctx,
                                            const std::vector<int8_t>& A,
                                            const std::vector<int8_t>& B,
                                            std::vector<int32_t>& C,
@@ -529,24 +529,24 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(const CUBLASLTContext& dev_ctx,
 
   // init data structure
 
-  cublasLtMatmulDesc_t matmul_desc_;
-  cublasLtMatrixLayout_t A_desc_;
-  cublasLtMatrixLayout_t B_desc_;
-  cublasLtMatrixLayout_t C_desc_;
-  int32_t alpha_ = 1;
-  int32_t beta_ = 0;
+  cublasLtMatmulDesc_t matmul_desc;
+  cublasLtMatrixLayout_t A_desc;
+  cublasLtMatrixLayout_t B_desc;
+  cublasLtMatrixLayout_t C_desc;
+  int32_t alpha = 1;
+  int32_t beta = 0;
 
   cublasComputeType_t cudaComputeType = CUBLAS_COMPUTE_32I;
   CUDA_CHECK(
-      cublasLtMatmulDescCreate(&matmul_desc_, cudaComputeType, CUDA_R_32I));
+      cublasLtMatmulDescCreate(&matmul_desc, cudaComputeType, CUDA_R_32I));
   cublasOperation_t op_transpose = CUBLAS_OP_T;
-  CUDA_CHECK(cublasLtMatmulDescSetAttribute(matmul_desc_,
+  CUDA_CHECK(cublasLtMatmulDescSetAttribute(matmul_desc,
                                             CUBLASLT_MATMUL_DESC_TRANSA,
                                             &op_transpose,
                                             sizeof(op_transpose)));
-  CUDA_CHECK(cublasLtMatrixLayoutCreate(&B_desc_, CUDA_R_8I, k, n, k));
-  CUDA_CHECK(cublasLtMatrixLayoutCreate(&A_desc_, CUDA_R_8I, k, m, k));
-  CUDA_CHECK(cublasLtMatrixLayoutCreate(&C_desc_, CUDA_R_32I, n, m, n));
+  CUDA_CHECK(cublasLtMatrixLayoutCreate(&B_desc, CUDA_R_8I, k, n, k));
+  CUDA_CHECK(cublasLtMatrixLayoutCreate(&A_desc, CUDA_R_8I, k, m, k));
+  CUDA_CHECK(cublasLtMatrixLayoutCreate(&C_desc, CUDA_R_32I, n, m, n));
 
   cublasLtMatmulAlgo_t algo;
   int algoId;
@@ -582,10 +582,10 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(const CUBLASLTContext& dev_ctx,
              B_dev,
              A_dev,
              C_dev,
-             matmul_desc_,
-             B_desc_,
-             A_desc_,
-             C_desc_,
+             matmul_desc,
+             B_desc,
+             A_desc,
+             C_desc,
              CUBLAS_COMPUTE_32I,
              CUDA_R_32I,
              CUDA_R_8I,
@@ -679,17 +679,17 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(const CUBLASLTContext& dev_ctx,
   const int repeats = 10;
   for (int loop = 0; loop < repeats; loop++) {
     CUDA_CHECK(cublasLtMatmul(dev_ctx.handle,
-                              matmul_desc_,
-                              &alpha_,
+                              matmul_desc,
+                              &alpha,
                               B_dev,
-                              B_desc_,
+                              B_desc,
                               A_dev,
-                              A_desc_,
-                              &beta_,
+                              A_desc,
+                              &beta,
                               C_dev,
-                              C_desc_,
+                              C_desc,
                               C_dev,
-                              C_desc_,
+                              C_desc,
                               &algo,
                               //  nullptr,
                               workspace_ptr,
