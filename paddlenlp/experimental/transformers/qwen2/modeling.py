@@ -15,7 +15,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-import os
 from functools import partial
 
 import numpy as np
@@ -34,6 +33,7 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
     GenerationInferenceModel,
 )
+from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
 from paddlenlp.transformers import Qwen2Config, Qwen2PretrainedModel
 from paddlenlp.transformers.model_outputs import (  # CausalLMOutputWithCrossAttentions,
     BaseModelOutputWithPast,
@@ -133,6 +133,21 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         ffn1_weight_scale_attrs = None
         ffn2_weight_scale_attrs = None
 
+        qkv_out_scale_attrs = None
+        linear_out_scale_attrs = None
+        ffn1_out_scale_attrs = None
+        ffn2_out_scale_attrs = None
+        linear_shift_attrs = None
+        linear_smooth_attrs = None
+        ffn2_shift_attrs = None
+        ffn2_smooth_attrs = None
+
+        ln_bias_attrs = None
+        out_proj_bias_attrs = None
+        ffn_ln_bias_attrs = None
+        ffn1_bias_attrs = None
+        ffn2_bias_attrs = None
+
         if self.use_weight_only:
             qkv_weight_scale_attrs = [
                 paddle.ParamAttr(name="fuseqwen2.{}.qkv_weight_scale".format(i)) for i in range(self.num_layers)
@@ -147,6 +162,11 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 paddle.ParamAttr(name="fuseqwen2.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
             ]
 
+        cache_k_scale_attrs = None
+        cache_v_scale_attrs = None
+        cache_k_out_scale_attrs = None
+        cache_v_out_scale_attrs = None
+
         transformer_config = FusedMultiTransformerConfig(
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
@@ -155,7 +175,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             weight_only_quant_bits=self.weight_only_quant_bits,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
-            nranks=1,
+            nranks=config.tensor_parallel_degree,
             ring_id=-1,
             ln_scale_attrs=ln_scale_attrs,
             qkv_weight_attrs=qkv_weight_attrs,
@@ -167,10 +187,29 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
             ffn2_weight_attrs=ffn2_weight_attrs,
             ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
+            qkv_out_scale_attrs=qkv_out_scale_attrs,
+            linear_out_scale_attrs=linear_out_scale_attrs,
+            ffn1_out_scale_attrs=ffn1_out_scale_attrs,
+            ffn2_out_scale_attrs=ffn2_out_scale_attrs,
+            linear_shift_attrs=linear_shift_attrs,
+            linear_smooth_attrs=linear_smooth_attrs,
+            ffn2_shift_attrs=ffn2_shift_attrs,
+            ffn2_smooth_attrs=ffn2_smooth_attrs,
+            ln_bias_attrs=ln_bias_attrs,
             qkv_bias_attrs=qkv_bias_attrs,
+            linear_bias_attrs=out_proj_bias_attrs,
+            ffn_ln_bias_attrs=ffn_ln_bias_attrs,
+            ffn1_bias_attrs=ffn1_bias_attrs,
+            ffn2_bias_attrs=ffn2_bias_attrs,
+            cache_k_scale_attrs=cache_k_scale_attrs,
+            cache_v_scale_attrs=cache_v_scale_attrs,
+            cache_k_out_scale_attrs=cache_k_out_scale_attrs,
+            cache_v_out_scale_attrs=cache_v_out_scale_attrs,
             epsilon=self.rms_norm_eps,
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
+            use_dynamic_cachekv_quant=config.use_cachekv_int8 == "dynamic",
+            rank_id=config.tensor_parallel_rank,
         )
 
         self.set_transformer_block(transformer_config)
@@ -482,11 +521,8 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
         self.lm_head = new_embeddings
 
     @classmethod
-    def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
-    ):
-        kwargs["use_safetensors"] = False
-        return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+        return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -676,7 +712,6 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
         kwargs["max_input_length"] = self.max_seq_len
 
         inputs_embeds = self.wte(ids_remove_padding)
-        # import pdb;pdb.set_trace()
 
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
@@ -772,55 +807,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        # TODO: Support safetensors loading.
-        kwargs["use_safetensors"] = False
-        from paddlenlp.transformers.utils import (
-            ContextManagers,
-            is_safetensors_available,
-        )
-
-        from_hf_hub = kwargs.pop("from_hf_hub", False)
-        config = kwargs.pop("config", None)
-        from_aistudio = kwargs.get("from_aistudio", False)
-        subfolder = kwargs.get("subfolder", None)
-        variant = kwargs.pop("variant", None)
-        use_safetensors = kwargs.pop("use_safetensors", None if is_safetensors_available() else False)
-        convert_from_torch = kwargs.pop("convert_from_torch", None)
-        cache_dir = kwargs.pop("cache_dir", None)
-
-        init_contexts = []
-        with ContextManagers(init_contexts):
-            model = cls(config)
-
-        if not config.single_card_ptq:
-            resolved_archive_file = pretrained_model_name_or_path
-        else:
-            resolved_archive_file = cls._resolve_model_file_path(
-                pretrained_model_name_or_path,
-                cache_dir=cache_dir,
-                subfolder=subfolder,
-                from_hf_hub=from_hf_hub,
-                from_aistudio=from_aistudio,
-                config=config,
-                convert_from_torch=convert_from_torch,
-                use_safetensors=use_safetensors,
-                variant=variant,
-            )[0]
-        logger.info(f"Load model form {resolved_archive_file}")
-
-        if config.tensor_parallel_degree > 1 and config.single_card_ptq:
-            logger.info(f"convert_tensor_parallel {config.tensor_parallel_degree}")
-            model.state_dict = model.convert_tensor_parallel(resolved_archive_file, config)
-        elif config.tensor_parallel_degree > 1:
-            resolved_archive_file = os.path.join(
-                resolved_archive_file, f"mp_{config.tensor_parallel_rank:0>2d}_sharding_00_pp_00", "model.pdparams"
-            )
-            model.state_dict = paddle.load(resolved_archive_file, return_numpy=True)
-        else:
-            model.state_dict = paddle.load(resolved_archive_file, return_numpy=True)
-        model.set_state_dict(model.state_dict)
-
-        return model
+        return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
