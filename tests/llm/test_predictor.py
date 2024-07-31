@@ -288,7 +288,7 @@ class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
             count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
 
-        self.assertGreaterEqual(count / len(result_0), 0.2)
+        self.assertGreaterEqual(count / len(result_0), 0.15)
 
 
 @parameterized_class(

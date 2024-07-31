@@ -233,6 +233,7 @@ class ChatGLMStackDyBatch(nn.Layer):
             config.hidden_size,
             config.num_attention_heads,
             4 * config.hidden_size,
+            quant_type=config.quant_type,
             activation="gelu",
             num_layers=config.num_layers,
             nranks=config.tensor_parallel_degree,
