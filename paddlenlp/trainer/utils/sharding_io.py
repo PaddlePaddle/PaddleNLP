@@ -204,9 +204,20 @@ class ShardingIO:
         path = os.path.join(checkpoint, optimizer_name)
         logger.info(f"load optimizer state from {path}")
         if os.path.isfile(path):
-            return paddlenlp_load(path, map_location="cpu")
+            return self._modify_ckpt_for_compatibility(paddlenlp_load(path, map_location="cpu"))
         logger.info(f"{path} not exists")
         return None
+
+    def _modify_ckpt_for_compatibility(self, ckpt):
+        master_weights = ckpt.get("master_weights", None)
+        if master_weights:
+            for k, v in master_weights.items():
+                assert isinstance(v, paddle.Tensor), v
+                if not v.name.startswith(k):
+                    new_name = k + "_fp32_master_0"
+                    logger.info(f"Modify master weights {v.name} -> {new_name}")
+                    v.name = new_name
+        return ckpt
 
     def _need_reshard(self, checkpoint):
         if self._need_reshard_pp(checkpoint):
