@@ -96,8 +96,8 @@ class PredictorArgument:
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     quant_type: str = field(
-        default=None,
-        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
+        default="",
+        metadata={"help": "Quantization type. Supported values: a8w8, a8w8c8, weight_only_int4, weight_only_int8"},
     )
     avx_model: bool = field(
         default=False, metadata={"help": "whether use AvxModel to do generation when using cpu inference"}
@@ -1355,14 +1355,11 @@ def create_predictor(
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
             config.model_name_or_path = predictor_args.model_name_or_path
+            config.quant_type = predictor_args.quant_type
             config.cachekv_int8_type = predictor_args.cachekv_int8_type
             config.single_card_ptq = True
             if predictor_args.avx_model:
                 config.avx_type = predictor_args.avx_type
-            
-            config.quant_type = None
-            if predictor_args.quant_type is not None:
-                config.quant_type = predictor_args.quant_type
 
             if config.quantization_config.quant_type is not None:
                 config.quant_type = config.quantization_config.quant_type

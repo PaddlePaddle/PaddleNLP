@@ -151,7 +151,7 @@ class FusedMultiTransformerConfig:
         embed_dim,
         num_heads,
         dim_feedforward,
-        quant_type=None,
+        quant_type="",
         dropout_rate=0.0,
         activation="gelu",
         norm_type="layernorm",

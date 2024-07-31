@@ -357,7 +357,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         elif config.quant_type == "weight_only_int4":
             self.use_weight_only = True
             self.quant_algo = "weight_only_int4"
-        elif "a8w8" in self.quant_type:
+        elif "a8w8" in config.quant_type:
             self.quant_model_path = config.model_name_or_path
             self.shift = config.quantization_config.shift
             self.smooth = config.quantization_config.smooth
