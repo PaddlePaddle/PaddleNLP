@@ -1000,7 +1000,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         )
         self.ffn2_weight_shape = [self.embed_dim, self.dim_feedforward]
 
-        if self.quant_type == "weight_only_int4":
+        if config.quant_type == "weight_only_int4":
             self.qkv_weight_shape[0] //= 2
             self.linear_weight_shape[0] //= 2
             self.ffn1_weight_shape[0] //= 2
