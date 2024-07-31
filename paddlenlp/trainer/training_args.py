@@ -1161,15 +1161,18 @@ class TrainingArguments:
                         # sync_param_name = [""] matches any parameter name.
                         # If sync_param, sync_grad and sync_moment are not set, the default value in Paddle is :
                         # sync_param = True, sync_grad = False, sync_moment = False, sync_param_name = ["embedding", "layer_norm", ".b_"].
-                        if sync_param:
-                            strategy.hybrid_configs["mp_configs"].sync_param = True
-                            strategy.hybrid_configs["mp_configs"].sync_param_name = [""]
-                        if sync_grad:
-                            strategy.hybrid_configs["mp_configs"].sync_grad = True
-                            strategy.hybrid_configs["mp_configs"].sync_grad_name = [""]
-                        if sync_moment:
-                            strategy.hybrid_configs["mp_configs"].sync_moment = True
-                            strategy.hybrid_configs["mp_configs"].sync_moment_name = [""]
+                        strategy.sync_param_name = [""]
+                        mp_configs = strategy.hybrid_configs["mp_configs"]
+                        if sync_param or sync_grad or sync_moment:
+                            mp_configs.sync_param = sync_param
+                            mp_configs.sync_grad = sync_grad
+                            mp_configs.sync_moment = sync_moment
+                        else:
+                            # default sync=True for distributed parameter in tp.
+                            mp_configs.sync_param = True
+                            mp_configs.sync_grad = True
+                            mp_configs.sync_moment = True
+                        logger.info(f"using tesnor_parallel configs:{strategy.sync_param_name}, {mp_configs}")
                     except:
                         warnings.warn(
                             "The enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
