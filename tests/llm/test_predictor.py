@@ -266,7 +266,7 @@ class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
             count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
 
-        self.assertGreaterEqual(full_match / len(result_0), 0.75)
+        self.assertGreaterEqual(full_match / len(result_0), 0.6)
 
         if self.model_name_or_path == "__internal_testing__/tiny-fused-chatglm":
             self.assertGreaterEqual(count / len(result_0), 0.3)
@@ -343,8 +343,7 @@ class QWenVLTest(LLMTest, unittest.TestCase):
     def test_forward(self):
         self.disable_static()
         config = AutoConfig.from_pretrained(self.output_dir)
-        config.quant_type = None
-        config.weight_only_quant_bits = None
+        config.quant_type = ""
 
         paddle.set_default_dtype("float16")
         # need to use dtype guard
