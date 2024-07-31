@@ -60,7 +60,7 @@ class TestBasicUtils(unittest.TestCase):
         )
         tokenizer.pad_token_id = tokenizer.unk_token_id
         train_ds = LoReftSupervisedDataset(
-            "../../tests/fixtures/llm/data",
+            "./tests/fixtures/llm/data",
             tokenizer,
             data_split="train",
             seed=42,

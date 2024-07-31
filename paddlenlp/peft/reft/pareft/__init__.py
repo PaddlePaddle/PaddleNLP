@@ -14,7 +14,7 @@
 
 # model helpers
 from .config import ReftConfig
-from .dataset import ReftDataCollator, ReftDataset
+from .dataset import LoReftSupervisedDataset, ReftDataCollator, ReftDataset
 
 # interventions
 from .interventions import LoreftIntervention, LowRankRotateLayer, TinyIntervention

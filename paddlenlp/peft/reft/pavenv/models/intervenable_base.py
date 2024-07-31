@@ -35,11 +35,8 @@ from .modeling_utils import (
 )
 
 
+# Generic intervenable model
 class IntervenableModel(nn.Layer):
-    """
-    Generic intervenable model.
-    """
-
     def __init__(self, config, model, **kwargs):
         super().__init__()
         if isinstance(config, dict) or isinstance(config, list):
@@ -58,16 +55,25 @@ class IntervenableModel(nn.Layer):
         self._key_collision_counter = {}
         self._intervention_group = {}
         _original_key_order = []
+        # for generate
+        self._key_setter_call_counter = {}
         for i, representation in enumerate(config.representations):
             _key = self._get_representation_key(representation)
             if representation.intervention is not None:
                 intervention = representation.intervention
+            # when load reft model from saved config
             else:
-                raise ValueError("representation.intervention should not be None.")
+                intervention_function = intervention_type if type(intervention_type) != list else intervention_type[i]
+                intervention = intervention_function(**config["intervention_params"])
+
             module_hook = get_module_hook(model, representation)
             self.representations[_key] = representation
             self.interventions[_key] = (intervention, module_hook)
             _original_key_order += [_key]
+
+            # usually, it's a one time call per
+            # hook unless model generates.
+            self._key_setter_call_counter[_key] = 0
 
         self.sorted_keys = _original_key_order
         # assign each key to an unique group based on topological order
@@ -82,6 +88,12 @@ class IntervenableModel(nn.Layer):
         self.model_type = get_internal_model_type(model)
         self.disable_model_gradients()
         self.trainable_model_parameters = {}
+
+    def _reset_hook_count(self):
+        """
+        Reset the hook count before any generate call
+        """
+        self._key_setter_call_counter = dict.fromkeys(self._key_setter_call_counter, 0)
 
     def __str__(self):
         attr_dict = {
@@ -154,7 +166,7 @@ class IntervenableModel(nn.Layer):
             param.stop_gradient = True
         self.model_has_grad = False
 
-    def save(self, save_directory):
+    def save(self, save_directory, intervention_params):
         """
         Save interventions to disk or hub
         """
@@ -204,6 +216,7 @@ class IntervenableModel(nn.Layer):
                 saving_config.intervention_dimensions += [intervention.interchange_dim.tolist()]
             saving_config.intervention_constant_sources += [intervention.is_source_constant]
 
+        saving_config["intervention_params"] = intervention_params
         # save metadata config
         saving_config.save_pretrained(save_directory)
 
@@ -350,6 +363,11 @@ class IntervenableModel(nn.Layer):
                 inputs,
                 outputs,
             ):
+                is_prompt = self._key_setter_call_counter[key] == 0
+                if is_prompt:
+                    self._key_setter_call_counter[key] += 1
+                if not is_prompt:
+                    return
 
                 selected_output = self._gather_intervention_output(outputs, key, unit_locations_base[key_i])
 
@@ -362,12 +380,20 @@ class IntervenableModel(nn.Layer):
                 if intervened_representation is None:
                     return
 
-                _ = self._scatter_intervention_output(
-                    outputs,
-                    intervened_representation,
-                    key,
-                    unit_locations_base[key_i],
-                )
+                if isinstance(outputs, tuple):
+                    _ = self._scatter_intervention_output(
+                        outputs[0],
+                        intervened_representation,
+                        key,
+                        unit_locations_base[key_i],
+                    )
+                else:
+                    _ = self._scatter_intervention_output(
+                        outputs,
+                        intervened_representation,
+                        key,
+                        unit_locations_base[key_i],
+                    )
 
             handlers.append(
                 module_hook(
@@ -402,6 +428,8 @@ class IntervenableModel(nn.Layer):
         output_original_output: Optional[bool] = False,
         use_cache: Optional[bool] = True,
     ):
+
+        self._reset_hook_count()
         # if no intervention, return base
         if unit_locations is None and len(self.interventions) == 0:
             return self.model(**base), None
@@ -425,6 +453,7 @@ class IntervenableModel(nn.Layer):
             set_handlers_to_remove.remove()
         except Exception as e:
             raise e
+        self._reset_hook_count()
         return base_outputs, counterfactual_outputs
 
     def train(self):
@@ -449,9 +478,10 @@ class IntervenableModel(nn.Layer):
         output_original_output: Optional[bool] = False,
         **kwargs,
     ):
+        self._reset_hook_count()
         self._intervene_on_prompt = intervene_on_prompt
         base_outputs = None
-        if output_original_output:
+        if output_original_output or True:
             # returning un-intervened output
             base_outputs = self.model.generate(**base, **kwargs)
         set_handlers_to_remove = None
@@ -465,4 +495,5 @@ class IntervenableModel(nn.Layer):
             set_handlers_to_remove.remove()
         except Exception as e:
             raise e
+        self._reset_hook_count()
         return base_outputs, counterfactual_outputs

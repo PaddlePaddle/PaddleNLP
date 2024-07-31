@@ -16,6 +16,8 @@ from __future__ import annotations
 import json
 import os
 import sys
+
+sys.path.append("/home/ldn/baidu/pyreft/paddle-version/mypr/0705/reft-pr/PaddleNLP/llm")
 import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
@@ -43,6 +45,8 @@ from utils.utils import (
 
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft.reft.pareft import LoReftSupervisedDataset, ReftModel
+from paddlenlp.peft.reft.pareft.predict import do_predict
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.transformers import (
@@ -65,6 +69,8 @@ MAX_BSZ = 512
 
 @dataclass
 class PredictorArgument:
+    reft: bool = field(default=False, metadata={"help": "whether to use reft"})
+    reft_path: str = field(default=None, metadata={"help": "The directory of reft parameters. Default to None"})
     model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
     src_length: int = field(default=None, metadata={"help": "The max length of source text."})
@@ -1616,68 +1622,117 @@ def create_predictor(
 def predict():
     parser = PdArgumentParser((PredictorArgument, ModelArgument))
     predictor_args, model_args = parser.parse_args_into_dataclasses()
-
-    paddle.set_device(predictor_args.device)
-    paddle.set_default_dtype(predictor_args.dtype)
-
-    tensor_parallel_degree = paddle.distributed.get_world_size()
-    if tensor_parallel_degree > 1:
-        strategy = fleet.DistributedStrategy()
-        strategy.hybrid_configs = {
-            "dp_degree": 1,
-            "mp_degree": tensor_parallel_degree,
-            "pp_degree": 1,
-            "sharding_degree": 1,
-        }
-        fleet.init(is_collective=True, strategy=strategy)
-
-    predictor = create_predictor(predictor_args, model_args)
-
-    source_texts = []
-    target_texts = []
-    if model_args.data_file:
-        with open(model_args.data_file, "r", encoding="utf-8") as f:
-            for line in f:
-                example = json.loads(line)
-                if isinstance(example["src"], str) or predictor.tokenizer.chat_template is None:
-                    if isinstance(example["src"], str):
-                        source_texts.append(example["src"])
-                        target_texts.append(example["tgt"])
-                    else:
-                        # load multi-rounds dataset
-                        source_texts.append(example["src"][0])
-                        target_texts.append(example["tgt"][0])
-                else:
-                    source_texts.append(list(zip(example["src"], example["tgt"])))
-                    target_texts.append("")
-
+    if predictor_args.reft:
+        tokenizer = AutoTokenizer.from_pretrained(
+            predictor_args.model_name_or_path,
+            model_max_length=512,
+            padding_side="right",
+        )
+        tokenizer.pad_token_id = tokenizer.unk_token_id
+        dev_ds = LoReftSupervisedDataset(
+            model_args.data_file,
+            tokenizer,
+            data_split="dev",
+            seed=42,
+            **{
+                "num_interventions": 32,
+                "position": "f7+l7",
+                "trigger_tokens": "LLM Response: ",
+            },
+        )
+        print(dev_ds)
+        model = AutoModelForCausalLM.from_pretrained(predictor_args.model_name_or_path, dtype=paddle.bfloat16)
+        reft_model = ReftModel.load(predictor_args.reft_path, model)
+        # intervention_dtype = "bfloat16"
+        # representations = [
+        #     {
+        #         "layer": l,
+        #         "component": "block_output",
+        #         "low_rank_dimension": 8,
+        #         "intervention": LoreftIntervention(
+        #             embed_dim=4096,
+        #             low_rank_dimension=8,
+        #             dropout=0.00,
+        #             dtype=intervention_dtype,
+        #             act_fn="linear",
+        #             device="gpu",
+        #             add_bias=False,
+        #         ),
+        #     }
+        #     for l in range(32)
+        # ]
+        # reft_config = ReftConfig(representations=representations)
+        # reft_model = get_reft_model(model, reft_config, set_device=False)
+        do_predict(
+            intervenable=reft_model,
+            tokenizer=tokenizer,
+            eval_dataset=dev_ds,
+            data_items=dev_ds.raw_dataset,
+            batch_size=predictor_args.batch_size,
+            predict_path=model_args.output_file,
+        )
     else:
-        source_texts = ["你好，请问你是谁?"] * predictor_args.batch_size
-        target_texts = [""] * predictor_args.batch_size
+        paddle.set_device(predictor_args.device)
+        paddle.set_default_dtype(predictor_args.dtype)
 
-    batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
-    batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
+        tensor_parallel_degree = paddle.distributed.get_world_size()
+        if tensor_parallel_degree > 1:
+            strategy = fleet.DistributedStrategy()
+            strategy.hybrid_configs = {
+                "dp_degree": 1,
+                "mp_degree": tensor_parallel_degree,
+                "pp_degree": 1,
+                "sharding_degree": 1,
+            }
+            fleet.init(is_collective=True, strategy=strategy)
 
-    with open(model_args.output_file, "w", encoding="utf-8") as f:
-        for bs, batch_source_text in enumerate(batch_source_texts):
-            logger.info("Start predict")
-            outputs = predictor.predict(batch_source_text)
-            logger.info("End predict")
+        predictor = create_predictor(predictor_args, model_args)
 
-            if predictor.tensor_parallel_rank > 0:
-                continue
-            for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
-                print("***********Source**********")
-                print(source)
-                print("***********Target**********")
-                print(target)
-                print("***********Output**********")
-                print(output)
-                out = {"src": source, "tgt": target, "output": output}
-                f.write(json.dumps(out, ensure_ascii=False) + "\n")
+        source_texts = []
+        target_texts = []
+        if model_args.data_file:
+            with open(model_args.data_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    example = json.loads(line)
+                    if isinstance(example["src"], str) or predictor.tokenizer.chat_template is None:
+                        if isinstance(example["src"], str):
+                            source_texts.append(example["src"])
+                            target_texts.append(example["tgt"])
+                        else:
+                            # load multi-rounds dataset
+                            source_texts.append(example["src"][0])
+                            target_texts.append(example["tgt"][0])
+                    else:
+                        source_texts.append(list(zip(example["src"], example["tgt"])))
+                        target_texts.append("")
 
-    if predictor_args.benchmark:
-        benchmark(predictor, predictor_args, model_args)
+        else:
+            source_texts = ["你好，请问你是谁?"] * predictor_args.batch_size
+            target_texts = [""] * predictor_args.batch_size
+
+        batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
+        batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
+
+        with open(model_args.output_file, "w", encoding="utf-8") as f:
+            for bs, batch_source_text in enumerate(batch_source_texts):
+                logger.info("Start predict")
+                outputs = predictor.predict(batch_source_text)
+                logger.info("End predict")
+
+                if predictor.tensor_parallel_rank > 0:
+                    continue
+                for output, source, target in zip(outputs, batch_source_texts[bs], batch_target_texts[bs]):
+                    print("***********Source**********")
+                    print(source)
+                    print("***********Target**********")
+                    print(target)
+                    print("***********Output**********")
+                    print(output)
+                    out = {"src": source, "tgt": target, "output": output}
+                    f.write(json.dumps(out, ensure_ascii=False) + "\n")
+
+        if predictor_args.benchmark:
+            benchmark(predictor, predictor_args, model_args)
 
 
 def benchmark(predictor, predictor_args, model_args):

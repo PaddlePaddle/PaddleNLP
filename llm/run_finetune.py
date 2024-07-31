@@ -61,6 +61,7 @@ from paddlenlp.peft.reft.pareft import (
     get_reft_model,
 )
 from paddlenlp.peft.reft.pareft.dataset import LoReftSupervisedDataset
+from paddlenlp.peft.reft.pareft.predict import do_predict
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
@@ -532,7 +533,7 @@ def main():
 
     if model_args.reft:
         # intervention config based on model type
-        intervention_dtype = paddle.bfloat16
+        intervention_dtype = "bfloat16"
         representations = [
             {
                 "layer": l,
@@ -633,7 +634,26 @@ def main():
         )
         trainer.train()
         run_name = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        reft_model.save(f"{training_args.output_dir}/{run_name}")
+        # 定义参数字典
+        params = {
+            "embed_dim": model_config.hidden_size,
+            "low_rank_dimension": reft_args.rank,
+            "dropout": reft_args.dropout,
+            "dtype": intervention_dtype,
+            "act_fn": reft_args.act_fn,
+            "device": "gpu",
+            "add_bias": reft_args.add_bias,
+        }
+        reft_model.save(f"{training_args.output_dir}/{run_name}", params)
+        # 预测
+        do_predict(
+            intervenable=reft_model,
+            tokenizer=tokenizer,
+            eval_dataset=dev_ds,
+            data_items=dev_ds.raw_dataset,
+            batch_size=training_args.per_device_eval_batch_size,
+            predict_path=f"{training_args.output_dir}/pred_result.json",
+        )
     else:
         trainer = CausalLMTrainer(
             model=model,

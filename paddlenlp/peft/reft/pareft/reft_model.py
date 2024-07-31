@@ -36,9 +36,10 @@ class ReftModel(pv.IntervenableModel):
         return reft_model
 
     @staticmethod
-    def load(*args, **kwargs):
-        model = pv.IntervenableModel.load(*args, **kwargs)
-        return ReftModel._convert_to_reft_model(model)
+    def load(reft_checkpoint_dir, model):
+        model = pv.IntervenableModel.load(reft_checkpoint_dir, model)
+        # return ReftModel._convert_to_reft_model(model)
+        return model
 
     def print_trainable_parameters(self):
         trainable_intervention_parameters = 0

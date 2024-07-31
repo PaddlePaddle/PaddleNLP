@@ -31,7 +31,8 @@ def get_type_from_string(type_str):
     module_name, class_name = type_str.rsplit(".", 1)
 
     # Import the module
-    module_name = f"paddlenlp.peft.reft.{module_name}"
+    if not module_name.startswith("paddlenlp"):
+        module_name = f"paddlenlp.peft.reft.{module_name}"
     module = importlib.import_module(module_name)
 
     # Get the class
