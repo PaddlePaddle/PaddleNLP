@@ -1207,6 +1207,8 @@ class GenerationMixin(object):
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
             if paddle.device.is_compiled_with_custom_device("gcu"):
                 probs = paddle.cast(probs, "float32")
+            if paddle.device.is_compiled_with_xpu():
+                probs = paddle.cast(probs, "float32")
 
             # multinomial already support fp16 and bf16 currently, fix issue: https://github.com/PaddlePaddle/Paddle/issues/51852
             next_tokens = paddle.multinomial(probs)
