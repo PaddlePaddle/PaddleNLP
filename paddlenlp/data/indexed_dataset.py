@@ -70,17 +70,16 @@ def make_dataset(path, impl, skip_warmup=False):
 
 
 def make_sft_dataset(path, impl, dataclass, skip_warmup=False):
-    if impl == "mmap" and SFT_MMapIndexedDataset.exists(path, dataclass):
-        print_rank_0(" > building dataset index ...")
-        start_time = time.time()
-        sft_indexed_dataset = SFT_MMapIndexedDataset(path, dataclass, skip_warmup)
-        print_rank_0(" > finished creating SFT indexed dataset in {:4f} " "seconds".format(time.time() - start_time))
-        print_rank_0("    number of samples: {}".format(len(sft_indexed_dataset.doc_idx) - 1))
+    if impl != "mmap":
+        raise ValueError("SFT Indexed Dataset only support mmap memory-mapped method temporarily")
 
-        return sft_indexed_dataset
+    print_rank_0(" > building dataset index ...")
+    start_time = time.time()
+    sft_indexed_dataset = SFT_MMapIndexedDataset(path, dataclass, skip_warmup)
+    print_rank_0(" > finished creating SFT indexed dataset in {:4f} " "seconds".format(time.time() - start_time))
+    print_rank_0("    number of samples: {}".format(len(sft_indexed_dataset.doc_idx) - 1))
 
-    print(f"Unknown dataset implementation: {impl}")
-    return None
+    return sft_indexed_dataset
 
 
 def dataset_exists(path, impl):
