@@ -979,6 +979,12 @@ class TrainingArguments:
             if ShardingOption.OFFLOAD in self.sharding:
                 warnings.warn("`offload` is not supported NOW!")
 
+            if self.sharding_parallel_degree > 1:
+                if ShardingOption.FULL_SHARD in self.sharding or ShardingOption.SHARD_GRAD_OP in self.sharding:
+                    assert (
+                        not self.release_grads
+                    ), "`release_grads` should be False when using sharding stage2 or stage3."
+
             if self.pipeline_parallel_degree > 1:
                 if ShardingOption.FULL_SHARD in self.sharding or ShardingOption.SHARD_GRAD_OP in self.sharding:
                     raise ValueError(
