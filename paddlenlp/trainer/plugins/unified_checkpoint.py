@@ -1029,15 +1029,20 @@ def save_prefix_past_key_value(model_to_save, save_directory):
 def get_expected_state_dict(model_to_save):
     if isinstance(model_to_save, PretrainedModel):
         state_dict = model_to_save.state_dict()
+        if (
+            hasattr(model_to_save.config, "tie_word_embeddings")
+            and model_to_save.config.tie_word_embeddings
+            and hasattr(model_to_save, "_tied_weights_keys")
+            and model_to_save._tied_weights_keys is not None
+        ):
+            for key in model_to_save._tied_weights_keys:
+                if key in state_dict:
+                    state_dict.pop(key)
     elif isinstance(model_to_save, LoRAModel):
         state_dict = model_to_save.get_trainable_state_dict()
     elif isinstance(model_to_save, PrefixModelForCausalLM):
         state_dict = model_to_save.prefix_encoder.state_dict()
 
-    if hasattr(model_to_save, "_tied_weights_keys") and model_to_save._tied_weights_keys is not None:
-        for key in model_to_save._tied_weights_keys:
-            if key in state_dict:
-                state_dict.pop(key)
     return state_dict
 
 
