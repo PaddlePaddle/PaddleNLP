@@ -681,7 +681,7 @@ class SFT_MMapIndexedDataset(paddle.io.Dataset):
             return self._pointers[i], self._sizes[i]
 
         def __len__(self):
-            return self._len
+            return self._doc_count - 1
 
     def __init__(self, path, dataclass, skip_warmup=False):
         super().__init__()
@@ -728,33 +728,41 @@ class SFT_MMapIndexedDataset(paddle.io.Dataset):
         return len(self._index)
 
     def __getitem__(self, idx):
-        doc_idx = self._index.doc_idx
-        start_sentence, end_sentence = doc_idx[idx], doc_idx[idx + 1]
-        start_pointers, _ = self._index[start_sentence]
-        length_list = self._index._sizes[start_sentence:end_sentence]
+        def get_index(idx):
+            doc_idx = self._index.doc_idx
+            start_sentence, end_sentence = doc_idx[idx], doc_idx[idx + 1]
+            start_pointers, _ = self._index[start_sentence]
+            length_list = self._index._sizes[start_sentence:end_sentence]
 
-        dataclass_fields = fields(self._dataclass)
-        dataclass_list = []
-        sequence_offset = start_pointers
-        scalar_offset = doc_idx[idx] * np.dtype(self._index.dtype).itemsize
+            dataclass_fields = fields(self._dataclass)
+            dataclass_list = []
+            sequence_offset = start_pointers
+            scalar_offset = doc_idx[idx] * np.dtype(self._index.dtype).itemsize
 
-        for length in length_list:
-            field_data = {field.name: [] for field in dataclass_fields}
-            for field in dataclass_fields:
-                bin_buffer = self._bin_buffer_dict[os.path.join(self._path, f"{field.name}.bin")]
-                if field.type != int:
-                    data = np.frombuffer(bin_buffer, dtype=self._index.dtype, count=length, offset=sequence_offset)
-                    field_data[field.name] = data.tolist()
-                else:
-                    data = np.frombuffer(bin_buffer, dtype=self._index.dtype, count=1, offset=scalar_offset)
-                    field_data[field.name] = int(data[0])
+            for length in length_list:
+                field_data = {field.name: [] for field in dataclass_fields}
+                for field in dataclass_fields:
+                    bin_buffer = self._bin_buffer_dict[os.path.join(self._path, f"{field.name}.bin")]
+                    if field.type != int:
+                        data = np.frombuffer(bin_buffer, dtype=self._index.dtype, count=length, offset=sequence_offset)
+                        field_data[field.name] = data.tolist()
+                    else:
+                        data = np.frombuffer(bin_buffer, dtype=self._index.dtype, count=1, offset=scalar_offset)
+                        field_data[field.name] = int(data[0])
 
-            dataclass_list.append(self._dataclass(**field_data))
+                dataclass_list.append(self._dataclass(**field_data))
 
-            sequence_offset += length * np.dtype(self._index.dtype).itemsize
-            scalar_offset += np.dtype(self._index.dtype).itemsize
+                sequence_offset += length * np.dtype(self._index.dtype).itemsize
+                scalar_offset += np.dtype(self._index.dtype).itemsize
+            return dataclass_list
 
-        return dataclass_list
+        if isinstance(idx, (int, np.integer)):
+            return get_index(idx)
+        elif isinstance(idx, slice):
+            start, stop, step = idx.indices(len(self))
+            if step != 1:
+                raise ValueError("Slices into indexed_dataset must be contiguous")
+            return [get_index(idx) for idx in range(start, stop)]
 
     @property
     def sizes(self):
