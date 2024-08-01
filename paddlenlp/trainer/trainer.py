@@ -1163,7 +1163,7 @@ class Trainer:
                     if optimizer_was_run:
                         self.lr_scheduler.step()
 
-                    if enable_release_grads:
+                    if args.release_grads or enable_release_grads:
                         self.optimizer.clear_grad(set_to_zero=False)
                         if args.pipeline_parallel_degree > 1:
                             for _, buffers in model._chunk_2_comm_buffers.items():
@@ -2660,7 +2660,9 @@ class Trainer:
             dist.barrier()
         if self.args.use_expert_parallel:
             opt_state_dict = broadcast_moe_optimizer(
-                opt_state_dict, broadcast_dp=not self.args.should_load_sharding_stage1_model
+                opt_state_dict,
+                model_state_dict=self.model.state_dict(),
+                broadcast_dp=not self.args.should_load_sharding_stage1_model,
             )
         else:
             if not self.args.should_load_sharding_stage1_model:

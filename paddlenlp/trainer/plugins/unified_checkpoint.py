@@ -1029,15 +1029,20 @@ def save_prefix_past_key_value(model_to_save, save_directory):
 def get_expected_state_dict(model_to_save):
     if isinstance(model_to_save, PretrainedModel):
         state_dict = model_to_save.state_dict()
+        if (
+            hasattr(model_to_save.config, "tie_word_embeddings")
+            and model_to_save.config.tie_word_embeddings
+            and hasattr(model_to_save, "_tied_weights_keys")
+            and model_to_save._tied_weights_keys is not None
+        ):
+            for key in model_to_save._tied_weights_keys:
+                if key in state_dict:
+                    state_dict.pop(key)
     elif isinstance(model_to_save, LoRAModel):
         state_dict = model_to_save.get_trainable_state_dict()
     elif isinstance(model_to_save, PrefixModelForCausalLM):
         state_dict = model_to_save.prefix_encoder.state_dict()
 
-    if hasattr(model_to_save, "_tied_weights_keys") and model_to_save._tied_weights_keys is not None:
-        for key in model_to_save._tied_weights_keys:
-            if key in state_dict:
-                state_dict.pop(key)
     return state_dict
 
 
@@ -1735,6 +1740,37 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
     return filter_tensor_list
 
 
+def merge_large_tensor_parallel(tensor, tp_group, tp_action, dst_rank, is_dst):
+    num_rows = tensor.shape[0]
+    num_splits = 4
+    parts = np.array_split(np.arange(num_rows), num_splits)
+    splits = [len(part) for part in parts]
+    split_parts = np.insert(np.cumsum(splits), 0, 0)
+    split_tensors = []
+    for i in range(num_splits):
+        if get_env_device() == "xpu":
+            ret = distributed_allgather(tensor[split_parts[i] : split_parts[i + 1], :], group=tp_group, offload=False)
+        else:
+            ret = distributed_gather(
+                tensor[split_parts[i] : split_parts[i + 1], :], dst=dst_rank, group=tp_group, offload=False
+            )
+        # Copy to CPUPlace temporarily, may lower speed.
+        if ret is not None:
+            ret = [t.cpu() for t in ret]
+        split_tensors.append(ret)
+    concat_tensors = []
+    if is_dst:
+        for i in range(tp_group.nranks):
+            tmp = []
+            for j in range(num_splits):
+                tmp.append(split_tensors[j][i])
+            concat_tensors.append(paddle.concat(tmp))
+        tensor = tp_action(concat_tensors)
+    else:
+        tensor = None
+    return tensor
+
+
 def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
@@ -1757,12 +1793,17 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
             key = filter_keys[i]
             tensor = state_dict[key]
             if key in tp_actions:
-                if get_env_device() == "xpu":
-                    ret = distributed_allgather(tensor, group=tp_group, offload=False)
+                # Get tensor size
+                tensor_bytes = tensor.numel().item() * dtype_byte_size(tensor.dtype) * tp_group.nranks
+                if tensor_bytes >= 5 * 1024 * 1024 * 1024:  # temporarily set 5GB as threshold
+                    tensor = merge_large_tensor_parallel(tensor, tp_group, tp_actions[key], j, is_dst)
                 else:
-                    ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
-                action = tp_actions.pop(key)
-                tensor = action(ret) if is_dst else None
+                    if get_env_device() == "xpu":
+                        ret = distributed_allgather(tensor, group=tp_group, offload=False)
+                    else:
+                        ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
+                    action = tp_actions.pop(key)
+                    tensor = action(ret) if is_dst else None
             else:
                 tensor = tensor._copy_to(DEST_PLACE, False) if is_dst else None
 
@@ -1797,12 +1838,17 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys)
                 if tensor.numel().item() == 1:
                     tensor = tensor._copy_to(DEST_PLACE, False) if is_dst else None  # Need broadcast when loaded
                 else:
-                    if get_env_device() == "xpu":
-                        ret = distributed_allgather(tensor, group=tp_group, offload=False)
+                    # Get tensor size
+                    tensor_bytes = tensor.numel().item() * dtype_byte_size(tensor.dtype) * tp_group.nranks
+                    if tensor_bytes >= 5 * 1024 * 1024 * 1024:  # temporarily set 5GB as threshold
+                        tensor = merge_large_tensor_parallel(tensor, tp_group, tp_actions[model_key], j, is_dst)
                     else:
-                        ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
-                    action = tp_actions[model_key]
-                    tensor = action(ret) if is_dst else None
+                        if get_env_device() == "xpu":
+                            ret = distributed_allgather(tensor, group=tp_group, offload=False)
+                        else:
+                            ret = distributed_gather(tensor, dst=j, group=tp_group, offload=False)
+                        action = tp_actions[model_key]
+                        tensor = action(ret) if is_dst else None
             else:
                 tensor = tensor._copy_to(DEST_PLACE, False) if is_dst else None
 

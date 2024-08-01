@@ -271,7 +271,7 @@ class TrainingArguments:
               enable_stage1_broadcast_overlap, overlap stage1 V1 broadcast with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap forward compute and no other sync could be called during the training for broadcast overlap.
               enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap.
               disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.
-              enable_release_graHEADds, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
+              enable_release_grads, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -355,6 +355,8 @@ class TrainingArguments:
             Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
         distributed_dataloader (`bool`, *optional*):
             Whether to use distributed dataloader. Default is `False`.
+        release_grads (`bool`, *optional*):
+            Whether to release gradients during training. Default is `False`.
     """
 
     output_dir: str = field(
@@ -831,6 +833,9 @@ class TrainingArguments:
     use_expert_parallel: Optional[bool] = field(
         default=False,
         metadata={"help": "Enable MoE (Mixture of Experts) expert parallel training"},
+    )
+    release_grads: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to release gradients during training. Default is `False`."}
     )
 
     def __post_init__(self):
