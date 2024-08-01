@@ -1208,6 +1208,8 @@ class GenerationMixin(object):
                 probs = TopKProcess(probs, top_k, min_tokens_to_keep)
             if top_p is not None and top_p < 1.0:
                 probs = TopPProcess(probs, top_p, min_tokens_to_keep)
+            if paddle.device.is_compiled_with_xpu():
+                probs = paddle.cast(probs, "float32")
 
             # multinomial already support fp16 and bf16 currently, fix issue: https://github.com/PaddlePaddle/Paddle/issues/51852
             next_tokens = paddle.multinomial(probs)

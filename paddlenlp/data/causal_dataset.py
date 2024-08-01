@@ -94,10 +94,11 @@ def get_datasets_weights_and_num_samples(data_prefix, train_val_test_num_samples
     # Add 0.5% (the 1.005 factor) so in case the bleding dataset does
     # not uniformly distribute the number of samples, we still have
     # samples left to feed to the network.
+    # (NOTE, yujun06): This is a workaround to avoid issues with indexing in the blending dataset. Therefore, we need to add 20 samples to each dataset.
     datasets_train_valid_test_num_samples = []
     for weight in weights:
         datasets_train_valid_test_num_samples.append(
-            [int(math.ceil(val * weight * 1.005)) for val in train_val_test_num_samples]
+            [int(math.ceil(val * weight * 1.005)) + 20 for val in train_val_test_num_samples]
         )
 
     return prefixes, weights, datasets_train_valid_test_num_samples
@@ -146,7 +147,9 @@ def build_train_valid_test_datasets(
     # Parse the values.
     output = get_datasets_weights_and_num_samples(data_prefix, train_val_test_num_samples)
     prefixes, weights, datasets_train_valid_test_num_samples = output
-    train_num_samples, valid_num_samples, test_num_samples = map(sum, zip(*datasets_train_valid_test_num_samples))
+    # NOTE: megatron/gpt_dataset.py has been updated. When creating BlendableDataset, we will use the raw train_val_test_num_samples instead of the expanded ones.
+    # Please refer to https://github.com/NVIDIA/NeMo/blob/72f630d087d45655b1a069dc72debf01dfdbdb2d/nemo/collections/nlp/data/language_modeling/megatron/gpt_dataset.py#L74-L80 for more information
+    train_num_samples, valid_num_samples, test_num_samples = train_val_test_num_samples
 
     # Build individual datasets.
     train_datasets = []

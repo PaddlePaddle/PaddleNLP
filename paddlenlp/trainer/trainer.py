@@ -1460,6 +1460,7 @@ class Trainer:
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
                     collate_fn=self.data_collator,
+                    drop_last=self.args.dataloader_drop_last,
                     num_workers=0,
                     eval=True,
                 )
@@ -1468,6 +1469,7 @@ class Trainer:
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
                     collate_fn=self.data_collator,
+                    drop_last=self.args.dataloader_drop_last,
                     num_workers=0,
                 )
 
@@ -1526,6 +1528,7 @@ class Trainer:
                     batch_size=self.args.per_device_eval_batch_size * self.world_size,
                     collate_fn=self.data_collator,  # _get_collator_with_removed_columns
                     num_workers=0,
+                    drop_last=self.args.dataloader_drop_last,
                     eval=True,
                 )
             else:
@@ -1533,6 +1536,7 @@ class Trainer:
                     test_dataset,
                     batch_size=self.args.per_device_eval_batch_size * self.world_size,
                     collate_fn=self.data_collator,  # _get_collator_with_removed_columns
+                    drop_last=self.args.dataloader_drop_last,
                     num_workers=0,
                 )
 
@@ -2509,7 +2513,9 @@ class Trainer:
             dist.barrier()
         if self.args.use_expert_parallel:
             opt_state_dict = broadcast_moe_optimizer(
-                opt_state_dict, broadcast_dp=not self.args.should_load_sharding_stage1_model
+                opt_state_dict,
+                model_state_dict=self.model.state_dict(),
+                broadcast_dp=not self.args.should_load_sharding_stage1_model,
             )
         else:
             if not self.args.should_load_sharding_stage1_model:
