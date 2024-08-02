@@ -49,6 +49,7 @@ except:
 MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
 DIST_CKPT_PATH = "dist_ckpt"
+FREE_SVAE_LOAD_KEY_PATTERNS = ["learning_rate_", "gradient_merge_", "@GRAD@MERG", "eager_tmp"]
 
 
 class AutoTrainer(Trainer):
@@ -543,7 +544,15 @@ class AutoTrainer(Trainer):
 
             if self.args.should_save_model_state:
                 if self.args.to_static:
-                    state_dict = model.state_dict()
+                    opt_state_dict = {
+                        key: value
+                        for key, value in model.state_dict("opt").items()
+                        if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
+                    }
+                    state_dict = {
+                        MODEL_NAME: model.state_dict("param"),
+                        OPTIMIZER_NAME: opt_state_dict,
+                    }
                 else:
                     optim_state_dict = self.optimizer.state_dict()
                     optim_state_dict.pop("LR_Scheduler", None)
@@ -669,7 +678,15 @@ class AutoTrainer(Trainer):
                 raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
 
             if self.args.to_static:
-                state_dict = self.model_wrapped.state_dict()
+                opt_state_dict = {
+                    key: value
+                    for key, value in self.model_wrapped.state_dict("opt").items()
+                    if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
+                }
+                state_dict = {
+                    MODEL_NAME: self.model_wrapped.state_dict("param"),
+                    OPTIMIZER_NAME: opt_state_dict,
+                }
             else:
                 model_state_dict = self.model_wrapped.state_dict()
                 optim_state_dict = self.optimizer.state_dict()
