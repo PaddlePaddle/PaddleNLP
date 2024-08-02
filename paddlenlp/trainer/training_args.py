@@ -1173,19 +1173,19 @@ class TrainingArguments:
                         # sync_param = True, sync_grad = False, sync_moment = False, sync_param_name = ["embedding", "layer_norm", ".b_"].
 
                         if sync_param or sync_grad or sync_moment:
-                            logger.info(f"setting sync_param_name")
+                            logger.info("setting sync_param_name")
                             strategy.sync_param_name = [""]
 
                         if sync_param:
-                            logger.info(f"setting sync_param")
+                            logger.info("setting sync_param")
                             strategy.hybrid_configs["mp_configs"].sync_param = True
 
                         if sync_grad:
-                            logger.info(f"setting sync_grad")
+                            logger.info("setting sync_grad")
                             strategy.hybrid_configs["mp_configs"].sync_grad = True
 
                         if sync_moment:
-                            logger.info(f"setting sync_moment")
+                            logger.info("setting sync_moment")
                             strategy.hybrid_configs["mp_configs"].sync_moment = True
 
                     except:
