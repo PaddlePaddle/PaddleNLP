@@ -20,8 +20,11 @@ import sys
 import tempfile
 
 import paddle
+from filelock import FileLock
 
 from tests.testing_utils import argv_context_guard, load_test_config
+
+lock = FileLock(".predictor_lock_guard.txt.lock")
 
 
 class LLMTest:
@@ -60,47 +63,58 @@ class LLMTest:
         if config_params is None:
             config_params = {}
 
-        # to avoid the same parameter
-        self.disable_static()
         predict_config = load_test_config(self.config_path, "inference-predict")
         predict_config["output_file"] = os.path.join(self.output_dir, "predict.json")
         predict_config["model_name_or_path"] = self.output_dir
         predict_config.update(config_params)
 
-        with argv_context_guard(predict_config):
-            from predict.predictor import predict
+        with lock:
+            # to avoid the same parameter
+            self.disable_static()
+            if "predict" in sys.modules.keys():
+                del sys.modules["predict"]
 
-            predict()
+            with argv_context_guard(predict_config):
+                from predict.predictor import predict
+
+                predict()
+            self.disable_static()
 
         # prefix_tuning dynamic graph do not support to_static
         if not predict_config["inference_model"]:
             return
 
-        # to static
-        self.disable_static()
         config = load_test_config(self.config_path, "inference-to-static")
         config["output_path"] = self.inference_output_dir
         config["model_name_or_path"] = self.output_dir
         config.update(config_params)
-        with argv_context_guard(config):
-            from predict.export_model import main
+        with lock:
+            # to static
+            self.disable_static()
+            if "predict" in sys.modules.keys():
+                del sys.modules["predict"]
 
-            main()
+            with argv_context_guard(config):
+                from predict.export_model import main
 
-        # inference
-        self.disable_static()
+                main()
+            self.disable_static()
+
         config = load_test_config(self.config_path, "inference-infer")
         config["model_name_or_path"] = self.inference_output_dir
         config["output_file"] = os.path.join(self.inference_output_dir, "infer.json")
 
         config_params.pop("model_name_or_path", None)
         config.update(config_params)
-        with argv_context_guard(config):
-            from predict.predictor import predict
+        with lock:
+            if "predict" in sys.modules.keys():
+                del sys.modules["predict"]
+            self.disable_static()
+            with argv_context_guard(config):
+                from predict.predictor import predict
 
-            predict()
-
-        self.disable_static()
+                predict()
+            self.disable_static()
 
         predict_result = self._read_result(predict_config["output_file"])
         infer_result = self._read_result(config["output_file"])

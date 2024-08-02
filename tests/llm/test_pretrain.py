@@ -21,11 +21,12 @@ import unittest
 from parameterized import parameterized_class
 
 from paddlenlp.utils.downloader import get_path_from_url
-from tests.testing_utils import argv_context_guard, load_test_config
+from tests.testing_utils import argv_context_guard, load_test_config, require_gpu
 
 from .testing_utils import LLMTest
 
 
+@require_gpu(1)
 @parameterized_class(
     ["model_dir"],
     [
@@ -50,13 +51,7 @@ class PretrainTest(LLMTest, unittest.TestCase):
         shutil.rmtree(self.dataset_dir)
 
     def test_pretrain(self):
-
-        pretrain_flag = False
-        for key, value in sys.modules.items():
-            if "run_pretrain" in key:
-                pretrain_flag = True
-                break
-        if pretrain_flag:
+        if "run_pretrain" in sys.modules.keys():
             del sys.modules["run_pretrain"]
 
         # Run pretrain

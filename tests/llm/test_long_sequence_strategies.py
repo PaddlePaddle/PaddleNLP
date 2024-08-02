@@ -22,6 +22,7 @@ import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+from tests.testing_utils import require_gpu
 
 from .testing_utils import LLMTest, argv_context_guard, load_test_config
 
@@ -4808,6 +4809,7 @@ all_ppl = [
 ]
 
 
+@require_gpu(1)
 @parameterized_class(
     [
         "model_name_or_path",

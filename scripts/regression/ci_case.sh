@@ -627,16 +627,6 @@ taskflow (){
     python -m pytest scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
     print_info $? taskflow
 }
-llm(){
-    cd ${nlp_dir}/csrc
-    echo "build paddlenlp_op"
-    python setup_cuda.py install
-
-    echo ' Testing all LLMs '
-    cd ${nlp_dir}
-    python -m pytest tests/llm/test_*.py --alluredir=result >${log_path}/llm >>${log_path}/llm 2>&1
-    print_info $? llm
-}
 fast_generation(){
     cd ${nlp_dir}/fast_generation/samples
     # python codegen_sample.py >${log_path}/fast_generation_codegen >>${log_path}/fast_generation_codegen 2>&1
