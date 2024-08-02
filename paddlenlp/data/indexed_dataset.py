@@ -69,13 +69,13 @@ def make_dataset(path, impl, skip_warmup=False):
     return None
 
 
-def make_sft_dataset(path, impl, dataclass, skip_warmup=False):
+def make_sft_dataset(path, dataclass, skip_warmup=False, impl="mmap"):
     if impl != "mmap":
         raise ValueError("SFT Indexed Dataset only support mmap memory-mapped method temporarily")
 
     print_rank_0(" > building dataset index ...")
     start_time = time.time()
-    sft_indexed_dataset = SFT_MMapIndexedDataset(path, dataclass, skip_warmup)
+    sft_indexed_dataset = SftMMapIndexedDataset(path, dataclass, skip_warmup)
     print_rank_0(" > finished creating SFT indexed dataset in {:4f} " "seconds".format(time.time() - start_time))
     print_rank_0("    number of samples: {}".format(len(sft_indexed_dataset.doc_idx) - 1))
 
@@ -574,7 +574,7 @@ class MMapIndexedDataset(paddle.io.Dataset):
         return os.path.exists(index_file_path(path)) and os.path.exists(data_file_path(path))
 
 
-class SFT_MMapIndexedDataset(paddle.io.Dataset):
+class SftMMapIndexedDataset(paddle.io.Dataset):
     class Index(object):
         _HDR_MAGIC = b"MMIDIDX\x00\x00"
 
@@ -798,7 +798,7 @@ def make_builder(out_file, impl, save_dtype, loss_mask_file=None):
         return IndexedDatasetBuilder(out_file, dtype=save_dtype)
 
 
-class SFT_MMapIndexedDatasetBuilder(object):
+class SftMMapIndexedDatasetBuilder(object):
     def __init__(self, output_file_dict, dtype):
         self._data_file_dict = {}
         for key, filename in output_file_dict.items():
@@ -823,7 +823,7 @@ class SFT_MMapIndexedDatasetBuilder(object):
     def finalize(self, index_file):
         for key, filename in self._data_file_dict.items():
             filename.close()
-        with SFT_MMapIndexedDataset.Index.writer(index_file, self._dtype) as index:
+        with SftMMapIndexedDataset.Index.writer(index_file, self._dtype) as index:
             index.write(self._sizes, self._doc_idx)
 
 
