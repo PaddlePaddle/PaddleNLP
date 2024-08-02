@@ -28,7 +28,7 @@ import paddle.distributed.fleet.base.topology as tp
 import paddle.incubate.multiprocessing as mp
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
 from paddle.distributed import fleet
-from utils.utils import (
+from llm.utils.utils import (
     dybatch_preprocess,
     get_alibi_slopes,
     get_default_max_decoding_length,
@@ -1450,10 +1450,16 @@ def create_predictor(
                 model.eval()
 
             elif "chatglmv2forcausallm" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    ChatGLMv2ForCausalLMInferenceModel as Model,
-                )
-
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                    from paddlenlp.experimental.transformers import (
+                        ChatGLMv2ForCausalLMBlockInferenceModel as Model,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        ChatGLMv2ForCausalLMInferenceModel as Model,
+                    )
                 model = Model.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
