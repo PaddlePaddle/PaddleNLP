@@ -16,10 +16,13 @@ import unittest
 
 import paddle
 
+from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.peft.reft.pareft import (
     LoreftIntervention,
     LowRankRotateLayer,
     ReftConfig,
+    ReftDataCollator,
+    ReftTrainer,
     TinyIntervention,
     get_reft_model,
 )
@@ -29,9 +32,43 @@ from paddlenlp.peft.reft.pareft.dataset import (
     get_intervention_locations,
     parse_positions,
 )
+from paddlenlp.peft.reft.pareft.predict import do_predict
 from paddlenlp.peft.reft.pareft.reft_model import ReftModel
 from paddlenlp.peft.reft.pavenv.models.basic_utils import get_type_from_string
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+
+
+class TestReftDataCollator(unittest.TestCase):
+    def test_call(self):
+        model_name = "__internal_testing__/tiny-random-llama"
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            model_max_length=512,
+            padding_side="right",
+        )
+        tokenizer.pad_token_id = tokenizer.eos_token_id
+        model = AutoModelForCausalLM.from_pretrained(model_name)
+        data_collator = DataCollatorForSeq2Seq(
+            tokenizer=tokenizer, model=model, label_pad_token_id=-100, padding="longest"
+        )
+        reft_data_collator = ReftDataCollator(data_collator)
+        instances = [
+            {
+                "input_ids": paddle.to_tensor([[1, 2, 3], [4, 5, 6]]),
+                "intervention_locations": paddle.to_tensor([[0, 1, 0], [1, 0, 1]]),
+            },
+            {
+                "input_ids": paddle.to_tensor([[7, 8, 9], [10, 11, 12]]),
+                "intervention_locations": paddle.to_tensor([[1, 0, 1], [0, 1, 0]]),
+            },
+        ]
+
+        batch_inputs = reft_data_collator(instances)
+
+        self.assertIn("input_ids", batch_inputs)
+        self.assertIn("intervention_locations", batch_inputs)
+        self.assertIsInstance(batch_inputs["input_ids"], paddle.Tensor)
+        self.assertIsInstance(batch_inputs["intervention_locations"], paddle.Tensor)
 
 
 class TestBasicUtils(unittest.TestCase):
@@ -43,6 +80,10 @@ class TestBasicUtils(unittest.TestCase):
     def test_parse_positions(self):
         positions = "f7+l7"
         self.assertEqual(parse_positions(positions), (7, 7))
+        positions = "f7"
+        self.assertEqual(parse_positions(positions), (7, 0))
+        positions = "l7"
+        self.assertEqual(parse_positions(positions), (0, 7))
 
     def test_get_intervention_locations(self):
         kwargs = {"last_position": 10, "positions": "f7+l7", "num_interventions": 1}
@@ -76,8 +117,8 @@ class TestBasicUtils(unittest.TestCase):
 class TestLoReftIntervention(unittest.TestCase):
     def setUp(self):
         self.kwargs = {
-            "embed_dim": 256,
-            "low_rank_dimension": 64,
+            "embed_dim": 64,
+            "low_rank_dimension": 4,
             "dtype": paddle.float32,
             "dropout": 0.1,
             "act_fn": "linear",
@@ -95,6 +136,23 @@ class TestLoReftIntervention(unittest.TestCase):
         output = intervention.forward(base)
         self.assertEqual(output.shape, base.shape)
         self.assertEqual(output.dtype, self.kwargs["dtype"])
+
+    def test_load_state_dict(self):
+        model = LoreftIntervention(**self.kwargs)
+        state_dict = {
+            "learned_source.weight": paddle.randn([64, 4]),
+            "learned_source.bias": paddle.zeros([4]),
+            "rotate_layer.weight": paddle.randn([64, 4]),
+        }
+        model.load_state_dict(state_dict)
+        self.assertTrue(paddle.allclose(model.learned_source.weight.data, state_dict["learned_source.weight"]))
+        self.assertTrue(paddle.allclose(model.learned_source.bias.data, state_dict["learned_source.bias"]))
+        self.assertTrue(
+            paddle.allclose(
+                model.rotate_layer.weight[:, : state_dict["rotate_layer.weight"].shape[-1]],
+                state_dict["rotate_layer.weight"],
+            )
+        )
 
 
 class TestTinyIntervention(unittest.TestCase):
@@ -177,6 +235,84 @@ class TestReftModel(unittest.TestCase):
         reft_model.print_trainable_parameters()
         outputs = reft_model.model(**{"input_ids": paddle.randint(low=1, high=100, shape=(5, 10))})
         self.assertTrue(outputs[0].shape, [5, 10, 32000])
+
+
+class TestReftModelTrain(unittest.TestCase):
+    def test_reft_model_train(self):
+        model_name = "__internal_testing__/tiny-random-llama"
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_name,
+            model_max_length=128,
+            padding_side="right",
+        )
+        tokenizer.pad_token_id = tokenizer.unk_token_id
+        model = AutoModelForCausalLM.from_pretrained(model_name, dtype="bfloat16")
+        intervention_dtype = "bfloat16"
+        layers = [int(l) for l in range(1)]
+        representations = [
+            {
+                "layer": l,
+                "component": "block_output",
+                "low_rank_dimension": 4,
+                "intervention": LoreftIntervention(
+                    embed_dim=768,
+                    low_rank_dimension=4,
+                    dropout=0.00,
+                    dtype=intervention_dtype,
+                    act_fn="linear",
+                    device="gpu",
+                    add_bias=False,
+                ),
+            }
+            for l in layers
+        ]
+        reft_config = ReftConfig(representations=representations)
+        reft_model = get_reft_model(model, reft_config, set_device=False)
+        reft_model.print_trainable_parameters()
+        reft_model.model.train()
+        train_ds = LoReftSupervisedDataset(
+            "./tests/fixtures/llm/data",
+            tokenizer,
+            data_split="train",
+            seed=42,
+            **{
+                "num_interventions": len(layers),
+                "position": "f5+l5",
+                "trigger_tokens": "LLM Response: ",
+            },
+        )
+        dev_ds = LoReftSupervisedDataset(
+            "./tests/fixtures/llm/data",
+            tokenizer,
+            data_split="dev",
+            seed=42,
+            **{
+                "num_interventions": len(layers),
+                "position": "f5+l5",
+                "trigger_tokens": "LLM Response: ",
+            },
+        )
+        data_collator_fn = DataCollatorForSeq2Seq(
+            tokenizer=tokenizer, model=model, label_pad_token_id=-100, padding="longest"
+        )
+        data_collator = ReftDataCollator(data_collator=data_collator_fn)
+        trainer = ReftTrainer(
+            model=reft_model,
+            tokenizer=tokenizer,
+            # args=training_args,
+            train_dataset=train_ds,
+            data_collator=data_collator,
+            eval_dataset=None,
+            compute_metrics=None,
+        )
+        trainer.train()
+        do_predict(
+            intervenable=reft_model,
+            tokenizer=tokenizer,
+            eval_dataset=dev_ds,
+            data_items=dev_ds.raw_dataset,
+            batch_size=1,
+        )
 
 
 if __name__ == "__main__":

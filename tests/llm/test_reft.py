@@ -29,6 +29,7 @@ from .testing_utils import LLMTest
     ["model_dir"],
     [
         ["llama"],
+        ["baichuan"],
     ],
 )
 class ReftTest(LLMTest, unittest.TestCase):

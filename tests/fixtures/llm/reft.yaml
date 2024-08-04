@@ -30,6 +30,20 @@ reft:
   default:
     llama:
       model_name_or_path: __internal_testing__/tiny-random-llama
+    chatglm:
+      model_name_or_path: __internal_testing__/tiny-fused-chatglm
+    chatglm2:
+      model_name_or_path: __internal_testing__/tiny-fused-chatglm2
+    bloom:
+      model_name_or_path: __internal_testing__/tiny-fused-bloom
+    qwen:
+      model_name_or_path: __internal_testing__/tiny-fused-qwen
+    qwen2:
+      model_name_or_path: __internal_testing__/tiny-random-qwen2
+    qwen2moe:
+      model_name_or_path: __internal_testing__/tiny-random-qwen2moe
+    baichuan:
+      model_name_or_path: __internal_testing__/tiny-fused-baichuan
 
 
 inference-predict:

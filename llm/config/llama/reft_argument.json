@@ -28,5 +28,6 @@
     "pipeline_parallel_degree": 1,
     "zero_padding": false,
     "recompute": false,
-    "reft": true
+    "reft": true,
+    "intervention_type": "TinyIntervention"
 }

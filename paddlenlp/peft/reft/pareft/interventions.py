@@ -86,7 +86,6 @@ class LoreftIntervention(SourcelessIntervention):
     def load_state_dict(self, state_dict, *args, **kwargs):
         self.learned_source.weight.data = state_dict["learned_source.weight"]
         self.learned_source.bias.data = state_dict["learned_source.bias"]
-
         overload_w = state_dict["rotate_layer.weight"]
         overload_w_width = overload_w.shape[-1]
         with paddle.no_grad():
@@ -142,3 +141,9 @@ class TinyIntervention(SourcelessIntervention):
         diag_a = paddle.diag(self.param_a)
         result = (self.dropout(base) @ self.param_A @ diag_a @ self.param_B @ diag_b) * self.scaling
         return self.dropout(base + result.astype(base.dtype))
+
+    def load_state_dict(self, state_dict):
+        self.param_A.set_value(state_dict["param_A"])
+        self.param_B.set_value(state_dict["param_B"])
+        self.param_a.set_value(state_dict["param_a"])
+        self.param_b.set_value(state_dict["param_b"])

@@ -122,7 +122,8 @@ def do_predict(
                         "pred": pred,
                     }
                 ]
-            with open(predict_path, "w") as json_file:
-                json.dump(generations, json_file, indent=4, ensure_ascii=False)
+            if predict_path is not None:
+                with open(predict_path, "w") as json_file:
+                    json.dump(generations, json_file, indent=4, ensure_ascii=False)
 
     return generations
