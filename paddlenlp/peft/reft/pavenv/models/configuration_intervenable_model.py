@@ -44,6 +44,7 @@ class IntervenableConfig(PretrainedConfig):
 
         casted_representations = []
         for reprs in representations:
+            print(f"type is : {type(reprs)}")
             if isinstance(reprs, RepresentationConfig):
                 casted_representations += [reprs]
             elif isinstance(reprs, list):
@@ -99,7 +100,6 @@ class IntervenableConfig(PretrainedConfig):
             "intervention_dimensions": str(self.intervention_dimensions),
         }
         _repr_string = json.dumps(_repr, indent=4)
-
         return f"IntervenableConfig\n{_repr_string}"
 
     def __str__(self):

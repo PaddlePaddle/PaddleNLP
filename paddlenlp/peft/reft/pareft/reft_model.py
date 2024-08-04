@@ -28,17 +28,8 @@ class ReftModel(pv.IntervenableModel):
         super().__init__(config, model, **kwargs)
 
     @staticmethod
-    def _convert_to_reft_model(intervenable_model):
-        reft_model = ReftModel(intervenable_model.config, intervenable_model.model)
-        # Copy any other necessary attributes
-        for attr in vars(intervenable_model):
-            setattr(reft_model, attr, getattr(intervenable_model, attr))
-        return reft_model
-
-    @staticmethod
     def load(reft_checkpoint_dir, model):
         model = pv.IntervenableModel.load(reft_checkpoint_dir, model)
-        # return ReftModel._convert_to_reft_model(model)
         return model
 
     def print_trainable_parameters(self):

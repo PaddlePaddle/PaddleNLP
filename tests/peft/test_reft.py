@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import unittest
+from tempfile import TemporaryDirectory
 
 import paddle
 
@@ -34,7 +35,11 @@ from paddlenlp.peft.reft.pareft.dataset import (
 )
 from paddlenlp.peft.reft.pareft.predict import do_predict
 from paddlenlp.peft.reft.pareft.reft_model import ReftModel
-from paddlenlp.peft.reft.pavenv.models.basic_utils import get_type_from_string
+from paddlenlp.peft.reft.pavenv.models.basic_utils import (
+    count_parameters,
+    get_type_from_string,
+    set_seed,
+)
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
 
 
@@ -113,6 +118,37 @@ class TestBasicUtils(unittest.TestCase):
         )
         self.assertIsInstance(train_ds, ReftDataset)
 
+    def test_set_seed(self):
+        set_seed(42)
+
+    def test_count_param(self):
+        model = AutoModelForCausalLM.from_pretrained("__internal_testing__/tiny-random-llama")
+        count_parameters(model)
+
+
+class TestReftConfig(unittest.TestCase):
+    def test_reft_config(self):
+        layers = [0, 1, 2]
+        representations = [
+            {
+                "layer": l,
+                "component": "block_output",
+                "low_rank_dimension": 4,
+                "intervention": LoreftIntervention(
+                    embed_dim=768,
+                    low_rank_dimension=4,
+                    dropout=0.00,
+                    dtype="float32",
+                    act_fn="linear",
+                    device="gpu",
+                    add_bias=False,
+                ),
+            }
+            for l in layers
+        ]
+        reft_config = ReftConfig(representations=representations)
+        reft_config.__str__()
+
 
 class TestLoReftIntervention(unittest.TestCase):
     def setUp(self):
@@ -158,8 +194,8 @@ class TestLoReftIntervention(unittest.TestCase):
 class TestTinyIntervention(unittest.TestCase):
     def setUp(self):
         self.kwargs = {
-            "embed_dim": 256,
-            "low_rank_dimension": 64,
+            "embed_dim": 768,
+            "low_rank_dimension": 4,
             "dtype": paddle.float32,
             "dropout": 0.1,
             "act_fn": "relu",
@@ -178,9 +214,22 @@ class TestTinyIntervention(unittest.TestCase):
         base = paddle.randn([10, self.kwargs["embed_dim"]])
         intervention = TinyIntervention(**self.kwargs)
         output = intervention.forward(base)
-
         self.assertEqual(output.shape, base.shape)
         self.assertEqual(output.dtype, self.kwargs["dtype"])
+
+    def test_load_state_dict(self):
+        model = TinyIntervention(**self.kwargs)
+        state_dict = {
+            "param_A": paddle.randn([768, 4]),
+            "param_B": paddle.randn([4, 768]),
+            "param_a": paddle.randn([4]),
+            "param_b": paddle.randn([768]),
+        }
+        model.load_state_dict(state_dict)
+        self.assertTrue(paddle.allclose(model.param_A, state_dict["param_A"]))
+        self.assertTrue(paddle.allclose(model.param_B, state_dict["param_B"]))
+        self.assertTrue(paddle.allclose(model.param_a, state_dict["param_a"]))
+        self.assertTrue(paddle.allclose(model.param_b, state_dict["param_b"]))
 
 
 class TestReftModel(unittest.TestCase):
@@ -306,6 +355,17 @@ class TestReftModelTrain(unittest.TestCase):
             compute_metrics=None,
         )
         trainer.train()
+        params = {
+            "embed_dim": 768,
+            "low_rank_dimension": 4,
+            "dropout": 0.00,
+            "dtype": "float32",
+            "act_fn": "linear",
+            "device": "gpu",
+            "add_bias": False,
+        }
+        with TemporaryDirectory() as tempdir:
+            reft_model.save(tempdir, params)
         do_predict(
             intervenable=reft_model,
             tokenizer=tokenizer,

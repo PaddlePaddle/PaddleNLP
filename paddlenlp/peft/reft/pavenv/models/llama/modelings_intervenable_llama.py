@@ -22,9 +22,6 @@ config the dimensions of intervention based on model config
 defined in the huggingface library.
 """
 
-import paddle
-
-# from ..constants import *
 from ..constants import CONST_INPUT_HOOK, CONST_OUTPUT_HOOK
 
 llama_type_to_module_mapping = {
@@ -81,18 +78,3 @@ for k, v in llama_type_to_module_mapping.items():
 
 
 llama_classifier_type_to_dimension_mapping = llama_type_to_dimension_mapping
-
-
-def create_llama(name="sharpbai/alpaca-7b-merged", cache_dir=None, dtype=paddle.bfloat16):
-    """Creates a LLaMA Causal LM model, config, and tokenizer from the given name and revision"""
-    from transformers import LlamaConfig, LlamaForCausalLM, LlamaTokenizer
-
-    config = LlamaConfig.from_pretrained(name, cache_dir=cache_dir)
-    tokenizer = LlamaTokenizer.from_pretrained(name, cache_dir=cache_dir)
-    llama = LlamaForCausalLM.from_pretrained(
-        name,
-        config=config,
-        cache_dir=cache_dir,
-        dtype=dtype,  # save memory
-    )
-    return config, tokenizer, llama
