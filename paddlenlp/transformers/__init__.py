@@ -25,6 +25,7 @@ from .tokenizer_utils import (
     tokenize_special_chars,
     convert_to_unicode,
 )
+from .tokenizer_utils_fast import PretrainedTokenizerFast
 from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .image_processing_utils import ImageProcessingMixin
