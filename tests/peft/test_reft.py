@@ -239,7 +239,6 @@ class TestReftModel(unittest.TestCase):
 
 class TestReftModelTrain(unittest.TestCase):
     def test_reft_model_train(self):
-        paddle.set_device("gpu")
         model_name = "__internal_testing__/tiny-random-llama"
         tokenizer = AutoTokenizer.from_pretrained(
             model_name,
@@ -247,8 +246,8 @@ class TestReftModelTrain(unittest.TestCase):
             padding_side="right",
         )
         tokenizer.pad_token_id = tokenizer.unk_token_id
-        model = AutoModelForCausalLM.from_pretrained(model_name, dtype="bfloat16")
-        intervention_dtype = "bfloat16"
+        model = AutoModelForCausalLM.from_pretrained(model_name, dtype="float32")
+        intervention_dtype = "float32"
         layers = [int(l) for l in range(1)]
         representations = [
             {
