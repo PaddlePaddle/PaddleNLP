@@ -239,6 +239,7 @@ class TestReftModel(unittest.TestCase):
 
 class TestReftModelTrain(unittest.TestCase):
     def test_reft_model_train(self):
+        paddle.set_device("gpu")
         model_name = "__internal_testing__/tiny-random-llama"
         tokenizer = AutoTokenizer.from_pretrained(
             model_name,
