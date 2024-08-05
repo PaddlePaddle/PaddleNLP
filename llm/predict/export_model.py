@@ -61,7 +61,8 @@ def main():
         },
     )
     predictor.model.config.save_pretrained(export_args.output_path)
-    predictor.model.generation_config.save_pretrained(export_args.output_path)
+    predictor.generation_config.save_pretrained(export_args.output_path)
+
     predictor.tokenizer.save_pretrained(export_args.output_path)
     generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 

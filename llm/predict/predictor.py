@@ -186,11 +186,11 @@ def init_dist_env():
 
 def get_eos_token_id(
     tokenizer: PretrainedTokenizer, generation_config: Optional[GenerationConfig] = None
-) -> int | List[List[int]]:
+) -> List[List[int]]:
     """get eos_token_id from generation_config or tokenizer
 
     Returns:
-        int | List[int]: eos_token_id to stop the generation
+        List[int]: eos_token_id to stop the generation
     """
     eos_token_ids = []
     if tokenizer.eos_token_id is not None:
@@ -396,8 +396,10 @@ class StaticGraphPredictor(BasePredictor):
         return decoded_ids
 
 
-class InferencePredictorMixin:
+class InferencePredictorMixin(BasePredictor):
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer):
+        BasePredictor.__init__(self, config, tokenizer)
+
         self.architectures = self.model_config.architectures[0].lower()
 
         self.dtype = config.dtype or self.model_config
@@ -466,14 +468,6 @@ class InferencePredictorMixin:
                     self.pre_caches = [
                         item.squeeze_(0) for item in paddle.split(prefix_cache, self.num_layers, axis=0)
                     ]
-
-        try:
-            self.generation_config = GenerationConfig.from_pretrained(config.model_name_or_path)
-        except:
-            logger.warning(
-                "Can't find generation config, so it will not use generation_config field in the model config"
-            )
-            self.generation_config = None
 
     def _postprocess(self, predictions, return_tokens=False):
         if paddle.distributed.get_rank() == 0:
@@ -649,7 +643,7 @@ class InferencePredictorMixin:
         return inputs
 
 
-class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
+class StaticInferencePredictor(InferencePredictorMixin):
     def __init__(
         self,
         config: PredictorArgument,
@@ -657,7 +651,6 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         tokenizer: PretrainedTokenizer = None,
     ):
         self.cache_kvs_shape = cache_kvs_shape
-        BasePredictor.__init__(self, config, tokenizer)
         InferencePredictorMixin.__init__(self, config, tokenizer)
 
         self.predictor = self._create_predictor(config)
@@ -741,7 +734,7 @@ class StaticInferencePredictor(InferencePredictorMixin, BasePredictor):
         self.predictor.run()
 
 
-class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
+class DygraphInferencePredictor(InferencePredictorMixin):
     def __init__(
         self,
         config: PredictorArgument,
@@ -749,7 +742,6 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
         tokenizer: PretrainedTokenizer = None,
     ):
         self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size, config.max_seq_len)
-        BasePredictor.__init__(self, config, tokenizer)
         InferencePredictorMixin.__init__(self, config, tokenizer)
         self.model = model
 
@@ -772,8 +764,9 @@ class DygraphInferencePredictor(InferencePredictorMixin, BasePredictor):
         return None
 
 
-class BlockInferencePredictorMixin:
+class BlockInferencePredictorMixin(BasePredictor):
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer):
+        BasePredictor.__init__(self, config, tokenizer)
 
         self.num_layers = len(self.cache_kvs_shape) // 2
         self.num_attention_heads = self.cache_kvs_shape[0][-3]
@@ -872,10 +865,9 @@ class BlockInferencePredictorMixin:
         self.model_inputs["temperature"] = paddle.full(
             shape=[config.batch_size, 1], fill_value=config.temperature, dtype="float32"
         )
-        eos_token_id = get_eos_token_id(self.tokenizer, self.generation_config)
-        if isinstance(eos_token_id, int):
-            eos_token_id = [eos_token_id]
-        self.model_inputs["eos_token_id"] = paddle.to_tensor(np.array(eos_token_id).reshape(-1, 1).astype("int64"))
+        self.model_inputs["eos_token_id"] = paddle.to_tensor(
+            np.array(get_eos_token_id(self.tokenizer, self.generation_config)).reshape(-1, 1).astype("int64")
+        )
         self.model_inputs["penalty_score"] = paddle.full(
             shape=[config.batch_size, 1], fill_value=config.repetition_penalty, dtype="float32"
         )
@@ -1001,7 +993,7 @@ class BlockInferencePredictorMixin:
                 v.name = k
 
 
-class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor):
+class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     def __init__(
         self,
         config: PredictorArgument,
@@ -1009,7 +1001,6 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor
         tokenizer: PretrainedTokenizer = None,
     ):
         self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size)
-        BasePredictor.__init__(self, config, tokenizer)
         BlockInferencePredictorMixin.__init__(self, config, tokenizer)
 
         cachekv_dtype = self.dtype if config.cachekv_int8_type is None else "uint8"
@@ -1063,7 +1054,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor
             return outputs
 
 
-class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor):
+class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
     def __init__(
         self,
         config: PredictorArgument,
@@ -1071,7 +1062,6 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
         tokenizer: PretrainedTokenizer = None,
     ):
         self.cache_kvs_shape = cache_kvs_shape
-        BasePredictor.__init__(self, config, tokenizer)
         BlockInferencePredictorMixin.__init__(self, config, tokenizer)
 
         self._create_predictor(config)
