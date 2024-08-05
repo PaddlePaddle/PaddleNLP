@@ -34,7 +34,6 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     ChatGLMv2Tokenizer,
     LlamaForCausalLMPipe,
-    PretrainedConfig,
     Qwen2ForCausalLMPipe,
 )
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
@@ -472,8 +471,8 @@ def pad_batch_data(insts, pad_id=0, return_seq_len=False, pad_style="right"):
 def dybatch_preprocess(
     tokenizer,
     texts: list[str],
-    src_length: int,
-    max_length: int,
+    max_src_length: int,
+    max_dec_len: int,
     architectures: str,
     top_p: float,
     temperature: float,
@@ -492,7 +491,7 @@ def dybatch_preprocess(
                 text,
                 return_tensors="np",
                 padding=True,
-                max_length=src_length,
+                max_length=max_src_length,
                 # if use chat_template, it will not add special_tokens
                 add_special_tokens=tokenizer.chat_template is None or isinstance(tokenizer, ChatGLMv2Tokenizer),
             )
@@ -518,7 +517,7 @@ def dybatch_preprocess(
                 text,
                 return_tensors="np",
                 padding=False,
-                max_length=src_length,
+                max_length=max_src_length,
                 return_attention_mask=False,
                 return_token_type_ids=False,
             )
@@ -545,7 +544,7 @@ def dybatch_preprocess(
                 text,
                 return_tensors="np",
                 padding=False,
-                max_length=src_length,
+                max_length=max_src_length,
                 return_attention_mask=False,
                 return_token_type_ids=False,
                 add_special_tokens=tokenizer.chat_template is None or isinstance(tokenizer, ChatGLMv2Tokenizer),
@@ -557,7 +556,7 @@ def dybatch_preprocess(
         bs = inputs["input_ids"].shape[0]
         max_len = max(map(len, input_ids))
 
-        position_ids = paddle.zeros(shape=[bs, max_length + src_length], dtype="int64")
+        position_ids = paddle.zeros(shape=[bs, max_dec_len + max_src_length], dtype="int64")
 
         for i in range(bs):
             position_ids[i, pre_caches_length : pre_caches_length + seq_len[i]] = paddle.arange(seq_len[i])
@@ -603,13 +602,13 @@ def dybatch_preprocess(
     inputs["step_idx"] = np.array(step_idx).astype("int64").reshape(-1, 1)
     inputs["tgt_ids"] = np.array(tgt_ids).astype("int64").reshape(-1, 1)
     inputs["tgt_pos"] = tgt_pos.reshape(-1, 1)
-    inputs["max_length"] = np.array(max_length - pre_caches_length).astype("int64").reshape((-1, 1))
-    inputs["min_length"] = (
+    inputs["max_dec_len"] = np.array(max_dec_len - pre_caches_length).astype("int64").reshape((-1, 1))
+    inputs["min_dec_len"] = (
         np.array(
             [
                 1
                 if not benchmark
-                else max_length
+                else max_dec_len
                 - pre_caches_length,  # Note(Zhengzekang): When in benchmark mode, we need to set a fixed decode length.
             ]
             * bs
@@ -723,52 +722,6 @@ def init_chat_template(
 
     logger.info(f"loading `chat_template.json` from `{chat_template_file}`")
     tokenizer.init_chat_template(chat_template_file)
-
-
-def get_model_max_position_embeddings(config: PretrainedConfig) -> Optional[int]:
-    names = [
-        "max_position_embeddings",  # most of models
-        "max_sequence_length",  # GLM model
-        "seq_length",  # llama model
-    ]
-    for name in names:
-        max_length = config.get(name, None)
-        if max_length is not None:
-            return max_length
-    return None
-
-
-def get_default_max_decoding_length(config: PretrainedConfig, default: int = 1024) -> int:
-    """get the default max decoding length from config.
-
-    Args:
-        config (PretrainedConfig): the instance of PretrainedConfig
-        default (int): the default value of max decoding length
-
-    Returns:
-        int: the default max_length of decoding length
-    """
-    max_position_embeddings = get_model_max_position_embeddings(config)
-    if max_position_embeddings is None:
-        return default
-    return max_position_embeddings // 4
-
-
-def get_default_max_encoding_length(config: PretrainedConfig, default: int = 1024) -> int:
-    """get the default max encoding length from config.
-
-    Args:
-        config (PretrainedConfig): the instance of PretrainedConfig
-        default (int): the default value of max encoding length
-
-    Returns:
-        int: the default max_length of encoding length
-    """
-
-    max_position_embeddings = get_model_max_position_embeddings(config)
-    if max_position_embeddings is None:
-        return default
-    return max_position_embeddings // 4 * 3
 
 
 def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue):

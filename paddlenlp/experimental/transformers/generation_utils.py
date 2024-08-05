@@ -33,7 +33,7 @@ class ForcedDecodingEOSTokenLogitsProcessor(LogitsProcessor):
     This `LogitsProcessor` enforces the last generated token to be the selected `forced_eos_token`.
 
     Args:
-        max_length (int): The maximum length of the sequence to be generated.
+        max_dec_len (int): The maximum length of the sequence to be generated.
         forced_eos_token_id (int): The id of the token to be generated as the last token.
     """
 
@@ -50,13 +50,13 @@ class ForcedDecodingEOSTokenLogitsProcessor(LogitsProcessor):
 
 class GenerationInferenceModel(GenerationMixin):
     @classmethod
-    def get_cache_kvs_shape(cls, max_batch_size: int = None, max_length: int = None) -> list[list[int]]:
+    def get_cache_kvs_shape(cls, max_batch_size: int = None, max_dec_len: int = None) -> list[list[int]]:
         raise NotImplementedError
 
     def to_static(self, output_path: str, config: dict):
         dtype = config.get("dtype", paddle.get_default_dtype())
 
-        cache_kvs_shapes = self.get_cache_kvs_shape(self.config, max_length=config.get("max_length", None))
+        cache_kvs_shapes = self.get_cache_kvs_shape(self.config, max_dec_len=config.get("max_dec_len", None))
         export_precache = config.get("export_precache", False)
         if export_precache:
             precache_input_spec = [
@@ -73,8 +73,8 @@ class GenerationInferenceModel(GenerationMixin):
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="presence_score"),  # presence_score
-            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="min_length"),  # min_decode_length
-            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="max_length"),  # max_decode_length
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="min_dec_len"),  # min_decode_length
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="max_dec_len"),  # max_decode_length
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="temperature"),  # temperature
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="top_p"),  # top_p
             paddle.static.InputSpec(shape=[None], dtype="int64", name="eos_token_id"),  # eos_token_id
@@ -134,8 +134,8 @@ class GenerationInferenceModel(GenerationMixin):
         penalty_score=None,
         frequency_score=None,
         presence_score=None,
-        min_length=None,
-        max_length=None,
+        min_dec_len=None,
+        max_dec_len=None,
         temperature=None,
         top_p=None,
         eos_token_id=None,
@@ -165,8 +165,8 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["step_idx"] = step_idx
         model_kwargs["stop_flags"] = stop_flags
         model_kwargs["pre_ids"] = pre_ids
-        model_kwargs["min_dec_len"] = min_length
-        model_kwargs["max_dec_len"] = max_length
+        model_kwargs["min_dec_len"] = min_dec_len
+        model_kwargs["max_dec_len"] = max_dec_len
         model_kwargs["stop_nums"] = stop_nums
         model_kwargs["penalty_score"] = penalty_score
         model_kwargs["frequency_score"] = frequency_score
@@ -399,7 +399,7 @@ class GenerationInferenceModel(GenerationMixin):
 
 class GenerationBlockInferenceModel(GenerationMixin):
     @classmethod
-    def get_cache_kvs_shape(cls, max_batch_size: int = None, max_length: int = None) -> list[list[int]]:
+    def get_cache_kvs_shape(cls, max_batch_size: int = None, max_dec_len: int = None) -> list[list[int]]:
         raise NotImplementedError
 
     def to_static(self, output_path: str, config: dict):
@@ -407,7 +407,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
         cachekv_dtype = dtype
 
         cache_kvs_shapes = self.get_cache_kvs_shape(
-            self.config, max_batch_size=config.get("max_batch_size", -1), max_length=config.get("max_length", None)
+            self.config, max_batch_size=config.get("max_batch_size", -1), max_dec_len=config.get("max_dec_len", None)
         )
         export_precache = config.get("export_precache", False)
         if export_precache:
@@ -506,8 +506,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
             paddle.static.InputSpec(
                 shape=[2, None, self.config.max_seq_len, None, None], dtype="float32", name="rope_emb"
             ),  # rope_emb
-            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="min_length"),  # min_dec_len
-            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="max_length"),  # max_dec_len
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="min_dec_len"),  # min_dec_len
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="max_dec_len"),  # max_dec_len
             paddle.static.InputSpec(shape=[1, 1], dtype="int64", name="stop_nums"),  # stop_nums
             paddle.static.InputSpec(shape=[None], dtype="int64", name="bad_tokens"),  # bad_tokens
             paddle.static.InputSpec(shape=[1, 1], dtype="bool", name="not_need_stop"),  # not_need_stop
@@ -556,8 +556,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
         step_idx=None,
         stop_flags=None,
         rope_emb=None,
-        min_length=None,
-        max_length=None,
+        min_dec_len=None,
+        max_dec_len=None,
         stop_nums=None,
         bad_tokens=None,
         not_need_stop=None,
@@ -582,8 +582,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
         model_kwargs["seq_lens_decoder"] = seq_lens_decoder
         model_kwargs["step_idx"] = step_idx
         model_kwargs["stop_flags"] = stop_flags
-        model_kwargs["min_dec_len"] = min_length
-        model_kwargs["max_dec_len"] = max_length
+        model_kwargs["min_dec_len"] = min_dec_len
+        model_kwargs["max_dec_len"] = max_dec_len
         model_kwargs["stop_nums"] = stop_nums
         model_kwargs["rope_emb"] = rope_emb
         model_kwargs["bad_tokens"] = bad_tokens
@@ -723,7 +723,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
 class GenerationAvxInferenceModel(GenerationMixin):
     @classmethod
-    def get_cache_kvs_shape(cls, max_batch_size: int = None, max_length: int = None) -> list[list[int]]:
+    def get_cache_kvs_shape(cls, max_batch_size: int = None, max_dec_len: int = None) -> list[list[int]]:
         raise NotImplementedError
 
     def to_static(self, output_path: str, config: dict):
@@ -734,8 +734,8 @@ class GenerationAvxInferenceModel(GenerationMixin):
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="presence_score"),  # presence_score
-            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="min_length"),  # min_decode_length
-            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="max_length"),  # max_decode_length
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="min_dec_len"),  # min_decode_length
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="max_dec_len"),  # max_decode_length
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="temperature"),  # temperature
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="top_p"),  # top_p
             paddle.static.InputSpec(shape=[None], dtype="int64", name="eos_token_id"),  # eos_token_id
@@ -778,8 +778,8 @@ class GenerationAvxInferenceModel(GenerationMixin):
         penalty_score=None,
         frequency_score=None,
         presence_score=None,
-        min_length=None,
-        max_length=None,
+        min_dec_len=None,
+        max_dec_len=None,
         temperature=None,
         top_p=None,
         eos_token_id=None,
@@ -804,8 +804,8 @@ class GenerationAvxInferenceModel(GenerationMixin):
         model_kwargs["step_idx"] = step_idx
         model_kwargs["stop_flags"] = stop_flags
         model_kwargs["pre_ids"] = pre_ids
-        model_kwargs["min_dec_len"] = min_length
-        model_kwargs["max_dec_len"] = max_length
+        model_kwargs["min_dec_len"] = min_dec_len
+        model_kwargs["max_dec_len"] = max_dec_len
         model_kwargs["stop_nums"] = stop_nums
         model_kwargs["penalty_score"] = penalty_score
         model_kwargs["frequency_score"] = frequency_score

@@ -103,7 +103,7 @@ std::vector<paddle::DataType> GetPaddingOffsetV2InferDtype(const paddle::DataTyp
 }
 
 PD_BUILD_OP(get_padding_offset_v2)
-    .Inputs({"input_ids", "token_num", "cum_offsets", "seq_len"})
+    .Inputs({"input_ids", "cum_offsets", "token_num", "seq_len"})
     .Outputs({"x_remove_padding", "cum_offsets_out", "padding_offset", "cu_seqlens_q", "cu_seqlens_k"})
     .SetKernelFn(PD_KERNEL(GetPaddingOffsetV2))
     .SetInferShapeFn(PD_INFER_SHAPE(GetPaddingOffsetV2InferShape))

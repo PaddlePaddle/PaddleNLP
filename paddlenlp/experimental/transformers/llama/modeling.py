@@ -349,6 +349,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.quant_type = config.quant_type
 
         self.rope_theta = config.rope_theta
+        self.use_neox = True
 
         self.use_weight_only = False
         if config.quant_type == "weight_only_int8":
@@ -562,7 +563,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             cache_v_out_scale_attrs=cache_v_out_scale_attrs,
             epsilon=self.epsilon,
             norm_type="rmsnorm",
-            use_neox_rotary_style=True,
+            use_neox_rotary_style=self.use_neox,
             cachekv_int8_type=config.cachekv_int8_type,
             rank_id=config.tensor_parallel_rank,
             trans_qkvw=(False if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8" else True),
@@ -683,7 +684,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         from paddlenlp_ops import fused_get_rotary_embedding
 
         new_rope = fused_get_rotary_embedding(
-            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, self.rope_theta, True
+            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, self.rope_theta, self.use_neox
         )
 
         with dy2st_nocheck_guard_context():
@@ -1168,7 +1169,7 @@ class LlamaForCausalLMAvxInferenceModel(GenerationAvxInferenceModel, LlamaPretra
 
     @classmethod
     def get_cache_kvs_shape(
-        cls, config: LlamaConfig, max_batch_size: int = None, max_length: int = None
+        cls, config: LlamaConfig, max_batch_size: int = None, max_dec_len: int = None
     ) -> list[list[int]]:
         return []
 
@@ -1265,19 +1266,19 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
 
     @classmethod
     def get_cache_kvs_shape(
-        cls, config: LlamaConfig, max_batch_size: int = None, max_length: int = None
+        cls, config: LlamaConfig, max_batch_size: int = None, max_dec_len: int = None
     ) -> list[list[int]]:
         """get cache_kvs tensor for llama model
 
         Args:
             max_batch_size (int): the max batch size
-            max_length (int | None, optional): the max_length of cache_kvs. Defaults to None.
+            max_dec_len (int | None, optional): the max_length of cache_kvs. Defaults to None.
 
         Returns:
             list[paddle.Tensor]: the list tensor shape for cache
         """
-        if max_length is None:
-            max_length = config.max_position_embeddings
+        if max_dec_len is None:
+            max_dec_len = config.max_position_embeddings
 
         cache_kvs = []
         for _ in range(config.num_hidden_layers):
@@ -1286,7 +1287,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
                     2,
                     max_batch_size,
                     config.num_key_value_heads // max(config.tensor_parallel_degree, 1),
-                    max_length,
+                    max_dec_len,
                     config.hidden_size // config.num_attention_heads,
                 ]
             )
@@ -1502,13 +1503,13 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
 
     @classmethod
     def get_cache_kvs_shape(
-        cls, config: LlamaConfig, max_batch_size: int = None, max_length: int = None
+        cls, config: LlamaConfig, max_batch_size: int = None, max_dec_len: int = None
     ) -> list[list[int]]:
         """get cache_kvs tensor for llama model
 
         Args:
             max_batch_size (int): the max batch size
-            max_length (int | None, optional): the max_length of cache_kvs. Defaults to None.
+            max_dec_len (int | None, optional): the max_length of cache_kvs. Defaults to None.
 
         Returns:
             list[paddle.Tensor]: the list tensor shape for cache
@@ -1632,8 +1633,8 @@ class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
         penalty_score=None,
         frequency_score=None,
         presence_score=None,
-        min_length=None,
-        max_length=None,
+        min_dec_len=None,
+        max_dec_len=None,
         temperature=None,
         top_p=None,
         eos_token_id=None,
@@ -1663,8 +1664,8 @@ class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
             penalty_score=penalty_score,
             frequency_score=frequency_score,
             presence_score=presence_score,
-            min_length=min_length,
-            max_length=max_length,
+            min_dec_len=min_dec_len,
+            max_dec_len=max_dec_len,
             temperature=temperature,
             top_p=top_p,
             eos_token_id=eos_token_id,
@@ -1684,7 +1685,7 @@ class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
     # rewrite to_static function in generation_utils.py
     def to_static(self, output_path: str, config: dict):
         dtype = config.get("dtype", paddle.get_default_dtype())
-        cache_kvs_shapes = self.get_cache_kvs_shape(self.config, max_length=config.get("max_length", None))
+        cache_kvs_shapes = self.get_cache_kvs_shape(self.config, max_dec_len=config.get("max_dec_len", None))
         input_spec = [
             paddle.static.InputSpec(
                 shape=[None, None, None], dtype="float32", name="image_features"
@@ -1696,8 +1697,8 @@ class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="penalty_score"),  # penalty_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="frequency_score"),  # frequency_score
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="presence_score"),  # presence_score
-            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="min_length"),  # min_decode_length
-            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="max_length"),  # max_decode_length
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="min_dec_len"),  # min_decode_length
+            paddle.static.InputSpec(shape=[None, 1], dtype="int64", name="max_dec_len"),  # max_decode_length
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="temperature"),  # temperature
             paddle.static.InputSpec(shape=[None, 1], dtype="float32", name="top_p"),  # top_p
             paddle.static.InputSpec(shape=[None], dtype="int64", name="eos_token_id"),  # eos_token_id
