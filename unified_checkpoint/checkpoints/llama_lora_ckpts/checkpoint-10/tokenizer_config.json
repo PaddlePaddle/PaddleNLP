@@ -1,1 +1,0 @@
-{"unk_token": "<unk>", "bos_token": "<s>", "eos_token": "</s>", "add_bos_token": true, "add_eos_token": false, "sp_model_kwargs": null, "decode_with_prefix_space": false, "tokenizer_class": "LlamaTokenizer", "special_tokens_map_file": "/home/ldn/.paddlenlp/models/__internal_testing__/unified-ckpt-llama-170m-for-peft/special_tokens_map.json", "chat_template_file": null}
