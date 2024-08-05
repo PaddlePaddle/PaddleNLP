@@ -16,6 +16,7 @@ import atexit
 import copy
 import multiprocessing
 import os
+import time
 
 import paddle
 
@@ -70,7 +71,24 @@ class AsyncSaver:
                 except Exception as e:
                     if retries == max_retries - 1:
                         raise RuntimeError(f"Failed after {max_retries} retries during async save.")
+
+                    time.sleep(1 + retries * 2)
                     logger.warning(f"An error occurred during async save: {e}. Retrying...")
+                    self.result = self.pool.apply_async(
+                        _save_optimizer,
+                        args=(
+                            self.cpu_optimizer_state_dict,
+                            self.name_mapping,
+                            self.path,
+                            self.saved_signal_path,
+                            self.protocol,
+                        ),
+                    )
+
+            if self.result.ready() and not self.result.successful():
+                raise RuntimeError("The previous async save task failed.")
+        else:
+            pass
 
     def _reset_state(self, path, saved_signal_path, protocol):
         self.cpu_optimizer_state_dict.clear()
