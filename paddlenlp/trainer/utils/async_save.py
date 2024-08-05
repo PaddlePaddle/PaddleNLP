@@ -24,6 +24,7 @@ from paddlenlp.utils.log import logger
 
 
 def _save_optimizer(obj, name_mapping, path, saved_signal_path, protocol):
+    start_time = time.time()
     for k, v in obj.items():
         if k == "master_weights" and isinstance(v, dict):
             for kk, vv in v.items():
@@ -38,6 +39,9 @@ def _save_optimizer(obj, name_mapping, path, saved_signal_path, protocol):
         f.write("1")
         f.flush()
         os.fsync(f.fileno())
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    logger.info(f"Async save took {elapsed_time:.6f} seconds to execute.")
 
 
 class AsyncSaver:
@@ -51,6 +55,7 @@ class AsyncSaver:
         atexit.register(self.shutdown)
 
     def run(self, optimizer_state_dict, path, saved_signal_path, protocol=4):
+        logger.info(f"Started saving optimizer_state_dict to {os.path.abspath(path)}...")
         self._wait_for_previous_result()
 
         self._reset_state(path, saved_signal_path, protocol)
@@ -60,6 +65,8 @@ class AsyncSaver:
             _save_optimizer,
             args=(self.cpu_optimizer_state_dict, self.name_mapping, self.path, self.saved_signal_path, self.protocol),
         )
+
+        logger.info("Finished launching saving optimizer_state_dict process")
 
     def _wait_for_previous_result(self):
         if self.result is not None:
