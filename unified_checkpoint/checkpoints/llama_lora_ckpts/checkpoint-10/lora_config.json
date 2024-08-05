@@ -1,0 +1,30 @@
+{
+  "base_model_name_or_path": "__internal_testing__/unified-ckpt-llama-170m-for-peft",
+  "do_qat": false,
+  "dtype": "float16",
+  "enable_lora_list": null,
+  "head_dim": null,
+  "lora_alpha": 16,
+  "lora_dropout": 0.0,
+  "lora_plus_scale": 1.0,
+  "merge_weights": false,
+  "pissa": false,
+  "r": 8,
+  "rslora": false,
+  "scaling": 2.0,
+  "target_modules": [
+    ".*q_proj.*",
+    ".*v_proj.*",
+    ".*k_proj.*",
+    ".*o_proj.*",
+    ".*qkv_proj.*",
+    ".*gate_proj.*",
+    ".*down_proj.*",
+    ".*up_proj.*",
+    ".*gate_up_fused_proj.*"
+  ],
+  "tensor_parallel_degree": 4,
+  "trainable_bias": null,
+  "trainable_modules": null,
+  "use_quick_lora": false
+}

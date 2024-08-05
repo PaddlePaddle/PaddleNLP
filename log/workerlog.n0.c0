@@ -1,0 +1,1310 @@
+/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/_distutils_hack/__init__.py:26: UserWarning: Setuptools is replacing distutils.
+  warnings.warn("Setuptools is replacing distutils.")
+I0805 08:54:45.055281 2294389 custom_operator.cc:1296] register pir custom op :write_int8_cache_kv
+I0805 08:54:45.055388 2294389 custom_operator.cc:1296] register pir custom op :update_inputs
+I0805 08:54:45.055439 2294389 custom_operator.cc:1296] register pir custom op :transpose_remove_padding
+I0805 08:54:45.055460 2294389 custom_operator.cc:1296] register pir custom op :set_stop_value_multi_ends_v2
+I0805 08:54:45.055488 2294389 custom_operator.cc:1296] register pir custom op :step_paddle
+I0805 08:54:45.055565 2294389 custom_operator.cc:1296] register pir custom op :get_token_penalty_multi_scores
+I0805 08:54:45.055584 2294389 custom_operator.cc:1296] register pir custom op :set_value_by_flags_and_idx_v2
+I0805 08:54:45.055604 2294389 custom_operator.cc:1296] register pir custom op :dequant_int8
+I0805 08:54:45.055622 2294389 custom_operator.cc:1296] register pir custom op :set_stop_value_multi_ends
+I0805 08:54:45.055640 2294389 custom_operator.cc:1296] register pir custom op :encode_rotary_qk
+I0805 08:54:45.055663 2294389 custom_operator.cc:1296] register pir custom op :get_output
+I0805 08:54:45.055682 2294389 custom_operator.cc:1296] register pir custom op :fused_get_rotary_embedding
+I0805 08:54:45.055704 2294389 custom_operator.cc:1296] register pir custom op :set_value_by_flags_and_idx
+I0805 08:54:45.055720 2294389 custom_operator.cc:1296] register pir custom op :save_with_output
+I0805 08:54:45.055738 2294389 custom_operator.cc:1296] register pir custom op :write_cache_kv
+I0805 08:54:45.055753 2294389 custom_operator.cc:1296] register pir custom op :get_token_penalty_multi_scores_v2
+I0805 08:54:45.055773 2294389 custom_operator.cc:1296] register pir custom op :get_padding_offset
+I0805 08:54:45.055789 2294389 custom_operator.cc:1296] register pir custom op :quant_int8
+I0805 08:54:45.055810 2294389 custom_operator.cc:1296] register pir custom op :rebuild_padding_v2
+I0805 08:54:45.055827 2294389 custom_operator.cc:1296] register pir custom op :get_padding_offset_v2
+I0805 08:54:45.055845 2294389 custom_operator.cc:1296] register pir custom op :flash_attn_bwd
+I0805 08:54:45.055866 2294389 custom_operator.cc:1296] register pir custom op :qkv_transpose_split
+I0805 08:54:45.055884 2294389 custom_operator.cc:1296] register pir custom op :rebuild_padding
+I0805 08:54:45.055897 2294389 custom_operator.cc:1296] register pir custom op :save_output
+[2024-08-05 08:54:46,318] [    INFO] distributed_strategy.py:214 - distributed strategy initialized
+[32m[2024-08-05 08:54:46,318] [    INFO][0m - PP configs:{'micro_batch_size': 4, 'accumulate_steps': 8, 'schedule_mode': '1F1B', 'p2p_cache_shape': True, 'enable_partial_send_recv': True}, use master_grad: False[0m
+[32m[2024-08-05 08:54:46,318] [    INFO][0m - using pipeline configs:{'delay_scale_loss': False, 'dp_comm_overlap': False, 'sharding_comm_overlap': False, 'enable_timer': False, 'release_gradients': False, 'overlap_p2p_comm': False, 'clear_every_step_cache': False, 'use_batch_p2p_comm': True}[0m
+======================= Modified FLAGS detected =======================
+FLAGS(name='FLAGS_cudnn_deterministic', current_value=True, default_value=False)
+FLAGS(name='FLAGS_nvidia_package_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia', default_value='')
+FLAGS(name='FLAGS_cusparse_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/cusparse/lib', default_value='')
+FLAGS(name='FLAGS_curand_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/curand/lib', default_value='')
+FLAGS(name='FLAGS_embedding_deterministic', current_value=1, default_value=0)
+FLAGS(name='FLAGS_selected_gpus', current_value='0', default_value='')
+FLAGS(name='FLAGS_cupti_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/cuda_cupti/lib', default_value='')
+FLAGS(name='FLAGS_cudnn_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/cudnn/lib', default_value='')
+FLAGS(name='FLAGS_cusolver_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/cusolver/lib', default_value='')
+FLAGS(name='FLAGS_cublas_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/cublas/lib', default_value='')
+FLAGS(name='FLAGS_nccl_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/nccl/lib', default_value='')
+=======================================================================
+I0805 08:54:46.319559 2294389 tcp_utils.cc:181] The server starts to listen on IP_ANY:46279
+I0805 08:54:46.319712 2294389 tcp_utils.cc:130] Successfully connected to 127.0.0.1:46279
+I0805 08:54:46.992800 2294389 process_group_nccl.cc:138] ProcessGroupNCCL pg_timeout_ 1800000
+I0805 08:54:46.992831 2294389 process_group_nccl.cc:139] ProcessGroupNCCL nccl_comm_init_option_ 0
+I0805 08:54:48.352483 2294389 process_group_nccl.cc:138] ProcessGroupNCCL pg_timeout_ 1800000
+I0805 08:54:48.352514 2294389 process_group_nccl.cc:139] ProcessGroupNCCL nccl_comm_init_option_ 0
+[2024-08-05 08:54:48,352] [    INFO] topology.py:357 - Total 4 pipe comm group(s) create successfully!
+W0805 08:54:48.354871 2294389 gpu_resources.cc:119] Please NOTE: device: 0, GPU Compute Capability: 8.0, Driver API Version: 12.2, Runtime API Version: 12.2
+W0805 08:54:48.389575 2294389 gpu_resources.cc:164] device: 0, cuDNN Version: 9.0.
+W0805 08:54:48.389598 2294389 gpu_resources.cc:196] WARNING: device: 0. The installed Paddle is compiled with CUDA 12.3, but CUDA runtime version in your machine is 12.2, which may cause serious incompatible bug. Please recompile or reinstall Paddle with compatible CUDA version.
+ubuntu:2294389:2294389 [0] NCCL INFO Bootstrap : Using eno1:10.3.242.26<0>
+ubuntu:2294389:2294389 [0] NCCL INFO NET/Plugin : dlerror=libnccl-net.so: cannot open shared object file: No such file or directory No plugin found (libnccl-net.so), using internal implementation
+ubuntu:2294389:2294389 [0] NCCL INFO cudaDriverVersion 12020
+NCCL version 2.20.5+cuda12.4
+ubuntu:2294389:2294681 [0] NCCL INFO NET/IB : No device found.
+ubuntu:2294389:2294681 [0] NCCL INFO NET/Socket : Using [0]eno1:10.3.242.26<0> [1]br-8d7ae5405055:172.18.0.1<0>
+ubuntu:2294389:2294681 [0] NCCL INFO Using non-device net plugin version 0
+ubuntu:2294389:2294681 [0] NCCL INFO Using network Socket
+ubuntu:2294389:2294681 [0] NCCL INFO comm 0x562066cf42e0 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 52000 commId 0xab6e75ae4dc00db3 - Init START
+ubuntu:2294389:2294681 [0] NCCL INFO Setting affinity for GPU 0 to ffffffff,00000000,ffffffff
+ubuntu:2294389:2294681 [0] NCCL INFO comm 0x562066cf42e0 rank 0 nRanks 2 nNodes 1 localRanks 2 localRank 0 MNNVL 0
+ubuntu:2294389:2294681 [0] NCCL INFO Channel 00/02 :    0   1
+ubuntu:2294389:2294681 [0] NCCL INFO Channel 01/02 :    0   1
+ubuntu:2294389:2294681 [0] NCCL INFO Trees [0] 1/-1/-1->0->-1 [1] 1/-1/-1->0->-1
+ubuntu:2294389:2294681 [0] NCCL INFO P2P Chunksize set to 131072
+ubuntu:2294389:2294681 [0] NCCL INFO Channel 00 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2294389:2294681 [0] NCCL INFO Channel 01 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2294389:2294681 [0] NCCL INFO Connected all rings
+ubuntu:2294389:2294681 [0] NCCL INFO Connected all trees
+ubuntu:2294389:2294681 [0] NCCL INFO NCCL_ALGO set by environment to Tree
+ubuntu:2294389:2294681 [0] NCCL INFO threadThresholds 8/8/64 | 16/8/64 | 512 | 512
+ubuntu:2294389:2294681 [0] NCCL INFO 2 coll channels, 0 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer
+ubuntu:2294389:2294681 [0] NCCL INFO comm 0x562066cf42e0 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 52000 commId 0xab6e75ae4dc00db3 - Init COMPLETE
+[2024-08-05 08:54:49,479] [    INFO] topology.py:357 - Total 8 data comm group(s) create successfully!
+I0805 08:54:49.479374 2294389 process_group_nccl.cc:138] ProcessGroupNCCL pg_timeout_ 1800000
+I0805 08:54:49.479426 2294389 process_group_nccl.cc:139] ProcessGroupNCCL nccl_comm_init_option_ 0
+[2024-08-05 08:54:49,479] [    INFO] topology.py:357 - Total 2 model comm group(s) create successfully!
+[2024-08-05 08:54:49,479] [    INFO] topology.py:357 - Total 8 sharding comm group(s) create successfully!
+I0805 08:54:49.480042 2294389 process_group_nccl.cc:138] ProcessGroupNCCL pg_timeout_ 1800000
+I0805 08:54:49.480060 2294389 process_group_nccl.cc:139] ProcessGroupNCCL nccl_comm_init_option_ 0
+I0805 08:54:49.480139 2294389 process_group_nccl.cc:138] ProcessGroupNCCL pg_timeout_ 1800000
+I0805 08:54:49.480152 2294389 process_group_nccl.cc:139] ProcessGroupNCCL nccl_comm_init_option_ 0
+[2024-08-05 08:54:49,480] [    INFO] topology.py:279 - HybridParallelInfo: rank_id: 0, mp_degree: 4, sharding_degree: 1, pp_degree: 2, dp_degree: 1, sep_degree: 1, mp_group: [0, 1, 2, 3],  sharding_group: [0], pp_group: [0, 4], dp_group: [0], sep:group: None, check/clip group: [0, 1, 2, 3, 4, 5, 6, 7]
+[32m[2024-08-05 08:54:49,482] [    INFO][0m -     +==============================================================================+
+    |                                                                              |
+    |                         DistributedStrategy Overview                         |
+    |                                                                              |
+    +==============================================================================+
+    |                        a_sync=True <-> a_sync_configs                        |
+    +------------------------------------------------------------------------------+
+    |                               k_steps                    -1                  |
+    |                     max_merge_var_num                    1                   |
+    |                       send_queue_size                    16                  |
+    |               independent_recv_thread                  False                 |
+    |         min_send_grad_num_before_recv                    1                   |
+    |                      thread_pool_size                    1                   |
+    |                       send_wait_times                    1                   |
+    |               runtime_split_send_recv                  False                 |
+    |                        launch_barrier                   True                 |
+    |             heter_worker_device_guard                   cpu                  |
+    |                        lr_decay_steps                    10                  |
+    |                            use_ps_gpu                    0                   |
+    +==============================================================================+
+    |                    Environment Flags, Communication Flags                    |
+    +------------------------------------------------------------------------------+
+    |                                  mode                    1                   |
+    |                               elastic                  False                 |
+    |                                  auto                  False                 |
+    |                   sync_nccl_allreduce                   True                 |
+    |                         nccl_comm_num                    1                   |
+    |            use_hierarchical_allreduce                  False                 |
+    |   hierarchical_allreduce_inter_nranks                    1                   |
+    |                       sync_batch_norm                  False                 |
+    |                   fuse_all_reduce_ops                   True                 |
+    |                  fuse_grad_size_in_MB                    32                  |
+    |              fuse_grad_size_in_TFLOPS                   50.0                 |
+    |               cudnn_exhaustive_search                  False                 |
+    |             conv_workspace_size_limit                   512                  |
+    |    cudnn_batchnorm_spatial_persistent                  False                 |
+    |                        fp16_allreduce                  False                 |
+    |               last_comm_group_size_MB                   1.0                  |
+    |                find_unused_parameters                  False                 |
+    |            without_graph_optimization                   True                 |
+    |                 fuse_grad_size_in_num                    8                   |
+    |                 calc_comm_same_stream                  False                 |
+    |                                   asp                  False                 |
+    |                       fuse_grad_merge                  False                 |
+    |                             semi_auto                  False                 |
+    |                            adam_d2sum                  False                 |
+    |                           auto_search                  False                 |
+    |                        heter_ccl_mode                  False                 |
+    |                         is_fl_ps_mode                  False                 |
+    |                      with_coordinator                  False                 |
+    |                            split_data                   True                 |
+    |                  downpour_table_param                    []                  |
+    |                       fs_client_param                                        |
+    |                    execution_strategy                                        |
+    +==============================================================================+
+    |                                Build Strategy                                |
+    +------------------------------------------------------------------------------+
+    |           enable_sequential_execution                  False                 |
+    |              fuse_elewise_add_act_ops                  False                 |
+    |                       fuse_bn_act_ops                  False                 |
+    |              fuse_relu_depthwise_conv                  False                 |
+    |                    fuse_broadcast_ops                  False                 |
+    |                fuse_all_optimizer_ops                  False                 |
+    |                        enable_inplace                  False                 |
+    |     enable_backward_optimizer_op_deps                   True                 |
+    |                 cache_runtime_context                  False                 |
+    |                   fuse_bn_add_act_ops                   True                 |
+    |                    enable_auto_fusion                  False                 |
+    |                          enable_addto                  False                 |
+    |                      fix_op_run_order                  False                 |
+    |              allow_cuda_graph_capture                  False                 |
+    |                       reduce_strategy                    0                   |
+    |                    fuse_gemm_epilogue                  False                 |
+    |                   debug_graphviz_path                                        |
+    |                       fused_attention                  False                 |
+    |                     fused_feedforward                  False                 |
+    |            fuse_dot_product_attention                  False                 |
+    |                          fuse_resunit                  False                 |
+    +==============================================================================+
+[0m
+[32m[2024-08-05 08:54:49,483] [    INFO][0m - The default value for the training argument `--report_to` will change in v5 (from all installed integrations to none). In v5, you will need to use `--report_to all` to get the same behavior as now. You should start updating your code and make this info disappear :-).[0m
+[35m[2024-08-05 08:54:49,484] [   DEBUG][0m - ============================================================[0m
+[35m[2024-08-05 08:54:49,484] [   DEBUG][0m -      Model Configuration Arguments      [0m
+[35m[2024-08-05 08:54:49,484] [   DEBUG][0m - paddle commit id              : a842a0f40f6111fb0c2df218130d0560aa747bc8[0m
+[35m[2024-08-05 08:54:49,484] [   DEBUG][0m - paddlenlp commit id           : 272a4b04992242b0a3ca250c6a4b2b5d5c660f66[0m
+[35m[2024-08-05 08:54:49,484] [   DEBUG][0m - aistudio_repo_id              : None[0m
+[35m[2024-08-05 08:54:49,485] [   DEBUG][0m - aistudio_repo_license         : Apache License 2.0[0m
+[35m[2024-08-05 08:54:49,485] [   DEBUG][0m - aistudio_repo_private         : True[0m
+[35m[2024-08-05 08:54:49,485] [   DEBUG][0m - aistudio_token                : None[0m
+[35m[2024-08-05 08:54:49,485] [   DEBUG][0m - attention_probs_dropout_prob  : 0.1[0m
+[35m[2024-08-05 08:54:49,485] [   DEBUG][0m - continue_training             : True[0m
+[35m[2024-08-05 08:54:49,485] [   DEBUG][0m - flash_mask                    : False[0m
+[35m[2024-08-05 08:54:49,486] [   DEBUG][0m - from_aistudio                 : False[0m
+[35m[2024-08-05 08:54:49,486] [   DEBUG][0m - fuse_attention_ffn            : None[0m
+[35m[2024-08-05 08:54:49,486] [   DEBUG][0m - fuse_attention_qkv            : None[0m
+[35m[2024-08-05 08:54:49,486] [   DEBUG][0m - hidden_dropout_prob           : 0.1[0m
+[35m[2024-08-05 08:54:49,486] [   DEBUG][0m - lora                          : True[0m
+[35m[2024-08-05 08:54:49,486] [   DEBUG][0m - lora_path                     : None[0m
+[35m[2024-08-05 08:54:49,487] [   DEBUG][0m - lora_plus_scale               : 1.0[0m
+[35m[2024-08-05 08:54:49,487] [   DEBUG][0m - lora_rank                     : 8[0m
+[35m[2024-08-05 08:54:49,487] [   DEBUG][0m - model_name_or_path            : __internal_testing__/unified-ckpt-llama-170m-for-peft[0m
+[35m[2024-08-05 08:54:49,487] [   DEBUG][0m - neftune                       : False[0m
+[35m[2024-08-05 08:54:49,487] [   DEBUG][0m - neftune_noise_alpha           : 5.0[0m
+[35m[2024-08-05 08:54:49,487] [   DEBUG][0m - num_prefix_tokens             : 128[0m
+[35m[2024-08-05 08:54:49,488] [   DEBUG][0m - pissa                         : False[0m
+[35m[2024-08-05 08:54:49,488] [   DEBUG][0m - prefix_path                   : None[0m
+[35m[2024-08-05 08:54:49,488] [   DEBUG][0m - prefix_tuning                 : False[0m
+[35m[2024-08-05 08:54:49,488] [   DEBUG][0m - reft                          : False[0m
+[35m[2024-08-05 08:54:49,488] [   DEBUG][0m - rslora                        : False[0m
+[35m[2024-08-05 08:54:49,489] [   DEBUG][0m - save_to_aistudio              : False[0m
+[35m[2024-08-05 08:54:49,489] [   DEBUG][0m - tokenizer_name_or_path        : None[0m
+[35m[2024-08-05 08:54:49,489] [   DEBUG][0m - use_fast_layer_norm           : False[0m
+[35m[2024-08-05 08:54:49,489] [   DEBUG][0m - use_quick_lora                : False[0m
+[35m[2024-08-05 08:54:49,489] [   DEBUG][0m - vera                          : False[0m
+[35m[2024-08-05 08:54:49,489] [   DEBUG][0m - vera_rank                     : 8[0m
+[35m[2024-08-05 08:54:49,490] [   DEBUG][0m - weight_blocksize              : 64[0m
+[35m[2024-08-05 08:54:49,490] [   DEBUG][0m - weight_double_quant           : False[0m
+[35m[2024-08-05 08:54:49,490] [   DEBUG][0m - weight_double_quant_block_size: 256[0m
+[35m[2024-08-05 08:54:49,490] [   DEBUG][0m - weight_quantize_algo          : None[0m
+[35m[2024-08-05 08:54:49,490] [   DEBUG][0m - [0m
+[35m[2024-08-05 08:54:49,490] [   DEBUG][0m - ============================================================[0m
+[35m[2024-08-05 08:54:49,491] [   DEBUG][0m -       Data Configuration Arguments      [0m
+[35m[2024-08-05 08:54:49,491] [   DEBUG][0m - paddle commit id              : a842a0f40f6111fb0c2df218130d0560aa747bc8[0m
+[35m[2024-08-05 08:54:49,491] [   DEBUG][0m - paddlenlp commit id           : 272a4b04992242b0a3ca250c6a4b2b5d5c660f66[0m
+[35m[2024-08-05 08:54:49,491] [   DEBUG][0m - chat_template                 : None[0m
+[35m[2024-08-05 08:54:49,491] [   DEBUG][0m - dataset_name_or_path          : ./unified_checkpoint/peft_input/data/[0m
+[35m[2024-08-05 08:54:49,491] [   DEBUG][0m - eval_with_do_generation       : False[0m
+[35m[2024-08-05 08:54:49,492] [   DEBUG][0m - intokens                      : None[0m
+[35m[2024-08-05 08:54:49,492] [   DEBUG][0m - lazy                          : False[0m
+[35m[2024-08-05 08:54:49,492] [   DEBUG][0m - max_length                    : 2048[0m
+[35m[2024-08-05 08:54:49,492] [   DEBUG][0m - pad_to_multiple_of            : None[0m
+[35m[2024-08-05 08:54:49,492] [   DEBUG][0m - save_generation_output        : False[0m
+[35m[2024-08-05 08:54:49,493] [   DEBUG][0m - src_length                    : 1024[0m
+[35m[2024-08-05 08:54:49,493] [   DEBUG][0m - task_name                     : None[0m
+[35m[2024-08-05 08:54:49,493] [   DEBUG][0m - task_name_or_path             : None[0m
+[35m[2024-08-05 08:54:49,493] [   DEBUG][0m - zero_padding                  : False[0m
+[35m[2024-08-05 08:54:49,493] [   DEBUG][0m - [0m
+[35m[2024-08-05 08:54:49,493] [   DEBUG][0m - ============================================================[0m
+[35m[2024-08-05 08:54:49,494] [   DEBUG][0m -      Quant Configuration Arguments      [0m
+[35m[2024-08-05 08:54:49,494] [   DEBUG][0m - paddle commit id              : a842a0f40f6111fb0c2df218130d0560aa747bc8[0m
+[35m[2024-08-05 08:54:49,494] [   DEBUG][0m - paddlenlp commit id           : 272a4b04992242b0a3ca250c6a4b2b5d5c660f66[0m
+[35m[2024-08-05 08:54:49,494] [   DEBUG][0m - auto_clip                     : False[0m
+[35m[2024-08-05 08:54:49,494] [   DEBUG][0m - autoclip_step                 : 8[0m
+[35m[2024-08-05 08:54:49,495] [   DEBUG][0m - awq_step                      : 8[0m
+[35m[2024-08-05 08:54:49,495] [   DEBUG][0m - do_awq                        : False[0m
+[35m[2024-08-05 08:54:49,495] [   DEBUG][0m - do_gptq                       : False[0m
+[35m[2024-08-05 08:54:49,495] [   DEBUG][0m - do_ptq                        : False[0m
+[35m[2024-08-05 08:54:49,495] [   DEBUG][0m - do_qat                        : False[0m
+[35m[2024-08-05 08:54:49,495] [   DEBUG][0m - gptq_step                     : 8[0m
+[35m[2024-08-05 08:54:49,496] [   DEBUG][0m - ptq_step                      : 32[0m
+[35m[2024-08-05 08:54:49,496] [   DEBUG][0m - quant_type                    : a8w8[0m
+[35m[2024-08-05 08:54:49,496] [   DEBUG][0m - shift                         : False[0m
+[35m[2024-08-05 08:54:49,496] [   DEBUG][0m - shift_all_linears             : False[0m
+[35m[2024-08-05 08:54:49,496] [   DEBUG][0m - shift_sampler                 : ema[0m
+[35m[2024-08-05 08:54:49,496] [   DEBUG][0m - shift_step                    : 32[0m
+[35m[2024-08-05 08:54:49,497] [   DEBUG][0m - smooth                        : False[0m
+[35m[2024-08-05 08:54:49,497] [   DEBUG][0m - smooth_all_linears            : False[0m
+[35m[2024-08-05 08:54:49,497] [   DEBUG][0m - smooth_k_piece                : 3[0m
+[35m[2024-08-05 08:54:49,497] [   DEBUG][0m - smooth_piecewise_search       : False[0m
+[35m[2024-08-05 08:54:49,497] [   DEBUG][0m - smooth_sampler                : none[0m
+[35m[2024-08-05 08:54:49,497] [   DEBUG][0m - smooth_search_piece           : False[0m
+[35m[2024-08-05 08:54:49,498] [   DEBUG][0m - smooth_step                   : 32[0m
+[35m[2024-08-05 08:54:49,498] [   DEBUG][0m - weight_quant_method           : abs_max_channel_wise[0m
+[35m[2024-08-05 08:54:49,498] [   DEBUG][0m - [0m
+[35m[2024-08-05 08:54:49,498] [   DEBUG][0m - ============================================================[0m
+[35m[2024-08-05 08:54:49,498] [   DEBUG][0m -    Generation Configuration Arguments   [0m
+[35m[2024-08-05 08:54:49,498] [   DEBUG][0m - paddle commit id              : a842a0f40f6111fb0c2df218130d0560aa747bc8[0m
+[35m[2024-08-05 08:54:49,499] [   DEBUG][0m - paddlenlp commit id           : 272a4b04992242b0a3ca250c6a4b2b5d5c660f66[0m
+[35m[2024-08-05 08:54:49,499] [   DEBUG][0m - top_k                         : 1[0m
+[35m[2024-08-05 08:54:49,499] [   DEBUG][0m - top_p                         : 1.0[0m
+[35m[2024-08-05 08:54:49,499] [   DEBUG][0m - [0m
+[35m[2024-08-05 08:54:49,499] [   DEBUG][0m - ============================================================[0m
+[35m[2024-08-05 08:54:49,500] [   DEBUG][0m -       Reft Configuration Arguments      [0m
+[35m[2024-08-05 08:54:49,500] [   DEBUG][0m - paddle commit id              : a842a0f40f6111fb0c2df218130d0560aa747bc8[0m
+[35m[2024-08-05 08:54:49,500] [   DEBUG][0m - paddlenlp commit id           : 272a4b04992242b0a3ca250c6a4b2b5d5c660f66[0m
+[35m[2024-08-05 08:54:49,500] [   DEBUG][0m - act_fn                        : None[0m
+[35m[2024-08-05 08:54:49,500] [   DEBUG][0m - add_bias                      : False[0m
+[35m[2024-08-05 08:54:49,500] [   DEBUG][0m - dropout                       : 0.0[0m
+[35m[2024-08-05 08:54:49,501] [   DEBUG][0m - intervention_type             : LoreftIntervention[0m
+[35m[2024-08-05 08:54:49,501] [   DEBUG][0m - layers                        : all[0m
+[35m[2024-08-05 08:54:49,501] [   DEBUG][0m - position                      : f7+l7[0m
+[35m[2024-08-05 08:54:49,501] [   DEBUG][0m - rank                          : 8[0m
+[35m[2024-08-05 08:54:49,501] [   DEBUG][0m - [0m
+[33m[2024-08-05 08:54:49,502] [ WARNING][0m - Process rank: 0, device: gpu, world_size: 8, distributed training: True, 16-bits training: True[0m
+[32m[2024-08-05 08:54:49,503] [    INFO][0m - We are using <class 'paddlenlp.transformers.llama.configuration.LlamaConfig'> to load '__internal_testing__/unified-ckpt-llama-170m-for-peft'.[0m
+[32m[2024-08-05 08:54:49,503] [    INFO][0m - Loading configuration file /home/ldn/.paddlenlp/models/__internal_testing__/unified-ckpt-llama-170m-for-peft/config.json[0m
+[32m[2024-08-05 08:54:49,508] [    INFO][0m - Final model config: LlamaConfig {
+  "alibi": false,
+  "architectures": [
+    "LlamaForCausalLM"
+  ],
+  "bos_token_id": 1,
+  "dtype": "float16",
+  "eos_token_id": 2,
+  "hidden_size": 1024,
+  "immediate_clear_past_key_value": false,
+  "initializer_range": 0.02,
+  "intermediate_size": 2816,
+  "long_sequence_init_args": {},
+  "long_sequence_strategy_name": null,
+  "long_sequence_strategy_type": null,
+  "max_position_embeddings": 2048,
+  "model_type": "llama",
+  "num_attention_heads": 8,
+  "num_hidden_layers": 8,
+  "num_key_value_heads": 8,
+  "pad_token_id": 0,
+  "paddlenlp_version": "3.0.0b0.post20240805",
+  "pipeline_parallel_degree": 2,
+  "recompute": true,
+  "rms_norm_eps": 1e-06,
+  "rope_scaling_factor": 1.0,
+  "rope_scaling_type": null,
+  "rope_theta": 10000.0,
+  "seq_length": 2048,
+  "tensor_parallel_degree": 4,
+  "tensor_parallel_output": false,
+  "tie_word_embeddings": false,
+  "use_fast_layer_norm": false,
+  "use_flash_attention_for_generation": false,
+  "use_last_token_for_generation": false,
+  "use_long_sequence_strategies": false,
+  "vocab_size": 32000
+}
+[0m
+[32m[2024-08-05 08:54:49,509] [    INFO][0m - We are using <class 'paddlenlp.transformers.llama.modeling_pp.LlamaForCausalLMPipe'> to load '__internal_testing__/unified-ckpt-llama-170m-for-peft'.[0m
+[32m[2024-08-05 08:54:49,509] [    INFO][0m - Loading weights file from cache at /home/ldn/.paddlenlp/models/__internal_testing__/unified-ckpt-llama-170m-for-peft/model_state.pdparams[0m
+[32m[2024-08-05 08:54:49,824] [    INFO][0m - Starting to convert orignal state_dict to tensor parallel state_dict.[0m
+[32m[2024-08-05 08:54:49,974] [    INFO][0m - Loaded weights file from disk, setting weights to model.[0m
+[2024-08-05 08:54:49,975] [    INFO] pp_layers.py:607 - start segment network..
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:613 - segment with method: layer:LlamaDecoderLayer; result: 0, 5, 11
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:629 - stage=0, global_rank=0 ,layer_number=5
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:634 - 0: LlamaEmbeddingPipe
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:634 - 1: LlamaDecoderLayerPipe
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:634 - 2: LlamaDecoderLayerPipe
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:634 - 3: LlamaDecoderLayerPipe
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:634 - 4: LlamaDecoderLayerPipe
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:629 - stage=1, global_rank=0 ,layer_number=6
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:634 - 5: LlamaDecoderLayerPipe
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:634 - 6: LlamaDecoderLayerPipe
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:634 - 7: LlamaDecoderLayerPipe
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:634 - 8: LlamaDecoderLayerPipe
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:634 - 9: LlamaRMSNormPipe
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:634 - 10: LlamaLMHead
+[2024-08-05 08:54:49,976] [    INFO] pp_layers.py:656 - loss: LlamaPretrainingCriterion
+[2024-08-05 08:54:50,394] [    INFO] pp_layers.py:706 - flush 5 of layers into run_function
+[33m[2024-08-05 08:54:50,601] [ WARNING][0m - Some weights of the model checkpoint at __internal_testing__/unified-ckpt-llama-170m-for-peft were not used when initializing LlamaForCausalLMPipe: ['llama.layers.4.input_layernorm.weight', 'llama.layers.4.mlp.down_proj.weight', 'llama.layers.4.mlp.gate_proj.weight', 'llama.layers.4.mlp.up_proj.weight', 'llama.layers.4.post_attention_layernorm.weight', 'llama.layers.4.self_attn.k_proj.weight', 'llama.layers.4.self_attn.o_proj.weight', 'llama.layers.4.self_attn.q_proj.weight', 'llama.layers.4.self_attn.v_proj.weight', 'llama.layers.5.input_layernorm.weight', 'llama.layers.5.mlp.down_proj.weight', 'llama.layers.5.mlp.gate_proj.weight', 'llama.layers.5.mlp.up_proj.weight', 'llama.layers.5.post_attention_layernorm.weight', 'llama.layers.5.self_attn.k_proj.weight', 'llama.layers.5.self_attn.o_proj.weight', 'llama.layers.5.self_attn.q_proj.weight', 'llama.layers.5.self_attn.v_proj.weight', 'llama.layers.6.input_layernorm.weight', 'llama.layers.6.mlp.down_proj.weight', 'llama.layers.6.mlp.gate_proj.weight', 'llama.layers.6.mlp.up_proj.weight', 'llama.layers.6.post_attention_layernorm.weight', 'llama.layers.6.self_attn.k_proj.weight', 'llama.layers.6.self_attn.o_proj.weight', 'llama.layers.6.self_attn.q_proj.weight', 'llama.layers.6.self_attn.v_proj.weight', 'llama.layers.7.input_layernorm.weight', 'llama.layers.7.mlp.down_proj.weight', 'llama.layers.7.mlp.gate_proj.weight', 'llama.layers.7.mlp.up_proj.weight', 'llama.layers.7.post_attention_layernorm.weight', 'llama.layers.7.self_attn.k_proj.weight', 'llama.layers.7.self_attn.o_proj.weight', 'llama.layers.7.self_attn.q_proj.weight', 'llama.layers.7.self_attn.v_proj.weight', 'llama.norm.weight', 'lm_head.weight']
+- This IS expected if you are initializing LlamaForCausalLMPipe from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).
+- This IS NOT expected if you are initializing LlamaForCausalLMPipe from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).[0m
+[32m[2024-08-05 08:54:50,602] [    INFO][0m - All the weights of LlamaForCausalLMPipe were initialized from the model checkpoint at __internal_testing__/unified-ckpt-llama-170m-for-peft.
+If your task is similar to the task the model of the checkpoint was trained on, you can already use LlamaForCausalLMPipe for predictions without further training.[0m
+[32m[2024-08-05 08:54:50,606] [    INFO][0m - We are using <class 'paddlenlp.transformers.llama.tokenizer.LlamaTokenizer'> to load '__internal_testing__/unified-ckpt-llama-170m-for-peft'.[0m
+[32m[2024-08-05 08:54:51,646] [    INFO][0m - Mark only lora and trainable_module as trainable.[0m
+[35m[2024-08-05 08:54:51,649] [   DEBUG][0m - Frozen parameters: 2.10e+07 || Trainable parameters:3.30e+05 || Total parameters:2.14e+07|| Trainable:1.54%[0m
+[32m[2024-08-05 08:54:51,651] [    INFO][0m - The global seed is set to 42, local seed is set to 50 and random seed is set to 42.[0m
+[32m[2024-08-05 08:54:51,677] [    INFO][0m - max_steps is given, it will override any value given in num_train_epochs[0m
+[32m[2024-08-05 08:54:51,677] [    INFO][0m - Using half precision[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - ============================================================[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m -     Training Configuration Arguments    [0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - paddle commit id              : a842a0f40f6111fb0c2df218130d0560aa747bc8[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - paddlenlp commit id           : 272a4b04992242b0a3ca250c6a4b2b5d5c660f66[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - _no_sync_in_gradient_accumulation: True[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - adam_beta1                    : 0.9[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - adam_beta2                    : 0.999[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - adam_epsilon                  : 1e-08[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - amp_custom_black_list         : None[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - amp_custom_white_list         : None[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - amp_master_grad               : False[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - autotuner_benchmark           : False[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - benchmark                     : False[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - bf16                          : False[0m
+[35m[2024-08-05 08:54:51,695] [   DEBUG][0m - bf16_full_eval                : False[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - context_parallel_degree       : 1[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - current_device                : gpu:0[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - data_parallel_config          : [0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - data_parallel_degree          : 1[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - data_parallel_rank            : 0[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - dataloader_drop_last          : False[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - dataloader_num_workers        : 0[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - dataset_rank                  : 0[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - dataset_world_size            : 1[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - decay_steps                   : 0[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - device                        : gpu[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - disable_tqdm                  : True[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - distributed_dataloader        : False[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - do_eval                       : False[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - do_export                     : False[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - do_predict                    : False[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - do_train                      : True[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - enable_auto_parallel          : False[0m
+[35m[2024-08-05 08:54:51,696] [   DEBUG][0m - eval_accumulation_steps       : 16[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - eval_batch_size               : 8[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - eval_steps                    : None[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - evaluation_strategy           : IntervalStrategy.NO[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - flatten_param_grads           : False[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - force_reshard_pp              : False[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - fp16                          : True[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - fp16_full_eval                : False[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - fp16_opt_level                : O2[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - fuse_sequence_parallel_allreduce: False[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - gradient_accumulation_steps   : 8[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - greater_is_better             : None[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - hybrid_parallel_topo_order    : pp_first[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - ignore_data_skip              : False[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - ignore_load_lr_and_optim      : False[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - ignore_save_lr_and_optim      : False[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - label_names                   : None[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - lazy_data_processing          : True[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - learning_rate                 : 0.0003[0m
+[35m[2024-08-05 08:54:51,697] [   DEBUG][0m - load_best_model_at_end        : False[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - load_sharded_model            : False[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - local_process_index           : 0[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - local_rank                    : 0[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - log_level                     : -1[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - log_level_replica             : -1[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - log_on_each_node              : True[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - logging_dir                   : ./unified_checkpoint/checkpoints/llama_lora_ckpts/runs/Aug05_08-54-46_ubuntu[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - logging_first_step            : False[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - logging_steps                 : 1[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - logging_strategy              : IntervalStrategy.STEPS[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - logical_process_index         : 0[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - lr_end                        : 1e-07[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - lr_scheduler_type             : SchedulerType.LINEAR[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - max_evaluate_steps            : -1[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - max_grad_norm                 : 1.0[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - max_steps                     : 15[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - metric_for_best_model         : None[0m
+[35m[2024-08-05 08:54:51,698] [   DEBUG][0m - minimum_eval_times            : None[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - no_cuda                       : False[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - no_recompute_layers           : None[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - num_cycles                    : 0.5[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - num_train_epochs              : 1.0[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - optim                         : OptimizerNames.ADAMW[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - optimizer_name_suffix         : tp00_pp00[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - output_dir                    : ./unified_checkpoint/checkpoints/llama_lora_ckpts[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - overwrite_output_dir          : False[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - past_index                    : -1[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - per_device_eval_batch_size    : 8[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - per_device_train_batch_size   : 4[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - pipeline_parallel_config      : [0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - pipeline_parallel_degree      : 2[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - pipeline_parallel_rank        : 0[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - power                         : 1.0[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - pp_recompute_interval         : 1[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - prediction_loss_only          : False[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - process_index                 : 0[0m
+[35m[2024-08-05 08:54:51,699] [   DEBUG][0m - recompute                     : True[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - recompute_granularity         : full[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - recompute_use_reentrant       : False[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - remove_unused_columns         : True[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - report_to                     : ['visualdl'][0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - resume_from_checkpoint        : None[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - run_name                      : ./unified_checkpoint/checkpoints/llama_lora_ckpts[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - save_on_each_node             : False[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - save_sharded_model            : False[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - save_steps                    : 10[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - save_strategy                 : IntervalStrategy.STEPS[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - save_total_limit              : 1[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - scale_loss                    : 32768[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - seed                          : 42[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - sep_parallel_degree           : 1[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - sequence_parallel             : False[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - sequence_parallel_config      : [0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - sharding                      : [][0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - sharding_degree               : -1[0m
+[35m[2024-08-05 08:54:51,700] [   DEBUG][0m - sharding_parallel_config      : [0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - sharding_parallel_degree      : 1[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - sharding_parallel_rank        : 0[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - should_load_dataset           : True[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - should_load_sharding_stage1_model: False[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - should_log                    : True[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - should_save                   : True[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - should_save_model_state       : True[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - should_save_sharding_stage1_model: False[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - skip_memory_metrics           : True[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - skip_profile_timer            : True[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - tensor_parallel_config        : [0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - tensor_parallel_degree        : 4[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - tensor_parallel_output        : False[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - tensor_parallel_rank          : 0[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - to_static                     : False[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - train_batch_size              : 4[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - unified_checkpoint            : True[0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - unified_checkpoint_config     : [''][0m
+[35m[2024-08-05 08:54:51,701] [   DEBUG][0m - use_async_save                : False[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - use_expert_parallel           : False[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - use_flash_attention           : False[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - use_fused_dropout_add         : False[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - use_fused_linear              : False[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - use_fused_rms_norm            : False[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - use_fused_rope                : False[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - use_hybrid_parallel           : True[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - virtual_pp_degree             : 1[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - wandb_api_key                 : None[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - warmup_ratio                  : 0.0[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - warmup_steps                  : 30[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - weight_decay                  : 0.0[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - weight_name_suffix            : tp00_pp00[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - world_size                    : 8[0m
+[35m[2024-08-05 08:54:51,702] [   DEBUG][0m - [0m
+[32m[2024-08-05 08:54:51,702] [    INFO][0m - Starting training from resume_from_checkpoint : None[0m
+ubuntu:2294389:2294766 [0] NCCL INFO Using non-device net plugin version 0
+ubuntu:2294389:2294766 [0] NCCL INFO Using network Socket
+ubuntu:2294389:2294766 [0] NCCL INFO comm 0x56206863b030 rank 0 nranks 8 cudaDev 0 nvmlDev 0 busId 52000 commId 0x123cc55294d9570 - Init START
+ubuntu:2294389:2294766 [0] NCCL INFO Setting affinity for GPU 0 to ffffffff,00000000,ffffffff
+ubuntu:2294389:2294766 [0] NCCL INFO NVLS multicast support is not available on dev 0
+ubuntu:2294389:2294766 [0] NCCL INFO comm 0x56206863b030 rank 0 nRanks 8 nNodes 1 localRanks 8 localRank 0 MNNVL 0
+ubuntu:2294389:2294766 [0] NCCL INFO Channel 00/02 :    0   3   1   2   4   5   6   7
+ubuntu:2294389:2294766 [0] NCCL INFO Channel 01/02 :    0   3   1   2   4   5   6   7
+ubuntu:2294389:2294766 [0] NCCL INFO Trees [0] 1/-1/-1->0->-1 [1] 1/-1/-1->0->-1
+ubuntu:2294389:2294766 [0] NCCL INFO P2P Chunksize set to 524288
+ubuntu:2294389:2294766 [0] NCCL INFO Channel 00/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2294389:2294766 [0] NCCL INFO Channel 01/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2294389:2294766 [0] NCCL INFO Connected all rings
+ubuntu:2294389:2294766 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2294389:2294766 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2294389:2294766 [0] NCCL INFO Connected all trees
+ubuntu:2294389:2294766 [0] NCCL INFO NCCL_ALGO set by environment to Tree
+ubuntu:2294389:2294766 [0] NCCL INFO threadThresholds 8/8/64 | 64/8/64 | 512 | 512
+ubuntu:2294389:2294766 [0] NCCL INFO 2 coll channels, 0 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer
+ubuntu:2294389:2294766 [0] NCCL INFO comm 0x56206863b030 rank 0 nranks 8 cudaDev 0 nvmlDev 0 busId 52000 commId 0x123cc55294d9570 - Init COMPLETE
+[2024-08-05 08:54:53,804] [    INFO] pipeline_parallel.py:235 - dp_comm_overlap False;             sharding_comm_overlap False;             sharding_split_param False;
+[2024-08-05 08:54:53,804] [    INFO] pipeline_parallel.py:303 - Pipeline Info -- num_stages: 2, stage_id: 0
+[2024-08-05 08:54:53,804] [    INFO] pipeline_parallel.py:308 - start broadcast mp parameters
+ubuntu:2294389:2294838 [0] NCCL INFO Using non-device net plugin version 0
+ubuntu:2294389:2294838 [0] NCCL INFO Using network Socket
+ubuntu:2294389:2294838 [0] NCCL INFO comm 0x56206865d0d0 rank 0 nranks 4 cudaDev 0 nvmlDev 0 busId 52000 commId 0x993e01a33492d757 - Init START
+ubuntu:2294389:2294838 [0] NCCL INFO Setting affinity for GPU 0 to ffffffff,00000000,ffffffff
+ubuntu:2294389:2294838 [0] NCCL INFO NVLS multicast support is not available on dev 0
+ubuntu:2294389:2294838 [0] NCCL INFO comm 0x56206865d0d0 rank 0 nRanks 4 nNodes 1 localRanks 4 localRank 0 MNNVL 0
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 00/08 :    0   1   2   3
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 01/08 :    0   1   2   3
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 02/08 :    0   3   2   1
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 03/08 :    0   3   2   1
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 04/08 :    0   1   2   3
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 05/08 :    0   1   2   3
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 06/08 :    0   3   2   1
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 07/08 :    0   3   2   1
+ubuntu:2294389:2294838 [0] NCCL INFO Trees [0] 3/-1/-1->0->-1 [1] -1/-1/-1->0->3 [2] 3/-1/-1->0->1 [3] 2/-1/-1->0->3 [4] 3/-1/-1->0->-1 [5] -1/-1/-1->0->3 [6] 3/-1/-1->0->1 [7] 2/-1/-1->0->3
+ubuntu:2294389:2294838 [0] NCCL INFO P2P Chunksize set to 524288
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 04/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 05/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 02/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 03/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 06/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 07/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2294389:2294838 [0] NCCL INFO Connected all rings
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 02/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 06/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 03/0 : 0[0] -> 2[2] via P2P/CUMEM
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 07/0 : 0[0] -> 2[2] via P2P/CUMEM
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 00/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 01/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 04/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2294389:2294838 [0] NCCL INFO Channel 05/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2294389:2294838 [0] NCCL INFO Connected all trees
+ubuntu:2294389:2294838 [0] NCCL INFO NCCL_ALGO set by environment to Tree
+ubuntu:2294389:2294838 [0] NCCL INFO threadThresholds 8/8/64 | 32/8/64 | 512 | 512
+ubuntu:2294389:2294838 [0] NCCL INFO 8 coll channels, 0 collnet channels, 0 nvls channels, 8 p2p channels, 2 p2p channels per peer
+ubuntu:2294389:2294838 [0] NCCL INFO comm 0x56206865d0d0 rank 0 nranks 4 cudaDev 0 nvmlDev 0 busId 52000 commId 0x993e01a33492d757 - Init COMPLETE
+[2024-08-05 08:54:55,219] [ WARNING] hybrid_parallel_optimizer.py:292 - While using ClipGradByGlobalNorm in TensorParallel, PipelineParallel or Sharding, the grad clip of original optimizer will be changed.
+[32m[2024-08-05 08:54:55,220] [    INFO][0m - [timelog] checkpoint loading time: 0.00s (2024-08-05 08:54:55) [0m
+[32m[2024-08-05 08:54:55,220] [    INFO][0m - ***** Running training *****[0m
+[32m[2024-08-05 08:54:55,221] [    INFO][0m -   Num examples = 114,599[0m
+[32m[2024-08-05 08:54:55,221] [    INFO][0m -   Num Epochs = 1[0m
+[32m[2024-08-05 08:54:55,221] [    INFO][0m -   Instantaneous batch size per device = 4[0m
+[32m[2024-08-05 08:54:55,222] [    INFO][0m -   Total train batch size (w. parallel, distributed & accumulation) = 32[0m
+[32m[2024-08-05 08:54:55,222] [    INFO][0m -   Gradient Accumulation steps = 8[0m
+[32m[2024-08-05 08:54:55,222] [    INFO][0m -   Total optimization steps = 15[0m
+[32m[2024-08-05 08:54:55,222] [    INFO][0m -   Total num train samples = 480[0m
+[35m[2024-08-05 08:54:55,226] [   DEBUG][0m -   Number of trainable parameters = 329,728 (per device)[0m
+[35m[2024-08-05 08:54:55,235] [   DEBUG][0m -   Number of trainable parameters = 2,637,824 (all devices, roughly)[0m
+W0805 08:54:56.638290 2294389 multiply_fwd_func.cc:75] got different data type, run type promotion automatically, this may cause data type been changed.
+ubuntu:2294389:2294927 [0] NCCL INFO Using non-device net plugin version 0
+ubuntu:2294389:2294927 [0] NCCL INFO Using network Socket
+ubuntu:2294389:2294927 [0] NCCL INFO comm 0x56208277c250 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 52000 commId 0x30533af9b90480b6 - Init START
+ubuntu:2294389:2294927 [0] NCCL INFO Setting affinity for GPU 0 to ffffffff,00000000,ffffffff
+ubuntu:2294389:2294927 [0] NCCL INFO comm 0x56208277c250 rank 0 nRanks 2 nNodes 1 localRanks 2 localRank 0 MNNVL 0
+ubuntu:2294389:2294927 [0] NCCL INFO Channel 00/02 :    0   1
+ubuntu:2294389:2294927 [0] NCCL INFO Channel 01/02 :    0   1
+ubuntu:2294389:2294927 [0] NCCL INFO Trees [0] 1/-1/-1->0->-1 [1] 1/-1/-1->0->-1
+ubuntu:2294389:2294927 [0] NCCL INFO P2P Chunksize set to 131072
+ubuntu:2294389:2294927 [0] NCCL INFO Channel 00 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2294389:2294927 [0] NCCL INFO Channel 01 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2294389:2294927 [0] NCCL INFO Connected all rings
+ubuntu:2294389:2294927 [0] NCCL INFO Connected all trees
+ubuntu:2294389:2294927 [0] NCCL INFO NCCL_ALGO set by environment to Tree
+ubuntu:2294389:2294927 [0] NCCL INFO threadThresholds 8/8/64 | 16/8/64 | 512 | 512
+ubuntu:2294389:2294927 [0] NCCL INFO 2 coll channels, 0 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer
+ubuntu:2294389:2294927 [0] NCCL INFO comm 0x56208277c250 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 52000 commId 0x30533af9b90480b6 - Init COMPLETE
+ubuntu:2294389:2294963 [0] NCCL INFO Channel 00 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2294389:2294963 [0] NCCL INFO Channel 01 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2294389:2294974 [0] NCCL INFO Channel 00 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2294389:2294974 [0] NCCL INFO Channel 01 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2294389:2295034 [0] NCCL INFO Using non-device net plugin version 0
+ubuntu:2294389:2295034 [0] NCCL INFO Using network Socket
+ubuntu:2294389:2295034 [0] NCCL INFO comm 0x5620828504f0 rank 0 nranks 8 cudaDev 0 nvmlDev 0 busId 52000 commId 0xd6b8ecfce2d966a - Init START
+ubuntu:2294389:2295034 [0] NCCL INFO Setting affinity for GPU 0 to ffffffff,00000000,ffffffff
+ubuntu:2294389:2295034 [0] NCCL INFO NVLS multicast support is not available on dev 0
+ubuntu:2294389:2295034 [0] NCCL INFO comm 0x5620828504f0 rank 0 nRanks 8 nNodes 1 localRanks 8 localRank 0 MNNVL 0
+ubuntu:2294389:2295034 [0] NCCL INFO Channel 00/02 :    0   3   1   2   4   5   6   7
+ubuntu:2294389:2295034 [0] NCCL INFO Channel 01/02 :    0   3   1   2   4   5   6   7
+ubuntu:2294389:2295034 [0] NCCL INFO Trees [0] 1/-1/-1->0->-1 [1] 1/-1/-1->0->-1
+ubuntu:2294389:2295034 [0] NCCL INFO P2P Chunksize set to 524288
+ubuntu:2294389:2295034 [0] NCCL INFO Channel 00/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2294389:2295034 [0] NCCL INFO Channel 01/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2294389:2295034 [0] NCCL INFO Connected all rings
+ubuntu:2294389:2295034 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2294389:2295034 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2294389:2295034 [0] NCCL INFO Connected all trees
+ubuntu:2294389:2295034 [0] NCCL INFO NCCL_ALGO set by environment to Tree
+ubuntu:2294389:2295034 [0] NCCL INFO threadThresholds 8/8/64 | 64/8/64 | 512 | 512
+ubuntu:2294389:2295034 [0] NCCL INFO 2 coll channels, 0 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer
+ubuntu:2294389:2295034 [0] NCCL INFO comm 0x5620828504f0 rank 0 nranks 8 cudaDev 0 nvmlDev 0 busId 52000 commId 0xd6b8ecfce2d966a - Init COMPLETE
+[32m[2024-08-05 08:55:04,068] [    INFO][0m - loss: 10.53592682, learning_rate: 1e-05, global_step: 1, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.672877550125122, max_memory_reserved: 2.006225824356079, interval_runtime: 8.8312, interval_samples_per_second: 3.6235, interval_steps_per_second: 0.1132, ppl: 37643.92328240881, progress_or_epoch: 0.0003[0m
+[32m[2024-08-05 08:55:06,208] [    INFO][0m - loss: 10.52800369, learning_rate: 2e-05, global_step: 2, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 2.1397, interval_samples_per_second: 14.9551, interval_steps_per_second: 0.4673, ppl: 37346.844037390205, progress_or_epoch: 0.0006[0m
+[32m[2024-08-05 08:55:07,958] [    INFO][0m - loss: 10.52021408, learning_rate: 3e-05, global_step: 3, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 1.75, interval_samples_per_second: 18.2853, interval_steps_per_second: 0.5714, ppl: 37057.05681762876, progress_or_epoch: 0.0008[0m
+[32m[2024-08-05 08:55:11,169] [    INFO][0m - loss: 10.4806242, learning_rate: 4e-05, global_step: 4, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 3.2107, interval_samples_per_second: 9.9666, interval_steps_per_second: 0.3115, ppl: 35618.63375543165, progress_or_epoch: 0.0011[0m
+[32m[2024-08-05 08:55:13,458] [    INFO][0m - loss: 10.46234894, learning_rate: 5e-05, global_step: 5, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 2.2895, interval_samples_per_second: 13.9766, interval_steps_per_second: 0.4368, ppl: 34973.60594059294, progress_or_epoch: 0.0014[0m
+[32m[2024-08-05 08:55:17,045] [    INFO][0m - loss: 10.42655373, learning_rate: 6e-05, global_step: 6, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 3.5866, interval_samples_per_second: 8.9221, interval_steps_per_second: 0.2788, ppl: 33743.859196078825, progress_or_epoch: 0.0017[0m
+[32m[2024-08-05 08:55:19,712] [    INFO][0m - loss: 10.34102821, learning_rate: 7e-05, global_step: 7, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 2.6677, interval_samples_per_second: 11.9953, interval_steps_per_second: 0.3749, ppl: 30977.865428523815, progress_or_epoch: 0.002[0m
+[32m[2024-08-05 08:55:22,101] [    INFO][0m - loss: 10.27382469, learning_rate: 8e-05, global_step: 8, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 2.3881, interval_samples_per_second: 13.3999, interval_steps_per_second: 0.4187, ppl: 28964.455650497694, progress_or_epoch: 0.0022[0m
+[32m[2024-08-05 08:55:24,020] [    INFO][0m - loss: 10.17301464, learning_rate: 9e-05, global_step: 9, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 1.9194, interval_samples_per_second: 16.6718, interval_steps_per_second: 0.521, ppl: 26186.90197167708, progress_or_epoch: 0.0025[0m
+[32m[2024-08-05 08:55:26,389] [    INFO][0m - loss: 10.04575729, learning_rate: 0.0001, global_step: 10, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 2.3689, interval_samples_per_second: 13.5087, interval_steps_per_second: 0.4221, ppl: 23057.751671452545, progress_or_epoch: 0.0028[0m
+[32m[2024-08-05 08:55:26,390] [    INFO][0m - Saving model checkpoint to ./unified_checkpoint/checkpoints/llama_lora_ckpts/checkpoint-10[0m
+[32m[2024-08-05 08:55:26,391] [    INFO][0m - tokenizer config file saved in ./unified_checkpoint/checkpoints/llama_lora_ckpts/checkpoint-10/tokenizer_config.json[0m
+[32m[2024-08-05 08:55:26,391] [    INFO][0m - Special tokens file saved in ./unified_checkpoint/checkpoints/llama_lora_ckpts/checkpoint-10/special_tokens_map.json[0m
+[32m[2024-08-05 08:55:26,588] [    INFO][0m - Unified model tensor parallel weights in shards[0m
+ubuntu:2294389:2295666 [0] NCCL INFO Channel 04/1 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2294389:2295666 [0] NCCL INFO Channel 05/1 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2294389:2295669 [0] NCCL INFO Channel 02/1 : 0[0] -> 2[2] via P2P/CUMEM
+ubuntu:2294389:2295669 [0] NCCL INFO Channel 03/1 : 0[0] -> 2[2] via P2P/CUMEM
+ubuntu:2294389:2295678 [0] NCCL INFO Channel 06/1 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2294389:2295678 [0] NCCL INFO Channel 07/1 : 0[0] -> 3[3] via P2P/CUMEM/read
+[32m[2024-08-05 08:55:26,817] [    INFO][0m - Unified checkpoint: generating sharded_index json files for model weight.[0m
+[32m[2024-08-05 08:55:26,898] [    INFO][0m - Configuration saved in ./unified_checkpoint/checkpoints/llama_lora_ckpts/checkpoint-10/config.json[0m
+[32m[2024-08-05 08:55:26,898] [    INFO][0m - Saving optimizer files.[0m
+[32m[2024-08-05 08:55:27,397] [    INFO][0m - Unified optimizer tensor parallel in shards[0m
+[32m[2024-08-05 08:55:27,646] [    INFO][0m - Unified master weight tensor parallel in shards[0m
+[32m[2024-08-05 08:55:27,908] [    INFO][0m - Unified checkpoint: generating sharded_index json files for optimizer or master weight.[0m
+[32m[2024-08-05 08:55:28,076] [    INFO][0m - Unified checkpoint: generating sharded_index json files for optimizer or master weight.[0m
+[32m[2024-08-05 08:55:28,182] [    INFO][0m - [timelog] checkpoint saving time: 1.75s (2024-08-05 08:55:28) [0m
+[32m[2024-08-05 08:55:31,018] [    INFO][0m - loss: 9.89326954, learning_rate: 0.00011, global_step: 11, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 1.959717035293579, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 4.6292, interval_samples_per_second: 6.9126, interval_steps_per_second: 0.216, ppl: 19796.680280011595, progress_or_epoch: 0.0031[0m
+[32m[2024-08-05 08:55:32,699] [    INFO][0m - loss: 9.76630211, learning_rate: 0.00012, global_step: 12, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 1.959717035293579, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 1.6815, interval_samples_per_second: 19.0303, interval_steps_per_second: 0.5947, ppl: 17436.170815081674, progress_or_epoch: 0.0034[0m
+[32m[2024-08-05 08:55:35,091] [    INFO][0m - loss: 9.61932182, learning_rate: 0.00013, global_step: 13, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 1.959717035293579, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 2.3924, interval_samples_per_second: 13.3754, interval_steps_per_second: 0.418, ppl: 15052.837942374175, progress_or_epoch: 0.0036[0m
+[32m[2024-08-05 08:55:37,001] [    INFO][0m - loss: 9.45707226, learning_rate: 0.00014, global_step: 14, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 1.959717035293579, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 1.9094, interval_samples_per_second: 16.7596, interval_steps_per_second: 0.5237, ppl: 12798.359274345816, progress_or_epoch: 0.0039[0m
+[32m[2024-08-05 08:55:41,401] [    INFO][0m - loss: 9.35388565, learning_rate: 0.00015, global_step: 15, current_memory_allocated: 0.04802298545837402, current_memory_reserved: 1.959717035293579, max_memory_allocated: 1.676563024520874, max_memory_reserved: 2.006225824356079, interval_runtime: 4.3997, interval_samples_per_second: 7.2732, interval_steps_per_second: 0.2273, ppl: 11543.590767216201, progress_or_epoch: 0.0042[0m
+[32m[2024-08-05 08:55:41,402] [    INFO][0m - 
+Training completed. 
+[0m
+[32m[2024-08-05 08:55:41,403] [    INFO][0m - train_runtime: 46.1669, train_samples_per_second: 10.3971, train_steps_per_second: 0.3249, train_loss: 10.125143178304036, progress_or_epoch: 0.0042[0m
+[32m[2024-08-05 08:55:41,403] [    INFO][0m - Saving model checkpoint to ./unified_checkpoint/checkpoints/llama_lora_ckpts[0m
+[32m[2024-08-05 08:55:41,404] [    INFO][0m - tokenizer config file saved in ./unified_checkpoint/checkpoints/llama_lora_ckpts/tokenizer_config.json[0m
+[32m[2024-08-05 08:55:41,404] [    INFO][0m - Special tokens file saved in ./unified_checkpoint/checkpoints/llama_lora_ckpts/special_tokens_map.json[0m
+[32m[2024-08-05 08:55:41,606] [    INFO][0m - Unified model tensor parallel weights in shards[0m
+[32m[2024-08-05 08:55:41,677] [    INFO][0m - Unified checkpoint: generating sharded_index json files for model weight.[0m
+[32m[2024-08-05 08:55:41,732] [    INFO][0m - Configuration saved in ./unified_checkpoint/checkpoints/llama_lora_ckpts/config.json[0m
+[32m[2024-08-05 08:55:41,732] [    INFO][0m - ***** train metrics *****[0m
+[32m[2024-08-05 08:55:41,732] [    INFO][0m -   progress_or_epoch        =     0.0042[0m
+[32m[2024-08-05 08:55:41,732] [    INFO][0m -   train_loss               =    10.1251[0m
+[32m[2024-08-05 08:55:41,732] [    INFO][0m -   train_runtime            = 0:00:46.16[0m
+[32m[2024-08-05 08:55:41,732] [    INFO][0m -   train_samples_per_second =    10.3971[0m
+[32m[2024-08-05 08:55:41,732] [    INFO][0m -   train_steps_per_second   =     0.3249[0m
+I0805 08:55:43.215848 2294389 process_group_nccl.cc:143] ProcessGroupNCCL destruct 
+I0805 08:55:43.218900 2294389 process_group_nccl.cc:143] ProcessGroupNCCL destruct 
+I0805 08:55:43.218968 2294389 process_group_nccl.cc:143] ProcessGroupNCCL destruct 
+I0805 08:55:43.218991 2294389 process_group_nccl.cc:143] ProcessGroupNCCL destruct 
+I0805 08:55:43.219007 2294389 process_group_nccl.cc:143] ProcessGroupNCCL destruct 
+I0805 08:55:43.334718 2294589 tcp_store.cc:293] receive shutdown event and so quit from MasterDaemon run loop
+/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/_distutils_hack/__init__.py:26: UserWarning: Setuptools is replacing distutils.
+  warnings.warn("Setuptools is replacing distutils.")
+I0805 08:55:51.708911 2296430 custom_operator.cc:1296] register pir custom op :write_int8_cache_kv
+I0805 08:55:51.709026 2296430 custom_operator.cc:1296] register pir custom op :update_inputs
+I0805 08:55:51.709079 2296430 custom_operator.cc:1296] register pir custom op :transpose_remove_padding
+I0805 08:55:51.709100 2296430 custom_operator.cc:1296] register pir custom op :set_stop_value_multi_ends_v2
+I0805 08:55:51.709128 2296430 custom_operator.cc:1296] register pir custom op :step_paddle
+I0805 08:55:51.709206 2296430 custom_operator.cc:1296] register pir custom op :get_token_penalty_multi_scores
+I0805 08:55:51.709226 2296430 custom_operator.cc:1296] register pir custom op :set_value_by_flags_and_idx_v2
+I0805 08:55:51.709246 2296430 custom_operator.cc:1296] register pir custom op :dequant_int8
+I0805 08:55:51.709265 2296430 custom_operator.cc:1296] register pir custom op :set_stop_value_multi_ends
+I0805 08:55:51.709283 2296430 custom_operator.cc:1296] register pir custom op :encode_rotary_qk
+I0805 08:55:51.709306 2296430 custom_operator.cc:1296] register pir custom op :get_output
+I0805 08:55:51.709324 2296430 custom_operator.cc:1296] register pir custom op :fused_get_rotary_embedding
+I0805 08:55:51.709347 2296430 custom_operator.cc:1296] register pir custom op :set_value_by_flags_and_idx
+I0805 08:55:51.709362 2296430 custom_operator.cc:1296] register pir custom op :save_with_output
+I0805 08:55:51.709380 2296430 custom_operator.cc:1296] register pir custom op :write_cache_kv
+I0805 08:55:51.709396 2296430 custom_operator.cc:1296] register pir custom op :get_token_penalty_multi_scores_v2
+I0805 08:55:51.709417 2296430 custom_operator.cc:1296] register pir custom op :get_padding_offset
+I0805 08:55:51.709434 2296430 custom_operator.cc:1296] register pir custom op :quant_int8
+I0805 08:55:51.709455 2296430 custom_operator.cc:1296] register pir custom op :rebuild_padding_v2
+I0805 08:55:51.709472 2296430 custom_operator.cc:1296] register pir custom op :get_padding_offset_v2
+I0805 08:55:51.709489 2296430 custom_operator.cc:1296] register pir custom op :flash_attn_bwd
+I0805 08:55:51.709511 2296430 custom_operator.cc:1296] register pir custom op :qkv_transpose_split
+I0805 08:55:51.709529 2296430 custom_operator.cc:1296] register pir custom op :rebuild_padding
+I0805 08:55:51.709543 2296430 custom_operator.cc:1296] register pir custom op :save_output
+[2024-08-05 08:55:52,985] [    INFO] distributed_strategy.py:214 - distributed strategy initialized
+[32m[2024-08-05 08:55:52,985] [    INFO][0m - PP configs:{'micro_batch_size': 4, 'accumulate_steps': 8, 'schedule_mode': '1F1B', 'p2p_cache_shape': True, 'enable_partial_send_recv': True}, use master_grad: False[0m
+[32m[2024-08-05 08:55:52,985] [    INFO][0m - using pipeline configs:{'delay_scale_loss': False, 'dp_comm_overlap': False, 'sharding_comm_overlap': False, 'enable_timer': False, 'release_gradients': False, 'overlap_p2p_comm': False, 'clear_every_step_cache': False, 'use_batch_p2p_comm': True}[0m
+======================= Modified FLAGS detected =======================
+FLAGS(name='FLAGS_cudnn_deterministic', current_value=True, default_value=False)
+FLAGS(name='FLAGS_selected_gpus', current_value='0', default_value='')
+FLAGS(name='FLAGS_cusolver_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/cusolver/lib', default_value='')
+FLAGS(name='FLAGS_cupti_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/cuda_cupti/lib', default_value='')
+FLAGS(name='FLAGS_curand_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/curand/lib', default_value='')
+FLAGS(name='FLAGS_embedding_deterministic', current_value=1, default_value=0)
+FLAGS(name='FLAGS_cusparse_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/cusparse/lib', default_value='')
+FLAGS(name='FLAGS_nccl_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/nccl/lib', default_value='')
+FLAGS(name='FLAGS_cudnn_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/cudnn/lib', default_value='')
+FLAGS(name='FLAGS_cublas_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia/cublas/lib', default_value='')
+FLAGS(name='FLAGS_nvidia_package_dir', current_value='/home/ldn/anaconda3/envs/paddle-test/lib/python3.10/site-packages/paddle/../nvidia', default_value='')
+=======================================================================
+I0805 08:55:52.986371 2296430 tcp_utils.cc:181] The server starts to listen on IP_ANY:55271
+I0805 08:55:52.986498 2296430 tcp_utils.cc:130] Successfully connected to 127.0.0.1:55271
+I0805 08:55:56.084921 2296430 process_group_nccl.cc:138] ProcessGroupNCCL pg_timeout_ 1800000
+I0805 08:55:56.084975 2296430 process_group_nccl.cc:139] ProcessGroupNCCL nccl_comm_init_option_ 0
+I0805 08:55:56.869623 2296430 process_group_nccl.cc:138] ProcessGroupNCCL pg_timeout_ 1800000
+I0805 08:55:56.869663 2296430 process_group_nccl.cc:139] ProcessGroupNCCL nccl_comm_init_option_ 0
+[2024-08-05 08:55:56,869] [    INFO] topology.py:357 - Total 4 pipe comm group(s) create successfully!
+W0805 08:55:56.871943 2296430 gpu_resources.cc:119] Please NOTE: device: 0, GPU Compute Capability: 8.0, Driver API Version: 12.2, Runtime API Version: 12.2
+W0805 08:55:56.889174 2296430 gpu_resources.cc:164] device: 0, cuDNN Version: 9.0.
+W0805 08:55:56.889206 2296430 gpu_resources.cc:196] WARNING: device: 0. The installed Paddle is compiled with CUDA 12.3, but CUDA runtime version in your machine is 12.2, which may cause serious incompatible bug. Please recompile or reinstall Paddle with compatible CUDA version.
+ubuntu:2296430:2296430 [0] NCCL INFO Bootstrap : Using eno1:10.3.242.26<0>
+ubuntu:2296430:2296430 [0] NCCL INFO NET/Plugin : dlerror=libnccl-net.so: cannot open shared object file: No such file or directory No plugin found (libnccl-net.so), using internal implementation
+ubuntu:2296430:2296430 [0] NCCL INFO cudaDriverVersion 12020
+NCCL version 2.20.5+cuda12.4
+ubuntu:2296430:2296744 [0] NCCL INFO NET/IB : No device found.
+ubuntu:2296430:2296744 [0] NCCL INFO NET/Socket : Using [0]eno1:10.3.242.26<0> [1]br-8d7ae5405055:172.18.0.1<0>
+ubuntu:2296430:2296744 [0] NCCL INFO Using non-device net plugin version 0
+ubuntu:2296430:2296744 [0] NCCL INFO Using network Socket
+ubuntu:2296430:2296744 [0] NCCL INFO comm 0x5608227a6d40 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 52000 commId 0xf74387ffd1bb9a50 - Init START
+ubuntu:2296430:2296744 [0] NCCL INFO Setting affinity for GPU 0 to ffffffff,00000000,ffffffff
+ubuntu:2296430:2296744 [0] NCCL INFO comm 0x5608227a6d40 rank 0 nRanks 2 nNodes 1 localRanks 2 localRank 0 MNNVL 0
+ubuntu:2296430:2296744 [0] NCCL INFO Channel 00/02 :    0   1
+ubuntu:2296430:2296744 [0] NCCL INFO Channel 01/02 :    0   1
+ubuntu:2296430:2296744 [0] NCCL INFO Trees [0] 1/-1/-1->0->-1 [1] 1/-1/-1->0->-1
+ubuntu:2296430:2296744 [0] NCCL INFO P2P Chunksize set to 131072
+ubuntu:2296430:2296744 [0] NCCL INFO Channel 00 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2296430:2296744 [0] NCCL INFO Channel 01 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2296430:2296744 [0] NCCL INFO Connected all rings
+ubuntu:2296430:2296744 [0] NCCL INFO Connected all trees
+ubuntu:2296430:2296744 [0] NCCL INFO NCCL_ALGO set by environment to Tree
+ubuntu:2296430:2296744 [0] NCCL INFO threadThresholds 8/8/64 | 16/8/64 | 512 | 512
+ubuntu:2296430:2296744 [0] NCCL INFO 2 coll channels, 0 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer
+ubuntu:2296430:2296744 [0] NCCL INFO comm 0x5608227a6d40 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 52000 commId 0xf74387ffd1bb9a50 - Init COMPLETE
+[2024-08-05 08:55:57,871] [    INFO] topology.py:357 - Total 8 data comm group(s) create successfully!
+I0805 08:55:57.872318 2296430 process_group_nccl.cc:138] ProcessGroupNCCL pg_timeout_ 1800000
+I0805 08:55:57.872354 2296430 process_group_nccl.cc:139] ProcessGroupNCCL nccl_comm_init_option_ 0
+[2024-08-05 08:55:57,872] [    INFO] topology.py:357 - Total 2 model comm group(s) create successfully!
+[2024-08-05 08:55:57,872] [    INFO] topology.py:357 - Total 8 sharding comm group(s) create successfully!
+I0805 08:55:57.872960 2296430 process_group_nccl.cc:138] ProcessGroupNCCL pg_timeout_ 1800000
+I0805 08:55:57.872978 2296430 process_group_nccl.cc:139] ProcessGroupNCCL nccl_comm_init_option_ 0
+I0805 08:55:57.873054 2296430 process_group_nccl.cc:138] ProcessGroupNCCL pg_timeout_ 1800000
+I0805 08:55:57.873067 2296430 process_group_nccl.cc:139] ProcessGroupNCCL nccl_comm_init_option_ 0
+[2024-08-05 08:55:57,873] [    INFO] topology.py:279 - HybridParallelInfo: rank_id: 0, mp_degree: 4, sharding_degree: 1, pp_degree: 2, dp_degree: 1, sep_degree: 1, mp_group: [0, 1, 2, 3],  sharding_group: [0], pp_group: [0, 4], dp_group: [0], sep:group: None, check/clip group: [0, 1, 2, 3, 4, 5, 6, 7]
+[32m[2024-08-05 08:55:57,875] [    INFO][0m -     +==============================================================================+
+    |                                                                              |
+    |                         DistributedStrategy Overview                         |
+    |                                                                              |
+    +==============================================================================+
+    |                        a_sync=True <-> a_sync_configs                        |
+    +------------------------------------------------------------------------------+
+    |                               k_steps                    -1                  |
+    |                     max_merge_var_num                    1                   |
+    |                       send_queue_size                    16                  |
+    |               independent_recv_thread                  False                 |
+    |         min_send_grad_num_before_recv                    1                   |
+    |                      thread_pool_size                    1                   |
+    |                       send_wait_times                    1                   |
+    |               runtime_split_send_recv                  False                 |
+    |                        launch_barrier                   True                 |
+    |             heter_worker_device_guard                   cpu                  |
+    |                        lr_decay_steps                    10                  |
+    |                            use_ps_gpu                    0                   |
+    +==============================================================================+
+    |                    Environment Flags, Communication Flags                    |
+    +------------------------------------------------------------------------------+
+    |                                  mode                    1                   |
+    |                               elastic                  False                 |
+    |                                  auto                  False                 |
+    |                   sync_nccl_allreduce                   True                 |
+    |                         nccl_comm_num                    1                   |
+    |            use_hierarchical_allreduce                  False                 |
+    |   hierarchical_allreduce_inter_nranks                    1                   |
+    |                       sync_batch_norm                  False                 |
+    |                   fuse_all_reduce_ops                   True                 |
+    |                  fuse_grad_size_in_MB                    32                  |
+    |              fuse_grad_size_in_TFLOPS                   50.0                 |
+    |               cudnn_exhaustive_search                  False                 |
+    |             conv_workspace_size_limit                   512                  |
+    |    cudnn_batchnorm_spatial_persistent                  False                 |
+    |                        fp16_allreduce                  False                 |
+    |               last_comm_group_size_MB                   1.0                  |
+    |                find_unused_parameters                  False                 |
+    |            without_graph_optimization                   True                 |
+    |                 fuse_grad_size_in_num                    8                   |
+    |                 calc_comm_same_stream                  False                 |
+    |                                   asp                  False                 |
+    |                       fuse_grad_merge                  False                 |
+    |                             semi_auto                  False                 |
+    |                            adam_d2sum                  False                 |
+    |                           auto_search                  False                 |
+    |                        heter_ccl_mode                  False                 |
+    |                         is_fl_ps_mode                  False                 |
+    |                      with_coordinator                  False                 |
+    |                            split_data                   True                 |
+    |                  downpour_table_param                    []                  |
+    |                       fs_client_param                                        |
+    |                    execution_strategy                                        |
+    +==============================================================================+
+    |                                Build Strategy                                |
+    +------------------------------------------------------------------------------+
+    |           enable_sequential_execution                  False                 |
+    |              fuse_elewise_add_act_ops                  False                 |
+    |                       fuse_bn_act_ops                  False                 |
+    |              fuse_relu_depthwise_conv                  False                 |
+    |                    fuse_broadcast_ops                  False                 |
+    |                fuse_all_optimizer_ops                  False                 |
+    |                        enable_inplace                  False                 |
+    |     enable_backward_optimizer_op_deps                   True                 |
+    |                 cache_runtime_context                  False                 |
+    |                   fuse_bn_add_act_ops                   True                 |
+    |                    enable_auto_fusion                  False                 |
+    |                          enable_addto                  False                 |
+    |                      fix_op_run_order                  False                 |
+    |              allow_cuda_graph_capture                  False                 |
+    |                       reduce_strategy                    0                   |
+    |                    fuse_gemm_epilogue                  False                 |
+    |                   debug_graphviz_path                                        |
+    |                       fused_attention                  False                 |
+    |                     fused_feedforward                  False                 |
+    |            fuse_dot_product_attention                  False                 |
+    |                          fuse_resunit                  False                 |
+    +==============================================================================+
+[0m
+[32m[2024-08-05 08:55:57,876] [    INFO][0m - The default value for the training argument `--report_to` will change in v5 (from all installed integrations to none). In v5, you will need to use `--report_to all` to get the same behavior as now. You should start updating your code and make this info disappear :-).[0m
+[35m[2024-08-05 08:55:57,876] [   DEBUG][0m - ============================================================[0m
+[35m[2024-08-05 08:55:57,877] [   DEBUG][0m -      Model Configuration Arguments      [0m
+[35m[2024-08-05 08:55:57,877] [   DEBUG][0m - paddle commit id              : a842a0f40f6111fb0c2df218130d0560aa747bc8[0m
+[35m[2024-08-05 08:55:57,877] [   DEBUG][0m - paddlenlp commit id           : 272a4b04992242b0a3ca250c6a4b2b5d5c660f66[0m
+[35m[2024-08-05 08:55:57,877] [   DEBUG][0m - aistudio_repo_id              : None[0m
+[35m[2024-08-05 08:55:57,877] [   DEBUG][0m - aistudio_repo_license         : Apache License 2.0[0m
+[35m[2024-08-05 08:55:57,878] [   DEBUG][0m - aistudio_repo_private         : True[0m
+[35m[2024-08-05 08:55:57,878] [   DEBUG][0m - aistudio_token                : None[0m
+[35m[2024-08-05 08:55:57,878] [   DEBUG][0m - attention_probs_dropout_prob  : 0.1[0m
+[35m[2024-08-05 08:55:57,878] [   DEBUG][0m - continue_training             : True[0m
+[35m[2024-08-05 08:55:57,878] [   DEBUG][0m - flash_mask                    : False[0m
+[35m[2024-08-05 08:55:57,878] [   DEBUG][0m - from_aistudio                 : False[0m
+[35m[2024-08-05 08:55:57,879] [   DEBUG][0m - fuse_attention_ffn            : None[0m
+[35m[2024-08-05 08:55:57,879] [   DEBUG][0m - fuse_attention_qkv            : None[0m
+[35m[2024-08-05 08:55:57,879] [   DEBUG][0m - hidden_dropout_prob           : 0.1[0m
+[35m[2024-08-05 08:55:57,879] [   DEBUG][0m - lora                          : True[0m
+[35m[2024-08-05 08:55:57,879] [   DEBUG][0m - lora_path                     : None[0m
+[35m[2024-08-05 08:55:57,879] [   DEBUG][0m - lora_plus_scale               : 1.0[0m
+[35m[2024-08-05 08:55:57,880] [   DEBUG][0m - lora_rank                     : 8[0m
+[35m[2024-08-05 08:55:57,880] [   DEBUG][0m - model_name_or_path            : __internal_testing__/unified-ckpt-llama-170m-for-peft[0m
+[35m[2024-08-05 08:55:57,880] [   DEBUG][0m - neftune                       : False[0m
+[35m[2024-08-05 08:55:57,880] [   DEBUG][0m - neftune_noise_alpha           : 5.0[0m
+[35m[2024-08-05 08:55:57,880] [   DEBUG][0m - num_prefix_tokens             : 128[0m
+[35m[2024-08-05 08:55:57,880] [   DEBUG][0m - pissa                         : False[0m
+[35m[2024-08-05 08:55:57,881] [   DEBUG][0m - prefix_path                   : None[0m
+[35m[2024-08-05 08:55:57,881] [   DEBUG][0m - prefix_tuning                 : False[0m
+[35m[2024-08-05 08:55:57,881] [   DEBUG][0m - reft                          : False[0m
+[35m[2024-08-05 08:55:57,881] [   DEBUG][0m - rslora                        : False[0m
+[35m[2024-08-05 08:55:57,881] [   DEBUG][0m - save_to_aistudio              : False[0m
+[35m[2024-08-05 08:55:57,881] [   DEBUG][0m - tokenizer_name_or_path        : None[0m
+[35m[2024-08-05 08:55:57,882] [   DEBUG][0m - use_fast_layer_norm           : False[0m
+[35m[2024-08-05 08:55:57,882] [   DEBUG][0m - use_quick_lora                : False[0m
+[35m[2024-08-05 08:55:57,882] [   DEBUG][0m - vera                          : False[0m
+[35m[2024-08-05 08:55:57,882] [   DEBUG][0m - vera_rank                     : 8[0m
+[35m[2024-08-05 08:55:57,882] [   DEBUG][0m - weight_blocksize              : 64[0m
+[35m[2024-08-05 08:55:57,882] [   DEBUG][0m - weight_double_quant           : False[0m
+[35m[2024-08-05 08:55:57,883] [   DEBUG][0m - weight_double_quant_block_size: 256[0m
+[35m[2024-08-05 08:55:57,883] [   DEBUG][0m - weight_quantize_algo          : None[0m
+[35m[2024-08-05 08:55:57,883] [   DEBUG][0m - [0m
+[35m[2024-08-05 08:55:57,883] [   DEBUG][0m - ============================================================[0m
+[35m[2024-08-05 08:55:57,883] [   DEBUG][0m -       Data Configuration Arguments      [0m
+[35m[2024-08-05 08:55:57,883] [   DEBUG][0m - paddle commit id              : a842a0f40f6111fb0c2df218130d0560aa747bc8[0m
+[35m[2024-08-05 08:55:57,884] [   DEBUG][0m - paddlenlp commit id           : 272a4b04992242b0a3ca250c6a4b2b5d5c660f66[0m
+[35m[2024-08-05 08:55:57,884] [   DEBUG][0m - chat_template                 : None[0m
+[35m[2024-08-05 08:55:57,884] [   DEBUG][0m - dataset_name_or_path          : ./unified_checkpoint/peft_input/data/[0m
+[35m[2024-08-05 08:55:57,884] [   DEBUG][0m - eval_with_do_generation       : False[0m
+[35m[2024-08-05 08:55:57,884] [   DEBUG][0m - intokens                      : None[0m
+[35m[2024-08-05 08:55:57,885] [   DEBUG][0m - lazy                          : False[0m
+[35m[2024-08-05 08:55:57,885] [   DEBUG][0m - max_length                    : 2048[0m
+[35m[2024-08-05 08:55:57,885] [   DEBUG][0m - pad_to_multiple_of            : None[0m
+[35m[2024-08-05 08:55:57,885] [   DEBUG][0m - save_generation_output        : False[0m
+[35m[2024-08-05 08:55:57,885] [   DEBUG][0m - src_length                    : 1024[0m
+[35m[2024-08-05 08:55:57,885] [   DEBUG][0m - task_name                     : None[0m
+[35m[2024-08-05 08:55:57,886] [   DEBUG][0m - task_name_or_path             : None[0m
+[35m[2024-08-05 08:55:57,886] [   DEBUG][0m - zero_padding                  : False[0m
+[35m[2024-08-05 08:55:57,886] [   DEBUG][0m - [0m
+[35m[2024-08-05 08:55:57,886] [   DEBUG][0m - ============================================================[0m
+[35m[2024-08-05 08:55:57,886] [   DEBUG][0m -      Quant Configuration Arguments      [0m
+[35m[2024-08-05 08:55:57,886] [   DEBUG][0m - paddle commit id              : a842a0f40f6111fb0c2df218130d0560aa747bc8[0m
+[35m[2024-08-05 08:55:57,887] [   DEBUG][0m - paddlenlp commit id           : 272a4b04992242b0a3ca250c6a4b2b5d5c660f66[0m
+[35m[2024-08-05 08:55:57,887] [   DEBUG][0m - auto_clip                     : False[0m
+[35m[2024-08-05 08:55:57,887] [   DEBUG][0m - autoclip_step                 : 8[0m
+[35m[2024-08-05 08:55:57,887] [   DEBUG][0m - awq_step                      : 8[0m
+[35m[2024-08-05 08:55:57,887] [   DEBUG][0m - do_awq                        : False[0m
+[35m[2024-08-05 08:55:57,888] [   DEBUG][0m - do_gptq                       : False[0m
+[35m[2024-08-05 08:55:57,888] [   DEBUG][0m - do_ptq                        : False[0m
+[35m[2024-08-05 08:55:57,888] [   DEBUG][0m - do_qat                        : False[0m
+[35m[2024-08-05 08:55:57,888] [   DEBUG][0m - gptq_step                     : 8[0m
+[35m[2024-08-05 08:55:57,888] [   DEBUG][0m - ptq_step                      : 32[0m
+[35m[2024-08-05 08:55:57,888] [   DEBUG][0m - quant_type                    : a8w8[0m
+[35m[2024-08-05 08:55:57,889] [   DEBUG][0m - shift                         : False[0m
+[35m[2024-08-05 08:55:57,889] [   DEBUG][0m - shift_all_linears             : False[0m
+[35m[2024-08-05 08:55:57,889] [   DEBUG][0m - shift_sampler                 : ema[0m
+[35m[2024-08-05 08:55:57,889] [   DEBUG][0m - shift_step                    : 32[0m
+[35m[2024-08-05 08:55:57,889] [   DEBUG][0m - smooth                        : False[0m
+[35m[2024-08-05 08:55:57,889] [   DEBUG][0m - smooth_all_linears            : False[0m
+[35m[2024-08-05 08:55:57,890] [   DEBUG][0m - smooth_k_piece                : 3[0m
+[35m[2024-08-05 08:55:57,890] [   DEBUG][0m - smooth_piecewise_search       : False[0m
+[35m[2024-08-05 08:55:57,890] [   DEBUG][0m - smooth_sampler                : none[0m
+[35m[2024-08-05 08:55:57,890] [   DEBUG][0m - smooth_search_piece           : False[0m
+[35m[2024-08-05 08:55:57,890] [   DEBUG][0m - smooth_step                   : 32[0m
+[35m[2024-08-05 08:55:57,890] [   DEBUG][0m - weight_quant_method           : abs_max_channel_wise[0m
+[35m[2024-08-05 08:55:57,891] [   DEBUG][0m - [0m
+[35m[2024-08-05 08:55:57,891] [   DEBUG][0m - ============================================================[0m
+[35m[2024-08-05 08:55:57,891] [   DEBUG][0m -    Generation Configuration Arguments   [0m
+[35m[2024-08-05 08:55:57,891] [   DEBUG][0m - paddle commit id              : a842a0f40f6111fb0c2df218130d0560aa747bc8[0m
+[35m[2024-08-05 08:55:57,891] [   DEBUG][0m - paddlenlp commit id           : 272a4b04992242b0a3ca250c6a4b2b5d5c660f66[0m
+[35m[2024-08-05 08:55:57,892] [   DEBUG][0m - top_k                         : 1[0m
+[35m[2024-08-05 08:55:57,892] [   DEBUG][0m - top_p                         : 1.0[0m
+[35m[2024-08-05 08:55:57,892] [   DEBUG][0m - [0m
+[35m[2024-08-05 08:55:57,892] [   DEBUG][0m - ============================================================[0m
+[35m[2024-08-05 08:55:57,892] [   DEBUG][0m -       Reft Configuration Arguments      [0m
+[35m[2024-08-05 08:55:57,893] [   DEBUG][0m - paddle commit id              : a842a0f40f6111fb0c2df218130d0560aa747bc8[0m
+[35m[2024-08-05 08:55:57,893] [   DEBUG][0m - paddlenlp commit id           : 272a4b04992242b0a3ca250c6a4b2b5d5c660f66[0m
+[35m[2024-08-05 08:55:57,893] [   DEBUG][0m - act_fn                        : None[0m
+[35m[2024-08-05 08:55:57,893] [   DEBUG][0m - add_bias                      : False[0m
+[35m[2024-08-05 08:55:57,893] [   DEBUG][0m - dropout                       : 0.0[0m
+[35m[2024-08-05 08:55:57,893] [   DEBUG][0m - intervention_type             : LoreftIntervention[0m
+[35m[2024-08-05 08:55:57,894] [   DEBUG][0m - layers                        : all[0m
+[35m[2024-08-05 08:55:57,894] [   DEBUG][0m - position                      : f7+l7[0m
+[35m[2024-08-05 08:55:57,894] [   DEBUG][0m - rank                          : 8[0m
+[35m[2024-08-05 08:55:57,894] [   DEBUG][0m - [0m
+[33m[2024-08-05 08:55:57,895] [ WARNING][0m - Process rank: 0, device: gpu, world_size: 8, distributed training: True, 16-bits training: True[0m
+[32m[2024-08-05 08:55:57,895] [    INFO][0m - Checkpoint detected, resuming training at ./unified_checkpoint/checkpoints/llama_lora_ckpts/checkpoint-10. To avoid this behavior, change the `--output_dir` or add `--overwrite_output_dir` to train from scratch.[0m
+[32m[2024-08-05 08:55:57,896] [    INFO][0m - We are using <class 'paddlenlp.transformers.llama.configuration.LlamaConfig'> to load '__internal_testing__/unified-ckpt-llama-170m-for-peft'.[0m
+[32m[2024-08-05 08:55:57,896] [    INFO][0m - Loading configuration file /home/ldn/.paddlenlp/models/__internal_testing__/unified-ckpt-llama-170m-for-peft/config.json[0m
+[32m[2024-08-05 08:55:57,901] [    INFO][0m - Final model config: LlamaConfig {
+  "alibi": false,
+  "architectures": [
+    "LlamaForCausalLM"
+  ],
+  "bos_token_id": 1,
+  "dtype": "float16",
+  "eos_token_id": 2,
+  "hidden_size": 1024,
+  "immediate_clear_past_key_value": false,
+  "initializer_range": 0.02,
+  "intermediate_size": 2816,
+  "long_sequence_init_args": {},
+  "long_sequence_strategy_name": null,
+  "long_sequence_strategy_type": null,
+  "max_position_embeddings": 2048,
+  "model_type": "llama",
+  "num_attention_heads": 8,
+  "num_hidden_layers": 8,
+  "num_key_value_heads": 8,
+  "pad_token_id": 0,
+  "paddlenlp_version": "3.0.0b0.post20240805",
+  "pipeline_parallel_degree": 2,
+  "recompute": true,
+  "rms_norm_eps": 1e-06,
+  "rope_scaling_factor": 1.0,
+  "rope_scaling_type": null,
+  "rope_theta": 10000.0,
+  "seq_length": 2048,
+  "tensor_parallel_degree": 4,
+  "tensor_parallel_output": false,
+  "tie_word_embeddings": false,
+  "use_fast_layer_norm": false,
+  "use_flash_attention_for_generation": false,
+  "use_last_token_for_generation": false,
+  "use_long_sequence_strategies": false,
+  "vocab_size": 32000
+}
+[0m
+[32m[2024-08-05 08:55:57,902] [    INFO][0m - We are using <class 'paddlenlp.transformers.llama.modeling_pp.LlamaForCausalLMPipe'> to load '__internal_testing__/unified-ckpt-llama-170m-for-peft'.[0m
+[32m[2024-08-05 08:55:57,902] [    INFO][0m - Loading weights file from cache at /home/ldn/.paddlenlp/models/__internal_testing__/unified-ckpt-llama-170m-for-peft/model_state.pdparams[0m
+[32m[2024-08-05 08:55:58,216] [    INFO][0m - Starting to convert orignal state_dict to tensor parallel state_dict.[0m
+[32m[2024-08-05 08:55:58,368] [    INFO][0m - Loaded weights file from disk, setting weights to model.[0m
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:607 - start segment network..
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:613 - segment with method: layer:LlamaDecoderLayer; result: 0, 5, 11
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:629 - stage=0, global_rank=0 ,layer_number=5
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:634 - 0: LlamaEmbeddingPipe
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:634 - 1: LlamaDecoderLayerPipe
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:634 - 2: LlamaDecoderLayerPipe
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:634 - 3: LlamaDecoderLayerPipe
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:634 - 4: LlamaDecoderLayerPipe
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:629 - stage=1, global_rank=0 ,layer_number=6
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:634 - 5: LlamaDecoderLayerPipe
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:634 - 6: LlamaDecoderLayerPipe
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:634 - 7: LlamaDecoderLayerPipe
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:634 - 8: LlamaDecoderLayerPipe
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:634 - 9: LlamaRMSNormPipe
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:634 - 10: LlamaLMHead
+[2024-08-05 08:55:58,369] [    INFO] pp_layers.py:656 - loss: LlamaPretrainingCriterion
+[2024-08-05 08:55:58,870] [    INFO] pp_layers.py:706 - flush 5 of layers into run_function
+[33m[2024-08-05 08:55:59,073] [ WARNING][0m - Some weights of the model checkpoint at __internal_testing__/unified-ckpt-llama-170m-for-peft were not used when initializing LlamaForCausalLMPipe: ['llama.layers.4.input_layernorm.weight', 'llama.layers.4.mlp.down_proj.weight', 'llama.layers.4.mlp.gate_proj.weight', 'llama.layers.4.mlp.up_proj.weight', 'llama.layers.4.post_attention_layernorm.weight', 'llama.layers.4.self_attn.k_proj.weight', 'llama.layers.4.self_attn.o_proj.weight', 'llama.layers.4.self_attn.q_proj.weight', 'llama.layers.4.self_attn.v_proj.weight', 'llama.layers.5.input_layernorm.weight', 'llama.layers.5.mlp.down_proj.weight', 'llama.layers.5.mlp.gate_proj.weight', 'llama.layers.5.mlp.up_proj.weight', 'llama.layers.5.post_attention_layernorm.weight', 'llama.layers.5.self_attn.k_proj.weight', 'llama.layers.5.self_attn.o_proj.weight', 'llama.layers.5.self_attn.q_proj.weight', 'llama.layers.5.self_attn.v_proj.weight', 'llama.layers.6.input_layernorm.weight', 'llama.layers.6.mlp.down_proj.weight', 'llama.layers.6.mlp.gate_proj.weight', 'llama.layers.6.mlp.up_proj.weight', 'llama.layers.6.post_attention_layernorm.weight', 'llama.layers.6.self_attn.k_proj.weight', 'llama.layers.6.self_attn.o_proj.weight', 'llama.layers.6.self_attn.q_proj.weight', 'llama.layers.6.self_attn.v_proj.weight', 'llama.layers.7.input_layernorm.weight', 'llama.layers.7.mlp.down_proj.weight', 'llama.layers.7.mlp.gate_proj.weight', 'llama.layers.7.mlp.up_proj.weight', 'llama.layers.7.post_attention_layernorm.weight', 'llama.layers.7.self_attn.k_proj.weight', 'llama.layers.7.self_attn.o_proj.weight', 'llama.layers.7.self_attn.q_proj.weight', 'llama.layers.7.self_attn.v_proj.weight', 'llama.norm.weight', 'lm_head.weight']
+- This IS expected if you are initializing LlamaForCausalLMPipe from the checkpoint of a model trained on another task or with another architecture (e.g. initializing a BertForSequenceClassification model from a BertForPreTraining model).
+- This IS NOT expected if you are initializing LlamaForCausalLMPipe from the checkpoint of a model that you expect to be exactly identical (initializing a BertForSequenceClassification model from a BertForSequenceClassification model).[0m
+[32m[2024-08-05 08:55:59,074] [    INFO][0m - All the weights of LlamaForCausalLMPipe were initialized from the model checkpoint at __internal_testing__/unified-ckpt-llama-170m-for-peft.
+If your task is similar to the task the model of the checkpoint was trained on, you can already use LlamaForCausalLMPipe for predictions without further training.[0m
+[32m[2024-08-05 08:55:59,079] [    INFO][0m - We are using <class 'paddlenlp.transformers.llama.tokenizer.LlamaTokenizer'> to load '__internal_testing__/unified-ckpt-llama-170m-for-peft'.[0m
+[32m[2024-08-05 08:56:00,146] [    INFO][0m - Mark only lora and trainable_module as trainable.[0m
+[35m[2024-08-05 08:56:00,150] [   DEBUG][0m - Frozen parameters: 2.10e+07 || Trainable parameters:3.30e+05 || Total parameters:2.14e+07|| Trainable:1.54%[0m
+[32m[2024-08-05 08:56:00,151] [    INFO][0m - The global seed is set to 42, local seed is set to 50 and random seed is set to 42.[0m
+[32m[2024-08-05 08:56:00,177] [    INFO][0m - max_steps is given, it will override any value given in num_train_epochs[0m
+[32m[2024-08-05 08:56:00,178] [    INFO][0m - Using half precision[0m
+[35m[2024-08-05 08:56:00,197] [   DEBUG][0m - ============================================================[0m
+[35m[2024-08-05 08:56:00,197] [   DEBUG][0m -     Training Configuration Arguments    [0m
+[35m[2024-08-05 08:56:00,197] [   DEBUG][0m - paddle commit id              : a842a0f40f6111fb0c2df218130d0560aa747bc8[0m
+[35m[2024-08-05 08:56:00,197] [   DEBUG][0m - paddlenlp commit id           : 272a4b04992242b0a3ca250c6a4b2b5d5c660f66[0m
+[35m[2024-08-05 08:56:00,197] [   DEBUG][0m - _no_sync_in_gradient_accumulation: True[0m
+[35m[2024-08-05 08:56:00,197] [   DEBUG][0m - adam_beta1                    : 0.9[0m
+[35m[2024-08-05 08:56:00,197] [   DEBUG][0m - adam_beta2                    : 0.999[0m
+[35m[2024-08-05 08:56:00,197] [   DEBUG][0m - adam_epsilon                  : 1e-08[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - amp_custom_black_list         : None[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - amp_custom_white_list         : None[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - amp_master_grad               : False[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - autotuner_benchmark           : False[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - benchmark                     : False[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - bf16                          : False[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - bf16_full_eval                : False[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - context_parallel_degree       : 1[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - current_device                : gpu:0[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - data_parallel_config          : [0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - data_parallel_degree          : 1[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - data_parallel_rank            : 0[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - dataloader_drop_last          : False[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - dataloader_num_workers        : 0[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - dataset_rank                  : 0[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - dataset_world_size            : 1[0m
+[35m[2024-08-05 08:56:00,198] [   DEBUG][0m - decay_steps                   : 0[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - device                        : gpu[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - disable_tqdm                  : True[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - distributed_dataloader        : False[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - do_eval                       : False[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - do_export                     : False[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - do_predict                    : False[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - do_train                      : True[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - enable_auto_parallel          : False[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - eval_accumulation_steps       : 16[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - eval_batch_size               : 8[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - eval_steps                    : None[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - evaluation_strategy           : IntervalStrategy.NO[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - flatten_param_grads           : False[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - force_reshard_pp              : False[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - fp16                          : True[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - fp16_full_eval                : False[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - fp16_opt_level                : O2[0m
+[35m[2024-08-05 08:56:00,199] [   DEBUG][0m - fuse_sequence_parallel_allreduce: False[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - gradient_accumulation_steps   : 8[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - greater_is_better             : None[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - hybrid_parallel_topo_order    : pp_first[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - ignore_data_skip              : False[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - ignore_load_lr_and_optim      : False[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - ignore_save_lr_and_optim      : False[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - label_names                   : None[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - lazy_data_processing          : True[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - learning_rate                 : 0.0003[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - load_best_model_at_end        : False[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - load_sharded_model            : False[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - local_process_index           : 0[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - local_rank                    : 0[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - log_level                     : -1[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - log_level_replica             : -1[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - log_on_each_node              : True[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - logging_dir                   : ./unified_checkpoint/checkpoints/llama_lora_ckpts/runs/Aug05_08-55-52_ubuntu[0m
+[35m[2024-08-05 08:56:00,200] [   DEBUG][0m - logging_first_step            : False[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - logging_steps                 : 1[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - logging_strategy              : IntervalStrategy.STEPS[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - logical_process_index         : 0[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - lr_end                        : 1e-07[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - lr_scheduler_type             : SchedulerType.LINEAR[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - max_evaluate_steps            : -1[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - max_grad_norm                 : 1.0[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - max_steps                     : 15[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - metric_for_best_model         : None[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - minimum_eval_times            : None[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - no_cuda                       : False[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - no_recompute_layers           : None[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - num_cycles                    : 0.5[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - num_train_epochs              : 1.0[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - optim                         : OptimizerNames.ADAMW[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - optimizer_name_suffix         : tp00_pp00[0m
+[35m[2024-08-05 08:56:00,201] [   DEBUG][0m - output_dir                    : ./unified_checkpoint/checkpoints/llama_lora_ckpts[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - overwrite_output_dir          : False[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - past_index                    : -1[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - per_device_eval_batch_size    : 8[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - per_device_train_batch_size   : 4[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - pipeline_parallel_config      : [0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - pipeline_parallel_degree      : 2[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - pipeline_parallel_rank        : 0[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - power                         : 1.0[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - pp_recompute_interval         : 1[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - prediction_loss_only          : False[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - process_index                 : 0[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - recompute                     : True[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - recompute_granularity         : full[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - recompute_use_reentrant       : False[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - remove_unused_columns         : True[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - report_to                     : ['visualdl'][0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - resume_from_checkpoint        : None[0m
+[35m[2024-08-05 08:56:00,202] [   DEBUG][0m - run_name                      : ./unified_checkpoint/checkpoints/llama_lora_ckpts[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - save_on_each_node             : False[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - save_sharded_model            : False[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - save_steps                    : 10[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - save_strategy                 : IntervalStrategy.STEPS[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - save_total_limit              : 1[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - scale_loss                    : 32768[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - seed                          : 42[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - sep_parallel_degree           : 1[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - sequence_parallel             : False[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - sequence_parallel_config      : [0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - sharding                      : [][0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - sharding_degree               : -1[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - sharding_parallel_config      : [0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - sharding_parallel_degree      : 1[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - sharding_parallel_rank        : 0[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - should_load_dataset           : True[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - should_load_sharding_stage1_model: False[0m
+[35m[2024-08-05 08:56:00,203] [   DEBUG][0m - should_log                    : True[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - should_save                   : True[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - should_save_model_state       : True[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - should_save_sharding_stage1_model: False[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - skip_memory_metrics           : True[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - skip_profile_timer            : True[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - tensor_parallel_config        : [0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - tensor_parallel_degree        : 4[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - tensor_parallel_output        : False[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - tensor_parallel_rank          : 0[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - to_static                     : False[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - train_batch_size              : 4[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - unified_checkpoint            : True[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - unified_checkpoint_config     : [''][0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - use_async_save                : False[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - use_expert_parallel           : False[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - use_flash_attention           : False[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - use_fused_dropout_add         : False[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - use_fused_linear              : False[0m
+[35m[2024-08-05 08:56:00,204] [   DEBUG][0m - use_fused_rms_norm            : False[0m
+[35m[2024-08-05 08:56:00,205] [   DEBUG][0m - use_fused_rope                : False[0m
+[35m[2024-08-05 08:56:00,205] [   DEBUG][0m - use_hybrid_parallel           : True[0m
+[35m[2024-08-05 08:56:00,205] [   DEBUG][0m - virtual_pp_degree             : 1[0m
+[35m[2024-08-05 08:56:00,205] [   DEBUG][0m - wandb_api_key                 : None[0m
+[35m[2024-08-05 08:56:00,205] [   DEBUG][0m - warmup_ratio                  : 0.0[0m
+[35m[2024-08-05 08:56:00,205] [   DEBUG][0m - warmup_steps                  : 30[0m
+[35m[2024-08-05 08:56:00,205] [   DEBUG][0m - weight_decay                  : 0.0[0m
+[35m[2024-08-05 08:56:00,205] [   DEBUG][0m - weight_name_suffix            : tp00_pp00[0m
+[35m[2024-08-05 08:56:00,205] [   DEBUG][0m - world_size                    : 8[0m
+[35m[2024-08-05 08:56:00,205] [   DEBUG][0m - [0m
+[32m[2024-08-05 08:56:00,205] [    INFO][0m - Starting training from resume_from_checkpoint : ./unified_checkpoint/checkpoints/llama_lora_ckpts/checkpoint-10[0m
+ubuntu:2296430:2296822 [0] NCCL INFO Using non-device net plugin version 0
+ubuntu:2296430:2296822 [0] NCCL INFO Using network Socket
+ubuntu:2296430:2296822 [0] NCCL INFO comm 0x560829afae10 rank 0 nranks 8 cudaDev 0 nvmlDev 0 busId 52000 commId 0x36a8e8104267bd16 - Init START
+ubuntu:2296430:2296822 [0] NCCL INFO Setting affinity for GPU 0 to ffffffff,00000000,ffffffff
+ubuntu:2296430:2296822 [0] NCCL INFO NVLS multicast support is not available on dev 0
+ubuntu:2296430:2296822 [0] NCCL INFO comm 0x560829afae10 rank 0 nRanks 8 nNodes 1 localRanks 8 localRank 0 MNNVL 0
+ubuntu:2296430:2296822 [0] NCCL INFO Channel 00/02 :    0   3   1   2   4   5   6   7
+ubuntu:2296430:2296822 [0] NCCL INFO Channel 01/02 :    0   3   1   2   4   5   6   7
+ubuntu:2296430:2296822 [0] NCCL INFO Trees [0] 1/-1/-1->0->-1 [1] 1/-1/-1->0->-1
+ubuntu:2296430:2296822 [0] NCCL INFO P2P Chunksize set to 524288
+ubuntu:2296430:2296822 [0] NCCL INFO Channel 00/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2296430:2296822 [0] NCCL INFO Channel 01/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2296430:2296822 [0] NCCL INFO Connected all rings
+ubuntu:2296430:2296822 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2296430:2296822 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2296430:2296822 [0] NCCL INFO Connected all trees
+ubuntu:2296430:2296822 [0] NCCL INFO NCCL_ALGO set by environment to Tree
+ubuntu:2296430:2296822 [0] NCCL INFO threadThresholds 8/8/64 | 64/8/64 | 512 | 512
+ubuntu:2296430:2296822 [0] NCCL INFO 2 coll channels, 0 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer
+ubuntu:2296430:2296822 [0] NCCL INFO comm 0x560829afae10 rank 0 nranks 8 cudaDev 0 nvmlDev 0 busId 52000 commId 0x36a8e8104267bd16 - Init COMPLETE
+ubuntu:2296430:2296912 [0] NCCL INFO Using non-device net plugin version 0
+ubuntu:2296430:2296912 [0] NCCL INFO Using network Socket
+ubuntu:2296430:2296912 [0] NCCL INFO comm 0x560832d05490 rank 0 nranks 4 cudaDev 0 nvmlDev 0 busId 52000 commId 0x8b8004f8edbb0f22 - Init START
+ubuntu:2296430:2296912 [0] NCCL INFO Setting affinity for GPU 0 to ffffffff,00000000,ffffffff
+ubuntu:2296430:2296912 [0] NCCL INFO NVLS multicast support is not available on dev 0
+ubuntu:2296430:2296912 [0] NCCL INFO comm 0x560832d05490 rank 0 nRanks 4 nNodes 1 localRanks 4 localRank 0 MNNVL 0
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 00/08 :    0   1   2   3
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 01/08 :    0   1   2   3
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 02/08 :    0   3   2   1
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 03/08 :    0   3   2   1
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 04/08 :    0   1   2   3
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 05/08 :    0   1   2   3
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 06/08 :    0   3   2   1
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 07/08 :    0   3   2   1
+ubuntu:2296430:2296912 [0] NCCL INFO Trees [0] 3/-1/-1->0->-1 [1] -1/-1/-1->0->3 [2] 3/-1/-1->0->1 [3] 2/-1/-1->0->3 [4] 3/-1/-1->0->-1 [5] -1/-1/-1->0->3 [6] 3/-1/-1->0->1 [7] 2/-1/-1->0->3
+ubuntu:2296430:2296912 [0] NCCL INFO P2P Chunksize set to 524288
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 04/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 05/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 02/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 03/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 06/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 07/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2296430:2296912 [0] NCCL INFO Connected all rings
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 02/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 06/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 03/0 : 0[0] -> 2[2] via P2P/CUMEM
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 07/0 : 0[0] -> 2[2] via P2P/CUMEM
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 00/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 01/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 04/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2296430:2296912 [0] NCCL INFO Channel 05/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2296430:2296912 [0] NCCL INFO Connected all trees
+ubuntu:2296430:2296912 [0] NCCL INFO NCCL_ALGO set by environment to Tree
+ubuntu:2296430:2296912 [0] NCCL INFO threadThresholds 8/8/64 | 32/8/64 | 512 | 512
+ubuntu:2296430:2296912 [0] NCCL INFO 8 coll channels, 0 collnet channels, 0 nvls channels, 8 p2p channels, 2 p2p channels per peer
+ubuntu:2296430:2296912 [0] NCCL INFO comm 0x560832d05490 rank 0 nranks 4 cudaDev 0 nvmlDev 0 busId 52000 commId 0x8b8004f8edbb0f22 - Init COMPLETE
+Loading checkpoint shards:   0%|          | 0/8 [00:00<?, ?it/s][32m[2024-08-05 08:56:03,905] [    INFO][0m - Load lora weight successfully[0m
+[32m[2024-08-05 08:56:03,978] [    INFO][0m - Load lora weight successfully[0m
+Loading checkpoint shards:  25%|██▌       | 2/8 [00:00<00:00, 13.70it/s][32m[2024-08-05 08:56:04,048] [    INFO][0m - Load lora weight successfully[0m
+[32m[2024-08-05 08:56:04,118] [    INFO][0m - Load lora weight successfully[0m
+Loading checkpoint shards:  50%|█████     | 4/8 [00:00<00:00, 14.05it/s]Loading checkpoint shards: 100%|██████████| 8/8 [00:00<00:00, 27.97it/s]
+[32m[2024-08-05 08:56:04,118] [    INFO][0m - Loading model from ./unified_checkpoint/checkpoints/llama_lora_ckpts/checkpoint-10 using unified checkpoint.[0m
+[2024-08-05 08:56:04,121] [    INFO] pipeline_parallel.py:235 - dp_comm_overlap False;             sharding_comm_overlap False;             sharding_split_param False;
+[2024-08-05 08:56:04,121] [    INFO] pipeline_parallel.py:303 - Pipeline Info -- num_stages: 2, stage_id: 0
+[2024-08-05 08:56:04,121] [    INFO] pipeline_parallel.py:308 - start broadcast mp parameters
+[2024-08-05 08:56:04,124] [ WARNING] hybrid_parallel_optimizer.py:292 - While using ClipGradByGlobalNorm in TensorParallel, PipelineParallel or Sharding, the grad clip of original optimizer will be changed.
+[32m[2024-08-05 08:56:04,125] [    INFO][0m - Loading optimizer and scheduler...[0m
+Loading optimizer shards:   0%|          | 0/8 [00:00<?, ?it/s]
+Loading master weights shards:   0%|          | 0/8 [00:00<?, ?it/s][ALoading optimizer shards:  12%|█▎        | 1/8 [00:00<00:01,  7.00it/s]Loading optimizer shards:  25%|██▌       | 2/8 [00:00<00:00,  8.32it/s]Loading optimizer shards:  38%|███▊      | 3/8 [00:00<00:00,  7.49it/s]Loading optimizer shards:  50%|█████     | 4/8 [00:00<00:01,  3.78it/s]Loading optimizer shards: 100%|██████████| 8/8 [00:00<00:00,  9.27it/s]
+
+Loading master weights shards:  12%|█▎        | 1/8 [00:00<00:06,  1.02it/s][A
+Loading master weights shards:  25%|██▌       | 2/8 [00:01<00:02,  2.09it/s][A
+Loading master weights shards:  38%|███▊      | 3/8 [00:01<00:01,  3.17it/s][A
+Loading master weights shards:  50%|█████     | 4/8 [00:01<00:00,  4.27it/s][ALoading master weights shards: 100%|██████████| 8/8 [00:01<00:00,  5.97it/s]
+[32m[2024-08-05 08:56:06,437] [    INFO][0m - Start broadcast optimizer in data parallel group.[0m
+[32m[2024-08-05 08:56:06,485] [    INFO][0m - [timelog] checkpoint loading time: 4.23s (2024-08-05 08:56:06) [0m
+[32m[2024-08-05 08:56:06,485] [    INFO][0m - ***** Running training *****[0m
+[32m[2024-08-05 08:56:06,485] [    INFO][0m -   Num examples = 114,599[0m
+[32m[2024-08-05 08:56:06,485] [    INFO][0m -   Num Epochs = 1[0m
+[32m[2024-08-05 08:56:06,485] [    INFO][0m -   Instantaneous batch size per device = 4[0m
+[32m[2024-08-05 08:56:06,485] [    INFO][0m -   Total train batch size (w. parallel, distributed & accumulation) = 32[0m
+[32m[2024-08-05 08:56:06,485] [    INFO][0m -   Gradient Accumulation steps = 8[0m
+[32m[2024-08-05 08:56:06,485] [    INFO][0m -   Total optimization steps = 15[0m
+[32m[2024-08-05 08:56:06,485] [    INFO][0m -   Total num train samples = 480[0m
+[35m[2024-08-05 08:56:06,486] [   DEBUG][0m -   Number of trainable parameters = 329,728 (per device)[0m
+[35m[2024-08-05 08:56:06,487] [   DEBUG][0m -   Number of trainable parameters = 2,637,824 (all devices, roughly)[0m
+[32m[2024-08-05 08:56:06,513] [    INFO][0m -   Continuing training from checkpoint, will skip to saved global_step[0m
+[32m[2024-08-05 08:56:06,513] [    INFO][0m -   Continuing training from epoch 0[0m
+[32m[2024-08-05 08:56:06,513] [    INFO][0m -   Continuing training from global step 10[0m
+[32m[2024-08-05 08:56:06,513] [    INFO][0m -   Will skip the first 0 epochs then the first 80 batches in the first epoch. If this takes a lot of time, you can add the `--ignore_data_skip` flag to your launch command, but you will resume the training on data already seen by your model.[0m
+W0805 08:56:08.595345 2296430 multiply_fwd_func.cc:75] got different data type, run type promotion automatically, this may cause data type been changed.
+ubuntu:2296430:2301993 [0] NCCL INFO Using non-device net plugin version 0
+ubuntu:2296430:2301993 [0] NCCL INFO Using network Socket
+ubuntu:2296430:2301993 [0] NCCL INFO comm 0x560842bd7f80 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 52000 commId 0x13499c4220d12cad - Init START
+ubuntu:2296430:2301993 [0] NCCL INFO Setting affinity for GPU 0 to ffffffff,00000000,ffffffff
+ubuntu:2296430:2301993 [0] NCCL INFO comm 0x560842bd7f80 rank 0 nRanks 2 nNodes 1 localRanks 2 localRank 0 MNNVL 0
+ubuntu:2296430:2301993 [0] NCCL INFO Channel 00/02 :    0   1
+ubuntu:2296430:2301993 [0] NCCL INFO Channel 01/02 :    0   1
+ubuntu:2296430:2301993 [0] NCCL INFO Trees [0] 1/-1/-1->0->-1 [1] 1/-1/-1->0->-1
+ubuntu:2296430:2301993 [0] NCCL INFO P2P Chunksize set to 131072
+ubuntu:2296430:2301993 [0] NCCL INFO Channel 00 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2296430:2301993 [0] NCCL INFO Channel 01 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2296430:2301993 [0] NCCL INFO Connected all rings
+ubuntu:2296430:2301993 [0] NCCL INFO Connected all trees
+ubuntu:2296430:2301993 [0] NCCL INFO NCCL_ALGO set by environment to Tree
+ubuntu:2296430:2301993 [0] NCCL INFO threadThresholds 8/8/64 | 16/8/64 | 512 | 512
+ubuntu:2296430:2301993 [0] NCCL INFO 2 coll channels, 0 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer
+ubuntu:2296430:2301993 [0] NCCL INFO comm 0x560842bd7f80 rank 0 nranks 2 cudaDev 0 nvmlDev 0 busId 52000 commId 0x13499c4220d12cad - Init COMPLETE
+ubuntu:2296430:2302036 [0] NCCL INFO Channel 00 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2296430:2302036 [0] NCCL INFO Channel 01 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2296430:2302050 [0] NCCL INFO Channel 00 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2296430:2302050 [0] NCCL INFO Channel 01 : 0[0] -> 1[4] via SHM/direct/direct
+ubuntu:2296430:2302090 [0] NCCL INFO Using non-device net plugin version 0
+ubuntu:2296430:2302090 [0] NCCL INFO Using network Socket
+ubuntu:2296430:2302090 [0] NCCL INFO comm 0x560842b32b10 rank 0 nranks 8 cudaDev 0 nvmlDev 0 busId 52000 commId 0xcca97553c6c09fb3 - Init START
+ubuntu:2296430:2302090 [0] NCCL INFO Setting affinity for GPU 0 to ffffffff,00000000,ffffffff
+ubuntu:2296430:2302090 [0] NCCL INFO NVLS multicast support is not available on dev 0
+ubuntu:2296430:2302090 [0] NCCL INFO comm 0x560842b32b10 rank 0 nRanks 8 nNodes 1 localRanks 8 localRank 0 MNNVL 0
+ubuntu:2296430:2302090 [0] NCCL INFO Channel 00/02 :    0   3   1   2   4   5   6   7
+ubuntu:2296430:2302090 [0] NCCL INFO Channel 01/02 :    0   3   1   2   4   5   6   7
+ubuntu:2296430:2302090 [0] NCCL INFO Trees [0] 1/-1/-1->0->-1 [1] 1/-1/-1->0->-1
+ubuntu:2296430:2302090 [0] NCCL INFO P2P Chunksize set to 524288
+ubuntu:2296430:2302090 [0] NCCL INFO Channel 00/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2296430:2302090 [0] NCCL INFO Channel 01/0 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2296430:2302090 [0] NCCL INFO Connected all rings
+ubuntu:2296430:2302090 [0] NCCL INFO Channel 00/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2296430:2302090 [0] NCCL INFO Channel 01/0 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2296430:2302090 [0] NCCL INFO Connected all trees
+ubuntu:2296430:2302090 [0] NCCL INFO NCCL_ALGO set by environment to Tree
+ubuntu:2296430:2302090 [0] NCCL INFO threadThresholds 8/8/64 | 64/8/64 | 512 | 512
+ubuntu:2296430:2302090 [0] NCCL INFO 2 coll channels, 0 collnet channels, 0 nvls channels, 2 p2p channels, 2 p2p channels per peer
+ubuntu:2296430:2302090 [0] NCCL INFO comm 0x560842b32b10 rank 0 nranks 8 cudaDev 0 nvmlDev 0 busId 52000 commId 0xcca97553c6c09fb3 - Init COMPLETE
+[32m[2024-08-05 08:56:15,787] [    INFO][0m - loss: 9.89326954, learning_rate: 0.00011, global_step: 11, current_memory_allocated: 0.04805159568786621, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.676591157913208, max_memory_reserved: 2.006225824356079, interval_runtime: 9.2979, interval_samples_per_second: 3.4416, interval_steps_per_second: 0.1076, ppl: 19796.680280011595, progress_or_epoch: 0.0031[0m
+[32m[2024-08-05 08:56:18,285] [    INFO][0m - loss: 9.76630211, learning_rate: 0.00012, global_step: 12, current_memory_allocated: 0.04805159568786621, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.6765916347503662, max_memory_reserved: 2.006225824356079, interval_runtime: 2.4983, interval_samples_per_second: 12.8087, interval_steps_per_second: 0.4003, ppl: 17436.170815081674, progress_or_epoch: 0.0034[0m
+[32m[2024-08-05 08:56:21,822] [    INFO][0m - loss: 9.61932182, learning_rate: 0.00013, global_step: 13, current_memory_allocated: 0.04805159568786621, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.6765916347503662, max_memory_reserved: 2.006225824356079, interval_runtime: 3.5367, interval_samples_per_second: 9.048, interval_steps_per_second: 0.2828, ppl: 15052.837942374175, progress_or_epoch: 0.0036[0m
+[32m[2024-08-05 08:56:23,747] [    INFO][0m - loss: 9.45707226, learning_rate: 0.00014, global_step: 14, current_memory_allocated: 0.04805159568786621, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.6765916347503662, max_memory_reserved: 2.006225824356079, interval_runtime: 1.9253, interval_samples_per_second: 16.6212, interval_steps_per_second: 0.5194, ppl: 12798.359274345816, progress_or_epoch: 0.0039[0m
+[32m[2024-08-05 08:56:26,150] [    INFO][0m - loss: 9.35388565, learning_rate: 0.00015, global_step: 15, current_memory_allocated: 0.04805159568786621, current_memory_reserved: 2.006225824356079, max_memory_allocated: 1.6765916347503662, max_memory_reserved: 2.006225824356079, interval_runtime: 2.4028, interval_samples_per_second: 13.3179, interval_steps_per_second: 0.4162, ppl: 11543.590767216201, progress_or_epoch: 0.0042[0m
+[32m[2024-08-05 08:56:26,150] [    INFO][0m - 
+Training completed. 
+[0m
+[32m[2024-08-05 08:56:26,151] [    INFO][0m - train_runtime: 19.6634, train_samples_per_second: 24.4108, train_steps_per_second: 0.7628, train_loss: 3.2059900919596354, progress_or_epoch: 0.0042[0m
+[32m[2024-08-05 08:56:26,152] [    INFO][0m - Saving model checkpoint to ./unified_checkpoint/checkpoints/llama_lora_ckpts[0m
+[32m[2024-08-05 08:56:26,153] [    INFO][0m - tokenizer config file saved in ./unified_checkpoint/checkpoints/llama_lora_ckpts/tokenizer_config.json[0m
+[32m[2024-08-05 08:56:26,153] [    INFO][0m - Special tokens file saved in ./unified_checkpoint/checkpoints/llama_lora_ckpts/special_tokens_map.json[0m
+[32m[2024-08-05 08:56:26,304] [    INFO][0m - Unified model tensor parallel weights in shards[0m
+ubuntu:2296430:2302330 [0] NCCL INFO Channel 04/1 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2296430:2302330 [0] NCCL INFO Channel 05/1 : 0[0] -> 1[1] via P2P/CUMEM
+ubuntu:2296430:2302338 [0] NCCL INFO Channel 02/1 : 0[0] -> 2[2] via P2P/CUMEM
+ubuntu:2296430:2302338 [0] NCCL INFO Channel 03/1 : 0[0] -> 2[2] via P2P/CUMEM
+ubuntu:2296430:2302343 [0] NCCL INFO Channel 06/1 : 0[0] -> 3[3] via P2P/CUMEM/read
+ubuntu:2296430:2302343 [0] NCCL INFO Channel 07/1 : 0[0] -> 3[3] via P2P/CUMEM/read
+[32m[2024-08-05 08:56:26,527] [    INFO][0m - Unified checkpoint: generating sharded_index json files for model weight.[0m
+[32m[2024-08-05 08:56:26,584] [    INFO][0m - Configuration saved in ./unified_checkpoint/checkpoints/llama_lora_ckpts/config.json[0m
+[32m[2024-08-05 08:56:26,584] [    INFO][0m - ***** train metrics *****[0m
+[32m[2024-08-05 08:56:26,584] [    INFO][0m -   progress_or_epoch        =     0.0042[0m
+[32m[2024-08-05 08:56:26,584] [    INFO][0m -   train_loss               =      3.206[0m
+[32m[2024-08-05 08:56:26,584] [    INFO][0m -   train_runtime            = 0:00:19.66[0m
+[32m[2024-08-05 08:56:26,584] [    INFO][0m -   train_samples_per_second =    24.4108[0m
+[32m[2024-08-05 08:56:26,584] [    INFO][0m -   train_steps_per_second   =     0.7628[0m
+I0805 08:56:28.046097 2296430 process_group_nccl.cc:143] ProcessGroupNCCL destruct 
+I0805 08:56:28.049166 2296430 process_group_nccl.cc:143] ProcessGroupNCCL destruct 
+I0805 08:56:28.049230 2296430 process_group_nccl.cc:143] ProcessGroupNCCL destruct 
+I0805 08:56:28.049249 2296430 process_group_nccl.cc:143] ProcessGroupNCCL destruct 
+I0805 08:56:28.049265 2296430 process_group_nccl.cc:143] ProcessGroupNCCL destruct 
+I0805 08:56:28.157156 2296669 tcp_store.cc:293] receive shutdown event and so quit from MasterDaemon run loop
