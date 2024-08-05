@@ -357,7 +357,7 @@ class Trainer:
         self._save_ckpt_func = dist.save_state_dict if self.args.enable_auto_parallel else paddle.save
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
         if self.args.use_async_save:
-            self._async_optimizer_state = AsyncSaver()
+            self._async_optimizer_saver = AsyncSaver()
 
         if args.max_steps > 0:
             logger.info("max_steps is given, it will override any value given in num_train_epochs")
@@ -2284,7 +2284,7 @@ class Trainer:
                             save_path = os.path.join(output_dir, optimizer_name)
                             if self.args.use_async_save:
                                 assert not strtobool(os.getenv("FLAG_LLM_PDC", "False")), "Dont support FLAG_LLM_PDC"
-                                self._async_optimizer_state.run(
+                                self._async_optimizer_saver.run(
                                     state_dict, save_path, saved_signal_path=saved_signal_path
                                 )
                             else:
