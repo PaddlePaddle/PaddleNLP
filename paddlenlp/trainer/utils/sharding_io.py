@@ -38,6 +38,7 @@ from paddlenlp.transformers.model_utils import (
 )
 from paddlenlp.transformers.utils import paddlenlp_load
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import get_env_device
 
 from . import reshard as reshard_util
 from .reshard import SHARDING_STRATEGY_V1, SHARDING_STRATEGY_V2, pp_reshard
@@ -457,7 +458,7 @@ class ShardingIO:
         # cast to before
         for (k, v) in tmp.items():
             name = v.name
-            master_weights[k] = paddle.cast(v.cuda(), paddle.bfloat16).cpu()
+            master_weights[k] = paddle.cast(v.to(get_env_device()), paddle.bfloat16).cpu()
             master_weights[k].name = name
 
         structure_name_map = {k: v.name for (k, v) in self.model.state_dict().items()}
@@ -488,7 +489,10 @@ class ShardingIO:
         for key, param in model_state_dict.items():
             if param.name in master_weights:
                 assert param.shape == master_weights[param.name].shape
-                paddle.assign(paddle.cast(master_weights[param.name].cuda(), paddle.bfloat16), model_state_dict[key])
+                paddle.assign(
+                    paddle.cast(master_weights[param.name].to(get_env_device()), paddle.bfloat16),
+                    model_state_dict[key],
+                )
             elif key in state_dict:
                 logger.info(f"key: {key} is in state_dict, but not in master_weights")
                 paddle.assign(state_dict[key], model_state_dict[key])
