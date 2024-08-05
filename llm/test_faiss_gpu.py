@@ -232,11 +232,14 @@ def recon(checkpoint, args, i):
         if args.quant_stage == 1:
             #recover_opt_v, _ = qdq_weight(ckpt["opt_v_c"], scales=ckpt["opt_v_i"], quant_bit=args.quant_bits_opt, dequant=True)
             recover_opt_v = np.square((recover_opt_m / (ckpt["opt_v_i"].astype(np.float32) + eps)) - eps)
-        else:
-            try:
+        elif args.quant_stage == 2:
+            recover_opt_m, recover_opt_v = np.split(recover_opt_m, 2, axis=0)
+        elif args.quant_stage == 3:
+            if ckpt["opt_v_i"].dtype == np.float16:
+                recover_opt_v = np.square(ckpt["opt_v_i"].astype(np.float32))
+            else:
                 recover_opt_v, _ = qdq_weight(ckpt["opt_v_c"], scales=ckpt["opt_v_i"], quant_bit=args.quant_bits_opt, dequant=True)
-            except:
-                import pdb; pdb.set_trace()
+                recover_opt_v = np.square(recover_opt_v)
 
         unquant_v += time.time() - in_st
         in_st = time.time()
@@ -294,6 +297,7 @@ def main(args):
     eps = 1e-8
     #with safe_open(os.path.join(args.ref_checkpoint_path, "model-00001-of-00008.safetensors.safetensors"),\
     meta = {}
+    quant_num, skip_num = 0, 0
     for i in range(args.start_idx, args.end_idx):
         print(f"saving model-0000{i+1}-of-00008.safetensors!")
         w_cast, opt_cast, prune_w, prune_opt, quant_w, quant_opt, save_cast = 0, 0, 0, 0, 0, 0, 0
@@ -349,10 +353,30 @@ def main(args):
                         opt_v_index = cal_radio(pruned_opt_m, pruned_opt_v)
                         opt_m_index, opt_m_codebook = qdq_weight(pruned_opt_m, quant_bit=args.quant_bits_opt)
                     elif args.quant_stage == 2:
-                        #concat_mv = np.concatenate((pruned_opt_m, np.sqrt(pruned_opt_v)), axis=0)
-                        opt_m_index, opt_m_codebook = qdq_weight(pruned_opt_m, quant_bit=args.quant_bits_opt)
-                        opt_v_index, opt_v_codebook = qdq_weight(1/(np.sqrt(pruned_opt_v) + eps), quant_bit=args.quant_bits_opt)
+                        concat_mv = np.concatenate((pruned_opt_m, np.sqrt(pruned_opt_v)), axis=0)
+                        opt_m_index, opt_m_codebook = qdq_weight(concat_mv, quant_bit=args.quant_bits_opt)
+                        #opt_v_index, opt_v_codebook = qdq_weight(1/(np.sqrt(pruned_opt_v) + eps), quant_bit=args.quant_bits_opt)
                         #qdq_weight(opt_m_codebook, scales=opt_m_index, quant_bit=args.quant_bits_opt, dequant=True)
+                    elif args.quant_stage == 3:
+                        opt_m_index, opt_m_codebook = qdq_weight(pruned_opt_m, quant_bit=args.quant_bits_opt)
+
+                        sqrt_v = np.sqrt(pruned_opt_v)
+                        opt_v_index, opt_v_codebook = qdq_weight(sqrt_v, quant_bit=args.quant_bits_opt)
+                        if args.fusion_quant:
+                            # peek dequant elems
+                            peek_dequant, _ = qdq_weight(opt_v_codebook, scales=opt_v_index, quant_bit=args.quant_bits_opt, dequant=True)
+                            # non zero mask
+                            nonzero_mask = sqrt_v != 0.0
+                            # outlier flag
+                            has_outlier = not np.all(peek_dequant[nonzero_mask] != 0.0)
+                            if has_outlier:
+                                #print(f"{k_v} has outliers cnt {peek_dequant[nonzero_mask][peek_dequant[nonzero_mask] == 0].shape}, skip.")
+                                skip_num += 1
+                                #import pdb; pdb.set_trace()
+                                opt_v_index = sqrt_v.astype(np.float16)
+                            else:
+                                print(f"{k_v} dont has outliers.")
+                                quant_num += 1
                     
                     quant_opt += time.time() - in_st
                     in_st = time.time()
@@ -413,6 +437,7 @@ def main(args):
             meta_data = recon(saved_ckpt, args, i, handler.info)
     #paddle.cuda.synchronize()
     ed = time.time()
+    print(f"quant key {quant_num}, skip key {skip_num}.")
     print("recon using time: {}".format(ed - st))
 
 
@@ -427,6 +452,7 @@ if __name__ == "__main__":
     parser.add_argument('--start_idx', type=int, default=0)
     parser.add_argument('--end_idx', type=int, default=8)
     parser.add_argument('--quant_bits_opt', type=int, default=8)
+    parser.add_argument('--fusion_quant', action='store_true')
     parser.add_argument('--recon', action='store_true')
     parser.add_argument('--only_recon', action='store_true')
     parser.add_argument('--output', type=str, default="./")

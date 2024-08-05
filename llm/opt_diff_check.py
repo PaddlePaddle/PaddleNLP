@@ -59,10 +59,11 @@ def main(args):
                     wmax_diff = diff_w
                     wmax_diff_key = key
 
+                print(f"ratio detect {diff_update_radio}")
                 if diff_update_radio > umax_diff:
                     umax_diff = diff_update_radio
                     umax_diff_key = [k_m, k_v]
-                    if diff_update_radio > 100:
+                    if diff_update_radio > 7:
                         print(f"broken ratio detect {diff_update_radio}")
 
                 if diff_m > mmax_diff:

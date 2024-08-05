@@ -144,8 +144,8 @@ def get_meta(checkpoint, i):
     for k in checkpoint.keys():
         k_m = k + '/moment1_0'
         k_v = k + '/moment2_0'
-        optimizer_dict[k_v] = f"model-0000{i+1}-of-00008.safetensors"
-        optimizer_dict[k_m] = f"model-0000{i+1}-of-00008.safetensors"
+        optimizer_dict[k_v] = f"optimizer-0000{i+1}-of-00008.safetensors"
+        optimizer_dict[k_m] = f"optimizer-0000{i+1}-of-00008.safetensors"
 
     return optimizer_dict
 
@@ -184,10 +184,16 @@ def recon(checkpoint, ref_weights, args, i):
         #optim_k = optimizer_name.index(k)
         k_m = k + '/moment1_0'
         k_v = k + '/moment2_0'
+        k_m_acc = k + '/beta1_pow_acc_0'
+        k_v_acc = k + '/beta2_pow_acc_0'
         data_pt[k_v] = recover_opt_v
         data_pt[k_m] = recover_opt_m
-        optimizer_dict[k_v] = f"model-0000{i+1}-of-00008.safetensors"
-        optimizer_dict[k_m] = f"model-0000{i+1}-of-00008.safetensors"
+        data_pt[k_v_acc] = ckpt["opt_v_acc"]
+        data_pt[k_m_acc] = ckpt["opt_m_acc"]
+        optimizer_dict[k_v] = f"optimizer-0000{i+1}-of-00008.safetensors"
+        optimizer_dict[k_m] = f"optimizer-0000{i+1}-of-00008.safetensors"
+        optimizer_dict[k_v_acc] = f"optimizer-0000{i+1}-of-00008.safetensors"
+        optimizer_dict[k_m_acc] = f"optimizer-0000{i+1}-of-00008.safetensors"
         cast_w += time.time() - in_st
         in_st = time.time()
     all_time = unquant_w + unquant_v + unquant_m + cast_w
@@ -251,8 +257,12 @@ def main(args):
                         in_st = time.time()
                         k_m = k + '/moment1_0'
                         k_v = k + '/moment2_0'
+                        k_m_acc = k + '/beta1_pow_acc_0'
+                        k_v_acc = k + '/beta2_pow_acc_0'
                         opt_m = handler.get_tensors(k_m)
                         opt_v = handler.get_tensors(k_v)
+                        opt_m_acc = handler.get_tensors(k_m_acc)
+                        opt_v_acc = handler.get_tensors(k_v_acc)
                         #opt_m = paddle.Tensor(np_m, zero_copy=True).astype("float32")
                         #opt_v = paddle.Tensor(np_v, zero_copy=True).astype("float32")
                         #opt_m = paddle.Tensor(np_m, zero_copy=True).astype("float32").numpy()
@@ -282,10 +292,12 @@ def main(args):
                             saved_checkpoint[k]['weights_i'] = residual_tensor_index.astype(np.uint8)
                             saved_checkpoint[k]["weights_c"] = residual_tensor_codebook.astype(np.float16)
                         saved_checkpoint[k]["opt_v_i"] = opt_v_index
+                        saved_checkpoint[k]["opt_v_acc"] = opt_v_acc
                         if opt_v_codebook is not None:
                             saved_checkpoint[k]["opt_v_i"] = opt_v_index.astype(np.uint8)
                             saved_checkpoint[k]["opt_v_c"] = opt_v_codebook.astype(np.float16)
                         saved_checkpoint[k]["opt_m_i"] = opt_m_index
+                        saved_checkpoint[k]["opt_m_acc"] = opt_m_acc
                         if opt_m_codebook is not None:
                             saved_checkpoint[k]["opt_m_i"] = opt_m_index.astype(np.uint8)
                             saved_checkpoint[k]["opt_m_c"] = opt_m_codebook.astype(np.float16)
