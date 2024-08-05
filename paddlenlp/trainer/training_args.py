@@ -1482,11 +1482,13 @@ class TrainingArguments:
                             "enable_stage1_tensor_fusion",
                             "enable_stage1_overlap",
                             "enable_stage2_overlap",
+                            "split_param",
                         ]:
                             raise ValueError(
                                 f"Found unknown pipeline mode config {x}, " f"accpet config is reduce_overlap."
                             )
-
+                    if "split_param" in sharding_parallel_config:
+                        sharding.split_param = True
                     if (
                         "enable_stage1_overlap" in sharding_parallel_config
                         or "enable_stage2_overlap" in sharding_parallel_config
@@ -1534,6 +1536,7 @@ class TrainingArguments:
             strategy = fleet.DistributedStrategy()
             strategy.hybrid_configs = {
                 "dp_degree": self.dataset_world_size,
+                "sharding_degree": 1,
                 "mp_degree": self.tensor_parallel_degree,
                 "pp_degree": self.pipeline_parallel_degree,
                 "order": order,
@@ -1709,7 +1712,7 @@ class TrainingArguments:
             return max(tp_group.rank, 0)
         elif self.enable_auto_parallel:
             mesh = fleet.auto.get_mesh()
-            return mesh.get_rank_by_dim_and_process_id("mp", dist.get_rank())
+            return max(mesh.get_rank_by_dim_and_process_id("mp", dist.get_rank()), 0)
         else:
             return 0
 
@@ -1721,7 +1724,7 @@ class TrainingArguments:
             return max(rank, 0)
         elif self.enable_auto_parallel:
             mesh = fleet.auto.get_mesh()
-            return mesh.get_rank_by_dim_and_process_id("pp", dist.get_rank())
+            return max(mesh.get_rank_by_dim_and_process_id("pp", dist.get_rank()), 0)
         else:
             return 0
 
