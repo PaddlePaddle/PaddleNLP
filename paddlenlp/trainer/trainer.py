@@ -18,10 +18,8 @@
 
 import collections
 import contextlib
-import copy
 import inspect
 import math
-import multiprocessing
 import os
 import random
 import re
@@ -148,6 +146,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
 )
 from .training_args import TrainingArguments
 from .utils import reshard as reshard_util
+from .utils.async_save import AsyncSaver
 from .utils.helper import (  # nested_truncate,
     broadcast_dp_optimizer,
     broadcast_moe_optimizer,
@@ -189,88 +188,6 @@ except:
 
 
 __all__ = ["Trainer"]
-
-async_save_queue = []
-g_cpu_optimizer_state_dict = {}
-
-
-def _save_func(obj, name_mapping, path, saved_signal_path, protocol):
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if k == "master_weights" and isinstance(v, dict):
-                for kk, vv in v.items():
-                    if isinstance(vv, paddle.Tensor):
-                        vv.name = name_mapping["master_weights"][kk]
-            else:
-                if k in name_mapping and isinstance(v, paddle.Tensor):
-                    v.name = name_mapping[k]
-
-    paddle.save(obj, path, protocol)
-    # dump savd_siganl
-    with open(saved_signal_path, mode="w+") as f:
-        f.write("1")
-
-
-def check_exitcode(task):
-    exitcode = task.exitcode
-    if exitcode != 0:
-        print(f"Error: save ckpt process failed with exitcode {exitcode}!!!")
-
-
-def clear_async_save_task_queue():
-    """
-    wait until all async save task to be done.
-    """
-    while len(async_save_queue) > 0:
-        task = async_save_queue.pop()
-        if task and task.is_alive():
-            task.join(timeout=60)
-            if task.is_alive():
-                logger.error("Error: save ckpt process timeout!!!")
-                async_save_queue.append(task)
-            else:
-                check_exitcode(task)
-        else:
-            check_exitcode(task)
-
-
-def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol=4):
-    global g_cpu_optimizer_state_dict
-    g_cpu_optimizer_state_dict.clear()
-    name_mapping = {"master_weights": {}}
-    for k, v in optimizer_state_dict.items():
-        if k == "master_weights":
-            g_cpu_optimizer_state_dict[k] = {}
-            for kk, vv in v.items():
-                g_cpu_optimizer_state_dict[k][kk] = vv.pin_memory()
-                name_mapping[k][kk] = vv.name
-        elif k == "LR_Scheduler":
-            g_cpu_optimizer_state_dict[k] = copy.deepcopy(v)
-        else:
-            g_cpu_optimizer_state_dict[k] = v.pin_memory()
-            name_mapping[k] = v.name
-        paddle.device.synchronize()
-    clear_async_save_task_queue()
-
-    attempt = 0
-    ctx = multiprocessing.get_context("spawn")
-
-    def start_process():
-        nonlocal attempt
-        try:
-            p = ctx.Process(
-                target=_save_func, args=(g_cpu_optimizer_state_dict, name_mapping, path, saved_signal_path, protocol)
-            )
-            p.start()
-            return p
-        except Exception as e:
-            print(f"Attempt {attempt + 1} failed with error: {e}")
-            attempt += 1
-            time.sleep(1)
-            return start_process()
-
-    p = start_process()
-    async_save_queue.append(p)
 
 
 class Trainer:
@@ -439,6 +356,8 @@ class Trainer:
 
         self._save_ckpt_func = dist.save_state_dict if self.args.enable_auto_parallel else paddle.save
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
+        if self.args.use_async_save:
+            self._async_optimizer_saver = AsyncSaver()
 
         if args.max_steps > 0:
             logger.info("max_steps is given, it will override any value given in num_train_epochs")
@@ -2323,9 +2242,6 @@ class Trainer:
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
         self.runtime_timer.start("checkpoint saving time")
 
-        if self.args.use_async_save:
-            clear_async_save_task_queue()
-
         # Save model checkpoint
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
 
@@ -2368,10 +2284,8 @@ class Trainer:
                             save_path = os.path.join(output_dir, optimizer_name)
                             if self.args.use_async_save:
                                 assert not strtobool(os.getenv("FLAG_LLM_PDC", "False")), "Dont support FLAG_LLM_PDC"
-                                async_save_optimizer(
-                                    state_dict,
-                                    save_path,
-                                    saved_signal_path=saved_signal_path,
+                                self._async_optimizer_saver.run(
+                                    state_dict, save_path, saved_signal_path=saved_signal_path
                                 )
                             else:
                                 self._save_ckpt_func(state_dict, save_path)
