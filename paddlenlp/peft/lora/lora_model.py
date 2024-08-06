@@ -42,7 +42,7 @@ from ...transformers.model_utils import (
     load_state_dict,
 )
 from ...transformers.utils import get_checkpoint_shard_files, weight_name_suffix
-from ...utils.distributed import distributed_gather
+from ...utils.distributed import distributed_allgather, distributed_gather
 from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
 from ...utils.tools import get_env_device
@@ -329,7 +329,10 @@ class LoRAModel(nn.Layer):
         for key in trainable_state_dict:
             tensor = trainable_state_dict[key]
             if key in trainable_name_action_mappings:
-                ret = distributed_gather(tensor, group=mp_group, offload=True)
+                if get_env_device() == "xpu":
+                    ret = distributed_allgather(tensor, group=mp_group, offload=True)
+                else:
+                    ret = distributed_gather(tensor, group=mp_group, offload=True)
                 action = trainable_name_action_mappings[key]
                 if key in self.lora_split_mapping and not self.lora_split_mapping[key] and "_scale" in key and is_dst:
                     ret = paddle.to_tensor(ret)

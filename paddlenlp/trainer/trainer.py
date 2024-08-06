@@ -81,7 +81,7 @@ from ..data import (
     DistDataLoader,
     default_data_collator,
 )
-from ..peft import LoRAModel, PrefixModelForCausalLM
+from ..peft import LoRAModel, PrefixModelForCausalLM, VeRAModel
 
 try:
     from ..quantization.quantization_linear import QuantizationLinear
@@ -107,18 +107,14 @@ from ..utils.env import (
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
+    VERA_WEIGHTS_NAME,
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import RuntimeTimer, get_timers, set_timers
-from .plugins.unified_checkpoint import (
-    load_unified_checkpoint,
-    load_unified_optimizer,
-    save_unified_checkpoint,
-    save_unified_optimizer,
-)
+from .plugins.unified_checkpoint import UnifiedCheckpointHandler
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -403,6 +399,8 @@ class Trainer:
         self.sharding_io = None
         if self.args.should_save_sharding_stage1_model or self.args.should_load_sharding_stage1_model:
             self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
+        if self.args.unified_checkpoint:
+            self.unified_checkpoint_handler = UnifiedCheckpointHandler(self.args)
 
         if self.sharding is not None and self.optimizer is not None:
             raise RuntimeError(
@@ -433,7 +431,11 @@ class Trainer:
         if train_dataset is not None and not isinstance(train_dataset, collections.abc.Sized) and args.max_steps <= 0:
             raise ValueError("train_dataset does not implement __len__, max_steps has to be specified")
 
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+        if (
+            isinstance(self.model, LoRAModel)
+            or isinstance(self.model, PrefixModelForCausalLM)
+            or isinstance(self.model, VeRAModel)
+        ):
             if self.args.unified_checkpoint and "skip_save_model_weight" in self.args.unified_checkpoint_config:
                 self.args.unified_checkpoint_config.remove("skip_save_model_weight")
                 logger.warning(
@@ -572,6 +574,8 @@ class Trainer:
                 weights_file = os.path.join(resume_from_checkpoint, PREFIX_WEIGHTS_NAME)
                 if self.model.prefix_config.tensor_parallel_degree > 1:
                     convert_tp = True
+            elif isinstance(self.model, VeRAModel):
+                weights_file = os.path.join(resume_from_checkpoint, VERA_WEIGHTS_NAME)
             if self.args.dataset_rank == 0:
                 logger.info(f"Loading model from {resume_from_checkpoint} .")
 
@@ -615,18 +619,20 @@ class Trainer:
                     logger.info("Loading origin checkpoint, the next checkpoint will be saved as unified checkpoint")
 
                 if use_unified_checkpoint:
-                    load_unified_checkpoint(
-                        self.args,
+                    self.unified_checkpoint_handler.load_unified_checkpoint(
                         self.model,
                         self.optimizer,
                         resume_from_checkpoint,
-                        safe_serialization=True,
                     )
                     logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
                     self.runtime_timer.stop()
                     return
 
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+        if (
+            isinstance(self.model, LoRAModel)
+            or isinstance(self.model, PrefixModelForCausalLM)
+            or isinstance(self.model, VeRAModel)
+        ):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
             self.runtime_timer.stop()
             return
@@ -1083,17 +1089,13 @@ class Trainer:
                         fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     # Pipeline parallel mode,  handle gradient reduce here to overlap
-                    pipeline_parallel_config = (
-                        set(args.pipeline_parallel_config.split(" ")) if args.pipeline_parallel_degree > 1 else set()
-                    )
-                    sharding_parallel_config = (
-                        set(args.sharding_parallel_config.split(" ")) if args.sharding_parallel_degree > 1 else set()
-                    )
-                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in pipeline_parallel_config
-                    enable_release_grads = (
-                        "enable_release_grads" in pipeline_parallel_config
-                        or "enable_release_grads" in sharding_parallel_config
-                    )
+                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in args.pipeline_parallel_config
+
+                    enable_release_grads = False
+                    if args.sharding_parallel_degree > 1:
+                        enable_release_grads = "enable_release_grads" in args.sharding_parallel_config
+                    if not enable_release_grads and args.pipeline_parallel_degree > 1:
+                        enable_release_grads = "enable_release_grads" in args.pipeline_parallel_config
 
                     # Case 3: Pipeline parallel mode, overlap with dp
                     if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
@@ -1195,6 +1197,10 @@ class Trainer:
             if self.control.should_training_stop:
                 break
 
+        # unlink shared_memory if used.
+        if self.args.unified_checkpoint:
+            self.unified_checkpoint_handler.unlink_shared_memory()
+
         if args.past_index and hasattr(self, "_past"):
             # Clean the state at the end of training
             delattr(self, "_past")
@@ -1211,12 +1217,10 @@ class Trainer:
                 self._load_best_model_from_peft_checkpoint()
             else:
                 if self.args.unified_checkpoint:
-                    load_unified_checkpoint(
-                        self.args,
+                    self.unified_checkpoint_handler.load_unified_checkpoint(
                         self.model,
                         self.optimizer,
                         self.state.best_model_checkpoint,
-                        safe_serialization=True,
                     )
                 else:
                     weight_name = PADDLE_WEIGHTS_NAME
@@ -1253,12 +1257,10 @@ class Trainer:
 
     def _load_best_model_from_peft_checkpoint(self):
         if self.args.unified_checkpoint:
-            load_unified_checkpoint(
-                self.args,
+            self.unified_checkpoint_handler.load_unified_checkpoint(
                 self.model,
                 self.optimizer,
                 self.state.best_model_checkpoint,
-                safe_serialization=True,
             )
             return
 
@@ -1992,8 +1994,7 @@ class Trainer:
                         "please upgrade your paddle (using nightly version)."
                     )
 
-                sharding_parallel_config = set(self.args.sharding_parallel_config.split(" "))
-                if level == "os_g" and "enable_stage2_overlap" in sharding_parallel_config:
+                if level == "os_g" and "enable_stage2_overlap" in self.args.sharding_parallel_config:
                     model._set_reduce_overlap(True)
                     optimizer._set_broadcast_overlap(True, model)
 
@@ -2133,9 +2134,9 @@ class Trainer:
     def _enable_delay_scale_loss(self):
         key = "enable_delay_scale_loss"
         if self.args.pipeline_parallel_degree > 1:
-            return key in self.args.pipeline_parallel_config.split(" ")
+            return key in self.args.pipeline_parallel_config
         elif self.args.tensor_parallel_degree > 1:
-            return key in self.args.tensor_parallel_config.split(" ")
+            return key in self.args.tensor_parallel_config
         else:
             return False
 
@@ -2312,12 +2313,10 @@ class Trainer:
                     os.makedirs(output_dir, exist_ok=True)
                     logger.info("Saving optimizer files.")
                     if self.args.unified_checkpoint:
-                        save_unified_optimizer(
-                            self.args,
+                        self.unified_checkpoint_handler.save_unified_optimizer(
                             self.model,
                             self.optimizer,
                             output_dir,
-                            safe_serialization=True,
                         )
                     else:
                         if self.dp_group.rank > 0:  # this should only work for MoE saving
@@ -2344,12 +2343,10 @@ class Trainer:
                 if not self.args.use_hybrid_parallel:
                     logger.info("Saving optimizer files.")
                     if self.args.unified_checkpoint:
-                        save_unified_optimizer(
-                            self.args,
+                        self.unified_checkpoint_handler.save_unified_optimizer(
                             self.model,
                             self.optimizer,
                             output_dir,
-                            safe_serialization=True,
                         )
                     else:
                         if self.args.data_parallel_rank > 0 and self.args.use_expert_parallel:
@@ -2509,12 +2506,16 @@ class Trainer:
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
         if self.args.unified_checkpoint:
-            save_unified_checkpoint(self.args, self.model, self.optimizer, output_dir, safe_serialization=True)
+            self.unified_checkpoint_handler.save_unified_checkpoint(self.model, self.optimizer, output_dir)
             return
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
         # peft model
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+        if (
+            isinstance(self.model, LoRAModel)
+            or isinstance(self.model, PrefixModelForCausalLM)
+            or isinstance(self.model, VeRAModel)
+        ):
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,
@@ -2628,12 +2629,11 @@ class Trainer:
                 else:
                     opt_state_dict = None
             else:
-                opt_state_dict = load_unified_optimizer(
+                opt_state_dict = self.unified_checkpoint_handler.load_unified_optimizer(
                     args=self.args,
                     model=self.model,
                     optimizer=self.optimizer,
                     resume_from_checkpoint=checkpoint,
-                    safe_serialization=True,
                 )
 
         if self.args.ignore_load_lr_and_optim and opt_state_dict:
