@@ -290,6 +290,8 @@ class NodeModelState:
                 _find = False
                 for s in suffix:
                     if get_env_device() == "xpu" and t.endswith(s + ".SCALE_VALUE"):
+                        # NOTE: for xpu adamw, all optimizer state will have an extra attribute end with SCALE_VALUE.
+                        # This extra attribute won't be used, just skip it.
                         _find = True
                         break
                     if t.endswith(s):
@@ -323,6 +325,7 @@ class NodeModelState:
         (self._opt_state, opt_tmp) = (opt_tmp, self._opt_state)
         for opt_name in list(opt_tmp.keys()):
             if get_env_device() == "xpu" and "SCALE_VALUE" in opt_name:
+                # Do not handle optimizer state end with SCALE_VALUE for xpu.
                 continue
             assert opt_name in opt_name_to_tname
             t_name = opt_name_to_tname[opt_name]
