@@ -801,11 +801,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 concated_ffn1_weight = np.concatenate(
                     [unfused_state_dict["mlp.gate_proj.weight"], unfused_state_dict["mlp.up_proj.weight"]], axis=-1
                 )
-            ffn1_weight_tensor = paddle.to_tensor(concated_ffn1_weight)
 
-            qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight)
+            qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight).cast(paddle.get_default_dtype())
             if self.use_weight_only:
-                qkv_weight_tensor = paddle.to_tensor(concated_qkv_weight)
                 qkv_weight_tensor = paddle.transpose(qkv_weight_tensor, perm=[1, 0])
                 qkv_quanted_weight_tensor, qkv_weight_scale_tensor = weight_quantize(
                     qkv_weight_tensor, algo=self.quant_algo
@@ -817,11 +815,11 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     paddle.cast(paddle.to_tensor(concated_qkv_weight), "int8")
                 )
             else:
-                self.transformer_block.qkv_weights[idx].set_value(
-                    qkv_weight_tensor.cast(self.transformer_block.qkv_weights[idx].dtype)
-                )
+                self.transformer_block.qkv_weights[idx].set_value(qkv_weight_tensor)
 
-            linear_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)])
+            linear_weight_tensor = paddle.to_tensor(
+                state_dict["llama.layers.{}.self_attn.o_proj.weight".format(idx)]
+            ).cast(paddle.get_default_dtype())
             if self.use_weight_only:
                 linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
                     linear_weight_tensor, algo=self.quant_algo
@@ -845,10 +843,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         )
                     )
             else:
-                self.transformer_block.linear_weights[idx].set_value(
-                    linear_weight_tensor.cast(self.transformer_block.linear_weights[idx].dtype)
-                )
+                self.transformer_block.linear_weights[idx].set_value(linear_weight_tensor)
 
+            ffn1_weight_tensor = paddle.to_tensor(concated_ffn1_weight).cast(paddle.get_default_dtype())
             if self.use_weight_only:
                 ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
                     ffn1_weight_tensor, algo=self.quant_algo
@@ -865,11 +862,11 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         paddle.cast(paddle.to_tensor(concated_ffn1_weight).transpose((1, 0)), "int8")
                     )
             else:
-                self.transformer_block.ffn1_weights[idx].set_value(
-                    ffn1_weight_tensor.cast(self.transformer_block.ffn1_weights[idx].dtype)
-                )
+                self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight_tensor)
 
-            ffn2_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
+            ffn2_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)]).cast(
+                paddle.get_default_dtype()
+            )
             if self.use_weight_only:
                 ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
                     ffn2_weight_tensor, algo=self.quant_algo
@@ -893,9 +890,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         )
                     )
             else:
-                self.transformer_block.ffn2_weights[idx].set_value(
-                    ffn2_weight_tensor.cast(self.transformer_block.ffn2_weights[idx].dtype)
-                )
+                self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
 
             if "a8w8" in self.quant_type:
                 if self.shift_smooth_all_linears:
@@ -1019,7 +1014,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         cache_scale_json_path,
                         cache_scale_map_dict,
                         num_of_layers=self.config.num_hidden_layers,
-                        num_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
+                        num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                        num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
                     )
                     for k, v in cache_scales_loader.scale.items():
                         for i_layer, weight_scale in enumerate(v):
@@ -1401,7 +1397,9 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         if "lm_head.weight" in state_dict:
-            self.lm_head.weight.set_value(state_dict["lm_head.weight"])
+            self.lm_head.weight.set_value(
+                paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
+            )
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
 

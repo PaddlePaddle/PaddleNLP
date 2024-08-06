@@ -396,7 +396,7 @@ class InferencePredictorMixin(BasePredictor):
 
         self.architectures = self.model_config.architectures[0].lower()
 
-        self.dtype = config.dtype or self.model_config
+        self.dtype = config.dtype or self.model_config.dtype
         self.pre_ids = paddle.full([config.batch_size, config.total_max_length], -1, dtype="int64")
 
         if config.device == "cpu" and config.avx_model:
@@ -408,7 +408,6 @@ class InferencePredictorMixin(BasePredictor):
             self.tgt_generation_mask = None
             self.tgt_pos = None
         else:
-            self.arange_tensor_encoder = paddle.arange(config.total_max_length, dtype=self.dtype)
             self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
             self.num_layers, self.num_attention_heads, self.head_dim = (
                 len(self.cache_kvs),
@@ -548,8 +547,8 @@ class InferencePredictorMixin(BasePredictor):
             # alibi encoder
             alibi_slopes = get_alibi_slopes(self.model_config.n_head)
             inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
-
-            alibi = alibi_slopes[None, :, None, None] * self.arange_tensor_encoder
+            arange_tensor_encoder = paddle.arange(self.config.total_max_length, dtype=self.config.dtype)
+            alibi = alibi_slopes[None, :, None, None] * arange_tensor_encoder
 
             if self.model_config.tensor_parallel_degree > 1:
                 block_size = self.model_config.n_head // self.model_config.tensor_parallel_degree
@@ -773,8 +772,6 @@ class BlockInferencePredictorMixin(BasePredictor):
 
         self.dtype = config.dtype or self.model_config.dtype
 
-        self.block_size = config.block_size
-
         try:
             self.rope_theta = self.model_config.rope_theta
         except:
@@ -883,19 +880,21 @@ class BlockInferencePredictorMixin(BasePredictor):
 
         # bloom model needs src_mask and tgt_mask!
         if "bloom" in self.architectures:
-            lower_one_tril = paddle.tril(paddle.ones(shape=(config.total_max_length, config.total_max_length), dtype=self.dtype))
+            lower_one_tril = paddle.tril(
+                paddle.ones(shape=(config.total_max_length, config.total_max_length), dtype=self.dtype)
+            )
             lower_one_tril = lower_one_tril[None, None, :, :]
-            self.model_inputs["src_mask"] = lower_one_tril.tile([self.batch_size, 1, 1, 1])
+            self.model_inputs["src_mask"] = lower_one_tril.tile([config.batch_size, 1, 1, 1])
             self.model_inputs["tgt_mask"] = paddle.full(
                 shape=[config.batch_size, 1, 1, config.total_max_length], fill_value=1, dtype=self.dtype
             )
             arange_tensor_encoder = paddle.arange(config.total_max_length).astype(self.dtype)
             alibi_slopes = get_alibi_slopes(self.num_attention_heads)
             alibi = alibi_slopes[None, :, None, None] * arange_tensor_encoder
-            alibi_encoder = alibi.tile([self.batch_size, 1, config.total_max_length, 1])
+            alibi_encoder = alibi.tile([config.batch_size, 1, config.total_max_length, 1])
             alibi_decoder = alibi.tile(
                 [
-                    self.batch_size,
+                    config.batch_size,
                     1,
                     1,
                     1,
