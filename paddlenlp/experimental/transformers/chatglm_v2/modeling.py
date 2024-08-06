@@ -78,17 +78,12 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         self.multi_query_group_num = config.multi_query_group_num
 
         self.use_weight_only = False
-        self.weight_only_quant_bits = config.weight_only_quant_bits
-        self.quant_algo = "weight_only_int" + str(self.weight_only_quant_bits)
-        if self.weight_only_quant_bits != -1:
+        if config.quant_type == "weight_only_int8":
             self.use_weight_only = True
-
-        if self.use_weight_only:
-            assert (
-                self.quant_algo == "weight_only_int8" or self.quant_algo == "weight_only_int4"
-            ), "Expected quant_algo equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
-                self.quant_algo
-            )
+            self.quant_algo = "weight_only_int8"
+        elif config.quant_type == "weight_only_int4":
+            self.use_weight_only = True
+            self.quant_algo = "weight_only_int4"
 
         ln_scale_attrs = [
             paddle.ParamAttr(name="encoder.layers.{}.input_layernorm.weight".format(i))
@@ -159,7 +154,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             config.num_attention_heads,
             config.ffn_hidden_size,
             dropout_rate=0.0,
-            weight_only_quant_bits=self.weight_only_quant_bits,
+            quant_type=config.quant_type,
             activation="swiglu",
             normalize_before=True,
             num_layers=config.num_hidden_layers,

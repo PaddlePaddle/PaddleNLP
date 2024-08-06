@@ -516,6 +516,43 @@ class LlamaDynamicNTKScalingRotaryEmbedding(LlamaRotaryEmbedding):
             return scale_cos_sin
 
 
+class Llama3RotaryEmbedding(LlamaRotaryEmbedding):
+    def __init__(
+        self,
+        dim,
+        max_position_embeddings=8192,
+        base=500000,
+        factor=8.0,
+        low_freq_factor=1.0,
+        high_freq_factor=4.0,
+        original_max_position_embeddings=8192,
+    ):
+        self.factor = factor
+        self.low_freq_factor = low_freq_factor
+        self.high_freq_factor = high_freq_factor
+        self.original_max_position_embeddings = original_max_position_embeddings
+        super().__init__(dim, max_position_embeddings, base)
+
+    def _set_cos_sin_cache(self, seq_len):
+        low_freq_wavelen = self.original_max_position_embeddings / self.low_freq_factor
+        high_freq_wavelen = self.original_max_position_embeddings / self.high_freq_factor
+        new_freqs = []
+        for freq in self.inv_freq:
+            wavelen = 2 * math.pi / freq
+            if wavelen < high_freq_wavelen:
+                new_freqs.append(freq)
+            elif wavelen > low_freq_wavelen:
+                new_freqs.append(freq / self.factor)
+            else:
+                assert low_freq_wavelen != high_freq_wavelen
+                smooth = (self.original_max_position_embeddings / wavelen - self.low_freq_factor) / (
+                    self.high_freq_factor - self.low_freq_factor
+                )
+                new_freqs.append((1 - smooth) * freq / self.factor + smooth * freq)
+        self.inv_freq = paddle.to_tensor(new_freqs, dtype=self.inv_freq.dtype)
+        super()._set_cos_sin_cache(seq_len=seq_len)
+
+
 def rotate_half(x):
     """Rotates half the hidden dims of the input."""
     x1 = x[..., : x.shape[-1] // 2]
@@ -779,7 +816,21 @@ class LlamaAttention(nn.Layer):
         self.config = config
 
     def _init_rope(self):
-        if self.config.rope_scaling_type is None:
+        if (
+            hasattr(self.config, "rope_scaling")
+            and self.config.rope_scaling is not None
+            and self.config.rope_scaling.get("rope_type", None) == "llama3"
+        ):
+            self.rotary_emb = Llama3RotaryEmbedding(
+                self.head_dim,
+                max_position_embeddings=self.max_position_embeddings,
+                base=self.config.rope_theta,
+                factor=self.config.rope_scaling["factor"],
+                high_freq_factor=self.config.rope_scaling["high_freq_factor"],
+                low_freq_factor=self.config.rope_scaling["low_freq_factor"],
+                original_max_position_embeddings=self.config.rope_scaling["original_max_position_embeddings"],
+            )
+        elif self.config.rope_scaling_type is None:
             self.rotary_emb = LlamaRotaryEmbedding(
                 self.head_dim,
                 max_position_embeddings=self.max_position_embeddings,
@@ -987,6 +1038,9 @@ class LlamaAttention(nn.Layer):
             # reuse k, v, self_attention
             key_states = paddle.concat([past_key_value[0], key_states], axis=1)
             value_states = paddle.concat([past_key_value[1], value_states], axis=1)
+            if self.config.immediate_clear_past_key_value:
+                past_key_value[0]._clear_data()
+                past_key_value[1]._clear_data()
 
         past_key_value = (key_states, value_states) if use_cache else None
         if self.kv_indices is not None:
@@ -1547,8 +1601,11 @@ class LlamaModel(LlamaPretrainedModel):
 
         if self.config.context_parallel_degree > 1 and (attention_mask is not None or self.config.alibi):
             raise NotImplementedError("Ring FlashAttention dosen't support attention_mask or alibi")
+
         # embed positions
-        if attn_mask_startend_row_indices is None and attention_mask is None:
+        if self.config.use_flash_attention_for_generation:
+            attention_mask = None
+        elif attn_mask_startend_row_indices is None and attention_mask is None:
             # [bs, seq_len]
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
         if attn_mask_startend_row_indices is None and self.config.alibi:
@@ -1580,7 +1637,7 @@ class LlamaModel(LlamaPretrainedModel):
 
         use_casual_mask = get_use_casual_mask() and not self.config.alibi
 
-        if use_casual_mask:
+        if self.config.use_flash_attention_for_generation or use_casual_mask:
             attention_mask = None
         elif attn_mask_startend_row_indices is None:
             attention_mask = self._prepare_decoder_attention_mask(
@@ -1590,7 +1647,7 @@ class LlamaModel(LlamaPretrainedModel):
         is_casual = False
 
         if attn_mask_startend_row_indices is None and self.config.use_flash_attention and get_env_device() != "gcu":
-            if use_casual_mask:
+            if self.config.use_flash_attention_for_generation or use_casual_mask:
                 is_casual = True
             else:
                 is_casual = is_casual_mask(attention_mask)
@@ -1653,6 +1710,9 @@ class LlamaModel(LlamaPretrainedModel):
 
             if use_cache:
                 next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+
+        if self.config.use_last_token_for_generation:
+            hidden_states = paddle.unsqueeze(hidden_states[:, -1, :], 1)
 
         hidden_states = self.norm(hidden_states)
 
@@ -1879,7 +1939,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
             position_ids = model_kwargs["position_ids"]
             model_kwargs["position_ids"] = paddle.concat([position_ids, position_ids[..., -1:] + 1], axis=-1)
 
-        if not is_encoder_decoder and "attention_mask" in model_kwargs:
+        if not is_encoder_decoder and "attention_mask" in model_kwargs and model_kwargs["attention_mask"] is not None:
             attention_mask = model_kwargs["attention_mask"]
             model_kwargs["attention_mask"] = paddle.concat(
                 [attention_mask, paddle.ones([attention_mask.shape[0], 1], dtype=attention_mask.dtype)], axis=-1
