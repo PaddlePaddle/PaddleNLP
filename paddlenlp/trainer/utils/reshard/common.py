@@ -28,6 +28,7 @@ try:
 except:
     DygraphShardingOptimizerV2 = None
 
+from paddlenlp.utils.tools import get_env_device
 
 from ....transformers.model_utils import unwrap_optimizer
 
@@ -288,6 +289,9 @@ class NodeModelState:
             for t in opt_names:
                 _find = False
                 for s in suffix:
+                    if get_env_device() == "xpu" and t.endswith(s + ".SCALE_VALUE"):
+                        _find = True
+                        break
                     if t.endswith(s):
                         logger.info(f"{t}-{t[:-len(s)]}--{t[:-len(s)] in tensor_names}")
                         opt_to_t[t] = t[: -len(s)]
@@ -318,6 +322,8 @@ class NodeModelState:
         opt_tmp = OrderedDict()
         (self._opt_state, opt_tmp) = (opt_tmp, self._opt_state)
         for opt_name in list(opt_tmp.keys()):
+            if get_env_device() == "xpu" and "SCALE_VALUE" in opt_name:
+                continue
             assert opt_name in opt_name_to_tname
             t_name = opt_name_to_tname[opt_name]
             assert t_name in tname_to_structure_name
