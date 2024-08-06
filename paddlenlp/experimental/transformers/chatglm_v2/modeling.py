@@ -25,11 +25,13 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformerA8W8,
     FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerBase,
+    FusedMultiTransformerA8W8,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
+    GenerationBlockInferenceModel,
 )
 from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2PretrainedModel
 from paddlenlp.transformers.chatglm_v2.modeling import (
@@ -82,6 +84,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         self.head_size = self.hidden_size // self.num_heads
         self.multi_query_group_num = config.multi_query_group_num
 
+        self.quant_type = config.quant_type
         self.use_weight_only = False
         self.weight_only_quant_bits = config.weight_only_quant_bits
         self.quant_algo = "weight_only_int" + str(self.weight_only_quant_bits)
@@ -186,16 +189,21 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             kv_num_heads=config.multi_query_group_num,
         )
 
-        if self.use_weight_only:
-            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
-        else:
-            self.transformer_block = FusedMultiTransformerBase(transformer_config)
+        self.set_transformer_block(transformer_config)
 
         self.post_layer_norm = config.post_layer_norm
         if self.post_layer_norm:
             LayerNormFunc = RMSNorm if config.rmsnorm else nn.LayerNorm
             # Final layer norm before output.
             self.final_layernorm = LayerNormFunc(config.hidden_size, epsilon=config.layernorm_epsilon)
+
+    def set_transformer_block(self, transformer_config):
+        if self.use_weight_only:
+            self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
+        elif self.quant_type == "a8w8":
+            self.transformer_block = FusedMultiTransformerA8W8(transformer_config)
+        else:
+            self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
     def get_input_embeddings(self):
         return self.embedding.word_embeddings
@@ -425,7 +433,7 @@ class ChatGLMv2BlockInferenceModel(ChatGLMv2InferenceModel):
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
 
-        inputs_embeds = self.embed_tokens(ids_remove_padding)
+        inputs_embeds = self.embedding.word_embeddings(ids_remove_padding)
 
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
@@ -434,7 +442,7 @@ class ChatGLMv2BlockInferenceModel(ChatGLMv2InferenceModel):
                 cum_offsets=cum_offsets,
                 attn_mask=attention_mask,
                 caches=caches,
-                pre_caches=pre_caches,
+                pre_caches=None,
                 rotary_embs=rope_emb,
                 **kwargs,
             )
@@ -448,6 +456,10 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
         super().__init__(config)
         self.max_sequence_length = config.max_sequence_length
         self.chatglm_v2 = ChatGLMv2InferenceModel(config)
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+        return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -565,11 +577,15 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
         self.chatglm_v2.set_state_dict(state_dict)
 
 
-class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationInferenceModel, ChatGLMv2PretrainedModel):
+class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, ChatGLMv2PretrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.chatglm_v2 = ChatGLMv2BlockInferenceModel(config)
         self.max_sequence_length = config.max_sequence_length
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+        return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -594,7 +610,7 @@ class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationInferenceModel, ChatGLMv
         for _ in range(config.num_hidden_layers):
             cache_kv_shape = [
                 max_block_nums,
-                config.hidden_size // config.num_attention_heads,
+                config.multi_query_group_num,
                 config.block_size,
                 config.hidden_size // config.num_attention_heads,
             ]
@@ -670,7 +686,7 @@ class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationInferenceModel, ChatGLMv
 
         hidden_states = outputs[0]
         lm_logits = self.chatglm_v2.output_layer(hidden_states)
-        output = (lm_logits,) +outputs[1:]
+        output = (lm_logits,) + outputs[1:]
 
         return output
     
