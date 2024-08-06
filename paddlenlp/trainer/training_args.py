@@ -1563,10 +1563,11 @@ class TrainingArguments:
                             "master_weight_compatible",
                             "async_save",
                             "enable_all_options",
+                            "ignore_merge_optimizer",
                         ]:
                             raise ValueError(
                                 f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
-                                + "master_weight_compatible, async_save, enable_all_options."
+                                + "master_weight_compatible, async_save, enable_all_options, ignore_merge_optimizer"
                             )
                 if "enable_all_options" in unified_checkpoint_config:
                     self.unified_checkpoint_config = [
