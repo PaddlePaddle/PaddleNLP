@@ -349,6 +349,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.quant_type = config.quant_type
 
         self.rope_theta = config.rope_theta
+        self.use_neox = True
 
         self.use_weight_only = False
         if config.quant_type == "weight_only_int8":
@@ -562,7 +563,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             cache_v_out_scale_attrs=cache_v_out_scale_attrs,
             epsilon=self.epsilon,
             norm_type="rmsnorm",
-            use_neox_rotary_style=True,
+            use_neox_rotary_style=self.use_neox,
             cachekv_int8_type=config.cachekv_int8_type,
             rank_id=config.tensor_parallel_rank,
             trans_qkvw=(False if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8" else True),
@@ -683,7 +684,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         from paddlenlp_ops import fused_get_rotary_embedding
 
         new_rope = fused_get_rotary_embedding(
-            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, self.rope_theta, True
+            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, self.rope_theta, self.use_neox
         )
 
         with dy2st_nocheck_guard_context():
@@ -1009,7 +1010,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 )
 
                 if self.config.cachekv_int8_type == "static":
-                    cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_act_scales.json")
+                    cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_scales.json")
                     if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
                         cache_scale_json_path = os.path.join(
                             self.quant_model_path, f"cachekv_act_scales_{self.config.tensor_parallel_rank}.json"
