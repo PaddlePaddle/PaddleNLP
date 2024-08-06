@@ -1288,7 +1288,7 @@ class ConversionMixin:
 
         if len(name_action_mappings) > 0:
             for x in name_action_mappings.keys():
-                logger.warning(f"key <{x}> need to merge tensor parallel but we can't find in model state.")
+                logger.debug(f"key <{x}> need to merge tensor parallel but we can't find in model state.")
 
         return state_dict_to_save
 
@@ -1322,7 +1322,7 @@ class ConversionMixin:
                     break
             if key not in state_keys_map:
                 if not ignore_error:
-                    logger.error(f"tensor parallel conversion: could not find name {key} in loaded state dict!")
+                    logger.debug(f"tensor parallel conversion: could not find name {key} in loaded state dict!")
             else:
                 state_keys_real.remove(state_keys_map[key])
 
