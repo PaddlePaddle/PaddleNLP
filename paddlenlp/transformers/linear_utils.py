@@ -15,6 +15,7 @@
 """
 This file is used for replacing Paddle's native Linear implementations with vendors' customized implementations
 """
+from paddlenlp.utils.log import logger
 
 import paddle.distributed.fleet.meta_parallel as mpu
 from paddle import nn
@@ -63,22 +64,14 @@ if get_env_device() == "npu":
         RowSequenceParallelLinear = MC2RowSeqParallelLinear
 elif get_env_device() == "xpu":
     try:
-        from paddle_xpu.layers.nn import ColumnParallelLinear as XPUColumnParallelLinear
-        from paddle_xpu.layers.nn import Linear as XPULinear
-        from paddle_xpu.layers.nn import RowParallelLinear as XPURowParallelLinear
-        from paddle_xpu.layers.nn.sequence_parallel import (
-            XPUColumnSequenceParallelLinear,
-            XPURowSequenceParallelLinear,
-        )
-
-        Linear = XPULinear
-        ColumnParallelLinear = XPUColumnParallelLinear
-        RowParallelLinear = XPURowParallelLinear
-        ColumnSequenceParallelLinear = XPUColumnSequenceParallelLinear
-        RowSequenceParallelLinear = XPURowSequenceParallelLinear
+        import paddle_xpu
     except ImportError:
         # If paddle_xpu is not installed, just use Paddle's native Linear implementations
-        pass
+        logger.warning("Import paddle_xpu failed, use Paddle's native Linear implementations")
+    else:
+        logger.info("Import paddle_xpu succeeded.")
+        import inspect
+        logger.info(f"Now nn.Linear is {inspect.getmodule(Linear)}.")
 else:
     # By default, use Paddle's native Linear implementations
     pass
