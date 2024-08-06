@@ -245,6 +245,7 @@ class TrainingArguments:
               enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance.
               enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.
               enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true. It can accelerate model parallel further.
+              enable_sp_async_reduce_scatter, it supports async reduce_scatter in ColumnSequenceParallelLinear. It only works when set sp_async_reduce_scatter is True. It can accelerate sequence parallel further.
               enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
               sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
               sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
@@ -357,6 +358,8 @@ class TrainingArguments:
             Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
         distributed_dataloader (`bool`, *optional*):
             Whether to use distributed dataloader. Default is `False`.
+        release_grads (`bool`, *optional*):
+            Whether to release gradients during training. Default is `False`.
     """
 
     output_dir: str = field(
@@ -632,6 +635,7 @@ class TrainingArguments:
                 "enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance. \n"
                 "enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.\n"
                 "enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true.  It can accelerate model parallel further.\n"
+                "enable_sp_async_reduce_scatter, it supports async reduce_scatter in ColumnSequenceParallelLinear. It only works when set sp_async_reduce_scatter is True. It can accelerate sequence parallel further.\n"
                 "enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.\n"
                 "sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.\n"
                 "sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.\n"
@@ -841,6 +845,9 @@ class TrainingArguments:
     use_expert_parallel: Optional[bool] = field(
         default=False,
         metadata={"help": "Enable MoE (Mixture of Experts) expert parallel training"},
+    )
+    release_grads: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to release gradients during training. Default is `False`."}
     )
 
     def __post_init__(self):
@@ -1140,6 +1147,7 @@ class TrainingArguments:
                                 "enable_mp_async_allreduce",
                                 "enable_mp_skip_c_identity",
                                 "enable_mp_fused_linear_param_grad_add",
+                                "enable_sp_async_reduce_scatter",
                                 "enable_delay_scale_loss",
                                 "sync_param",
                                 "sync_grad",
@@ -1147,7 +1155,7 @@ class TrainingArguments:
                             ]:
                                 raise ValueError(
                                     f"Found unknown tensor parallell config {x}, "
-                                    f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity, enable_mp_fused_linear_param_grad_add, sync_param, sync_grad and sync_moment."
+                                    f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity, enable_mp_fused_linear_param_grad_add, enable_sp_async_reduce_scatter, enable_delay_scale_loss, sync_param, sync_grad and sync_moment."
                                 )
                     try:
                         if "enable_mp_async_allreduce" in mp_config:
@@ -1165,6 +1173,8 @@ class TrainingArguments:
                                 warnings.warn(
                                     "enable_mp_fused_linear_param_grad_add only works with enable_mp_async_allreduce. It will not work."
                                 )
+                        if "enable_sp_async_reduce_scatter" in mp_config:
+                            strategy.hybrid_configs["mp_configs"].sp_async_reduce_scatter = True
 
                         sync_param = "sync_param" in mp_config
                         sync_grad = "sync_grad" in mp_config
@@ -1173,15 +1183,23 @@ class TrainingArguments:
                         # sync_param_name = [""] matches any parameter name.
                         # If sync_param, sync_grad and sync_moment are not set, the default value in Paddle is :
                         # sync_param = True, sync_grad = False, sync_moment = False, sync_param_name = ["embedding", "layer_norm", ".b_"].
+
+                        if sync_param or sync_grad or sync_moment:
+                            logger.info("setting sync_param_name")
+                            strategy.sync_param_name = [""]
+
                         if sync_param:
+                            logger.info("setting sync_param")
                             strategy.hybrid_configs["mp_configs"].sync_param = True
-                            strategy.hybrid_configs["mp_configs"].sync_param_name = [""]
+
                         if sync_grad:
+                            logger.info("setting sync_grad")
                             strategy.hybrid_configs["mp_configs"].sync_grad = True
-                            strategy.hybrid_configs["mp_configs"].sync_grad_name = [""]
+
                         if sync_moment:
+                            logger.info("setting sync_moment")
                             strategy.hybrid_configs["mp_configs"].sync_moment = True
-                            strategy.hybrid_configs["mp_configs"].sync_moment_name = [""]
+
                     except:
                         warnings.warn(
                             "The enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "

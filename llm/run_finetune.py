@@ -41,7 +41,14 @@ from paddlenlp.datasets import (
     load_dataset,
 )
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
-from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
+from paddlenlp.peft import (
+    LoRAConfig,
+    LoRAModel,
+    PrefixConfig,
+    PrefixModelForCausalLM,
+    VeRAConfig,
+    VeRAModel,
+)
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
@@ -492,6 +499,20 @@ def main():
             "rougel": rougel.score(),
             "bleu4": bleu4.score(),
         }
+
+    if model_args.vera:
+        target_modules = get_lora_target_modules(model)
+        vera_config = VeRAConfig(
+            target_modules=target_modules,
+            r=model_args.vera_rank,
+            vera_alpha=model_args.vera_rank,
+            dtype=dtype,
+            base_model_name_or_path=model_args.model_name_or_path,
+            pissa_init=True,
+        )
+        model = VeRAModel(model, vera_config)
+        model.mark_only_vera_as_trainable(notfreezeB=True)
+        model.print_trainable_parameters()
 
     # Create trainer
     max_length = (

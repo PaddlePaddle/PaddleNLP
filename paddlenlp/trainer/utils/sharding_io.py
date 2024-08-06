@@ -40,7 +40,7 @@ from paddlenlp.transformers.utils import paddlenlp_load
 from paddlenlp.utils.log import logger
 
 from . import reshard as reshard_util
-from .reshard import SHARDING_STRATEGY_V1, pp_reshard
+from .reshard import SHARDING_STRATEGY_V1, SHARDING_STRATEGY_V2, pp_reshard
 
 # Name of the files used for checkpointing
 TRAINING_ARGS_NAME = "training_args.bin"
@@ -204,9 +204,20 @@ class ShardingIO:
         path = os.path.join(checkpoint, optimizer_name)
         logger.info(f"load optimizer state from {path}")
         if os.path.isfile(path):
-            return paddlenlp_load(path, map_location="cpu")
+            return self._modify_ckpt_for_compatibility(paddlenlp_load(path, map_location="cpu"))
         logger.info(f"{path} not exists")
         return None
+
+    def _modify_ckpt_for_compatibility(self, ckpt):
+        master_weights = ckpt.get("master_weights", None)
+        if master_weights:
+            for k, v in master_weights.items():
+                assert isinstance(v, paddle.Tensor), v
+                if not v.name.startswith(k):
+                    new_name = k + "_fp32_master_0"
+                    logger.info(f"Modify master weights {v.name} -> {new_name}")
+                    v.name = new_name
+        return ckpt
 
     def _need_reshard(self, checkpoint):
         if self._need_reshard_pp(checkpoint):
@@ -253,10 +264,6 @@ class ShardingIO:
     def load_optimizer_state_with_reshard(self, checkpoint, base_opt_name, model_wrapped):
         """load state_dict of multiple shard from_checkpoint, Only load model state dict."""
 
-        if not self._need_reshard(checkpoint):
-            logger.info("do not need reshard")
-            return self._load_optimizer_state_of_one_shard(checkpoint, base_opt_name, self.args.optimizer_name_suffix)
-        logger.info("reshard optimizer state")
         parallel_config = self._load_distributed_strategy(checkpoint)
         sharding_meta = self._load_sharding_meta(checkpoint, 0)
         pp_degree = parallel_config["pp_degree"]
@@ -276,6 +283,26 @@ class ShardingIO:
         cur_sharding_degree = self.args.sharding_parallel_degree
         cur_sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
 
+        if not self._need_reshard(checkpoint):
+            one_shard_opt_state_dict = self._load_optimizer_state_of_one_shard(
+                checkpoint, base_opt_name, self.args.optimizer_name_suffix
+            )
+
+            if sharding_strategy == SHARDING_STRATEGY_V2 and cur_sharding_strategy == SHARDING_STRATEGY_V2:
+                is_matched = reshard_util.sharding_v2.is_matched_optimizer_state_dict(
+                    one_shard_opt_state_dict, self.optimizer, model_wrapped
+                )
+            else:
+                is_matched = True
+
+            if is_matched:
+                logger.info("do not need reshard")
+                return one_shard_opt_state_dict
+        else:
+            one_shard_opt_state_dict = None
+
+        logger.info("reshard optimizer state")
+
         def load_model_slices():
             model_state = reshard_util.NodeModelState()
             for j in range(self.args.pipeline_parallel_rank, pp_degree, cur_pp_degree):
@@ -283,9 +310,14 @@ class ShardingIO:
                 assert "structure_name_mapping" in cur_sharding_meta
                 structure_name_map = cur_sharding_meta["structure_name_mapping"]
                 for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
-                    tmp = self._load_optimizer_state_of_one_shard(
-                        checkpoint, base_opt_name, self.args.sharded_name_suffix(i, j)
-                    )
+                    sharded_name_suffix = self.args.sharded_name_suffix(i, j)
+                    if one_shard_opt_state_dict is None:
+                        tmp = self._load_optimizer_state_of_one_shard(checkpoint, base_opt_name, sharded_name_suffix)
+                    else:
+                        assert (
+                            self.args.optimizer_name_suffix == sharded_name_suffix
+                        ), f"{self.args.optimizer_name_suffix} vs {sharded_name_suffix}"
+                        tmp = one_shard_opt_state_dict
                     node_model_state_tmp = reshard_util.NodeModelState()
                     node_model_state_tmp.add_opts(tmp)
                     node_model_state_tmp.pack_keys(structure_name_map)

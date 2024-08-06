@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .lora import LoRAConfig, LoRAModel
-from .prefix import PrefixConfig, PrefixModelForCausalLM
-from .vera import VeRAConfig, VeRAModel
+from paddlenlp_ops import tune_cublaslt_gemm
+import paddle
+
+M_tensor = paddle.to_tensor([1024])
+K_tensor = paddle.to_tensor([1024, 2048])
+N_tensor = paddle.to_tensor([4096, 8192])
+
+Dtype = "int8"
+Path = "./search.csv"
+
+tune_cublaslt_gemm(M_tensor, K_tensor, N_tensor, Dtype, True, False, Path)

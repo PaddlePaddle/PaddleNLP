@@ -81,7 +81,7 @@ from ..data import (
     DistDataLoader,
     default_data_collator,
 )
-from ..peft import LoRAModel, PrefixModelForCausalLM
+from ..peft import LoRAModel, PrefixModelForCausalLM, VeRAModel
 
 try:
     from ..quantization.quantization_linear import QuantizationLinear
@@ -107,6 +107,7 @@ from ..utils.env import (
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
+    VERA_WEIGHTS_NAME,
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
@@ -194,7 +195,17 @@ async_save_queue = []
 g_cpu_optimizer_state_dict = {}
 
 
-def _save_func(obj, path, saved_signal_path, protocol):
+def _save_func(obj, name_mapping, path, saved_signal_path, protocol):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == "master_weights" and isinstance(v, dict):
+                for kk, vv in v.items():
+                    if isinstance(vv, paddle.Tensor):
+                        vv.name = name_mapping["master_weights"][kk]
+            else:
+                if k in name_mapping and isinstance(v, paddle.Tensor):
+                    v.name = name_mapping[k]
+
     paddle.save(obj, path, protocol)
     # dump savd_siganl
     with open(saved_signal_path, mode="w+") as f:
@@ -227,17 +238,18 @@ def clear_async_save_task_queue():
 def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol=4):
     global g_cpu_optimizer_state_dict
     g_cpu_optimizer_state_dict.clear()
+    name_mapping = {"master_weights": {}}
     for k, v in optimizer_state_dict.items():
         if k == "master_weights":
             g_cpu_optimizer_state_dict[k] = {}
             for kk, vv in v.items():
-                tensor_name = vv.name
                 g_cpu_optimizer_state_dict[k][kk] = vv.pin_memory()
-                g_cpu_optimizer_state_dict[k][kk].name = tensor_name
+                name_mapping[k][kk] = vv.name
         elif k == "LR_Scheduler":
             g_cpu_optimizer_state_dict[k] = copy.deepcopy(v)
         else:
             g_cpu_optimizer_state_dict[k] = v.pin_memory()
+            name_mapping[k] = v.name
         paddle.device.synchronize()
     clear_async_save_task_queue()
 
@@ -247,7 +259,9 @@ def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol
     def start_process():
         nonlocal attempt
         try:
-            p = ctx.Process(target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol))
+            p = ctx.Process(
+                target=_save_func, args=(g_cpu_optimizer_state_dict, name_mapping, path, saved_signal_path, protocol)
+            )
             p.start()
             return p
         except Exception as e:
@@ -433,7 +447,11 @@ class Trainer:
         if train_dataset is not None and not isinstance(train_dataset, collections.abc.Sized) and args.max_steps <= 0:
             raise ValueError("train_dataset does not implement __len__, max_steps has to be specified")
 
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+        if (
+            isinstance(self.model, LoRAModel)
+            or isinstance(self.model, PrefixModelForCausalLM)
+            or isinstance(self.model, VeRAModel)
+        ):
             if self.args.unified_checkpoint and "skip_save_model_weight" in self.args.unified_checkpoint_config:
                 self.args.unified_checkpoint_config.remove("skip_save_model_weight")
                 logger.warning(
@@ -572,6 +590,8 @@ class Trainer:
                 weights_file = os.path.join(resume_from_checkpoint, PREFIX_WEIGHTS_NAME)
                 if self.model.prefix_config.tensor_parallel_degree > 1:
                     convert_tp = True
+            elif isinstance(self.model, VeRAModel):
+                weights_file = os.path.join(resume_from_checkpoint, VERA_WEIGHTS_NAME)
             if self.args.dataset_rank == 0:
                 logger.info(f"Loading model from {resume_from_checkpoint} .")
 
@@ -626,7 +646,11 @@ class Trainer:
                     self.runtime_timer.stop()
                     return
 
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+        if (
+            isinstance(self.model, LoRAModel)
+            or isinstance(self.model, PrefixModelForCausalLM)
+            or isinstance(self.model, VeRAModel)
+        ):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
             self.runtime_timer.stop()
             return
@@ -737,11 +761,6 @@ class Trainer:
                     os.makedirs(resume_from_checkpoint, exist_ok=True)
                     logger.info(f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}")
 
-        # memory metrics - must set up as early as possible
-        self._memory_tracker.start()
-        if not self.args.should_load_sharding_stage1_model:
-            self._load_from_checkpoint(resume_from_checkpoint)
-
         train_dataloader = self.get_train_dataloader()
 
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
@@ -792,34 +811,43 @@ class Trainer:
 
         self.state = TrainerState()
 
-        if self.args.should_load_sharding_stage1_model:
-            model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
 
-        elif self.args.should_save_sharding_stage1_model:
-            # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
-            # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
-            model = self._wrap_model(self.model_wrapped)
-            if self.sharding_io is not None:
-                assert delay_optimizer_creation is False, "delay_optimizer_creation should be False"
-                # the self.optimizer should be wrapped and it is done in _wrap_model
-                self.sharding_io.set_optimizer(self.optimizer)
-            # for the rest of this function `model` is the outside model, whether it was wrapped or not
-            if model is not self.model:
-                self.model_wrapped = model
-            if delay_optimizer_creation:
-                self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-            self._load_optimizer_and_scheduler(resume_from_checkpoint)
+        if not self.args.enable_auto_parallel:
+            if not self.args.should_load_sharding_stage1_model:
+                self._load_from_checkpoint(resume_from_checkpoint)
+
+            if self.args.should_load_sharding_stage1_model:
+                model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
+
+            elif self.args.should_save_sharding_stage1_model:
+                # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
+                # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
+                model = self._wrap_model(self.model_wrapped)
+                if self.sharding_io is not None:
+                    assert delay_optimizer_creation is False, "delay_optimizer_creation should be False"
+                    # the self.optimizer should be wrapped and it is done in _wrap_model
+                    self.sharding_io.set_optimizer(self.optimizer)
+                # for the rest of this function `model` is the outside model, whether it was wrapped or not
+                if model is not self.model:
+                    self.model_wrapped = model
+                if delay_optimizer_creation:
+                    self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+                self._load_optimizer_and_scheduler(resume_from_checkpoint)
+            else:
+                model = self._wrap_model(self.model_wrapped)
+                # for the rest of this function `model` is the outside model, whether it was wrapped or not
+                if model is not self.model:
+                    self.model_wrapped = model
+                if delay_optimizer_creation:
+                    self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+                self._load_optimizer_and_scheduler(resume_from_checkpoint)
         else:
-            model = self._wrap_model(self.model_wrapped)
-            # for the rest of this function `model` is the outside model, whether it was wrapped or not
-            if model is not self.model:
-                self.model_wrapped = model
-            if delay_optimizer_creation:
-                self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-            self._load_optimizer_and_scheduler(resume_from_checkpoint)
+            model = self.model_wrapped
+            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
         logger.info(f"{self.runtime_timer.log()}")
-
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
         logger.info(f"  Num Epochs = {num_train_epochs}")
@@ -1148,7 +1176,7 @@ class Trainer:
                     if optimizer_was_run:
                         self.lr_scheduler.step()
 
-                    if enable_release_grads:
+                    if args.release_grads or enable_release_grads:
                         self.optimizer.clear_grad(set_to_zero=False)
                         if args.pipeline_parallel_degree > 1:
                             for _, buffers in model._chunk_2_comm_buffers.items():
@@ -2520,7 +2548,11 @@ class Trainer:
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
         # peft model
-        if isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
+        if (
+            isinstance(self.model, LoRAModel)
+            or isinstance(self.model, PrefixModelForCausalLM)
+            or isinstance(self.model, VeRAModel)
+        ):
             self.model.save_pretrained(
                 output_dir,
                 variant=self.args.weight_name_suffix,
@@ -2652,7 +2684,9 @@ class Trainer:
             dist.barrier()
         if self.args.use_expert_parallel:
             opt_state_dict = broadcast_moe_optimizer(
-                opt_state_dict, broadcast_dp=not self.args.should_load_sharding_stage1_model
+                opt_state_dict,
+                model_state_dict=self.model.state_dict(),
+                broadcast_dp=not self.args.should_load_sharding_stage1_model,
             )
         else:
             if not self.args.should_load_sharding_stage1_model:

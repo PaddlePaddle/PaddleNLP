@@ -49,6 +49,7 @@ except:
 MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
 DIST_CKPT_PATH = "dist_ckpt"
+FREE_SVAE_LOAD_KEY_PATTERNS = ["learning_rate_", "gradient_merge_", "@GRAD@MERG", "eager_tmp"]
 
 
 class AutoTrainer(Trainer):
@@ -122,12 +123,10 @@ class AutoTrainer(Trainer):
         if self.args.to_static:
             unified_strategy = dist.Strategy()
             unified_strategy._from_legacy_strategy(self.args.strategy)
-            return (
-                dist.to_static(model, dist_loader, self.criterion, self.optimizer, strategy=unified_strategy),
-                dist_loader,
-            )
-        else:
-            return model, dist_loader
+            model = dist.to_static(model, dist_loader, self.criterion, self.optimizer, strategy=unified_strategy)
+
+        self.model_wrapped = model
+        return model, dist_loader
 
     def _wrap_amp_model(self, args, model):
         logger.info("Using half precision")
@@ -216,7 +215,6 @@ class AutoTrainer(Trainer):
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
                 steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
-                steps_trained_in_current_epoch *= args.gradient_accumulation_steps
             else:
                 steps_trained_in_current_epoch = 0
 
@@ -268,6 +266,9 @@ class AutoTrainer(Trainer):
 
         model, dist_loader = self._wrap_for_auto(model, train_dataloader)
         train_dataloader = dist_loader()
+
+        if resume_from_checkpoint is not None:
+            self._load_from_checkpoint(resume_from_checkpoint)
 
         self.timers and self.timers("read-data").start()
 
@@ -542,14 +543,34 @@ class AutoTrainer(Trainer):
             logger.info(f"Saving checkpoinit files into {output_dir}")
 
             if self.args.should_save_model_state:
+                if self.args.to_static:
+                    opt_state_dict = {
+                        key: value
+                        for key, value in model.state_dict("opt").items()
+                        if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
+                    }
+                    state_dict = {
+                        MODEL_NAME: model.state_dict("param"),
+                        OPTIMIZER_NAME: opt_state_dict,
+                    }
+                else:
+                    optim_state_dict = self.optimizer.state_dict()
+                    optim_state_dict.pop("LR_Scheduler", None)
+                    opt_state_keys = ["_moment1_0", "_moment2_0", "_beta1_pow_acc_0", "_beta2_pow_acc_0"]
+                    for p_name, p in model.state_dict().items():
+                        if paddle.distributed.get_rank() not in p.process_mesh.process_ids:
+                            var_name = p.name
+                            for key in opt_state_keys:
+                                if (
+                                    var_name + key in optim_state_dict
+                                    and not optim_state_dict[var_name + key].is_dist()
+                                ):
+                                    optim_state_dict.pop(var_name + key)
 
-                optim_state_dict = self.optimizer.state_dict()
-                optim_state_dict.pop("LR_Scheduler", None)
-
-                state_dict = {
-                    MODEL_NAME: self.model.state_dict(),
-                    OPTIMIZER_NAME: optim_state_dict,
-                }
+                    state_dict = {
+                        MODEL_NAME: model.state_dict(),
+                        OPTIMIZER_NAME: optim_state_dict,
+                    }
 
                 self._save_ckpt_func(state_dict, os.path.join(output_dir, DIST_CKPT_PATH))
                 logger.info(f"Model weights and optimizer states saved in {output_dir}/{DIST_CKPT_PATH}")
@@ -584,13 +605,9 @@ class AutoTrainer(Trainer):
         rng_states = {
             "python": random.getstate(),
             "numpy": np.random.get_state(),
-            "cuda": [k.current_seed() for k in paddle.get_rng_state()],
-            "cpu": paddle.framework.core.default_cpu_generator().get_state().current_seed(),
+            "cuda": paddle.get_rng_state(),
+            "cpu": paddle.framework.core.default_cpu_generator().get_state(),
         }
-        # if self.args.use_hybrid_parallel:
-        #     rng_states[
-        #         "hybrid_parallel_rng_state_tracker"
-        #     ] = fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()
 
         if self.args.world_size > 1:
             rng_states_list = []
@@ -660,15 +677,31 @@ class AutoTrainer(Trainer):
             if not os.path.isdir(ckpt_path):
                 raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
 
-            optim_state_dict = self.optimizer.state_dict()
-            optim_state_dict.pop("LR_Scheduler", None)
+            if self.args.to_static:
+                opt_state_dict = {
+                    key: value
+                    for key, value in self.model_wrapped.state_dict("opt").items()
+                    if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
+                }
+                state_dict = {
+                    MODEL_NAME: self.model_wrapped.state_dict("param"),
+                    OPTIMIZER_NAME: opt_state_dict,
+                }
+            else:
+                model_state_dict = self.model_wrapped.state_dict()
+                optim_state_dict = self.optimizer.state_dict()
+                optim_state_dict.pop("LR_Scheduler", None)
+                if len(optim_state_dict) == 0:
+                    self.optimizer._create_accumulators(
+                        paddle.base.framework.default_main_program().global_block(), self.optimizer._parameter_list
+                    )
+                    optim_state_dict = self.optimizer.state_dict()
+                    optim_state_dict.pop("LR_Scheduler", None)
 
-            state_dict = {
-                MODEL_NAME: self.model.state_dict(),
-                OPTIMIZER_NAME: optim_state_dict,
-            }
-
-            print("state_dict :", state_dict)
+                state_dict = {
+                    MODEL_NAME: model_state_dict,
+                    OPTIMIZER_NAME: optim_state_dict,
+                }
 
             self._load_ckpt_func(state_dict, ckpt_path)
 
