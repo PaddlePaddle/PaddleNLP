@@ -32,6 +32,7 @@ from paddlenlp.trainer.trainer_utils import ExplicitEnum
 from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
+    _add_variant,
     _load_state_dict_into_model,
     faster_set_state_dict,
     get_parameter_dtype,
@@ -127,6 +128,11 @@ class UnifiedCheckpointHandler:
         self._meta_dict_model = None
         self._meta_dict_mw = None
         self._meta_dict_optim = None
+        self._process = None
+        self._lock = multiprocessing.Lock()
+        self._shared_save_flag = multiprocessing.Value("i", 0)
+        self._shared_save_path = multiprocessing.Array("c", 1000000)
+        self._shared_signal_path = multiprocessing.Array("c", 1000000)
 
     def _file_save_async_or_sync(self, state_dict, path, saved_signal_path=None, is_sync=True, type="model_weight"):
         if is_sync:
@@ -154,24 +160,61 @@ class UnifiedCheckpointHandler:
                 shm_state_dict = self._shm_optimizer_weight
                 meta_dict = self._meta_dict_optim
 
-            _traverse_copy_to_shm(state_dict, meta_dict, shm_state_dict.buf)
-            ctx = multiprocessing.get_context("spawn")
-            p = ctx.Process(
-                target=self._save_file_async_in_process, args=(meta_dict, shm_state_dict.name, path, saved_signal_path)
-            )
-            logger.info(f"Start to async save {path}")
-            p.start()
-            async_save_queue.append(p)
+            if self._process is None:
+                ctx = multiprocessing.get_context("spawn")
+                self._process = ctx.Process(
+                    target=self._save_file_async_in_process,
+                    args=(
+                        meta_dict,
+                        shm_state_dict.name,
+                        self._shared_save_flag,
+                        self._shared_save_path,
+                        self._shared_signal_path,
+                        self._lock,
+                    ),
+                )
+                self._process.start()
 
-    def _save_file_async_in_process(self, meta_dict, shm_name, path, saved_signal_path):
-        shm = shared_memory.SharedMemory(name=shm_name)
-        state_dict = _read_state_dict_from_shm(meta_dict, shm)  # numpy array
-        safe_save_file(state_dict, path, {"format": "np"})
-        with open(saved_signal_path, mode="a+") as f:
-            f.write(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())))
-            f.write("\n")
-        del state_dict
-        shm.close()
+            while True:  # wait until no process is saving.
+                if self._shared_save_flag.value == 0:
+                    break
+            with self._lock:
+                self._reset_and_update(self._shared_save_path, path)
+                if saved_signal_path is not None:
+                    self._reset_and_update(self._shared_signal_path, saved_signal_path)
+                _traverse_copy_to_shm(state_dict, meta_dict, shm_state_dict.buf)
+                self._shared_save_flag.value = 1
+
+    def _save_file_async_in_process(
+        self, meta_dict, shm_name, shared_save_flag, shared_save_path, shared_signal_path, lock
+    ):
+        while True:
+            if shared_save_flag.value == -1:  # stop process
+                break
+            if shared_save_flag.value == 0:
+                continue
+            if shared_save_flag.value == 1:  # need to save
+                with lock:
+                    path = shared_save_path[:].decode("utf-8").rstrip("\x00")
+                    saved_signal_path = shared_signal_path[:].decode("utf-8").rstrip("\x00")
+                    logger.info(f"Start to async save {path}")
+                    shm = shared_memory.SharedMemory(name=shm_name)
+                    state_dict = _read_state_dict_from_shm(meta_dict, shm)  # numpy array
+                    safe_save_file(state_dict, path, {"format": "np"})
+                    shared_save_flag.value = 0
+                with open(saved_signal_path, mode="a+") as f:
+                    f.write(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())))
+                    f.write("\n")
+                del state_dict
+                shm.close()
+
+    def _reset_and_update(self, shared_array, new_value):
+        # clear array
+        for i in range(len(shared_array)):
+            shared_array[i] = b"\0"
+        # update array
+        encoded_value = new_value.encode("utf-8")
+        shared_array[: len(encoded_value)] = encoded_value
 
     def save_unified_checkpoint(self, model, optimizer, output_dir):
         """save unified checkpoint
@@ -213,12 +256,16 @@ class UnifiedCheckpointHandler:
 
         # save model weights
         if not skip_save_model_weight:
+            s = time.time()
             state_dict, shard_file, sharded_index = unified_checkpoint_into_shards(
                 self.args, model_to_save, safe_serialization=True
             )
+            e = time.time()
+            print(f"merge model tp: {e - s}s")
             is_sync_save = True
             if "async_save" in self.args.unified_checkpoint_config or self.args.use_async_save:
                 is_sync_save = False
+            s = time.time()
             clear_async_save_task_queue()
             self._file_save_async_or_sync(
                 state_dict,
@@ -227,6 +274,9 @@ class UnifiedCheckpointHandler:
                 is_sync=is_sync_save,
                 type="model_weight",
             )
+            e = time.time()
+            print(f"create async process and copy share memory: {e - s}s")
+            s = time.time()
             if sharded_index is not None:
                 if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
                     index_name = SAFE_PEFT_WEIGHTS_INDEX_NAME
@@ -237,7 +287,10 @@ class UnifiedCheckpointHandler:
                 if self.args.should_save:
                     with open(path, "w") as f:
                         json.dump(sharded_index, f, indent=4)
+            e = time.time()
+            print(f"save safetensors json: {e - s}s")
 
+        s = time.time()
         if self.args.should_save:
             # Save prefix model past_key_values
             if isinstance(model_to_save, PrefixModelForCausalLM):
@@ -253,6 +306,8 @@ class UnifiedCheckpointHandler:
         if self.args.should_save:
             config_to_save.save_pretrained(save_directory)
         paddle.device.cuda.empty_cache()
+        e = time.time()
+        print(f"save model config: {e - s}s")
 
     def load_unified_checkpoint(self, model, optimizer, resume_from_checkpoint: str):
         """Load potential model checkpoint
@@ -280,6 +335,66 @@ class UnifiedCheckpointHandler:
         if self.args.dataset_rank == 0:
             load_unified_checkpoint_locally(self.args, model, resume_from_checkpoint, safe_serialization=True)
 
+    def save_non_merge_optimizer(self, model, optimizer, output_dir):
+        s = time.time()
+        paddle.device.cuda.empty_cache()
+        optim_state_dict = nested_copy(optimizer.state_dict())
+        master_weights = None
+        if "master_weights" in optim_state_dict.keys():
+            master_weights = optim_state_dict["master_weights"]
+            optim_state_dict.pop("master_weights")
+        if "LR_Scheduler" in optim_state_dict.keys():
+            optim_state_dict.pop("LR_Scheduler")
+
+        # gather global master_weights status.
+        global_master_weights = reduce_master_weights_status(master_weights is not None)
+        if master_weights is None and global_master_weights:
+            master_weights = {}
+
+        # get optimizer param mappings
+        static2struct_name_mappings = {}
+        state_dict = get_expected_state_dict(model)
+        for k, v in state_dict.items():
+            static2struct_name_mappings[v.name] = k
+
+        # rename optimizer param name
+        for key in list(optim_state_dict.keys()):
+            static_name, type_name = generate_base_static_name(key)
+            new_name = static2struct_name_mappings[static_name] + "/" + type_name
+            optim_state_dict[new_name] = optim_state_dict.pop(key)
+        if master_weights is not None:
+            for key in list(master_weights.keys()):
+                master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
+
+        optimizer_name = _add_variant(SAFE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+        master_weights_name = _add_variant(SAFE_MASTER_WEIGHTS_NAME, self.args.optimizer_name_suffix)
+        e = time.time()
+        print(f"rename optimizer name: {e - s}s")
+
+        is_sync_save = True
+        if "async_save" in self.args.unified_checkpoint_config or self.args.use_async_save:
+            is_sync_save = False
+        s = time.time()
+        self._file_save_async_or_sync(
+            optim_state_dict,
+            path=os.path.join(output_dir, optimizer_name),
+            saved_signal_path=os.path.join(output_dir, f"saved_signal_{dist.get_rank()}"),
+            is_sync=is_sync_save,
+            type="optimizer_weight",
+        )
+        e = time.time()
+        print(f"create optimizer async process and share memory: {e-s} s")
+        s = time.time()
+        self._file_save_async_or_sync(
+            master_weights,
+            path=os.path.join(output_dir, master_weights_name),
+            saved_signal_path=os.path.join(output_dir, f"saved_signal_{dist.get_rank()}"),
+            is_sync=is_sync_save,
+            type="master_weight",
+        )
+        e = time.time()
+        print(f"create master weight async process and share memory: {e-s} s")
+
     def save_unified_optimizer(self, model, optimizer, output_dir):
         """save unified optimizer
 
@@ -289,6 +404,11 @@ class UnifiedCheckpointHandler:
             output_dir (str): Save directory.
 
         """
+
+        if "ignore_merge_optimizer" in self.args.unified_checkpoint_config:
+            self.save_non_merge_optimizer(model, optimizer, output_dir)
+            return
+
         if paddle.distributed.get_world_size() <= 1:
             self.save_single_card_optimizer(model, optimizer, output_dir)
             return
