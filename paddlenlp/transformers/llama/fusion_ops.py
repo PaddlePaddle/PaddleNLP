@@ -34,7 +34,7 @@ except ImportError:
 
 from paddle.utils import try_import
 
-from paddlenlp.utils.tools import get_env_device
+from paddlenlp.device import get_env_device
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding

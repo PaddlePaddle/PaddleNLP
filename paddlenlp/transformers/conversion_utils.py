@@ -37,6 +37,7 @@ from numpy import allclose, ndarray, transpose
 from paddle import Tensor
 from paddle.nn import Layer
 
+from paddlenlp.device import get_env_device
 from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
 from paddlenlp.utils.env import CONFIG_NAME, PADDLE_WEIGHTS_NAME, PYTORCH_WEIGHTS_NAME
 from paddlenlp.utils.import_utils import (
@@ -46,7 +47,6 @@ from paddlenlp.utils.import_utils import (
 )
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.serialization import load_torch
-from paddlenlp.utils.tools import get_env_device
 
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedConfig, PretrainedModel

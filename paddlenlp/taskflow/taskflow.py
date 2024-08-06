@@ -17,7 +17,7 @@ import threading
 
 import paddle
 
-from ..utils.tools import get_env_device
+from ..device import get_env_device
 from .code_generation import CodeGenerationTask
 from .dependency_parsing import DDParserTask
 from .dialogue import DialogueTask

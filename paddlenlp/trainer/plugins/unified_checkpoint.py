@@ -25,6 +25,7 @@ import paddle.distributed as dist
 from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
+from paddlenlp.device import get_env_device
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.trainer.trainer_utils import ExplicitEnum
 from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
@@ -65,7 +66,6 @@ from paddlenlp.utils.env import (
 )
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.nested import nested_copy, nested_copy_place
-from paddlenlp.utils.tools import get_env_device
 
 if is_safetensors_available():
     from safetensors.numpy import save_file as safe_save_file

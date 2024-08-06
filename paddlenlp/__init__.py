@@ -40,6 +40,7 @@ from . import (
     data,
     dataaug,
     datasets,
+    device,
     embeddings,
     experimental,
     layers,

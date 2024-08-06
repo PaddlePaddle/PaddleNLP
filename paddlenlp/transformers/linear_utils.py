@@ -24,11 +24,11 @@ try:
 except:
     sequence_parallel_utils = None
 
+from paddlenlp.device import get_env_device
 from paddlenlp.transformers.mc2_parallel_linear import (
     MC2ColumnSeqParallelLinear,
     MC2RowSeqParallelLinear,
 )
-from paddlenlp.utils.tools import get_env_device
 
 Linear = nn.Linear
 ColumnParallelLinear = mpu.ColumnParallelLinear
