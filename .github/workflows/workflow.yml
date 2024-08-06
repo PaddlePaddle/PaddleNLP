@@ -1,0 +1,10 @@
+steps:
+- uses: actions/checkout@main
+- uses: codecov/codecov-action@v4.5.0
+  with:
+    fail_ci_if_error: true # optional (default = false)
+    files: ./coverage1.xml,./coverage2.xml # optional
+    flags: unittests # optional
+    name: paddlenlp-guangyun # optional
+    token: 9216cd63-5964-4528-81ad-ff5cc7f7180a # required
+    verbose: true # optional (default = false)
