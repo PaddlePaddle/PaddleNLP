@@ -1,21 +1,21 @@
 exclude: 'legacy/model_zoo/gpt-3'
 repos:
 # For Python files
--   repo: https://github.com/psf/black.git
+-   repo: git@github.com:psf/black.git
     rev: 22.8.0
     hooks:
     -   id: black
         files: \.(py|pyi)$
         additional_dependencies: [toml]
--   repo: https://github.com/PyCQA/isort
+-   repo: git@github.com:PyCQA/isort
     rev: 5.11.5
     hooks:
     -   id: isort
--   repo: https://github.com/PyCQA/flake8
+-   repo: git@github.com:PyCQA/flake8
     rev: 4.0.1
     hooks:
     -   id: flake8
--   repo: https://github.com/pre-commit/pre-commit-hooks
+-   repo: git@github.com:pre-commit/pre-commit-hooks
     rev: v4.1.0
     hooks:
     -   id: check-merge-conflict
@@ -26,7 +26,7 @@ repos:
         files: \.md$
     -   id: trailing-whitespace
         files: \.md$
--   repo: https://github.com/Lucas-C/pre-commit-hooks
+-   repo: git@github.com:Lucas-C/pre-commit-hooks
     rev: v1.1.14
     hooks:
     -   id: forbid-crlf

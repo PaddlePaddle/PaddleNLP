@@ -24,15 +24,16 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerA8W8,
     FusedBlockMultiTransformerWeightOnly,
-    FusedMultiTransformerBase,
     FusedMultiTransformerA8W8,
+    FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
-    GenerationInferenceModel,
     GenerationBlockInferenceModel,
+    GenerationInferenceModel,
 )
+from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
 from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2PretrainedModel
 from paddlenlp.transformers.chatglm_v2.modeling import (
     Embedding,
@@ -43,12 +44,8 @@ from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
     register_base_model,
 )
-from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
 
-__all__ = [
-    "ChatGLMv2ForCausalLMInferenceModel",
-    "ChatGLMv2ForCausalLMBlockInferenceModel"
-]
+__all__ = ["ChatGLMv2ForCausalLMInferenceModel", "ChatGLMv2ForCausalLMBlockInferenceModel"]
 
 
 @register_base_model
@@ -462,9 +459,7 @@ class ChatGLMv2ForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMv2Pret
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
-    def get_cache_kvs_shape(
-        cls, config: ChatGLMv2Config, max_batch_size: int = None, max_length: int = None
-    ):
+    def get_cache_kvs_shape(cls, config: ChatGLMv2Config, max_batch_size: int = None, max_length: int = None):
         """get cache_kvs tensor for opt model
 
         Args:
@@ -588,9 +583,7 @@ class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Cha
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
-    def get_cache_kvs_shape(
-        cls, config: ChatGLMv2Config, max_batch_size: int = None, max_length: int = None
-    ):
+    def get_cache_kvs_shape(cls, config: ChatGLMv2Config, max_batch_size: int = None, max_length: int = None):
         """get cache_kvs tensor for chatglmv2 model
 
         Args:
@@ -617,7 +610,7 @@ class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Cha
             cache_kvs.append(cache_kv_shape)
             cache_kvs.append(cache_kv_shape)
         return cache_kvs
-    
+
     def prepare_inputs_for_generation(self, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
         input_ids = kwargs["input_ids"]
@@ -651,7 +644,7 @@ class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Cha
             "v_dequant_scales": v_dequant_scales,
         }
         return model_inputs
-    
+
     def forward(
         self,
         input_ids,
@@ -689,7 +682,7 @@ class ChatGLMv2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Cha
         output = (lm_logits,) + outputs[1:]
 
         return output
-    
+
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         self.chatglm_v2.set_state_dict(state_dict)

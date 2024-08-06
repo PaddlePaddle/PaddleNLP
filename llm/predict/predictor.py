@@ -28,6 +28,7 @@ import paddle.distributed.fleet.base.topology as tp
 import paddle.incubate.multiprocessing as mp
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
 from paddle.distributed import fleet
+
 from llm.utils.utils import (
     dybatch_preprocess,
     get_alibi_slopes,
@@ -40,7 +41,6 @@ from llm.utils.utils import (
     load_real_time_tokens,
     read_res,
 )
-
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
