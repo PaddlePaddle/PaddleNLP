@@ -458,7 +458,6 @@ def main():
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
-
     # Config for model using dropout, such as GPT.
     config.hidden_dropout_prob = model_args.hidden_dropout_prob
     config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
@@ -589,7 +588,7 @@ def main():
         test_ret = trainer.predict(test_dataset)
         trainer.log_metrics("test", test_ret.metrics)
 
-    if training_args.should_load_dataset:
+    if training_args.do_train and training_args.should_load_dataset:
         effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
         print(f"Effective Tokens per second: {effective_tokens_per_second:.2f}")
         print(f"ips: {effective_tokens_per_second:.2f} tokens/s")
