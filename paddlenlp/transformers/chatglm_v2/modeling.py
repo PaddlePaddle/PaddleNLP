@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import map_structure
 
@@ -37,6 +38,27 @@ __all__ = [
     "ChatGLMv2PretrainedModel",
     "ChatGLMv2ForCausalLM",
 ]
+
+
+def parallel_matmul(lm_output, logit_weights, parallel_output):
+    hcg = fleet.get_hybrid_communicate_group()
+    model_parallel_group = hcg.get_model_parallel_group()
+    world_size = hcg.get_model_parallel_world_size()
+
+    if world_size > 1:
+        # _c_identity is backwards is reduce
+        input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
+
+        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
+
+        if parallel_output:
+            return logits
+
+        # _c_concat has not grad backwards
+        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+    else:
+        logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+        return logits
 
 
 class RotaryEmbedding(nn.Layer):
@@ -222,13 +244,25 @@ class SelfAttention(nn.Layer):
         self.multi_query_group_num = config.multi_query_group_num
         self.num_attention_heads_per_partition = config.num_attention_heads
 
-        self.query_key_value = nn.Linear(
+        if config.tensor_parallel_degree > 1:
+            self.query_key_value = fleet.meta_parallel.ColumnParallelLinear(
+                config.hidden_size,
+                config.hidden_size + 2 * self.hidden_size_per_attention_head * config.multi_query_group_num,
+                has_bias=True,
+                gather_output=False
+            )
+            self.dense = fleet.meta_parallel.RowParallelLinear(
+                config.hidden_size, config.hidden_size, input_is_parallel=True, has_bias=True
+            )
+            self.num_attention_heads_per_partition = config.num_attention_heads // config.tensor_parallel_degree
+        else:
+            self.query_key_value = nn.Linear(
             config.hidden_size,
             config.hidden_size + 2 * self.hidden_size_per_attention_head * config.multi_query_group_num,
             bias_attr=config.add_bias_linear or config.add_qkv_bias,
-        )
-        # Output.
-        self.dense = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=config.add_bias_linear)
+            )
+            # Output.
+            self.dense = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=config.add_bias_linear)
 
     def forward(self, hidden_states, attention_mask, rotary_pos_emb, kv_cache=None, use_cache=True):
         seq_length, batch_size, hidden_size = hidden_states.shape
@@ -302,14 +336,22 @@ class MLP(nn.Layer):
 
         self.add_bias = config.add_bias_linear
 
-        # Project to 4h due to swiglu doubling the output width, see https://arxiv.org/pdf/2002.05202.pdf
-        self.dense_h_to_4h = nn.Linear(config.hidden_size, config.ffn_hidden_size * 2, bias_attr=self.add_bias)
-        # Project back to h.
-        self.dense_4h_to_h = nn.Linear(
-            config.ffn_hidden_size,
-            config.hidden_size,
-            bias_attr=self.add_bias,
-        )
+        if config.tensor_parallel_degree > 1:
+            self.dense_h_to_4h = fleet.meta_parallel.ColumnParallelLinear(
+                config.hidden_size, config.ffn_hidden_size * 2, has_bias=True, gather_output=False
+            )
+            self.dense_4h_to_h = fleet.meta_parallel.RowParallelLinear(
+                config.ffn_hidden_size, config.hidden_size, input_is_parallel=True, has_bias=True
+            )
+        else:
+            # Project to 4h due to swiglu doubling the output width, see https://arxiv.org/pdf/2002.05202.pdf
+            self.dense_h_to_4h = nn.Linear(config.hidden_size, config.ffn_hidden_size * 2, bias_attr=self.add_bias)
+            # Project back to h.
+            self.dense_4h_to_h = nn.Linear(
+                config.ffn_hidden_size,
+                config.hidden_size,
+                bias_attr=self.add_bias,
+            )
 
     def forward(self, hidden_states):
         # [s, b, 4hp]
@@ -546,6 +588,10 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
 
         return casual_mask
 
+    def init_weights(self, layer):
+        """Initialization hook"""
+        return None
+
     def get_position_ids(self, input_ids):
         batch_size, seq_length = input_ids.shape
         position_ids = paddle.arange(seq_length, dtype="int64").unsqueeze(0).tile([batch_size, 1])
@@ -618,6 +664,42 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
         init_name_mappings(mappings)
         return [StateDictNameMapping(*mapping) for mapping in mappings]
 
+    @classmethod
+    def _get_tensor_parallel_mappings(cls, config, is_split=True):
+
+        from paddlenlp.transformers.conversion_utils import split_or_merge_func
+
+        fn = split_or_merge_func(
+            is_split=is_split,
+            tensor_parallel_degree=config.tensor_parallel_degree,
+            tensor_parallel_rank=config.tensor_parallel_rank,
+            num_attention_heads=config.num_attention_heads,
+        )
+        
+        def get_tensor_parallel_split_mappings(num_hidden_layers):
+            final_actions = {}
+            base_actions = {
+                # Column Linear
+                "transformer.layers.0.mlp.dense_h_to_4h.bias": partial(fn, is_column=True),
+                "transformer.layers.0.mlp.dense_h_to_4h.weight": partial(fn, is_column=True),
+                "transformer.layers.0.attention.query_key_value.bias": partial(fn, is_column=True),
+                "transformer.layers.0.attention.query_key_value.weight": partial(fn, is_column=True),
+                # Row Linear
+                "transformer.word_embeddings.weight": partial(fn, is_column=False),
+                "transformer.layers.0.attention.dense.weight": partial(fn, is_column=False),
+                "transformer.layers.0.mlp.dense_4h_to_h.weight": partial(fn, is_column=False),
+            }
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(num_hidden_layers):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                final_actions[key] = action
+
+            return final_actions
+
+        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
+
+        return mappings
 
 class Embedding(nn.Layer):
     """Language model embeddings."""
@@ -626,7 +708,13 @@ class Embedding(nn.Layer):
         super(Embedding, self).__init__()
 
         self.hidden_size = config.hidden_size
-        self.word_embeddings = nn.Embedding(config.padded_vocab_size, self.hidden_size)
+        if self.config.tensor_parallel_degree > 1:
+            self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
+                config.padded_vocab_size,
+                self.hidden_size
+            )
+        else:
+            self.word_embeddings = nn.Embedding(config.padded_vocab_size, self.hidden_size)
         self.fp32_residual_connection = config.fp32_residual_connection
 
     def forward(self, input_ids):
@@ -662,7 +750,10 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         else:
             self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2)
         self.encoder = GLMTransformer(config)
-        self.output_layer = nn.Linear(config.hidden_size, config.padded_vocab_size, bias_attr=False)
+        # if self.config.tensor_parallel_degree > 1:
+        #     self.output_layer = parallel_matmul(config.hidden_size,config.padded_vocab_size,config.tensor_parallel_output)
+        # self.output_layer = nn.Linear(config.hidden_size, config.padded_vocab_size, bias_attr=False)
+        self.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.embedding.word_embeddings
@@ -730,11 +821,31 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         )
 
 
+class ChatGLMv2Head(nn.Layer):
+    def __init__(self, config,embedding_weights=None):
+        super(ChatGLM2Head, self).__init__()
+        self.decoder_weight = (
+            self.create_parameter(shape=[config.vocab_size, config.hidden_size], dtype=paddle.get_default_dtype())
+            if embedding_weights is None
+            embedding_weights
+        )
+        self.config = config
+    
+    def forward(self, hidden_states):
+        if self.config.tensor_parallel_degree > 1:
+            logits = parallel_matmul(hidden_states,self.decoder_weight, self.config.tensor_parallel_output)
+        else:
+            logits = F.linear(hidden_states, self.decoder_weight.T)
+        return logits
+
+
 class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
-    def __init__(self, config: ChatGLMv2Config):
+    def __init__(self, config: ChatGLMv2Config): 
         super().__init__(config)
         self.max_sequence_length = config.max_sequence_length
         self.chatglm_v2 = ChatGLMv2Model(config)
+
+        self.lm_head = ChatGLMv2Head(config, self.chatglm_v2.embedding.word_embeddings.weight)
 
     def reorder_cache(self, cache: paddle.Tensor, beam_idx):
         cache = map_structure(lambda x: paddle.index_select(x, beam_idx, axis=1), cache)
@@ -828,15 +939,18 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
 
         if return_last_logit:
             hidden_states = hidden_states[-1:]
-        lm_logits = self.chatglm_v2.output_layer(hidden_states)
+        # lm_logits = self.chatglm_v2.output_layer(hidden_states)
+        lm_logits = self.lm_head(hidden_states)
         lm_logits = lm_logits.transpose([1, 0, 2])
 
         loss = None
         if labels is not None:
             reshaped_logits = lm_logits.reshape([-1, lm_logits.shape[-1]]).astype("float32")
             reshaped_labels = labels.reshape([-1])
-
-            loss_fn = nn.CrossEntropyLoss(reduction="none")
+            if self.config.tensor_parallel_degree > 1 and self.config.tensor_parallel_output:
+                loss_fn = fleet.meta_parallel.ParallelCrossEntropy()
+            else:
+                loss_fn = nn.CrossEntropyLoss(reduction="none")
 
             loss_mask = (labels != -100).astype("float32")
             loss = loss_fn(reshaped_logits, reshaped_labels)

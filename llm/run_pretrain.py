@@ -414,16 +414,15 @@ def main():
     # set all llm config
     LlmMetaConfig.set_llm_config(config, training_args)
     config.use_fast_layer_norm = model_args.use_fast_layer_norm
-
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
     if not model_args.continue_training:
-        config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
+        # config.max_position_embeddings = max(config.max_position_embeddings, data_args.max_seq_length)
+        # logger.info(f"Reset max_position_embeddings to {config.max_position_embeddings} for new model.")
 
-    if not model_args.continue_training:
         config.vocab_size = max(config.vocab_size, ((tokenizer.vocab_size - 1) // 128 + 1) * 128)
         logger.info(f"Reset vocab size to {config.vocab_size} for batter amp peformance.")
-
+        
     config.num_hidden_layers = (
         model_args.num_hidden_layers if model_args.num_hidden_layers is not None else config.num_hidden_layers
     )

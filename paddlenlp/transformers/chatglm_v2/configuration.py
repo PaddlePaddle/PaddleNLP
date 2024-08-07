@@ -37,7 +37,8 @@ class ChatGLMv2Config(PretrainedConfig):
         ffn_hidden_size=13696,
         kv_channels=128,
         num_attention_heads=32,
-        max_sequence_length=2048,
+        max_position_embeddings=2048,
+        max_sequence_length=512,
         hidden_dropout=0.0,
         attention_dropout=0.0,
         layernorm_epsilon=1e-5,
@@ -68,6 +69,7 @@ class ChatGLMv2Config(PretrainedConfig):
         self.ffn_hidden_size = ffn_hidden_size
         self.kv_channels = kv_channels
         self.num_attention_heads = num_attention_heads
+        self.max_position_embeddings = max_position_embeddings
         self.max_sequence_length = max_sequence_length
         self.hidden_dropout = hidden_dropout
         self.attention_dropout = attention_dropout
@@ -88,3 +90,10 @@ class ChatGLMv2Config(PretrainedConfig):
         self.long_sequence_strategy_name = long_sequence_strategy_name
         self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
         self.use_long_sequence_strategies = use_long_sequence_strategies
+    @property
+    def max_position_embeddings(self):
+        return self.padded_vocab_size
+    #set 方法
+    @max_position_embeddings.setter
+    def max_position_embeddings(self, value):
+        self.padded_vocab_size = value
