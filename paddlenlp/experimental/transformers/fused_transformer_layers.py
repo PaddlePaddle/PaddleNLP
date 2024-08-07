@@ -153,7 +153,7 @@ class FusedMultiTransformerConfig:
         embed_dim,
         num_heads,
         dim_feedforward,
-        weight_only_quant_bits=-1,  # -1 means use Half precision.
+        quant_type="",
         dropout_rate=0.0,
         activation="gelu",
         norm_type="layernorm",
@@ -197,7 +197,7 @@ class FusedMultiTransformerConfig:
         trans_qkvw=True,
         ring_id=-1,
         kv_num_heads=-1,
-        use_dynamic_cachekv_quant=True,
+        cachekv_int8_type=None,
         rank_id=-1,
         moe_topk=1,
         num_experts=1,
@@ -215,7 +215,6 @@ class FusedMultiTransformerConfig:
         else:
             self.kv_num_heads = num_heads
         self.dim_feedforward = dim_feedforward
-        self.weight_only_quant_bits = weight_only_quant_bits
         self.dropout_rate = dropout_rate
         self.activation = activation
         self.norm_type = norm_type
@@ -252,10 +251,11 @@ class FusedMultiTransformerConfig:
         self.cache_k_out_scale_attrs = cache_k_out_scale_attrs
         self.cache_v_out_scale_attrs = cache_v_out_scale_attrs
 
+        self.quant_type = quant_type
         self.quant_round_type = quant_round_type
         self.quant_max_bound = quant_max_bound
         self.quant_min_bound = quant_min_bound
-        self.use_dynamic_cachekv_quant = use_dynamic_cachekv_quant
+        self.cachekv_int8_type = cachekv_int8_type
 
         self.epsilon = epsilon
         self.residual_alpha = residual_alpha
@@ -264,7 +264,7 @@ class FusedMultiTransformerConfig:
         self.rank_id = rank_id
         self.trans_qkvw = trans_qkvw
         self.ring_id = ring_id
-        # moe config
+        
         self.moe_topk = moe_topk
         self.num_experts = num_experts
         self.gate_weight_attrs = gate_weight_attrs
@@ -1174,10 +1174,18 @@ class FusedMultiTransformerPostLayernorm(FusedMultiTransformerBase):
 class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__(config)
-        self.weight_only_quant_bits = config.weight_only_quant_bits
+        self.quant_type = config.quant_type
+        if self.quant_type == "weight_only_int8":
+            self.weight_dtype = "int8"
+        elif self.quant_type == "weight_only_int4":
+            self.weight_dtype = "int4"
+        else:
+            assert (
+                self.quant_type == "weight_only_int8" or self.quant_type == "weight_only_int4"
+            ), "Expected quant_type equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
+                self.quant_type
+            )
 
-        assert self.weight_only_quant_bits != -1
-        self.weight_dtype = "int" + str(self.weight_only_quant_bits)
         self.weight_scale_dtype = self._dtype
         self.qkv_weights_scale = []
         self.linear_weights_scale = []
@@ -1243,7 +1251,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         )
         self.ffn2_weight_shape = [self.embed_dim, self.dim_feedforward]
 
-        if config.weight_only_quant_bits == 4:
+        if config.quant_type == "weight_only_int4":
             self.qkv_weight_shape[0] //= 2
             self.linear_weight_shape[0] //= 2
             self.ffn1_weight_shape[0] //= 2
@@ -1752,7 +1760,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
         v_dequant_scales = kwargs.get("v_dequant_scales", None)
 
-        if not self.config.use_dynamic_cachekv_quant:
+        if self.config.cachekv_int8_type == "static":
             k_quant_scales = self.cache_k_scales
             v_quant_scales = self.cache_v_scales
             k_dequant_scales = self.cache_k_out_scales
@@ -1790,7 +1798,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 kwargs.get("max_input_length", -1),
                 kwargs.get("block_size", 64),
                 self.use_neox_rotary_style,
-                self.config.use_dynamic_cachekv_quant,
+                self.config.cachekv_int8_type == "dynamic",
                 quant_round_type=self.config.quant_round_type,
                 quant_max_bound=self.config.quant_max_bound,
                 quant_min_bound=self.config.quant_min_bound,
@@ -1826,7 +1834,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 kwargs.get("max_input_length", -1),
                 kwargs.get("block_size", 64),
                 self.use_neox_rotary_style,
-                self.config.use_dynamic_cachekv_quant,
+                self.config.cachekv_int8_type == "dynamic",
                 quant_round_type=self.config.quant_round_type,
                 quant_max_bound=self.config.quant_max_bound,
                 quant_min_bound=self.config.quant_min_bound,
@@ -1877,7 +1885,7 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
         v_dequant_scales = kwargs.get("v_dequant_scales", None)
 
-        if not self.config.use_dynamic_cachekv_quant:
+        if self.config.cachekv_int8_type == "static":
             k_quant_scales = self.cache_k_scales
             v_quant_scales = self.cache_v_scales
             k_dequant_scales = self.cache_k_out_scales
@@ -1913,7 +1921,7 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
             kwargs.get("max_input_length", -1),
             kwargs.get("block_size", 64),
             self.use_neox_rotary_style,
-            self.config.use_dynamic_cachekv_quant,
+            self.config.cachekv_int8_type == "dynamic",
             quant_round_type=self.quant_round_type,
             quant_max_bound=self.quant_max_bound,
             quant_min_bound=self.quant_min_bound,

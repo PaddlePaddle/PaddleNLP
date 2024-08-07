@@ -158,20 +158,43 @@ class AutoTrainer(Trainer):
         if self.args.gradient_accumulation_steps == 1:
             return [inputs]
 
-        # if self.args.to_static:
         if self.args.to_static and self.args.pipeline_parallel_degree > 1:
             return [inputs]
 
         local_batches = [{} for i in range(self.args.gradient_accumulation_steps)]
+        assert isinstance(inputs, dict)
 
-        for key, value in inputs.items():
-            ori_mesh, ori_placements = value.process_mesh, value.placements
-            replicate_value = dist.reshard(value, ori_mesh, [dist.Replicate(), dist.Replicate()])
+        def split_dtensor_by_axis(dtensor, axis):
+            mesh = dtensor.process_mesh
+            placements = [dist.Replicate() for _ in range(len(mesh.shape))]
+            replicate_value = dist.reshard(dtensor, mesh, placements)
             local_datas = replicate_value.split(self.args.gradient_accumulation_steps, axis=0)
+            return local_datas
 
-            for index, data in enumerate(local_datas):
-                local_batches[index].update({key: dist.reshard(data, ori_mesh, ori_placements)})
-
+        for key, dtensors in inputs.items():
+            if isinstance(dtensors, paddle.Tensor):
+                mesh, placements = dtensors.process_mesh, dtensors.placements
+                local_datas = split_dtensor_by_axis(dtensors, 0)
+                for index, data in enumerate(local_datas):
+                    local_batches[index].update({key: dist.reshard(data, mesh, placements)})
+            elif isinstance(dtensors, (list, tuple)):
+                if len(dtensors) == 0:
+                    for i in range(self.args.gradient_accumulation_steps):
+                        local_batches[i].update({key: []})
+                else:
+                    for dtensor in dtensors:
+                        if isinstance(dtensor, paddle.Tensor):
+                            mesh, placements = dtensor.process_mesh, dtensor.placements
+                            local_datas = split_dtensor_by_axis(dtensor, 0)
+                            for index, data in enumerate(local_datas):
+                                if key in local_batches[index].keys():
+                                    local_batches[index][key].append(dist.reshard(data, mesh, placements))
+                                else:
+                                    local_batches[index].update({key: [dist.reshard(data, mesh, placements)]})
+                        else:
+                            raise ValueError(f"unsupported type: {type(dtensor)}")
+            else:
+                raise ValueError(f"unsupported type: {type(dtensors)}")
         return local_batches
 
     def _inner_training_loop(

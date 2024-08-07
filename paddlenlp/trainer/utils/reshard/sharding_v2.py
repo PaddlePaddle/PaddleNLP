@@ -14,10 +14,13 @@
 
 import numpy as np
 import paddle
+import paddle.distributed.fleet as fleet
 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
     HybridParallelOptimizer,
 )
 from paddle.distributed.fleet.model import PipelineParallel
+
+from paddlenlp.utils.log import logger
 
 from ....transformers.model_utils import unwrap_optimizer
 
@@ -27,6 +30,9 @@ try:
     )
 except:
     DygraphShardingOptimizerV2 = None
+
+
+from paddle.distributed.communication.reduce import ReduceOp
 
 
 def shard(node_model_state, model, optimizer, hcg):
@@ -137,7 +143,7 @@ def slice_tensor(tensor, begin, end):
     return tensor[begin:end]
 
 
-def collect_split_info(optimizer, model):
+def collect_split_info(optimizer, model, only_return_lengths=False):
     split_infos = {}
 
     def gather_infos(comm_buffer):
@@ -146,7 +152,13 @@ def collect_split_info(optimizer, model):
             padded_size = v._padded_size
             buffer_size = v._param_buffer._numel()
             has_slice_grad = v._slice_grad is not None
-            split_infos[k] = (index, padded_size, buffer_size, has_slice_grad)
+            if only_return_lengths:
+                if v._param_begin < v._param_end:
+                    split_infos[k] = v._param_end - v._param_begin
+                else:
+                    split_infos[k] = None
+            else:
+                split_infos[k] = (index, padded_size, buffer_size, has_slice_grad)
 
     if isinstance(model, PipelineParallel) and model._sharding_comm_overlap > 0:
         optimizer = unwrap_optimizer(optimizer, HybridParallelOptimizer)
@@ -165,6 +177,51 @@ def collect_split_info(optimizer, model):
 
     assert len(split_infos)
     return split_infos
+
+
+def is_matched_optimizer_state_dict(opt_state_dict, optimizer, model, hcg=None, need_allgather=True):
+    split_infos = collect_split_info(optimizer, model, only_return_lengths=True)
+    master_weights = opt_state_dict.get("master_weights", None)
+
+    def get_matched_length(name):
+        if master_weights and name in master_weights:
+            tensor = master_weights[name]
+        else:
+            moment_name = name + "_moment1_0"
+            if moment_name not in opt_state_dict:
+                return None
+
+            tensor = opt_state_dict[moment_name]
+            if isinstance(tensor, (list, tuple)):
+                assert len(tensor) == 2, tensor
+                assert isinstance(tensor[0], str), tensor[0]
+                tensor = tensor[1]
+        shape = tensor.shape
+        assert len(shape) == 1, shape
+        length = shape[0]
+        return length
+
+    is_matched = 1
+    for k, length in split_infos.items():
+        matched_length = get_matched_length(k)
+        if length != matched_length:
+            is_matched = 0
+            break
+
+    if need_allgather:
+        if hcg is None:
+            hcg = fleet.get_hybrid_communicate_group()
+        group = hcg.get_sharding_parallel_group()
+        if group is not None and group.nranks > 1:
+            x = paddle.to_tensor([is_matched], dtype=paddle.int32)
+            paddle.distributed.stream.all_reduce(x, op=ReduceOp.MIN, group=group, sync_op=True, use_calc_stream=True)
+            global_is_matched = int(x.numpy()[0])
+    else:
+        global_is_matched = is_matched
+
+    global_is_matched = True if global_is_matched else False
+    logger.info(f"Sharding reshard checkpoint: local_match = {is_matched} , global_match = {global_is_matched}")
+    return global_is_matched
 
 
 def is_bata(name):
