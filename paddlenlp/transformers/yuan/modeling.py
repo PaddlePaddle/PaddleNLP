@@ -19,6 +19,7 @@ import math
 from functools import partial
 from typing import List, Optional, Tuple, Union
 
+import numpy as np
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
 from paddle import Tensor, nn
@@ -354,6 +355,67 @@ class YuanPretrainedModel(PretrainedModel):
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
         return mappings
+
+    @classmethod
+    def _get_fuse_or_split_param_mappings(cls, config: YuanConfig, is_fuse=False):
+        def convert_qk_keys_fn(fused_params, tensor_parallel_degree):
+            concat_fn = np.concatenate
+            split_fn = np.split
+            if isinstance(fused_params, paddle.Tensor):
+                concat_fn = paddle.concat
+                split_fn = paddle.split
+
+            q_weight, k_weight = split_fn(fused_params, 2, axis=-1)
+
+            hidden_size = q_weight.shape[-1]
+            step = 1
+            if tensor_parallel_degree > 1:
+                assert hidden_size // tensor_parallel_degree, "hidden_size must be divisible by tensor_parallel_degree"
+                step = hidden_size // tensor_parallel_degree
+
+            q_slices = [q_weight[:, i : i + step] for i in range(0, hidden_size, step)]
+            k_slices = [k_weight[:, i : i + step] for i in range(0, hidden_size, step)]
+            q1 = concat_fn(q_slices[0::2], -1)
+            q2 = concat_fn(k_slices[0::2], -1)
+            k1 = concat_fn(q_slices[1::2], -1)
+            k2 = concat_fn(k_slices[1::2], -1)
+
+            return concat_fn([q1, q2], -1), concat_fn([k1, k2], -1)
+
+        def fuse_qk_keys_fn(fuse_params):
+            concat_fn = np.concatenate
+            if isinstance(fuse_params[0], paddle.Tensor):
+                concat_fn = paddle.concat
+            return concat_fn(fuse_params, axis=-1)
+
+        # last key is fused key, other keys are to be fused.
+
+        final_actions = {}
+        if config.tensor_parallel_degree <= 1:
+            return final_actions
+
+        if is_fuse:
+            fuse_qk_keys = (
+                "layers.0.self_attn.q_proj.weight",  # base param key
+                "layers.0.self_attn.k_proj.weight",  # base param key
+                "layers.0.self_attn.qk_proj.weight",  # new param key
+            )
+
+            for i in range(config.num_hidden_layers):
+                keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qk_keys])
+                final_actions[keys] = partial(fuse_qk_keys_fn)
+        else:
+            split_qk_keys = (
+                "layers.0.self_attn.q_proj.weight",  # new param key
+                "layers.0.self_attn.k_proj.weight",  # new param key
+                "layers.0.self_attn.qk_proj.weight",  # base param key
+            )
+
+            for i in range(config.num_hidden_layers):
+                keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in split_qk_keys])
+                final_actions[keys] = partial(convert_qk_keys_fn, tensor_parallel_degree=config.tensor_parallel_degree)
+
+        return final_actions
 
     def _init_weights(self, layer):
         """Initialization hook"""
