@@ -354,7 +354,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
             if self.use_weight_only:
                 linear_quanted_weight_tensor, linear_weight_scale_tensor = weight_quantize(
-                    out_proj_weight, algo=self.quant_algo
+                    paddle.to_tensor(out_proj_weight), algo=self.quant_algo
                 )
                 self.transformer_block.linear_weights[i].set_value(linear_quanted_weight_tensor)
                 self.transformer_block.linear_weights_scale[i].set_value(linear_weight_scale_tensor)
@@ -365,7 +365,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
             if self.use_weight_only:
                 ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
-                    ffn1_weight, algo=self.quant_algo
+                    paddle.to_tensor(ffn1_weight), algo=self.quant_algo
                 )
                 self.transformer_block.ffn1_weights[i].set_value(ffn1_quanted_weight_tensor)
                 self.transformer_block.ffn1_weights_scale[i].set_value(ffn1_weight_scale_tensor)
@@ -374,7 +374,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
             if self.use_weight_only:
                 ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
-                    ffn2_weight, algo=self.quant_algo
+                    paddle.to_tensor(ffn2_weight), algo=self.quant_algo
                 )
                 self.transformer_block.ffn2_weights[i].set_value(ffn2_quanted_weight_tensor)
                 self.transformer_block.ffn2_weights_scale[i].set_value(ffn2_weight_scale_tensor)
