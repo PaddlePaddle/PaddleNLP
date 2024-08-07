@@ -547,9 +547,9 @@ class InferencePredictorMixin(BasePredictor):
             # alibi encoder
             alibi_slopes = get_alibi_slopes(self.model_config.n_head)
             inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
+
             arange_tensor_encoder = paddle.arange(self.config.total_max_length, dtype=self.config.dtype)
             alibi = alibi_slopes[None, :, None, None] * arange_tensor_encoder
-
             if self.model_config.tensor_parallel_degree > 1:
                 block_size = self.model_config.n_head // self.model_config.tensor_parallel_degree
                 alibi = alibi[
@@ -1380,6 +1380,32 @@ def create_predictor(
                     dtype=predictor_args.dtype,
                 )
                 model.eval()
+            elif "qwen2" in config.architectures[0].lower():
+                if predictor_args.block_attn:
+                    config.max_seq_len = predictor_args.total_max_length
+                    config.block_size = predictor_args.block_size
+                    from paddlenlp.experimental.transformers import (
+                        Qwen2ForCausalLMBlockInferenceModel as Qwen2InferenceModel,
+                    )
+
+                    model = Qwen2InferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        Qwen2ForCausalLMInferenceModel as Qwen2InferenceModel,
+                    )
+
+                    model = Qwen2InferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                    )
+                model.eval()
             elif "qwen" in config.architectures[0].lower():
                 if model_args.model_type == "qwen-img2txt":
                     # we use qwen for img2txt.
@@ -1405,6 +1431,16 @@ def create_predictor(
 
         elif predictor_args.mode == "static":
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
+            config.quant_type = predictor_args.quant_type
+            config.cachekv_int8_type = predictor_args.cachekv_int8_type
+
+            if config.quantization_config.quant_type is not None:
+                predictor_args.quant_type = config.quantization_config.quant_type
+                config.quant_type = config.quantization_config.quant_type
+                if "c8" in config.quant_type:
+                    predictor_args.cachekv_int8_type = "static"
+                    config.cachekv_int8_type = "static"
+
             if "llama" in config.architectures[0].lower():
                 if predictor_args.block_attn:
                     config.block_size = predictor_args.block_size
@@ -1471,6 +1507,21 @@ def create_predictor(
                 cache_kvs_shape = GPTForCausalLMInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
+            elif "qwen2" in config.architectures[0].lower():
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                    from paddlenlp.experimental.transformers import (
+                        Qwen2ForCausalLMBlockInferenceModel as Qwen2InferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        Qwen2ForCausalLMInferenceModel as Qwen2InferenceModel,
+                    )
+                cache_kvs_shape = Qwen2InferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
+
             elif "qwen" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     QWenForCausalLMInferenceModel,
