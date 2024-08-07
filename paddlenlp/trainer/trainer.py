@@ -2298,6 +2298,9 @@ class Trainer:
                                 self._filter_moe_no_sync_optimizer_params(),
                                 os.path.join(output_dir, optimizer_name),
                             )
+                            with open(saved_signal_path, mode="w+") as f:
+                                f.write("1")
+
                         else:
                             state_dict = self.optimizer.state_dict()
                             save_path = os.path.join(output_dir, optimizer_name)
@@ -2330,8 +2333,12 @@ class Trainer:
                             self._save_ckpt_func(
                                 self._filter_moe_no_sync_optimizer_params(), os.path.join(output_dir, optimizer_name)
                             )
+                            with open(saved_signal_path, mode="w+") as f:
+                                f.write("1")
                         else:
                             self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
+                            with open(saved_signal_path, mode="w+") as f:
+                                f.write("1")
 
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
