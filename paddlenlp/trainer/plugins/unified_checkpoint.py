@@ -96,9 +96,6 @@ optimizer_non_scaler_name = [
 ]  # to be added
 
 
-async_save_queue = []
-
-
 DEST_PLACE = paddle.CPUPlace()
 if paddle.device.is_compiled_with_cuda():
     DEST_PLACE = paddle.CUDAPinnedPlace()

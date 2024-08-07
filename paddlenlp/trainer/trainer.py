@@ -1214,10 +1214,6 @@ class Trainer:
             if self.control.should_training_stop:
                 break
 
-        # unlink shared_memory if used.
-        if self.args.unified_checkpoint:
-            self.unified_checkpoint_handler.unlink_shared_memory()
-
         if args.past_index and hasattr(self, "_past"):
             # Clean the state at the end of training
             delattr(self, "_past")
@@ -1254,6 +1250,10 @@ class Trainer:
                             f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
                             "on multiple nodes, you should activate `--save_on_each_node`."
                         )
+
+        # unlink shared_memory if used.
+        if self.args.unified_checkpoint:
+            self.unified_checkpoint_handler.unlink_shared_memory()
 
         self._total_loss_scalar += tr_loss.item()
         train_loss = self._total_loss_scalar / self.state.global_step
