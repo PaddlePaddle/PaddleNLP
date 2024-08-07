@@ -75,8 +75,10 @@ if is_safetensors_available():
 
     if sys.platform.startswith("win"):
         from safetensors import safe_open
+        from safetensors.numpy import load_file
     else:
         from paddlenlp.utils.safetensors import fast_safe_open as safe_open
+        from paddlenlp.utils.safetensors import fast_load_file as load_file
 
 from .shared_memory_utils import (
     _read_state_dict_from_shm,
@@ -372,6 +374,53 @@ class UnifiedCheckpointHandler:
         if self.args.dataset_rank == 0:
             load_unified_checkpoint_locally(self.args, model, resume_from_checkpoint, safe_serialization=True)
 
+    def load_non_merge_optimizer(self, model, optimizer, resume_from_checkpoint):
+        # init and get optimizer LR_Scheduler
+        returned_optim_state_dict = nested_copy(optimizer.state_dict())
+
+        optimizer_name = _add_variant(SAFE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+        master_weights_name = _add_variant(SAFE_MASTER_WEIGHTS_NAME, self.args.optimizer_name_suffix)
+        optimizer_path = os.path.join(resume_from_checkpoint, optimizer_name)
+        master_weights_path = os.path.join(resume_from_checkpoint, master_weights_name)
+        has_master_weights = True if os.path.isfile(master_weights_path) else False
+
+        model_state_dict = get_expected_state_dict(model)
+        struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}  # get optimizer param mappings
+        optimizer_state_dict = load_file(optimizer_path)
+        if has_master_weights:
+            master_weights = load_file(master_weights_path)
+
+        # rename and move to paddle.Tensor
+        for key in list(optimizer_state_dict.keys()):
+            key_name = key.split("/")
+            static_name = struct2static_name_mappings[key_name[0]]
+            if has_master_weights:
+                key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
+            else:
+                key_name = "_".join([static_name, key_name[1]])
+            with device_guard():
+                weight = paddle.Tensor(optimizer_state_dict.pop(key), zero_copy=True)
+            weight = weight._copy_to(paddle.framework._current_expected_place(), False)
+            returned_optim_state_dict[key_name] = weight
+            returned_optim_state_dict[key_name].name = key_name
+
+        if has_master_weights:
+            returned_optim_state_dict["master_weights"] = {}
+            for key in list(master_weights.keys()):
+                static_name = struct2static_name_mappings[key]
+                with device_guard():
+                    weight = paddle.Tensor(master_weights.pop(key), zero_copy=True)
+                weight = weight._copy_to(paddle.framework._current_expected_place(), False)
+                returned_optim_state_dict["master_weights"][static_name] = weight
+                returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, FP32_MASTER])
+
+        returned_optim_state_dict = nested_copy_place(
+            returned_optim_state_dict,
+            place=paddle.framework._current_expected_place(),
+        )
+
+        return returned_optim_state_dict
+
     def save_non_merge_optimizer(self, model, optimizer, output_dir):
         paddle.device.cuda.empty_cache()
         optim_state_dict = nested_copy(optimizer.state_dict())
@@ -490,7 +539,7 @@ class UnifiedCheckpointHandler:
                     with open(master_path, "w") as f:
                         json.dump(sharded_master_weight_index, f, indent=4)
 
-    def load_unified_optimizer(self, model, optimizer, resume_from_checkpoint):
+    def load_unified_optimizer(self, args, model, optimizer, resume_from_checkpoint):
         """Load potential model checkpoint
 
         Args:
@@ -505,8 +554,16 @@ class UnifiedCheckpointHandler:
             optim_state_dict = load_single_card_optimizer(self.args, model, optimizer, resume_from_checkpoint)
             return optim_state_dict
 
-        # if "ignore_merge_optimizer" in self.args.unified_checkpoint_config:
-        #    optimizer_name =
+        if "ignore_merge_optimizer" in self.args.unified_checkpoint_config:
+            if self.args.data_parallel_rank == 0:
+                returned_optim_state_dict = self.load_non_merge_optimizer(
+                    model,
+                    optimizer,
+                    resume_from_checkpoint,
+                )
+                return returned_optim_state_dict
+            else:
+                return None
 
         local_resume = check_unified_optimizer(
             self.args, model, optimizer, resume_from_checkpoint, safe_serialization=True
