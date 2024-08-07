@@ -235,6 +235,10 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
     expected_keys = set(list(model_state_dict.keys()))
     missing_keys = expected_keys - set(loaded_keys)
 
+    use_fast_set = True
+    if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
+        use_fast_set = False
+
     if len(missing_keys) > 0:
         raise ValueError(f"missing_keys: {missing_keys}")
 
@@ -257,7 +261,7 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
     for shard_file in resolved_archive_file:
-        # TODO: check if  no expected_keys in shard_file, then don't load it
+        # TODO: check if no expected_keys in shard_file, then don't load it
         if expected_keys.isdisjoint(sharded_metadata["file_map"][os.path.split(shard_file)[-1]]):
             continue
 
@@ -287,8 +291,10 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
                 None, model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
             )
 
-        # error_msgs += _load_state_dict_into_model(model, state_dict, "")
-        error_msgs += faster_set_state_dict(model, state_dict, strict_dtype=False)
+        if use_fast_set:
+            error_msgs += faster_set_state_dict(model, state_dict, strict_dtype=False)
+        else:
+            error_msgs += _load_state_dict_into_model(model, state_dict, "")
 
         # force memory release
         del state_dict
