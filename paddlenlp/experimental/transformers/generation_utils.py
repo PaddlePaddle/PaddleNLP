@@ -172,6 +172,7 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["frequency_score"] = frequency_score
         model_kwargs["presence_score"] = presence_score
         model_kwargs["logits_processors"] = logits_processors or LogitsProcessorList()
+        model_kwargs["pre_caches"] = pre_caches
 
         ret = self.sample(
             input_ids,
@@ -182,7 +183,7 @@ class GenerationInferenceModel(GenerationMixin):
             inputs_embeds=inputs_embeds,
             **model_kwargs,
         )
-        model_kwargs["pre_caches"] = pre_caches
+
         return ret
 
     def update_model_kwargs_for_generation(self, cache, just_decoder, next_tokens, eos_token_id, model_kwargs):
