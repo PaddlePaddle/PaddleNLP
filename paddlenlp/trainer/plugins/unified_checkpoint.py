@@ -312,7 +312,7 @@ class UnifiedCheckpointHandler:
                 self.args, model_to_save, safe_serialization=True
             )
             is_sync_save = True
-            if "async_save" in self.args.unified_checkpoint_config or self.args.use_async_save:
+            if "async_save" in self.args.unified_checkpoint_config:
                 is_sync_save = False
             self._file_save_async_or_sync(
                 state_dict,
@@ -374,6 +374,57 @@ class UnifiedCheckpointHandler:
         if self.args.dataset_rank == 0:
             load_unified_checkpoint_locally(self.args, model, resume_from_checkpoint, safe_serialization=True)
 
+    def save_non_merge_optimizer(self, model, optimizer, output_dir):
+        paddle.device.cuda.empty_cache()
+        optim_state_dict = nested_copy(optimizer.state_dict())
+        master_weights = None
+        if "master_weights" in optim_state_dict.keys():
+            master_weights = optim_state_dict["master_weights"]
+            optim_state_dict.pop("master_weights")
+        if "LR_Scheduler" in optim_state_dict.keys():
+            optim_state_dict.pop("LR_Scheduler")
+
+        # gather global master_weights status.
+        global_master_weights = reduce_master_weights_status(master_weights is not None)
+        if master_weights is None and global_master_weights:
+            master_weights = {}
+
+        # get optimizer param mappings
+        static2struct_name_mappings = {}
+        state_dict = get_expected_state_dict(model)
+        for k, v in state_dict.items():
+            static2struct_name_mappings[v.name] = k
+
+        # rename optimizer param name
+        for key in list(optim_state_dict.keys()):
+            static_name, type_name = generate_base_static_name(key)
+            new_name = static2struct_name_mappings[static_name] + "/" + type_name
+            optim_state_dict[new_name] = optim_state_dict.pop(key)
+        if master_weights is not None:
+            for key in list(master_weights.keys()):
+                master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
+
+        optimizer_name = _add_variant(SAFE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
+        master_weights_name = _add_variant(SAFE_MASTER_WEIGHTS_NAME, self.args.optimizer_name_suffix)
+
+        is_sync_save = True
+        if "async_save" in self.args.unified_checkpoint_config:
+            is_sync_save = False
+        self._file_save_async_or_sync(
+            optim_state_dict,
+            path=os.path.join(output_dir, optimizer_name),
+            saved_signal_path=os.path.join(output_dir, f"saved_signal_{dist.get_rank()}"),
+            is_sync=is_sync_save,
+            state_dict_type="optimizer_weight",
+        )
+        self._file_save_async_or_sync(
+            master_weights,
+            path=os.path.join(output_dir, master_weights_name),
+            saved_signal_path=os.path.join(output_dir, f"saved_signal_{dist.get_rank()}"),
+            is_sync=is_sync_save,
+            state_dict_type="master_weight",
+        )
+
     def load_non_merge_optimizer(self, model, optimizer, resume_from_checkpoint):
         # init and get optimizer LR_Scheduler
         returned_optim_state_dict = nested_copy(optimizer.state_dict())
@@ -421,57 +472,6 @@ class UnifiedCheckpointHandler:
 
         return returned_optim_state_dict
 
-    def save_non_merge_optimizer(self, model, optimizer, output_dir):
-        paddle.device.cuda.empty_cache()
-        optim_state_dict = nested_copy(optimizer.state_dict())
-        master_weights = None
-        if "master_weights" in optim_state_dict.keys():
-            master_weights = optim_state_dict["master_weights"]
-            optim_state_dict.pop("master_weights")
-        if "LR_Scheduler" in optim_state_dict.keys():
-            optim_state_dict.pop("LR_Scheduler")
-
-        # gather global master_weights status.
-        global_master_weights = reduce_master_weights_status(master_weights is not None)
-        if master_weights is None and global_master_weights:
-            master_weights = {}
-
-        # get optimizer param mappings
-        static2struct_name_mappings = {}
-        state_dict = get_expected_state_dict(model)
-        for k, v in state_dict.items():
-            static2struct_name_mappings[v.name] = k
-
-        # rename optimizer param name
-        for key in list(optim_state_dict.keys()):
-            static_name, type_name = generate_base_static_name(key)
-            new_name = static2struct_name_mappings[static_name] + "/" + type_name
-            optim_state_dict[new_name] = optim_state_dict.pop(key)
-        if master_weights is not None:
-            for key in list(master_weights.keys()):
-                master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
-
-        optimizer_name = _add_variant(SAFE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
-        master_weights_name = _add_variant(SAFE_MASTER_WEIGHTS_NAME, self.args.optimizer_name_suffix)
-
-        is_sync_save = True
-        if "async_save" in self.args.unified_checkpoint_config or self.args.use_async_save:
-            is_sync_save = False
-        self._file_save_async_or_sync(
-            optim_state_dict,
-            path=os.path.join(output_dir, optimizer_name),
-            saved_signal_path=os.path.join(output_dir, f"saved_signal_{dist.get_rank()}"),
-            is_sync=is_sync_save,
-            state_dict_type="optimizer_weight",
-        )
-        self._file_save_async_or_sync(
-            master_weights,
-            path=os.path.join(output_dir, master_weights_name),
-            saved_signal_path=os.path.join(output_dir, f"saved_signal_{dist.get_rank()}"),
-            is_sync=is_sync_save,
-            state_dict_type="master_weight",
-        )
-
     def save_unified_optimizer(self, model, optimizer, output_dir):
         """save unified optimizer
 
@@ -505,7 +505,7 @@ class UnifiedCheckpointHandler:
         os.makedirs(save_directory, exist_ok=True)
 
         is_sync_save = True
-        if "async_save" in self.args.unified_checkpoint_config or self.args.use_async_save:
+        if "async_save" in self.args.unified_checkpoint_config:
             is_sync_save = False
         self._file_save_async_or_sync(
             optim_state_dict,
@@ -697,6 +697,22 @@ class UnifiedCheckpointHandler:
             )
 
     def unlink_shared_memory(self):
+        if not ("async_save" in self.args.unified_checkpoint_config):
+            return
+
+        if self._shared_save_model_flag is not None:
+            while self._shared_save_model_flag[0] > 0:  # async process is saving
+                time.sleep(0.5)
+            self._shared_save_model_flag[0] = -1
+        if self._shared_save_master_weight_flag is not None:
+            while self._shared_save_master_weight_flag[0] > 0:
+                time.sleep(0.5)
+            self._shared_save_master_weight_flag[0] = -1
+        if self._shared_save_optimizer_flag is not None:
+            while self._shared_save_optimizer_flag[0] > 0:
+                time.sleep(0.5)
+            self._shared_save_optimizer_flag[0] = -1
+
         if self._shm_model_weight is not None:
             self._shm_model_weight.close()
             self._shm_model_weight.unlink()
@@ -709,12 +725,8 @@ class UnifiedCheckpointHandler:
             self._shm_optimizer_weight.close()
             self._shm_optimizer_weight.unlink()
             self._shm_optimizer_weight = None
-        if self._shared_save_model_flag is not None:
-            self._shared_save_model_flag[0] = -1
-        if self._shared_save_master_weight_flag is not None:
-            self._shared_save_master_weight_flag[0] = -1
-        if self._shared_save_optimizer_flag is not None:
-            self._shared_save_optimizer_flag[0] = -1
+
+        dist.barrier()
 
 
 def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, safe_serialization=False):
