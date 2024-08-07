@@ -26,7 +26,7 @@ from paddle.nn.quant import weight_quantize
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerWeightOnly,
-    FusedMultiTransformerBase,
+    FusedMultiTransformerMoe,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
 )
@@ -76,13 +76,19 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         self.hidden_size = config.hidden_size
         self.num_attention_heads = config.num_attention_heads
         self.num_key_value_heads = config.num_key_value_heads
-        self.intermediate_size = config.intermediate_size
         self.num_layers = config.num_hidden_layers
         self.rms_norm_eps = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
         self.quant_type = config.quant_type
         self.weight_only_quant_bits = config.weight_only_quant_bits
         self.rope_theta = config.rope_theta
+
+        # Moe config
+        self.num_experts = config.num_experts
+        self.moe_topk = config.num_experts_per_tok
+        self.norm_topk_prob = config.norm_topk_prob
+        self.moe_intermediate_size = config.moe_intermediate_size
+        self.shared_expert_intermediate_size = config.shared_expert_intermediate_size
 
         if self.quant_type is not None and "weight_only_int" in self.quant_type:
             self.use_weight_only = True
@@ -99,32 +105,50 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         self.wte = nn.Embedding(self.vocab_size, self.hidden_size)
         # print(self.vocab_size, self.hidden_size)
 
-        ln_scale_attrs = [paddle.ParamAttr(name="fuseqwen2moe.{}.ln_scale".format(i)) for i in range(self.num_layers)]
+        ln_scale_attrs = [paddle.ParamAttr(name="fuseqwen2_moe.{}.ln_scale".format(i)) for i in range(self.num_layers)]
         qkv_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen2moe.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseqwen2_moe.{}.qkv_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(self.num_layers)
         ]
-        qkv_bias_attrs = [paddle.ParamAttr(name="fuseqwen2moe.{}.qkv_bias".format(i)) for i in range(self.num_layers)]
+        qkv_bias_attrs = [paddle.ParamAttr(name="fuseqwen2_moe.{}.qkv_bias".format(i)) for i in range(self.num_layers)]
         out_proj_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen2moe.{}.out_proj_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseqwen2_moe.{}.out_proj_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(self.num_layers)
         ]
         ffn_ln_scale_attrs = [
-            paddle.ParamAttr(name="fuseqwen2moe.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
+            paddle.ParamAttr(name="fuseqwen2_moe.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
         ]
         ffn1_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen2moe.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseqwen2_moe.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(self.num_layers)
         ]
         ffn2_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen2moe.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseqwen2_moe.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
+        ]
+        shared_expert_ffn1_weight_attrs = [
+            paddle.ParamAttr(
+                name="fuseqwen2_moe.{}.shared_expert_ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
+        ]
+        shared_expert_ffn2_weight_attrs = [
+            paddle.ParamAttr(
+                name="fuseqwen2_moe.{}.shared_expert_ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
+        ]
+        shared_expert_gate_weight_attrs = [
+            paddle.ParamAttr(
+                name="fuseqwen2_moe.{}.shared_expert_gate_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(self.num_layers)
         ]
@@ -136,23 +160,23 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
 
         if self.use_weight_only:
             qkv_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2moe.{}.qkv_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseqwen2_moe.{}.qkv_weight_scale".format(i)) for i in range(self.num_layers)
             ]
             out_proj_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2moe.{}.out_proj_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseqwen2_moe.{}.out_proj_weight_scale".format(i)) for i in range(self.num_layers)
             ]
             ffn1_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2moe.{}.ffn1_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseqwen2_moe.{}.ffn1_weight_scale".format(i)) for i in range(self.num_layers)
             ]
             ffn2_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2moe.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseqwen2_moe.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
             ]
 
         transformer_config = FusedMultiTransformerConfig(
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
             kv_num_heads=self.num_key_value_heads,
-            dim_feedforward=self.intermediate_size,
+            dim_feedforward=self.moe_intermediate_size,
             weight_only_quant_bits=self.weight_only_quant_bits,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
@@ -172,6 +196,13 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             epsilon=self.rms_norm_eps,
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
+            # moe config
+            moe_topk=self.moe_topk,
+            num_experts=self.num_experts,
+            shared_expert_intermediate_size=self.shared_expert_intermediate_size,
+            shared_expert_ffn1_weight_attrs=shared_expert_ffn1_weight_attrs,
+            shared_expert_ffn2_weight_attrs=shared_expert_ffn2_weight_attrs,
+            shared_expert_gate_weight_attrs=shared_expert_gate_weight_attrs,
         )
 
         self.set_transformer_block(transformer_config)
@@ -185,7 +216,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         if self.use_weight_only:
             self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
         else:
-            self.transformer_block = FusedMultiTransformerBase(transformer_config)
+            self.transformer_block = FusedMultiTransformerMoe(transformer_config)
 
     def get_input_embeddings(self):
         return self.wte
@@ -195,7 +226,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
-        print(state_dict)
         head_size = self.hidden_size // self.num_attention_heads
         dtype = paddle.get_default_dtype()
         wte_weight = paddle.to_tensor(state_dict["qwen2_moe.embed_tokens.weight"]).cast(dtype)
@@ -308,24 +338,48 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             self.transformer_block.ffn_ln_scales[idx].set_value(ffn_ln_scale)
 
             # print("qwen2_moe.layers.{}.post_attention_layernorm.weight".format(idx), ffn_ln_scale)
+            
+            # set Moe state_dict
+            ffn1_weights = []
+            ffn2_weights = []
+            for expert_idx in range(self.num_experts):
+                up_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{0}.mlp.experts.{1}.up_proj.weight".format(idx, expert_idx)]).cast(dtype)
+                gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{0}.mlp.experts.{1}.gate_proj.weight".format(idx, expert_idx)]).cast(dtype)
+                down_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{0}.mlp.experts.{1}.down_proj.weight".format(idx, expert_idx)]).cast(dtype)
+                ffn1_weights.append(paddle.concat(x=[gate_weight, up_weight], axis=-1))
+                ffn2_weights.append(down_weight)
+            fused_moe_ffn1_weight = paddle.stack(ffn1_weights, axis=0)
+            fused_moe_ffn2_weight = paddle.stack(ffn2_weights, axis=0)  
 
-            up_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.up_proj.weight".format(idx)]).cast(dtype)
-            gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.gate_proj.weight".format(idx)]).cast(dtype)
-            ffn1_weight = paddle.concat(x=[gate_weight, up_weight], axis=-1)
             if self.use_weight_only:
-                ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(ffn1_weight, algo=self.quant_type)
+                ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(fused_moe_ffn1_weight, algo=self.quant_type)
                 self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight)
                 self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale)
             else:
-                self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight)
+                self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight)
 
-            ffn2_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.down_proj.weight".format(idx)]).cast(dtype)
             if self.use_weight_only:
-                ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(ffn2_weight, algo=self.quant_type)
+                ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(fused_moe_ffn2_weight, algo=self.quant_type)
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight)
                 self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale)
             else:
-                self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight)
+                self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
+                
+            gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.gate.weight".format(idx)]).cast("float32")
+
+            shared_expert_ffn1gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert.gate_proj.weight".format(idx)]).cast(dtype)
+            shared_expert_ffn1up_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert.up_proj.weight".format(idx)]).cast(dtype)
+            shared_expert_ffn1_weight = paddle.concat(x=[shared_expert_ffn1gate_weight, shared_expert_ffn1up_weight], axis=-1)
+
+            shared_expert_ffn2_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert.down_proj.weight".format(idx)]).cast(dtype)
+            shared_expert_gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert_gate.weight".format(idx)]).cast(dtype)
+            
+            self.transformer_block.gate_weights[idx].set_value(gate_weight)
+            self.transformer_block.shared_expert_ffn1_weights[idx].set_value(shared_expert_ffn1_weight)
+            self.transformer_block.shared_expert_ffn2_weights[idx].set_value(shared_expert_ffn2_weight)
+            self.transformer_block.shared_expert_gate_weights[idx].set_value(shared_expert_gate_weight)
+
+            
 
             # print("qwen2_moe.layers.{}.mlp.up_proj.weight".format(idx), up_weight)
             # print("qwen2_moe.layers.{}.mlp.gate_proj.weight".format(idx), gate_weight)
