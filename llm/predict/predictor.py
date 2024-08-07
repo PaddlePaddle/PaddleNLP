@@ -1039,6 +1039,9 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             result = result_queue.get(timeout=1)
             outputs.append(result[-1])
             output_tokens.append(result[-2])
+
+        read_res_process.terminate()
+
         if return_tokens:
             return outputs, output_tokens
         else:
@@ -1158,6 +1161,9 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
             result = result_queue.get(timeout=1)
             outputs.append(result[-1])
             output_tokens.append(result[-2])
+
+        read_res_process.terminate()
+
         if return_tokens:
             return outputs, output_tokens
         else:
@@ -1524,8 +1530,8 @@ def predict():
                     target_texts.append("")
 
     else:
-        source_texts = ["解释一下温故而知新"] * predictor_args.batch_size
-        target_texts = [""] * predictor_args.batch_size
+        source_texts = ["解释一下温故而知新", "解释一下温故而知新"]
+        target_texts = ["", ""]
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)

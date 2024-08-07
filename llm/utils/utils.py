@@ -725,11 +725,10 @@ def init_chat_template(
 
 
 def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue):
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name_or_path,
-    )
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
     paddle.device.set_device("cpu")
+    paddle.disable_static()
     outputs = []
     output_tensor = tensor_queue.get(timeout=1)
 
@@ -746,7 +745,7 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
         output_numpy = output_tensor[2 : bsz + 2].numpy()
         output_numpy[output_numpy == -1] = 2
         outputs.append(output_numpy)
-        if output_tensor[0, 0] == -1:
+        if int(output_tensor[0, 0]) == -1:
             break
     output = np.concatenate(outputs, axis=1).tolist()
     seqs = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)
