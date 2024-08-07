@@ -649,7 +649,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
                 model_kwargs["stop_flags"],
             )
 
-            logits = paddle.cast(outputs, paddle.float32)
+            logits = paddle.cast(paddle.to_tensor(outputs), paddle.float32)
 
             # pre-process distribution
             from paddlenlp_ops import get_token_penalty_multi_scores_v2
