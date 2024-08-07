@@ -37,6 +37,7 @@ from paddlenlp.transformers.model_utils import (
     get_parameter_dtype,
     load_state_dict,
     unwrap_model,
+    qdq_weight,
 )
 from paddlenlp.transformers.utils import (
     device_guard,
@@ -128,7 +129,7 @@ class UnifiedCheckpointHandler:
         self._meta_dict_mw = None
         self._meta_dict_optim = None
 
-    def _file_save_async_or_sync(self, state_dict, path, saved_signal_path=None, is_sync=True, type="model_weight"):
+    def _file_save_async_or_sync(self, state_dict, path, saved_signal_path=None, is_sync=False, type="model_weight"):
         if is_sync:
             for k in list(state_dict.keys()):
                 if isinstance(state_dict[k], paddle.Tensor):
@@ -157,15 +158,36 @@ class UnifiedCheckpointHandler:
             _traverse_copy_to_shm(state_dict, meta_dict, shm_state_dict.buf)
             ctx = multiprocessing.get_context("spawn")
             p = ctx.Process(
-                target=self._save_file_async_in_process, args=(meta_dict, shm_state_dict.name, path, saved_signal_path)
+                target=self._save_file_async_in_process, args=(meta_dict, shm_state_dict.name, path, saved_signal_path, type)
             )
             logger.info(f"Start to async save {path}")
             p.start()
             async_save_queue.append(p)
 
-    def _save_file_async_in_process(self, meta_dict, shm_name, path, saved_signal_path):
+    def _save_file_async_in_process(self, meta_dict, shm_name, path, saved_signal_path, type):
+        quant = True
         shm = shared_memory.SharedMemory(name=shm_name)
         state_dict = _read_state_dict_from_shm(meta_dict, shm)  # numpy array
+
+        if quant and type == "optimizer_weight":
+            codebook_dict = {}
+            opt_keys = state_dict.keys()
+            for k in opt_keys:
+                is_momentum = k.endswith("moment1_0")
+                quant_weight, codebook = qdq_weight(state_dict[k], quant_bit=8)
+                if not is_momentum:
+                    peek_dequant, _ = qdq_weight(codebook, scales=quant_weight, quant_bit=8, dequant=True)
+                    nonzero_mask = state_dict[k] != 0.0
+                    # outlier flag
+                    has_outlier = not np.all(peek_dequant[nonzero_mask] != 0.0)
+                    if has_outlier:
+                        quant_weight = state_dict[k].astype(np.float16)
+                print(f'{k}: {state_dict[k].dtype}')
+                state_dict[k] = quant_weight
+                codebook_dict[k + '_codebook'] = codebook
+
+            state_dict.update(codebook_dict)
+
         safe_save_file(state_dict, path, {"format": "np"})
         with open(saved_signal_path, mode="a+") as f:
             f.write(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())))
@@ -489,6 +511,7 @@ class UnifiedCheckpointHandler:
             )
 
     def unlink_shared_memory(self):
+        clear_async_save_task_queue()
         if self._shm_model_weight is not None:
             self._shm_model_weight.close()
             self._shm_model_weight.unlink()
@@ -1112,10 +1135,15 @@ def get_expected_state_dict(model_to_save):
     elif isinstance(model_to_save, PrefixModelForCausalLM):
         state_dict = model_to_save.prefix_encoder.state_dict()
 
-    if hasattr(model_to_save, "_tied_weights_keys") and model_to_save._tied_weights_keys is not None:
-        for key in model_to_save._tied_weights_keys:
-            if key in state_dict:
-                state_dict.pop(key)
+    if(
+        hasattr(model_to_save.config, "tie_word_embeddings")
+        and model_to_save.config.tie_word_embeddings
+        and hasattr(model_to_save, "_tied_weights_keys")
+        and model_to_save._tied_weights_keys is not None
+    ):
+            for key in model_to_save._tied_weights_keys:
+                if key in state_dict:
+                    state_dict.pop(key)
     return state_dict
 
 

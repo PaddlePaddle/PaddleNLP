@@ -193,13 +193,13 @@ def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False):
 #    recover_tensor = paddle.concat([tmp, paddle.to_tensor(codebook.squeeze())], axis=0)[recover_indexes.flatten().squeeze().to(paddle.int64)]
 #    return recover_tensor
 
-def get_meta(checkpoint, i):
+def get_meta(checkpoint, i, args):
     optimizer_dict = {}
     for k in checkpoint.keys():
         k_m = k + '/moment1_0'
         k_v = k + '/moment2_0'
-        optimizer_dict[k_v] = f"optimizer-0000{i+1}-of-00008.safetensors"
-        optimizer_dict[k_m] = f"optimizer-0000{i+1}-of-00008.safetensors"
+        optimizer_dict[k_v] = f"optimizer-0000{i+1}-of-0000{args.shard_num}.safetensors"
+        optimizer_dict[k_m] = f"optimizer-0000{i+1}-of-0000{args.shard_num}.safetensors"
 
     return optimizer_dict
 
@@ -254,16 +254,16 @@ def recon(checkpoint, args, i):
         data_pt[k_m] = recover_opt_m
         data_pt[k_v_acc] = ckpt["opt_v_acc"]
         data_pt[k_m_acc] = ckpt["opt_m_acc"]
-        optimizer_dict[k_v] = f"optimizer-0000{i+1}-of-00008.safetensors"
-        optimizer_dict[k_m] = f"optimizer-0000{i+1}-of-00008.safetensors"
-        optimizer_dict[k_v_acc] = f"optimizer-0000{i+1}-of-00008.safetensors"
-        optimizer_dict[k_m_acc] = f"optimizer-0000{i+1}-of-00008.safetensors"
+        optimizer_dict[k_v] = f"optimizer-0000{i+1}-of-0000{args.shard_num}.safetensors"
+        optimizer_dict[k_m] = f"optimizer-0000{i+1}-of-0000{args.shard_num}.safetensors"
+        optimizer_dict[k_v_acc] = f"optimizer-0000{i+1}-of-0000{args.shard_num}.safetensors"
+        optimizer_dict[k_m_acc] = f"optimizer-0000{i+1}-of-0000{args.shard_num}.safetensors"
         cast_w += time.time() - in_st
         in_st = time.time()
     all_time = unquant_w + unquant_v + unquant_m + cast_w
     print(f"unquant w: {unquant_w/all_time}, unquant v: {unquant_v/all_time}, unquant m: {unquant_m/all_time}, cast w: {cast_w/all_time}")
     #save_file(recon_dict, os.path.join(args.output, f"model-0000{i+1}-of-00008.safetensors"), metadata = {"format": "np"})
-    save_file(data_pt, os.path.join(args.output, f"optimizer-0000{i+1}-of-00008.safetensors"), metadata = {"format": "np"})
+    save_file(data_pt, os.path.join(args.output, f"optimizer-0000{i+1}-of-0000{args.shard_num}.safetensors"), metadata = {"format": "np"})
     ed = time.time()
     print("ckpt save time: ",ed - st)
     return optimizer_dict
@@ -299,7 +299,7 @@ def main(args):
     meta = {}
     quant_num, skip_num = 0, 0
     for i in range(args.start_idx, args.end_idx):
-        print(f"saving model-0000{i+1}-of-00008.safetensors!")
+        print(f"saving model-0000{i+1}-of-0000{args.shard_num}.safetensors!")
         w_cast, opt_cast, prune_w, prune_opt, quant_w, quant_opt, save_cast = 0, 0, 0, 0, 0, 0, 0
         if args.only_recon:
             saved_checkpoint = paddle.load(os.path.join(args.output, f"compressed_{i+1}.pt"))
@@ -307,7 +307,7 @@ def main(args):
             #meta_data = get_meta(saved_checkpoint, i)
             meta.update(meta_data)
         else:
-            with safe_open(os.path.join(args.checkpoint_path, f"model-0000{i+1}-of-00008.safetensors"),\
+            with safe_open(os.path.join(args.checkpoint_path, f"model-0000{i+1}-of-0000{args.shard_num}.safetensors"),\
                                    framework="np", device="cpu") as weights:
                 saved_checkpoint = {}
                 for ind, k in enumerate(weights.keys()):
@@ -434,7 +434,7 @@ def main(args):
     if args.recon:
         for i in range(8):
             saved_ckpt = paddle.load(os.path.join(args.output, f"compressed_{i+1}.pt"))
-            meta_data = recon(saved_ckpt, args, i, handler.info)
+            meta_data = recon(saved_ckpt, args, i)
     #paddle.cuda.synchronize()
     ed = time.time()
     print(f"quant key {quant_num}, skip key {skip_num}.")
@@ -450,7 +450,8 @@ if __name__ == "__main__":
     parser.add_argument('--quant_bits', type=int, default=8)
     parser.add_argument('--quant_stage', type=int, default=1)
     parser.add_argument('--start_idx', type=int, default=0)
-    parser.add_argument('--end_idx', type=int, default=8)
+    parser.add_argument('--end_idx', type=int, default=4)
+    parser.add_argument('--shard_num', type=int, default=4)
     parser.add_argument('--quant_bits_opt', type=int, default=8)
     parser.add_argument('--fusion_quant', action='store_true')
     parser.add_argument('--recon', action='store_true')

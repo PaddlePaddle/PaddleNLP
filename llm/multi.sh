@@ -1,11 +1,12 @@
 set -x
 temp_dir=./tmp
-checkpoint_path=${1-"checkpoints/ckpt_quant_pt_1000/checkpoint-500-ori"}
+checkpoint_path=${1-"checkpoints/qwen_ckpt_quant_pt_1000/checkpoint-500-ori"}
 output=${2-"ckpt"}
-jobs_num=${3-8}
-worker_num=${4-8}
+jobs_num=${3-4}
+worker_num=${4-4}
 bit_cnt=${5-8}
-quant_stage=${6-3}
+quant_stage=${6-1}
+shard_num=${7-4}
 
 mkdir -p ${temp_dir}
 
@@ -24,6 +25,7 @@ for dev_id in $(seq 0 $((worker_num - 1))); do
         --start_idx ${start_idx} \
         --quant_stage ${quant_stage} \
         --fusion_quant \
+        --shard_num ${shard_num} \
         --end_idx ${end_idx} &> ${temp_dir}/workerlog.${dev_id} & 
     pids="$pids $!"
 done

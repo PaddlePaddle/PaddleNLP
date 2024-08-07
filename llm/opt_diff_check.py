@@ -31,14 +31,16 @@ def main(args):
     umax_diff_key = None
     wmax_diff = 0.0
     wmax_diff_key = None
-    for i in range(8):
+    shard_num = 4
+    shard_name = "00004"
+    for i in range(shard_num):
         eps = 1e-8
         handler1 = opt_handler(os.path.join(args.checkpoint_path1, "optimizer.safetensors.index.json"), args.checkpoint_path1)
         handler2 = opt_handler(os.path.join(args.checkpoint_path2, "optimizer.safetensors.index.json"), args.checkpoint_path2)
-        path = os.path.join(args.checkpoint_path1, f"model-0000{i+1}-of-00008.safetensors")
-        path1 = os.path.join(args.checkpoint_path2, f"model-0000{i+1}-of-00008.safetensors")
+        path = os.path.join(args.checkpoint_path1, f"model-0000{i+1}-of-{shard_name}.safetensors")
+        path1 = os.path.join(args.checkpoint_path2, f"model-0000{i+1}-of-{shard_name}.safetensors")
         with safe_open(path, framework='np') as weight, safe_open(path1, framework='np') as weight1:
-            print(f"checking model-0000{i+1}-of-00008.safetensors!")
+            print(f"checking model-0000{i+1}-of-{shard_name}.safetensors!")
             for key in weight.keys():
                 k_m = key + '/moment1_0'
                 k_v = key + '/moment2_0'

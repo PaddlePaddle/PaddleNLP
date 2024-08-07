@@ -46,6 +46,7 @@ from paddle.distributed.fleet.meta_parallel.parallel_layers import (
     PipelineLayer,
     SharedLayerDesc,
 )
+from paddle.distributed import fleet
 from paddle.nn import Embedding, Layer
 
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
@@ -89,6 +90,35 @@ __all__ = [
     "register_base_model",
 ]
 
+def cal_abs_max_channel(inputs, quant_axis=1):
+    reduce_axis = tuple(
+        [i for i in range(len(inputs.shape)) if i != quant_axis])
+    abs_max_values = np.max(np.abs(inputs), axis=reduce_axis)
+    abs_max_values = np.where(
+        abs_max_values == np.array(0, dtype=inputs.dtype),
+        np.array(1e-8, dtype=inputs.dtype), abs_max_values)
+    return abs_max_values
+
+def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-1, world_size=1):
+    if scales is None:
+        scales = cal_abs_max_channel(x)
+    bnt = (1 << (quant_bit - 1)) - 1
+    if not dequant:
+        # quant
+        quant_x = np.clip(np.round(x / scales * bnt), -bnt - 1, bnt)
+        return quant_x.astype(np.int8), scales
+    else:
+        quant_x = x
+        # dequant
+        if len(quant_x.shape == 2) and quant_x.shape[1] == scales.shape[0]:
+            print(quant_x.shape, scales.shape)
+            qdq_x = quant_x / bnt * scales
+        else:
+            qdq_x = quant_x / bnt * scales[rank * scales.shape[0] // world_size: (rank + 1) * scales.shape[0] // world_size]
+        # fp32 , int8, int, fp32 or fp64
+        print(quant_x.dtype, scales.dtype, bnt, qdq_x.dtype)
+        #return qdq_x, scales
+        return qdq_x.astype(np.float32), scales
 
 def dy2st_nocheck_guard_context():
     try:
@@ -315,13 +345,13 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
     # TODO(wj-Mcat): get dtype of model when it's in DataParallel Mode.
     return last_dtype
 
-
 def load_state_dict(
     checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None, device="cpu"
 ):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
     """
+    quant = "optimizer" in checkpoint_file
     if tensor_parallel_split_mapping is None:
         tensor_parallel_split_mapping = {}
 
@@ -341,8 +371,12 @@ def load_state_dict(
             raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
         if metadata.get("format", "np") == "np":
             state_dict = {}
+            scale_dict = {}
             with safe_open(checkpoint_file, framework="np") as f:
                 for key in f.keys():
+                    if key.endswith("_codebook"):
+                        scale = f.get_tensor(key)
+                        scale_dict[key] = scale
                     if fliter_dict_keys is not None and key not in fliter_dict_keys:
                         continue
                     py_safe_slice_ = f.get_slice(key)
@@ -350,16 +384,35 @@ def load_state_dict(
                         weight = tensor_parallel_split_mapping[key](py_safe_slice_)
                     else:
                         weight = py_safe_slice_[:]
+
                     if device == "expected":
                         with device_guard():
                             weight = paddle.Tensor(weight, zero_copy=True)
                         weight = weight._copy_to(paddle.framework._current_expected_place(), False)
+
                     state_dict[key] = weight
 
             if device == "cpu":
                 for k in list(state_dict.keys()):
                     with device_guard():
                         state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+            if quant:
+                hcg = fleet.get_hybrid_communicate_group()
+                tp_group = hcg.get_model_parallel_group()
+                rank, world_size = tp_group.rank, tp_group.nranks
+
+                for quant_key in state_dict.keys():
+                    scale_key = quant_key + "_codebook"
+                    if scale_key in scale_dict:
+                        scales = scale_dict[scale_key]
+                        weight = state_dict[quant_key]
+                        weight, _ = qdq_weight(weight, scales=scales, quant_bit=8, dequant=True, rank=rank, world_size=world_size)
+                        print(f"dequant {key}")
+                    else:
+                        weight = weight.astype(np.float32)
+
+                    if quant_key.endswith("moment2_0"):
+                        weight = np.square(weight)
 
             return state_dict
 
