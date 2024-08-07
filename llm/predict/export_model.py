@@ -57,7 +57,7 @@ def main():
         {
             "dtype": predictor_args.dtype,
             "export_precache": predictor_args.export_precache,
-            "use_cachekv_int8": predictor_args.use_cachekv_int8,
+            "cachekv_int8_type": predictor_args.cachekv_int8_type,
         },
     )
     predictor.model.config.save_pretrained(export_args.output_path)

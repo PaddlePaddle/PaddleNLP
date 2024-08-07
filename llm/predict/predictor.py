@@ -96,8 +96,8 @@ class PredictorArgument:
     )
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     quant_type: str = field(
-        default=None,
-        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
+        default="",
+        metadata={"help": "Quantization type. Supported values: a8w8, a8w8c8, weight_only_int4, weight_only_int8"},
     )
     avx_model: bool = field(
         default=False, metadata={"help": "whether use AvxModel to do generation when using cpu inference"}
@@ -116,9 +116,9 @@ class PredictorArgument:
 
     block_attn: bool = field(default=False, metadata={"help": "whether use block attention"})
     block_size: int = field(default=64, metadata={"help": "the block size for cache_kvs."})
-    cachekv_int8: bool = field(
-        default=False,
-        metadata={"help": "If cachekv_int8 set as `True`, cache kv would be quantized to int8 dynamically. "},
+    cachekv_int8_type: str = field(
+        default=None,
+        metadata={"help": "If cachekv_int8_type set as `dynamic`, cache kv would be quantized to int8 dynamically. If cachekv_int8_type set as `static`, cache kv would be quantized to int8 Statically."},
     )
 
     chat_template: str = field(
@@ -135,10 +135,6 @@ class PredictorArgument:
     @property
     def total_max_length(self):
         return self.src_length + self.max_length
-
-    @property
-    def use_cachekv_int8(self):
-        return "dynamic" if self.cachekv_int8 else "None"
 
 
 @dataclass
@@ -824,7 +820,7 @@ class BlockInferencePredictorMixin:
                 paddle.ones(shape=[config.batch_size, 1, config.src_length, config.src_length], dtype=config.dtype)
             )
 
-        if config.use_cachekv_int8 == "dynamic":
+        if config.cachekv_int8_type == "dynamic":
             self.k_quant_scales = [
                 paddle.zeros([config.batch_size, self.num_attention_heads], dtype="float32")
                 for _ in range(self.num_layers)
@@ -1015,17 +1011,17 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor
         BasePredictor.__init__(self, config, tokenizer)
         BlockInferencePredictorMixin.__init__(self, config, tokenizer)
 
-        if config.use_cachekv_int8 == "dynamic" or config.use_cachekv_int8 == "static":
-            self.cache_kvs = [paddle.zeros(shape, dtype="uint8") for shape in self.cache_kvs_shape]
-        else:
-            self.cache_kvs = [paddle.zeros(shape, dtype=self.dtype) for shape in self.cache_kvs_shape]
+        cachekv_dtype = self.dtype
+        if config.cachekv_int8_type is not None:
+            cachekv_dtype = "uint8"
+        self.cache_kvs = [paddle.zeros(shape, dtype=cachekv_dtype) for shape in self.cache_kvs_shape]
 
         self.model = model
 
         self.init_inputs(config)
         if config.export_precache:
             self.inputs["pre_caches"] = self.pre_caches
-        if config.use_cachekv_int8 == "dynamic":
+        if config.cachekv_int8_type == "dynamic":
             self.inputs["k_quant_scales"] = self.k_quant_scales
             self.inputs["v_quant_scales"] = self.v_quant_scales
             self.inputs["k_dequant_scales"] = self.k_dequant_scales
@@ -1090,23 +1086,19 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin, BasePredictor)
                 self.inputs["pre_caches_{}".format(i)] = self.pre_caches[i]
 
         self.cache_kvs = {}
-        if config.use_cachekv_int8 == "dynamic" or config.use_cachekv_int8 == "static":
-            for i in range(len(self.cache_kvs_shape) // 2):
-                self.cache_kvs["key_caches_{}".format(i)] = paddle.zeros(self.cache_kvs_shape[2 * i], dtype="uint8")
-                self.cache_kvs["value_caches_{}".format(i)] = paddle.zeros(
-                    self.cache_kvs_shape[2 * i + 1], dtype="uint8"
-                )
-        else:
-            for i in range(len(self.cache_kvs_shape) // 2):
-                self.cache_kvs["key_caches_{}".format(i)] = paddle.zeros(
-                    self.cache_kvs_shape[2 * i], dtype=config.dtype
-                )
-                self.cache_kvs["value_caches_{}".format(i)] = paddle.zeros(
-                    self.cache_kvs_shape[2 * i + 1], dtype=config.dtype
-                )
+        cachekv_dtype = config.dtype
+        if config.cachekv_int8_type is not None:
+            cachekv_dtype = "uint8"
+        for i in range(len(self.cache_kvs_shape) // 2):
+            self.cache_kvs["key_caches_{}".format(i)] = paddle.zeros(
+                self.cache_kvs_shape[2 * i], dtype=cachekv_dtype
+            )
+            self.cache_kvs["value_caches_{}".format(i)] = paddle.zeros(
+                self.cache_kvs_shape[2 * i + 1], dtype=cachekv_dtype
+            )
 
         for i in range(self.num_layers):
-            if self.config.use_cachekv_int8 == "dynamic":
+            if self.config.cachekv_int8_type == "dynamic":
                 self.inputs["k_quant_scales_" + str(i)] = self.k_quant_scales[i]
                 self.inputs["v_quant_scales_" + str(i)] = self.v_quant_scales[i]
                 self.inputs["k_dequant_scales_" + str(i)] = self.k_dequant_scales[i]
@@ -1362,34 +1354,22 @@ def create_predictor(
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
-            config.weight_only_quant_bits = -1
-            config.quant_type = None
-            config.model_name_or_path = ""
-            config.use_cachekv_int8 = predictor_args.use_cachekv_int8
+            config.model_name_or_path = predictor_args.model_name_or_path
+            config.quant_type = predictor_args.quant_type
+            config.cachekv_int8_type = predictor_args.cachekv_int8_type
             config.single_card_ptq = True
             if predictor_args.avx_model:
                 config.avx_type = predictor_args.avx_type
 
-            if predictor_args.quant_type is not None:
-                if predictor_args.quant_type.startswith("weight_only_int"):
-                    weight_only_quant_bits = int(predictor_args.quant_type[-1])
-                    config.weight_only_quant_bits = weight_only_quant_bits
-                    config.quant_type = predictor_args.quant_type
-                elif predictor_args.quant_type == "a8w8":
-                    config.quant_type = predictor_args.quant_type
-
-            if config.quantization_config.quant_type is not None and "a8w8" in config.quantization_config.quant_type:
-                config.model_name_or_path = predictor_args.model_name_or_path
+            if config.quantization_config.quant_type is not None:
                 config.quant_type = config.quantization_config.quant_type
+                if "c8" in config.quant_type:
+                    config.cachekv_int8_type = "static"
 
                 ptq_multicards_num = get_ptq_multicards_num(config.model_name_or_path)
                 logger.info(f"PTQ from {ptq_multicards_num} cards, so we will not split")
                 if ptq_multicards_num > 1:
                     config.single_card_ptq = False
-
-                # Turn on GEMM int8 kernel tuning
-                paddle.base.core.enable_autotune()
-                paddle.base.core.update_autotune_status()
 
             if "llama" in config.architectures[0].lower():
                 if model_args.model_type == "llama-img2txt":
@@ -1557,7 +1537,6 @@ def create_predictor(
                 if predictor_args.block_attn:
                     config.block_size = predictor_args.block_size
                     config.max_seq_len = predictor_args.total_max_length
-                    config.use_dynamic_cachekv_quant = predictor_args.use_cachekv_int8 == "dynamic"
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
                     )

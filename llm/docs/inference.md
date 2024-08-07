@@ -154,8 +154,10 @@ python ./predict/predictor.py  --model_name_or_path ./inference --inference_mode
 
 # PTQ-A8W8静态图推理命令参考
 # 以下环境变量用于开启int8矩阵乘的算法选择以获得更快的推理速度，打开之后第一次执行会执行算法选择从而导致速度较慢。
-export FLAGS_use_autotune=1
-export FLAGS_cublaslt_exhaustive_search_times=10
+# 开启后会在计算int8 matmul时启用cuBLASLt全局搜索找寻最优配置
+export FLAGS_enable_blaslt_global_search=1
+# 开启后会在离线文件中加载int8 matmul配置(使用方式可参考https://github.com/PaddlePaddle/Paddle/pull/66132描述)
+export FLAGS_cublaslt_device_best_config=/path/to/file
 export FLAGS_cache_inference_while_scope=1
 
 python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --quant_type weight_only_int8 --dtype "float16" --mode "static"
@@ -185,7 +187,7 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 python ./predict/predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --dtype float16 --block_attn
 
 # CacheKV 动态量化推理命令参考
-python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --cachekv_int8
+python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16 --block_attn --cachekv_int8_type dynamic
 ```
 
 #### 2.4.2 静态图推理
@@ -204,7 +206,7 @@ python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat
 python ./predict/export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --inference_model --output_path ./inference --dtype float16 --block_attn
 
 # CacheKV 动态量化动转静命令参考
-python ./predict/export_model.py  --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn --cachekv_int8
+python ./predict/export_model.py  --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16 --block_attn --cachekv_int8_type dynamic
 ```
 
 **step2：静态图推理**
@@ -226,12 +228,13 @@ export FLAGS_cache_inference_while_scope=1
 
 python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --block_attn
 
-# CacheKV 动态量化8静态图推理命令参考
-python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --cachekv_int8 --block_attn
+# CacheKV 动态量化int8静态图推理命令参考
+python ./predict/predictor.py  --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static" --cachekv_int8_type dynamic --block_attn
 ```
 **Note**：
-1. 使用Weight Only Int8 推理需要额外传入 `quant_type`。
-2. A8W8推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。
+1. `quant_type`可选的数值有`weight_only_int8`，`weight_only_int4`，`a8w8`, `a8w8c8`。
+2. `a8w8`推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型，需要额外的act和weight的scale校准表。
+3. `cachekv_int8_type`可选`dynamic`和`static`两种，`static`需要额外的cache kv的scale校准表。
 
 
 ## 3. 推理参数介绍
@@ -254,4 +257,4 @@ python ./predict/predictor.py  --model_name_or_path ./inference --inference_mode
 - `inference_model`: 是否使用Inference Model 推理，默认值为 False。
 - `block_attn`: 是否使用Block Attention 推理， 默认值为False。
 - `block_size`: 如果使用Block Attention 推理，指定一个Block可以存储的token数量，默认值为64。
-- `cachekv_int8`: 是否使用cachekv int8量化用于节省显存，默认值为False。
+- `cachekv_int8_type`: 是否使用cachekv int8量化用于节省显存，可以是动态或者静态，默认值为None。
