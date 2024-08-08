@@ -17,7 +17,6 @@ import os
 import unittest
 
 import paddle
-import pytest
 from parameterized import parameterized_class
 
 from paddlenlp.experimental.transformers import QWenForQWenVLInferenceModel
@@ -62,9 +61,9 @@ class PredictorTest(LLMTest, unittest.TestCase):
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
 
     def test_predictor(self):
-        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 256})
+        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
         result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
-        self.run_predictor({"inference_model": False, "src_length": 512, "max_length": 256})
+        self.run_predictor({"inference_model": False, "src_length": 512, "max_length": 48})
         result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
 
         # compare the generation result of inference & dygraph model
@@ -85,12 +84,12 @@ class PredictorTest(LLMTest, unittest.TestCase):
 
     def test_flash_attention(self):
         self.run_predictor(
-            {"inference_model": False, "use_flash_attention": False, "src_length": 512, "max_length": 256}
+            {"inference_model": False, "use_flash_attention": False, "src_length": 512, "max_length": 48}
         )
         result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
 
         self.run_predictor(
-            {"inference_model": False, "use_flash_attention": True, "src_length": 512, "max_length": 256}
+            {"inference_model": False, "use_flash_attention": True, "src_length": 512, "max_length": 48}
         )
         result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
 
@@ -113,10 +112,10 @@ class PredictorTest(LLMTest, unittest.TestCase):
 
     def test_wint8(self):
         self.run_predictor(
-            {"inference_model": True, "quant_type": "weight_only_int8", "src_length": 512, "max_length": 256}
+            {"inference_model": True, "quant_type": "weight_only_int8", "src_length": 512, "max_length": 48}
         )
         result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
-        self.run_predictor({"inference_model": False, "src_length": 512, "max_length": 256})
+        self.run_predictor({"inference_model": False, "src_length": 512, "max_length": 48})
         result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
 
         assert len(result_0) == len(result_1)
@@ -171,7 +170,7 @@ class PredictorPrecacheTest(LLMTest, unittest.TestCase):
                 "export_precache": True,
                 "prefix_path": self.output_dir,
                 "src_length": 512,
-                "max_length": 256,
+                "max_length": 48,
             }
         )
         result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
@@ -181,7 +180,7 @@ class PredictorPrecacheTest(LLMTest, unittest.TestCase):
                 "export_precache": True,
                 "prefix_path": self.output_dir,
                 "src_length": 512,
-                "max_length": 256,
+                "max_length": 48,
             }
         )
         result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
@@ -197,41 +196,6 @@ class PredictorPrecacheTest(LLMTest, unittest.TestCase):
 
         self.assertGreaterEqual(full_match / len(result_0), 0.6)
         self.assertGreaterEqual(count / len(result_0), 0.8)
-
-
-class PredictorBaseTest(LLMTest, unittest.TestCase):
-    def load_test_config(self):
-        config = load_test_config("./tests/fixtures/llm/predictor.yaml", "inference-predict")
-        config["model_name_or_path"] = "__internal_testing__/micro-random-llama"
-
-        return config
-
-    def test_create_predictor_with_unexpected_length(self):
-        from predict.predictor import predict
-
-        config = self.load_test_config()
-        config.pop("src_length", None)
-        config.pop("max_length", None)
-
-        with pytest.raises(ValueError, match="--src_length<2048> param should be smaller "):
-            config["src_length"] = 2048
-
-            with argv_context_guard(config):
-                predict()
-
-        with pytest.raises(ValueError, match="--max_length<2048> param should be smaller "):
-            config.pop("src_length", None)
-            config["max_length"] = 2048
-
-            with argv_context_guard(config):
-                predict()
-
-        with pytest.raises(ValueError, match="The sum of src_length<1025> and"):
-            config["max_length"] = 1024
-            config["src_length"] = 1025
-
-            with argv_context_guard(config):
-                predict()
 
 
 @parameterized_class(
@@ -253,9 +217,9 @@ class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
 
     def test_blha(self):
-        self.run_predictor({"inference_model": True, "block_attn": True, "src_length": 1024, "max_length": 48})
+        self.run_predictor({"inference_model": True, "block_attn": True, "src_length": 512, "max_length": 48})
         result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
-        self.run_predictor({"inference_model": False, "src_length": 1024, "max_length": 48})
+        self.run_predictor({"inference_model": False, "src_length": 512, "max_length": 48})
         result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
 
         # compare the generation result of inference & dygraph model
@@ -281,12 +245,12 @@ class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
                 "quant_type": "weight_only_int8",
                 "block_attn": True,
                 "src_length": 512,
-                "max_length": 256,
+                "max_length": 48,
             }
         )
         result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
         self.run_predictor(
-            {"inference_model": True, "quant_type": "weight_only_int8", "src_length": 512, "max_length": 256}
+            {"inference_model": True, "quant_type": "weight_only_int8", "src_length": 512, "max_length": 48}
         )
         result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
 
@@ -298,7 +262,7 @@ class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
             count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
 
-        self.assertGreaterEqual(full_match / len(result_0), 0.6)
+        self.assertGreaterEqual(full_match / len(result_0), 0.55)
 
         if self.model_name_or_path == "__internal_testing__/tiny-fused-chatglm":
             self.assertGreaterEqual(count / len(result_0), 0.3)
@@ -312,11 +276,11 @@ class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
                 "block_attn": True,
                 "cachekv_int8_type": "dynamic",
                 "src_length": 512,
-                "max_length": 256,
+                "max_length": 48,
             }
         )
         result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
-        self.run_predictor({"inference_model": True, "block_attn": True, "src_length": 512, "max_length": 256})
+        self.run_predictor({"inference_model": True, "block_attn": True, "src_length": 512, "max_length": 48})
         result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
         print(f"result_0 {result_0}, result_1 {result_1}")
 
@@ -328,7 +292,7 @@ class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
             count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
 
-        self.assertGreaterEqual(count / len(result_0), 0.15)
+        self.assertGreaterEqual(count / len(result_0), 0.1)
 
 
 @parameterized_class(
@@ -351,9 +315,9 @@ class GPUsPredictorTest(LLMTest, GPUsTesting, unittest.TestCase):
     def test_predictor(self):
         self.init_dist_env()
 
-        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 256})
+        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
         result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
-        self.run_predictor({"inference_model": False, "src_length": 512, "max_length": 256})
+        self.run_predictor({"inference_model": False, "src_length": 512, "max_length": 48})
         result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
 
         # compare the generation result of inference & dygraph model

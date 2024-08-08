@@ -724,6 +724,19 @@ def init_chat_template(
     tokenizer.init_chat_template(chat_template_file)
 
 
+def get_model_max_position_embeddings(config: PretrainedConfig) -> Optional[int]:
+    names = [
+        "max_position_embeddings",  # most of models
+        "max_sequence_length",  # GLM model
+        "seq_length",  # llama model
+    ]
+    for name in names:
+        max_length = config.get(name, None)
+        if max_length is not None:
+            return max_length
+    return None
+
+
 def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue):
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
