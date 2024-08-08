@@ -529,13 +529,7 @@ std::vector<std::vector<int64_t>> RMSLnBwdInferShape(
   return {x_shape, scale_shape};
 }
 
-std::vector<paddle::DataType> LnBwdInferDtype(paddle::DataType x_dtype,
-                                              paddle::DataType scale_dtype,
-                                              paddle::DataType mean_dtype,
-                                              paddle::DataType invvar_dtype,
-                                              paddle::DataType dy_dtype) {
-  return {x_dtype, scale_dtype, scale_dtype};
-}
+// fast_ln define SetInferDtypeFn
 
 PD_BUILD_OP(fast_ln)
     .Inputs({"x", "scale", "bias"})
