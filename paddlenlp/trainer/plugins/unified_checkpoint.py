@@ -28,6 +28,7 @@ from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.trainer.trainer_utils import ExplicitEnum
 from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
@@ -121,6 +122,7 @@ class UnifiedCheckpointOption(ExplicitEnum):
 class UnifiedCheckpointHandler:
     def __init__(self, args):
         self.args = args
+        self.global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
 
         # Mainly for asynchronous saving.
         self._shm_model_weight = None
@@ -134,7 +136,6 @@ class UnifiedCheckpointHandler:
         self._process_optimizer_weight = None
         self._lock = None
         self._shared_save_path = None
-        self._shared_signal_path = None
         self._shared_save_model_flag = None
         self._shared_save_master_weight_flag = None
         self._shared_save_optimizer_flag = None
@@ -144,14 +145,11 @@ class UnifiedCheckpointHandler:
             self._shared_save_model_path = multiprocessing.Array("c", 100000)
             self._shared_save_master_weight_path = multiprocessing.Array("c", 100000)
             self._shared_save_optimizer_path = multiprocessing.Array("c", 100000)
-            self._shared_signal_path = multiprocessing.Array("c", 100000)
             self._shared_save_model_flag = multiprocessing.Array("i", 1)
             self._shared_save_master_weight_flag = multiprocessing.Array("i", 1)
             self._shared_save_optimizer_flag = multiprocessing.Array("i", 1)
 
-    def _file_save_async_or_sync(
-        self, state_dict, path, saved_signal_path=None, is_sync=True, state_dict_type="model_weight"
-    ):
+    def _file_save_async_or_sync(self, state_dict, path, is_sync=True, state_dict_type="model_weight"):
         if is_sync:
             for k in list(state_dict.keys()):
                 if isinstance(state_dict[k], paddle.Tensor):
@@ -174,8 +172,9 @@ class UnifiedCheckpointHandler:
                             self._shm_model_weight.name,
                             self._shared_save_model_flag,
                             self._shared_save_model_path,
-                            self._shared_signal_path,
                             self._lock,
+                            state_dict_type,
+                            self.global_rank,
                         ),
                     )
                     self._process_model_weight.start()
@@ -195,8 +194,9 @@ class UnifiedCheckpointHandler:
                             self._shm_master_weight.name,
                             self._shared_save_master_weight_flag,
                             self._shared_save_master_weight_path,
-                            self._shared_signal_path,
                             self._lock,
+                            state_dict_type,
+                            self.global_rank,
                         ),
                     )
                     self._process_master_weight.start()
@@ -216,8 +216,9 @@ class UnifiedCheckpointHandler:
                             self._shm_optimizer_weight.name,
                             self._shared_save_optimizer_flag,
                             self._shared_save_optimizer_path,
-                            self._shared_signal_path,
                             self._lock,
+                            state_dict_type,
+                            self.global_rank,
                         ),
                     )
                     self._process_optimizer_weight.start()
@@ -230,13 +231,19 @@ class UnifiedCheckpointHandler:
                 logger.info(f"Wait for the previous save process to finish saving {state_dict_type}")
             # only save model weight or save master weight, we enter this loop.
             self._reset_and_update(shared_save_path, path)
-            self._reset_and_update(self._shared_signal_path, saved_signal_path)
             _traverse_copy_to_shm(state_dict, meta_dict, shm_state_dict.buf)
             with self._lock:
                 shared_save_flag[0] = 1
 
     def _save_file_async_in_process(
-        self, meta_dict, shm_name, shared_save_flag, shared_save_path, shared_signal_path, lock
+        self,
+        meta_dict,
+        shm_name,
+        shared_save_flag,
+        shared_save_path,
+        lock,
+        state_dict_type,
+        global_rank,
     ):
         shm = shared_memory.SharedMemory(name=shm_name)
         while True:
@@ -247,14 +254,13 @@ class UnifiedCheckpointHandler:
                 continue
             if flag_value == 1:  # need to save
                 path = shared_save_path[:].decode("utf-8").rstrip("\x00")
-                saved_signal_path = shared_signal_path[:].decode("utf-8").rstrip("\x00")
                 logger.info(f"Start to async save {path}")
                 state_dict = _read_state_dict_from_shm(meta_dict, shm)  # numpy array
                 safe_save_file(state_dict, path, {"format": "np"})
                 del state_dict
-                with open(saved_signal_path, mode="a+") as f:
-                    f.write(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time())))
-                    f.write("\n")
+                if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
+                    saved_signal_path = os.path.join(os.path.dirname(path), f".{state_dict_type}.done.{global_rank}")
+                    paddle.save(global_rank, saved_signal_path)
                 with lock:
                     shared_save_flag[0] = 0
             time.sleep(0.5)
@@ -317,7 +323,6 @@ class UnifiedCheckpointHandler:
             self._file_save_async_or_sync(
                 state_dict,
                 path=os.path.join(save_directory, shard_file),
-                saved_signal_path=os.path.join(save_directory, f"saved_signal_{dist.get_rank()}"),
                 is_sync=is_sync_save,
                 state_dict_type="model_weight",
             )
@@ -413,14 +418,12 @@ class UnifiedCheckpointHandler:
         self._file_save_async_or_sync(
             optim_state_dict,
             path=os.path.join(output_dir, optimizer_name),
-            saved_signal_path=os.path.join(output_dir, f"saved_signal_{dist.get_rank()}"),
             is_sync=is_sync_save,
             state_dict_type="optimizer_weight",
         )
         self._file_save_async_or_sync(
             master_weights,
             path=os.path.join(output_dir, master_weights_name),
-            saved_signal_path=os.path.join(output_dir, f"saved_signal_{dist.get_rank()}"),
             is_sync=is_sync_save,
             state_dict_type="master_weight",
         )
@@ -510,7 +513,6 @@ class UnifiedCheckpointHandler:
         self._file_save_async_or_sync(
             optim_state_dict,
             path=os.path.join(save_directory, shard_optim_file),
-            saved_signal_path=os.path.join(save_directory, f"saved_signal_{dist.get_rank()}"),
             is_sync=is_sync_save,
             state_dict_type="optimizer_weight",
         )
@@ -518,7 +520,6 @@ class UnifiedCheckpointHandler:
             self._file_save_async_or_sync(
                 master_weight_state_dict,
                 path=os.path.join(save_directory, shard_master_weight_file),
-                saved_signal_path=os.path.join(save_directory, f"saved_signal_{dist.get_rank()}"),
                 is_sync=is_sync_save,
                 state_dict_type="master_weight",
             )

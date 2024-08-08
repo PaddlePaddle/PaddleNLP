@@ -2273,11 +2273,32 @@ class Trainer:
             # recover unified_checkpoint_config for not trine stage
             if not self.is_in_train:
                 self.args.unified_checkpoint_config = unified_checkpoint_config_backup
+        else:
+            if (
+                strtobool(os.getenv("FLAG_LLM_PDC", "False"))
+                and self.args.unified_checkpoint
+                and "async_save" in self.args.unified_checkpoint_config
+            ):
+                if self.is_in_train:
+                    global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                    paddle.save(global_rank, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
+
         if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
             # save model_done file to ensure model is complete
-            if self.args.should_save_model_state and self.args.should_save:
+            if (
+                self.args.should_save_model_state
+                and self.args.should_save
+                and not ("async_save" in self.args.unified_checkpoint_config)
+            ):
                 # For ckpt integrity
                 paddle.save(self.state.global_step, os.path.join(output_dir, ".model_done"))
+            elif (
+                self.args.unified_checkpoint
+                and "async_save" in self.args.unified_checkpoint_config
+                and not self.is_in_train
+            ):
+                global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                paddle.save(self.state.global_step, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
 
     def _filter_moe_no_sync_optimizer_params(self):
         """
@@ -2436,7 +2457,7 @@ class Trainer:
         if need_to_rotate_checkpoints:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
-        if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
+        if strtobool(os.getenv("FLAG_LLM_PDC", "False")) and not ("async_save" in self.args.unified_checkpoint_config):
             # save checkpoint_done file to ensure checkpoint is complete
             if self.args.should_save_model_state and self.args.should_save:
                 # For ckpt integrity
