@@ -18,6 +18,7 @@ import re
 from functools import reduce
 
 import paddle
+import paddle.distributed as dist
 from paddle.distributed.checkpoint.load_state_dict import (
     _load_state_dict,
     get_local_load_files,
@@ -39,7 +40,7 @@ class CheckpointConverter:
         self.use_dist = True if paddle.distributed.get_world_size() > 1 else False
         self.path = dynamic_ckpt_path
         self.semi_auto_model_state = model_state
-        self.parameter_to_structured_name = parameter_to_structured_name
+        self.parameter_to_structured_name = self.gather_global_object(parameter_to_structured_name)
         model_state_global_shape = {}
         for k, v in model_state.items():
             model_state_global_shape[k] = v.shape
@@ -138,7 +139,7 @@ class CheckpointConverter:
             if file.endswith(OPTIMIZER_WEIGHT_SUFFIX) and sharding_stage1_v[0] == 2:
                 for k, v in state_dict.items():
                     # Under shardingv2, the optimizer state is first flattened and then split.
-                    if "_fp32_master_0_moment" in k and len(v.shape) != 1:
+                    if "_moment" in k and len(v.shape) != 1:
                         sharding_stage1_v = [1]
                         break
 
@@ -186,10 +187,10 @@ class CheckpointConverter:
 
     def optimizer_key_to_model_state_key(self, optimizer_key):
         adamw_optimizer_key_suffix = [
-            ".w_0_fp32_master_0_beta1_pow_acc_0",
-            ".w_0_fp32_master_0_beta2_pow_acc_0",
-            ".w_0_fp32_master_0_moment1_0",
-            ".w_0_fp32_master_0_moment2_0",
+            ".w_0_beta1_pow_acc_0",
+            ".w_0_beta2_pow_acc_0",
+            ".w_0_moment1_0",
+            ".w_0_moment2_0",
             ".w_0",
         ]
         model_state_key = optimizer_key
@@ -320,6 +321,25 @@ class CheckpointConverter:
                         # In sharding stage3, ‘@slice’ will be added in front of the key for master_weight, which is removed here.
                         k = k.replace("slice@", "")
                         state_dict[k] = v
+
+                # Standardize the state names of the AdamW optimizer.
+                adamw_optimizer_param_suffix_name_mapping = {
+                    ".w_0_fp32_master_0_moment1_0": ".w_0_moment1_0",
+                    ".w_0_fp32_master_0_moment2_0": ".w_0_moment2_0",
+                    ".w_0_fp32_master_0_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
+                    ".w_0_fp32_master_0_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
+                }
+
+                unified_name_state_dict = {}
+                for k, v in state_dict.items():
+                    new_k = k
+                    for suffix in adamw_optimizer_param_suffix_name_mapping:
+                        if k.endswith(suffix):
+                            new_k = k.replace(suffix, adamw_optimizer_param_suffix_name_mapping[suffix])
+                            break
+                    unified_name_state_dict[new_k] = v
+
+                self.cur_rank_loaded_state_dict[file] = unified_name_state_dict
 
         # After the rank has finished loading the files it needs, it can infer sharding_stage1_v and is_sharding_stage3.
         self.sharding_stage1_v = self.infer_sharding_stage1_v()
@@ -636,15 +656,13 @@ class CheckpointConverter:
             storage_metadata = {}
             # After obtaining the local_shape and sharding rank of each tensor, the global offset of each tensor can be calculated.
             for k, v in self.global_sharded_tensor_infos.items():
-                global_offset = 0
+                global_offset = [0] * self.tp_degree
                 for item in v:
-                    if item[0]["tp_rank"] != -1:
-                        k_with_tp_rank = k + "_tp" + "{:02d}".format(item[0]["tp_rank"])
-                    else:
-                        k_with_tp_rank = k
-                    local_tensor_meta_data = LocalTensorMetadata((global_offset,), item[1], item[2])
-                    local_tensor_index = LocalTensorIndex(k_with_tp_rank, (global_offset,))
-                    global_offset += item[1][0]
+                    tp_rank = item[0]["tp_rank"]
+                    k_with_tp_rank = k + "_tp" + "{:02d}".format(tp_rank)
+                    local_tensor_meta_data = LocalTensorMetadata((global_offset[tp_rank],), item[1], item[2])
+                    local_tensor_index = LocalTensorIndex(k_with_tp_rank, (global_offset[tp_rank],))
+                    global_offset[tp_rank] += item[1][0]
                     if k_with_tp_rank not in state_dict_metadata:
                         state_dict_metadata[k_with_tp_rank] = [local_tensor_meta_data]
                     else:
@@ -687,12 +705,17 @@ class CheckpointConverter:
             for cur_rank, partition_model_state in partition_mapping.items():
                 partition_model_state_keys.append([item[0] for item in partition_model_state])
 
-            global_model_state_flattened_shapes = {}
-            for item in global_model_state_shapes:
-                name = item[0]
-                shape = item[1]
-                flattened_size = reduce(lambda x, y: x * y, shape)
-                global_model_state_flattened_shapes[name] = flattened_size
+            param_meta = {}
+            for i in range(self.tp_degree):
+                for j in range(self.pp_degree):
+                    key = "tp{:02d}_pp{:02d}".format(i, j)
+                    pm = self.model_meta["sharding_metas"][key]["param_meta"]
+                    for k, v in pm.items():
+                        param_meta[k] = v
+
+            param_flattened_shapes = {}
+            for k, v in param_meta.items():
+                param_flattened_shapes[k] = reduce(lambda x, y: x * y, v[0])
 
             cur_rank_need_load_model_state_keys = partition_model_state_keys[self.cur_rank]
 
@@ -701,25 +724,21 @@ class CheckpointConverter:
             for key in cur_rank_need_load_model_state_keys:
                 for tp_rank in range(self.tp_degree):
                     tp_rank_suffix = "_tp{:02d}".format(tp_rank)
-                    optimizer_state_dict[key + ".w_0_fp32_master_0_moment1_0" + tp_rank_suffix] = paddle.zeros(
-                        (global_model_state_flattened_shapes[key],), "float32"
+                    optimizer_state_dict[key + ".w_0_moment1_0" + tp_rank_suffix] = paddle.zeros(
+                        (param_flattened_shapes[key],), "float32"
                     )
-                    optimizer_state_dict[key + ".w_0_fp32_master_0_moment2_0" + tp_rank_suffix] = paddle.zeros(
-                        (global_model_state_flattened_shapes[key],), "float32"
+                    optimizer_state_dict[key + ".w_0_moment2_0" + tp_rank_suffix] = paddle.zeros(
+                        (param_flattened_shapes[key],), "float32"
                     )
                     if self.optimizer_state_with_master_weights:
                         optimizer_state_dict[key + ".w_0" + tp_rank_suffix] = paddle.zeros(
-                            (global_model_state_flattened_shapes[key],), "float32"
+                            (param_flattened_shapes[key],), "float32"
                         )
                     # When handling tensor parallelism (TP), if some tensors are replicated, we initially assume that they are partitioned.
                     # Later, when these are compared with the global shape, we realize that they are replicated.
 
-                    optimizer_state_dict[key + ".w_0_fp32_master_0_beta1_pow_acc_0" + tp_rank_suffix] = paddle.zeros(
-                        (1,), "float32"
-                    )
-                    optimizer_state_dict[key + ".w_0_fp32_master_0_beta2_pow_acc_0" + tp_rank_suffix] = paddle.zeros(
-                        (1,), "float32"
-                    )
+                    optimizer_state_dict[key + ".w_0_beta1_pow_acc_0" + tp_rank_suffix] = paddle.zeros((1,), "float32")
+                    optimizer_state_dict[key + ".w_0_beta2_pow_acc_0" + tp_rank_suffix] = paddle.zeros((1,), "float32")
 
             # merge sharding
             _load_state_dict(optimizer_state_dict, source_state_dict_for_merge_sharding, [metadata_for_merge_sharding])
@@ -727,13 +746,11 @@ class CheckpointConverter:
             # Reshape
             for k, v in optimizer_state_dict.items():
                 if v.shape[0] > 1 and "_tp" in k:
-                    for item in global_model_state_shapes:
-                        master_weight_key = item[0]
-                        shape = item[1]
-                        if master_weight_key in k and reduce(lambda a, b: a * b, shape) == v.numel():
-                            reshaped_v = v.reshape(shape)
-                            optimizer_state_dict[k] = reshaped_v
-
+                    param_name = self.optimizer_key_to_model_state_key(k[:-5])
+                    param_shape = param_meta[param_name][0]
+                    assert v.numel() == reduce(lambda x, y: x * y, param_shape)
+                    reshaped_v = v.reshape(param_shape)
+                    optimizer_state_dict[k] = reshaped_v
             concat_optimier_state_dict = {}
 
             optimizer_state_key_to_tp_keys = {}
@@ -821,7 +838,6 @@ class CheckpointConverter:
             return self.gen_metadata_for_tp_sharded_tensor()
         else:
             if self.is_sharding_stage3:
-                return
                 for k, v in self.global_sharded_tensor_infos.items():
                     v.sort(key=lambda x: x[0]["sharding_rank"])
 
@@ -900,11 +916,15 @@ class CheckpointConverter:
             self.semi_auto_model_state.pop(key)
 
         adamw_optimizer_status_name_suffix_mappings = {
-            "_fp32_master_1_moment1_0": ".w_0_fp32_master_0_moment1_0",
-            "_fp32_master_1_moment2_0": ".w_0_fp32_master_0_moment2_0",
-            "_fp32_master_1_beta1_pow_acc_0": ".w_0_fp32_master_0_beta1_pow_acc_0",
-            "_fp32_master_1_beta2_pow_acc_0": ".w_0_fp32_master_0_beta2_pow_acc_0",
+            "_fp32_master_1_moment1_0": ".w_0_moment1_0",
+            "_fp32_master_1_moment2_0": ".w_0_moment2_0",
+            "_fp32_master_1_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
+            "_fp32_master_1_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
             "_fp32_master_1": ".w_0",
+            "_moment1_0": ".w_0_moment1_0",
+            "_moment2_0": ".w_0_moment2_0",
+            "_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
+            "_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
         }
 
         def rename(old_name, map1, map2):
@@ -923,7 +943,6 @@ class CheckpointConverter:
                 new_name = key
             else:
                 new_name = rename(key, self.parameter_to_structured_name, adamw_optimizer_status_name_suffix_mappings)
-                print(new_name)
             assert new_name is not None
             renamed_state_dict[new_name] = value
 
@@ -946,14 +965,15 @@ class CheckpointConverter:
                 master_weight = k + ".w_0"
                 if master_weight not in self.semi_auto_model_state:
                     appended_master_weight_names.append(master_weight)
-                    # TODO(zhuxinming) Create a new distributed tensor with the same distribution information as the corresponding parameter.
-                    self.semi_auto_model_state[master_weight] = paddle.zeros(v._local_value().shape, "float32")
+                    tmp_tensor = paddle.zeros(v.shape, "float32")
+                    dist_tmp_tensor = dist.shard_tensor(tmp_tensor, v.process_mesh, v.placements)
+                    self.semi_auto_model_state[master_weight] = dist_tmp_tensor
 
             _load_state_dict(self.semi_auto_model_state, source_state_dict, [metadata])
             for k, v in model_params.items():
                 master_weight = self.semi_auto_model_state[k + ".w_0"]
-                # cast_master_weight = paddle.cast(master_weight, "bfloat16")
-
+                cast_master_weight = paddle.cast(master_weight._local_value(), "bfloat16")
+                paddle.assign(cast_master_weight, v._local_value())
             for k in appended_master_weight_names:
                 self.semi_auto_model_state.pop(k)
 
