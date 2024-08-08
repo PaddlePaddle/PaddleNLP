@@ -34,7 +34,7 @@ def is_visualdl_available():
 
 
 def is_tensorboard_available():
-    return importlib.util.find_spec("tensorboard") is not None or importlib.util.find_spec("tensorboardX") is not None
+    return importlib.util.find_spec("tensorboardX") is not None
 
 
 def is_wandb_available():
@@ -171,22 +171,14 @@ class TensorBoardCallback(TrainerCallback):
     def __init__(self, tb_writer=None):
         has_tensorboard = is_tensorboard_available()
         if not has_tensorboard:
-            raise RuntimeError(
-                "TensorBoardCallback requires tensorboard to be installed. Either update your PyTorch version or"
-                " install tensorboardX."
-            )
+            raise RuntimeError("TensorBoardCallback requires tensorboardX to be installed")
         if has_tensorboard:
             try:
-                from torch.utils.tensorboard import SummaryWriter  # noqa: F401
+                from tensorboardX import SummaryWriter
 
                 self._SummaryWriter = SummaryWriter
             except ImportError:
-                try:
-                    from tensorboardX import SummaryWriter
-
-                    self._SummaryWriter = SummaryWriter
-                except ImportError:
-                    self._SummaryWriter = None
+                self._SummaryWriter = None
         else:
             self._SummaryWriter = None
         self.tb_writer = tb_writer
