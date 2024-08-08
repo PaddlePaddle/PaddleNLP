@@ -689,11 +689,10 @@ class YuanAttention(nn.Layer):
             seqlen_k = key_states.shape[1]
 
             # q, k, v = [rearrange(x, "b s ... -> (b s) ...") for x in [query_states, key_states, value_states]]
-            b, s = query_states.shape[:2]
-            new_shape = (b * s,) + tuple(query_states.shape[2:])
-            q = paddle.reshape(query_states, new_shape)
-            k = paddle.reshape(key_states, new_shape)
-            v = paddle.reshape(value_states, new_shape)
+            q, k, v = [
+                x.reshape([x.shape[0] * x.shape[1]] + list(x.shape[2:]))
+                for x in [query_states, key_states, value_states]
+            ]
 
             cu_seqlens_q = paddle.arange(0, (batch_size + 1) * seqlen_q, step=seqlen_q, dtype="int32")
 
@@ -710,7 +709,7 @@ class YuanAttention(nn.Layer):
             )
             # attn_output = rearrange(output[0], '(b s) ... -> b s ...', b=batch_size)
             seq_length = output[0].shape[0] // batch_size
-            new_shape = (batch_size, seq_length) + output[0].shape[1:]
+            new_shape = (batch_size, seq_length) + tuple(output[0].shape[1:])
             attn_output = paddle.reshape(output[0], new_shape)
         else:
             attn_weights = paddle.matmul(
