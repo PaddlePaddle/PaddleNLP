@@ -48,17 +48,6 @@ try:
 except:
     pass
 
-try:
-    if get_env_device() == "npu":
-        import os
-
-        for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
-            if lib.endswith(".so"):
-                paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(lib)
-    from paddle.nn.functional.flash_attention import flash_attn_unpadded
-except:
-    flash_attention = None
-
 __all__ = [
     "YuanModel",
     "YuanPretrainedModel",
@@ -208,7 +197,7 @@ def _make_causal_mask(
     Make causal mask used for bi-directional self-attention.
     """
     bsz, tgt_len = input_ids_shape
-    mask = paddle.full((tgt_len, tgt_len), paddle.to_tensor(paddle.finfo(dtype).min, device=device), device=device)
+    mask = paddle.full((tgt_len, tgt_len), paddle.to_tensor(paddle.finfo(dtype).min))
     mask_cond = paddle.arange(mask.size(-1))
     mask_cond = paddle.add(mask_cond, 1)
     mask_cond_reshaped = paddle.reshape(mask_cond, [mask.size(-1), 1])
@@ -686,7 +675,7 @@ class YuanAttention(nn.Layer):
             key_states = key_states.transpose([0, 2, 1, *range(3, len(key_states.shape))])
             value_states = value_states.transpose([0, 2, 1, *range(3, len(value_states.shape))])
 
-            batch_size, seqlen_q = query_states.shape[0], query_states.shape[1]
+            batch_size = query_states.shape[0]
 
             output = F.scaled_dot_product_attention(
                         query_states,
