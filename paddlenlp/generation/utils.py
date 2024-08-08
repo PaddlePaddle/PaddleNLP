@@ -596,8 +596,13 @@ class GenerationMixin(object):
 
     def set_pad_token_id(self, pad_token_id, eos_token_id):
         if pad_token_id is None and eos_token_id is not None:
-            print("Setting `pad_token_id` to `eos_token_id`:{} for " "open-end generation.".format(eos_token_id))
-            pad_token_id = eos_token_id
+            logger.warning(
+                "Setting `pad_token_id` to `eos_token_id`:{} for " "open-end generation.".format(eos_token_id)
+            )
+            if isinstance(eos_token_id, list):
+                pad_token_id = eos_token_id[0]
+            else:
+                pad_token_id = eos_token_id
         return pad_token_id
 
     @paddle.no_grad()

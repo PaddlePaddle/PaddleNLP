@@ -27,6 +27,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
+from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
 from paddlenlp.transformers import ChatGLMConfig, ChatGLMPretrainedModel
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -126,17 +127,12 @@ class ChatGLMStackDyBatch(nn.Layer):
         self.world_size = 1
 
         self.use_weight_only = False
-        self.weight_only_quant_bits = config.weight_only_quant_bits
-        self.quant_algo = "weight_only_int" + str(self.weight_only_quant_bits)
-        if self.weight_only_quant_bits != -1:
+        if config.quant_type == "weight_only_int8":
             self.use_weight_only = True
-
-        if self.use_weight_only:
-            assert (
-                self.quant_algo == "weight_only_int8" or self.quant_algo == "weight_only_int4"
-            ), "Expected quant_algo equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
-                self.quant_algo
-            )
+            self.quant_algo = "weight_only_int8"
+        elif config.quant_type == "weight_only_int4":
+            self.use_weight_only = True
+            self.quant_algo = "weight_only_int4"
 
         try:
             self.current_rank = paddle.distributed.get_rank()
@@ -237,7 +233,7 @@ class ChatGLMStackDyBatch(nn.Layer):
             config.hidden_size,
             config.num_attention_heads,
             4 * config.hidden_size,
-            weight_only_quant_bits=self.weight_only_quant_bits,
+            quant_type=config.quant_type,
             activation="gelu",
             num_layers=config.num_layers,
             nranks=config.tensor_parallel_degree,
@@ -388,20 +384,20 @@ class ChatGLMStackDyBatch(nn.Layer):
         head_dim = embed_dim // config.num_attention_heads
 
         for k, v in state_dict.items():
-            if k.startswith("transformer.word_embeddings.weight"):
+            if k.startswith("chatglm.transformer.word_embeddings.weight"):
                 self.word_embeddings.weight.set_value(v.astype(dtype))
                 continue
-            elif k.startswith("transformer.final_layernorm.weight"):
+            elif k.startswith("chatglm.transformer.final_layernorm.weight"):
                 self.transformer_block.ffn_ln_scales[config.num_hidden_layers - 1].set_value(v.astype("float32"))
                 continue
-            elif k.startswith("transformer.final_layernorm.bias"):
+            elif k.startswith("chatglm.transformer.final_layernorm.bias"):
                 self.transformer_block.ffn_ln_biases[config.num_hidden_layers - 1].set_value(v.astype("float32"))
                 continue
             elif k.startswith("lm_head.weight"):
                 continue
             elif k.endswith("rotary_embeddings.inv_freq") or k.endswith("rotary_emb.inv_freq"):
                 continue
-            idx = int(k.split(".")[2])
+            idx = int(k.split(".")[3])
             if k.endswith("input_layernorm.weight"):
                 if idx == 0:
                     self.input_layernorm.weight.set_value(v.astype(dtype))
@@ -583,9 +579,7 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-        # TODO: Support safetensors loading.
-        kwargs["use_safetensors"] = False
-        return super().from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+        return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs, return_numpy=False)
 
     @classmethod
     def get_cache_kvs_shape(
@@ -746,6 +740,6 @@ class ChatGLMForCausalLMInferenceModel(GenerationInferenceModel, ChatGLMPretrain
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         self.lm_head.weight.set_value(
-            state_dict["transformer.word_embeddings.weight"].astype(self.lm_head.weight.dtype)
+            state_dict["chatglm.transformer.word_embeddings.weight"].astype(self.lm_head.weight.dtype)
         )
         self.model.transformer.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
