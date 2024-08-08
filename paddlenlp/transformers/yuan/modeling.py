@@ -21,8 +21,8 @@ from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
-import paddle.nn.functional as F
 import paddle.distributed.fleet.meta_parallel as mpu
+import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
@@ -36,7 +36,6 @@ from ...transformers.model_outputs import (
 )
 from ...transformers.model_utils import PretrainedModel
 from ...utils.log import logger
-from ...utils.tools import get_env_device
 from ..activations import ACT2FN
 from .configuration import YuanConfig
 
@@ -190,9 +189,7 @@ class LocalizedFiltering(paddle.nn.Layer):
 
 
 # Copied from transformers.models.bart.modeling_bart._make_causal_mask
-def _make_causal_mask(
-    input_ids_shape: paddle.shape, dtype: paddle.dtype, past_key_values_length: int = 0
-):
+def _make_causal_mask(input_ids_shape: paddle.shape, dtype: paddle.dtype, past_key_values_length: int = 0):
     """
     Make causal mask used for bi-directional self-attention.
     """
@@ -204,9 +201,7 @@ def _make_causal_mask(
     mask = paddle.where(mask_cond < mask_cond_reshaped, paddle.zeros_like(mask), mask)
     mask = paddle.cast(mask, dtype)
     if past_key_values_length > 0:
-        mask = paddle.concat(
-            [paddle.zeros([tgt_len, past_key_values_length], dtype=dtype), mask], zeros=-1
-        )
+        mask = paddle.concat([paddle.zeros([tgt_len, past_key_values_length], dtype=dtype), mask], zeros=-1)
     return mask[None, None, :, :].expand(bsz, 1, tgt_len, tgt_len + past_key_values_length)
 
 
@@ -678,12 +673,12 @@ class YuanAttention(nn.Layer):
             batch_size = query_states.shape[0]
 
             output = F.scaled_dot_product_attention(
-                        query_states,
-                        key_states,
-                        value_states,
-                        attn_mask=attention_mask,
-                        is_causal=attention_mask is None,
-                    )
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=attention_mask is None,
+            )
             # attn_output = rearrange(output[0], '(b s) ... -> b s ...', b=batch_size)
             seq_length = output[0].shape[0] // batch_size
             new_shape = (batch_size, seq_length) + tuple(output[0].shape[1:])
@@ -704,7 +699,9 @@ class YuanAttention(nn.Layer):
                         f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
                     )
                 attn_weights = attn_weights + attention_mask
-                attn_weights = paddle.maximum(attn_weights, paddle.to_tensor(paddle.finfo(attn_weights.dtype).min, attn_weights.dtype))
+                attn_weights = paddle.maximum(
+                    attn_weights, paddle.to_tensor(paddle.finfo(attn_weights.dtype).min, attn_weights.dtype)
+                )
 
             # upcast attention to fp32
             attn_weights = paddle.cast(
@@ -992,9 +989,7 @@ class YuanModel(YuanPretrainedModel):
 
         else:
             if attention_mask is None:
-                attention_mask = paddle.ones(
-                    (batch_size, seq_length_with_past), dtype=paddle.bool
-                )
+                attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
             attention_mask = self._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), inputs_embeds, past_key_values_length
             )
