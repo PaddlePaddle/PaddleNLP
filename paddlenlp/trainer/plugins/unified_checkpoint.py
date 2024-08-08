@@ -129,7 +129,7 @@ class UnifiedCheckpointHandler:
         self._shm_master_weight = None
         self._shm_optimizer_weight = None
         self._meta_dict_model = None
-        self._meta_dict_mw = None
+        self._meta_dict_master_weight = None
         self._meta_dict_optim = None
         self._process_model_weight = None
         self._process_master_weight = None
@@ -180,10 +180,10 @@ class UnifiedCheckpointHandler:
                     self._process_model_weight.start()
             elif state_dict_type == "master_weight":
                 if self._shm_master_weight is None:
-                    self._meta_dict_mw, buffer_size = create_meta_dict(state_dict)
+                    self._meta_dict_master_weight, buffer_size = create_meta_dict(state_dict)
                     self._shm_master_weight = shared_memory.SharedMemory(create=True, size=buffer_size)
                 shm_state_dict = self._shm_master_weight
-                meta_dict = self._meta_dict_mw
+                meta_dict = self._meta_dict_master_weight
                 shared_save_flag = self._shared_save_master_weight_flag
                 shared_save_path = self._shared_save_master_weight_path
                 if self._process_master_weight is None:
@@ -195,7 +195,9 @@ class UnifiedCheckpointHandler:
                             self._shared_save_master_weight_flag,
                             self._shared_save_master_weight_path,
                             self._lock,
-                            state_dict_type,
+                            "model_weight"
+                            if "skip_save_model_weight" in self.args.unified_checkpoint_config
+                            else state_dict_type,
                             self.global_rank,
                         ),
                     )
@@ -304,7 +306,7 @@ class UnifiedCheckpointHandler:
             if is_need_master_weight(optimizer, is_fp16_or_bp16=(self.args.fp16 or self.args.bf16)):
                 logger.info(
                     f"With {UnifiedCheckpointOption.SKIP_SAVE_MODEL_WEIGHT.value}, skip the model checkpoint save."
-                    "The master weight will be loaded as model weights for next resumption."
+                    " The master weight will be loaded as model weights for next resumption."
                 )
                 # not save model weight, load from master weight
                 skip_save_model_weight = True
