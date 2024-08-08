@@ -308,7 +308,9 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             qkv_bias = paddle.to_tensor(concated_qkv_biases).cast(self.transformer_block.qkv_biases[idx].dtype)
             self.transformer_block.qkv_biases[idx].set_value(qkv_bias)
 
-            linear_weight = paddle.to_tensor(state_dict["qwen2.layers.{}.self_attn.o_proj.weight".format(idx)]).cast(paddle.get_default_dtype())
+            linear_weight = paddle.to_tensor(state_dict["qwen2.layers.{}.self_attn.o_proj.weight".format(idx)]).cast(
+                paddle.get_default_dtype()
+            )
             if self.use_weight_only:
                 linear_quanted_weight, linear_weight_scale = weight_quantize(linear_weight, algo=self.quant_algo)
                 self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight)
