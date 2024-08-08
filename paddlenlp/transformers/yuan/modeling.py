@@ -21,6 +21,7 @@ from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
+import paddle.nn.functional as F
 import paddle.distributed.fleet.meta_parallel as mpu
 from paddle import Tensor, nn
 from paddle.distributed import fleet
@@ -201,21 +202,21 @@ class LocalizedFiltering(paddle.nn.Layer):
 
 # Copied from transformers.models.bart.modeling_bart._make_causal_mask
 def _make_causal_mask(
-    input_ids_shape: paddle.shape, dtype: paddle.dtype, device: paddle.device, past_key_values_length: int = 0
+    input_ids_shape: paddle.shape, dtype: paddle.dtype, past_key_values_length: int = 0
 ):
     """
     Make causal mask used for bi-directional self-attention.
     """
     bsz, tgt_len = input_ids_shape
     mask = paddle.full((tgt_len, tgt_len), paddle.to_tensor(paddle.finfo(dtype).min, device=device), device=device)
-    mask_cond = paddle.arange(mask.size(-1), device=device)
+    mask_cond = paddle.arange(mask.size(-1))
     mask_cond = paddle.add(mask_cond, 1)
     mask_cond_reshaped = paddle.reshape(mask_cond, [mask.size(-1), 1])
     mask = paddle.where(mask_cond < mask_cond_reshaped, paddle.zeros_like(mask), mask)
     mask = paddle.cast(mask, dtype)
     if past_key_values_length > 0:
         mask = paddle.concat(
-            [paddle.zeros([tgt_len, past_key_values_length], dtype=dtype, device=device), mask], zeros=-1
+            [paddle.zeros([tgt_len, past_key_values_length], dtype=dtype), mask], zeros=-1
         )
     return mask[None, None, :, :].expand(bsz, 1, tgt_len, tgt_len + past_key_values_length)
 
@@ -686,27 +687,14 @@ class YuanAttention(nn.Layer):
             value_states = value_states.transpose([0, 2, 1, *range(3, len(value_states.shape))])
 
             batch_size, seqlen_q = query_states.shape[0], query_states.shape[1]
-            seqlen_k = key_states.shape[1]
 
-            # q, k, v = [rearrange(x, "b s ... -> (b s) ...") for x in [query_states, key_states, value_states]]
-            q, k, v = [
-                x.reshape([x.shape[0] * x.shape[1]] + list(x.shape[2:]))
-                for x in [query_states, key_states, value_states]
-            ]
-
-            cu_seqlens_q = paddle.arange(0, (batch_size + 1) * seqlen_q, step=seqlen_q, dtype="int32")
-
-            if self.training:
-                assert seqlen_k == seqlen_q
-                cu_seqlens_k = cu_seqlens_q
-                is_causal = self.causal_mask
-            else:
-                is_causal = seqlen_q == seqlen_k
-                cu_seqlens_k = paddle.arange(0, (batch_size + 1) * seqlen_k, step=seqlen_k, dtype="int32")
-                self.dropout = 0
-            output = flash_attn_unpadded(
-                q, k, v, cu_seqlens_q, cu_seqlens_k, seqlen_q, seqlen_k, self.dropout, causal=is_causal
-            )
+            output = F.scaled_dot_product_attention(
+                        query_states,
+                        key_states,
+                        value_states,
+                        attn_mask=attention_mask,
+                        is_causal=attention_mask is None,
+                    )
             # attn_output = rearrange(output[0], '(b s) ... -> b s ...', b=batch_size)
             seq_length = output[0].shape[0] // batch_size
             new_shape = (batch_size, seq_length) + tuple(output[0].shape[1:])
@@ -727,7 +715,7 @@ class YuanAttention(nn.Layer):
                         f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
                     )
                 attn_weights = attn_weights + attention_mask
-                attn_weights = paddle.maximum(attn_weights, paddle.to_tensor(paddle.finfo(attn_weights.dtype).min))
+                attn_weights = paddle.maximum(attn_weights, paddle.to_tensor(paddle.finfo(attn_weights.dtype).min, attn_weights.dtype))
 
             # upcast attention to fp32
             attn_weights = paddle.cast(
@@ -865,14 +853,13 @@ class YuanModel(YuanPretrainedModel):
             combined_attention_mask = _make_causal_mask(
                 input_shape,
                 inputs_embeds.dtype,
-                device=inputs_embeds.place(),
                 past_key_values_length=past_key_values_length,
             )
 
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
             expanded_attn_mask = _expand_mask(attention_mask, inputs_embeds.dtype, tgt_len=input_shape[-1])
-            expanded_attn_mask = paddle.to_tensor(expanded_attn_mask, place=inputs_embeds.place())
+            expanded_attn_mask = paddle.to_tensor(expanded_attn_mask)
             combined_attention_mask = (
                 expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
             )
@@ -884,7 +871,7 @@ class YuanModel(YuanPretrainedModel):
     ):
 
         micro_batch_size, seq_length = input_id.shape
-        attention_mask = paddle.tril(paddle.ones((micro_batch_size, seq_length, seq_length)))
+        attention_mask = paddle.tril(paddle.ones((micro_batch_size, seq_length, seq_length), dtype=paddle.bfloat16))
         attention_mask = paddle.reshape(attention_mask, (micro_batch_size, 1, seq_length, seq_length))
 
         position_ids = paddle.arange(seq_length, dtype=paddle.int64)
@@ -1017,7 +1004,7 @@ class YuanModel(YuanPretrainedModel):
         else:
             if attention_mask is None:
                 attention_mask = paddle.ones(
-                    (batch_size, seq_length_with_past), dtype=paddle.bool, device=inputs_embeds.place()
+                    (batch_size, seq_length_with_past), dtype=paddle.bool
                 )
             attention_mask = self._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), inputs_embeds, past_key_values_length
@@ -1137,9 +1124,9 @@ class YuanForCausalLM(YuanPretrainedModel):
     def get_loss_mask(self, input_ids, labels, eod_token, sep_token):
         micro_batch_size, seq_length = input_ids.shape
 
-        loss_mask = paddle.ones(input_ids.shape, dtype=paddle.float, device=input_ids.place())
+        loss_mask = paddle.ones(input_ids.shape, dtype=paddle.float32)
 
-        position_ids = paddle.arange(seq_length, dtype=paddle.int64, device=input_ids.place())
+        position_ids = paddle.arange(seq_length, dtype=paddle.int64)
         position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
 
         """modify loss_mask to only calculate the loss of the answer (separated with [SEP])"""
