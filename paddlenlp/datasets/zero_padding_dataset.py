@@ -148,7 +148,7 @@ class ZeroPaddingIterableDataset(ZeroPadding, IterableDataset):
                 cur_len_so_far = 0
                 # append current data
                 batch_records.append(record)
-                self.intokens_global_step += 1
+                self.zero_padding_global_step += 1
                 cur_len_so_far += len(record["input_ids"])
         if batch_records:
             padded_list = self._pad_batch_records(batch_records)
