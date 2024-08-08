@@ -64,7 +64,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_path, add_eos_token=False, add_b
 tokenizer.add_tokens(['<sep>', '<pad>', '<mask>', '<predict>', '<FIM_SUFFIX>', '<FIM_PREFIX>', '<FIM_MIDDLE>','<commit_before>','<commit_msg>','<commit_after>','<jupyter_start>','<jupyter_text>','<jupyter_code>','<jupyter_output>','<empty_output>'], special_tokens=True)
 model = AutoModelForCausalLM.from_pretrained(model_path, tensor_parallel_degree= 8, tensor_parallel_rank=tensor_parallel_rank, dtype="bfloat16")
 model.eval()
-input_features = tokenizer("青岛推荐去哪玩？", return_tensors="pd")
+input_features = tokenizer("厦门推荐去哪玩？", return_tensors="pd")
 print("问题：", tokenizer.batch_decode(input_features["input_ids"]))
 outputs = model.generate(**input_features, do_sample=False, max_length=1024)
 print("回答：", tokenizer.batch_decode(outputs[0]))
@@ -72,7 +72,7 @@ print("回答：", tokenizer.batch_decode(outputs[0]))
 
 ### · 102B
 
-与51B模型的推理脚本一致
+与51B 模型的推理脚本一致
 
 ## 3. 预训练介绍
 
