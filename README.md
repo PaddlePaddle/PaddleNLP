@@ -42,10 +42,6 @@
 
 ## 特性
 
-<div align="center">
-    <img src="https://github.com/PaddlePaddle/PaddleNLP/assets/15797489/983d1ee1-1acc-4e01-a341-557cfe43aec5" width="600">
-</div>
-
 ### <a href=#多硬件训推一体> 🔧 多硬件训推一体 </a>
 
 支持英伟达 GPU、昆仑 XPU、昇腾 NPU、燧原 GCU 和海光 DCU 等多个硬件的大模型训练和推理，套件接口支持硬件快速切换，大幅降低硬件切换研发成本。

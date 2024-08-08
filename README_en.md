@@ -40,10 +40,6 @@
 
 ## Features
 
-<div align="center">
-    <img src="https://github.com/PaddlePaddle/PaddleNLP/assets/15797489/c22f218f-cdfa-4d73-8bc8-b6ba5237a3c1" width="600">
-</div>
-
 ### <a href=#Integrated training and inference on multiple hardware platforms> 🔧 Integrated training and inference on multiple hardware platforms </a>
 
 Our development suit supports large model training and inference on multiple hardware platforms, including NVIDIA GPUs, Kunlun XPUs, Ascend NPUs, Enflame GCUs, and Hygon DCUs. The toolkit's interface allows for quick hardware switching, significantly reducing research and development costs associated with hardware transitions.
