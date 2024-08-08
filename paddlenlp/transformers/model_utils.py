@@ -100,25 +100,30 @@ def cal_abs_max_channel(inputs, quant_axis=1):
     return abs_max_values
 
 def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-1, world_size=1):
+    implement_class = None
+    if not dequant:
+        implement_class = np
+    else:
+        implement_class = paddle
+
     if scales is None:
         scales = cal_abs_max_channel(x)
     bnt = (1 << (quant_bit - 1)) - 1
     if not dequant:
         # quant
-        quant_x = np.clip(np.round(x / scales * bnt), -bnt - 1, bnt)
-        return quant_x.astype(np.int8), scales
+        quant_x = implement_class.clip(implement_class.round(x / scales * bnt), -bnt - 1, bnt)
+        return quant_x.astype(implement_class.int8), scales
     else:
         quant_x = x
         # dequant
-        if len(quant_x.shape == 2) and quant_x.shape[1] == scales.shape[0]:
-            print(quant_x.shape, scales.shape)
+        if len(scales.shape) == 0 or quant_x.shape[-1] == scales.shape[-1]:
             qdq_x = quant_x / bnt * scales
         else:
             qdq_x = quant_x / bnt * scales[rank * scales.shape[0] // world_size: (rank + 1) * scales.shape[0] // world_size]
         # fp32 , int8, int, fp32 or fp64
         print(quant_x.dtype, scales.dtype, bnt, qdq_x.dtype)
         #return qdq_x, scales
-        return qdq_x.astype(np.float32), scales
+        return qdq_x.astype(implement_class.float32), scales
 
 def dy2st_nocheck_guard_context():
     try:
@@ -396,6 +401,7 @@ def load_state_dict(
                 for k in list(state_dict.keys()):
                     with device_guard():
                         state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+
             if quant:
                 hcg = fleet.get_hybrid_communicate_group()
                 tp_group = hcg.get_model_parallel_group()
@@ -407,12 +413,15 @@ def load_state_dict(
                         scales = scale_dict[scale_key]
                         weight = state_dict[quant_key]
                         weight, _ = qdq_weight(weight, scales=scales, quant_bit=8, dequant=True, rank=rank, world_size=world_size)
-                        print(f"dequant {key}")
+                        print(f"dequant {quant_key}, dtype: {weight.dtype}")
                     else:
-                        weight = weight.astype(np.float32)
+                        #weight = weight.astype(np.float32)
+                        weight = weight.astype(paddle.float32)
+                        print(f"dequant {quant_key}, dtype: {weight.dtype}")
 
                     if quant_key.endswith("moment2_0"):
-                        weight = np.square(weight)
+                        weight = paddle.square(weight)
+                    state_dict[quant_key] = weight
 
             return state_dict
 

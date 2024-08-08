@@ -5,7 +5,7 @@ output=${2-"ckpt"}
 jobs_num=${3-4}
 worker_num=${4-4}
 bit_cnt=${5-8}
-quant_stage=${6-1}
+quant_stage=${6-3}
 shard_num=${7-4}
 
 mkdir -p ${temp_dir}

@@ -2630,7 +2630,6 @@ class Trainer:
                     opt_state_dict = None
             else:
                 opt_state_dict = self.unified_checkpoint_handler.load_unified_optimizer(
-                    args=self.args,
                     model=self.model,
                     optimizer=self.optimizer,
                     resume_from_checkpoint=checkpoint,
