@@ -544,7 +544,6 @@ PD_BUILD_OP(fast_ln)
     .SetKernelFn(PD_KERNEL(LnFwd))
     .SetInferShapeFn(PD_INFER_SHAPE(LnFwdInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(LnFwdInferDtype));
-    // .SetInferDtypeFn(PD_INFER_DTYPE(LnBwdInferDtype));
 
 PD_BUILD_GRAD_OP(fast_ln)
     .Inputs({"x", "scale", "mean", "invvar", paddle::Grad("y")})
