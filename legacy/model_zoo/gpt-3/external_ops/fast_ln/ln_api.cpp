@@ -529,6 +529,14 @@ std::vector<std::vector<int64_t>> RMSLnBwdInferShape(
   return {x_shape, scale_shape};
 }
 
+std::vector<paddle::DataType> LnBwdInferDtype(paddle::DataType x_dtype,
+                                              paddle::DataType scale_dtype,
+                                              paddle::DataType mean_dtype,
+                                              paddle::DataType invvar_dtype,
+                                              paddle::DataType dy_dtype) {
+  return {x_dtype, scale_dtype, scale_dtype};
+}
+
 PD_BUILD_OP(fast_ln)
     .Inputs({"x", "scale", "bias"})
     .Outputs({"y", "mean", "invvar"})
@@ -536,6 +544,7 @@ PD_BUILD_OP(fast_ln)
     .SetKernelFn(PD_KERNEL(LnFwd))
     .SetInferShapeFn(PD_INFER_SHAPE(LnFwdInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(LnFwdInferDtype));
+    .SetInferDtypeFn(PD_INFER_DTYPE(LnBwdInferDtype));
 
 PD_BUILD_GRAD_OP(fast_ln)
     .Inputs({"x", "scale", "mean", "invvar", paddle::Grad("y")})
