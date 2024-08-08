@@ -172,7 +172,7 @@ class TensorBoardCallback(TrainerCallback):
         has_tensorboard = is_tensorboardX_available()
         if not has_tensorboard:
             raise RuntimeError("TensorBoardCallback requires tensorboardX to be installed")
-            raise RuntimeError("TensorBoardCallback requires tensorboardX to be installed")
+
         if has_tensorboard:
             try:
                 from tensorboardX import SummaryWriter
