@@ -616,7 +616,6 @@ class FusedMultiTransformerBase(Layer):
             qkv_out, padding_offset, seq_lens, input_ids, self.num_heads, self.head_dim
         )
 
-        # rotary emb (inplace)
         if rotary_embs is not None:
             encode_rotary_qk(
                 q_out,
@@ -634,7 +633,6 @@ class FusedMultiTransformerBase(Layer):
         # write cache kv (inplace)
         write_cache_kv(k_out, v_out, caches[i], seq_lens + pre_caches_length)
 
-        # cutlass fmha
         qktv_out = variable_length_memory_efficient_attention(
             q_out,
             k_out,
@@ -695,7 +693,6 @@ class FusedMultiTransformerBase(Layer):
 
         else:
             fmha_out = self.compute_mmha(qkv_out, caches, attn_mask, seq_lens, rotary_embs, rotary_emb_dims, i)
-
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
         return out_linear_out
