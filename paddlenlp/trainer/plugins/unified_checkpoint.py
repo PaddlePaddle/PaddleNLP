@@ -153,10 +153,43 @@ class UnifiedCheckpointHandler:
     def _file_save_async_or_sync(
         self, state_dict, path, saved_signal_path=None, is_sync=True, state_dict_type="model_weight"
     ):
+        quant = True
         if is_sync:
             for k in list(state_dict.keys()):
                 if isinstance(state_dict[k], paddle.Tensor):
                     state_dict[k] = state_dict.pop(k).cpu().numpy()
+
+            if quant and state_dict_type == "optimizer_weight":
+                codebook_dict = {}
+                opt_keys = state_dict.keys()
+                for k in opt_keys:
+                    momentum1 = k.endswith("moment1_0")
+                    momentum2 = k.endswith("moment2_0")
+                    if momentum2:
+                        # moment2
+                        sqrt_m2 = np.sqrt(state_dict[k])
+                        quant_weight, codebook = qdq_weight(sqrt_m2, quant_bit=8)
+                        peek_dequant, _ = qdq_weight(quant_weight, scales=codebook, quant_bit=8, dequant=True)
+                        nonzero_mask = sqrt_m2 != 0.0
+                        # outlier flag
+                        has_outlier = not np.all(peek_dequant[nonzero_mask] != 0.0)
+                        #has_outlier = True
+                        if has_outlier:
+                            #quant_weight = state_dict[k].astype(np.float16)
+                            quant_weight = sqrt_m2.astype(np.float16)
+                        else:
+                            codebook_dict[k + '_codebook'] = codebook
+                    elif momentum1:
+                        # moment1
+                        quant_weight, codebook = qdq_weight(state_dict[k], quant_bit=8)
+                        codebook_dict[k + '_codebook'] = codebook
+                    else:
+                        quant_weight = state_dict[k]
+
+                    print(f'{k}: {state_dict[k].dtype}')
+                    state_dict[k] = quant_weight
+
+                state_dict.update(codebook_dict)
             safe_save_file(state_dict, path, metadata={"format": "np"})
         else:
             if state_dict_type == "model_weight":
@@ -233,10 +266,10 @@ class UnifiedCheckpointHandler:
             self._reset_and_update(shared_save_path, path)
             self._reset_and_update(self._shared_signal_path, saved_signal_path)
             _traverse_copy_to_shm(state_dict, meta_dict, shm_state_dict.buf)
+
     def _save_file_async_in_process(
         self, meta_dict, shm_name, shared_save_flag, shared_save_path, shared_signal_path, lock
     ):
-        quant = True
         shm = shared_memory.SharedMemory(name=shm_name)
         while True:
             flag_value = shared_save_flag[0]  # if process uses `spawn`, cannot read this value.
@@ -249,24 +282,6 @@ class UnifiedCheckpointHandler:
                 saved_signal_path = shared_signal_path[:].decode("utf-8").rstrip("\x00")
                 logger.info(f"Start to async save {path}")
                 state_dict = _read_state_dict_from_shm(meta_dict, shm)  # numpy array
-                if quant and type == "optimizer_weight":
-                    codebook_dict = {}
-                    opt_keys = state_dict.keys()
-                    for k in opt_keys:
-                        is_momentum = k.endswith("moment1_0")
-                        quant_weight, codebook = qdq_weight(state_dict[k], quant_bit=8)
-                        if not is_momentum:
-                            peek_dequant, _ = qdq_weight(codebook, scales=quant_weight, quant_bit=8, dequant=True)
-                            nonzero_mask = state_dict[k] != 0.0
-                            # outlier flag
-                            has_outlier = not np.all(peek_dequant[nonzero_mask] != 0.0)
-                            if has_outlier:
-                                quant_weight = state_dict[k].astype(np.float16)
-                        print(f'{k}: {state_dict[k].dtype}')
-                        state_dict[k] = quant_weight
-                        codebook_dict[k + '_codebook'] = codebook
-
-                    state_dict.update(codebook_dict)
                 safe_save_file(state_dict, path, {"format": "np"})
                 del state_dict
                 with open(saved_signal_path, mode="a+") as f:
@@ -427,6 +442,7 @@ class UnifiedCheckpointHandler:
         is_sync_save = True
         if "async_save" in self.args.unified_checkpoint_config or self.args.use_async_save:
             is_sync_save = False
+        #print(state_dict)
         self._file_save_async_or_sync(
             optim_state_dict,
             path=os.path.join(output_dir, optimizer_name),
@@ -2243,6 +2259,8 @@ def get_expected_keys(sharded_metadata, model, optimizer):
             if params_rank == sharding_rank:
                 expected_keys.append(key)
         else:
+            #if key_name == "qwen2.layers.10.mlp.down_proj.weight":
+            #    print("yyyy ", static_name)
             if static_name is not None:
                 expected_keys.append(key)
     expected_keys = set(expected_keys)

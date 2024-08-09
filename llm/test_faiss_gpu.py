@@ -268,6 +268,72 @@ def recon(checkpoint, args, i):
     print("ckpt save time: ",ed - st)
     return optimizer_dict
 
+#def recon_1(checkpoint, args, i):
+#    recon_dict = {}
+#    optimizer_dict = {}
+#    #data_pt = paddle.load(os.path.join(args.ref_checkpoint_path, "optimizer.pt"))
+#    data_pt = {}
+#    eps = 1e-8
+#    st = time.time()
+#    unquant_m, unquant_v, unquant_w, cast_w = 0, 0, 0, 0
+#    for k in checkpoint.keys():
+#        if not k.endswith('moment1_0') or not k.endswith('moment2_0'):
+#            data_pt[k] = checkpoint.get_tensor(k)
+#            continue
+#        in_st = time.time()
+#        ckpt = checkpoint.get_tensor(k)
+#        cckpt = checkpoint.get_tensor(k + '_codebook')
+#        #optim_k = optimizer_name.index(k)
+#        #ref_shape = ref_weights.get_tensor(k).shape
+#        #if "weights_c" in ckpt.keys():
+#        #    recover_weights = unquantize(ckpt["weights_c"].astype("float32"), ckpt["weights_i"].astype("int32"), args.quant_bits).reshape(ref_shape)
+#        #else:
+#        #    recover_weights = ckpt["weights_i"].reshape(ref_shape)
+#        unquant_w += time.time() - in_st
+#        in_st = time.time()
+#        #print(ckpt["opt_v_c"].dtype, ckpt["opt_v_i"].dtype)
+#        recover_opt_m, _ = qdq_weight(ckpt, scales=cckpt, quant_bit=args.quant_bits_opt, dequant=True)
+#
+#        unquant_m += time.time() - in_st
+#        in_st = time.time()
+#
+#        if args.quant_stage == 1:
+#            #recover_opt_v, _ = qdq_weight(ckpt["opt_v_c"], scales=ckpt["opt_v_i"], quant_bit=args.quant_bits_opt, dequant=True)
+#            recover_opt_v = np.square((recover_opt_m / (ckpt["opt_v_i"].astype(np.float32) + eps)) - eps)
+#        elif args.quant_stage == 2:
+#            recover_opt_m, recover_opt_v = np.split(recover_opt_m, 2, axis=0)
+#        elif args.quant_stage == 3:
+#            if ckpt.dtype == np.float16:
+#                #recover_opt_v = np.square(ckpt.astype(np.float32))
+#                recover_opt_v = ckpt.astype(np.float32)
+#            else:
+#                recover_opt_v, _ = qdq_weight(ckpt, scales=cckpt, quant_bit=args.quant_bits_opt, dequant=True)
+#                recover_opt_v = np.square(recover_opt_v)
+#
+#        unquant_v += time.time() - in_st
+#        in_st = time.time()
+#        print(k, recover_opt_m.shape, recover_opt_m.dtype)
+#        #recon_dict[k] = (recover_weights + paddle.Tensor(ref_weights.get_tensor(k), zero_copy=True)).astype("bfloat16").numpy()
+#        #optim_k = optimizer_name.index(k)
+#        k_m = k + '/moment1_0'
+#        k_v = k + '/moment2_0'
+#        k_m_acc = k + '/beta1_pow_acc_0'
+#        k_v_acc = k + '/beta2_pow_acc_0'
+#        data_pt[k_v] = recover_opt_v
+#        data_pt[k_m] = recover_opt_m
+#        optimizer_dict[k_v] = f"optimizer-0000{i+1}-of-0000{args.shard_num}.safetensors"
+#        optimizer_dict[k_m] = f"optimizer-0000{i+1}-of-0000{args.shard_num}.safetensors"
+#        optimizer_dict[k_v_acc] = f"optimizer-0000{i+1}-of-0000{args.shard_num}.safetensors"
+#        optimizer_dict[k_m_acc] = f"optimizer-0000{i+1}-of-0000{args.shard_num}.safetensors"
+#        cast_w += time.time() - in_st
+#        in_st = time.time()
+#    all_time = unquant_w + unquant_v + unquant_m + cast_w
+#    print(f"unquant w: {unquant_w/all_time}, unquant v: {unquant_v/all_time}, unquant m: {unquant_m/all_time}, cast w: {cast_w/all_time}")
+#    #save_file(recon_dict, os.path.join(args.output, f"model-0000{i+1}-of-00008.safetensors"), metadata = {"format": "np"})
+#    save_file(data_pt, os.path.join(args.output, f"optimizer-0000{i+1}-of-0000{args.shard_num}.safetensors"), metadata = {"format": "np"})
+#    ed = time.time()
+#    print("ckpt save time: ",ed - st)
+#    return optimizer_dict
 class opt_handler:
     def __init__(self, index_file, ckpt_path):
         self.info = {}
@@ -302,7 +368,8 @@ def main(args):
         print(f"saving model-0000{i+1}-of-0000{args.shard_num}.safetensors!")
         w_cast, opt_cast, prune_w, prune_opt, quant_w, quant_opt, save_cast = 0, 0, 0, 0, 0, 0, 0
         if args.only_recon:
-            saved_checkpoint = paddle.load(os.path.join(args.output, f"compressed_{i+1}.pt"))
+            #saved_checkpoint = paddle.load(os.path.join(args.output, f"compressed_{i+1}.pt"))
+            saved_checkpoint = safe_open(os.path.join(args.output, f"optimizer-0000{i+1}-of-00008.safetensors"), framework='np')[:]
             meta_data = recon(saved_checkpoint, args, i)
             #meta_data = get_meta(saved_checkpoint, i)
             meta.update(meta_data)
@@ -450,7 +517,7 @@ if __name__ == "__main__":
     parser.add_argument('--quant_bits', type=int, default=8)
     parser.add_argument('--quant_stage', type=int, default=1)
     parser.add_argument('--start_idx', type=int, default=0)
-    parser.add_argument('--end_idx', type=int, default=4)
+    parser.add_argument('--end_idx', type=int, default=8)
     parser.add_argument('--shard_num', type=int, default=4)
     parser.add_argument('--quant_bits_opt', type=int, default=8)
     parser.add_argument('--fusion_quant', action='store_true')

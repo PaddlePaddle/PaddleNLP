@@ -1188,6 +1188,8 @@ class Trainer:
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                    if (self.state.global_step) % 50:
+                        exit(0)
                     self._print_timer()
                     step_control = 0
                 else:
@@ -2647,6 +2649,7 @@ class Trainer:
                     opt_state_dict = None
             else:
                 opt_state_dict = self.unified_checkpoint_handler.load_unified_optimizer(
+                    args=self.args,
                     model=self.model,
                     optimizer=self.optimizer,
                     resume_from_checkpoint=checkpoint,
