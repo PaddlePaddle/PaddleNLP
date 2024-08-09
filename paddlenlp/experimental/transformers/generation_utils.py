@@ -285,8 +285,7 @@ class GenerationInferenceModel(GenerationMixin):
         # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
         if inputs_embeds is not None:
             model_kwargs["inputs_embeds"] = inputs_embeds
-        if input_ids is not None:
-            model_kwargs["all_input_ids"] = input_ids
+        model_kwargs["all_input_ids"] = input_ids
         logits_processors = model_kwargs.pop("logits_processors")
 
         def _forward_(**args):
