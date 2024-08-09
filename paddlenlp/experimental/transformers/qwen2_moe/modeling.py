@@ -80,7 +80,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         self.rms_norm_eps = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
         self.quant_type = config.quant_type
-        self.weight_only_quant_bits = config.weight_only_quant_bits
         self.rope_theta = config.rope_theta
 
         # Moe config
@@ -177,7 +176,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             num_heads=self.num_attention_heads,
             kv_num_heads=self.num_key_value_heads,
             dim_feedforward=self.moe_intermediate_size,
-            weight_only_quant_bits=self.weight_only_quant_bits,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
             nranks=1,
@@ -233,20 +231,12 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         self.wte.weight.set_value(wte_weight)
         self.ln_f.weight.set_value(ln_f_weight)
 
-        # print("wte.weight:", self.wte.weight)
-        # print("ln_f.weight:", self.wte.weight)
-
-        # print("qwen2_moe.embed_tokens.weight:", wte_weight)
-        # print("qwen2_moe.norm.weight:", ln_f_weight)
-
         for idx in range(self.num_layers):
             unfused_state_dict = {}
             ln_scale = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.input_layernorm.weight".format(idx)]).cast(
                 self.transformer_block.ln_scales[idx].dtype
             )
             self.transformer_block.ln_scales[idx].set_value(ln_scale)
-
-            # print("qwen2_moe.layers.{}.input_layernorm.weight".format(idx), ln_scale)
 
             unfused_state_dict["qwen2_moe.self_attn.q_proj.weight"] = state_dict[
                 "qwen2_moe.layers.{}.self_attn.q_proj.weight".format(idx)
@@ -302,10 +292,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
                 "qwen2_moe.layers.{}.self_attn.v_proj.bias".format(idx)
             ]
 
-            # print("qwen2_moe.layers.{}.self_attn.q_proj.bias".format(idx), unfused_state_dict["qwen2_moe.self_attn.q_proj.bias"])
-            # print("qwen2_moe.layers.{}.self_attn.k_proj.bias".format(idx), unfused_state_dict["qwen2_moe.self_attn.k_proj.bias"])
-            # print("qwen2_moe.layers.{}.self_attn.v_proj.bias".format(idx), unfused_state_dict["qwen2_moe.self_attn.v_proj.bias"])
-
             concated_qkv_biases = np.concatenate(
                 [
                     unfused_state_dict["qwen2_moe.self_attn.q_proj.bias"],
@@ -321,8 +307,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
                 dtype
             )
 
-            # print("qwen2_moe.layers.{}.self_attn.o_proj.weight".format(idx), linear_weight)
-
             if self.use_weight_only:
                 linear_quanted_weight, linear_weight_scale = weight_quantize(linear_weight, algo=self.quant_type)
                 self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight)
@@ -336,8 +320,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
                 self.transformer_block.ffn_ln_scales[idx].dtype,
             )
             self.transformer_block.ffn_ln_scales[idx].set_value(ffn_ln_scale)
-
-            # print("qwen2_moe.layers.{}.post_attention_layernorm.weight".format(idx), ffn_ln_scale)
             
             # set Moe state_dict
             ffn1_weights = []
@@ -365,25 +347,20 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             else:
                 self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
                 
-            gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.gate.weight".format(idx)]).cast("float32")
+            gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.gate.weight".format(idx)])
 
             shared_expert_ffn1gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert.gate_proj.weight".format(idx)]).cast(dtype)
             shared_expert_ffn1up_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert.up_proj.weight".format(idx)]).cast(dtype)
             shared_expert_ffn1_weight = paddle.concat(x=[shared_expert_ffn1gate_weight, shared_expert_ffn1up_weight], axis=-1)
 
             shared_expert_ffn2_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert.down_proj.weight".format(idx)]).cast(dtype)
-            shared_expert_gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert_gate.weight".format(idx)]).cast(dtype)
+            shared_expert_gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert_gate.weight".format(idx)])
             
             self.transformer_block.gate_weights[idx].set_value(gate_weight)
             self.transformer_block.shared_expert_ffn1_weights[idx].set_value(shared_expert_ffn1_weight)
             self.transformer_block.shared_expert_ffn2_weights[idx].set_value(shared_expert_ffn2_weight)
             self.transformer_block.shared_expert_gate_weights[idx].set_value(shared_expert_gate_weight)
 
-            
-
-            # print("qwen2_moe.layers.{}.mlp.up_proj.weight".format(idx), up_weight)
-            # print("qwen2_moe.layers.{}.mlp.gate_proj.weight".format(idx), gate_weight)
-            # print("qwen2_moe.layers.{}.mlp.down_proj.weight".format(idx), ffn2_weight)
 
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
@@ -461,9 +438,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
 
         if inputs_embeds is None:
             inputs_embeds = self.wte(ids_remove_padding)
-            # print("input_ids:", input_ids)
-            # print("ids_remove_padding:", ids_remove_padding)
-            # print("inputs_embeds wte:", inputs_embeds)
 
         hidden_states = inputs_embeds
 
@@ -483,8 +457,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         new_rope = fused_get_rotary_embedding(
             input_ids, position_ids, self.head_dim_shape_tensor, position_offset, self.rope_theta, True
         )
-        # print("new_rope:", new_rope)
-
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
                 input_ids,
@@ -500,12 +472,9 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
                 rotary_emb_dims=1,
                 time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
             )
-
-        # print("hidden_states:", hidden_states)
-
+        
         hidden_states = self.ln_f(hidden_states)
-        # print("hidden_states_ln:", hidden_states)
-
+        
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
 
@@ -729,7 +698,6 @@ class Qwen2MoeBlockInferenceModel(Qwen2MoeInferenceModel):
         kwargs["max_input_length"] = self.max_seq_len
 
         inputs_embeds = self.wte(ids_remove_padding)
-        # import pdb;pdb.set_trace()
 
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(

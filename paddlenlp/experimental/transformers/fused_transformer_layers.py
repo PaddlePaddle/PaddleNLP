@@ -264,7 +264,7 @@ class FusedMultiTransformerConfig:
         self.rank_id = rank_id
         self.trans_qkvw = trans_qkvw
         self.ring_id = ring_id
-        
+
         self.moe_topk = moe_topk
         self.num_experts = num_experts
         self.gate_weight_attrs = gate_weight_attrs
@@ -1104,22 +1104,16 @@ class FusedMultiTransformerMoe(FusedMultiTransformerBase):
             # all_reduce
             if self.nranks > 1:
                 dist.all_reduce(out_linear_out)
-
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
-            
+
             # Moe layer
             tmp_fused_moe_out = self.compute_fused_moe(tmp_out, i)
-
-            # shared_expert
             shared_expert_output = self.compute_shared_expert(tmp_out, i)
-
             moe_out = tmp_fused_moe_out + shared_expert_output
-
             # all_reduce
             if self.nranks > 1:
                 dist.all_reduce(moe_out)
-
             # norm + residual_add_bias
             tmp_out, residual_input = self.compute_bias_residual_layernorm(
                 moe_out, residual_input, i, self.num_layers
