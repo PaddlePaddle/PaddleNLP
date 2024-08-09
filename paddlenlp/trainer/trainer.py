@@ -1770,6 +1770,8 @@ class Trainer:
 
         if self.args.use_hybrid_parallel:
             if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:
+                if self.args.tensor_parallel_degree <= 1:
+                    checkpoint_rng_state["hybrid_parallel_rng_state_tracker"].pop("model_parallel_rng", None)
                 fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
                     checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
                 )
