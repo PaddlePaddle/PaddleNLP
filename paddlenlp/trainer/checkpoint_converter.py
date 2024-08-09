@@ -400,7 +400,7 @@ class CheckpointConverter:
                         )
 
                 self.cur_rank_loaded_state_dict[file] = renamed_state_dict
-        # 2. In handling the sharding stage1 v1 scenario, the optimizer states are distributed across different ranks.
+        # 2. In handling the sharding stage1 v1 and stage2 scenario, the optimizer states are distributed across different ranks.
         # We need to obtain the name mapping by simulating the partitioning method, without concern for the presence of master_weights.
         elif self.sharding_degree > 1 and self.sharding_stage1_v == 1 and not self.is_sharding_stage3:
             if not self.save_sharded_model:
@@ -515,7 +515,7 @@ class CheckpointConverter:
 
                     self.cur_rank_loaded_state_dict[file] = renamed_state_dict
         else:
-            # 3. Handling the case of disabling sharding, independent of master_weights, but without considering the save_sharded_model flag.
+            # 3. Handling the sharding stage3 and non-sharding scenario
             if not self.save_sharded_model:
                 for file, state_dict in self.cur_rank_loaded_state_dict.items():
                     (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file)
