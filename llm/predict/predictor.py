@@ -48,7 +48,7 @@ from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
-    AutoTokenizer,
+    # AutoTokenizer,
     ChatGLMTokenizer,
     ChatGLMv2Tokenizer,
     Llama3Tokenizer,
@@ -62,6 +62,7 @@ from paddlenlp.utils.log import logger
 # Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
 MAX_BSZ = 512
 
+from transformers import AutoTokenizer
 
 @dataclass
 class PredictorArgument:
@@ -1631,8 +1632,9 @@ def predict():
                     target_texts.append("")
 
     else:
-        source_texts = ["你好，请问你是谁?"] * predictor_args.batch_size
-        target_texts = [""] * predictor_args.batch_size
+        source_texts = ["SYSTEM: You are talking with your friend. You respond in considerated and empathetic style.</s>\nUSER: Hey, I've been seeing a married coworker for 8 months and left my wife for her. She said she'd leave her husband, but now she won't because of her kids. Can we be friends or should I cut contact?</s>\nMODEL:"]
+        target_texts = [""]
+
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)

@@ -31,7 +31,7 @@ from paddlenlp.datasets import ZeroPaddingIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
 from paddlenlp.transformers import (
-    AutoTokenizer,
+    # AutoTokenizer,
     ChatGLMv2Tokenizer,
     LlamaForCausalLMPipe,
     PretrainedConfig,
@@ -40,6 +40,7 @@ from paddlenlp.transformers import (
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
+from transformers import AutoTokenizer
 
 def compute_metrics(eval_preds):
     flattened_preds = np.array(eval_preds.predictions).flatten()
