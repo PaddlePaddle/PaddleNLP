@@ -26,6 +26,8 @@ namespace cub = hipcub;
 #else
 #include <cub/cub.cuh>
 #include <curand_kernel.h>
+#include "cutlass/half.h"
+#include "cutlass/bfloat16.h"
 #endif
 
 constexpr int kBlockSize = 256; 
@@ -73,6 +75,30 @@ inline cudaError_t GetNumBlocks(int64_t n, int* num_blocks) {
                                                     sm_count * tpm / kBlockSize * kNumWaves));
   return cudaSuccess;
 }
+
+template <paddle::DataType D>
+class CutlassDtypeTraits;
+
+template <>
+class CutlassDtypeTraits<paddle::DataType::FLOAT32> {
+public:
+  typedef float DataType;
+  typedef float data_t;
+};
+
+template <>
+class CutlassDtypeTraits<paddle::DataType::FLOAT16> {
+public:
+  typedef cutlass::half_t DataType;
+  typedef paddle::float16 data_t;
+};
+
+template <>
+class CutlassDtypeTraits<paddle::DataType::BFLOAT16> {
+public:
+  typedef cutlass::bfloat16_t DataType;
+  typedef paddle::bfloat16 data_t;
+};
 #endif
 
 template<typename T>
