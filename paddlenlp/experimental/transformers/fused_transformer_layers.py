@@ -1328,7 +1328,8 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         attn_mask,
         i,
     ):
-        qkv_out = dequant_int8(qkv_out, self.qkv_out_scales[i], self._dtype)
+        if not self.use_gemm_dequant:
+            qkv_out = dequant_int8(qkv_out, self.qkv_out_scales[i], self._dtype)
         if self.qkv_biases[i] is not None:
             qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
 
