@@ -347,7 +347,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             else:
                 self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
                 
-            gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.gate.weight".format(idx)])
+            gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.gate.weight".format(idx)]).cast("float32")
 
             shared_expert_ffn1gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert.gate_proj.weight".format(idx)]).cast(dtype)
             shared_expert_ffn1up_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert.up_proj.weight".format(idx)]).cast(dtype)
