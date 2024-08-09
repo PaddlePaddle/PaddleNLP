@@ -55,7 +55,6 @@ coverage.xml
 *.pot
 *.doctree
 
-llm/output.json
 
 # Django stuff:
 *.log
