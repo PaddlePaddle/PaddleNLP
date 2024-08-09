@@ -969,7 +969,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             )
 
         # embed positions
-        if attention_mask is None:
+        if not self.config.use_flash_attention and attention_mask is None:
             # [bs, seq_len]
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
 

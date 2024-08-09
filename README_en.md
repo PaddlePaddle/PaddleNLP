@@ -34,15 +34,7 @@
 
 * **2024.04.24 [PaddleNLP v2.8](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.8.0)**：Our self-developed RsLoRA+ algorithm with extreme convergence significantly improves the convergence speed and training effectiveness of PEFT training. By introducing high-performance generation acceleration into the RLHF PPO algorithm, we have broken through the generation speed bottleneck in PPO training, achieving a significant lead in PPO training performance. We generally support multiple large model training performance optimization methods such as FastFFN and FusedQKV, making large model training faster and more stable.
 
-* **2024.01.04 [PaddleNLP v2.7](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.7.0)**: The LLM experience is fully upgraded, and the tool chain LLM entrance is unified. Unify the implementation code of pre-training, fine-tuning, compression, inference and deployment to the `PaddleNLP/llm` directory. The new [LLM Suite Documentation](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html) provides one-stop guidance for users from getting started with LLM to business deployment and launch. The full breakpoint storage mechanism Unified Checkpoint greatly improves the versatility of LLM storage. Efficient fine-tuning upgrade supports the simultaneous use of efficient fine-tuning + LoRA, and supports QLoRA and other algorithms.
-
-* **2023.08.15 [PaddleNLP v2.6](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.6.0)**: Release [Full-process LLM suite](./llm) , covering all aspects of pre-training, fine-tuning, compression, inference and deployment, providing users with end-to-end LLM solutions and one-stop development experience; built-in [4D parallel distributed Trainer](./docs/trainer.md ), [Efficient fine-tuning algorithm LoRA/Prefix Tuning](./llm/README.md#2-%E7%B2%BE%E8%B0%83), [Self-developed INT8/INT4 quantization algorithm](./llm/README.md#4-%E9%87%8F%E5%8C%96), etc.; fully supports [LLaMA 1/2](./llm/config/llama), [BLOOM](./llm/config/bloom), [ChatGLM 1/2](./llm/config/chatglm), [OPT](./llm/config/opt) and other mainstream LLMs.
-
 ## Features
-
-<div align="center">
-    <img src="https://github.com/PaddlePaddle/PaddleNLP/assets/15797489/c22f218f-cdfa-4d73-8bc8-b6ba5237a3c1" width="600">
-</div>
 
 ### <a href=#Integrated training and inference on multiple hardware platforms> 🔧 Integrated training and inference on multiple hardware platforms </a>
 
