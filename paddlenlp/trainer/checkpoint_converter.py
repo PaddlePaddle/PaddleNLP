@@ -36,10 +36,10 @@ MODEL_META_FILE_NAME = "model_meta.json"
 
 
 class CheckpointConverter:
-    def __init__(self, dynamic_ckpt_path, model_state, parameter_to_structured_name):
+    def __init__(self, hybrid_parallel_ckpt_path, model_state, parameter_to_structured_name):
         self.use_dist = True if paddle.distributed.get_world_size() > 1 else False
-        self.path = dynamic_ckpt_path
-        self.semi_auto_model_state = model_state
+        self.path = hybrid_parallel_ckpt_path
+        self.auto_parallel_state_dict = model_state
         self.parameter_to_structured_name = self.gather_global_object(parameter_to_structured_name)
         model_state_global_shape = {}
         for k, v in model_state.items():
@@ -139,7 +139,7 @@ class CheckpointConverter:
             if file.endswith(OPTIMIZER_WEIGHT_SUFFIX) and sharding_stage1_v[0] == 2:
                 for k, v in state_dict.items():
                     # Under shardingv2, the optimizer state is first flattened and then split.
-                    if "_moment" in k and len(v.shape) != 1:
+                    if len(v.shape) != 1:
                         sharding_stage1_v = [1]
                         break
 
@@ -163,6 +163,8 @@ class CheckpointConverter:
                 state_shape_mapping = {}
                 for k, v in state_dict.items():
                     state_shape_mapping[k] = v.shape
+                    if len(v.shape) != 1:
+                        return False
                 file_to_state_shape_mapping[file] = state_shape_mapping
         global_file_to_state_shape_mapping = self.gather_global_object(file_to_state_shape_mapping)
 
@@ -174,10 +176,10 @@ class CheckpointConverter:
                 break
         return is_sharding_stage3
 
-    def optimizer_state_name_to_master_weight_name(self, optimizer_state_name):
+    def parse_master_weight_name_by(self, optimizer_state_name):
         return optimizer_state_name.split(".")[0]
 
-    def optimizer_state_file_name_to_model_state_file_name(self, optimizer_state_file_name):
+    def get_model_state_file_from(self, optimizer_state_file_name):
         (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(optimizer_state_file_name)
         for model_state_file in self.global_model_state_file_names:
             distributed_rank = self.get_distribution_rank_from_file_name(model_state_file)
@@ -249,7 +251,7 @@ class CheckpointConverter:
             (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file_name)
             state_dict = self.cur_rank_loaded_state_dict[file_name]
             for k, v in state_dict.items():
-                master_weight_name = self.optimizer_state_name_to_master_weight_name(k)
+                master_weight_name = self.parse_master_weight_name_by(k)
                 model_weight_name = master_weight_name_to_model_weight_name_mapping[master_weight_name]
                 new_k = k.replace(master_weight_name, model_weight_name)
                 renamed_state_dict[new_k] = v
@@ -266,22 +268,22 @@ class CheckpointConverter:
             self.global_file_to_state_dict_keys_mapping = self.gather_global_object(file_to_state_dict_keys_mapping)
 
         (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file_name)
-        if file.endswith(OPTIMIZER_WEIGHT_SUFFIX):
-            model_state_file_name = self.optimizer_state_file_name_to_model_state_file_name(file)
+        if file_name.endswith(OPTIMIZER_WEIGHT_SUFFIX):
+            model_state_file_name = self.get_model_state_file_from(file_name)
             assert model_state_file_name is not None
             model_state_keys = self.global_file_to_state_dict_keys_mapping[model_state_file_name]
-            optimizer_state_keys = self.global_file_to_state_dict_keys_mapping[file]
+            optimizer_state_keys = self.global_file_to_state_dict_keys_mapping[file_name]
 
             master_weight_name_to_model_weight_name_mapping = {}
             for i in range(len(model_state_keys)):
-                master_weight_name = self.optimizer_state_name_to_master_weight_name(optimizer_state_keys[i])
+                master_weight_name = self.parse_master_weight_name_by(optimizer_state_keys[i])
                 master_weight_name_to_model_weight_name_mapping[master_weight_name] = model_state_keys[i]
 
             state_dict = self.cur_rank_loaded_state_dict[file_name]
             renamed_state_dict = {}
-            (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file)
+            (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file_name)
             for k, v in state_dict.items():
-                master_weight_name = self.optimizer_state_name_to_master_weight_name(k)
+                master_weight_name = self.parse_master_weight_name_by(k)
                 model_weight_name = master_weight_name_to_model_weight_name_mapping[master_weight_name]
                 new_k = k.replace(master_weight_name, model_weight_name)
                 renamed_state_dict[new_k] = v
@@ -419,7 +421,7 @@ class CheckpointConverter:
                             (tp_rank_, pp_rank_, sharding_rank_) = self.get_distribution_rank_from_file_name(k)
                             if tp_rank == tp_rank_ and pp_rank == pp_rank_ and k.endswith(OPTIMIZER_WEIGHT_SUFFIX):
                                 sharding_optimizer_state_shards.append([v, sharding_rank_])
-                        model_state_file_name = self.optimizer_state_file_name_to_model_state_file_name(file)
+                        model_state_file_name = self.get_model_state_file_from(file)
                         model_state_shapes = global_file_to_state_dict_shapes_mapping[model_state_file_name]
                         sharding_optimizer_state_shards.sort(key=lambda x: x[1])
 
@@ -462,7 +464,7 @@ class CheckpointConverter:
                             state_shard = sharding_optimizer_state_shards[i][0]
                             partitioned_shard = partition_result[i]
                             for j in range(len(partitioned_shard)):
-                                master_weight_name = self.optimizer_state_name_to_master_weight_name(state_shard[j][0])
+                                master_weight_name = self.parse_master_weight_name_by(state_shard[j][0])
                                 master_weight_name_to_model_weight_name_mapping[
                                     master_weight_name
                                 ] = partitioned_shard[j][0]
@@ -473,7 +475,7 @@ class CheckpointConverter:
                         # In this branch, sharding does not split the optimizer states; it merely relocates them to different cards.
                         # Therefore, the sharding information can now be directly removed.
                         for k, v in state_dict.items():
-                            master_weight_name = self.optimizer_state_name_to_master_weight_name(k)
+                            master_weight_name = self.parse_master_weight_name_by(k)
                             model_weight_name = master_weight_name_to_model_weight_name_mapping[master_weight_name]
                             new_k = k.replace(master_weight_name, model_weight_name)
                             renamed_state_dict[new_k] = v
@@ -548,7 +550,7 @@ class CheckpointConverter:
                             if k not in cur_rank_sharded_tensor_infos:
                                 cur_rank_sharded_tensor_infos[k] = [
                                     [
-                                        {"tp_rank": tp_rank, "sharding_rank": -1},
+                                        {"tp_rank": tp_rank, "sharding_rank": sharding_rank},
                                         v.shape,
                                         str(v.dtype).split(".")[1],
                                         file,
@@ -557,7 +559,7 @@ class CheckpointConverter:
                             else:
                                 cur_rank_sharded_tensor_infos[k].append(
                                     [
-                                        {"tp_rank": tp_rank, "sharding_rank": -1},
+                                        {"tp_rank": tp_rank, "sharding_rank": sharding_rank},
                                         v.shape,
                                         str(v.dtype).split(".")[1],
                                         file,
@@ -840,16 +842,20 @@ class CheckpointConverter:
             if self.is_sharding_stage3:
                 for k, v in self.global_sharded_tensor_infos.items():
                     v.sort(key=lambda x: x[0]["sharding_rank"])
-
                 state_dict_metadata = {}
                 storage_metadata = {}
                 # After obtaining the local_shape and sharding rank of each tensor, the global offset of each tensor can be calculated.
                 for k, v in self.global_sharded_tensor_infos.items():
                     global_offset = 0
                     for item in v:
-                        local_tensor_meta_data = LocalTensorMetadata((global_offset,), item[1], item[2])
-                        local_tensor_index = LocalTensorIndex(k, (global_offset,))
-                        global_offset += item[1][0]
+                        if len(item[1]) == 1:
+                            local_tensor_meta_data = LocalTensorMetadata((global_offset,), item[1], item[2])
+                            local_tensor_index = LocalTensorIndex(k, (global_offset,))
+                            global_offset += item[1][0]
+                        else:
+                            global_offset = tuple([0] * len(item[1]))
+                            local_tensor_meta_data = LocalTensorMetadata(global_offset, item[1], item[2])
+                            local_tensor_index = LocalTensorIndex(k, global_offset)
                         if k not in state_dict_metadata:
                             state_dict_metadata[k] = [local_tensor_meta_data]
                         else:
@@ -857,7 +863,6 @@ class CheckpointConverter:
                         storage_metadata[local_tensor_index] = item[3]
 
                 metadata_for_merge_sharding = Metadata(state_dict_metadata, storage_metadata, None)
-
                 model_state_shapes = []
                 dtype = ""
                 for file, state_dict in self.cur_rank_loaded_state_dict.items():
@@ -896,9 +901,58 @@ class CheckpointConverter:
                     target_state_dict[key + ".w_0_beta1_pow_acc_0"] = paddle.zeros((1,), "float32")
                     target_state_dict[key + ".w_0_beta2_pow_acc_0"] = paddle.zeros((1,), "float32")
 
-                # TODO(zhuxinming) To resolve hanging during the loading of weights in sharding stage 3.
                 _load_state_dict(target_state_dict, self.cur_rank_loaded_state_dict, [metadata_for_merge_sharding])
 
+                # Reshape
+                for item in cur_rank_merger_model_params:
+                    key = item[0]
+                    shape = item[1]
+                    for k, v in target_state_dict.items():
+                        if key == self.optimizer_key_to_model_state_key(k):
+                            if tuple(shape) != tuple(v.shape) and v.numel() == reduce(lambda x, y: x * y, shape):
+                                reshaped_v = v.reshape(shape)
+                                target_state_dict[k] = reshaped_v
+
+                fake_file_name = "{:02d}".format(self.cur_rank) + ".distcp"
+                local_tensor_meta_data = {}
+                local_tensor_index = {}
+                for k, v in target_state_dict.items():
+                    # Generate metadata.
+                    local_shape = v.shape
+                    global_offset = tuple([0] * len(local_shape))
+                    dtype = str(v.dtype).split(".")[1]
+                    local_tensor_meta_data[k] = LocalTensorMetadata(global_offset, local_shape, dtype)
+                    local_tensor_index[k] = [LocalTensorIndex(k, global_offset), fake_file_name]
+
+                global_local_tensor_meta_data = []
+                global_local_tensor_index = []
+
+                use_dist = True if paddle.distributed.get_world_size() > 1 else False
+
+                if use_dist:
+                    paddle.distributed.all_gather_object(global_local_tensor_meta_data, local_tensor_meta_data)
+                    paddle.distributed.all_gather_object(global_local_tensor_index, local_tensor_index)
+                else:
+                    global_local_tensor_meta_data = [local_tensor_meta_data]
+                    global_local_tensor_index = [local_tensor_index]
+
+                state_dict_metadata = {}
+                for tensor_meta_data in global_local_tensor_meta_data:
+                    for k, v in tensor_meta_data.items():
+                        if k not in state_dict_metadata:
+                            state_dict_metadata[k] = [v]
+                        else:
+                            state_dict_metadata[k].append(v)
+
+                storage_metadata = {}
+                for tensor_index in global_local_tensor_index:
+                    for k, v in tensor_index.items():
+                        storage_metadata[v[0]] = v[1]
+
+                meta_data = Metadata(state_dict_metadata, storage_metadata, None)
+                source_state_dict = {fake_file_name: target_state_dict}
+
+                return meta_data, source_state_dict
             else:
                 return self.gen_metadata_for_tp_sharded_tensor()
 
@@ -906,14 +960,14 @@ class CheckpointConverter:
         need_remove_key_pattern = ["eager_tmp", "learning_rate", "@GRAD@MERG", "gradient_merge_"]
 
         need_remove_key = set()
-        for key in self.semi_auto_model_state.keys():
+        for key in self.auto_parallel_state_dict.keys():
             for pattern in need_remove_key_pattern:
                 if pattern in key:
                     need_remove_key.add(key)
                     break
 
         for key in need_remove_key:
-            self.semi_auto_model_state.pop(key)
+            self.auto_parallel_state_dict.pop(key)
 
         adamw_optimizer_status_name_suffix_mappings = {
             "_fp32_master_1_moment1_0": ".w_0_moment1_0",
@@ -938,44 +992,45 @@ class CheckpointConverter:
             return None
 
         renamed_state_dict = {}
-        for key, value in self.semi_auto_model_state.items():
+
+        for key, value in self.auto_parallel_state_dict.items():
+
             if key in self.parameter_to_structured_name.values():
                 new_name = key
             else:
                 new_name = rename(key, self.parameter_to_structured_name, adamw_optimizer_status_name_suffix_mappings)
+
             assert new_name is not None
             renamed_state_dict[new_name] = value
 
-        self.semi_auto_model_state = renamed_state_dict
+        self.auto_parallel_state_dict = renamed_state_dict
 
-    def load_from_dynamic_checkpoint(self):
+    def load_from_hybrid_parallel_checkpoint(self):
         self.rename_semi_auto_state_dict()
         metadata, source_state_dict = self.gen_metadata_and_prepare_source_state_dict()
         if self.save_sharded_model:
             model_params = {}
-            for k, v in self.semi_auto_model_state.items():
+            for k, v in self.auto_parallel_state_dict.items():
                 if k in self.parameter_to_structured_name.values():
                     model_params[k] = v
             for k in model_params.keys():
-                self.semi_auto_model_state.pop(k)
+                self.auto_parallel_state_dict.pop(k)
 
             appended_master_weight_names = []
-
             for k, v in model_params.items():
                 master_weight = k + ".w_0"
-                if master_weight not in self.semi_auto_model_state:
+                if master_weight not in self.auto_parallel_state_dict:
                     appended_master_weight_names.append(master_weight)
                     tmp_tensor = paddle.zeros(v.shape, "float32")
                     dist_tmp_tensor = dist.shard_tensor(tmp_tensor, v.process_mesh, v.placements)
-                    self.semi_auto_model_state[master_weight] = dist_tmp_tensor
+                    self.auto_parallel_state_dict[master_weight] = dist_tmp_tensor
 
-            _load_state_dict(self.semi_auto_model_state, source_state_dict, [metadata])
+            _load_state_dict(self.auto_parallel_state_dict, source_state_dict, [metadata])
             for k, v in model_params.items():
-                master_weight = self.semi_auto_model_state[k + ".w_0"]
+                master_weight = self.auto_parallel_state_dict[k + ".w_0"]
                 cast_master_weight = paddle.cast(master_weight._local_value(), "bfloat16")
                 paddle.assign(cast_master_weight, v._local_value())
             for k in appended_master_weight_names:
-                self.semi_auto_model_state.pop(k)
-
+                self.auto_parallel_state_dict.pop(k)
         else:
-            _load_state_dict(self.semi_auto_model_state, source_state_dict, [metadata])
+            _load_state_dict(self.auto_parallel_state_dict, source_state_dict, [metadata])

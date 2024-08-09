@@ -245,7 +245,6 @@ class TrainingArguments:
               enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance.
               enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.
               enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true. It can accelerate model parallel further.
-              enable_sp_async_reduce_scatter, it supports async reduce_scatter in ColumnSequenceParallelLinear. It only works when set sp_async_reduce_scatter is True. It can accelerate sequence parallel further.
               enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.
               sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
               sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
@@ -630,7 +629,6 @@ class TrainingArguments:
                 "enable_mp_async_allreduce, it supports all_reduce(dx) overlap with matmul(dw) in ColumnParallelLinear backward when it set True, which can accelerate model parallel performance. \n"
                 "enable_mp_skip_c_identity, it supports skip c_identity in ColumnParallelLinear and RowParallelLinear. It only works when set mp_async_allreduce is True. It can accelerate model parallel further.\n"
                 "enable_mp_fused_linear_param_grad_add, it supports fused_linear_param_grad_add in ColumnParallelLinear (cuda >= 11.6). It only works when mp_async_allreduce is true.  It can accelerate model parallel further.\n"
-                "enable_sp_async_reduce_scatter, it supports async reduce_scatter in ColumnSequenceParallelLinear. It only works when set sp_async_reduce_scatter is True. It can accelerate sequence parallel further.\n"
                 "enable_delay_scale_loss, accumulate gradients until optimizer step, all gradients div by accumute step. instead of div accumute step on loss directly.\n"
                 "sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.\n"
                 "sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.\n"
@@ -833,6 +831,11 @@ class TrainingArguments:
         metadata={"help": "Enable MoE (Mixture of Experts) expert parallel training"},
     )
 
+    resume_form_hybrid_parallel: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Wether hybrid paralle checkpoints be loaded in automatic parallel mode"},
+    )
+
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size() > 1:
@@ -1024,13 +1027,6 @@ class TrainingArguments:
                 logger.warning("set amp_master_grad to false since amp is disabled.")
                 self.amp_master_grad = False
 
-        def split_parallel_config(parallel_config):
-            if "," in parallel_config:
-                parallel_config = set(parallel_config.split(","))
-            else:
-                parallel_config = set(parallel_config.split(" "))
-            return parallel_config
-
         # use_hybrid_parallel
         if self.use_hybrid_parallel:
 
@@ -1048,7 +1044,10 @@ class TrainingArguments:
                 strategy = fleet.DistributedStrategy()
                 assert self.data_parallel_config == "", "data_parallle_config is not supported in hybrid parallel"
                 if self.pipeline_parallel_degree > 1:
-                    pipeline_parallel_config = split_parallel_config(self.pipeline_parallel_config)
+                    if " " in self.pipeline_parallel_config:
+                        pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
+                    else:
+                        pipeline_parallel_config = set(self.pipeline_parallel_config.split(","))
                     for x in pipeline_parallel_config:
                         if len(x) > 0:
                             if x not in [
@@ -1122,7 +1121,10 @@ class TrainingArguments:
                 if self.tensor_parallel_degree > 1:
                     strategy.tensor_parallel_configs = {"tensor_init_seed": self.seed}
 
-                    mp_config = split_parallel_config(self.tensor_parallel_config)
+                    if " " in self.tensor_parallel_config:
+                        mp_config = set(self.tensor_parallel_config.split(" "))
+                    else:
+                        mp_config = set(self.tensor_parallel_config.split(","))
 
                     for x in mp_config:
                         if len(x) > 0:
@@ -1130,7 +1132,6 @@ class TrainingArguments:
                                 "enable_mp_async_allreduce",
                                 "enable_mp_skip_c_identity",
                                 "enable_mp_fused_linear_param_grad_add",
-                                "enable_sp_async_reduce_scatter",
                                 "enable_delay_scale_loss",
                                 "sync_param",
                                 "sync_grad",
@@ -1138,7 +1139,7 @@ class TrainingArguments:
                             ]:
                                 raise ValueError(
                                     f"Found unknown tensor parallell config {x}, "
-                                    f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity, enable_mp_fused_linear_param_grad_add, enable_sp_async_reduce_scatter, enable_delay_scale_loss, sync_param, sync_grad and sync_moment."
+                                    f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity, enable_mp_fused_linear_param_grad_add, sync_param, sync_grad and sync_moment."
                                 )
                     try:
                         if "enable_mp_async_allreduce" in mp_config:
@@ -1156,8 +1157,6 @@ class TrainingArguments:
                                 warnings.warn(
                                     "enable_mp_fused_linear_param_grad_add only works with enable_mp_async_allreduce. It will not work."
                                 )
-                        if "enable_sp_async_reduce_scatter" in mp_config:
-                            strategy.hybrid_configs["mp_configs"].sp_async_reduce_scatter = True
 
                         sync_param = "sync_param" in mp_config
                         sync_grad = "sync_grad" in mp_config
@@ -1231,8 +1230,10 @@ class TrainingArguments:
                 strategy.hybrid_configs = hybrid_configs
 
                 if self.sharding_parallel_degree > 1:
-                    sharding_parallel_config = split_parallel_config(self.sharding_parallel_config)
-
+                    if " " in self.sharding_parallel_config:
+                        sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
+                    else:
+                        sharding_parallel_config = set(self.sharding_parallel_config.split(","))
                     for x in sharding_parallel_config:
                         if len(x) > 0:
                             if x not in [
@@ -1388,7 +1389,10 @@ class TrainingArguments:
 
             # navie-pp: pipeline_parallel_degree > 1 and gradient_accumulation_steps == 1
             if self.pipeline_parallel_degree > 1 and self.gradient_accumulation_steps > 1:
-                pipeline_parallel_config = split_parallel_config(self.pipeline_parallel_config)
+                if " " in self.pipeline_parallel_config:
+                    pipeline_parallel_config = set(self.pipeline_parallel_config.split(" "))
+                else:
+                    pipeline_parallel_config = set(self.pipeline_parallel_config.split(","))
                 for x in pipeline_parallel_config:
                     if len(x) > 0:
                         if x not in [
@@ -1437,7 +1441,11 @@ class TrainingArguments:
 
             if self.tensor_parallel_degree > 1:
                 mp_optimization = strategy.mp_optimization
-                mp_config = split_parallel_config(self.tensor_parallel_config)
+
+                if " " in self.tensor_parallel_config:
+                    mp_config = set(self.tensor_parallel_config.split(" "))
+                else:
+                    mp_config = set(self.tensor_parallel_config.split(","))
 
                 for x in mp_config:
                     if len(x) > 0:
@@ -1470,7 +1478,10 @@ class TrainingArguments:
                 elif ShardingOption.FULL_SHARD in self.sharding:
                     sharding.stage = 3
 
-                sharding_parallel_config = split_parallel_config(self.sharding_parallel_config)
+                if " " in self.sharding_parallel_config:
+                    sharding_parallel_config = set(self.sharding_parallel_config.split(" "))
+                else:
+                    sharding_parallel_config = set(self.sharding_parallel_config.split(","))
                 for x in sharding_parallel_config:
                     if len(x) > 0:
                         if x not in [

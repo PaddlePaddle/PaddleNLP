@@ -28,6 +28,7 @@ from paddlenlp.trainer import Trainer
 
 from ..utils.log import logger
 from .argparser import strtobool
+from .ckpt_converter import CheckpointConverter
 from .trainer import SCALER_NAME, SCHEDULER_NAME, TRAINER_STATE_NAME, TRAINING_ARGS_NAME
 from .trainer_callback import TrainerState
 from .trainer_utils import (  # set_hyrbid_parallel_seed,
@@ -663,11 +664,6 @@ class AutoTrainer(Trainer):
                             )
                         )
 
-            ckpt_path = os.path.join(resume_from_checkpoint, DIST_CKPT_PATH)
-
-            if not os.path.isdir(ckpt_path):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
-
             if self.args.to_static:
                 state_dict = self.model_wrapped.state_dict()
             else:
@@ -681,12 +677,21 @@ class AutoTrainer(Trainer):
                     optim_state_dict = self.optimizer.state_dict()
                     optim_state_dict.pop("LR_Scheduler", None)
 
-                state_dict = {
-                    MODEL_NAME: model_state_dict,
-                    OPTIMIZER_NAME: optim_state_dict,
-                }
+                state_dict = {}
+                for k, v in model_state_dict.items():
+                    state_dict[k] = v
+                for k, v in optim_state_dict.items():
+                    state_dict[k] = v
 
-            self._load_ckpt_func(state_dict, ckpt_path)
+            if self.args.resume_form_hybrid_parallel:
+                CheckpointConverter(
+                    resume_from_checkpoint, state_dict, self.model_wrapped._parameter_to_structured_name
+                ).load_from_hybrid_parallel_checkpoint()
+            else:
+                ckpt_path = os.path.join(resume_from_checkpoint, DIST_CKPT_PATH)
+                if not os.path.isdir(ckpt_path):
+                    raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+                self._load_ckpt_func(state_dict, ckpt_path)
 
             # release memory
             del state_dict
