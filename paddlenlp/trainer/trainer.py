@@ -195,7 +195,17 @@ async_save_queue = []
 g_cpu_optimizer_state_dict = {}
 
 
-def _save_func(obj, path, saved_signal_path, protocol):
+def _save_func(obj, name_mapping, path, saved_signal_path, protocol):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == "master_weights" and isinstance(v, dict):
+                for kk, vv in v.items():
+                    if isinstance(vv, paddle.Tensor):
+                        vv.name = name_mapping["master_weights"][kk]
+            else:
+                if k in name_mapping and isinstance(v, paddle.Tensor):
+                    v.name = name_mapping[k]
+
     paddle.save(obj, path, protocol)
     # dump savd_siganl
     with open(saved_signal_path, mode="w+") as f:
@@ -228,17 +238,18 @@ def clear_async_save_task_queue():
 def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol=4):
     global g_cpu_optimizer_state_dict
     g_cpu_optimizer_state_dict.clear()
+    name_mapping = {"master_weights": {}}
     for k, v in optimizer_state_dict.items():
         if k == "master_weights":
             g_cpu_optimizer_state_dict[k] = {}
             for kk, vv in v.items():
-                tensor_name = vv.name
                 g_cpu_optimizer_state_dict[k][kk] = vv.pin_memory()
-                g_cpu_optimizer_state_dict[k][kk].name = tensor_name
+                name_mapping[k][kk] = vv.name
         elif k == "LR_Scheduler":
             g_cpu_optimizer_state_dict[k] = copy.deepcopy(v)
         else:
             g_cpu_optimizer_state_dict[k] = v.pin_memory()
+            name_mapping[k] = v.name
         paddle.device.synchronize()
     clear_async_save_task_queue()
 
@@ -248,7 +259,9 @@ def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol
     def start_process():
         nonlocal attempt
         try:
-            p = ctx.Process(target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol))
+            p = ctx.Process(
+                target=_save_func, args=(g_cpu_optimizer_state_dict, name_mapping, path, saved_signal_path, protocol)
+            )
             p.start()
             return p
         except Exception as e:
@@ -1163,7 +1176,7 @@ class Trainer:
                     if optimizer_was_run:
                         self.lr_scheduler.step()
 
-                    if enable_release_grads:
+                    if args.release_grads or enable_release_grads:
                         self.optimizer.clear_grad(set_to_zero=False)
                         if args.pipeline_parallel_degree > 1:
                             for _, buffers in model._chunk_2_comm_buffers.items():

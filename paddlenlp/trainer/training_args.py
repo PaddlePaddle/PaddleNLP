@@ -839,12 +839,10 @@ class TrainingArguments:
     release_grads: Optional[bool] = field(
         default=False, metadata={"help": "Whether to release gradients during training. Default is `False`."}
     )
-
     resume_form_hybrid_parallel: Optional[bool] = field(
         default=False,
         metadata={"help": "Wether hybrid paralle checkpoints be loaded in auto parallel mode."},
     )
-
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size() > 1:

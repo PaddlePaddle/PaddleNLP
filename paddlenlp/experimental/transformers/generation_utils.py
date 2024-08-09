@@ -183,6 +183,7 @@ class GenerationInferenceModel(GenerationMixin):
             inputs_embeds=inputs_embeds,
             **model_kwargs,
         )
+
         return ret
 
     def update_model_kwargs_for_generation(self, cache, just_decoder, next_tokens, eos_token_id, model_kwargs):
@@ -417,12 +418,12 @@ class GenerationBlockInferenceModel(GenerationMixin):
             ]
         else:
             precache_kv_spec = None
-        use_cachekv_int8 = config.get("use_cachekv_int8", "None")
+        cachekv_int8_type = config.get("cachekv_int8_type", "None")
 
-        if use_cachekv_int8 == "static" or use_cachekv_int8 == "dynamic":
+        if cachekv_int8_type is not None:
             cachekv_dtype = "uint8"
 
-        if use_cachekv_int8 == "dynamic":
+        if cachekv_int8_type == "dynamic":
             cache_k_quant_scales = [
                 paddle.static.InputSpec(
                     shape=[None, self.config.num_attention_heads],
