@@ -857,7 +857,7 @@ class YuanModel(YuanPretrainedModel):
     ):
 
         micro_batch_size, seq_length = input_id.shape
-        attention_mask = paddle.tril(paddle.ones((micro_batch_size, seq_length, seq_length), dtype=paddle.bfloat16))
+        attention_mask = paddle.tril(paddle.ones((micro_batch_size, seq_length, seq_length), dtype=self.config.dtype))
         attention_mask = paddle.reshape(attention_mask, (micro_batch_size, 1, seq_length, seq_length))
 
         position_ids = paddle.arange(seq_length, dtype=paddle.int64)
