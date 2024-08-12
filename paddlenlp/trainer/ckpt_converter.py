@@ -65,7 +65,7 @@ class CheckpointConverter:
         """
         Automatically and inplace load the distributed checkpoint stored in hybrid parallel mode into the auto parallel state_dict.
         The main logic is as follows:
-            1. Callrename_semi_auto_state_dict: Rename the keys of the auto parallel state_dict according to certain rules.
+            1. Call rename_semi_auto_state_dict: Rename the keys of the auto parallel state_dict according to certain rules.
                (Why rename? To facilitate the subsequent correspondence between the optimizer state names of the semi-automatic and static optimizers.)
             2. Callgen_metadata_and_prepare_source_state_dict: Automatically parse the manual checkpoint file based on the state_dict information
                provided by auto parallel, obtaining the Metadata and state_dict required for auto parallel to load the checkpoint.
@@ -539,10 +539,6 @@ class CheckpointConverter:
                     unified_name_state_dict[new_opt_state_name] = opt_state_value
 
                 self.cur_rank_loaded_state_dict[file] = unified_name_state_dict
-
-        for file, state_dict in self.cur_rank_loaded_state_dict.items():
-            for k, v in state_dict.items():
-                print(k, v.shape)
 
         # After the rank has finished loading the files it needs, it can infer sharding_stage1_v and is_sharding_stage3.
         self.sharding_stage1_v = self.infer_sharding_stage1_v()

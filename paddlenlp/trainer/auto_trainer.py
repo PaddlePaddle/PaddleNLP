@@ -697,14 +697,15 @@ class AutoTrainer(Trainer):
                         )
 
             if self.args.to_static:
-                opt_state_dict = {
+                model_state_dict = {
+                    key: value
+                    for key, value in self.model_wrapped.state_dict("param").items()
+                    if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
+                }
+                optim_state_dict = {
                     key: value
                     for key, value in self.model_wrapped.state_dict("opt").items()
                     if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
-                }
-                state_dict = {
-                    MODEL_NAME: self.model_wrapped.state_dict("param"),
-                    OPTIMIZER_NAME: opt_state_dict,
                 }
             else:
                 model_state_dict = self.model_wrapped.state_dict()
@@ -717,10 +718,10 @@ class AutoTrainer(Trainer):
                     optim_state_dict = self.optimizer.state_dict()
                     optim_state_dict.pop("LR_Scheduler", None)
 
-                state_dict = {
-                    MODEL_NAME: model_state_dict,
-                    OPTIMIZER_NAME: optim_state_dict,
-                }
+            state_dict = {
+                MODEL_NAME: model_state_dict,
+                OPTIMIZER_NAME: optim_state_dict,
+            }
 
             if self.args.resume_form_hybrid_parallel:
                 CheckpointConverter(
