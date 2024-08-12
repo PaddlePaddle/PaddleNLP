@@ -548,9 +548,9 @@ class InferencePredictorMixin(BasePredictor):
             # alibi encoder
             alibi_slopes = get_alibi_slopes(self.model_config.n_head)
             inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
-
             arange_tensor_encoder = paddle.arange(self.config.total_max_length, dtype=self.config.dtype)
             alibi = alibi_slopes[None, :, None, None] * arange_tensor_encoder
+
             if self.model_config.tensor_parallel_degree > 1:
                 block_size = self.model_config.n_head // self.model_config.tensor_parallel_degree
                 alibi = alibi[
