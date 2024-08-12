@@ -43,7 +43,7 @@ class CheckpointConverter:
         self.auto_parallel_state_dict = self.flatten_state_dict(model_state)
         self.parameter_to_structured_name = self.gather_global_object(parameter_to_structured_name)
         model_state_global_shape = {}
-        for k, v in model_state.items():
+        for k, v in self.auto_parallel_state_dict.items():
             model_state_global_shape[k] = v.shape
         self.model_state_global_shape = self.gather_global_object(model_state_global_shape)
         self.cur_rank = paddle.distributed.get_rank()

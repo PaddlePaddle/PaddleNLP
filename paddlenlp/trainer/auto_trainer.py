@@ -50,6 +50,7 @@ except:
 MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
 DIST_CKPT_PATH = "dist_ckpt"
+FREE_SVAE_LOAD_KEY_PATTERNS = ["learning_rate_", "gradient_merge_", "@GRAD@MERG", "eager_tmp"]
 
 
 class AutoTrainer(Trainer):
@@ -158,20 +159,43 @@ class AutoTrainer(Trainer):
         if self.args.gradient_accumulation_steps == 1:
             return [inputs]
 
-        # if self.args.to_static:
         if self.args.to_static and self.args.pipeline_parallel_degree > 1:
             return [inputs]
 
         local_batches = [{} for i in range(self.args.gradient_accumulation_steps)]
+        assert isinstance(inputs, dict)
 
-        for key, value in inputs.items():
-            ori_mesh, ori_placements = value.process_mesh, value.placements
-            replicate_value = dist.reshard(value, ori_mesh, [dist.Replicate(), dist.Replicate()])
+        def split_dtensor_by_axis(dtensor, axis):
+            mesh = dtensor.process_mesh
+            placements = [dist.Replicate() for _ in range(len(mesh.shape))]
+            replicate_value = dist.reshard(dtensor, mesh, placements)
             local_datas = replicate_value.split(self.args.gradient_accumulation_steps, axis=0)
+            return local_datas
 
-            for index, data in enumerate(local_datas):
-                local_batches[index].update({key: dist.reshard(data, ori_mesh, ori_placements)})
-
+        for key, dtensors in inputs.items():
+            if isinstance(dtensors, paddle.Tensor):
+                mesh, placements = dtensors.process_mesh, dtensors.placements
+                local_datas = split_dtensor_by_axis(dtensors, 0)
+                for index, data in enumerate(local_datas):
+                    local_batches[index].update({key: dist.reshard(data, mesh, placements)})
+            elif isinstance(dtensors, (list, tuple)):
+                if len(dtensors) == 0:
+                    for i in range(self.args.gradient_accumulation_steps):
+                        local_batches[i].update({key: []})
+                else:
+                    for dtensor in dtensors:
+                        if isinstance(dtensor, paddle.Tensor):
+                            mesh, placements = dtensor.process_mesh, dtensor.placements
+                            local_datas = split_dtensor_by_axis(dtensor, 0)
+                            for index, data in enumerate(local_datas):
+                                if key in local_batches[index].keys():
+                                    local_batches[index][key].append(dist.reshard(data, mesh, placements))
+                                else:
+                                    local_batches[index].update({key: [dist.reshard(data, mesh, placements)]})
+                        else:
+                            raise ValueError(f"unsupported type: {type(dtensor)}")
+            else:
+                raise ValueError(f"unsupported type: {type(dtensors)}")
         return local_batches
 
     def _inner_training_loop(
@@ -544,7 +568,15 @@ class AutoTrainer(Trainer):
 
             if self.args.should_save_model_state:
                 if self.args.to_static:
-                    state_dict = model.state_dict()
+                    opt_state_dict = {
+                        key: value
+                        for key, value in model.state_dict("opt").items()
+                        if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
+                    }
+                    state_dict = {
+                        MODEL_NAME: model.state_dict("param"),
+                        OPTIMIZER_NAME: opt_state_dict,
+                    }
                 else:
                     optim_state_dict = self.optimizer.state_dict()
                     optim_state_dict.pop("LR_Scheduler", None)
@@ -665,7 +697,15 @@ class AutoTrainer(Trainer):
                         )
 
             if self.args.to_static:
-                state_dict = self.model_wrapped.state_dict()
+                opt_state_dict = {
+                    key: value
+                    for key, value in self.model_wrapped.state_dict("opt").items()
+                    if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
+                }
+                state_dict = {
+                    MODEL_NAME: self.model_wrapped.state_dict("param"),
+                    OPTIMIZER_NAME: opt_state_dict,
+                }
             else:
                 model_state_dict = self.model_wrapped.state_dict()
                 optim_state_dict = self.optimizer.state_dict()
