@@ -34,6 +34,7 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     ChatGLMv2Tokenizer,
     LlamaForCausalLMPipe,
+    PretrainedConfig,
     Qwen2ForCausalLMPipe,
 )
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
@@ -722,6 +723,19 @@ def init_chat_template(
 
     logger.info(f"loading `chat_template.json` from `{chat_template_file}`")
     tokenizer.init_chat_template(chat_template_file)
+
+
+def get_model_max_position_embeddings(config: PretrainedConfig) -> Optional[int]:
+    names = [
+        "max_position_embeddings",  # most of models
+        "max_sequence_length",  # GLM model
+        "seq_length",  # llama model
+    ]
+    for name in names:
+        max_length = config.get(name, None)
+        if max_length is not None:
+            return max_length
+    return None
 
 
 def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue):

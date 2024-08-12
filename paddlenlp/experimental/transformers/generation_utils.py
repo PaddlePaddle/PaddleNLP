@@ -183,6 +183,7 @@ class GenerationInferenceModel(GenerationMixin):
             inputs_embeds=inputs_embeds,
             **model_kwargs,
         )
+
         return ret
 
     def update_model_kwargs_for_generation(self, cache, just_decoder, next_tokens, eos_token_id, model_kwargs):

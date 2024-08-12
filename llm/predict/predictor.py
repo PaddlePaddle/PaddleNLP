@@ -32,6 +32,7 @@ from utils.utils import (
     dybatch_preprocess,
     get_alibi_slopes,
     get_infer_model_path,
+    get_model_max_position_embeddings,
     get_prefix_tuning_params,
     init_chat_template,
     load_real_time_tokens,
@@ -64,9 +65,9 @@ MAX_BSZ = 512
 class PredictorArgument:
     model_name_or_path: str = field(default=None, metadata={"help": "The directory of model."})
     model_prefix: str = field(default="model", metadata={"help": "the prefix name of static model"})
-    src_length: int = field(default=4096, metadata={"help": "The max length of source text."})
+    src_length: int = field(default=1024, metadata={"help": "The max length of source text."})
     min_length: int = field(default=1, metadata={"help": "the min length for decoding."})
-    max_length: int = field(default=2048, metadata={"help": "the max length for decoding."})
+    max_length: int = field(default=1024, metadata={"help": "the max length for decoding."})
     top_k: int = field(default=0, metadata={"help": "top_k parameter for generation"})
     top_p: float = field(default=0.7, metadata={"help": "top_p parameter for generation"})
     temperature: float = field(default=0.95, metadata={"help": "top_p parameter for generation"})
@@ -1197,6 +1198,20 @@ def create_predictor(
 
     config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
 
+    max_position_embeddings = get_model_max_position_embeddings(config)
+    if max_position_embeddings is None:
+        max_position_embeddings = predictor_args.src_length + predictor_args.max_length
+        logger.warning(
+            f"Can not retrieval `max_position_embeddings` from config.json, use default value {max_position_embeddings}"
+        )
+    else:
+        if predictor_args.src_length + predictor_args.max_length > max_position_embeddings:
+            raise ValueError(
+                f"The sum of src_length<{predictor_args.src_length}> and "
+                f"max_length<{predictor_args.max_length}> should be smaller than or equal to "
+                f"the maximum position embedding size<{max_position_embeddings}>"
+            )
+
     # update config parameter for inference predictor
     if predictor_args.decode_strategy == "greedy_search":
         predictor_args.top_p = 0.0
@@ -1581,8 +1596,8 @@ def predict():
                     target_texts.append("")
 
     else:
-        source_texts = ["解释一下温故而知新", "解释一下温故而知新"]
-        target_texts = ["", ""]
+        source_texts = ["解释一下温故而知新"] * predictor_args.batch_size
+        target_texts = [""] * predictor_args.batch_size
 
     batch_source_texts = batchfy_text(source_texts, predictor_args.batch_size)
     batch_target_texts = batchfy_text(target_texts, predictor_args.batch_size)
