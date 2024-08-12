@@ -212,17 +212,17 @@ class CheckpointConverter:
             for cur_rank, partition_model_state in partition_mapping.items():
                 partition_model_state_keys.append([item[0] for item in partition_model_state])
 
-            param_meta = {}
+            all_param_meta = {}
             for i in range(self.tp_degree):
                 for j in range(self.pp_degree):
                     key = "tp{:02d}_pp{:02d}".format(i, j)
                     param_meta = self.model_meta["sharding_metas"][key]["param_meta"]
                     for param_name, param_shape_and_dtype in param_meta.items():
-                        param_meta[param_name] = param_shape_and_dtype
+                        all_param_meta[param_name] = param_shape_and_dtype
 
             param_flattened_shapes = {}
-            for param_meta, param_shape_and_dtype in param_meta.items():
-                param_flattened_shapes[param_meta] = reduce(lambda x, y: x * y, param_shape_and_dtype[0])
+            for param_name, param_shape_and_dtype in all_param_meta.items():
+                param_flattened_shapes[param_name] = reduce(lambda x, y: x * y, param_shape_and_dtype[0])
 
             cur_rank_need_load_model_state_keys = partition_model_state_keys[self.cur_rank]
 
@@ -254,7 +254,7 @@ class CheckpointConverter:
             for opt_state_name, opt_state_value in optimizer_state_dict.items():
                 if opt_state_value.shape[0] > 1 and "_tp" in opt_state_name:
                     param_name = self.optimizer_key_to_model_state_key(opt_state_name[:-5])
-                    param_shape = param_meta[param_name][0]
+                    param_shape = all_param_meta[param_name][0]
                     assert opt_state_value.numel() == reduce(lambda x, y: x * y, param_shape)
                     reshaped_opt_state_value = opt_state_value.reshape(param_shape)
                     optimizer_state_dict[opt_state_name] = reshaped_opt_state_value
@@ -281,7 +281,8 @@ class CheckpointConverter:
                 else:
                     global_shape = (1,)
 
-                assert len(local_shape) == len(global_shape)
+                if len(local_shape) != 1:
+                    assert len(local_shape) == len(global_shape)
 
                 axis = -1
                 for i in range(len(local_shape)):
@@ -498,7 +499,6 @@ class CheckpointConverter:
             )
 
         need_read_files = get_local_load_files(self.gather_global_object(rank_access_files))
-
         self.cur_rank_loaded_state_dict = {}
 
         for file in need_read_files:
@@ -539,6 +539,10 @@ class CheckpointConverter:
                     unified_name_state_dict[new_opt_state_name] = opt_state_value
 
                 self.cur_rank_loaded_state_dict[file] = unified_name_state_dict
+
+        for file, state_dict in self.cur_rank_loaded_state_dict.items():
+            for k, v in state_dict.items():
+                print(k, v.shape)
 
         # After the rank has finished loading the files it needs, it can infer sharding_stage1_v and is_sharding_stage3.
         self.sharding_stage1_v = self.infer_sharding_stage1_v()
