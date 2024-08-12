@@ -1313,7 +1313,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         else:
             # 尝试qkv后接dequant,省去attention中compute_attn的dequant但出现报错
             # if self.use_gemm_dequant:
-            # ln_out type is tuple
+            # ln_out type is tuple, use ln_out[0]
             # qkv_out = gemm_dequant(ln_out[0], self.qkv_weights[i], self.qkv_out_scales[i], self._dtype)
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
         return qkv_out
