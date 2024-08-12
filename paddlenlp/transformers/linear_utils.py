@@ -15,7 +15,6 @@
 """
 This file is used for replacing Paddle's native Linear implementations with vendors' customized implementations
 """
-from paddlenlp.utils.log import logger
 
 import paddle.distributed.fleet.meta_parallel as mpu
 from paddle import nn
@@ -30,6 +29,16 @@ from paddlenlp.transformers.mc2_parallel_linear import (
     MC2RowSeqParallelLinear,
 )
 from paddlenlp.utils.tools import get_env_device
+from paddlenlp.utils.log import logger
+
+if get_env_device() == "xpu":
+    try:
+        import paddle_xpu
+    except ImportError:
+        # If paddle_xpu is not installed, just use Paddle's native Linear implementations
+        logger.warning("Import paddle_xpu failed, use Paddle's native Linear implementations")
+    else:
+        logger.info("Import paddle_xpu succeeded.")
 
 Linear = nn.Linear
 ColumnParallelLinear = mpu.ColumnParallelLinear
@@ -62,16 +71,6 @@ if get_env_device() == "npu":
     if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:
         ColumnSequenceParallelLinear = MC2ColumnSeqParallelLinear
         RowSequenceParallelLinear = MC2RowSeqParallelLinear
-elif get_env_device() == "xpu":
-    try:
-        import paddle_xpu
-    except ImportError:
-        # If paddle_xpu is not installed, just use Paddle's native Linear implementations
-        logger.warning("Import paddle_xpu failed, use Paddle's native Linear implementations")
-    else:
-        logger.info("Import paddle_xpu succeeded.")
-        import inspect
-        logger.info(f"Now nn.Linear is {inspect.getmodule(Linear)}.")
 else:
     # By default, use Paddle's native Linear implementations
     pass

@@ -431,9 +431,7 @@ class LoRAModel(nn.Layer):
             parent_module = getattr(parent_module, name)
         module = getattr(parent_module, attribute_chain[-1])
         lora_module = None
-        import inspect
-        logger.info(f"{inspect.getmodule(module)}")
-        if isinstance(module, nn.Linear):
+        if isinstance(module, nn.layer.common.Linear):
             lora_module = LoRALinear(
                 in_features=module.weight.shape[0],
                 out_features=module.weight.shape[1],
