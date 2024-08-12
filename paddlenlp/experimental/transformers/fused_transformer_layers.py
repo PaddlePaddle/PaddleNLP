@@ -832,7 +832,6 @@ class FusedMultiTransformerBase(Layer):
         kwargs["max_dec_len_this_time"] = max_dec_len_this_time
 
         residual_input = src
-
         for i in range(self.num_layers):
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
             out_linear_out = self.compute_attn(
@@ -1309,7 +1308,6 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         return ln_out
 
     def compute_qkv_linear(self, ln_out, i):
-
         if paddle.is_compiled_with_rocm():
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i])
         else:
