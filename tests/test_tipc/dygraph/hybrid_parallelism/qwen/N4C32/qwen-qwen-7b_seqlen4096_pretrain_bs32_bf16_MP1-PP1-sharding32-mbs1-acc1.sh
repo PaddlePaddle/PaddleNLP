@@ -14,13 +14,13 @@
 
 
 param="model_name_or_path=qwen/qwen-7b "
-param+="per_device_train_batch_size=2 "
+param+="per_device_train_batch_size=1 "
 param+="data_parallel_degree=1 "
-param+="tensor_parallel_degree=2 "
+param+="tensor_parallel_degree=1 "
 param+="pipeline_parallel_degree=1 "
 param+="virtual_pp_degree=1 "
 param+="sequence_parallel=1 "
-param+="sharding_parallel_degree=16 "
+param+="sharding_parallel_degree=32 "
 param+="sharding=stage1 "
 param+="recompute=0 "
 param+="recompute_granularity=full_attn "
@@ -31,15 +31,15 @@ param+="model_item=qwen-qwen-7b_seqlen4096_pretrain "
 param+="max_steps=100 "
 param+="gradient_accumulation_steps=1 "
 param+="pp_recompute_interval=1 "
-param+="tensor_parallel_config=enable_delay_scale_loss,enable_mp_async_allreduce,enable_mp_skip_c_identity,enable_mp_fused_linear_param_grad_add "
+param+="tensor_parallel_config=enable_mp_async_allreduce,enable_mp_skip_c_identity,enable_mp_fused_linear_param_grad_add "
 #多机新添加的参数
-param+="pipeline_parallel_config=enable_delay_scale_loss,enable_sharding_comm_overlap,enable_release_grads "
+param+="pipeline_parallel_config=enable_sharding_comm_overlap,enable_release_grads "
 param+="max_seq_length=4096 "
 param+="min_learning_rate=0.000005 "
 param+="save_steps=5000 "
 param+="eval_steps=1000 "
 param+="scale_loss=1024 "
-param+="sharding_parallel_config=split_param,enable_stage1_overlap "
+param+="sharding_parallel_config=split_param,enable_stage1_overlap,enable_stage1_allgather_overlap "
 
 
 cd ./tests

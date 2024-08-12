@@ -13,7 +13,7 @@
 # limitations under the License.
 
 param="model_item=baichuan-inc-Baichun2-13b_pretrain "
-param+="run_mode=DP1_MP2_PP2_VPP1_Sharding8_Stage1 "
+param+="run_mode=MBS2_DP1_MP4_PP1_VPP1_Sharding8_Stage1 "
 param+="device_num=N4C32 "
 param+="global_batch_size=32 "
 param+="nnodes=4 "
