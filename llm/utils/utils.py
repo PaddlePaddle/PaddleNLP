@@ -34,6 +34,7 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     ChatGLMv2Tokenizer,
     LlamaForCausalLMPipe,
+    PretrainedConfig,
     Qwen2ForCausalLMPipe,
 )
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
