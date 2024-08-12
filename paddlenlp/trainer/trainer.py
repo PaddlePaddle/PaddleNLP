@@ -619,7 +619,8 @@ class Trainer:
 
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
-            resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
+            uc_async_save = self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config
+            resume_from_checkpoint = get_last_checkpoint(self.args.output_dir, uc_async_save)
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
@@ -1474,9 +1475,13 @@ class Trainer:
             raise ValueError("We don't need train_dataset when should_load_dataset is False.")
 
         train_dataset = self.train_dataset
+        if self.args.distributed_dataloader:
+            is_iterable_dataset = self._is_iterable_dataset_dd(train_dataset)
+        else:
+            is_iterable_dataset = self._is_iterable_dataset(train_dataset)
+
         if is_datasets_available() and train_dataset is not None and isinstance(train_dataset, datasets.Dataset):
             train_dataset = self._remove_unused_columns(train_dataset, description="training")
-        _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
         if self._is_iterable_dataset(train_dataset):
             if self.args.dataset_world_size > 1:
@@ -1488,24 +1493,42 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
-            return _DataLoader(
-                train_dataset,
-                batch_size=self.args.per_device_train_batch_size,
-                collate_fn=self.data_collator,
-                num_workers=self.args.dataloader_num_workers,
-            )
+            if self.args.distributed_dataloader:
+                return DistDataLoader(
+                    train_dataset,
+                    batch_size=self.args.per_device_train_batch_size,
+                    collate_fn=self.data_collator,
+                    num_workers=self.args.dataloader_num_workers,
+                    is_iterable_dataset=True,
+                )
+            else:
+                return DataLoader(
+                    train_dataset,
+                    batch_size=self.args.per_device_train_batch_size,
+                    collate_fn=self.data_collator,
+                    num_workers=self.args.dataloader_num_workers,
+                )
 
         train_sampler = self._get_train_sampler()
 
         if self.args.distributed_dataloader:
             logger.info("Training using DistDataLoader.")
 
-        return _DataLoader(
-            train_dataset,
-            batch_sampler=train_sampler,
-            collate_fn=self.data_collator,
-            num_workers=self.args.dataloader_num_workers,
-        )
+        if self.args.distributed_dataloader:
+            return DistDataLoader(
+                train_dataset,
+                batch_sampler=train_sampler if not is_iterable_dataset else None,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+                is_iterable_dataset=is_iterable_dataset,
+            )
+        else:
+            return DataLoader(
+                train_dataset,
+                batch_sampler=train_sampler,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+            )
 
     def _get_eval_sampler(self, eval_dataset: Dataset):
         if eval_dataset is None or not has_length(eval_dataset):
@@ -1552,6 +1575,10 @@ class Trainer:
             raise ValueError("We don't need eval_dataset when should_load_dataset is False.")
 
         eval_dataset = eval_dataset if eval_dataset is not None else self.eval_dataset
+        if self.args.distributed_dataloader:
+            is_iterable_dataset = self._is_iterable_dataset_dd(eval_dataset)
+        else:
+            is_iterable_dataset = self._is_iterable_dataset(eval_dataset)
 
         if is_datasets_available() and eval_dataset is not None and isinstance(eval_dataset, datasets.Dataset):
             eval_dataset = self._remove_unused_columns(eval_dataset, description="evaluation")
@@ -1573,6 +1600,7 @@ class Trainer:
                     collate_fn=self.data_collator,
                     num_workers=0,
                     eval=True,
+                    is_iterable_dataset=True,
                 )
             else:
                 return DataLoader(
@@ -1589,10 +1617,11 @@ class Trainer:
 
             return DistDataLoader(
                 eval_dataset,
-                batch_sampler=eval_sampler,
+                batch_sampler=eval_sampler if not is_iterable_dataset else None,
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
                 eval=True,
+                is_iterable_dataset=is_iterable_dataset,
             )
         else:
             return DataLoader(
@@ -1618,6 +1647,10 @@ class Trainer:
         if not self.args.should_load_dataset and test_dataset is not None:
             raise ValueError("We don't need test_dataset when should_load_dataset is False.")
 
+        if self.args.distributed_dataloader:
+            is_iterable_dataset = self._is_iterable_dataset_dd(test_dataset)
+        else:
+            is_iterable_dataset = self._is_iterable_dataset(test_dataset)
         if is_datasets_available() and test_dataset is not None and isinstance(test_dataset, datasets.Dataset):
             test_dataset = self._remove_unused_columns(test_dataset, description="test")
 
@@ -1638,6 +1671,7 @@ class Trainer:
                     collate_fn=self.data_collator,  # _get_collator_with_removed_columns
                     num_workers=self.args.dataloader_num_workers,
                     eval=True,
+                    is_iterable_dataset=True,
                 )
             else:
                 return DataLoader(
@@ -1655,10 +1689,11 @@ class Trainer:
             # We use the same batch_size as for eval.
             return DistDataLoader(
                 test_dataset,
-                batch_sampler=test_sampler,
+                batch_sampler=test_sampler if not is_iterable_dataset else None,
                 collate_fn=self.data_collator,
                 drop_last=self.args.dataloader_drop_last,
                 eval=True,
+                is_iterable_dataset=is_iterable_dataset,
             )
         else:
             return DataLoader(
@@ -2276,11 +2311,7 @@ class Trainer:
             if not self.is_in_train:
                 self.args.unified_checkpoint_config = unified_checkpoint_config_backup
         else:
-            if (
-                strtobool(os.getenv("FLAG_LLM_PDC", "False"))
-                and self.args.unified_checkpoint
-                and "async_save" in self.args.unified_checkpoint_config
-            ):
+            if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
                 if self.is_in_train:
                     global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
                     paddle.save(global_rank, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
@@ -2294,13 +2325,13 @@ class Trainer:
             ):
                 # For ckpt integrity
                 paddle.save(self.state.global_step, os.path.join(output_dir, ".model_done"))
-            elif (
-                self.args.unified_checkpoint
-                and "async_save" in self.args.unified_checkpoint_config
-                and not self.is_in_train
-            ):
-                global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
-                paddle.save(self.state.global_step, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
+        if (
+            self.args.unified_checkpoint
+            and "async_save" in self.args.unified_checkpoint_config
+            and not self.is_in_train
+        ):
+            global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+            paddle.save(self.state.global_step, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
 
     def _filter_moe_no_sync_optimizer_params(self):
         """
@@ -3299,6 +3330,15 @@ class Trainer:
 
     def _is_iterable_dataset(self, dataset):
         return isinstance(dataset, paddle.io.IterableDataset)
+
+    def _is_iterable_dataset_dd(self, dataset):
+        # For distributed dataloaer.
+        is_iterable_dataset_tensor = paddle.to_tensor(self._is_iterable_dataset(dataset)).reshape([1])
+        if dist.get_world_size() > 1:
+            dist.all_reduce(is_iterable_dataset_tensor, op=dist.ReduceOp.MAX)
+        if is_iterable_dataset_tensor.item() == 1:
+            return True
+        return False
 
     def print_config(self, args=None, key=""):
         """

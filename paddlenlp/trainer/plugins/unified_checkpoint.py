@@ -260,9 +260,8 @@ class UnifiedCheckpointHandler:
                 state_dict = _read_state_dict_from_shm(meta_dict, shm)  # numpy array
                 safe_save_file(state_dict, path, {"format": "np"})
                 del state_dict
-                if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
-                    saved_signal_path = os.path.join(os.path.dirname(path), f".{state_dict_type}.done.{global_rank}")
-                    paddle.save(global_rank, saved_signal_path)
+                saved_signal_path = os.path.join(os.path.dirname(path), f".{state_dict_type}.done.{global_rank}")
+                paddle.save(global_rank, saved_signal_path)
                 with lock:
                     shared_save_flag[0] = 0
             time.sleep(0.5)
@@ -354,6 +353,15 @@ class UnifiedCheckpointHandler:
         if self.args.should_save:
             config_to_save.save_pretrained(save_directory)
         paddle.device.cuda.empty_cache()
+
+        if strtobool(os.getenv("FLAG_LLM_PDC", "False")) and self.args.should_save:
+            world_size = paddle.distributed.get_world_size()
+            save_info = {
+                "world_size": world_size,
+                "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
+                "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
+            }
+            paddle.save(save_info, os.path.join(save_directory, ".saving_info"))
 
     def load_unified_checkpoint(self, model, optimizer, resume_from_checkpoint: str):
         """Load potential model checkpoint
