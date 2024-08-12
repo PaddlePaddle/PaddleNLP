@@ -242,10 +242,11 @@ class CheckpointConverter:
 
     def rename_using_model_meta(self, file_name):
         if not hasattr(self, "model_meta"):
-            try:
-                self.model_meta = json.load(open(os.path.join(self.path, MODEL_META_FILE_NAME)))
-            except Exception as e:
-                print(e)
+            meta_file_path = os.path.join(self.path, MODEL_META_FILE_NAME)
+            assert os.path.exists(meta_file_path)
+            with open(meta_file_path, "r") as file:
+                self.model_meta = json.load(file)
+
         distributed_rank = self.get_distribution_rank_from_file_name(file_name)
         dist_strategy_key = (
             "tp" + "{:02d}".format(distributed_rank[0]) + "_" + "pp" + "{:02d}".format(distributed_rank[1])
