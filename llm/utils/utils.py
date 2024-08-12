@@ -26,12 +26,12 @@ import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
+from transformers import AutoTokenizer
 
 from paddlenlp.datasets import ZeroPaddingIterableDataset
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
 from paddlenlp.transformers import (
-    AutoTokenizer,
     ChatGLMv2Tokenizer,
     LlamaForCausalLMPipe,
     PretrainedConfig,

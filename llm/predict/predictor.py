@@ -28,6 +28,7 @@ import paddle.distributed.fleet.base.topology as tp
 import paddle.incubate.multiprocessing as mp
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
 from paddle.distributed import fleet
+from transformers import AutoTokenizer
 from utils.utils import (
     dybatch_preprocess,
     get_alibi_slopes,
@@ -46,7 +47,6 @@ from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.transformers import (
     AutoConfig,
     AutoModelForCausalLM,
-    AutoTokenizer,
     ChatGLMTokenizer,
     ChatGLMv2Tokenizer,
     Llama3Tokenizer,
