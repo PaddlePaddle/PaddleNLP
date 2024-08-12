@@ -28,6 +28,7 @@ from paddle.distributed.checkpoint.metadata import (
     LocalTensorMetadata,
     Metadata,
 )
+from paddle.distributed.checkpoint.utils import flatten_state_dict
 
 MODEL_WEIGHT_SUFFIX = ".pdparams"
 OPTIMIZER_WEIGHT_SUFFIX = ".pdopt"
@@ -39,7 +40,7 @@ class CheckpointConverter:
     def __init__(self, hybrid_parallel_ckpt_path, model_state, parameter_to_structured_name):
         self.use_dist = True if paddle.distributed.get_world_size() > 1 else False
         self.path = hybrid_parallel_ckpt_path
-        self.auto_parallel_state_dict = model_state
+        self.auto_parallel_state_dict = self.flatten_state_dict(model_state)
         self.parameter_to_structured_name = self.gather_global_object(parameter_to_structured_name)
         model_state_global_shape = {}
         for k, v in model_state.items():
@@ -67,6 +68,15 @@ class CheckpointConverter:
             save_sharded_model_flag = []
         save_sharded_model_flag = self.gather_global_object(save_sharded_model_flag)
         return save_sharded_model_flag[0]
+
+    def flatten_state_dict(self, state_dict):
+        flattened_state_dict = {}
+        flat_state_dict, mapping = flatten_state_dict(state_dict)
+        for k, v in flat_state_dict.items():
+            last_level_key = mapping[k][-1]
+            assert last_level_key not in flattened_state_dict
+            flattened_state_dict[last_level_key] = v
+        return flattened_state_dict
 
     def gather_global_object(self, cur_rank_object):
         all_rank_objects = []
@@ -953,7 +963,7 @@ class CheckpointConverter:
             else:
                 return self.gen_metadata_for_tp_sharded_tensor()
 
-    def rename_semi_auto_state_dict(self):
+    def rename_auto_parallel_state_dict(self):
         need_remove_key_pattern = ["eager_tmp", "learning_rate", "@GRAD@MERG", "gradient_merge_"]
 
         need_remove_key = set()
@@ -1003,7 +1013,7 @@ class CheckpointConverter:
         self.auto_parallel_state_dict = renamed_state_dict
 
     def load_from_hybrid_parallel_checkpoint(self):
-        self.rename_semi_auto_state_dict()
+        self.rename_auto_parallel_state_dict()
         metadata, source_state_dict = self.gen_metadata_and_prepare_source_state_dict()
         if self.save_sharded_model:
             model_params = {}
