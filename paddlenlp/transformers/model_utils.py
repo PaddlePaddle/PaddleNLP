@@ -1928,6 +1928,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     need_add_except_key = k[-1] in expected_keys
                     if need_add_except_key:
                         filter_dict_keys |= set(k[:-1])
+                    # remove pre_tensor_parallel_split function from tp_actions
+                    if pre_tensor_parallel_split:
+                        for item in k[:-1]:
+                            if item in tp_actions:
+                                tp_actions.pop(item, None)
+
                 for k in list(split_actions.keys()):
                     need_add_except_key = False
                     for item in k[:-1]:
@@ -1936,6 +1942,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                             break
                     if need_add_except_key:
                         filter_dict_keys.add(k[-1])
+                    # remove pre_tensor_parallel_split function from tp_actions
+                    if pre_tensor_parallel_split:
+                        if k[-1] in tp_actions:
+                            fuse_actions.pop(k[-1], None)
 
                 if config.quantization_config.is_weight_quantize():
                     filter_dict_keys = None

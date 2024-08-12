@@ -34,6 +34,7 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     ChatGLMv2Tokenizer,
     LlamaForCausalLMPipe,
+    PretrainedConfig,
     Qwen2ForCausalLMPipe,
 )
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
@@ -219,7 +220,17 @@ def get_lora_target_modules(model):
             ".*up_proj.*",
             ".*down_proj.*",
         ]
-    else:
+    elif model.base_model_prefix == "yuan":
+        target_modules = [
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*o_proj.*",
+            ".*gate_proj.*",
+            ".*up_proj.*",
+            ".*down_proj.*",
+        ]
+    else:    
         raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}.")
     return target_modules
 
