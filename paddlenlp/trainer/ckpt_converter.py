@@ -61,13 +61,812 @@ class CheckpointConverter:
 
         self.initial_distributed_configuration()
 
-    def get_save_sharded_model_flag(self):
-        if self.cur_rank == 1:
-            save_sharded_model_flag = [os.path.exists(os.path.join(self.path, MODEL_META_FILE_NAME))]
+    def load_from_hybrid_parallel_checkpoint(self):
+        """
+        Automatically and inplace load the distributed checkpoint stored in hybrid parallel mode into the auto parallel state_dict.
+        The main logic is as follows:
+            1. Callrename_semi_auto_state_dict: Rename the keys of the auto parallel state_dict according to certain rules.
+               (Why rename? To facilitate the subsequent correspondence between the optimizer state names of the semi-automatic and static optimizers.)
+            2. Callgen_metadata_and_prepare_source_state_dict: Automatically parse the manual checkpoint file based on the state_dict information
+               provided by auto parallel, obtaining the Metadata and state_dict required for auto parallel to load the checkpoint.
+            3. Callload_state_dict: Automatically reshard and load.
+            4. Special logic adaptation: In the save_sharded_model mode, the weights are obtained through the master_weight cast in the checkpoint.
+        """
+        self.rename_auto_parallel_state_dict()
+        metadata, source_state_dict = self.gen_metadata_and_prepare_source_state_dict()
+        if self.save_sharded_model:
+            model_params = {}
+            for state_name, state_value in self.auto_parallel_state_dict.items():
+                if state_name in self.parameter_to_structured_name.values():
+                    model_params[state_name] = state_value
+            for param_name in model_params.keys():
+                self.auto_parallel_state_dict.pop(param_name)
+
+            appended_master_weight_names = []
+            for param_name, param_value in model_params.items():
+                master_weight = param_name + ".w_0"
+                if master_weight not in self.auto_parallel_state_dict:
+                    appended_master_weight_names.append(master_weight)
+                    tmp_tensor = paddle.zeros(param_value.shape, "float32")
+                    self.auto_parallel_state_dict[master_weight] = dist.shard_tensor(
+                        tmp_tensor, param_value.process_mesh, param_value.placements
+                    )
+
+            _load_state_dict(self.auto_parallel_state_dict, source_state_dict, [metadata])
+            for param_name, param_value in model_params.items():
+                master_weight = self.auto_parallel_state_dict[param_name + ".w_0"]
+                cast_master_weight = paddle.cast(master_weight._local_value(), "bfloat16")
+                paddle.assign(cast_master_weight, param_value._local_value())
+            for master_weight_name in appended_master_weight_names:
+                self.auto_parallel_state_dict.pop(master_weight_name)
         else:
-            save_sharded_model_flag = []
-        save_sharded_model_flag = self.gather_global_object(save_sharded_model_flag)
-        return save_sharded_model_flag[0]
+            _load_state_dict(self.auto_parallel_state_dict, source_state_dict, [metadata])
+
+    def rename_auto_parallel_state_dict(self):
+        """
+        Rename the keys of the auto parallel state_dict according to certain rules:
+            1. Rename the suffixes of the optimizer states to a unified format: adamw_optimizer_status_name_suffix_mappings
+        """
+
+        adamw_optimizer_state_name_suffix_mappings = {
+            "_fp32_master_1_moment1_0": ".w_0_moment1_0",
+            "_fp32_master_1_moment2_0": ".w_0_moment2_0",
+            "_fp32_master_1_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
+            "_fp32_master_1_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
+            "_fp32_master_1": ".w_0",
+            "_moment1_0": ".w_0_moment1_0",
+            "_moment2_0": ".w_0_moment2_0",
+            "_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
+            "_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
+        }
+
+        def rename(old_name, map1, map2):
+            for i in range(1, len(old_name)):
+                str1 = old_name[:i]
+                str2 = old_name[i:]
+                if (str1 in map1) and (str2 in map2):
+                    transformed_str1 = map1[str1]
+                    transformed_str2 = map2[str2]
+                    return transformed_str1 + transformed_str2
+            return None
+
+        renamed_state_dict = {}
+
+        for key, value in self.auto_parallel_state_dict.items():
+
+            if key in self.parameter_to_structured_name.values():
+                new_name = key
+            else:
+                new_name = rename(key, self.parameter_to_structured_name, adamw_optimizer_state_name_suffix_mappings)
+
+            assert new_name is not None
+            renamed_state_dict[new_name] = value
+
+        self.auto_parallel_state_dict = renamed_state_dict
+
+    def gen_metadata_and_prepare_source_state_dict(self):
+        """
+        Automatically parse the manual checkpoint file based on the state_dict information provided by auto parallel,
+        obtaining the Metadata and state_dict required for auto parallel to load the checkpoint:
+            1. Callload_state_dict_and_rename: Parse the distributed information from the names of the checkpoint files, and evenly parse out the distributed
+               information for each weight/optimizer state into self.global_sharded_tensor_infos(data structure:param_name -> [{tp_rank: 1, sharding_rank: 1}, shape, dtype, file_name]).
+               Modify the names of the optimizer states in the form ofparameter+suffixand record them in self.cur_rank_loaded_state_dict(data structure:file_name -> renamed_state_dict).
+            2. Construct the Metadata and state_dict based on the distributed information obtained in the previous step for the final load.
+            3. Special logic adaptation: When sharding is enabled, the optimizer states are also split. In this step, the optimizer states need to be concatenated back according to the sharding dimension:
+                * Construct the Metadata for concatenating the sharded states back based on the characteristics of sharding.
+                * Construct a temporaryopt_state_dictand use the_load_state_dictinterface to obtain the state_dict with the sharded states concatenated back.
+                * Reshape the optimizer states back to the shape of the weights.
+        """
+        self.load_state_dict_and_rename()
+        if self.sharding_degree > 1 and self.sharding_stage1_v == 2 and not self.is_sharding_stage3:
+            for state_name, shard_info in self.global_sharded_tensor_infos.items():
+                shard_info.sort(key=lambda x: x[0]["sharding_rank"])
+
+            state_dict_metadata = {}
+            storage_metadata = {}
+            # After obtaining the local_shape and sharding rank of each tensor, the global offset of each tensor can be calculated.
+            for state_name, shard_info in self.global_sharded_tensor_infos.items():
+                global_offset = [0] * self.tp_degree
+                for item in shard_info:
+                    tp_rank = item[0]["tp_rank"]
+                    state_name_with_tp_rank = state_name + "_tp" + "{:02d}".format(tp_rank)
+                    local_tensor_meta_data = LocalTensorMetadata((global_offset[tp_rank],), item[1], item[2])
+                    local_tensor_index = LocalTensorIndex(state_name_with_tp_rank, (global_offset[tp_rank],))
+                    global_offset[tp_rank] += item[1][0]
+                    if state_name_with_tp_rank not in state_dict_metadata:
+                        state_dict_metadata[state_name_with_tp_rank] = [local_tensor_meta_data]
+                    else:
+                        state_dict_metadata[state_name_with_tp_rank].append(local_tensor_meta_data)
+                    storage_metadata[local_tensor_index] = item[3]
+
+            metadata_for_merge_sharding = Metadata(state_dict_metadata, storage_metadata, None)
+
+            source_state_dict_for_merge_sharding = {}
+            for file_name, state_dict in self.cur_rank_loaded_state_dict.items():
+                renamed_state_dict = {}
+                (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file_name)
+                for state_name, state_value in state_dict.items():
+                    state_name_with_tp_rank = state_name + "_tp" + "{:02d}".format(tp_rank)
+                    renamed_state_dict[state_name_with_tp_rank] = state_value
+
+                source_state_dict_for_merge_sharding[file_name] = renamed_state_dict
+
+            assert self.model_meta is not None
+            global_model_state_shapes = []
+            sharding_metas_keys = []
+            for i in range(self.pp_degree):
+                for j in range(self.tp_degree):
+                    sharding_metas_keys.append("tp{:02d}_pp{:02d}".format(i, j))
+            for key in sharding_metas_keys:
+                param_meta = self.model_meta["sharding_metas"][key]["param_meta"]
+                for param_name, param_shape_and_dtype in param_meta.items():
+                    global_model_state_shapes.append([param_name, param_shape_and_dtype[0]])
+
+            # Distribute all model parameters evenly across each card for loading
+
+            world_size = paddle.distributed.get_world_size()
+
+            partition_mapping = self.partition_parameters(global_model_state_shapes, True, world_size)
+
+            partition_model_state_keys = []
+            for cur_rank, partition_model_state in partition_mapping.items():
+                partition_model_state_keys.append([item[0] for item in partition_model_state])
+
+            param_meta = {}
+            for i in range(self.tp_degree):
+                for j in range(self.pp_degree):
+                    key = "tp{:02d}_pp{:02d}".format(i, j)
+                    param_meta = self.model_meta["sharding_metas"][key]["param_meta"]
+                    for param_name, param_shape_and_dtype in param_meta.items():
+                        param_meta[param_name] = param_shape_and_dtype
+
+            param_flattened_shapes = {}
+            for param_meta, param_shape_and_dtype in param_meta.items():
+                param_flattened_shapes[param_meta] = reduce(lambda x, y: x * y, param_shape_and_dtype[0])
+
+            cur_rank_need_load_model_state_keys = partition_model_state_keys[self.cur_rank]
+
+            # Generate the optimizer states corresponding to the model weights.
+            optimizer_state_dict = {}
+            for key in cur_rank_need_load_model_state_keys:
+                for tp_rank in range(self.tp_degree):
+                    tp_rank_suffix = "_tp{:02d}".format(tp_rank)
+                    optimizer_state_dict[key + ".w_0_moment1_0" + tp_rank_suffix] = paddle.zeros(
+                        (param_flattened_shapes[key],), "float32"
+                    )
+                    optimizer_state_dict[key + ".w_0_moment2_0" + tp_rank_suffix] = paddle.zeros(
+                        (param_flattened_shapes[key],), "float32"
+                    )
+                    if self.optimizer_state_with_master_weights:
+                        optimizer_state_dict[key + ".w_0" + tp_rank_suffix] = paddle.zeros(
+                            (param_flattened_shapes[key],), "float32"
+                        )
+                    # When handling tensor parallelism (TP), if some tensors are replicated, we initially assume that they are partitioned.
+                    # Later, when these are compared with the global shape, we realize that they are replicated.
+
+                    optimizer_state_dict[key + ".w_0_beta1_pow_acc_0" + tp_rank_suffix] = paddle.zeros((1,), "float32")
+                    optimizer_state_dict[key + ".w_0_beta2_pow_acc_0" + tp_rank_suffix] = paddle.zeros((1,), "float32")
+
+            # merge sharding
+            _load_state_dict(optimizer_state_dict, source_state_dict_for_merge_sharding, [metadata_for_merge_sharding])
+
+            # Reshape
+            for opt_state_name, opt_state_value in optimizer_state_dict.items():
+                if opt_state_value.shape[0] > 1 and "_tp" in opt_state_name:
+                    param_name = self.optimizer_key_to_model_state_key(opt_state_name[:-5])
+                    param_shape = param_meta[param_name][0]
+                    assert opt_state_value.numel() == reduce(lambda x, y: x * y, param_shape)
+                    reshaped_opt_state_value = opt_state_value.reshape(param_shape)
+                    optimizer_state_dict[opt_state_name] = reshaped_opt_state_value
+            concat_optimier_state_dict = {}
+
+            optimizer_state_key_to_tp_keys = {}
+            for opt_state_name in optimizer_state_dict.keys():
+                # Count how each key is split into keys ending with ‘_tpXX’.
+                # optimizer_state_key_to_tp_keys ： {key:[key_tp00,key_tp01]}
+                opt_state_name_removed_tp_rank = opt_state_name[:-5]
+                if opt_state_name_removed_tp_rank not in optimizer_state_key_to_tp_keys:
+                    optimizer_state_key_to_tp_keys[opt_state_name_removed_tp_rank] = [opt_state_name]
+                else:
+                    optimizer_state_key_to_tp_keys[opt_state_name_removed_tp_rank].append(opt_state_name)
+
+            for opt_state_name_removed_tp_rank, opt_state_name in optimizer_state_key_to_tp_keys.items():
+                opt_state_name.sort(key=lambda x: int(x[-2:]))
+
+            for opt_state_name_removed_tp_rank, opt_state_name in optimizer_state_key_to_tp_keys.items():
+                model_state_name = self.optimizer_key_to_model_state_key(opt_state_name_removed_tp_rank)
+                local_shape = optimizer_state_dict[opt_state_name[0]].shape
+                if "_pow_acc_0" not in key:
+                    global_shape = self.model_state_global_shape[model_state_name]
+                else:
+                    global_shape = (1,)
+
+                assert len(local_shape) == len(global_shape)
+
+                axis = -1
+                for i in range(len(local_shape)):
+                    if local_shape[i] != global_shape[i]:
+                        axis = i
+                        break
+
+                is_replicated = axis == -1
+                tp_tensors = []
+                for opt_state_name_with_tp_rank in opt_state_name:
+                    tp_tensors.append(optimizer_state_dict[opt_state_name_with_tp_rank])
+
+                if not is_replicated:
+                    # Derive the partition strategy based on the global_shape, then concatenate.
+                    concat_optimier_state_dict[opt_state_name_removed_tp_rank] = paddle.concat(tp_tensors, axis=axis)
+                else:
+                    concat_optimier_state_dict[opt_state_name_removed_tp_rank] = tp_tensors[0]
+
+            fake_file_name = "{:02d}".format(self.cur_rank) + ".distcp"
+            local_tensor_meta_data = {}
+            local_tensor_index = {}
+            for k, v in concat_optimier_state_dict.items():
+                # Generate metadata.
+                local_shape = v.shape
+                global_offset = tuple([0] * len(local_shape))
+                dtype = str(v.dtype).split(".")[1]
+                local_tensor_meta_data[k] = LocalTensorMetadata(global_offset, local_shape, dtype)
+                local_tensor_index[k] = [LocalTensorIndex(k, global_offset), fake_file_name]
+
+            global_local_tensor_meta_data = []
+            global_local_tensor_index = []
+
+            use_dist = True if paddle.distributed.get_world_size() > 1 else False
+
+            if use_dist:
+                paddle.distributed.all_gather_object(global_local_tensor_meta_data, local_tensor_meta_data)
+                paddle.distributed.all_gather_object(global_local_tensor_index, local_tensor_index)
+            else:
+                global_local_tensor_meta_data = [local_tensor_meta_data]
+                global_local_tensor_index = [local_tensor_index]
+
+            state_dict_metadata = {}
+            for tensor_meta_data in global_local_tensor_meta_data:
+                for k, v in tensor_meta_data.items():
+                    if k not in state_dict_metadata:
+                        state_dict_metadata[k] = [v]
+                    else:
+                        state_dict_metadata[k].append(v)
+
+            storage_metadata = {}
+            for tensor_index in global_local_tensor_index:
+                for k, v in tensor_index.items():
+                    storage_metadata[v[0]] = v[1]
+
+            meta_data = Metadata(state_dict_metadata, storage_metadata, None)
+            source_state_dict = {fake_file_name: concat_optimier_state_dict}
+
+            return meta_data, source_state_dict
+
+        elif self.sharding_degree > 1 and self.sharding_stage1_v == 1 and not self.is_sharding_stage3:
+            return self.gen_metadata_for_tp_sharded_tensor()
+        else:
+            if self.is_sharding_stage3:
+                for state_name, shard_info in self.global_sharded_tensor_infos.items():
+                    shard_info.sort(key=lambda x: x[0]["sharding_rank"])
+                state_dict_metadata = {}
+                storage_metadata = {}
+                # After obtaining the local_shape and sharding rank of each tensor, the global offset of each tensor can be calculated.
+                for state_name, shard_info in self.global_sharded_tensor_infos.items():
+                    global_offset = 0
+                    for item in shard_info:
+                        if len(item[1]) == 1:
+                            local_tensor_meta_data = LocalTensorMetadata((global_offset,), item[1], item[2])
+                            local_tensor_index = LocalTensorIndex(state_name, (global_offset,))
+                            global_offset += item[1][0]
+                        else:
+                            global_offset = tuple([0] * len(item[1]))
+                            local_tensor_meta_data = LocalTensorMetadata(global_offset, item[1], item[2])
+                            local_tensor_index = LocalTensorIndex(state_name, global_offset)
+                        if state_name not in state_dict_metadata:
+                            state_dict_metadata[state_name] = [local_tensor_meta_data]
+                        else:
+                            state_dict_metadata[state_name].append(local_tensor_meta_data)
+                        storage_metadata[local_tensor_index] = item[3]
+
+                metadata_for_merge_sharding = Metadata(state_dict_metadata, storage_metadata, None)
+                model_state_shapes = []
+                dtype = ""
+                for file, state_dict in self.cur_rank_loaded_state_dict.items():
+                    if file.endswith(MODEL_WEIGHT_SUFFIX):
+                        for k, v in state_dict.items():
+                            model_state_shapes.append([k, v.shape])
+                            dtype = str(v.dtype).split(".")[1]
+
+                dtypes = self.gather_global_object([dtype])
+                for dtype_s in dtypes:
+                    if len(dtype_s) > 0:
+                        dtype = dtype_s
+
+                assert len(dtype) > 0
+
+                global_model_state_shapes = self.gather_global_object(model_state_shapes)
+
+                partition_result = self.partition_parameters(
+                    global_model_state_shapes, True, paddle.distributed.get_world_size()
+                )
+
+                cur_rank_merger_model_params = partition_result[self.cur_rank]
+                target_state_dict = {}
+                for item in cur_rank_merger_model_params:
+                    key = item[0]
+                    shape = item[1]
+                    flatten_shape = reduce(lambda a, b: a * b, item[1])
+                    target_state_dict[key] = paddle.zeros(shape, dtype)
+                    target_state_dict[key + ".w_0_moment1_0"] = paddle.zeros((flatten_shape,), "float32")
+                    target_state_dict[key + ".w_0_moment2_0"] = paddle.zeros((flatten_shape,), "float32")
+                    if self.optimizer_state_with_master_weights:
+                        target_state_dict[key + ".w_0"] = paddle.zeros((flatten_shape,), "float32")
+                    # When handling tensor parallelism (TP), if some tensors are replicated, we initially assume that they are partitioned.
+                    # Later, when these are compared with the global shape, we realize that they are replicated.
+
+                    target_state_dict[key + ".w_0_beta1_pow_acc_0"] = paddle.zeros((1,), "float32")
+                    target_state_dict[key + ".w_0_beta2_pow_acc_0"] = paddle.zeros((1,), "float32")
+
+                _load_state_dict(target_state_dict, self.cur_rank_loaded_state_dict, [metadata_for_merge_sharding])
+
+                # Reshape
+                for item in cur_rank_merger_model_params:
+                    key = item[0]
+                    shape = item[1]
+                    for k, v in target_state_dict.items():
+                        if key == self.optimizer_key_to_model_state_key(k):
+                            if tuple(shape) != tuple(v.shape) and v.numel() == reduce(lambda x, y: x * y, shape):
+                                reshaped_v = v.reshape(shape)
+                                target_state_dict[k] = reshaped_v
+
+                fake_file_name = "{:02d}".format(self.cur_rank) + ".distcp"
+                local_tensor_meta_data = {}
+                local_tensor_index = {}
+                for k, v in target_state_dict.items():
+                    # Generate metadata.
+                    local_shape = v.shape
+                    global_offset = tuple([0] * len(local_shape))
+                    dtype = str(v.dtype).split(".")[1]
+                    local_tensor_meta_data[k] = LocalTensorMetadata(global_offset, local_shape, dtype)
+                    local_tensor_index[k] = [LocalTensorIndex(k, global_offset), fake_file_name]
+
+                global_local_tensor_meta_data = []
+                global_local_tensor_index = []
+
+                use_dist = True if paddle.distributed.get_world_size() > 1 else False
+
+                if use_dist:
+                    paddle.distributed.all_gather_object(global_local_tensor_meta_data, local_tensor_meta_data)
+                    paddle.distributed.all_gather_object(global_local_tensor_index, local_tensor_index)
+                else:
+                    global_local_tensor_meta_data = [local_tensor_meta_data]
+                    global_local_tensor_index = [local_tensor_index]
+
+                state_dict_metadata = {}
+                for tensor_meta_data in global_local_tensor_meta_data:
+                    for k, v in tensor_meta_data.items():
+                        if k not in state_dict_metadata:
+                            state_dict_metadata[k] = [v]
+                        else:
+                            state_dict_metadata[k].append(v)
+
+                storage_metadata = {}
+                for tensor_index in global_local_tensor_index:
+                    for k, v in tensor_index.items():
+                        storage_metadata[v[0]] = v[1]
+
+                meta_data = Metadata(state_dict_metadata, storage_metadata, None)
+                source_state_dict = {fake_file_name: target_state_dict}
+
+                return meta_data, source_state_dict
+            else:
+                return self.gen_metadata_for_tp_sharded_tensor()
+
+    def load_state_dict_and_rename(self):
+        """
+        Parse the distributed information from the names of the checkpoint files and evenly parse out the distributed information for each weight/optimizer state
+        into self.global_sharded_tensor_infos (data structure: param_name -> [{tp_rank: 1, sharding_rank: 1}, shape, dtype, file_name]). Modify the names of the
+        optimizer states in the form of parameter+suffix and record them in self.cur_rank_loaded_state_dict (data structure: file_name -> renamed_state_dict).
+            1. Load balancing: Each rank parses a portion of the checkpoint files.
+            2. Flatten master_weights in opt_state into opt_state.
+            3. Rename the keys in opt_state according to the rule: adamw_optimizer_param_suffix_name_mapping.
+            4. Optimizer state renaming and distributed information extraction:
+                * If it is sharding_stage1/2_v2 version:
+                    * Renaming: rename_using_model_meta: In this case, a model_meta file is required. According to this file,
+                      obtain the name mapping of weights and optimizer parameters, so that the optimizer states of manual and static partitions can correspond.
+                    * Distributed information extraction: Record the distributed information of parameters: name -> [{tp_rank, sharding_rank}, shape, dtype, file_name].
+                * If it is sharding_stage1/2_v1 version:
+                    * Renaming:
+                        * If a model_meta file exists:
+                            * rename_using_model_meta
+                        * If a model_meta file does not exist:
+                            * According to the characteristics of v1 partitioning, infer the mapping relationship between optimizer states and weights (partition_result): master_weight_name_to_model_weight_name_mapping.
+                        * Distributed information extraction: Record the distributed information of parameters: name -> [{tp_rank}, shape, dtype, file_name] (parameters will not be sharded).
+                * If it is sharding_stage3:
+                    * Renaming:
+                        * If a model_meta file exists:
+                            * rename_using_model_meta
+                        * If a model_meta file does not exist:
+                            * Establish the mapping between weights and optimizer names according to the order of optimizer states and weights: rename_using_optimizer_state_order.
+                        * Distributed information extraction: Record the distributed information of parameters: name -> [{tp_rank, sharding_rank}, shape, dtype, file_name].
+        """
+        rank_access_files = {}
+        if self.save_sharded_model:
+            rank_access_files[self.cur_rank] = self.cur_rank_optimizer_state_file_names
+        else:
+            rank_access_files[self.cur_rank] = (
+                self.cur_rank_model_state_file_names + self.cur_rank_optimizer_state_file_names
+            )
+
+        need_read_files = get_local_load_files(self.gather_global_object(rank_access_files))
+
+        self.cur_rank_loaded_state_dict = {}
+
+        for file in need_read_files:
+            self.cur_rank_loaded_state_dict[file] = paddle.load(os.path.join(self.path, file))
+
+        file_to_master_weights_keys = {}
+
+        self.optimizer_state_with_master_weights = False
+
+        for file, state_dict in self.cur_rank_loaded_state_dict.items():
+            if file.endswith(OPTIMIZER_WEIGHT_SUFFIX):
+                state_dict.pop("LR_Scheduler")
+                if "master_weights" in state_dict:
+                    self.optimizer_state_with_master_weights = True
+                    master_weights = state_dict.pop("master_weights")
+                    file_to_master_weights_keys[file] = list(master_weights.keys())
+                    for master_weight_name, master_weight_value in master_weights.items():
+                        # In sharding stage3, ‘@slice’ will be added in front of the key for master_weight, which is removed here.
+                        state_dict[master_weight_name.replace("slice@", "")] = master_weight_value
+
+                # Standardize the state names of the AdamW optimizer.
+                adamw_opt_state_suffix_name_mapping = {
+                    ".w_0_fp32_master_0_moment1_0": ".w_0_moment1_0",
+                    ".w_0_fp32_master_0_moment2_0": ".w_0_moment2_0",
+                    ".w_0_fp32_master_0_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
+                    ".w_0_fp32_master_0_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
+                }
+
+                unified_name_state_dict = {}
+                for opt_state_name, opt_state_value in state_dict.items():
+                    new_opt_state_name = opt_state_name
+                    for suffix in adamw_opt_state_suffix_name_mapping:
+                        if opt_state_name.endswith(suffix):
+                            new_opt_state_name = opt_state_name.replace(
+                                suffix, adamw_opt_state_suffix_name_mapping[suffix]
+                            )
+                            break
+                    unified_name_state_dict[new_opt_state_name] = opt_state_value
+
+                self.cur_rank_loaded_state_dict[file] = unified_name_state_dict
+
+        # After the rank has finished loading the files it needs, it can infer sharding_stage1_v and is_sharding_stage3.
+        self.sharding_stage1_v = self.infer_sharding_stage1_v()
+        self.is_sharding_stage3 = self.infer_is_sharding_stage3()
+
+        # In sharding stage3, the parameters need to be reordered based on whether they are sliced.
+        # The threshold for determining whether to slice is segment_size, with a default value of 2**20.
+        # However, sharding stage3 allows users to specify their own unsliced layers, which seems to be incompatible here.
+        if self.is_sharding_stage3:
+            segment_size = 2**20
+            for file, state_dict in self.cur_rank_loaded_state_dict.items():
+                if file.endswith(MODEL_WEIGHT_SUFFIX):
+                    sliced_pramaeters = []
+                    unseliced_pramaeters = []
+                    sorted_state_dict = {}
+                    for k, v in state_dict.items():
+                        if v.numel() > segment_size:
+                            sliced_pramaeters.append(k)
+                        else:
+                            unseliced_pramaeters.append(k)
+                    for k in sliced_pramaeters + unseliced_pramaeters:
+                        sorted_state_dict[k] = state_dict.pop(k)
+                    self.cur_rank_loaded_state_dict[file] = sorted_state_dict
+
+        self.global_file_to_master_weights_keys = self.gather_global_object(file_to_master_weights_keys)
+
+        # rename and record sharded_tensor_info
+        cur_rank_sharded_tensor_infos = {}
+
+        # 1. Handling the sharding stage1 v2 scenario, where the save_sharded_model flag must be enabled, independent of master_weights.
+        if self.sharding_degree > 1 and self.sharding_stage1_v == 2 and not self.is_sharding_stage3:
+            assert self.save_sharded_model
+            for file, state_dict in self.cur_rank_loaded_state_dict.items():
+                # The rule for renaming is to change the master_weights name in the optimizer state to the model weight name,
+                # and then append the tp_degree.
+                renamed_state_dict = self.rename_using_model_meta(file)
+                self.get_sharded_tensor_infos(file, renamed_state_dict, cur_rank_sharded_tensor_infos)
+                self.cur_rank_loaded_state_dict[file] = renamed_state_dict
+        # 2. In handling the sharding stage1 v1 and stage2 scenario, the optimizer states are distributed across different ranks.
+        # We need to obtain the name mapping by simulating the partitioning method, without concern for the presence of master_weights.
+        elif self.sharding_degree > 1 and self.sharding_stage1_v == 1 and not self.is_sharding_stage3:
+            if not self.save_sharded_model:
+                file_to_state_dict_shapes_mapping = {}
+                for file, state_dict in self.cur_rank_loaded_state_dict.items():
+                    shapes = []
+                    for state_name, state_value in state_dict.items():
+                        shapes.append([state_name, state_value.shape])
+                    file_to_state_dict_shapes_mapping[file] = shapes
+
+                global_file_to_state_dict_shapes_mapping = self.gather_global_object(file_to_state_dict_shapes_mapping)
+
+                for file, state_dict in self.cur_rank_loaded_state_dict.items():
+                    (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file)
+                    sharding_optimizer_state_shards = []
+                    if file.endswith(OPTIMIZER_WEIGHT_SUFFIX):
+                        for k, v in global_file_to_state_dict_shapes_mapping.items():
+                            (tp_rank_, pp_rank_, sharding_rank_) = self.get_distribution_rank_from_file_name(k)
+                            if tp_rank == tp_rank_ and pp_rank == pp_rank_ and k.endswith(OPTIMIZER_WEIGHT_SUFFIX):
+                                sharding_optimizer_state_shards.append([v, sharding_rank_])
+                        model_state_file_name = self.get_model_state_file_from(file)
+                        model_state_shapes = global_file_to_state_dict_shapes_mapping[model_state_file_name]
+                        sharding_optimizer_state_shards.sort(key=lambda x: x[1])
+
+                        partition_result_0 = self.partition_parameters(model_state_shapes, False, self.sharding_degree)
+                        partition_result_1 = self.partition_parameters(model_state_shapes, True, self.sharding_degree)
+
+                        for rank, portion in partition_result_0.items():
+                            portion = sorted(portion, key=model_state_shapes.index)
+                            partition_result_0[rank] = portion
+
+                        for rank, portion in partition_result_1.items():
+                            portion = sorted(portion, key=model_state_shapes.index)
+                            partition_result_1[rank] = portion
+
+                        sharding_sort_parameters = False
+
+                        for i in range(len(sharding_optimizer_state_shards)):
+                            if not sharding_sort_parameters:
+                                state_shard = sharding_optimizer_state_shards[i][0]
+                                partitioned_shard = partition_result_0[i]
+                                for j in range(len(partitioned_shard)):
+                                    if partitioned_shard[j][1] != state_shard[j][1]:
+                                        sharding_sort_parameters = True
+                                        break
+
+                        if sharding_sort_parameters:
+                            for i in range(len(sharding_optimizer_state_shards)):
+                                state_shard = sharding_optimizer_state_shards[i][0]
+                                partitioned_shard = partition_result_1[i]
+                                for j in range(len(partitioned_shard)):
+                                    assert partitioned_shard[j][1] == state_shard[j][1]
+
+                        if sharding_sort_parameters:
+                            partition_result = partition_result_1
+                        else:
+                            partition_result = partition_result_0
+
+                        master_weight_name_to_model_weight_name_mapping = {}
+                        for i in range(len(sharding_optimizer_state_shards)):
+                            state_shard = sharding_optimizer_state_shards[i][0]
+                            partitioned_shard = partition_result[i]
+                            for j in range(len(partitioned_shard)):
+                                master_weight_name = self.parse_master_weight_name_by(state_shard[j][0])
+                                master_weight_name_to_model_weight_name_mapping[
+                                    master_weight_name
+                                ] = partitioned_shard[j][0]
+
+                        renamed_state_dict = {}
+                        # In this branch, sharding does not split the optimizer states; it merely relocates them to different cards.
+                        # Therefore, the sharding information can now be directly removed.
+                        for opt_state_name, opt_state_value in state_dict.items():
+                            master_weight_name = self.parse_master_weight_name_by(opt_state_name)
+                            model_weight_name = master_weight_name_to_model_weight_name_mapping[master_weight_name]
+                            new_opt_state_name = opt_state_name.replace(master_weight_name, model_weight_name)
+                            renamed_state_dict[new_opt_state_name] = opt_state_value
+
+                        self.get_sharded_tensor_infos(file, renamed_state_dict, cur_rank_sharded_tensor_infos)
+
+                        self.cur_rank_loaded_state_dict[file] = renamed_state_dict
+                    else:
+                        self.get_sharded_tensor_infos(file, state_dict, cur_rank_sharded_tensor_infos)
+            else:
+                for file, state_dict in self.cur_rank_loaded_state_dict.items():
+                    renamed_state_dict = self.rename_using_model_meta(file)
+                    self.get_sharded_tensor_infos(file, renamed_state_dict, cur_rank_sharded_tensor_infos)
+
+                    self.cur_rank_loaded_state_dict[file] = renamed_state_dict
+        else:
+            # 3. Handling the sharding stage3 and non-sharding scenario
+            if not self.save_sharded_model:
+                for file, state_dict in self.cur_rank_loaded_state_dict.items():
+                    if file.endswith(OPTIMIZER_WEIGHT_SUFFIX):
+                        renamed_state_dict = self.rename_using_optimizer_state_order(file)
+                        self.get_sharded_tensor_infos(file, renamed_state_dict, cur_rank_sharded_tensor_infos)
+                        self.cur_rank_loaded_state_dict[file] = renamed_state_dict
+                    else:
+                        self.get_sharded_tensor_infos(file, state_dict, cur_rank_sharded_tensor_infos)
+
+            else:
+                for file, state_dict in self.cur_rank_loaded_state_dict.items():
+                    # The rule for renaming is to change the master_weights name in the optimizer state to the model weight name,
+                    # and then append the tp_degree.
+                    renamed_state_dict = self.rename_using_model_meta(file)
+                    self.get_sharded_tensor_infos(file, renamed_state_dict, cur_rank_sharded_tensor_infos)
+                    self.cur_rank_loaded_state_dict[file] = renamed_state_dict
+        # gather global sharded tensor infos
+        sharded_tensor_infos = self.gather_global_object({self.cur_rank: cur_rank_sharded_tensor_infos})
+
+        self.global_sharded_tensor_infos = {}
+        for rank, sharded_tensor_info in sharded_tensor_infos.items():
+            for state_name, shard_info in sharded_tensor_info.items():
+                if state_name not in self.global_sharded_tensor_infos:
+                    self.global_sharded_tensor_infos[state_name] = shard_info
+                else:
+                    self.global_sharded_tensor_infos[state_name] += shard_info
+
+    def get_sharded_tensor_infos(self, file, state_dict, cur_rank_sharded_tensor_infos):
+        (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file)
+        for state_name, state_value in state_dict.items():
+            if state_name not in cur_rank_sharded_tensor_infos:
+                cur_rank_sharded_tensor_infos[state_name] = [
+                    [
+                        {"tp_rank": tp_rank, "sharding_rank": sharding_rank},
+                        state_value.shape,
+                        str(state_value.dtype).split(".")[1],
+                        file,
+                    ]
+                ]
+            else:
+                cur_rank_sharded_tensor_infos[state_name].append(
+                    [
+                        {"tp_rank": tp_rank, "sharding_rank": sharding_rank},
+                        state_value.shape,
+                        str(state_value.dtype).split(".")[1],
+                        file,
+                    ]
+                )
+
+    def gen_metadata_for_tp_sharded_tensor(self):
+        """
+        Based on the distributed information of each weight/optimizer state (global_sharded_tensor_infos), construct Metadata
+        information: LocalTensorMetadata,LocalTensorIndex
+        """
+        for state_name, shard_info in self.global_sharded_tensor_infos.items():
+            shard_info.sort(key=lambda x: x[0]["tp_rank"])
+
+        state_dict_metadata = {}
+        storage_metadata = {}
+        # After obtaining the local_shape and sharding rank of each tensor, the global offset of each tensor can be calculated.
+        for state_name, shard_info in self.global_sharded_tensor_infos.items():
+            global_offset = 0
+            local_shape = shard_info[0][1]
+            model_state_name = self.optimizer_key_to_model_state_key(state_name)
+            if "_pow_acc_0" not in state_name:
+                global_shape = self.model_state_global_shape[model_state_name]
+            else:
+                global_shape = (1,)
+
+            assert len(local_shape) == len(global_shape)
+            axis = -1
+            for i in range(len(local_shape)):
+                if local_shape[i] != global_shape[i]:
+                    axis = i
+                    break
+
+            is_replicated = axis == -1
+            global_offset = [0] * len(local_shape)
+
+            if is_replicated:
+                shard_info = [shard_info[0]]
+
+            for item in shard_info:
+                local_tensor_meta_data = LocalTensorMetadata(tuple(global_offset), item[1], item[2])
+                local_tensor_index = LocalTensorIndex(state_name, tuple(global_offset))
+                global_offset[axis] += item[1][axis]
+                if state_name not in state_dict_metadata:
+                    state_dict_metadata[state_name] = [local_tensor_meta_data]
+                else:
+                    state_dict_metadata[state_name].append(local_tensor_meta_data)
+                storage_metadata[local_tensor_index] = item[3]
+
+            metadata = Metadata(state_dict_metadata, storage_metadata, None)
+            source_state_dict = self.cur_rank_loaded_state_dict
+
+        return metadata, source_state_dict
+
+    def rename_using_model_meta(self, file_name):
+        """
+        Rename the keys in opt_state_dict based on the following rule: model_meta records a mapping of parameter names to optimizer names.
+        Here, we unify the optimizer state names to parameter names directly. For example:
+            * model_meta: linear0 -> param0
+            * opt_state: param0.w0
+            * Renamed opt_state: linear0.w0
+        NOTE：The reason for renaming is that there is a difference in the naming of optimizer parameters between dynamic and static partitions,
+        making it difficult to match optimizer parameters directly by name. Therefore, we unify them to the weight names.
+        """
+        if not hasattr(self, "model_meta"):
+            meta_file_path = os.path.join(self.path, MODEL_META_FILE_NAME)
+            assert os.path.exists(meta_file_path)
+            with open(meta_file_path, "r") as file:
+                self.model_meta = json.load(file)
+
+        (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file_name)
+        dist_strategy_key = "tp" + "{:02d}".format(tp_rank) + "_" + "pp" + "{:02d}".format(pp_rank)
+        # Map model weight names to their corresponding names of master_weights in the optimizer state.
+        if file_name.endswith(OPTIMIZER_WEIGHT_SUFFIX):
+            structure_name_mapping = self.model_meta["sharding_metas"][dist_strategy_key]["structure_name_mapping"]
+            master_weight_name_to_model_weight_name_mapping = {}
+            for model_weight_name, master_weight_name in structure_name_mapping.items():
+                master_weight_name_to_model_weight_name_mapping[master_weight_name.split(".")[0]] = model_weight_name
+
+            renamed_state_dict = {}
+            state_dict = self.cur_rank_loaded_state_dict[file_name]
+            for opt_state_name, opt_state_value in state_dict.items():
+                master_weight_name = self.parse_master_weight_name_by(opt_state_name)
+                model_weight_name = master_weight_name_to_model_weight_name_mapping[master_weight_name]
+                renamed_state_dict[opt_state_name.replace(master_weight_name, model_weight_name)] = opt_state_value
+            return renamed_state_dict
+        else:
+            return self.cur_rank_loaded_state_dict[file_name]
+
+    def partition_parameters(self, model_state_shapes, is_sort, shard_num):
+        """
+        In sharding_stage3 and sharding_stage1_v1, parameters and optimizer states will be assigned to different ranks. This function defines the allocation rules.
+        For details, refer to: python/paddle/distributed/fleet/meta_optimizers/dygraph_optimizer/dygraph_sharding_optimizer.py.
+        """
+        mapping = {}
+        for rank_ in range(shard_num):
+            mapping[rank_] = []
+        sizes = [0] * shard_num
+
+        parameters = model_state_shapes.copy()
+
+        if is_sort:
+            parameters.sort(key=lambda p: reduce(lambda x, y: x * y, p[1]), reverse=True)
+
+        for param in parameters:
+            rank = sizes.index(min(sizes))
+            mapping[rank].append(param)
+            numel = reduce(lambda x, y: x * y, param[1], 1)
+            assert numel > 0, f"param [{param[0]}] should larger than 0, but it is [{numel}]"
+            sizes[rank] += numel
+
+        return mapping
+
+    def rename_using_optimizer_state_order(self, file_name):
+        """
+        Rename the keys in opt_state_dict based on the following rule: The order of weights recorded in the weight file is consistent with the order of optimizer states recorded in the optimizer file.
+        By using this order, we can obtain the correspondence between the names of weights and optimizer states and rename the optimizer accordingly. For example:
+            * model_state: linear0, linear1
+            * opt_state: param0.w0, param1.w0
+            * Renamed opt_state: linear0.w0, linear1.w0
+        NOTE：The reason for renaming is that there is a difference in the naming of optimizer parameters between dynamic and static partitions, making it difficult to match optimizer parameters directly by name.
+        Therefore, we unify them to the weight names.
+        """
+        if not hasattr(self, "global_file_to_state_dict_keys_mapping"):
+            file_to_state_dict_keys_mapping = {}
+            for file_name, state_dict in self.cur_rank_loaded_state_dict.items():
+                file_to_state_dict_keys_mapping[file_name] = list(state_dict.keys())
+
+            self.global_file_to_state_dict_keys_mapping = self.gather_global_object(file_to_state_dict_keys_mapping)
+
+        if file_name.endswith(OPTIMIZER_WEIGHT_SUFFIX):
+            model_state_file_name = self.get_model_state_file_from(file_name)
+            assert model_state_file_name is not None
+            model_state_keys = self.global_file_to_state_dict_keys_mapping[model_state_file_name]
+            optimizer_state_keys = self.global_file_to_state_dict_keys_mapping[file_name]
+
+            master_weight_name_to_model_weight_name_mapping = {}
+            for i in range(len(model_state_keys)):
+                master_weight_name = self.parse_master_weight_name_by(optimizer_state_keys[i])
+                master_weight_name_to_model_weight_name_mapping[master_weight_name] = model_state_keys[i]
+
+            state_dict = self.cur_rank_loaded_state_dict[file_name]
+            renamed_state_dict = {}
+            for opt_state_name, opt_state_value in state_dict.items():
+                master_weight_name = self.parse_master_weight_name_by(opt_state_name)
+                model_weight_name = master_weight_name_to_model_weight_name_mapping[master_weight_name]
+                renamed_state_dict[opt_state_name.replace(master_weight_name, model_weight_name)] = opt_state_value
+            return renamed_state_dict
+        else:
+            return self.cur_rank_loaded_state_dict[file_name]
+
+    def get_save_sharded_model_flag(self):
+        save_sharded_model_flag = self.gather_global_object(
+            [os.path.exists(os.path.join(self.path, MODEL_META_FILE_NAME))]
+        )
+        return True in save_sharded_model_flag
 
     def flatten_state_dict(self, state_dict):
         flattened_state_dict = {}
@@ -99,11 +898,11 @@ class CheckpointConverter:
         cur_rank_files = os.listdir(self.path)
         cur_rank_model_state_file_names = []
         cur_rank_optimizer_state_file_names = []
-        for file in cur_rank_files:
-            if file.endswith(MODEL_WEIGHT_SUFFIX):
-                cur_rank_model_state_file_names.append(file)
-            elif file.endswith(OPTIMIZER_WEIGHT_SUFFIX):
-                cur_rank_optimizer_state_file_names.append(file)
+        for file_name in cur_rank_files:
+            if file_name.endswith(MODEL_WEIGHT_SUFFIX):
+                cur_rank_model_state_file_names.append(file_name)
+            elif file_name.endswith(OPTIMIZER_WEIGHT_SUFFIX):
+                cur_rank_optimizer_state_file_names.append(file_name)
         if SCHEDULER_NAME in cur_rank_model_state_file_names:
             cur_rank_model_state_file_names.remove(SCHEDULER_NAME)
         return cur_rank_model_state_file_names, cur_rank_optimizer_state_file_names
@@ -212,833 +1011,3 @@ class CheckpointConverter:
                 model_state_key = model_state_key[: -len(suffix)]
                 break
         return model_state_key
-
-    def partition_parameters(self, model_state_shapes, is_sort, shard_num):
-        """
-        Partitions parameters among sharding ranks.
-
-        Return:
-        Dict[int, List]
-        """
-        # Copy from python/paddle/distributed/fleet/meta_optimizers/dygraph_optimizer/dygraph_sharding_optimizer.py
-        mapping = {}
-        for rank_ in range(shard_num):
-            mapping[rank_] = []
-        sizes = [0] * shard_num
-
-        parameters = model_state_shapes.copy()
-
-        if is_sort:
-            parameters.sort(key=lambda p: reduce(lambda x, y: x * y, p[1]), reverse=True)
-
-        for param in parameters:
-            rank = sizes.index(min(sizes))
-            mapping[rank].append(param)
-            numel = reduce(lambda x, y: x * y, param[1], 1)
-            assert numel > 0, f"param [{param[0]}] should larger than 0, but it is [{numel}]"
-            sizes[rank] += numel
-
-        return mapping
-
-    def rename_using_model_meta(self, file_name):
-        if not hasattr(self, "model_meta"):
-            meta_file_path = os.path.join(self.path, MODEL_META_FILE_NAME)
-            assert os.path.exists(meta_file_path)
-            with open(meta_file_path, "r") as file:
-                self.model_meta = json.load(file)
-
-        distributed_rank = self.get_distribution_rank_from_file_name(file_name)
-        dist_strategy_key = (
-            "tp" + "{:02d}".format(distributed_rank[0]) + "_" + "pp" + "{:02d}".format(distributed_rank[1])
-        )
-        # Map model weight names to their corresponding names of master_weights in the optimizer state.
-        if file_name.endswith(OPTIMIZER_WEIGHT_SUFFIX):
-            structure_name_mapping = self.model_meta["sharding_metas"][dist_strategy_key]["structure_name_mapping"]
-            master_weight_name_to_model_weight_name_mapping = {}
-            for k, v in structure_name_mapping.items():
-                master_weight_name_to_model_weight_name_mapping[v.split(".")[0]] = k
-
-            renamed_state_dict = {}
-            state_dict = self.cur_rank_loaded_state_dict[file_name]
-            for k, v in state_dict.items():
-                master_weight_name = self.parse_master_weight_name_by(k)
-                model_weight_name = master_weight_name_to_model_weight_name_mapping[master_weight_name]
-                new_k = k.replace(master_weight_name, model_weight_name)
-                renamed_state_dict[new_k] = v
-            return renamed_state_dict
-        else:
-            return self.cur_rank_loaded_state_dict[file_name]
-
-    def rename_using_optimizer_state_order(self, file_name):
-        if not hasattr(self, "global_file_to_state_dict_keys_mapping"):
-            file_to_state_dict_keys_mapping = {}
-            for file, state_dict in self.cur_rank_loaded_state_dict.items():
-                file_to_state_dict_keys_mapping[file] = list(state_dict.keys())
-
-            self.global_file_to_state_dict_keys_mapping = self.gather_global_object(file_to_state_dict_keys_mapping)
-
-        if file_name.endswith(OPTIMIZER_WEIGHT_SUFFIX):
-            model_state_file_name = self.get_model_state_file_from(file_name)
-            assert model_state_file_name is not None
-            model_state_keys = self.global_file_to_state_dict_keys_mapping[model_state_file_name]
-            optimizer_state_keys = self.global_file_to_state_dict_keys_mapping[file_name]
-
-            master_weight_name_to_model_weight_name_mapping = {}
-            for i in range(len(model_state_keys)):
-                master_weight_name = self.parse_master_weight_name_by(optimizer_state_keys[i])
-                master_weight_name_to_model_weight_name_mapping[master_weight_name] = model_state_keys[i]
-
-            state_dict = self.cur_rank_loaded_state_dict[file_name]
-            renamed_state_dict = {}
-            for k, v in state_dict.items():
-                master_weight_name = self.parse_master_weight_name_by(k)
-                model_weight_name = master_weight_name_to_model_weight_name_mapping[master_weight_name]
-                new_k = k.replace(master_weight_name, model_weight_name)
-                renamed_state_dict[new_k] = v
-
-            return renamed_state_dict
-        else:
-            return self.cur_rank_loaded_state_dict[file_name]
-
-    def load_state_dict_and_rename(self):
-        rank_access_files = {}
-        if self.save_sharded_model:
-            rank_access_files[self.cur_rank] = self.cur_rank_optimizer_state_file_names
-        else:
-            rank_access_files[self.cur_rank] = (
-                self.cur_rank_model_state_file_names + self.cur_rank_optimizer_state_file_names
-            )
-
-        need_read_files = get_local_load_files(self.gather_global_object(rank_access_files))
-
-        self.cur_rank_loaded_state_dict = {}
-
-        for file in need_read_files:
-            self.cur_rank_loaded_state_dict[file] = paddle.load(os.path.join(self.path, file))
-
-        file_to_master_weights_keys = {}
-
-        self.optimizer_state_with_master_weights = False
-
-        for file, state_dict in self.cur_rank_loaded_state_dict.items():
-            if file.endswith(OPTIMIZER_WEIGHT_SUFFIX):
-                state_dict.pop("LR_Scheduler")
-                if "master_weights" in state_dict:
-                    self.optimizer_state_with_master_weights = True
-                    master_weights = state_dict.pop("master_weights")
-                    file_to_master_weights_keys[file] = list(master_weights.keys())
-                    for k, v in master_weights.items():
-                        # In sharding stage3, ‘@slice’ will be added in front of the key for master_weight, which is removed here.
-                        k = k.replace("slice@", "")
-                        state_dict[k] = v
-
-                # Standardize the state names of the AdamW optimizer.
-                adamw_optimizer_param_suffix_name_mapping = {
-                    ".w_0_fp32_master_0_moment1_0": ".w_0_moment1_0",
-                    ".w_0_fp32_master_0_moment2_0": ".w_0_moment2_0",
-                    ".w_0_fp32_master_0_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
-                    ".w_0_fp32_master_0_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
-                }
-
-                unified_name_state_dict = {}
-                for k, v in state_dict.items():
-                    new_k = k
-                    for suffix in adamw_optimizer_param_suffix_name_mapping:
-                        if k.endswith(suffix):
-                            new_k = k.replace(suffix, adamw_optimizer_param_suffix_name_mapping[suffix])
-                            break
-                    unified_name_state_dict[new_k] = v
-
-                self.cur_rank_loaded_state_dict[file] = unified_name_state_dict
-
-        # After the rank has finished loading the files it needs, it can infer sharding_stage1_v and is_sharding_stage3.
-        self.sharding_stage1_v = self.infer_sharding_stage1_v()
-        self.is_sharding_stage3 = self.infer_is_sharding_stage3()
-
-        # In sharding stage3, the parameters need to be reordered based on whether they are sliced.
-        # The threshold for determining whether to slice is segment_size, with a default value of 2**20.
-        # However, sharding stage3 allows users to specify their own unsliced layers, which seems to be incompatible here.
-        if self.is_sharding_stage3:
-            segment_size = 2**20
-            for file, state_dict in self.cur_rank_loaded_state_dict.items():
-                if file.endswith(MODEL_WEIGHT_SUFFIX):
-                    sliced_pramaeters = []
-                    unseliced_pramaeters = []
-                    sorted_state_dict = {}
-                    for k, v in state_dict.items():
-                        if v.numel() > segment_size:
-                            sliced_pramaeters.append(k)
-                        else:
-                            unseliced_pramaeters.append(k)
-                    for k in sliced_pramaeters + unseliced_pramaeters:
-                        sorted_state_dict[k] = state_dict.pop(k)
-                    self.cur_rank_loaded_state_dict[file] = sorted_state_dict
-
-        self.global_file_to_master_weights_keys = self.gather_global_object(file_to_master_weights_keys)
-
-        # rename and record sharded_tensor_info
-        cur_rank_sharded_tensor_infos = {}
-
-        # 1. Handling the sharding stage1 v2 scenario, where the save_sharded_model flag must be enabled, independent of master_weights.
-        if self.sharding_degree > 1 and self.sharding_stage1_v == 2 and not self.is_sharding_stage3:
-            assert self.save_sharded_model
-            for file, state_dict in self.cur_rank_loaded_state_dict.items():
-                # The rule for renaming is to change the master_weights name in the optimizer state to the model weight name,
-                # and then append the tp_degree.
-                renamed_state_dict = self.rename_using_model_meta(file)
-                (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file)
-                for new_k, v in renamed_state_dict.items():
-                    if new_k not in cur_rank_sharded_tensor_infos:
-                        cur_rank_sharded_tensor_infos[new_k] = [
-                            [
-                                {"tp_rank": tp_rank, "sharding_rank": sharding_rank},
-                                v.shape,
-                                str(v.dtype).split(".")[1],
-                                file,
-                            ]
-                        ]
-                    else:
-                        cur_rank_sharded_tensor_infos[new_k].append(
-                            [
-                                {"tp_rank": tp_rank, "sharding_rank": sharding_rank},
-                                v.shape,
-                                str(v.dtype).split(".")[1],
-                                file,
-                            ]
-                        )
-
-                self.cur_rank_loaded_state_dict[file] = renamed_state_dict
-        # 2. In handling the sharding stage1 v1 and stage2 scenario, the optimizer states are distributed across different ranks.
-        # We need to obtain the name mapping by simulating the partitioning method, without concern for the presence of master_weights.
-        elif self.sharding_degree > 1 and self.sharding_stage1_v == 1 and not self.is_sharding_stage3:
-            if not self.save_sharded_model:
-                file_to_state_dict_shapes_mapping = {}
-                for file, state_dict in self.cur_rank_loaded_state_dict.items():
-                    shapes = []
-                    for k, v in state_dict.items():
-                        shapes.append([k, v.shape])
-                    file_to_state_dict_shapes_mapping[file] = shapes
-
-                global_file_to_state_dict_shapes_mapping = self.gather_global_object(file_to_state_dict_shapes_mapping)
-
-                for file, state_dict in self.cur_rank_loaded_state_dict.items():
-                    (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file)
-                    sharding_optimizer_state_shards = []
-                    if file.endswith(OPTIMIZER_WEIGHT_SUFFIX):
-                        for k, v in global_file_to_state_dict_shapes_mapping.items():
-                            (tp_rank_, pp_rank_, sharding_rank_) = self.get_distribution_rank_from_file_name(k)
-                            if tp_rank == tp_rank_ and pp_rank == pp_rank_ and k.endswith(OPTIMIZER_WEIGHT_SUFFIX):
-                                sharding_optimizer_state_shards.append([v, sharding_rank_])
-                        model_state_file_name = self.get_model_state_file_from(file)
-                        model_state_shapes = global_file_to_state_dict_shapes_mapping[model_state_file_name]
-                        sharding_optimizer_state_shards.sort(key=lambda x: x[1])
-
-                        partition_result_0 = self.partition_parameters(model_state_shapes, False, self.sharding_degree)
-                        partition_result_1 = self.partition_parameters(model_state_shapes, True, self.sharding_degree)
-
-                        for k, v in partition_result_0.items():
-                            v = sorted(v, key=model_state_shapes.index)
-                            partition_result_0[k] = v
-
-                        for k, v in partition_result_1.items():
-                            v = sorted(v, key=model_state_shapes.index)
-                            partition_result_1[k] = v
-
-                        sharding_sort_parameters = False
-
-                        for i in range(len(sharding_optimizer_state_shards)):
-                            if not sharding_sort_parameters:
-                                state_shard = sharding_optimizer_state_shards[i][0]
-                                partitioned_shard = partition_result_0[i]
-                                for j in range(len(partitioned_shard)):
-                                    if partitioned_shard[j][1] != state_shard[j][1]:
-                                        sharding_sort_parameters = True
-                                        break
-
-                        if sharding_sort_parameters:
-                            for i in range(len(sharding_optimizer_state_shards)):
-                                state_shard = sharding_optimizer_state_shards[i][0]
-                                partitioned_shard = partition_result_1[i]
-                                for j in range(len(partitioned_shard)):
-                                    assert partitioned_shard[j][1] == state_shard[j][1]
-
-                        if sharding_sort_parameters:
-                            partition_result = partition_result_1
-                        else:
-                            partition_result = partition_result_0
-
-                        master_weight_name_to_model_weight_name_mapping = {}
-                        for i in range(len(sharding_optimizer_state_shards)):
-                            state_shard = sharding_optimizer_state_shards[i][0]
-                            partitioned_shard = partition_result[i]
-                            for j in range(len(partitioned_shard)):
-                                master_weight_name = self.parse_master_weight_name_by(state_shard[j][0])
-                                master_weight_name_to_model_weight_name_mapping[
-                                    master_weight_name
-                                ] = partitioned_shard[j][0]
-
-                        renamed_state_dict = {}
-                        (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file)
-
-                        # In this branch, sharding does not split the optimizer states; it merely relocates them to different cards.
-                        # Therefore, the sharding information can now be directly removed.
-                        for k, v in state_dict.items():
-                            master_weight_name = self.parse_master_weight_name_by(k)
-                            model_weight_name = master_weight_name_to_model_weight_name_mapping[master_weight_name]
-                            new_k = k.replace(master_weight_name, model_weight_name)
-                            renamed_state_dict[new_k] = v
-                            if new_k not in cur_rank_sharded_tensor_infos:
-                                cur_rank_sharded_tensor_infos[new_k] = [
-                                    [{"tp_rank": tp_rank}, v.shape, str(v.dtype).split(".")[1], file]
-                                ]
-                            else:
-                                cur_rank_sharded_tensor_infos[new_k].append(
-                                    [{"tp_rank": tp_rank}, v.shape, str(v.dtype).split(".")[1], file]
-                                )
-
-                        self.cur_rank_loaded_state_dict[file] = renamed_state_dict
-                    else:
-                        for k, v in state_dict.items():
-                            if k not in cur_rank_sharded_tensor_infos:
-                                cur_rank_sharded_tensor_infos[k] = [
-                                    [{"tp_rank": tp_rank}, v.shape, str(v.dtype).split(".")[1], file]
-                                ]
-                            else:
-                                cur_rank_sharded_tensor_infos[k].append(
-                                    [{"tp_rank": tp_rank}, v.shape, str(v.dtype).split(".")[1], file]
-                                )
-            else:
-                for file, state_dict in self.cur_rank_loaded_state_dict.items():
-                    renamed_state_dict = self.rename_using_model_meta(file)
-                    (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file)
-                    for new_k, v in renamed_state_dict.items():
-                        if new_k not in cur_rank_sharded_tensor_infos:
-                            cur_rank_sharded_tensor_infos[new_k] = [
-                                [{"tp_rank": tp_rank}, v.shape, str(v.dtype).split(".")[1], file]
-                            ]
-                        else:
-                            cur_rank_sharded_tensor_infos[new_k].append(
-                                [{"tp_rank": tp_rank}, v.shape, str(v.dtype).split(".")[1], file]
-                            )
-
-                    self.cur_rank_loaded_state_dict[file] = renamed_state_dict
-        else:
-            # 3. Handling the sharding stage3 and non-sharding scenario
-            if not self.save_sharded_model:
-                for file, state_dict in self.cur_rank_loaded_state_dict.items():
-                    (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file)
-                    if file.endswith(OPTIMIZER_WEIGHT_SUFFIX):
-
-                        renamed_state_dict = self.rename_using_optimizer_state_order(file)
-
-                        (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file)
-                        for new_k, v in renamed_state_dict.items():
-                            if new_k not in cur_rank_sharded_tensor_infos:
-                                cur_rank_sharded_tensor_infos[new_k] = [
-                                    [
-                                        {"tp_rank": tp_rank, "sharding_rank": sharding_rank},
-                                        v.shape,
-                                        str(v.dtype).split(".")[1],
-                                        file,
-                                    ]
-                                ]
-                            else:
-                                cur_rank_sharded_tensor_infos[new_k].append(
-                                    [
-                                        {"tp_rank": tp_rank, "sharding_rank": sharding_rank},
-                                        v.shape,
-                                        str(v.dtype).split(".")[1],
-                                        file,
-                                    ]
-                                )
-
-                        self.cur_rank_loaded_state_dict[file] = renamed_state_dict
-                    else:
-                        for k, v in state_dict.items():
-                            if k not in cur_rank_sharded_tensor_infos:
-                                cur_rank_sharded_tensor_infos[k] = [
-                                    [
-                                        {"tp_rank": tp_rank, "sharding_rank": sharding_rank},
-                                        v.shape,
-                                        str(v.dtype).split(".")[1],
-                                        file,
-                                    ]
-                                ]
-                            else:
-                                cur_rank_sharded_tensor_infos[k].append(
-                                    [
-                                        {"tp_rank": tp_rank, "sharding_rank": sharding_rank},
-                                        v.shape,
-                                        str(v.dtype).split(".")[1],
-                                        file,
-                                    ]
-                                )
-
-            else:
-                for file, state_dict in self.cur_rank_loaded_state_dict.items():
-                    # The rule for renaming is to change the master_weights name in the optimizer state to the model weight name,
-                    # and then append the tp_degree.
-                    renamed_state_dict = self.rename_using_model_meta(file)
-                    (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file)
-                    for new_k, v in renamed_state_dict.items():
-                        if new_k not in cur_rank_sharded_tensor_infos:
-                            cur_rank_sharded_tensor_infos[new_k] = [
-                                [
-                                    {"tp_rank": tp_rank, "sharding_rank": sharding_rank},
-                                    v.shape,
-                                    str(v.dtype).split(".")[1],
-                                    file,
-                                ]
-                            ]
-                        else:
-                            cur_rank_sharded_tensor_infos[new_k].append(
-                                [
-                                    {"tp_rank": tp_rank, "sharding_rank": sharding_rank},
-                                    v.shape,
-                                    str(v.dtype).split(".")[1],
-                                    file,
-                                ]
-                            )
-
-                    self.cur_rank_loaded_state_dict[file] = renamed_state_dict
-        # gather global sharded tensor infos
-        sharded_tensor_infos = self.gather_global_object({self.cur_rank: cur_rank_sharded_tensor_infos})
-
-        self.global_sharded_tensor_infos = {}
-        for rank, sharded_tensor_info in sharded_tensor_infos.items():
-            for k, v in sharded_tensor_info.items():
-                if k not in self.global_sharded_tensor_infos:
-                    self.global_sharded_tensor_infos[k] = v
-                else:
-                    self.global_sharded_tensor_infos[k] += v
-
-    def gen_metadata_for_tp_sharded_tensor(self):
-        for k, v in self.global_sharded_tensor_infos.items():
-            v.sort(key=lambda x: x[0]["tp_rank"])
-
-        state_dict_metadata = {}
-        storage_metadata = {}
-        # After obtaining the local_shape and sharding rank of each tensor, the global offset of each tensor can be calculated.
-        for k, v in self.global_sharded_tensor_infos.items():
-            global_offset = 0
-            local_shape = v[0][1]
-            model_state_name = self.optimizer_key_to_model_state_key(k)
-            if "_pow_acc_0" not in k:
-                global_shape = self.model_state_global_shape[model_state_name]
-            else:
-                global_shape = (1,)
-
-            assert len(local_shape) == len(global_shape)
-            axis = -1
-            for i in range(len(local_shape)):
-                if local_shape[i] != global_shape[i]:
-                    axis = i
-                    break
-
-            is_replicated = axis == -1
-            global_offset = [0] * len(local_shape)
-
-            if is_replicated:
-                v = [v[0]]
-
-            for item in v:
-                local_tensor_meta_data = LocalTensorMetadata(tuple(global_offset), item[1], item[2])
-                local_tensor_index = LocalTensorIndex(k, tuple(global_offset))
-                global_offset[axis] += item[1][axis]
-                if k not in state_dict_metadata:
-                    state_dict_metadata[k] = [local_tensor_meta_data]
-                else:
-                    state_dict_metadata[k].append(local_tensor_meta_data)
-                storage_metadata[local_tensor_index] = item[3]
-
-            metadata = Metadata(state_dict_metadata, storage_metadata, None)
-            source_state_dict = self.cur_rank_loaded_state_dict
-
-        return metadata, source_state_dict
-
-    def gen_metadata_and_prepare_source_state_dict(self):
-        self.load_state_dict_and_rename()
-        if self.sharding_degree > 1 and self.sharding_stage1_v == 2 and not self.is_sharding_stage3:
-            for k, v in self.global_sharded_tensor_infos.items():
-                v.sort(key=lambda x: x[0]["sharding_rank"])
-
-            state_dict_metadata = {}
-            storage_metadata = {}
-            # After obtaining the local_shape and sharding rank of each tensor, the global offset of each tensor can be calculated.
-            for k, v in self.global_sharded_tensor_infos.items():
-                global_offset = [0] * self.tp_degree
-                for item in v:
-                    tp_rank = item[0]["tp_rank"]
-                    k_with_tp_rank = k + "_tp" + "{:02d}".format(tp_rank)
-                    local_tensor_meta_data = LocalTensorMetadata((global_offset[tp_rank],), item[1], item[2])
-                    local_tensor_index = LocalTensorIndex(k_with_tp_rank, (global_offset[tp_rank],))
-                    global_offset[tp_rank] += item[1][0]
-                    if k_with_tp_rank not in state_dict_metadata:
-                        state_dict_metadata[k_with_tp_rank] = [local_tensor_meta_data]
-                    else:
-                        state_dict_metadata[k_with_tp_rank].append(local_tensor_meta_data)
-                    storage_metadata[local_tensor_index] = item[3]
-
-            metadata_for_merge_sharding = Metadata(state_dict_metadata, storage_metadata, None)
-
-            source_state_dict_for_merge_sharding = {}
-            for file_name, state_dict in self.cur_rank_loaded_state_dict.items():
-                renamed_state_dict = {}
-                (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file_name)
-                for k, v in state_dict.items():
-                    if self.global_sharded_tensor_infos[k][0][0]["tp_rank"] != -1:
-                        k_with_tp_rank = k + "_tp" + "{:02d}".format(tp_rank)
-                        renamed_state_dict[k_with_tp_rank] = v
-                    else:
-                        renamed_state_dict[k] = v
-
-                source_state_dict_for_merge_sharding[file_name] = renamed_state_dict
-
-            assert self.model_meta is not None
-            global_model_state_shapes = []
-            sharding_metas_keys = []
-            for i in range(self.pp_degree):
-                for j in range(self.tp_degree):
-                    sharding_metas_keys.append("tp{:02d}_pp{:02d}".format(i, j))
-            for key in sharding_metas_keys:
-                param_meta = self.model_meta["sharding_metas"][key]["param_meta"]
-                for k, v in param_meta.items():
-                    global_model_state_shapes.append([k, v[0]])
-
-            # Distribute all model parameters evenly across each card for loading
-
-            world_size = paddle.distributed.get_world_size()
-
-            partition_mapping = self.partition_parameters(global_model_state_shapes, True, world_size)
-
-            partition_model_state_keys = []
-            for cur_rank, partition_model_state in partition_mapping.items():
-                partition_model_state_keys.append([item[0] for item in partition_model_state])
-
-            param_meta = {}
-            for i in range(self.tp_degree):
-                for j in range(self.pp_degree):
-                    key = "tp{:02d}_pp{:02d}".format(i, j)
-                    pm = self.model_meta["sharding_metas"][key]["param_meta"]
-                    for k, v in pm.items():
-                        param_meta[k] = v
-
-            param_flattened_shapes = {}
-            for k, v in param_meta.items():
-                param_flattened_shapes[k] = reduce(lambda x, y: x * y, v[0])
-
-            cur_rank_need_load_model_state_keys = partition_model_state_keys[self.cur_rank]
-
-            # Generate the optimizer states corresponding to the model weights.
-            optimizer_state_dict = {}
-            for key in cur_rank_need_load_model_state_keys:
-                for tp_rank in range(self.tp_degree):
-                    tp_rank_suffix = "_tp{:02d}".format(tp_rank)
-                    optimizer_state_dict[key + ".w_0_moment1_0" + tp_rank_suffix] = paddle.zeros(
-                        (param_flattened_shapes[key],), "float32"
-                    )
-                    optimizer_state_dict[key + ".w_0_moment2_0" + tp_rank_suffix] = paddle.zeros(
-                        (param_flattened_shapes[key],), "float32"
-                    )
-                    if self.optimizer_state_with_master_weights:
-                        optimizer_state_dict[key + ".w_0" + tp_rank_suffix] = paddle.zeros(
-                            (param_flattened_shapes[key],), "float32"
-                        )
-                    # When handling tensor parallelism (TP), if some tensors are replicated, we initially assume that they are partitioned.
-                    # Later, when these are compared with the global shape, we realize that they are replicated.
-
-                    optimizer_state_dict[key + ".w_0_beta1_pow_acc_0" + tp_rank_suffix] = paddle.zeros((1,), "float32")
-                    optimizer_state_dict[key + ".w_0_beta2_pow_acc_0" + tp_rank_suffix] = paddle.zeros((1,), "float32")
-
-            # merge sharding
-            _load_state_dict(optimizer_state_dict, source_state_dict_for_merge_sharding, [metadata_for_merge_sharding])
-
-            # Reshape
-            for k, v in optimizer_state_dict.items():
-                if v.shape[0] > 1 and "_tp" in k:
-                    param_name = self.optimizer_key_to_model_state_key(k[:-5])
-                    param_shape = param_meta[param_name][0]
-                    assert v.numel() == reduce(lambda x, y: x * y, param_shape)
-                    reshaped_v = v.reshape(param_shape)
-                    optimizer_state_dict[k] = reshaped_v
-            concat_optimier_state_dict = {}
-
-            optimizer_state_key_to_tp_keys = {}
-            for key in optimizer_state_dict.keys():
-                # Count how each key is split into keys ending with ‘_tpXX’.
-                # optimizer_state_key_to_tp_keys ： {key:[key_tp00,key_tp01]}
-                key_removed_tp_rank = key[:-5]
-                if key_removed_tp_rank not in optimizer_state_key_to_tp_keys:
-                    optimizer_state_key_to_tp_keys[key_removed_tp_rank] = [key]
-                else:
-                    optimizer_state_key_to_tp_keys[key_removed_tp_rank].append(key)
-
-            for key, value in optimizer_state_key_to_tp_keys.items():
-                value.sort(key=lambda x: int(x[-2:]))
-
-            for key, tp_keys in optimizer_state_key_to_tp_keys.items():
-                model_state_name = self.optimizer_key_to_model_state_key(key)
-                local_shape = optimizer_state_dict[tp_keys[0]].shape
-                if "_pow_acc_0" not in key:
-                    global_shape = self.model_state_global_shape[model_state_name]
-                else:
-                    global_shape = (1,)
-
-                assert len(local_shape) == len(global_shape)
-
-                axis = -1
-                for i in range(len(local_shape)):
-                    if local_shape[i] != global_shape[i]:
-                        axis = i
-                        break
-
-                is_replicated = axis == -1
-                tp_tensors = []
-                for tp_key in tp_keys:
-                    tp_tensors.append(optimizer_state_dict[tp_key])
-
-                if not is_replicated:
-                    # Derive the partition strategy based on the global_shape, then concatenate.
-                    concat_optimier_state_dict[key] = paddle.concat(tp_tensors, axis=axis)
-                else:
-                    concat_optimier_state_dict[key] = tp_tensors[0]
-
-            fake_file_name = "{:02d}".format(self.cur_rank) + ".distcp"
-            local_tensor_meta_data = {}
-            local_tensor_index = {}
-            for k, v in concat_optimier_state_dict.items():
-                # Generate metadata.
-                local_shape = v.shape
-                global_offset = tuple([0] * len(local_shape))
-                dtype = str(v.dtype).split(".")[1]
-                local_tensor_meta_data[k] = LocalTensorMetadata(global_offset, local_shape, dtype)
-                local_tensor_index[k] = [LocalTensorIndex(k, global_offset), fake_file_name]
-
-            global_local_tensor_meta_data = []
-            global_local_tensor_index = []
-
-            use_dist = True if paddle.distributed.get_world_size() > 1 else False
-
-            if use_dist:
-                paddle.distributed.all_gather_object(global_local_tensor_meta_data, local_tensor_meta_data)
-                paddle.distributed.all_gather_object(global_local_tensor_index, local_tensor_index)
-            else:
-                global_local_tensor_meta_data = [local_tensor_meta_data]
-                global_local_tensor_index = [local_tensor_index]
-
-            state_dict_metadata = {}
-            for tensor_meta_data in global_local_tensor_meta_data:
-                for k, v in tensor_meta_data.items():
-                    if k not in state_dict_metadata:
-                        state_dict_metadata[k] = [v]
-                    else:
-                        state_dict_metadata[k].append(v)
-
-            storage_metadata = {}
-            for tensor_index in global_local_tensor_index:
-                for k, v in tensor_index.items():
-                    storage_metadata[v[0]] = v[1]
-
-            meta_data = Metadata(state_dict_metadata, storage_metadata, None)
-            source_state_dict = {fake_file_name: concat_optimier_state_dict}
-
-            return meta_data, source_state_dict
-
-        elif self.sharding_degree > 1 and self.sharding_stage1_v == 1 and not self.is_sharding_stage3:
-            return self.gen_metadata_for_tp_sharded_tensor()
-        else:
-            if self.is_sharding_stage3:
-                for k, v in self.global_sharded_tensor_infos.items():
-                    v.sort(key=lambda x: x[0]["sharding_rank"])
-                state_dict_metadata = {}
-                storage_metadata = {}
-                # After obtaining the local_shape and sharding rank of each tensor, the global offset of each tensor can be calculated.
-                for k, v in self.global_sharded_tensor_infos.items():
-                    global_offset = 0
-                    for item in v:
-                        if len(item[1]) == 1:
-                            local_tensor_meta_data = LocalTensorMetadata((global_offset,), item[1], item[2])
-                            local_tensor_index = LocalTensorIndex(k, (global_offset,))
-                            global_offset += item[1][0]
-                        else:
-                            global_offset = tuple([0] * len(item[1]))
-                            local_tensor_meta_data = LocalTensorMetadata(global_offset, item[1], item[2])
-                            local_tensor_index = LocalTensorIndex(k, global_offset)
-                        if k not in state_dict_metadata:
-                            state_dict_metadata[k] = [local_tensor_meta_data]
-                        else:
-                            state_dict_metadata[k].append(local_tensor_meta_data)
-                        storage_metadata[local_tensor_index] = item[3]
-
-                metadata_for_merge_sharding = Metadata(state_dict_metadata, storage_metadata, None)
-                model_state_shapes = []
-                dtype = ""
-                for file, state_dict in self.cur_rank_loaded_state_dict.items():
-                    if file.endswith(MODEL_WEIGHT_SUFFIX):
-                        for k, v in state_dict.items():
-                            model_state_shapes.append([k, v.shape])
-                            dtype = str(v.dtype).split(".")[1]
-
-                dtypes = self.gather_global_object([dtype])
-                for dtype_s in dtypes:
-                    if len(dtype_s) > 0:
-                        dtype = dtype_s
-
-                assert len(dtype) > 0
-
-                global_model_state_shapes = self.gather_global_object(model_state_shapes)
-
-                partition_result = self.partition_parameters(
-                    global_model_state_shapes, True, paddle.distributed.get_world_size()
-                )
-
-                cur_rank_merger_model_params = partition_result[self.cur_rank]
-                target_state_dict = {}
-                for item in cur_rank_merger_model_params:
-                    key = item[0]
-                    shape = item[1]
-                    flatten_shape = reduce(lambda a, b: a * b, item[1])
-                    target_state_dict[key] = paddle.zeros(shape, dtype)
-                    target_state_dict[key + ".w_0_moment1_0"] = paddle.zeros((flatten_shape,), "float32")
-                    target_state_dict[key + ".w_0_moment2_0"] = paddle.zeros((flatten_shape,), "float32")
-                    if self.optimizer_state_with_master_weights:
-                        target_state_dict[key + ".w_0"] = paddle.zeros((flatten_shape,), "float32")
-                    # When handling tensor parallelism (TP), if some tensors are replicated, we initially assume that they are partitioned.
-                    # Later, when these are compared with the global shape, we realize that they are replicated.
-
-                    target_state_dict[key + ".w_0_beta1_pow_acc_0"] = paddle.zeros((1,), "float32")
-                    target_state_dict[key + ".w_0_beta2_pow_acc_0"] = paddle.zeros((1,), "float32")
-
-                _load_state_dict(target_state_dict, self.cur_rank_loaded_state_dict, [metadata_for_merge_sharding])
-
-                # Reshape
-                for item in cur_rank_merger_model_params:
-                    key = item[0]
-                    shape = item[1]
-                    for k, v in target_state_dict.items():
-                        if key == self.optimizer_key_to_model_state_key(k):
-                            if tuple(shape) != tuple(v.shape) and v.numel() == reduce(lambda x, y: x * y, shape):
-                                reshaped_v = v.reshape(shape)
-                                target_state_dict[k] = reshaped_v
-
-                fake_file_name = "{:02d}".format(self.cur_rank) + ".distcp"
-                local_tensor_meta_data = {}
-                local_tensor_index = {}
-                for k, v in target_state_dict.items():
-                    # Generate metadata.
-                    local_shape = v.shape
-                    global_offset = tuple([0] * len(local_shape))
-                    dtype = str(v.dtype).split(".")[1]
-                    local_tensor_meta_data[k] = LocalTensorMetadata(global_offset, local_shape, dtype)
-                    local_tensor_index[k] = [LocalTensorIndex(k, global_offset), fake_file_name]
-
-                global_local_tensor_meta_data = []
-                global_local_tensor_index = []
-
-                use_dist = True if paddle.distributed.get_world_size() > 1 else False
-
-                if use_dist:
-                    paddle.distributed.all_gather_object(global_local_tensor_meta_data, local_tensor_meta_data)
-                    paddle.distributed.all_gather_object(global_local_tensor_index, local_tensor_index)
-                else:
-                    global_local_tensor_meta_data = [local_tensor_meta_data]
-                    global_local_tensor_index = [local_tensor_index]
-
-                state_dict_metadata = {}
-                for tensor_meta_data in global_local_tensor_meta_data:
-                    for k, v in tensor_meta_data.items():
-                        if k not in state_dict_metadata:
-                            state_dict_metadata[k] = [v]
-                        else:
-                            state_dict_metadata[k].append(v)
-
-                storage_metadata = {}
-                for tensor_index in global_local_tensor_index:
-                    for k, v in tensor_index.items():
-                        storage_metadata[v[0]] = v[1]
-
-                meta_data = Metadata(state_dict_metadata, storage_metadata, None)
-                source_state_dict = {fake_file_name: target_state_dict}
-
-                return meta_data, source_state_dict
-            else:
-                return self.gen_metadata_for_tp_sharded_tensor()
-
-    def rename_auto_parallel_state_dict(self):
-        need_remove_key_pattern = ["eager_tmp", "learning_rate", "@GRAD@MERG", "gradient_merge_"]
-
-        need_remove_key = set()
-        for key in self.auto_parallel_state_dict.keys():
-            for pattern in need_remove_key_pattern:
-                if pattern in key:
-                    need_remove_key.add(key)
-                    break
-
-        for key in need_remove_key:
-            self.auto_parallel_state_dict.pop(key)
-
-        adamw_optimizer_status_name_suffix_mappings = {
-            "_fp32_master_1_moment1_0": ".w_0_moment1_0",
-            "_fp32_master_1_moment2_0": ".w_0_moment2_0",
-            "_fp32_master_1_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
-            "_fp32_master_1_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
-            "_fp32_master_1": ".w_0",
-            "_moment1_0": ".w_0_moment1_0",
-            "_moment2_0": ".w_0_moment2_0",
-            "_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
-            "_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
-        }
-
-        def rename(old_name, map1, map2):
-            for i in range(1, len(old_name)):
-                str1 = old_name[:i]
-                str2 = old_name[i:]
-                if (str1 in map1) and (str2 in map2):
-                    transformed_str1 = map1[str1]
-                    transformed_str2 = map2[str2]
-                    return transformed_str1 + transformed_str2
-            return None
-
-        renamed_state_dict = {}
-
-        for key, value in self.auto_parallel_state_dict.items():
-
-            if key in self.parameter_to_structured_name.values():
-                new_name = key
-            else:
-                new_name = rename(key, self.parameter_to_structured_name, adamw_optimizer_status_name_suffix_mappings)
-
-            assert new_name is not None
-            renamed_state_dict[new_name] = value
-
-        self.auto_parallel_state_dict = renamed_state_dict
-
-    def load_from_hybrid_parallel_checkpoint(self):
-        self.rename_auto_parallel_state_dict()
-        metadata, source_state_dict = self.gen_metadata_and_prepare_source_state_dict()
-        if self.save_sharded_model:
-            model_params = {}
-            for k, v in self.auto_parallel_state_dict.items():
-                if k in self.parameter_to_structured_name.values():
-                    model_params[k] = v
-            for k in model_params.keys():
-                self.auto_parallel_state_dict.pop(k)
-
-            appended_master_weight_names = []
-            for k, v in model_params.items():
-                master_weight = k + ".w_0"
-                if master_weight not in self.auto_parallel_state_dict:
-                    appended_master_weight_names.append(master_weight)
-                    tmp_tensor = paddle.zeros(v.shape, "float32")
-                    dist_tmp_tensor = dist.shard_tensor(tmp_tensor, v.process_mesh, v.placements)
-                    self.auto_parallel_state_dict[master_weight] = dist_tmp_tensor
-
-            _load_state_dict(self.auto_parallel_state_dict, source_state_dict, [metadata])
-            for k, v in model_params.items():
-                master_weight = self.auto_parallel_state_dict[k + ".w_0"]
-                cast_master_weight = paddle.cast(master_weight._local_value(), "bfloat16")
-                paddle.assign(cast_master_weight, v._local_value())
-            for k in appended_master_weight_names:
-                self.auto_parallel_state_dict.pop(k)
-        else:
-            _load_state_dict(self.auto_parallel_state_dict, source_state_dict, [metadata])
