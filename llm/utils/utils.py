@@ -34,7 +34,6 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     ChatGLMv2Tokenizer,
     LlamaForCausalLMPipe,
-    PretrainedConfig,
     Qwen2ForCausalLMPipe,
 )
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
@@ -738,45 +737,11 @@ def get_model_max_position_embeddings(config: PretrainedConfig) -> Optional[int]
     return None
 
 
-def get_default_max_decoding_length(config: PretrainedConfig, default: int = 1024) -> int:
-    """get the default max decoding length from config.
-
-    Args:
-        config (PretrainedConfig): the instance of PretrainedConfig
-        default (int): the default value of max decoding length
-
-    Returns:
-        int: the default max_length of decoding length
-    """
-    max_position_embeddings = get_model_max_position_embeddings(config)
-    if max_position_embeddings is None:
-        return default
-    return max_position_embeddings // 4
-
-
-def get_default_max_encoding_length(config: PretrainedConfig, default: int = 1024) -> int:
-    """get the default max encoding length from config.
-
-    Args:
-        config (PretrainedConfig): the instance of PretrainedConfig
-        default (int): the default value of max encoding length
-
-    Returns:
-        int: the default max_length of encoding length
-    """
-
-    max_position_embeddings = get_model_max_position_embeddings(config)
-    if max_position_embeddings is None:
-        return default
-    return max_position_embeddings // 4 * 3
-
-
 def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue):
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name_or_path,
-    )
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
     paddle.device.set_device("cpu")
+    paddle.disable_static()
     outputs = []
     output_tensor = tensor_queue.get(timeout=1)
 
@@ -793,7 +758,7 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
         output_numpy = output_tensor[2 : bsz + 2].numpy()
         output_numpy[output_numpy == -1] = 2
         outputs.append(output_numpy)
-        if output_tensor[0, 0] == -1:
+        if int(output_tensor[0, 0]) == -1:
             break
     output = np.concatenate(outputs, axis=1).tolist()
     seqs = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)
