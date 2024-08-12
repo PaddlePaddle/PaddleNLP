@@ -28,7 +28,6 @@ from paddle.distributed.checkpoint.metadata import (
     LocalTensorMetadata,
     Metadata,
 )
-from paddle.distributed.checkpoint.utils import flatten_state_dict
 
 MODEL_WEIGHT_SUFFIX = ".pdparams"
 OPTIMIZER_WEIGHT_SUFFIX = ".pdopt"
@@ -40,7 +39,7 @@ class CheckpointConverter:
     def __init__(self, hybrid_parallel_ckpt_path, model_state, parameter_to_structured_name):
         self.use_dist = True if paddle.distributed.get_world_size() > 1 else False
         self.path = hybrid_parallel_ckpt_path
-        self.auto_parallel_state_dict = self.flatten_state_dict(model_state)
+        self.auto_parallel_state_dict = model_state
         self.parameter_to_structured_name = self.gather_global_object(parameter_to_structured_name)
         model_state_global_shape = {}
         for k, v in model_state.items():
@@ -68,15 +67,6 @@ class CheckpointConverter:
             save_sharded_model_flag = []
         save_sharded_model_flag = self.gather_global_object(save_sharded_model_flag)
         return save_sharded_model_flag[0]
-
-    def flatten_state_dict(self, state_dict):
-        flattened_state_dict = {}
-        flat_state_dict, mapping = flatten_state_dict(state_dict)
-        for k, v in flat_state_dict.items():
-            last_level_key = mapping[k][-1]
-            assert last_level_key not in flattened_state_dict
-            flattened_state_dict[last_level_key] = v
-        return flattened_state_dict
 
     def gather_global_object(self, cur_rank_object):
         all_rank_objects = []
@@ -258,7 +248,6 @@ class CheckpointConverter:
                 master_weight_name_to_model_weight_name_mapping[v.split(".")[0]] = k
 
             renamed_state_dict = {}
-            (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file_name)
             state_dict = self.cur_rank_loaded_state_dict[file_name]
             for k, v in state_dict.items():
                 master_weight_name = self.parse_master_weight_name_by(k)
@@ -277,7 +266,6 @@ class CheckpointConverter:
 
             self.global_file_to_state_dict_keys_mapping = self.gather_global_object(file_to_state_dict_keys_mapping)
 
-        (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file_name)
         if file_name.endswith(OPTIMIZER_WEIGHT_SUFFIX):
             model_state_file_name = self.get_model_state_file_from(file_name)
             assert model_state_file_name is not None
@@ -291,7 +279,6 @@ class CheckpointConverter:
 
             state_dict = self.cur_rank_loaded_state_dict[file_name]
             renamed_state_dict = {}
-            (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file_name)
             for k, v in state_dict.items():
                 master_weight_name = self.parse_master_weight_name_by(k)
                 model_weight_name = master_weight_name_to_model_weight_name_mapping[master_weight_name]
@@ -410,7 +397,7 @@ class CheckpointConverter:
                         )
 
                 self.cur_rank_loaded_state_dict[file] = renamed_state_dict
-        # 2. In handling the sharding stage1 v1 and sharding stage2 scenario, the optimizer states are distributed across different ranks.
+        # 2. In handling the sharding stage1 v1 and stage2 scenario, the optimizer states are distributed across different ranks.
         # We need to obtain the name mapping by simulating the partitioning method, without concern for the presence of master_weights.
         elif self.sharding_degree > 1 and self.sharding_stage1_v == 1 and not self.is_sharding_stage3:
             if not self.save_sharded_model:
@@ -525,7 +512,7 @@ class CheckpointConverter:
 
                     self.cur_rank_loaded_state_dict[file] = renamed_state_dict
         else:
-            # 3. Handling the case of disabling sharding, independent of master_weights, but without considering the save_sharded_model flag.
+            # 3. Handling the sharding stage3 and non-sharding scenario
             if not self.save_sharded_model:
                 for file, state_dict in self.cur_rank_loaded_state_dict.items():
                     (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file)
@@ -966,7 +953,7 @@ class CheckpointConverter:
             else:
                 return self.gen_metadata_for_tp_sharded_tensor()
 
-    def rename_auto_parallel_state_dict(self):
+    def rename_semi_auto_state_dict(self):
         need_remove_key_pattern = ["eager_tmp", "learning_rate", "@GRAD@MERG", "gradient_merge_"]
 
         need_remove_key = set()
@@ -1016,7 +1003,7 @@ class CheckpointConverter:
         self.auto_parallel_state_dict = renamed_state_dict
 
     def load_from_hybrid_parallel_checkpoint(self):
-        self.rename_auto_parallel_state_dict()
+        self.rename_semi_auto_state_dict()
         metadata, source_state_dict = self.gen_metadata_and_prepare_source_state_dict()
         if self.save_sharded_model:
             model_params = {}
