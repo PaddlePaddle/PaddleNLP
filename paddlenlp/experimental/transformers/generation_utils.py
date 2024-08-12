@@ -672,27 +672,31 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
             # sample
             probs = F.softmax(logits)
-            # _, next_tokens = top_p_sampling(probs, top_p, -1)
-            _, next_tokens = paddle.topk(probs, 1, -1)
+            _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
 
-            step_idx = paddle.where(model_kwargs["stop_flags"], model_kwargs["step_idx"], model_kwargs["step_idx"] + 1)
-            paddle.assign(step_idx, model_kwargs["step_idx"])
-            length_cond = paddle.greater_equal(step_idx, model_kwargs["max_dec_len"])
-            stop_flags = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
+            model_kwargs["step_idx"][:] = paddle.where(
+                model_kwargs["stop_flags"], model_kwargs["step_idx"], model_kwargs["step_idx"] + 1
+            )
+            length_cond = paddle.greater_equal(model_kwargs["step_idx"], model_kwargs["max_dec_len"])
+            model_kwargs["stop_flags"][:] = paddle.logical_or(model_kwargs["stop_flags"], length_cond)
+
             from paddlenlp_ops import set_stop_value_multi_ends_v2
 
             set_stop_value_multi_ends_v2(
-                next_tokens, stop_flags, model_kwargs["seq_lens_this_time"], eos_token_id, model_kwargs["next_tokens"]
+                next_tokens,
+                model_kwargs["stop_flags"],
+                model_kwargs["seq_lens_this_time"],
+                eos_token_id,
+                model_kwargs["next_tokens"],
             )  # multi ends
-            paddle.assign(stop_flags, model_kwargs["stop_flags"])
             # update inputs
             from paddlenlp_ops import update_inputs
 
             update_inputs(
-                stop_flags,
+                model_kwargs["stop_flags"],
                 model_kwargs["not_need_stop"],
                 model_kwargs["seq_lens_this_time"],
                 model_kwargs["seq_lens_encoder"],
