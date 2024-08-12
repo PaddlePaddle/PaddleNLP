@@ -366,7 +366,18 @@ def load_state_dict(
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
     """
-    quant = "optimizer" in checkpoint_file
+    # 假设你想要获取的环境变量名为 'MY_ENV_VAR'
+    env_var_name = 'QUANT'
+
+    # 使用 os.getenv() 方法获取环境变量的值
+    # 如果环境变量不存在，可以设置一个默认值
+    env_var_value = os.getenv(env_var_name, '0')
+
+    print(f"环境变量 {env_var_name} 的值为: {env_var_value}")
+    quant = False
+    if env_var_value == '1':
+        quant = "optimizer" in checkpoint_file
+        
     if tensor_parallel_split_mapping is None:
         tensor_parallel_split_mapping = {}
 

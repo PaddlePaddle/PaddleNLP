@@ -1188,8 +1188,17 @@ class Trainer:
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-                    if (self.state.global_step) % 50:
-                        exit(0)
+                    if self.state.global_step != 0 and (self.state.global_step) % 50 == 0:
+                        # 假设你想要获取的环境变量名为 'MY_ENV_VAR'
+                        env_var_name = 'BREAK'
+
+                        # 使用 os.getenv() 方法获取环境变量的值
+                        # 如果环境变量不存在，可以设置一个默认值
+                        env_var_value = os.getenv(env_var_name, '0')
+
+                        print(f"环境变量 {env_var_name} 的值为: {env_var_value}")
+                        if env_var_value == '1':
+                            exit(0)
                     self._print_timer()
                     step_control = 0
                 else:
