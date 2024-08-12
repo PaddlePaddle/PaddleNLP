@@ -349,6 +349,8 @@ class TrainingArguments:
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
+        resume_form_hybrid_parallel (`bool`, *optional*):
+            Wether hybrid paralle checkpoints be loaded in auto parallel mode.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
         skip_profile_timer (`bool`, *optional*):
@@ -357,8 +359,6 @@ class TrainingArguments:
             Whether to use distributed dataloader. Default is `False`.
         release_grads (`bool`, *optional*):
             Whether to release gradients during training. Default is `False`.
-        resume_form_hybrid_parallel (`bool`, *optional*):
-            Wether hybrid paralle checkpoints be loaded in auto parallel mode.
     """
 
     output_dir: str = field(
@@ -772,6 +772,10 @@ class TrainingArguments:
         default=None,
         metadata={"help": "The path to a folder with a valid checkpoint for your model."},
     )
+    resume_form_hybrid_parallel: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Wether hybrid paralle checkpoints be loaded in auto parallel mode."},
+    )
     skip_memory_metrics: bool = field(
         default=True, metadata={"help": "Whether or not to skip adding of memory profiler reports to metrics."}
     )
@@ -838,10 +842,6 @@ class TrainingArguments:
     )
     release_grads: Optional[bool] = field(
         default=False, metadata={"help": "Whether to release gradients during training. Default is `False`."}
-    )
-    resume_form_hybrid_parallel: Optional[bool] = field(
-        default=False,
-        metadata={"help": "Wether hybrid paralle checkpoints be loaded in auto parallel mode."},
     )
 
     def __post_init__(self):
