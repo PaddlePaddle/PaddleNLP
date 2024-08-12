@@ -18,6 +18,7 @@ tiktoken
 visualdl
 wandb
 tensorboard
+tensorboardX
 modelscope
 hyperopt
 h5py
