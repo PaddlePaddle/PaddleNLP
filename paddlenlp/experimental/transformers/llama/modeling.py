@@ -253,7 +253,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
                         state_dict["llama.layers.{}.self_attn.qkv_proj.weight".format(idx)],
                         is_qkv=True,
                         num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
-                        num_key_value_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                        num_key_value_heads=self.num_attention_heads,
                     ),
                     axis=-1,
                 )
@@ -738,7 +738,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         state_dict["llama.layers.{}.self_attn.qkv_proj.weight".format(idx)],
                         is_qkv=True,
                         num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
-                        num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
+                        num_key_value_heads=self.num_key_value_heads,
                     ),
                     axis=-1,
                 ).transpose(1, 0)
@@ -1015,7 +1015,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         cache_scale_map_dict,
                         num_of_layers=self.config.num_hidden_layers,
                         num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
-                        num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
+                        num_key_value_heads=self.num_key_value_heads,
                     )
                     for k, v in cache_scales_loader.scale.items():
                         for i_layer, weight_scale in enumerate(v):
