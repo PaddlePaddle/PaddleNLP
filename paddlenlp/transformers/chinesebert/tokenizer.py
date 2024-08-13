@@ -244,6 +244,7 @@ class ChineseBertTokenizer(BertTokenizer):
         """
         if "max_length" in kwargs.keys():
             max_seq_len = kwargs["max_length"]
+
         def get_input_ids(text):
             if isinstance(text, str):
                 tokens = self.tokenize(text)
@@ -688,7 +689,7 @@ class ChineseBertTokenizer(BertTokenizer):
             dict: the map of pinyin locations and pinyin tensor.
         """
         pypinyin = try_import("pypinyin")
-        pinyin_list =pypinyin.pinyin(
+        pinyin_list = pypinyin.pinyin(
             text,
             style=pypinyin.Style.TONE3,
             heteronym=True,
