@@ -35,7 +35,9 @@ if get_env_device() == "xpu":
     try:
         import paddle_xpu
     except Exception as e:
+        import traceback
         logger.warning("Import paddle_xpu failed, use PaddlePaddle's native Linear implementations")
+        logger.warning(f"{traceback.format_exc()}")
     else:
         logger.info("Import paddle_xpu succeeded.")
 
