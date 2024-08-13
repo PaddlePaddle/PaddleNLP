@@ -19,7 +19,6 @@ from collections import OrderedDict
 from functools import reduce
 
 import paddle
-import paddle.distributed as dist
 from paddle.distributed.checkpoint.load_state_dict import (
     _load_state_dict,
     get_local_load_files,
@@ -109,10 +108,13 @@ class CheckpointConverter:
                 master_weight = param_name + ".w_0"
                 if master_weight not in self.auto_parallel_state_dict:
                     appended_master_weight_names.append(master_weight)
-                    tmp_tensor = paddle.zeros(param_value.shape, "float32")
-                    self.auto_parallel_state_dict[master_weight] = dist.shard_tensor(
-                        tmp_tensor, param_value.process_mesh, param_value.placements
-                    )
+                    tmp_tensor = paddle.zeros(param_value._local_value().shape, "float32")
+                    with paddle.base.dygraph.guard():
+                        self.auto_parallel_state_dict[
+                            master_weight
+                        ] = paddle.distributed.auto_parallel.api.dtensor_from_local(
+                            tmp_tensor, param_value.process_mesh, param_value.placements
+                        )
 
             _load_state_dict(self.auto_parallel_state_dict, source_state_dict, [metadata])
             for param_name, param_value in model_params.items():
