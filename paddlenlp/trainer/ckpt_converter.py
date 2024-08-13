@@ -36,24 +36,26 @@ SCHEDULER_NAME = "scheduler.pdparams"
 MODEL_META_FILE_NAME = "model_meta.json"
 
 
-OPTIMIZER_STATE_NAME_SUFFIX_MAPPING = {
-    "_fp32_master_1_moment1_0": ".w_0_moment1_0",
-    "_fp32_master_1_moment2_0": ".w_0_moment2_0",
-    "_fp32_master_1_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
-    "_fp32_master_1_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
-    "_fp32_master_1": ".w_0",
-    "_moment1_0": ".w_0_moment1_0",
-    "_moment2_0": ".w_0_moment2_0",
-    "_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
-    "_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
-    ".w_0_fp32_master_0_moment1_0": ".w_0_moment1_0",
-    ".w_0_fp32_master_0_moment2_0": ".w_0_moment2_0",
-    ".w_0_fp32_master_0_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
-    ".w_0_fp32_master_0_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
-}
-
 OPTIMIZER_STATE_NAME_SUFFIX_MAPPING = OrderedDict(
-    sorted(OPTIMIZER_STATE_NAME_SUFFIX_MAPPING.items(), key=lambda x: len(x[0]), reverse=True)
+    sorted(
+        {
+            "_fp32_master_1_moment1_0": ".w_0_moment1_0",
+            "_fp32_master_1_moment2_0": ".w_0_moment2_0",
+            "_fp32_master_1_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
+            "_fp32_master_1_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
+            "_fp32_master_1": ".w_0",
+            "_moment1_0": ".w_0_moment1_0",
+            "_moment2_0": ".w_0_moment2_0",
+            "_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
+            "_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
+            ".w_0_fp32_master_0_moment1_0": ".w_0_moment1_0",
+            ".w_0_fp32_master_0_moment2_0": ".w_0_moment2_0",
+            ".w_0_fp32_master_0_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
+            ".w_0_fp32_master_0_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
+        }.items(),
+        key=lambda x: len(x[0]),
+        reverse=True,
+    )
 )
 
 
