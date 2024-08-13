@@ -1054,24 +1054,28 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         tensor_queue.put(output_tensor)
 
         read_res_process = mp.Process(target=read_res, args=[self.model_name_or_path, tensor_queue, result_queue])
-        read_res_process.start()
+        if self.tensor_parallel_rank == 0:
+            read_res_process.start()
 
+        s_time = time.time()
         while self.model_inputs["not_need_stop"]:
             self._infer(self.model_inputs)
+        logger.info(f"running spend {time.time()  -  s_time}")
 
-        outputs = []
-        output_tokens = []
-        while len(outputs) < self.batch_size:
-            result = result_queue.get(timeout=1)
-            outputs.append(result[-1])
-            output_tokens.append(result[-2])
+        if self.tensor_parallel_rank == 0:
+            outputs = []
+            output_tokens = []
+            while len(outputs) < self.batch_size:
+                result = result_queue.get(timeout=1)
+                outputs.append(result[-1])
+                output_tokens.append(result[-2])
 
-        read_res_process.terminate()
+            read_res_process.terminate()
 
-        if return_tokens:
-            return outputs, output_tokens
-        else:
-            return outputs
+            if return_tokens:
+                return outputs, output_tokens
+            else:
+                return outputs
 
 
 class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
@@ -1174,25 +1178,29 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
         tensor_queue.put(output_tensor)
 
         read_res_process = mp.Process(target=read_res, args=[self.model_name_or_path, tensor_queue, result_queue])
-        read_res_process.start()
+
+        if self.tensor_parallel_rank == 0:
+            read_res_process.start()
 
         s_time = time.time()
         while self.model_inputs["not_need_stop"]:
             self.predictor.run(list(self.model_inputs.values()))
         logger.info(f"running spend {time.time()  -  s_time}")
 
-        outputs = []
-        output_tokens = []
-        while len(outputs) < self.batch_size:
-            result = result_queue.get(timeout=1)
-            outputs.append(result[-1])
-            output_tokens.append(result[-2])
+        if self.tensor_parallel_rank == 0:
+            outputs = []
+            output_tokens = []
+            while len(outputs) < self.batch_size:
+                result = result_queue.get(timeout=1)
+                outputs.append(result[-1])
+                output_tokens.append(result[-2])
 
-        read_res_process.terminate()
+            read_res_process.terminate()
 
-        if return_tokens:
-            return outputs, output_tokens
-        else:
+            if return_tokens:
+                return outputs, output_tokens
+            else:
+                return outputs
             return outputs
 
 

@@ -253,7 +253,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
                         state_dict["llama.layers.{}.self_attn.qkv_proj.weight".format(idx)],
                         is_qkv=True,
                         num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
-                        num_key_value_heads=self.num_attention_heads,
+                        num_key_value_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
                     ),
                     axis=-1,
                 )
@@ -371,17 +371,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.quant_type
             )
 
-        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
-            self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
-                self.vocab_size,
-                self.hidden_size,
-                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
-            )
-        else:
-            self.embed_tokens = nn.Embedding(
-                self.vocab_size,
-                self.hidden_size,
-            )
+        self.embed_tokens = nn.Embedding(self.vocab_size, self.hidden_size)
 
         # get ring_id
         ring_id = -1
@@ -738,7 +728,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         state_dict["llama.layers.{}.self_attn.qkv_proj.weight".format(idx)],
                         is_qkv=True,
                         num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
-                        num_key_value_heads=self.num_key_value_heads,
+                        num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
                     ),
                     axis=-1,
                 ).transpose(1, 0)
@@ -1015,7 +1005,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         cache_scale_map_dict,
                         num_of_layers=self.config.num_hidden_layers,
                         num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
-                        num_key_value_heads=self.num_key_value_heads,
+                        num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
                     )
                     for k, v in cache_scales_loader.scale.items():
                         for i_layer, weight_scale in enumerate(v):
@@ -1435,7 +1425,6 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             base_actions = {
                 "lm_head.weight": partial(fn, is_column=True),
                 # Row Linear
-                "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
