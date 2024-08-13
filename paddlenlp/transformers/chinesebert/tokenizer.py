@@ -152,6 +152,7 @@ class ChineseBertTokenizer(BertTokenizer):
         return_length=False,
         return_overflowing_tokens=False,
         return_special_tokens_mask=False,
+        **kwargs,
     ):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
@@ -241,7 +242,8 @@ class ChineseBertTokenizer(BertTokenizer):
                   with 0 specifying special added tokens and 1 specifying sequence tokens.
                   Included when `return_special_tokens_mask` is `True`.
         """
-
+        if "max_length" in kwargs.keys():
+            max_seq_len = kwargs["max_length"]
         def get_input_ids(text):
             if isinstance(text, str):
                 tokens = self.tokenize(text)
@@ -685,11 +687,10 @@ class ChineseBertTokenizer(BertTokenizer):
         Returns:
             dict: the map of pinyin locations and pinyin tensor.
         """
-        pinyin = try_import("pypinyin.pinyin")
-        Style = try_import("pypinyin.Style")
-        pinyin_list = pinyin(
+        pypinyin = try_import("pypinyin")
+        pinyin_list =pypinyin.pinyin(
             text,
-            style=Style.TONE3,
+            style=pypinyin.Style.TONE3,
             heteronym=True,
             errors=lambda x: [["not chinese"] for _ in x],
         )
