@@ -723,9 +723,17 @@ class AutoTrainer(Trainer):
                 OPTIMIZER_NAME: optim_state_dict,
             }
 
+            parameter_to_structured_name = {}
+            if self.args.to_static:
+                parameter_to_structured_name = self.model_wrapped._parameter_to_structured_name
+            else:
+                for state_dict_name, sub_state_dict in state_dict.items():
+                    for state_name, state_value in sub_state_dict.items():
+                        parameter_to_structured_name[state_value.name] = state_name
+
             if self.args.resume_form_hybrid_parallel:
                 CheckpointConverter(
-                    resume_from_checkpoint, state_dict, self.model_wrapped._parameter_to_structured_name
+                    resume_from_checkpoint, state_dict, parameter_to_structured_name
                 ).load_from_hybrid_parallel_checkpoint()
             else:
                 ckpt_path = os.path.join(resume_from_checkpoint, DIST_CKPT_PATH)

@@ -15,6 +15,7 @@
 import json
 import os
 import re
+from collections import OrderedDict
 from functools import reduce
 
 import paddle
@@ -34,6 +35,27 @@ MODEL_WEIGHT_SUFFIX = ".pdparams"
 OPTIMIZER_WEIGHT_SUFFIX = ".pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
 MODEL_META_FILE_NAME = "model_meta.json"
+
+
+OPTIMIZER_STATE_NAME_SUFFIX_MAPPING = {
+    "_fp32_master_1_moment1_0": ".w_0_moment1_0",
+    "_fp32_master_1_moment2_0": ".w_0_moment2_0",
+    "_fp32_master_1_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
+    "_fp32_master_1_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
+    "_fp32_master_1": ".w_0",
+    "_moment1_0": ".w_0_moment1_0",
+    "_moment2_0": ".w_0_moment2_0",
+    "_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
+    "_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
+    ".w_0_fp32_master_0_moment1_0": ".w_0_moment1_0",
+    ".w_0_fp32_master_0_moment2_0": ".w_0_moment2_0",
+    ".w_0_fp32_master_0_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
+    ".w_0_fp32_master_0_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
+}
+
+OPTIMIZER_STATE_NAME_SUFFIX_MAPPING = OrderedDict(
+    sorted(OPTIMIZER_STATE_NAME_SUFFIX_MAPPING.items(), key=lambda x: len(x[0]), reverse=True)
+)
 
 
 class CheckpointConverter:
@@ -67,9 +89,9 @@ class CheckpointConverter:
         The main logic is as follows:
             1. Call rename_semi_auto_state_dict: Rename the keys of the auto parallel state_dict according to certain rules.
                (Why rename? To facilitate the subsequent correspondence between the optimizer state names of the semi-automatic and static optimizers.)
-            2. Callgen_metadata_and_prepare_source_state_dict: Automatically parse the manual checkpoint file based on the state_dict information
+            2. Call gen_metadata_and_prepare_source_state_dict: Automatically parse the manual checkpoint file based on the state_dict information
                provided by auto parallel, obtaining the Metadata and state_dict required for auto parallel to load the checkpoint.
-            3. Callload_state_dict: Automatically reshard and load.
+            3. Call load_state_dict: Automatically reshard and load.
             4. Special logic adaptation: In the save_sharded_model mode, the weights are obtained through the master_weight cast in the checkpoint.
         """
         self.rename_auto_parallel_state_dict()
@@ -108,18 +130,6 @@ class CheckpointConverter:
             1. Rename the suffixes of the optimizer states to a unified format: adamw_optimizer_status_name_suffix_mappings
         """
 
-        adamw_optimizer_state_name_suffix_mappings = {
-            "_fp32_master_1_moment1_0": ".w_0_moment1_0",
-            "_fp32_master_1_moment2_0": ".w_0_moment2_0",
-            "_fp32_master_1_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
-            "_fp32_master_1_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
-            "_fp32_master_1": ".w_0",
-            "_moment1_0": ".w_0_moment1_0",
-            "_moment2_0": ".w_0_moment2_0",
-            "_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
-            "_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
-        }
-
         def rename(old_name, map1, map2):
             for i in range(1, len(old_name)):
                 str1 = old_name[:i]
@@ -137,7 +147,7 @@ class CheckpointConverter:
             if key in self.parameter_to_structured_name.values():
                 new_name = key
             else:
-                new_name = rename(key, self.parameter_to_structured_name, adamw_optimizer_state_name_suffix_mappings)
+                new_name = rename(key, self.parameter_to_structured_name, OPTIMIZER_STATE_NAME_SUFFIX_MAPPING)
 
             assert new_name is not None
             renamed_state_dict[new_name] = value
@@ -148,7 +158,7 @@ class CheckpointConverter:
         """
         Automatically parse the manual checkpoint file based on the state_dict information provided by auto parallel,
         obtaining the Metadata and state_dict required for auto parallel to load the checkpoint:
-            1. Callload_state_dict_and_rename: Parse the distributed information from the names of the checkpoint files, and evenly parse out the distributed
+            1. Call load_state_dict_and_rename: Parse the distributed information from the names of the checkpoint files, and evenly parse out the distributed
                information for each weight/optimizer state into self.global_sharded_tensor_infos(data structure:param_name -> [{tp_rank: 1, sharding_rank: 1}, shape, dtype, file_name]).
                Modify the names of the optimizer states in the form ofparameter+suffixand record them in self.cur_rank_loaded_state_dict(data structure:file_name -> renamed_state_dict).
             2. Construct the Metadata and state_dict based on the distributed information obtained in the previous step for the final load.
@@ -339,7 +349,6 @@ class CheckpointConverter:
 
             meta_data = Metadata(state_dict_metadata, storage_metadata, None)
             source_state_dict = {fake_file_name: concat_optimier_state_dict}
-
             return meta_data, source_state_dict
 
         elif self.sharding_degree > 1 and self.sharding_stage1_v == 1 and not self.is_sharding_stage3:
@@ -519,21 +528,13 @@ class CheckpointConverter:
                         # In sharding stage3, ‘@slice’ will be added in front of the key for master_weight, which is removed here.
                         state_dict[master_weight_name.replace("slice@", "")] = master_weight_value
 
-                # Standardize the state names of the AdamW optimizer.
-                adamw_opt_state_suffix_name_mapping = {
-                    ".w_0_fp32_master_0_moment1_0": ".w_0_moment1_0",
-                    ".w_0_fp32_master_0_moment2_0": ".w_0_moment2_0",
-                    ".w_0_fp32_master_0_beta1_pow_acc_0": ".w_0_beta1_pow_acc_0",
-                    ".w_0_fp32_master_0_beta2_pow_acc_0": ".w_0_beta2_pow_acc_0",
-                }
-
                 unified_name_state_dict = {}
                 for opt_state_name, opt_state_value in state_dict.items():
                     new_opt_state_name = opt_state_name
-                    for suffix in adamw_opt_state_suffix_name_mapping:
+                    for suffix in OPTIMIZER_STATE_NAME_SUFFIX_MAPPING:
                         if opt_state_name.endswith(suffix):
                             new_opt_state_name = opt_state_name.replace(
-                                suffix, adamw_opt_state_suffix_name_mapping[suffix]
+                                suffix, OPTIMIZER_STATE_NAME_SUFFIX_MAPPING[suffix]
                             )
                             break
                     unified_name_state_dict[new_opt_state_name] = opt_state_value
