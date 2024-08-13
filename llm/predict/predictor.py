@@ -773,8 +773,12 @@ class BlockInferencePredictorMixin(BasePredictor):
 
         self.dtype = config.dtype or self.model_config.dtype
 
-        self.rope_theta = self.model_config.get("rope_theta", 10000.0)
-        self.rope_scaling = self.model_config.get("rope_scaling", None)
+        try:
+            self.rope_theta = self.model_config.rope_theta
+            self.rope_scaling = self.model_config.rope_scaling
+        except:
+            self.rope_theta = 10000.0
+            self.rope_scaling = None
 
         self.pre_cache_length = 0
 
@@ -1152,6 +1156,7 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
             passes.addPasses(pass_builder, self.model_config.model_type, self.model_config.quant_type)
 
         if self.tensor_parallel_degree > 1:
+            config.enable_new_executor(False)
             trainer_endpoints = fleet.worker_endpoints()
             current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
 
