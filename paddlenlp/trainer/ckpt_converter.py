@@ -29,12 +29,12 @@ from paddle.distributed.checkpoint.metadata import (
     Metadata,
 )
 from paddle.distributed.checkpoint.utils import flatten_state_dict
+from paddle.distributed.fleet.utils.log_util import logger
 
 MODEL_WEIGHT_SUFFIX = ".pdparams"
 OPTIMIZER_WEIGHT_SUFFIX = ".pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
 MODEL_META_FILE_NAME = "model_meta.json"
-
 
 OPTIMIZER_STATE_NAME_SUFFIX_MAPPING = OrderedDict(
     sorted(
@@ -83,6 +83,9 @@ class CheckpointConverter:
         self.global_optimizer_state_file_names = self.gather_global_object(self.cur_rank_optimizer_state_file_names)
 
         self.initial_distributed_configuration()
+        logger.debug(
+            f"The current checkpoint’s distributed strategy is tp{self.tp_degree}, pp{self.pp_degree}, sharding{self.sharding_degree}"
+        )
 
     def load_from_hybrid_parallel_checkpoint(self):
         """
@@ -97,6 +100,8 @@ class CheckpointConverter:
         """
         self.rename_auto_parallel_state_dict()
         metadata, source_state_dict = self.gen_metadata_and_prepare_source_state_dict()
+        logger.info("Generated the checkpoint’s metadata.")
+        logger.debug(f"The checkpoint's metadata is {metadata}.")
         if self.save_sharded_model:
             model_params = {}
             for state_name, state_value in self.auto_parallel_state_dict.items():
@@ -105,6 +110,7 @@ class CheckpointConverter:
             for param_name in model_params.keys():
                 self.auto_parallel_state_dict.pop(param_name)
 
+            logger.info("Requesting GPU memory space to load master_weights.")
             appended_master_weight_names = []
             for param_name, param_value in model_params.items():
                 master_weight = param_name + ".w_0"
@@ -118,7 +124,10 @@ class CheckpointConverter:
                             tmp_tensor, param_value.process_mesh, param_value.placements
                         )
 
+            logger.info("Calling _load_state_dict to load the required weights.")
             _load_state_dict(self.auto_parallel_state_dict, source_state_dict, [metadata])
+            logger.info("Calling _load_state_dict completed, restored the required weights.")
+
             for param_name, param_value in model_params.items():
                 master_weight = self.auto_parallel_state_dict[param_name + ".w_0"]
                 cast_master_weight = paddle.cast(master_weight._local_value(), "bfloat16")
@@ -126,7 +135,9 @@ class CheckpointConverter:
             for master_weight_name in appended_master_weight_names:
                 self.auto_parallel_state_dict.pop(master_weight_name)
         else:
+            logger.info("Calling _load_state_dict to load the required weights.")
             _load_state_dict(self.auto_parallel_state_dict, source_state_dict, [metadata])
+            logger.info("Calling _load_state_dict completed, restored the required weights.")
 
     def rename_auto_parallel_state_dict(self):
         """
@@ -172,6 +183,7 @@ class CheckpointConverter:
                 * Reshape the optimizer states back to the shape of the weights.
         """
         self.load_state_dict_and_rename()
+        logger.info("Complete the loading and renaming of state_dict.")
         if self.sharding_degree > 1 and self.sharding_stage1_v == 2 and not self.is_sharding_stage3:
             for state_name, shard_info in self.global_sharded_tensor_infos.items():
                 shard_info.sort(key=lambda x: x[0]["sharding_rank"])
@@ -194,6 +206,8 @@ class CheckpointConverter:
                     storage_metadata[local_tensor_index] = item[3]
 
             metadata_for_merge_sharding = Metadata(state_dict_metadata, storage_metadata, None)
+
+            logger.debug(f"The metadata for merge sharding is: {metadata_for_merge_sharding}")
 
             source_state_dict_for_merge_sharding = {}
             for file_name, state_dict in self.cur_rank_loaded_state_dict.items():
@@ -219,7 +233,6 @@ class CheckpointConverter:
             # Distribute all model parameters evenly across each card for loading
 
             world_size = paddle.distributed.get_world_size()
-
             partition_mapping = self.partition_parameters(global_model_state_shapes, True, world_size)
 
             partition_model_state_keys = []
@@ -239,8 +252,8 @@ class CheckpointConverter:
                 param_flattened_shapes[param_name] = reduce(lambda x, y: x * y, param_shape_and_dtype[0])
 
             cur_rank_need_load_model_state_keys = partition_model_state_keys[self.cur_rank]
-
             # Generate the optimizer states corresponding to the model weights.
+            logger.info("Requesting GPU memory space to concatenate tensors split by sharding1 v2.")
             optimizer_state_dict = {}
             for key in cur_rank_need_load_model_state_keys:
                 for tp_rank in range(self.tp_degree):
@@ -261,8 +274,16 @@ class CheckpointConverter:
                     optimizer_state_dict[key + ".w_0_beta1_pow_acc_0" + tp_rank_suffix] = paddle.zeros((1,), "float32")
                     optimizer_state_dict[key + ".w_0_beta2_pow_acc_0" + tp_rank_suffix] = paddle.zeros((1,), "float32")
 
+            malloc_size = 0
+            for opt_state_name, opt_state_value in optimizer_state_dict.items():
+                malloc_size += opt_state_value.numel() * opt_state_value.element_size()
+            malloc_size = malloc_size.numpy() / 2**20
+            logger.debug(f"{malloc_size} MB of GPU memory were allocated.")
+
             # merge sharding
+            logger.info("First call _load_state_dict to stitch back the tensors split by sharding1 v2.")
             _load_state_dict(optimizer_state_dict, source_state_dict_for_merge_sharding, [metadata_for_merge_sharding])
+            logger.info("Completed the call _load_state_dict, concating back the tensors split by sharding.")
 
             # Reshape
             for opt_state_name, opt_state_value in optimizer_state_dict.items():
@@ -512,6 +533,7 @@ class CheckpointConverter:
             )
 
         need_read_files = get_local_load_files(self.gather_global_object(rank_access_files))
+        logger.info(f"The file(s) to be loaded for the current rank are: {need_read_files}")
         self.cur_rank_loaded_state_dict = {}
 
         for file in need_read_files:
@@ -545,6 +567,16 @@ class CheckpointConverter:
 
                 self.cur_rank_loaded_state_dict[file] = unified_name_state_dict
 
+        memory_size = 0
+        for file, state_dict in self.cur_rank_loaded_state_dict.items():
+            for k, v in state_dict.items():
+                memory_size += v.numel() * v.element_size()
+
+        memory_size = memory_size.numpy() / 2**20
+        logger.debug(
+            f"The current rank has finished loading the checkpoint file and has allocated {memory_size} MB of GPU memory."
+        )
+
         # After the rank has finished loading the files it needs, it can infer sharding_stage1_v and is_sharding_stage3.
         self.sharding_stage1_v = self.infer_sharding_stage1_v()
         self.is_sharding_stage3 = self.infer_is_sharding_stage3()
@@ -553,6 +585,7 @@ class CheckpointConverter:
         # The threshold for determining whether to slice is segment_size, with a default value of 2**20.
         # However, sharding stage3 allows users to specify their own unsliced layers, which seems to be incompatible here.
         if self.is_sharding_stage3:
+            logger.info("The currently loaded checkpoint file comes from sharding stage 3.")
             segment_size = 2**20
             for file, state_dict in self.cur_rank_loaded_state_dict.items():
                 if file.endswith(MODEL_WEIGHT_SUFFIX):
@@ -573,8 +606,10 @@ class CheckpointConverter:
         # rename and record sharded_tensor_info
         cur_rank_sharded_tensor_infos = {}
 
+        logger.info(f"save_sharded_model is {self.save_sharded_model}.")
         # 1. Handling the sharding stage1 v2 scenario, where the save_sharded_model flag must be enabled, independent of master_weights.
         if self.sharding_degree > 1 and self.sharding_stage1_v == 2 and not self.is_sharding_stage3:
+            logger.info("The currently loaded checkpoint file comes from sharding stage1 v2.")
             assert self.save_sharded_model
             for file, state_dict in self.cur_rank_loaded_state_dict.items():
                 # The rule for renaming is to change the master_weights name in the optimizer state to the model weight name,
@@ -585,6 +620,7 @@ class CheckpointConverter:
         # 2. In handling the sharding stage1 v1 and stage2 scenario, the optimizer states are distributed across different ranks.
         # We need to obtain the name mapping by simulating the partitioning method, without concern for the presence of master_weights.
         elif self.sharding_degree > 1 and self.sharding_stage1_v == 1 and not self.is_sharding_stage3:
+            logger.info("The currently loaded checkpoint file comes from sharding stage1/2 v1.")
             if not self.save_sharded_model:
                 file_to_state_dict_shapes_mapping = {}
                 for file, state_dict in self.cur_rank_loaded_state_dict.items():
@@ -673,6 +709,7 @@ class CheckpointConverter:
                     self.cur_rank_loaded_state_dict[file] = renamed_state_dict
         else:
             # 3. Handling the sharding stage3 and non-sharding scenario
+            logger.info("The current checkpoint comes from either sharding stage 3 or non-sharding.")
             if not self.save_sharded_model:
                 for file, state_dict in self.cur_rank_loaded_state_dict.items():
                     if file.endswith(OPTIMIZER_WEIGHT_SUFFIX):
@@ -699,6 +736,8 @@ class CheckpointConverter:
                     self.global_sharded_tensor_infos[state_name] = shard_info
                 else:
                     self.global_sharded_tensor_infos[state_name] += shard_info
+
+        logger.info(f"global_sharded_tensor_infos: {self.global_sharded_tensor_infos}")
 
     def get_sharded_tensor_infos(self, file, state_dict, cur_rank_sharded_tensor_infos):
         (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file)
