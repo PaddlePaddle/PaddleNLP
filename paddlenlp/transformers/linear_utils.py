@@ -34,9 +34,8 @@ from paddlenlp.utils.log import logger
 if get_env_device() == "xpu":
     try:
         import paddle_xpu
-    except ImportError:
-        # If paddle_xpu is not installed, just use Paddle's native Linear implementations
-        logger.warning("Import paddle_xpu failed, use Paddle's native Linear implementations")
+    except Exception as e:
+        logger.warning("Import paddle_xpu failed, use PaddlePaddle's native Linear implementations")
     else:
         logger.info("Import paddle_xpu succeeded.")
 
@@ -71,6 +70,12 @@ if get_env_device() == "npu":
     if MC2ColumnSeqParallelLinear is not None and MC2RowSeqParallelLinear is not None:
         ColumnSequenceParallelLinear = MC2ColumnSeqParallelLinear
         RowSequenceParallelLinear = MC2RowSeqParallelLinear
+elif get_env_device() == "xpu":
+    import importlib
+    importlib.reload(nn)
+    import inspect
+    logger.info(f"Linear is {inspect.getmodule(Linear)}")
+    logger.info(f"paddle.nn.Linear is {inspect.getmodule(nn.Linear)}")
 else:
     # By default, use Paddle's native Linear implementations
     pass
