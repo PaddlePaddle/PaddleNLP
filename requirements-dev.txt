@@ -50,5 +50,13 @@ unidecode
 uvicorn
 visualdl
 wandb
+tensorboardX
+modelscope
+hyperopt
+h5py
+deploy
+ray
+loguru
+data
 wget
 yacs

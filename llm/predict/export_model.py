@@ -57,11 +57,15 @@ def main():
         {
             "dtype": predictor_args.dtype,
             "export_precache": predictor_args.export_precache,
-            "use_cachekv_int8": predictor_args.use_cachekv_int8,
+            "cachekv_int8_type": predictor_args.cachekv_int8_type,
         },
     )
     predictor.model.config.save_pretrained(export_args.output_path)
-    predictor.model.generation_config.save_pretrained(export_args.output_path)
+    if predictor.generation_config is not None:
+        predictor.generation_config.save_pretrained(export_args.output_path)
+    else:
+        predictor.model.generation_config.save_pretrained(export_args.output_path)
+
     predictor.tokenizer.save_pretrained(export_args.output_path)
     generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 
