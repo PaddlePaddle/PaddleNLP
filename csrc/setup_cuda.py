@@ -49,6 +49,7 @@ def get_gencode_flags():
 
 
 gencode_flags = get_gencode_flags()
+library_path = os.environ.get('LD_LIBRARY_PATH', '/usr/local/cuda/lib64')
 
 setup(
     name="paddlenlp_ops",
@@ -78,6 +79,7 @@ setup(
             "./generation/quant_int8.cu",
             "./generation/dequant_int8.cu",
             "./generation/flash_attn_bwd.cc",
+            "./generation/tune_cublaslt_gemm.cu",
         ],
         extra_compile_args={
             "cxx": ["-O3"],
@@ -92,5 +94,7 @@ setup(
             ]
             + gencode_flags,
         },
+        libraries=['cublasLt'],
+        library_dirs=[library_path],
     ),
 )
