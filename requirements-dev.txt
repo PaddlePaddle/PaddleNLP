@@ -17,6 +17,7 @@ rouge
 tiktoken
 visualdl
 wandb
+tensorboard
 tensorboardX
 modelscope
 hyperopt
