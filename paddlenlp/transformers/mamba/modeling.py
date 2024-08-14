@@ -709,7 +709,7 @@ class MambaForCausalLM(MambaPretrainedModel):
     def set_input_embeddings(self, new_embeddings):
         return self.backbone.set_input_embeddings(new_embeddings)
 
-    def _update_model_kwargs_for_generation(
+    def update_model_kwargs_for_generation(
         self, outputs: ModelOutput, model_kwargs: Dict[str, Any], **kwargs
     ) -> Dict[str, Any]:
         model_kwargs["cache"] = outputs.get("cache", None)
