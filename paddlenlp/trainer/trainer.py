@@ -89,7 +89,6 @@ from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load
 from ..transformers.model_utils import (
     PretrainedModel,
     _add_variant,
-    _load_state_dict_into_model,
     load_sharded_checkpoint,
     unwrap_model,
 )
@@ -1164,9 +1163,7 @@ class Trainer:
                         safe_serialization=True,
                     )
                     if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
-                        state_dict = broadcast_dataset_rank0_model(self.model.state_dict())
-                    if self.args.dataset_rank > 0:
-                        _load_state_dict_into_model(self.model, state_dict, "")
+                        broadcast_dataset_rank0_model(self.model)
                 else:
                     weight_name = PADDLE_WEIGHTS_NAME
                     best_model_path = os.path.join(
@@ -1210,9 +1207,7 @@ class Trainer:
                 safe_serialization=True,
             )
             if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
-                state_dict = broadcast_dataset_rank0_model(self.model.get_trainable_state_dict())
-            if self.args.dataset_rank > 0:
-                _load_state_dict_into_model(self.model, state_dict, "")
+                broadcast_dataset_rank0_model(self.model)
             return
 
         convert_tp = False
