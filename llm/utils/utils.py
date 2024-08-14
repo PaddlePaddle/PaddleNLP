@@ -220,6 +220,16 @@ def get_lora_target_modules(model):
             ".*up_proj.*",
             ".*down_proj.*",
         ]
+    elif model.base_model_prefix == "yuan":
+        target_modules = [
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*o_proj.*",
+            ".*gate_proj.*",
+            ".*up_proj.*",
+            ".*down_proj.*",
+        ]
     else:
         raise ValueError(f"Unknown base_model_prefix: {model.base_model_prefix}.")
     return target_modules
@@ -753,9 +763,9 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
 
     while True:
         get_output(output_tensor, 0, True)
-        if output_tensor[0, 0] == -2:  # read none
+        if int(output_tensor[0, 0]) == -2:  # read none
             continue
-        bsz = output_tensor[1, 0].numpy()
+        bsz = int(output_tensor[1, 0])
         output_numpy = output_tensor[2 : bsz + 2].numpy()
         output_numpy[output_numpy == -1] = 2
         outputs.append(output_numpy)
