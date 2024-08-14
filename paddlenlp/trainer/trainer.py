@@ -979,6 +979,10 @@ class Trainer:
                 else:
                     tr_loss_step = self.training_step(model, inputs)
 
+                if self.amp_dtype != "float16":
+                    if not paddle.isfinite(tr_loss_step).all().item():
+                        raise ValueError(f"Loss contains inf or nan values at rank {paddle.distributed.get_rank()}")
+
                 tr_loss += tr_loss_step
 
                 def fused_allreduce_gradients_no_sync(paramlist, hcg):
