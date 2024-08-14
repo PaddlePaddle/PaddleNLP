@@ -106,7 +106,8 @@ std::vector<paddle::Tensor> GemmDequant(const paddle::Tensor& x,
                                             const paddle::Tensor& scale,
                                             const std::string& out_dtype) {
   std::vector<int64_t> x_dims = x.shape(), y_dims = y.shape();
-  PD_CHECK(x_dims[x_dims.size() - 1] == y_dims[y_dims.size() - 1], "The last dimension of x and y should be equal. But received x[%d] != y[%d].",
+  PD_CHECK(x_dims[x_dims.size() - 1] == y_dims[y_dims.size() - 1], 
+        "The last dimension of x and y should be equal. But received x[%d] != y[%d].",
         "Ensure that x is not transposed and y is transposed.",
         x_dims[x_dims.size() - 1],
         y_dims[y_dims.size() - 1]);
