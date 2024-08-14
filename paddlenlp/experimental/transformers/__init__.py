@@ -20,3 +20,4 @@ from .gpt import *
 from .llama import *
 from .opt import *
 from .qwen import *
+from .qwen2 import *

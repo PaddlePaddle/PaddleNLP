@@ -55,12 +55,13 @@ def get_convert_example(model):
         "qwen2",
         "qwen2_moe",
         "gpt",
+        "yuan",
         "jamba",
     ]:
         return convert_example_common
     else:
         raise ValueError(
-            f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama, qwen, mixtral, gemma, qwen2, qwen2_moe, jamba",
+            f"Unknown base_model_prefix: {model.base_model_prefix}. Supported base_model_prefix list: chatglm, bloom, llama, qwen, mixtral, gemma, qwen2, qwen2_moe, yuan, jamba",
         )
 
 
