@@ -26,8 +26,6 @@ namespace cub = hipcub;
 #else
 #include <cub/cub.cuh>
 #include <curand_kernel.h>
-#include "cutlass/half.h"
-#include "cutlass/bfloat16.h"
 #endif
 
 constexpr int kBlockSize = 256; 
@@ -75,7 +73,6 @@ inline cudaError_t GetNumBlocks(int64_t n, int* num_blocks) {
                                                     sm_count * tpm / kBlockSize * kNumWaves));
   return cudaSuccess;
 }
-
 #endif
 
 template<typename T>
