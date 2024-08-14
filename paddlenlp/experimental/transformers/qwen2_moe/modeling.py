@@ -197,6 +197,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             # moe config
             moe_topk=self.moe_topk,
             num_experts=self.num_experts,
+            norm_topk_prob=self.norm_topk_prob,
             shared_expert_intermediate_size=self.shared_expert_intermediate_size,
             shared_expert_ffn1_weight_attrs=shared_expert_ffn1_weight_attrs,
             shared_expert_ffn2_weight_attrs=shared_expert_ffn2_weight_attrs,
@@ -662,7 +663,7 @@ class Qwen2MoeBlockInferenceModel(Qwen2MoeInferenceModel):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
         else:
-            self.transformer_block = FusedBlockMultiTransformer(transformer_config)
+            self.transformer_block = FusedBlockMultiTransformerMoe(transformer_config)
 
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)

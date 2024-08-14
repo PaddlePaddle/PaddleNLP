@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import pdb
 import paddle
 import paddle.distributed as dist
 from paddle.framework import LayerHelper, core, in_dynamic_mode
@@ -201,6 +202,7 @@ class FusedMultiTransformerConfig:
         rank_id=-1,
         moe_topk=1,
         num_experts=1,
+        norm_topk_prob=True,
         gate_weight_attrs=None,
         shared_expert_intermediate_size=1,
         shared_expert_ffn1_weight_attrs=None,
@@ -267,6 +269,7 @@ class FusedMultiTransformerConfig:
 
         self.moe_topk = moe_topk
         self.num_experts = num_experts
+        self.norm_topk_prob = norm_topk_prob
         self.gate_weight_attrs = gate_weight_attrs
         self.shared_expert_intermediate_size = shared_expert_intermediate_size
         self.shared_expert_ffn1_weight_attrs = shared_expert_ffn1_weight_attrs
@@ -902,6 +905,7 @@ class FusedMultiTransformerMoe(FusedMultiTransformerBase):
 
         self.moe_topk = config.moe_topk
         self.num_experts = config.num_experts
+        self.norm_topk_prob = config.norm_topk_prob
         self.gate_weights = []
         self.shared_expert_intermediate_size = config.shared_expert_intermediate_size
         self.shared_expert_ffn1_weights = []
@@ -992,6 +996,7 @@ class FusedMultiTransformerMoe(FusedMultiTransformerBase):
             ffn2_bias = self.ffn2_biases[i]
         else:
             ffn2_bias = paddle.zeros([self.num_experts, 1, self.embed_dim])
+        # pdb.set_trace()
         fused_moe_out = fused_moe(
             tmp_out,
             self.gate_weights[i],
@@ -1003,7 +1008,9 @@ class FusedMultiTransformerMoe(FusedMultiTransformerBase):
             None,
             "None",
             self.moe_topk,
+            self.norm_topk_prob,
         )
+        # pdb.set_trace()
         return fused_moe_out
 
     def compute_shared_expert(self, tmp_out, i):
@@ -1085,6 +1092,7 @@ class FusedMultiTransformerMoe(FusedMultiTransformerBase):
 
         residual_input = src
         for i in range(self.num_layers):
+            # pdb.set_trace()
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
             out_linear_out = self.compute_attn(
                 time_step,
@@ -1101,16 +1109,20 @@ class FusedMultiTransformerMoe(FusedMultiTransformerBase):
                 i,
                 **kwargs,
             )
+            # pdb.set_trace()
             # all_reduce
             if self.nranks > 1:
                 dist.all_reduce(out_linear_out)
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
-
+            # pdb.set_trace()
+            
             # Moe layer
+            # pdb.set_trace()
             tmp_fused_moe_out = self.compute_fused_moe(tmp_out, i)
             shared_expert_output = self.compute_shared_expert(tmp_out, i)
             moe_out = tmp_fused_moe_out + shared_expert_output
+            # pdb.set_trace()
             # all_reduce
             if self.nranks > 1:
                 dist.all_reduce(moe_out)
@@ -1118,6 +1130,7 @@ class FusedMultiTransformerMoe(FusedMultiTransformerBase):
             tmp_out, residual_input = self.compute_bias_residual_layernorm(
                 moe_out, residual_input, i, self.num_layers
             )
+            # pdb.set_trace()
             src = tmp_out
 
         kwargs["time_step"] = time_step
