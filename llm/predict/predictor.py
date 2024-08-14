@@ -775,8 +775,10 @@ class BlockInferencePredictorMixin(BasePredictor):
 
         try:
             self.rope_theta = self.model_config.rope_theta
+            self.rope_scaling = self.model_config.rope_scaling
         except:
             self.rope_theta = 10000.0
+            self.rope_scaling = None
 
         self.pre_cache_length = 0
 
@@ -874,7 +876,7 @@ class BlockInferencePredictorMixin(BasePredictor):
             shape=[config.batch_size, 1], fill_value=config.max_length, dtype="int64"
         )
         self.model_inputs["rope_emb"] = self._get_rotary_position_embedding(
-            paddle.arange(config.total_max_length).reshape((1, -1)), self.head_dim, self.rope_theta
+            paddle.arange(config.total_max_length).reshape((1, -1)), self.head_dim, self.rope_theta, self.rope_scaling
         )
         self.model_inputs["bad_tokens"] = paddle.to_tensor([-1], dtype="int64")
         self.model_inputs["is_block_step"] = paddle.full(shape=[config.batch_size], fill_value=False, dtype="bool")
@@ -909,7 +911,7 @@ class BlockInferencePredictorMixin(BasePredictor):
                 alibi_decoder + (1 - self.model_inputs["tgt_mask"]) * paddle.finfo(self.dtype).min
             ).cast(self.dtype)
 
-    def _get_rotary_position_embedding(self, position_ids, head_dim, rope_theta=10000.0):
+    def _get_rotary_position_embedding(self, position_ids, head_dim, rope_theta=10000.0, rope_scaling: dict = None):
         """
         Pre-calculate rotary position embedding for position_ids.
 
@@ -923,6 +925,33 @@ class BlockInferencePredictorMixin(BasePredictor):
         bsz, max_seq_len = position_ids.shape[:2]
         rot_emb = paddle.zeros((2, bsz, max_seq_len, 1, head_dim), dtype="float32")
         inv_freq = rope_theta ** (-paddle.arange(0, head_dim, 2, dtype="float32") / head_dim)
+
+        if rope_scaling is not None:
+            rope_type = rope_scaling.get("rope_type", None)
+            if rope_type is not None and rope_type == "llama3":
+                factor = rope_scaling.get("factor", 8.0)
+                low_freq_factor = rope_scaling.get("low_freq_factor", 1.0)
+                high_freq_factor = rope_scaling.get("high_freq_factor", 4.0)
+                original_max_position_embeddings = rope_scaling.get("original_max_position_embeddings", 8192)
+
+                low_freq_wavelen = original_max_position_embeddings / low_freq_factor
+                high_freq_wavelen = original_max_position_embeddings / high_freq_factor
+                new_freqs = []
+                for freq in inv_freq:
+                    import math
+
+                    wavelen = 2 * math.pi / freq
+                    if wavelen < high_freq_wavelen:
+                        new_freqs.append(freq)
+                    elif wavelen > low_freq_wavelen:
+                        new_freqs.append(freq / factor)
+                    else:
+                        assert low_freq_wavelen != high_freq_wavelen
+                        smooth = (original_max_position_embeddings / wavelen - low_freq_factor) / (
+                            high_freq_factor - low_freq_factor
+                        )
+                        new_freqs.append((1 - smooth) * freq / factor + smooth * freq)
+                inv_freq = paddle.to_tensor(new_freqs, dtype=inv_freq.dtype)
 
         # shape: [B, S, D/2]
         freqs = paddle.einsum("ij,k->ijk", position_ids.cast("float32"), inv_freq)
@@ -1029,24 +1058,28 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         tensor_queue.put(output_tensor)
 
         read_res_process = mp.Process(target=read_res, args=[self.model_name_or_path, tensor_queue, result_queue])
-        read_res_process.start()
+        if self.tensor_parallel_rank == 0:
+            read_res_process.start()
 
+        s_time = time.time()
         while self.model_inputs["not_need_stop"]:
             self._infer(self.model_inputs)
+        logger.info(f"running spend {time.time()  -  s_time}")
 
-        outputs = []
-        output_tokens = []
-        while len(outputs) < self.batch_size:
-            result = result_queue.get(timeout=1)
-            outputs.append(result[-1])
-            output_tokens.append(result[-2])
+        if self.tensor_parallel_rank == 0:
+            outputs = []
+            output_tokens = []
+            while len(outputs) < self.batch_size:
+                result = result_queue.get(timeout=1)
+                outputs.append(result[-1])
+                output_tokens.append(result[-2])
 
-        read_res_process.terminate()
+            read_res_process.terminate()
 
-        if return_tokens:
-            return outputs, output_tokens
-        else:
-            return outputs
+            if return_tokens:
+                return outputs, output_tokens
+            else:
+                return outputs
 
 
 class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
@@ -1123,6 +1156,8 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
             passes.addPasses(pass_builder, self.model_config.model_type, self.model_config.quant_type)
 
         if self.tensor_parallel_degree > 1:
+            # TODO(liuyuanle): support pir/new_executor
+            config.enable_new_executor(False)
             trainer_endpoints = fleet.worker_endpoints()
             current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
 
@@ -1149,26 +1184,29 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
         tensor_queue.put(output_tensor)
 
         read_res_process = mp.Process(target=read_res, args=[self.model_name_or_path, tensor_queue, result_queue])
-        read_res_process.start()
+
+        if self.tensor_parallel_rank == 0:
+            read_res_process.start()
 
         s_time = time.time()
         while self.model_inputs["not_need_stop"]:
             self.predictor.run(list(self.model_inputs.values()))
         logger.info(f"running spend {time.time()  -  s_time}")
 
-        outputs = []
-        output_tokens = []
-        while len(outputs) < self.batch_size:
-            result = result_queue.get(timeout=1)
-            outputs.append(result[-1])
-            output_tokens.append(result[-2])
+        if self.tensor_parallel_rank == 0:
+            outputs = []
+            output_tokens = []
+            while len(outputs) < self.batch_size:
+                result = result_queue.get(timeout=1)
+                outputs.append(result[-1])
+                output_tokens.append(result[-2])
 
-        read_res_process.terminate()
+            read_res_process.terminate()
 
-        if return_tokens:
-            return outputs, output_tokens
-        else:
-            return outputs
+            if return_tokens:
+                return outputs, output_tokens
+            else:
+                return outputs
 
 
 def get_ptq_multicards_num(directory):

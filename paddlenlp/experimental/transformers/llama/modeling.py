@@ -371,17 +371,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.quant_type
             )
 
-        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
-            self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
-                self.vocab_size,
-                self.hidden_size,
-                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
-            )
-        else:
-            self.embed_tokens = nn.Embedding(
-                self.vocab_size,
-                self.hidden_size,
-            )
+        self.embed_tokens = nn.Embedding(self.vocab_size, self.hidden_size)
 
         # get ring_id
         ring_id = -1
@@ -1435,7 +1425,6 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             base_actions = {
                 "lm_head.weight": partial(fn, is_column=True),
                 # Row Linear
-                "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
