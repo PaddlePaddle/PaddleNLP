@@ -94,13 +94,11 @@ void RunGemmDequant(const int8_t* a,
   GemmDequantT gemm;
   // Initialize
   auto status = gemm.initialize(args);
-  // PADDLE_ENFORCE_EQ(status, cutlass::Status::kSuccess,
-  // paddle::platform::errors::Fatal("cutlass GemmDequant initialize error"));
+  PD_CHECK(status == cutlass::Status::kSuccess, "cutlass GemmDequant initialize error");
 
   // Run
   status = gemm(stream);
-  // PADDLE_ENFORCE_EQ(status, cutlass::Status::kSuccess,
-  // paddle::platform::errors::Fatal("cutlass GemmDequant runtime error"));
+  PD_CHECK(status == cutlass::Status::kSuccess, "cutlass GemmDequant runtime error");
 }
 
 std::vector<paddle::Tensor> GemmDequant(const paddle::Tensor& x,
@@ -108,14 +106,10 @@ std::vector<paddle::Tensor> GemmDequant(const paddle::Tensor& x,
                                             const paddle::Tensor& scale,
                                             const std::string& out_dtype) {
   std::vector<int64_t> x_dims = x.shape(), y_dims = y.shape();
-  PADDLE_ENFORCE_EQ(
-    x_dims[x_dims.size() - 1],
-    y_dims[y_dims.size() - 1],
-    phi::errors::InvalidArgument(
-        "The last dimension of x and y should be equal. But received x[%d] != y[%d].",
+  PD_CHECK(x_dims[x_dims.size() - 1] == y_dims[y_dims.size() - 1], "The last dimension of x and y should be equal. But received x[%d] != y[%d].",
         "Ensure that x is not transposed and y is transposed.",
         x_dims[x_dims.size() - 1],
-        y_dims[y_dims.size() - 1]));
+        y_dims[y_dims.size() - 1]);
   int64_t m = x_dims[x_dims.size() - 2];
   int64_t k = x_dims[x_dims.size() - 1];
   int64_t n = y_dims[y_dims.size() - 2];
