@@ -1162,7 +1162,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         self.quant_round_type = config.quant_round_type
         self.quant_max_bound = config.quant_max_bound
         self.quant_min_bound = config.quant_min_bound
-        self.use_gemm_dequant = self._check_sm_support()
+        # self.use_gemm_dequant = False
 
         if self._dtype == "bfloat16":
             self._fuse_kernel_compute_dtype = "bf16"
@@ -1269,11 +1269,6 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             self._add_parameter(ffn2_shift)
             self._add_parameter(ffn2_smooth)
 
-    def _check_sm_support(self):
-        prop = paddle.device.cuda.get_device_properties()
-        cc = prop.major * 10 + prop.minor
-        return cc >= 80
-
     def get_weight_create_dype(self):
         return "int8"
 
@@ -1311,10 +1306,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         if paddle.is_compiled_with_rocm():
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i])
         else:
-            # 尝试qkv后接dequant,省去attention中compute_attn的dequant但出现报错
-            # if self.use_gemm_dequant:
-            # ln_out type is tuple, use ln_out[0]
-            # qkv_out = gemm_dequant(ln_out[0], self.qkv_weights[i], self.qkv_out_scales[i], self._dtype)
+            # TODO: add gemm_dequant after qkv_out
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
         return qkv_out
 
@@ -1332,7 +1324,6 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         attn_mask,
         i,
     ):
-        # if not self.use_gemm_dequant:
         qkv_out = dequant_int8(qkv_out, self.qkv_out_scales[i], self._dtype)
         if self.qkv_biases[i] is not None:
             qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
@@ -1413,9 +1404,9 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
             out_linear_out = dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
         else:
-            if self.use_gemm_dequant:
+            try:
                 out_linear_out = gemm_dequant(fmha_out, self.linear_weights[i], self.linear_out_scales[i], self._dtype)
-            else:
+            except:
                 out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
                 out_linear_out = dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
         return out_linear_out
@@ -1464,9 +1455,9 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i])
             ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
         else:
-            if self.use_gemm_dequant:
+            try:
                 ffn2_out = gemm_dequant(ffn1_out, self.ffn2_weights[i], self.ffn2_out_scales[i], self._dtype)
-            else:
+            except:
                 ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i], False, True)
                 ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
         return ffn2_out
@@ -1677,8 +1668,6 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
             k_dequant_scales[i] if k_dequant_scales is not None else None,
             v_dequant_scales[i] if v_dequant_scales is not None else None,
             self.qkv_out_scales[i],
-            # dequant在compute_qkv_linear中
-            # self.qkv_out_scales[i] if not self.use_gemm_dequant else None,
             self.qkv_biases[i] if len(self.qkv_biases) > 0 else None,
             self.linear_shifts[i] if len(self.linear_shifts) > 0 else None,
             self.linear_smooths[i] if len(self.linear_smooths) > 0 else None,

@@ -117,7 +117,7 @@ nvcc_compile_args += [
 ]
 cc = get_sm_version()
 if cc >= 80:
-    sources += ["gpu/cutlass_kernels/gemm_dequant.cu"]
+    sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
 setup(
     name="paddlenlp_ops",

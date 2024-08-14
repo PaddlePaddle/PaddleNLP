@@ -76,29 +76,6 @@ inline cudaError_t GetNumBlocks(int64_t n, int* num_blocks) {
   return cudaSuccess;
 }
 
-template <paddle::DataType D>
-class CutlassDtypeTraits;
-
-template <>
-class CutlassDtypeTraits<paddle::DataType::FLOAT32> {
-public:
-  typedef float DataType;
-  typedef float data_t;
-};
-
-template <>
-class CutlassDtypeTraits<paddle::DataType::FLOAT16> {
-public:
-  typedef cutlass::half_t DataType;
-  typedef paddle::float16 data_t;
-};
-
-template <>
-class CutlassDtypeTraits<paddle::DataType::BFLOAT16> {
-public:
-  typedef cutlass::bfloat16_t DataType;
-  typedef paddle::bfloat16 data_t;
-};
 #endif
 
 template<typename T>
