@@ -2730,6 +2730,9 @@ class Trainer:
 
         if self.args.pipeline_parallel_degree > 1:
             # Only accept wrapped model for pipeline_parallel mode
+            if self.model is self.model_wrapped:
+                # NOTE(gongenlei): when do_train=False, do_eval=True, we need to wrap model for pipeline
+                self.model_wrapped = fleet.distributed_model(self.model_wrapped)
             model = self.model_wrapped
         else:
             model = self.model

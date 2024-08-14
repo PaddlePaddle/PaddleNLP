@@ -213,7 +213,6 @@ class FusedMultiTransformerConfig:
         self.num_heads = num_heads
         if kv_num_heads > 0:
             self.kv_num_heads = kv_num_heads
-            assert nranks == 1, "nranks should be 1 for kv_num_heads > 0"
         else:
             self.kv_num_heads = num_heads
         self.dim_feedforward = dim_feedforward

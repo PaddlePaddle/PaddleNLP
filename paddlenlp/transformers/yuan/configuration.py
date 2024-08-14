@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Yuan model configuration"""
+"""Configuration class for Yuan2.0 model"""
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
