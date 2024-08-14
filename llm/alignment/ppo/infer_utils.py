@@ -73,9 +73,7 @@ class Predictor:
             hcg = dist.fleet.get_hybrid_communicate_group()  # may differ with training
             config.tensor_parallel_degree = hcg.get_model_parallel_world_size()
             config.tensor_parallel_rank = hcg.get_model_parallel_rank()
-            config.weight_only_quant_bits = -1
             config.quant_type = None
-            config.use_cachekv_int8 = False
             config.single_card_ptq = True
             infer_model_cls = getattr(paddlenlp.experimental.transformers, model.__class__.__name__ + "InferenceModel")
             # ori_init_weights = infer_model_cls.init_weights
