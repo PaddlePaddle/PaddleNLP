@@ -1145,8 +1145,6 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
         else:
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
             config.enable_use_gpu(100, device_id)
-        # config.disable_glog_info()
-        # config.enable_memory_optim()
 
         if predictor_args.device == "npu":
             import paddle_custom_device.npu.passes as passes
@@ -1156,8 +1154,6 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
             passes.addPasses(pass_builder, self.model_config.model_type, self.model_config.quant_type)
 
         if self.tensor_parallel_degree > 1:
-            # TODO(liuyuanle): support pir/new_executor
-            config.enable_new_executor(False)
             trainer_endpoints = fleet.worker_endpoints()
             current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
 
