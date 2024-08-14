@@ -48,6 +48,10 @@ class LlamaTokenizerFast(PretrainedTokenizerFast):
             "tokenizer_file": {
                 "__internal_testing__/micro-random-llama": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/tokenizer.json",
                 "__internal_testing__/tiny-random-llama": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/tokenizer.json",
+                "facebook/llama-7b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/tokenizer.json",
+                "facebook/llama-13b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/tokenizer.json",
+                "facebook/llama-30b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/tokenizer.json",
+                "facebook/llama-65b": "https://bj.bcebos.com/paddlenlp/models/transformers/llama/tokenizer.json",
             },
         }
     )
