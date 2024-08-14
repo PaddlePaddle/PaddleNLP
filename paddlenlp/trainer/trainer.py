@@ -146,6 +146,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
 from .training_args import TrainingArguments
 from .utils import reshard as reshard_util
 from .utils.helper import (  # nested_truncate,
+    broadcast_dataset_rank0_model,
     broadcast_dp_optimizer,
     broadcast_moe_optimizer,
     distributed_concat,
@@ -1126,6 +1127,8 @@ class Trainer:
                         self.state.best_model_checkpoint,
                         safe_serialization=True,
                     )
+                    if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
+                        broadcast_dataset_rank0_model(self.model)
                 else:
                     weight_name = PADDLE_WEIGHTS_NAME
                     best_model_path = os.path.join(
@@ -1168,6 +1171,8 @@ class Trainer:
                 self.state.best_model_checkpoint,
                 safe_serialization=True,
             )
+            if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
+                broadcast_dataset_rank0_model(self.model)
             return
 
         convert_tp = False

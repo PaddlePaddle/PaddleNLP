@@ -23,6 +23,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
+from paddle.distributed.parallel import sync_params_buffers
 
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.nested import nested_broadcast_tensor_with_empty  # noqa: F401
@@ -310,3 +311,29 @@ def broadcast_moe_optimizer(state_dict, model_state_dict=None, broadcast_dp=True
         state_dict = base_state_dict
         del base_state_dict
     return state_dict
+
+
+def broadcast_dataset_rank0_model(model):
+    if paddle.distributed.get_world_size() <= 1:
+        return
+
+    logger.info("Start broadcast model in sharding group or data parallel group.")
+    hcg = fleet.get_hybrid_communicate_group()
+    sharding_group = hcg.get_sharding_parallel_group()
+    dp_group = hcg.get_data_parallel_group()
+    if sharding_group.nranks > 1:
+        sync_params_buffers(
+            model,
+            sharding_group,
+            hcg.get_sharding_parallel_group_src_rank(),
+            is_model_parallel=False,
+            fuse_params=False,
+        )
+    if dp_group.nranks > 1:
+        sync_params_buffers(
+            model,
+            dp_group,
+            hcg.get_data_parallel_group_src_rank(),
+            is_model_parallel=False,
+            fuse_params=False,
+        )
