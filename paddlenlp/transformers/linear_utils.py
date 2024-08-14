@@ -35,9 +35,7 @@ if get_env_device() == "xpu":
     try:
         import paddle_xpu
     except Exception as e:
-        import traceback
-        logger.warning("Import paddle_xpu failed, use PaddlePaddle's native Linear implementations")
-        logger.warning(f"{traceback.format_exc()}")
+        logger.warning("Failed to import paddle_xpu, using PaddlePaddle's native implementations.")
     else:
         logger.info("Import paddle_xpu succeeded.")
 
@@ -75,9 +73,6 @@ if get_env_device() == "npu":
 elif get_env_device() == "xpu":
     import importlib
     importlib.reload(nn)
-    import inspect
-    logger.info(f"Linear is {inspect.getmodule(Linear)}")
-    logger.info(f"paddle.nn.Linear is {inspect.getmodule(nn.Linear)}")
 else:
     # By default, use Paddle's native Linear implementations
     pass
