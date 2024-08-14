@@ -89,6 +89,7 @@ from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load
 from ..transformers.model_utils import (
     PretrainedModel,
     _add_variant,
+    _load_state_dict_into_model,
     load_sharded_checkpoint,
     unwrap_model,
 )
@@ -149,6 +150,7 @@ from .training_args import TrainingArguments
 from .utils import reshard as reshard_util
 from .utils.async_save import AsyncSaver
 from .utils.helper import (  # nested_truncate,
+    broadcast_dataset_rank0_model,
     broadcast_dp_optimizer,
     broadcast_moe_optimizer,
     distributed_concat,
@@ -1161,6 +1163,10 @@ class Trainer:
                         self.state.best_model_checkpoint,
                         safe_serialization=True,
                     )
+                    if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
+                        state_dict = broadcast_dataset_rank0_model(self.model.state_dict())
+                    if self.args.dataset_rank > 0:
+                        _load_state_dict_into_model(self.model, state_dict, "")
                 else:
                     weight_name = PADDLE_WEIGHTS_NAME
                     best_model_path = os.path.join(
@@ -1203,6 +1209,10 @@ class Trainer:
                 self.state.best_model_checkpoint,
                 safe_serialization=True,
             )
+            if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
+                state_dict = broadcast_dataset_rank0_model(self.model.get_trainable_state_dict())
+            if self.args.dataset_rank > 0:
+                _load_state_dict_into_model(self.model, state_dict, "")
             return
 
         convert_tp = False

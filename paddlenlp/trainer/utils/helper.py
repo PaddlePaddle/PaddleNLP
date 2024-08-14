@@ -309,3 +309,21 @@ def broadcast_moe_optimizer(state_dict, model_state_dict=None, broadcast_dp=True
         state_dict = base_state_dict
         del base_state_dict
     return state_dict
+
+
+def broadcast_dataset_rank0_model(state_dict):
+    if paddle.distributed.get_world_size() <= 1:
+        return state_dict
+
+    logger.info("Start broadcast model in sharding group or data parallel group.")
+    hcg = fleet.get_hybrid_communicate_group()
+    sharding_group = hcg.get_sharding_parallel_group()
+    dp_group = hcg.get_data_parallel_group()
+
+    if sharding_group.nranks > 1:
+        for k in state_dict.keys():
+            dist.broadcast(state_dict[k], src=hcg.get_sharding_parallel_group_src_rank(), group=sharding_group)
+    if dp_group.nranks > 1:
+        for k in state_dict.keys():
+            dist.broadcast(state_dict[k], src=hcg.get_data_parallel_group_src_rank(), group=dp_group)
+    return state_dict
