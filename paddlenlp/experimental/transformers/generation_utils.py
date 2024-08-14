@@ -172,7 +172,8 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["frequency_score"] = frequency_score
         model_kwargs["presence_score"] = presence_score
         model_kwargs["logits_processors"] = logits_processors or LogitsProcessorList()
-        model_kwargs["pre_caches"] = pre_caches
+        if pre_caches is not None:
+            model_kwargs["pre_caches"] = pre_caches
 
         ret = self.sample(
             input_ids,
@@ -183,6 +184,7 @@ class GenerationInferenceModel(GenerationMixin):
             inputs_embeds=inputs_embeds,
             **model_kwargs,
         )
+
         return ret
 
     def update_model_kwargs_for_generation(self, cache, just_decoder, next_tokens, eos_token_id, model_kwargs):
@@ -281,7 +283,8 @@ class GenerationInferenceModel(GenerationMixin):
 
         # let inputs_embeds enter into model_kwargs.
         # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
-        model_kwargs["inputs_embeds"] = inputs_embeds
+        if inputs_embeds is not None:
+            model_kwargs["inputs_embeds"] = inputs_embeds
         model_kwargs["all_input_ids"] = input_ids
         logits_processors = model_kwargs.pop("logits_processors")
 
@@ -669,8 +672,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
             # sample
             probs = F.softmax(logits)
-            # _, next_tokens = top_p_sampling(probs, top_p, -1)
-            _, next_tokens = paddle.topk(probs, 1, -1)
+            _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
