@@ -20,8 +20,5 @@ from .gpt import *
 from .llama import *
 from .opt import *
 from .qwen import *
-<<<<<<< HEAD
-from .qwen2_moe import *
-=======
 from .qwen2 import *
->>>>>>> 3fff3787ed2542d383a62fbc3879ced5fdc18ec6
+from .qwen2_moe import *

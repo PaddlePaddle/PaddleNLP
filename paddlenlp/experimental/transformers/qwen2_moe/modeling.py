@@ -26,7 +26,7 @@ from paddle.nn.quant import weight_quantize
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerWeightOnly,
-    FusedMultiTransformerMoe,
+    FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
 )
