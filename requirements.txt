@@ -26,4 +26,4 @@ jinja2
 regex
 numpy<=1.26.4
 tiktoken
-tokenizers>=0.13.3
+tokenizers
