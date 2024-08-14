@@ -50,6 +50,14 @@ from .lora_config import LoRAConfig
 
 
 def get_lora_layers():
+    if get_env_device() == "xpu":
+        try:
+            import paddle_xpu
+            paddle_xpu.init_lora_layers()
+        except Exception as e:
+            logger.warning("Failed to import LoRALinear from paddle_xpu, using PaddleNLP's native implementation.")
+        else:
+            logger.info("Import paddle_xpu succeeded.")
     from .lora_layers import (
         ColumnParallelLoRALinear,
         ColumnSequenceParallelLoRALinear,
@@ -58,21 +66,6 @@ def get_lora_layers():
         RowParallelLoRALinear,
         RowSequenceParallelLoRALinear,
     )
-    if get_env_device() == "xpu":
-        try:
-            import paddle_xpu
-            paddle_xpu.init_lora_layers()
-            from paddle_xpu import (
-                ColumnParallelLoRALinear,
-                ColumnSequenceParallelLoRALinear,
-                LoRALinear,
-                RowParallelLoRALinear,
-                RowSequenceParallelLoRALinear,
-            )
-        except Exception as e:
-            logger.warning("Failed to import LoRALinear from paddle_xpu, using PaddleNLP's native implementation.")
-        else:
-            logger.info("Import paddle_xpu succeeded.")
     return {
         "ColumnParallelLoRALinear": ColumnParallelLoRALinear,
         "ColumnSequenceParallelLoRALinear": ColumnSequenceParallelLoRALinear,
