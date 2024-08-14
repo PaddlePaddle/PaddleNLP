@@ -102,7 +102,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             )
 
         self.wte = nn.Embedding(self.vocab_size, self.hidden_size)
-        # print(self.vocab_size, self.hidden_size)
 
         ln_scale_attrs = [paddle.ParamAttr(name="fuseqwen2_moe.{}.ln_scale".format(i)) for i in range(self.num_layers)]
         qkv_weight_attrs = [
@@ -195,6 +194,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             norm_type="rmsnorm",
             use_neox_rotary_style=True,
             # moe config
+            is_moe=True,
             moe_topk=self.moe_topk,
             num_experts=self.num_experts,
             norm_topk_prob=self.norm_topk_prob,
@@ -215,7 +215,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         if self.use_weight_only:
             self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
         else:
-            self.transformer_block = FusedMultiTransformerMoe(transformer_config)
+            self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
     def get_input_embeddings(self):
         return self.wte
@@ -248,10 +248,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             unfused_state_dict["qwen2_moe.self_attn.v_proj.weight"] = state_dict[
                 "qwen2_moe.layers.{}.self_attn.v_proj.weight".format(idx)
             ]
-
-            # print("qwen2_moe.layers.{}.self_attn.q_proj.weight".format(idx), unfused_state_dict["qwen2_moe.self_attn.q_proj.weight"])
-            # print("qwen2_moe.layers.{}.self_attn.k_proj.weight".format(idx), unfused_state_dict["qwen2_moe.self_attn.k_proj.weight"])
-            # print("qwen2_moe.layers.{}.self_attn.v_proj.weight".format(idx), unfused_state_dict["qwen2_moe.self_attn.v_proj.weight"])
 
             concated_qkv_weight = (
                 np.concatenate(
@@ -663,7 +659,7 @@ class Qwen2MoeBlockInferenceModel(Qwen2MoeInferenceModel):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
         else:
-            self.transformer_block = FusedBlockMultiTransformerMoe(transformer_config)
+            self.transformer_block = FusedBlockMultiTransformerBase(transformer_config)
 
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
