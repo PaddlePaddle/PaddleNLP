@@ -855,7 +855,6 @@ class GenerationMixin(object):
             input_ids = self.prepare_input_ids_for_generation(
                 bos_token_id, encoder_output=model_kwargs["inputs_embeds"]
             )
-            model_kwargs["use_cache"] = True
 
         if model_kwargs.get("attention_mask", None) is None:
             # TODO
