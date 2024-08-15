@@ -31,7 +31,7 @@
     "weight_decay": 0.01,
     "warmup_ratio": 0.01,
     "max_grad_norm": 1.0,
-    "logging_steps": 1,
+    "logging_steps": 5,
     "dataloader_num_workers": 1,
     "eval_steps": 1000,
     "disable_tqdm": true,
