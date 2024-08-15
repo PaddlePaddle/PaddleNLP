@@ -289,7 +289,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
 
         moe_config = MoeConfig(
             num_experts=self.num_experts,
-            top_k=self.top_k,
+            top_k=self.moe_topk,
             norm_topk_prob=True,
             moe_every2=self.moe_every2,
         )
