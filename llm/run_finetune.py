@@ -564,7 +564,7 @@ def main():
             neft_post_hook_handle.remove()
         if training_args.benchmark:
             total_effective_tokens = (
-                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * training_args.num_train_epochs
+                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * train_result.metrics["progress_or_epoch"]
             )
             effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
             logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
