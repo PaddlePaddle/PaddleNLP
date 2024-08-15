@@ -1220,6 +1220,11 @@ class Trainer:
             delattr(self, "_past")
 
         logger.info("\nTraining completed. \n")
+
+        # unlink shared_memory if used.
+        if self.args.unified_checkpoint:
+            self.unified_checkpoint_handler.unlink_shared_memory()
+
         if args.load_best_model_at_end and self.state.best_model_checkpoint is not None:
             if args.local_rank != -1:
                 dist.barrier()
@@ -1251,10 +1256,6 @@ class Trainer:
                             f"Could not locate the best model at {best_model_path}, if you are running a distributed training "
                             "on multiple nodes, you should activate `--save_on_each_node`."
                         )
-
-        # unlink shared_memory if used.
-        if self.args.unified_checkpoint:
-            self.unified_checkpoint_handler.unlink_shared_memory()
 
         self._total_loss_scalar += tr_loss.item()
         train_loss = self._total_loss_scalar / self.state.global_step
