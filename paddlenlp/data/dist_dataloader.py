@@ -61,9 +61,11 @@ class DistDataLoader(paddle.io.DataLoader):
         timeout=0,
         worker_init_fn=None,
         persistent_workers=False,
-        eval=False,
-        is_iterable_dataset=False,
+        **kwargs,
     ):
+
+        eval = kwargs.pop("eval", False)
+        is_iterable_dataset = kwargs.pop("is_iterable_dataset", False)
 
         if dataset is None:
             dataset = DummyDataset() if not is_iterable_dataset else IterableDummyDataset()
