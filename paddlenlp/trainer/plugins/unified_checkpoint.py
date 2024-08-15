@@ -140,7 +140,7 @@ class UnifiedCheckpointHandler:
         self._shared_save_master_weight_flag = None
         self._shared_save_optimizer_flag = None
 
-        if "async_save" in self.args.unified_checkpoint_config or self.args.use_async_save:
+        if "async_save" in self.args.unified_checkpoint_config:
             self._lock = multiprocessing.Lock()
             self._shared_save_model_path = multiprocessing.Array("c", 100000)
             self._shared_save_master_weight_path = multiprocessing.Array("c", 100000)

@@ -33,11 +33,6 @@ class DummyDataset(paddle.io.Dataset):
         return 0
 
 
-class IterableDummyDataset(paddle.io.IterableDataset):
-    def __iter__(self):
-        return None
-
-
 class DistDataLoader(paddle.io.DataLoader):
     """
     DistDataLoader is a wrapper of paddle.io.DataLoader.
@@ -62,11 +57,10 @@ class DistDataLoader(paddle.io.DataLoader):
         worker_init_fn=None,
         persistent_workers=False,
         eval=False,
-        is_iterable_dataset=False,
     ):
 
         if dataset is None:
-            dataset = DummyDataset() if not is_iterable_dataset else IterableDummyDataset()
+            dataset = DummyDataset()
             logger.info("rank has no data, use Dummpy dataset")
 
         super().__init__(dataset=dataset, batch_sampler=batch_sampler, collate_fn=collate_fn, num_workers=num_workers)
@@ -206,7 +200,7 @@ class DistDataLoader(paddle.io.DataLoader):
             try:
                 data = next(self._dataloader_iter)
                 data = nested_copy_place(data, place=paddle.framework._current_expected_place())
-            except Exception as e:
-                logger.debug(e)
+            except:
+                pass
         data = self._broadcast_data(data)
         return data
