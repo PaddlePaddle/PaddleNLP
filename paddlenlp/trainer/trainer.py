@@ -1399,7 +1399,7 @@ class Trainer:
 
         train_dataset = self.train_dataset
         if self.args.distributed_dataloader:
-            is_iterable_dataset = self._is_iterable_dataset_dd(train_dataset)
+            is_iterable_dataset = self._is_iterable_dataset_distributed(train_dataset)
         else:
             is_iterable_dataset = self._is_iterable_dataset(train_dataset)
         if is_datasets_available() and train_dataset is not None and isinstance(train_dataset, datasets.Dataset):
@@ -1489,7 +1489,7 @@ class Trainer:
 
         eval_dataset = eval_dataset if eval_dataset is not None else self.eval_dataset
         if self.args.distributed_dataloader:
-            is_iterable_dataset = self._is_iterable_dataset_dd(eval_dataset)
+            is_iterable_dataset = self._is_iterable_dataset_distributed(eval_dataset)
         else:
             is_iterable_dataset = self._is_iterable_dataset(eval_dataset)
         if is_datasets_available() and eval_dataset is not None and isinstance(eval_dataset, datasets.Dataset):
@@ -1557,7 +1557,7 @@ class Trainer:
             raise ValueError("We don't need test_dataset when should_load_dataset is False.")
 
         if self.args.distributed_dataloader:
-            is_iterable_dataset = self._is_iterable_dataset_dd(test_dataset)
+            is_iterable_dataset = self._is_iterable_dataset_distributed(test_dataset)
         else:
             is_iterable_dataset = self._is_iterable_dataset(test_dataset)
         if is_datasets_available() and test_dataset is not None and isinstance(test_dataset, datasets.Dataset):
@@ -3220,7 +3220,7 @@ class Trainer:
     def _is_iterable_dataset(self, dataset):
         return isinstance(dataset, paddle.io.IterableDataset)
 
-    def _is_iterable_dataset_dd(self, dataset):
+    def _is_iterable_dataset_distributed(self, dataset):
         # For distributed dataloaer.
         is_iterable_dataset_tensor = paddle.to_tensor(self._is_iterable_dataset(dataset)).reshape([1])
         if dist.get_world_size() > 1:
