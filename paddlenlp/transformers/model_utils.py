@@ -2207,7 +2207,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if low_cpu_mem_usage or config.quantization_config.is_weight_quantize():
             # Instantiate model.
             init_contexts.append(no_init_weights(_enable=True))
-            if is_paddle_support_lazy_init():
+            if False and is_paddle_support_lazy_init():
                 init_contexts.append(paddle.LazyGuard())
 
         if dtype:
