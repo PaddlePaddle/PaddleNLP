@@ -693,13 +693,31 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 high_freq_factor = self.rope_scaling.get("high_freq_factor", 4.0)
                 original_max_position_embeddings = self.rope_scaling.get("original_max_position_embeddings", 8192)
                 new_rope = fused_get_rotary_embedding(
-                    input_ids, position_ids, self.head_dim_shape_tensor, position_offset, self.rope_theta, self.use_neox, True,
-                    factor, low_freq_factor, high_freq_factor, original_max_position_embeddings
+                    input_ids,
+                    position_ids,
+                    self.head_dim_shape_tensor,
+                    position_offset,
+                    self.rope_theta,
+                    self.use_neox,
+                    True,
+                    factor,
+                    low_freq_factor,
+                    high_freq_factor,
+                    original_max_position_embeddings,
                 )
         else:
             new_rope = fused_get_rotary_embedding(
-                input_ids, position_ids, self.head_dim_shape_tensor, position_offset, self.rope_theta, self.use_neox, False,
-                0.0, 0.0, 0.0, 0
+                input_ids,
+                position_ids,
+                self.head_dim_shape_tensor,
+                position_offset,
+                self.rope_theta,
+                self.use_neox,
+                False,
+                0.0,
+                0.0,
+                0.0,
+                0,
             )
 
         with dy2st_nocheck_guard_context():
