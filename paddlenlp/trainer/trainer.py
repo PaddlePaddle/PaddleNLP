@@ -1405,8 +1405,8 @@ class Trainer:
         if is_datasets_available() and train_dataset is not None and isinstance(train_dataset, datasets.Dataset):
             train_dataset = self._remove_unused_columns(train_dataset, description="training")
 
-        if self._is_iterable_dataset(train_dataset):
-            if self.args.dataset_world_size > 1:
+        if is_iterable_dataset:  # For iterable dataset
+            if self.args.dataset_world_size > 1 and train_dataset is not None:
                 train_dataset = IterableDatasetShard(
                     train_dataset,
                     batch_size=self.args.per_device_train_batch_size,
@@ -1416,6 +1416,7 @@ class Trainer:
                 )
 
             if self.args.distributed_dataloader:
+                logger.info("Training using DistDataLoader.")
                 return DistDataLoader(
                     train_dataset,
                     batch_size=self.args.per_device_train_batch_size,
@@ -1430,22 +1431,12 @@ class Trainer:
                     collate_fn=self.data_collator,
                     num_workers=self.args.dataloader_num_workers,
                 )
-
-        train_sampler = self._get_train_sampler()
-
-        if self.args.distributed_dataloader:
-            logger.info("Training using DistDataLoader.")
-
-        if self.args.distributed_dataloader:
-            return DistDataLoader(
-                train_dataset,
-                batch_sampler=train_sampler if not is_iterable_dataset else None,
-                collate_fn=self.data_collator,
-                num_workers=self.args.dataloader_num_workers,
-                is_iterable_dataset=is_iterable_dataset,
-            )
         else:
-            return DataLoader(
+            train_sampler = self._get_train_sampler()
+            _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
+            if self.args.distributed_dataloader:
+                logger.info("Training using DistDataLoader.")
+            return _DataLoader(
                 train_dataset,
                 batch_sampler=train_sampler,
                 collate_fn=self.data_collator,
@@ -1504,8 +1495,8 @@ class Trainer:
         if is_datasets_available() and eval_dataset is not None and isinstance(eval_dataset, datasets.Dataset):
             eval_dataset = self._remove_unused_columns(eval_dataset, description="evaluation")
 
-        if self._is_iterable_dataset(eval_dataset):
-            if self.args.dataset_world_size > 1:
+        if is_iterable_dataset:
+            if self.args.dataset_world_size > 1 and eval_dataset is not None:
                 eval_dataset = IterableDatasetShard(
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
@@ -1530,27 +1521,24 @@ class Trainer:
                     collate_fn=self.data_collator,
                     num_workers=0,
                 )
-
-        eval_sampler = self._get_eval_sampler(eval_dataset)
-
-        if self.args.distributed_dataloader:
-            logger.info("Eval using DistDataLoader.")
-
-            return DistDataLoader(
-                eval_dataset,
-                batch_sampler=eval_sampler if not is_iterable_dataset else None,
-                collate_fn=self.data_collator,
-                num_workers=self.args.dataloader_num_workers,
-                eval=True,
-                is_iterable_dataset=is_iterable_dataset,
-            )
         else:
-            return DataLoader(
-                eval_dataset,
-                batch_sampler=eval_sampler,
-                collate_fn=self.data_collator,
-                num_workers=self.args.dataloader_num_workers,
-            )
+            eval_sampler = self._get_eval_sampler(eval_dataset)
+            if self.args.distributed_dataloader:
+                logger.info("Eval using DistDataLoader.")
+                return DistDataLoader(
+                    eval_dataset,
+                    batch_sampler=eval_sampler,
+                    collate_fn=self.data_collator,
+                    num_workers=self.args.dataloader_num_workers,
+                    eval=True,
+                )
+            else:
+                return DataLoader(
+                    eval_dataset,
+                    batch_sampler=eval_sampler,
+                    collate_fn=self.data_collator,
+                    num_workers=self.args.dataloader_num_workers,
+                )
 
     def get_test_dataloader(self, test_dataset: Dataset) -> DataLoader:
         """
@@ -1575,8 +1563,8 @@ class Trainer:
         if is_datasets_available() and test_dataset is not None and isinstance(test_dataset, datasets.Dataset):
             test_dataset = self._remove_unused_columns(test_dataset, description="test")
 
-        if self._is_iterable_dataset(test_dataset):
-            if self.args.dataset_world_size > 1:
+        if is_iterable_dataset:
+            if self.args.dataset_world_size > 1 and test_dataset is not None:
                 test_dataset = IterableDatasetShard(
                     test_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
@@ -1601,28 +1589,25 @@ class Trainer:
                     collate_fn=self.data_collator,  # _get_collator_with_removed_columns
                     num_workers=self.args.dataloader_num_workers,
                 )
-
-        test_sampler = self._get_eval_sampler(test_dataset)
-
-        if self.args.distributed_dataloader:
-            logger.info("Test using DistDataLoader.")
-
-            # We use the same batch_size as for eval.
-            return DistDataLoader(
-                test_dataset,
-                batch_sampler=test_sampler if not is_iterable_dataset else None,
-                collate_fn=self.data_collator,
-                drop_last=self.args.dataloader_drop_last,
-                eval=True,
-                is_iterable_dataset=is_iterable_dataset,
-            )
         else:
-            return DataLoader(
-                test_dataset,
-                batch_sampler=test_sampler,
-                collate_fn=self.data_collator,
-                drop_last=self.args.dataloader_drop_last,
-            )
+            test_sampler = self._get_eval_sampler(test_dataset)
+            if self.args.distributed_dataloader:
+                logger.info("Test using DistDataLoader.")
+                # We use the same batch_size as for eval.
+                return DistDataLoader(
+                    test_dataset,
+                    batch_sampler=test_sampler,
+                    collate_fn=self.data_collator,
+                    drop_last=self.args.dataloader_drop_last,
+                    eval=True,
+                )
+            else:
+                return DataLoader(
+                    test_dataset,
+                    batch_sampler=test_sampler,
+                    collate_fn=self.data_collator,
+                    drop_last=self.args.dataloader_drop_last,
+                )
 
     def create_optimizer_and_scheduler(self, num_training_steps: int):
         """
