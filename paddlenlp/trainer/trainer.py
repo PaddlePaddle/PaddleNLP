@@ -764,7 +764,8 @@ class Trainer:
                 self._load_optimizer_and_scheduler(resume_from_checkpoint)
         else:
             model = self.model_wrapped
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+            if delay_optimizer_creation:
+                self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
         logger.info(f"{self.runtime_timer.log()}")
         logger.info("***** Running training *****")
