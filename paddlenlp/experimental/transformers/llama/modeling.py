@@ -351,6 +351,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.rope_theta = config.rope_theta
         self.use_neox = True
 
+        self.rope_scaling = config.rope_scaling
+
         self.use_weight_only = False
         if config.quant_type == "weight_only_int8":
             self.use_weight_only = True
@@ -683,9 +685,22 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             position_offset = 128
         from paddlenlp_ops import fused_get_rotary_embedding
 
-        new_rope = fused_get_rotary_embedding(
-            input_ids, position_ids, self.head_dim_shape_tensor, position_offset, self.rope_theta, self.use_neox
-        )
+        if self.rope_scaling is not None:
+            rope_type = self.rope_scaling.get("rope_type", None)
+            if rope_type is not None and rope_type == "llama3":
+                factor = self.rope_scaling.get("factor", 8.0)
+                low_freq_factor = self.rope_scaling.get("low_freq_factor", 1.0)
+                high_freq_factor = self.rope_scaling.get("high_freq_factor", 4.0)
+                original_max_position_embeddings = self.rope_scaling.get("original_max_position_embeddings", 8192)
+                new_rope = fused_get_rotary_embedding(
+                    input_ids, position_ids, self.head_dim_shape_tensor, position_offset, self.rope_theta, self.use_neox, True,
+                    factor, low_freq_factor, high_freq_factor, original_max_position_embeddings
+                )
+        else:
+            new_rope = fused_get_rotary_embedding(
+                input_ids, position_ids, self.head_dim_shape_tensor, position_offset, self.rope_theta, self.use_neox, False,
+                0.0, 0.0, 0.0, 0
+            )
 
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
