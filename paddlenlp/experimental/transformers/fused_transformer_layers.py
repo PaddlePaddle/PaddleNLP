@@ -13,6 +13,8 @@
 # limitations under the License.
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import paddle
 import paddle.distributed as dist
 from paddle.framework import LayerHelper, core, in_dynamic_mode, in_dynamic_or_pir_mode
@@ -50,6 +52,7 @@ if core.is_compiled_with_cuda():
     )
 
 __all__ = [
+    "MoeConfig",
     "FusedMultiTransformerConfig",
     "FusedMultiTransformerBase",
     "FusedMultiTransformerPostLayernorm",
@@ -147,6 +150,14 @@ def fused_act_bias_wrapper(
     return out
 
 
+@dataclass
+class MoeConfig:
+    num_experts: int = 0
+    top_k: int = 0
+    norm_topk_prob: bool = True
+    moe_every2: bool = False
+
+
 class FusedMultiTransformerConfig:
     def __init__(
         self,
@@ -200,10 +211,7 @@ class FusedMultiTransformerConfig:
         kv_num_heads=-1,
         cachekv_int8_type=None,
         rank_id=-1,
-        is_moe=False,
-        moe_every2=False,
-        moe_topk=2,
-        num_experts=1,
+        moe_config=None,
     ):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -262,10 +270,13 @@ class FusedMultiTransformerConfig:
         self.rank_id = rank_id
         self.trans_qkvw = trans_qkvw
         self.ring_id = ring_id
-        self.is_moe = is_moe
-        self.moe_every2 = moe_every2
-        self.moe_topk = moe_topk
-        self.num_experts = num_experts
+        if moe_config:
+            self.is_moe = True
+            self.moe_every2 = moe_config.moe_every2
+            self.moe_topk = moe_config.top_k
+            self.num_experts = moe_config.num_experts
+        else:
+            self.is_moe = False
 
 
 class FusedMultiTransformerBase(Layer):
@@ -595,6 +606,8 @@ class FusedMultiTransformerBase(Layer):
 
             self._add_parameter(ffn_ln_scale)
             self._add_parameter(ffn_ln_bias)
+            if gate_weight is not None:
+                self._add_parameter(gate_weight)
             self._add_parameter(ffn1_weight)
             self._add_parameter(ffn1_bias)
             self._add_parameter(ffn2_weight)

@@ -36,6 +36,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
+    MoeConfig,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
@@ -286,6 +287,13 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                 paddle.ParamAttr(name="fusemixtral.{}.cache_v_out_scale".format(i)) for i in range(self.num_layers)
             ]
 
+        moe_config = MoeConfig(
+            num_experts=self.num_experts,
+            top_k=self.top_k,
+            norm_topk_prob=True,
+            moe_every2=self.moe_every2,
+        )
+
         transformer_config = FusedMultiTransformerConfig(
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
@@ -331,10 +339,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
             cachekv_int8_type=config.cachekv_int8_type,
             rank_id=config.tensor_parallel_rank,
             trans_qkvw=(False if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8" else True),
-            is_moe=True,
-            moe_every2=False,
-            moe_topk=config.num_experts_per_tok,
-            num_experts=config.num_local_experts,
+            moe_config=moe_config,
         )
 
         self.set_transformer_block(transformer_config)
