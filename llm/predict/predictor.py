@@ -20,21 +20,22 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from threading import Thread
-from typing import List, Optional
 
 import numpy as np
 import paddle
-import paddle.distributed.fleet.base.topology as tp
 import paddle.incubate.multiprocessing as mp
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
 from paddle.distributed import fleet
 from utils.utils import (
     dybatch_preprocess,
     get_alibi_slopes,
+    get_eos_token_id,
     get_infer_model_path,
     get_model_max_position_embeddings,
     get_prefix_tuning_params,
+    get_rotary_position_embedding,
     init_chat_template,
+    init_dist_env,
     load_real_time_tokens,
     read_res,
 )
@@ -157,50 +158,6 @@ def batchfy_text(texts, batch_size):
     return batch_texts
 
 
-def init_dist_env():
-    tensor_parallel_degree = paddle.distributed.get_world_size()
-    tensor_parallel_rank = paddle.distributed.get_rank()
-
-    if tensor_parallel_degree > 1:
-        # refer to: https://github.com/PaddlePaddle/Paddle/blob/4abea956ee852ce52791a1e08fa92ed4d3be150d/python/paddle/distributed/fleet/fleet.py#L298C23-L298C45
-        hcg = tp._HYBRID_PARALLEL_GROUP
-        if hcg is None:
-            strategy = fleet.DistributedStrategy()
-            strategy.hybrid_configs = {
-                "dp_degree": 1,
-                "mp_degree": tensor_parallel_degree,
-                "pp_degree": 1,
-                "sharding_degree": 1,
-            }
-            fleet.init(is_collective=True, strategy=strategy)
-            hcg = fleet.get_hybrid_communicate_group()
-
-        tensor_parallel_rank = hcg.get_model_parallel_rank()
-    return tensor_parallel_rank, tensor_parallel_degree
-
-
-def get_eos_token_id(
-    tokenizer: PretrainedTokenizer, generation_config: Optional[GenerationConfig] = None
-) -> List[List[int]]:
-    """get eos_token_id from generation_config or tokenizer
-
-    Returns:
-        List[int]: eos_token_id to stop the generation
-    """
-    eos_token_ids = []
-    if tokenizer.eos_token_id is not None:
-        eos_token_ids.append(tokenizer.eos_token_id)
-
-    if generation_config is not None and generation_config.eos_token_id is not None:
-        if isinstance(generation_config.eos_token_id, int):
-            eos_token_ids.append(generation_config.eos_token_id)
-        else:
-            eos_token_ids.extend(generation_config.eos_token_id)
-
-    eos_token_ids_dict = {str(item): item for item in eos_token_ids}
-    return list(eos_token_ids_dict.values())
-
-
 class BasePredictor:
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
@@ -212,7 +169,10 @@ class BasePredictor:
 
         self.return_tensors = "pd"
         self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env()
-        self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = init_dist_env()
+        self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = (
+            self.tensor_parallel_rank,
+            self.tensor_parallel_degree,
+        )
 
         try:
             self.generation_config = GenerationConfig.from_pretrained(config.model_name_or_path)
@@ -875,7 +835,7 @@ class BlockInferencePredictorMixin(BasePredictor):
         self.model_inputs["max_length"] = paddle.full(
             shape=[config.batch_size, 1], fill_value=config.max_length, dtype="int64"
         )
-        self.model_inputs["rope_emb"] = self._get_rotary_position_embedding(
+        self.model_inputs["rope_emb"] = get_rotary_position_embedding(
             paddle.arange(config.total_max_length).reshape((1, -1)), self.head_dim, self.rope_theta, self.rope_scaling
         )
         self.model_inputs["bad_tokens"] = paddle.to_tensor([-1], dtype="int64")
@@ -910,57 +870,6 @@ class BlockInferencePredictorMixin(BasePredictor):
             self.model_inputs["tgt_mask"] = (
                 alibi_decoder + (1 - self.model_inputs["tgt_mask"]) * paddle.finfo(self.dtype).min
             ).cast(self.dtype)
-
-    def _get_rotary_position_embedding(self, position_ids, head_dim, rope_theta=10000.0, rope_scaling: dict = None):
-        """
-        Pre-calculate rotary position embedding for position_ids.
-
-        Args:
-            position_ids: [1, S]
-            head_dim: D
-
-        Returns:
-            rot_emb: [2, 1, S, 1, D], cos + sin
-        """
-        bsz, max_seq_len = position_ids.shape[:2]
-        rot_emb = paddle.zeros((2, bsz, max_seq_len, 1, head_dim), dtype="float32")
-        inv_freq = rope_theta ** (-paddle.arange(0, head_dim, 2, dtype="float32") / head_dim)
-
-        if rope_scaling is not None:
-            rope_type = rope_scaling.get("rope_type", None)
-            if rope_type is not None and rope_type == "llama3":
-                factor = rope_scaling.get("factor", 8.0)
-                low_freq_factor = rope_scaling.get("low_freq_factor", 1.0)
-                high_freq_factor = rope_scaling.get("high_freq_factor", 4.0)
-                original_max_position_embeddings = rope_scaling.get("original_max_position_embeddings", 8192)
-
-                low_freq_wavelen = original_max_position_embeddings / low_freq_factor
-                high_freq_wavelen = original_max_position_embeddings / high_freq_factor
-                new_freqs = []
-                for freq in inv_freq:
-                    import math
-
-                    wavelen = 2 * math.pi / freq
-                    if wavelen < high_freq_wavelen:
-                        new_freqs.append(freq)
-                    elif wavelen > low_freq_wavelen:
-                        new_freqs.append(freq / factor)
-                    else:
-                        assert low_freq_wavelen != high_freq_wavelen
-                        smooth = (original_max_position_embeddings / wavelen - low_freq_factor) / (
-                            high_freq_factor - low_freq_factor
-                        )
-                        new_freqs.append((1 - smooth) * freq / factor + smooth * freq)
-                inv_freq = paddle.to_tensor(new_freqs, dtype=inv_freq.dtype)
-
-        # shape: [B, S, D/2]
-        freqs = paddle.einsum("ij,k->ijk", position_ids.cast("float32"), inv_freq)
-        # shape: [B, S, 1, D]
-        emb = paddle.concat([freqs, freqs], axis=-1).reshape((bsz, max_seq_len, 1, head_dim))
-
-        rot_emb[0] = paddle.cos(emb)
-        rot_emb[1] = paddle.sin(emb)
-        return rot_emb
 
     def _preprocess(self, input_text: list[str]):
         if self.tokenizer.chat_template is not None:
