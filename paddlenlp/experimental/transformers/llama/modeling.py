@@ -1244,39 +1244,38 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
         self.set_state_dict_to_params(state_dict, True)
 
-        if True:
-            current_work_dir = os.path.dirname(__file__)
-            scale_map_file = f"{current_work_dir}/ptq_fp8_scales_map.json"
-            with open(scale_map_file) as json_file:
-                scale_map_dict = json.load(json_file)
-                act_scale_map_dict = scale_map_dict["act_scale"]
-                weight_scale_map_dict = scale_map_dict["weight_scale"]
-                act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
-                weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
-                if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                    act_scale_json_path = os.path.join(
-                        self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
-                    )
-                    weight_scale_json_path = os.path.join(
-                        self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
-                    )
-
-                act_scales = ActScalesLoader(
-                    act_scale_json_path, act_scale_map_dict, num_of_layers=self.config.num_hidden_layers
+        current_work_dir = os.path.dirname(__file__)
+        scale_map_file = f"{current_work_dir}/ptq_fp8_scales_map.json"
+        with open(scale_map_file) as json_file:
+            scale_map_dict = json.load(json_file)
+            act_scale_map_dict = scale_map_dict["act_scale"]
+            weight_scale_map_dict = scale_map_dict["weight_scale"]
+            act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
+            weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
+            if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
+                act_scale_json_path = os.path.join(
+                    self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
+                )
+                weight_scale_json_path = os.path.join(
+                    self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
                 )
 
-                weight_scales = PerTensorWeightScalesLoader(
-                    weight_scale_json_path,
-                    weight_scale_map_dict,
-                    num_of_layers=self.config.num_hidden_layers,
-                )
+            act_scales = ActScalesLoader(
+                act_scale_json_path, act_scale_map_dict, num_of_layers=self.config.num_hidden_layers
+            )
 
-                for weight_name in weight_scales.scale:
-                    weight_scales.scale[weight_name] = weight_scales.scale[weight_name].astype(np.float32)
-                for act_name in act_scales.scale:
-                    act_scales.scale[act_name] = act_scales.scale[act_name].astype(np.float32)
-                self.transformer_block.act_scales = act_scales
-                self.transformer_block.weight_scales = weight_scales
+            weight_scales = PerTensorWeightScalesLoader(
+                weight_scale_json_path,
+                weight_scale_map_dict,
+                num_of_layers=self.config.num_hidden_layers,
+            )
+
+            for weight_name in weight_scales.scale:
+                weight_scales.scale[weight_name] = weight_scales.scale[weight_name].astype(np.float32)
+            for act_name in act_scales.scale:
+                act_scales.scale[act_name] = act_scales.scale[act_name].astype(np.float32)
+            self.transformer_block.act_scales = act_scales
+            self.transformer_block.weight_scales = weight_scales
 
         return self
 
