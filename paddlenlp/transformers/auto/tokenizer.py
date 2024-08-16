@@ -98,6 +98,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("SpeechT5Tokenizer", "speecht5"),
         ("QWenTokenizer", "qwen"),
         ("GemmaTokenizer", "gemma"),
+        ("YuanTokenizer", "yuan"),
     ]
 )
 

@@ -27,6 +27,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationInferenceModel,
 )
+from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
 from paddlenlp.transformers import QWenConfig, QWenPretrainedModel
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPast,
@@ -70,18 +71,20 @@ class QWenInferenceModel(QWenPretrainedModel):
         self.layer_norm_epsilon = config.layer_norm_epsilon
         self.max_position_embeddings = config.max_position_embeddings
         self.quant_type = config.quant_type
-        self.weight_only_quant_bits = config.weight_only_quant_bits
 
-        if self.quant_type is not None and "weight_only_int" in self.quant_type:
+        self.use_weight_only = False
+        if config.quant_type == "weight_only_int8":
             self.use_weight_only = True
-        else:
-            self.use_weight_only = False
+            self.quant_algo = "weight_only_int8"
+        elif config.quant_type == "weight_only_int4":
+            self.use_weight_only = True
+            self.quant_algo = "weight_only_int4"
 
         if self.use_weight_only:
             assert (
-                self.quant_type == "weight_only_int8" or self.quant_type == "weight_only_int4"
+                self.quant_algo == "weight_only_int8" or self.quant_algo == "weight_only_int4"
             ), "Expected quant_type equal to 'weight_only_int8' or 'weight_only_int4', but received {}".format(
-                self.quant_type
+                self.quant_algo
             )
 
         self.wte = nn.Embedding(self.vocab_size, self.hidden_size)
@@ -139,7 +142,7 @@ class QWenInferenceModel(QWenPretrainedModel):
             self.hidden_size,
             self.num_attention_heads,
             self.intermediate_size // 2,
-            weight_only_quant_bits=self.weight_only_quant_bits,
+            quant_type=self.quant_type,
             activation="swiglu",
             num_layers=config.num_hidden_layers,
             nranks=1,
@@ -195,7 +198,7 @@ class QWenInferenceModel(QWenPretrainedModel):
             )
             if self.use_weight_only:
                 qkv_weight = paddle.transpose(qkv_weight, perm=[1, 0])
-                qkv_quanted_weight, qkv_weight_scale = weight_quantize(qkv_weight, algo=self.quant_type)
+                qkv_quanted_weight, qkv_weight_scale = weight_quantize(qkv_weight, algo=self.quant_algo)
                 self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight)
                 self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale)
             else:
@@ -206,7 +209,7 @@ class QWenInferenceModel(QWenPretrainedModel):
 
             linear_weight = paddle.to_tensor(state_dict["qwen.h.{}.attn.c_proj.weight".format(idx)], dtype=dtype)
             if self.use_weight_only:
-                linear_quanted_weight, linear_weight_scale = weight_quantize(linear_weight, algo=self.quant_type)
+                linear_quanted_weight, linear_weight_scale = weight_quantize(linear_weight, algo=self.quant_algo)
                 self.transformer_block.linear_weights[idx].set_value(linear_quanted_weight)
                 self.transformer_block.linear_weights_scale[idx].set_value(linear_weight_scale)
             else:
@@ -221,7 +224,7 @@ class QWenInferenceModel(QWenPretrainedModel):
             gate_weight = paddle.to_tensor(state_dict["qwen.h.{}.mlp.w2.weight".format(idx)], dtype=dtype)
             ffn1_weight = paddle.concat(x=[gate_weight, up_weight], axis=-1)
             if self.use_weight_only:
-                ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(ffn1_weight, algo=self.quant_type)
+                ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(ffn1_weight, algo=self.quant_algo)
                 self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight)
                 self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale)
             else:
@@ -229,7 +232,7 @@ class QWenInferenceModel(QWenPretrainedModel):
 
             ffn2_weight = paddle.to_tensor(state_dict["qwen.h.{}.mlp.c_proj.weight".format(idx)], dtype=dtype)
             if self.use_weight_only:
-                ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(ffn2_weight, algo=self.quant_type)
+                ffn2_quanted_weight, ffn2_weight_scale = weight_quantize(ffn2_weight, algo=self.quant_algo)
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight)
                 self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale)
             else:
@@ -377,12 +380,8 @@ class QWenForCausalLMInferenceModel(GenerationInferenceModel, QWenPretrainedMode
         self.lm_head = new_embeddings
 
     @classmethod
-    def from_pretrained(
-        cls, pretrained_model_name_or_path, from_hf_hub: bool = False, subfolder: str | None = None, *args, **kwargs
-    ):
-        # TODO: Support safetensors loading.
-        kwargs["use_safetensors"] = False
-        return super().from_pretrained(pretrained_model_name_or_path, from_hf_hub, subfolder, *args, **kwargs)
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+        return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
     @classmethod
     def get_cache_kvs_shape(

@@ -23,7 +23,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from ..peft import LoRAModel, PrefixModelForCausalLM
+from ..peft import LoRAModel, PrefixModelForCausalLM, VeRAModel
 from ..transformers import PretrainedModel
 from ..utils.log import logger
 from .trainer_callback import TrainerCallback
@@ -33,8 +33,8 @@ def is_visualdl_available():
     return importlib.util.find_spec("visualdl") is not None
 
 
-def is_tensorboard_available():
-    return importlib.util.find_spec("tensorboard") is not None or importlib.util.find_spec("tensorboardX") is not None
+def is_tensorboardX_available():
+    return importlib.util.find_spec("tensorboardX") is not None
 
 
 def is_wandb_available():
@@ -53,7 +53,7 @@ def get_available_reporting_integrations():
         integrations.append("visualdl")
     if is_wandb_available():
         integrations.append("wandb")
-    if is_tensorboard_available():
+    if is_tensorboardX_available():
         integrations.append("tensorboard")
 
     return integrations
@@ -116,7 +116,11 @@ class VisualDLCallback(TrainerCallback):
             self.vdl_writer.add_text("args", args.to_json_string())
             if "model" in kwargs and logger.logger.level < 20:
                 model = kwargs["model"]
-                if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
+                if (
+                    isinstance(model, LoRAModel)
+                    or isinstance(model, PrefixModelForCausalLM)
+                    or isinstance(model, VeRAModel)
+                ):
                     model = kwargs["model"].model
                 if isinstance(model, PretrainedModel) and model.constructed_from_pretrained_config():
                     model.config.architectures = [model.__class__.__name__]
@@ -165,24 +169,17 @@ class TensorBoardCallback(TrainerCallback):
     """
 
     def __init__(self, tb_writer=None):
-        has_tensorboard = is_tensorboard_available()
+        has_tensorboard = is_tensorboardX_available()
         if not has_tensorboard:
-            raise RuntimeError(
-                "TensorBoardCallback requires tensorboard to be installed. Either update your PyTorch version or"
-                " install tensorboardX."
-            )
+            raise RuntimeError("TensorBoardCallback requires tensorboardX to be installed")
+
         if has_tensorboard:
             try:
-                from torch.utils.tensorboard import SummaryWriter  # noqa: F401
+                from tensorboardX import SummaryWriter
 
                 self._SummaryWriter = SummaryWriter
             except ImportError:
-                try:
-                    from tensorboardX import SummaryWriter
-
-                    self._SummaryWriter = SummaryWriter
-                except ImportError:
-                    self._SummaryWriter = None
+                self._SummaryWriter = None
         else:
             self._SummaryWriter = None
         self.tb_writer = tb_writer
