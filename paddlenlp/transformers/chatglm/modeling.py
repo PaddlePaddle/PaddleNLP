@@ -413,7 +413,7 @@ class ChatGLMMLP(nn.Layer):
             self.dense_h_to_4h = nn.Linear(config.hidden_size, inner_hidden_size)
             self.dense_4h_to_h = nn.Linear(inner_hidden_size, config.hidden_size)
         # self.dropout = nn.Dropout(config.output_dropout_prob)
-        self.activation = self.geglue if self.config.activation == "geglu" else self.gelu
+        self.activation = self.geglu if self.config.activation == "geglu" else self.gelu
 
     def geglu(self, x):
         x1, x2 = paddle.chunk(x, chunks=2, axis=-1)
@@ -681,6 +681,14 @@ class ChatGLMPretrainedModel(PretrainedModel):
 
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
+        def split_mlp_weights(tensor_parallel_degree, tensor_parallel_rank, tensor):
+            split_size = tensor.shape[-1] // tensor_parallel_degree // 2
+            gate = tensor[..., : tensor.shape[-1] // 2]
+            ffn_fc = tensor[..., tensor.shape[-1] // 2 :]
+            ffn_fc_part = ffn_fc[..., tensor_parallel_rank * split_size : (tensor_parallel_rank + 1) * split_size]
+            gate_part = gate[..., tensor_parallel_rank * split_size : (tensor_parallel_rank + 1) * split_size]
+            return paddle.concat([gate_part, ffn_fc_part], axis=-1)
+
         fn = split_or_merge_func(
             is_split=is_split,
             tensor_parallel_degree=config.tensor_parallel_degree,
@@ -692,8 +700,12 @@ class ChatGLMPretrainedModel(PretrainedModel):
             final_actions = {}
             base_actions = {
                 # Column Linear
-                "transformer.layers.0.mlp.dense_h_to_4h.bias": partial(fn, is_column=True),
-                "transformer.layers.0.mlp.dense_h_to_4h.weight": partial(fn, is_column=True),
+                "transformer.layers.0.mlp.dense_h_to_4h.bias": partial(
+                    split_mlp_weights, config.tensor_parallel_degree, config.tensor_parallel_rank
+                ),
+                "transformer.layers.0.mlp.dense_h_to_4h.weight": partial(
+                    split_mlp_weights, config.tensor_parallel_degree, config.tensor_parallel_rank
+                ),
                 "transformer.layers.0.attention.query_key_value.bias": partial(fn, is_column=True),
                 "transformer.layers.0.attention.query_key_value.weight": partial(fn, is_column=True),
                 # Row Linear
