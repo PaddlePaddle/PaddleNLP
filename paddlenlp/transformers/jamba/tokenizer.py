@@ -22,3 +22,5 @@ class JambaTokenizer(LlamaTokenizer):
     resource_files_names = {
         "vocab_file": "sentencepiece.bpe.model",
     }
+    pretrained_resource_files_map = {}
+    pretrained_init_configuration = {}
