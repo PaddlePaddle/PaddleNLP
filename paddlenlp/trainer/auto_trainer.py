@@ -727,9 +727,8 @@ class AutoTrainer(Trainer):
             if self.args.to_static:
                 parameter_to_structured_name = self.model_wrapped._parameter_to_structured_name
             else:
-                for state_dict_name, sub_state_dict in state_dict.items():
-                    for state_name, state_value in sub_state_dict.items():
-                        parameter_to_structured_name[state_value.name] = state_name
+                for state_name, state_value in self.model_wrapped.state_dict().items():
+                    parameter_to_structured_name[state_value.name] = state_name
 
             if self.args.resume_form_hybrid_parallel:
                 CheckpointConverter(
