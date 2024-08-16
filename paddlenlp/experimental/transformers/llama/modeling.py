@@ -1238,11 +1238,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
                 )
             elif key.endswith(".mlp.down_proj.weight"):
-                # print(state_dict.pop(key).view("float8_e4m3fn"))
                 state_dict[key.replace(".mlp.down_proj.weight", ".ffn2_weight")] = (
                     state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
                 )
-                # exit()
 
         self.set_state_dict_to_params(state_dict, True)
 

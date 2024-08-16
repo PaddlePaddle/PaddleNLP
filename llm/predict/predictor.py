@@ -1322,7 +1322,6 @@ def create_predictor(
                     config.single_card_ptq = False
 
             if "llama" in config.architectures[0].lower():
-                print(f"model_type = {model_args.model_type}")
                 if model_args.model_type == "llama-img2txt":
                     # we use llama for img2txt.
                     from paddlenlp.experimental.transformers import (
