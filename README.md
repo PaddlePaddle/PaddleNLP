@@ -28,6 +28,8 @@
 
 **PaddleNLP**是一款基于飞桨深度学习框架的大语言模型(LLM)开发套件，支持在多种硬件上进行高效的大模型训练、无损压缩以及高性能推理。PaddleNLP 具备**简单易用**和**性能极致**的特点，致力于助力开发者实现高效的大模型产业级应用。
 
+<a href="https://trendshift.io/repositories/2246" target="_blank"><img src="https://trendshift.io/api/badge/repositories/2246" alt="PaddlePaddle%2FPaddleNLP | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+
 ## News 📢
 
 * **2024.08.08 📚《飞桨产业级大语言模型开发利器 PaddleNLP 3.0 重磅发布》**，训压推全流程贯通，主流模型全覆盖。大模型自动并行，千亿模型训推全流程开箱即用。提供产业级高性能精调与对齐解决方案，压缩推理领先，多硬件适配。覆盖产业级智能助手、内容创作、知识问答、关键信息抽取等应用场景。直播时间：8月22日（周四）19：00。报名链接：https://www.wjx.top/vm/Y2f7FFY.aspx?udsid=143844

@@ -53,11 +53,9 @@ class Predictor:
 
     @staticmethod
     def create_predictor(trainer):
-        from predictor import (
-            PdArgumentParser,
-            PredictorArgument,
-            get_model_max_position_embeddings,
-        )
+        from predictor import PdArgumentParser, PredictorArgument
+
+        from paddlenlp.utils.llm_utils import get_model_max_position_embeddings
 
         # create infer model
         # NOTE: infer model use static name param_attr to create and cannot be
