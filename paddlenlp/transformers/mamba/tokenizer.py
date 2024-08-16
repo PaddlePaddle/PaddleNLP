@@ -142,6 +142,8 @@ class MambaTokenizer(PretrainedTokenizer):
         re = try_import("regex")
         self.pat = re.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
 
+        super().__init__(**kwargs)
+
     @property
     def vocab_size(self):
         """
