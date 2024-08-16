@@ -773,12 +773,8 @@ class BlockInferencePredictorMixin(BasePredictor):
 
         self.dtype = config.dtype or self.model_config.dtype
 
-        try:
-            self.rope_theta = self.model_config.rope_theta
-            self.rope_scaling = self.model_config.rope_scaling
-        except:
-            self.rope_theta = 10000.0
-            self.rope_scaling = None
+        self.rope_theta = self.model_config.get("rope_theta", 10000.0)
+        self.rope_scaling = self.model_config.get("rope_scaling", None)
 
         self.pre_cache_length = 0
 
