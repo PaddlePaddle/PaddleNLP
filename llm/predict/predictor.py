@@ -96,7 +96,9 @@ class PredictorArgument:
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     quant_type: str = field(
         default="",
-        metadata={"help": "Quantization type. Supported values: a8w8, a8w8c8, weight_only_int4, weight_only_int8"},
+        metadata={
+            "help": "Quantization type. Supported values: a8w8, a8w8c8, a8w8_fp8 weight_only_int4, weight_only_int8"
+        },
     )
     avx_model: bool = field(
         default=False, metadata={"help": "whether use AvxModel to do generation when using cpu inference"}
@@ -1320,6 +1322,7 @@ def create_predictor(
                     config.single_card_ptq = False
 
             if "llama" in config.architectures[0].lower():
+                print(f"model_type = {model_args.model_type}")
                 if model_args.model_type == "llama-img2txt":
                     # we use llama for img2txt.
                     from paddlenlp.experimental.transformers import (
