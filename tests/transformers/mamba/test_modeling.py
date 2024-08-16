@@ -390,6 +390,7 @@ class MambaIntegrationTests(unittest.TestCase):
         self.model_id = "state-spaces/mamba-2.8b-hf"
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_id)
 
+    @slow
     def test_simple_generate(self):
         tokenizer = AutoTokenizer.from_pretrained(
             "state-spaces/mamba-130m-hf",
@@ -418,6 +419,7 @@ class MambaIntegrationTests(unittest.TestCase):
 
         self.assertTrue(paddle.allclose(logits[0, 0, :40].cpu(), EXPECTED_LOGITS_NO_GRAD, rtol=1e-3, atol=1e-3))
 
+    @slow
     def test_simple_generate_cuda_kernels_tiny(self):
         expected_output = "John and I am a newbie to the world"
 
