@@ -117,7 +117,7 @@ def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-
                 qdq_x = quant_x / bnt * scales
             else:
                 qdq_x = quant_x / bnt * scales[rank * scales.shape[0] // world_size: (rank + 1) * scales.shape[0] // world_size]
-            print(f"{quant_x.shape}, * {scales.shape} == {qdq_x.shape}")
+            #print(f"{quant_x.shape}, * {scales.shape} == {qdq_x.shape}")
             # fp32 , int8, int, fp32 or fp64
             #print(quant_x.dtype, scales.dtype, bnt, qdq_x.dtype)
             #return qdq_x, scales
@@ -126,11 +126,11 @@ def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-
             if len(scales.shape) == 0 or quant_x.shape[-1] == scales.shape[-1]:
                 qdq_x = quant_x / bnt * scales
             else:
-                print("scales cut: ", rank * scales.shape[0] // world_size,  (rank + 1) * scales.shape[0] // world_size)
+                #print("scales cut: ", rank * scales.shape[0] // world_size,  (rank + 1) * scales.shape[0] // world_size)
                 qdq_x = quant_x / bnt * scales[rank * scales.shape[0] // world_size: (rank + 1) * scales.shape[0] // world_size]
-            print(f"{quant_x.shape}, * {scales.shape} == {qdq_x.shape}")
+            #print(f"{quant_x.shape}, * {scales.shape} == {qdq_x.shape}")
             # fp32 , int8, int, fp32 or fp64
-            print(quant_x.dtype, scales.dtype, bnt, qdq_x.dtype)
+            #print(quant_x.dtype, scales.dtype, bnt, qdq_x.dtype)
             #return qdq_x, scales
             return qdq_x.astype(paddle.float32), scales
 
@@ -375,7 +375,7 @@ def load_state_dict(
 
     print(f"环境变量 {env_var_name} 的值为: {env_var_value}")
     quant = False
-    if env_var_value == '1':
+    if env_var_value != '0':
         quant = "optimizer" in checkpoint_file
         
     if tensor_parallel_split_mapping is None:
@@ -436,28 +436,53 @@ def load_state_dict(
                     tp_group = hcg.get_model_parallel_group()
                     rank, world_size = tp_group.rank, tp_group.nranks
 
-                #print("xxx ", scale_dict.keys())
-                for quant_key in state_dict.keys():
-                    if not quant_key.endswith("moment1_0") and not quant_key.endswith("moment2_0"):
-                        continue
-                    scale_key = quant_key + "_codebook"
-                    weight = state_dict[quant_key]
-                    if scale_key in scale_dict:
-                        # partial m2, all m1
+                if env_var_value == '2':
+                    #print("xxx ", scale_dict.keys())
+                    for quant_key in state_dict.keys():
+                        if not quant_key.endswith("moment1_0") and not quant_key.endswith("moment2_0"):
+                            continue
+                        scale_key = quant_key + "_codebook"
+                        weight = state_dict[quant_key]
+                        if scale_key in scale_dict:
+                            # partial m2, all m1
+                            scales = scale_dict[scale_key]
+                            weight, _ = qdq_weight(weight, scales=scales, quant_bit=8, dequant=True, rank=rank, world_size=world_size, peek=True)
+                            #print(f"dequant {quant_key}, dtype: {weight.shape}")
+                        else:
+                            # partial m2
+                            weight = weight.astype(paddle.float32)
+                            #print(f"loading {quant_key}, dtype: {weight.shape}")
+
+                        if quant_key.endswith("moment2_0") and scale_key in scale_dict:
+                            weight = paddle.square(weight)
+                            #print(f"squaring {quant_key}, dtype: {weight.shape}")
+                        state_dict[quant_key] = weight
+                elif env_var_value == '1':
+                    # set eps
+                    eps = 1e-8
+                    # dequant m1 first
+                    for scale_key in scale_dict.keys():
+                        quant_key = scale_key[:-len("_codebook")]
                         scales = scale_dict[scale_key]
+                        weight = state_dict[quant_key]
                         weight, _ = qdq_weight(weight, scales=scales, quant_bit=8, dequant=True, rank=rank, world_size=world_size, peek=True)
-                        print(f"dequant {quant_key}, dtype: {weight.shape}")
-                    else:
-                        # partial m2
-                        weight = weight.astype(paddle.float32)
-                        print(f"loading {quant_key}, dtype: {weight.shape}")
+                        state_dict[quant_key] = weight
 
-                    if quant_key.endswith("moment2_0") and scale_key in scale_dict:
-                        weight = paddle.square(weight)
-                        print(f"squaring {quant_key}, dtype: {weight.shape}")
-                    state_dict[quant_key] = weight
+                    # cal m2 by ratio
+                    for quant_key in state_dict.keys():
+                        if not quant_key.endswith("moment2_0"):
+                            continue
+                        # 1. cast fp32
+                        weight = state_dict[quant_key].astype(paddle.float32)
+                        # 2. fetch dequanted m1
+                        m1_key = quant_key[:-len("moment2_0")] + "moment1_0"
+                        m1_weight = state_dict[m1_key]
+                        # 3. cal m2
+                        weight = np.square((m1_weight / (weight + eps)) - eps)
+                        # 4. set sd
+                        state_dict[quant_key] = weight
 
-                print("=="*60)
+                #print("=="*60)
                 #print(state_dict)
             return state_dict
 

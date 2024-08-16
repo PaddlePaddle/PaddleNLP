@@ -119,6 +119,9 @@ class UnifiedCheckpointOption(ExplicitEnum):
     IGNORE_MERGE_OPTIMIZER = "ignore_merge_optimizer"
 
 
+def cal_radio(m, v, eps=1e-8):
+    return (m/(np.sqrt(v) + eps)).astype(np.float16)
+
 class UnifiedCheckpointHandler:
     def __init__(self, args):
         self.args = args
@@ -162,7 +165,7 @@ class UnifiedCheckpointHandler:
 
         print(f"环境变量 {env_var_name} 的值为: {env_var_value}")
         quant = False
-        if env_var_value == '1':
+        if env_var_value != '0':
             quant = True
         if is_sync:
             for k in list(state_dict.keys()):
@@ -172,34 +175,68 @@ class UnifiedCheckpointHandler:
             if quant and state_dict_type == "optimizer_weight":
                 codebook_dict = {}
                 opt_keys = state_dict.keys()
+                all_bits, quant_bits = paddle.to_tensor(0.0), paddle.to_tensor(0.0)
                 for k in opt_keys:
                     momentum1 = k.endswith("moment1_0")
                     momentum2 = k.endswith("moment2_0")
-                    if momentum2:
-                        # moment2
-                        sqrt_m2 = np.sqrt(state_dict[k])
-                        quant_weight, codebook = qdq_weight(sqrt_m2, quant_bit=8)
-                        peek_dequant, _ = qdq_weight(quant_weight, scales=codebook, quant_bit=8, dequant=True)
-                        nonzero_mask = sqrt_m2 != 0.0
-                        # outlier flag
-                        has_outlier = not np.all(peek_dequant[nonzero_mask] != 0.0)
-                        #has_outlier = True
-                        if has_outlier:
-                            #quant_weight = state_dict[k].astype(np.float16)
-                            quant_weight = sqrt_m2.astype(np.float16)
-                        else:
-                            codebook_dict[k + '_codebook'] = codebook
-                    elif momentum1:
-                        # moment1
-                        quant_weight, codebook = qdq_weight(state_dict[k], quant_bit=8)
-                        codebook_dict[k + '_codebook'] = codebook
-                    else:
-                        quant_weight = state_dict[k]
+                    k_size = state_dict[k].size
+                    if momentum1 or momentum2:
+                        all_bits += k_size * 4
 
-                    print(f'{k}: {state_dict[k].dtype}')
-                    state_dict[k] = quant_weight
+                    quant_weight = None
+                    if env_var_value == '2':
+                        if momentum2:
+                            # moment2
+                            sqrt_m2 = np.sqrt(state_dict[k])
+                            quant_weight, codebook = qdq_weight(sqrt_m2, quant_bit=8)
+                            peek_dequant, _ = qdq_weight(quant_weight, scales=codebook, quant_bit=8, dequant=True)
+                            nonzero_mask = sqrt_m2 != 0.0
+                            # outlier flag
+                            has_outlier = not np.all(peek_dequant[nonzero_mask] != 0.0)
+                            #has_outlier = True
+                            if has_outlier:
+                                #quant_weight = state_dict[k].astype(np.float16)
+                                quant_weight = sqrt_m2.astype(np.float16)
+                                quant_bits += k_size * 2
+                            else:
+                                codebook_dict[k + '_codebook'] = codebook
+                                quant_bits += k_size
+                        elif momentum1:
+                            # moment1
+                            quant_weight, codebook = qdq_weight(state_dict[k], quant_bit=8)
+                            codebook_dict[k + '_codebook'] = codebook
+                            quant_bits += k_size
+                        else:
+                            quant_weight = state_dict[k]
+                    elif env_var_value == '1':
+                        if momentum2:
+                            # m1: m1_quant_weight, m2: ratio
+                            m1_key = k.split('/')[0] + 'moment1_0'
+                            quant_weight = cal_radio(state_dict[m1_key], state_dict[k])
+                            m1_quant, codebook = qdq_weight(state_dict[m1_key], quant_bit=8)
+                            state_dict[m1_key] = m1_quant
+                            codebook_dict[m1_key + '_codebook'] = codebook
+                        elif not momentum1:
+                            quant_weight = state_dict[k]
+
+                    #print(f'{k}: {state_dict[k].dtype}')
+                    if quant_weight is not None:
+                        state_dict[k] = quant_weight
 
                 state_dict.update(codebook_dict)
+
+                if paddle.distributed.get_world_size() > 1:
+                    dist.all_reduce(all_bits)
+                    dist.all_reduce(quant_bits)
+
+                model_numel = all_bits / 4
+                all_bits = model_numel * 14.0
+                quant_bits_mw = quant_bits + model_numel * 6.0
+                quant_bits = quant_bits + model_numel * 2.0
+                logger.info(f"all bits: {all_bits.item()}, quant bits: {quant_bits.item()}, quant bits mw: {quant_bits_mw.item()}")
+                logger.info(f"quant ratio (w/o Master Weight): {(all_bits.item() - quant_bits.item()) / all_bits.item()}")
+                logger.info(f"quant ratio (w/ Master Weight): {(all_bits.item() - quant_bits_mw.item()) / all_bits.item()}")
+
             safe_save_file(state_dict, path, metadata={"format": "np"})
         else:
             if state_dict_type == "model_weight":
@@ -1028,6 +1065,17 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         state_dict_master_weight = load_resolved_archive_file(
             resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weights=True
         )
+    else:
+        state_dict_master_weight = {}
+        logger.info("No master weights found, converting model weights to master weights.")
+        for key, value in model_state_dict.items():
+            state_dict_master_weight[key] = value.astype(paddle.float32)
+        logger.info("converting model weights to master weights done.")
+        has_master_weights = True
+        returned_optim_state_dict["master_weights"] = {}
+    
+    #print(state_dict_master_weight)
+    
     # rename optimizer param
     for key in list(state_dict_optim.keys()):
         key_name = key.split("/")
@@ -1048,6 +1096,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
     returned_optim_state_dict = nested_copy_place(
         returned_optim_state_dict, place=paddle.framework._current_expected_place()
     )
+    
 
     return returned_optim_state_dict
 
@@ -1089,13 +1138,22 @@ def unified_optimizer_into_shards(
         static_name, type_name = generate_base_static_name(key)
         new_name = static2struct_name_mappings[static_name] + "/" + type_name
         optim_state_dict[new_name] = optim_state_dict.pop(key)
+
+    env_var_name = 'REMOVE_MW'
+    env_var_value = os.getenv(env_var_name, '0')
+
+    print(f"环境变量 {env_var_name} 的值为: {env_var_value}")
+    remove_mw = env_var_value == '1'
+    if remove_mw:
+        master_weights = None
+
     if master_weights is not None:
         for key in list(master_weights.keys()):
             master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
 
     # filter optimizer param
     if master_weights is not None:
-        filter_master_keys = filter_params(model, master_weights, is_optimizer=True)
+        filter_master_keys = filter_params(model, master_weights)
     filter_optim_keys = filter_params(model, optim_state_dict, is_optimizer=True)
 
     tp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
@@ -2040,41 +2098,93 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
     filter_tensor_list = [[] for i in range(tp_size)]
 
     if tp_rank == 0:
-        tensor_bytes_dict = {}
-        model_state_dict = get_expected_state_dict(model_to_save)
-        for (k, v) in state_dict.items():
-            model_v = model_state_dict[k.split("/")[0]] if is_optimizer else v
-            if hasattr(model_v, "is_distributed") and model_v.is_distributed:
-                tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
-            else:
-                tensor_bytes_dict[k] = v.numel().item() * dtype_byte_size(v.dtype)
+        # 假设你想要获取的环境变量名为 'MY_ENV_VAR'
+        env_var_name = 'QUANT'
 
-        filter_tensor_list = []
-        current_block = []
-        current_block_size = 0
-        total_size = 0
+        # 使用 os.getenv() 方法获取环境变量的值
+        # 如果环境变量不存在，可以设置一个默认值
+        env_var_value = os.getenv(env_var_name, '0')
 
-        max_shard_size = (sum(tensor_bytes_dict.values()) + tp_size - 1) // tp_size
+        print(f"环境变量 {env_var_name} 的值为: {env_var_value}")
+        quant = False
+        if env_var_value != '0':
+            quant = True
+        if not quant or not is_optimizer:    
+            tensor_bytes_dict = {}
+            model_state_dict = get_expected_state_dict(model_to_save)
+            for (k, v) in state_dict.items():
+                model_v = model_state_dict[k.split("/")[0]] if is_optimizer else v
+                if hasattr(model_v, "is_distributed") and model_v.is_distributed:
+                    tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
+                else:
+                    tensor_bytes_dict[k] = v.numel().item() * dtype_byte_size(v.dtype)
 
-        for index, (key, weight_size) in enumerate(tensor_bytes_dict.items()):
-            # If this weight is going to tip up over the maximal size, we split.
-            # if current_block_size + weight_size > max_shard_size:
-            if total_size + weight_size > max_shard_size * (len(filter_tensor_list) + 1) or (
-                len(tensor_bytes_dict) - index < (tp_size - len(filter_tensor_list))
-            ):
-                # fix if the first param is large than max_shard_size
-                if len(current_block) > 0:
-                    filter_tensor_list.append(current_block)
-                current_block = []
-                current_block_size = 0
+            filter_tensor_list = []
+            current_block = []
+            current_block_size = 0
+            total_size = 0
 
-            current_block.append(key)
-            current_block_size += weight_size
-            total_size += weight_size
+            max_shard_size = (sum(tensor_bytes_dict.values()) + tp_size - 1) // tp_size
 
-        filter_tensor_list.append(current_block)
-        if len(filter_tensor_list) < tp_size:
-            filter_tensor_list.extend([[] for i in range(tp_size - len(filter_tensor_list))])
+            for index, (key, weight_size) in enumerate(tensor_bytes_dict.items()):
+                # If this weight is going to tip up over the maximal size, we split.
+                # if current_block_size + weight_size > max_shard_size:
+                if total_size + weight_size > max_shard_size * (len(filter_tensor_list) + 1) or (
+                    len(tensor_bytes_dict) - index < (tp_size - len(filter_tensor_list))
+                ):
+                    # fix if the first param is large than max_shard_size
+                    if len(current_block) > 0:
+                        filter_tensor_list.append(current_block)
+                    current_block = []
+                    current_block_size = 0
+
+                current_block.append(key)
+                current_block_size += weight_size
+                total_size += weight_size
+
+            filter_tensor_list.append(current_block)
+            if len(filter_tensor_list) < tp_size:
+                filter_tensor_list.extend([[] for i in range(tp_size - len(filter_tensor_list))])
+        else:
+            tensor_bytes_dict = {}
+            model_state_dict = get_expected_state_dict(model_to_save)
+            for (k, v) in state_dict.items():
+                weight_key = k.split("/")[0]
+                model_v = model_state_dict[weight_key] if is_optimizer else v
+                if hasattr(model_v, "is_distributed") and model_v.is_distributed:
+                    tensor_bytes_dict[weight_key] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
+                else:
+                    tensor_bytes_dict[weight_key] = v.numel().item() * dtype_byte_size(v.dtype)
+
+            filter_tensor_list = []
+            current_block = []
+            current_block_size = 0
+            total_size = 0
+
+            max_shard_size = (sum(tensor_bytes_dict.values()) + tp_size - 1) // tp_size
+
+            for index, (key, weight_size) in enumerate(tensor_bytes_dict.items()):
+                # If this weight is going to tip up over the maximal size, we split.
+                # if current_block_size + weight_size > max_shard_size:
+                if total_size + weight_size > max_shard_size * (len(filter_tensor_list) + 1) or (
+                    len(tensor_bytes_dict) - index < (tp_size - len(filter_tensor_list))
+                ):
+                    # fix if the first param is large than max_shard_size
+                    if len(current_block) > 0:
+                        filter_tensor_list.append(current_block)
+                    current_block = []
+                    current_block_size = 0
+
+                current_block.append(key + '/moment1_0')
+                current_block.append(key + '/moment2_0')
+                current_block.append(key + '/beta1_pow_acc_0')
+                current_block.append(key + '/beta2_pow_acc_0')
+                current_block_size += weight_size
+                total_size += weight_size
+
+            filter_tensor_list.append(current_block)
+            if len(filter_tensor_list) < tp_size:
+                filter_tensor_list.extend([[] for i in range(tp_size - len(filter_tensor_list))])
 
     dist.broadcast_object_list(
         filter_tensor_list,
@@ -2180,6 +2290,7 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys)
                 continue
             # get base model key
             model_key = filter_keys[i].split("/")[0]
+            #print(state_dict.keys())
             tensor = state_dict[filter_keys[i]]
             if model_key in tp_actions:
                 # for example: beta1, beta2
@@ -2351,11 +2462,13 @@ def update_master_weight_status(args, optimizer, has_master_weight, safe_seriali
                     "the model weight will be loaded as master weight."
                 )
             else:
-                raise ValueError(
-                    "Can't find a valid unified master weight checkpoint,"
-                    f"add '{UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value}' into 'unified_checkpoint_config' to "
-                    "load model checkpoint as master weight"
-                )
+                has_master_weight = False
+                index_filename_master_weights = None
+                #raise ValueError(
+                #    "Can't find a valid unified master weight checkpoint,"
+                #    f"add '{UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value}' into 'unified_checkpoint_config' to "
+                #    "load model checkpoint as master weight"
+                #)
         else:
             has_master_weight = True
             index_filename_master_weights = (

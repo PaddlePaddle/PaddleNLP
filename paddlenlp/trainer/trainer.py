@@ -1188,7 +1188,7 @@ class Trainer:
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-                    if self.state.global_step != 0 and (self.state.global_step) % 50 == 0:
+                    if self.state.global_step != 0 and (self.state.global_step) % self.args.save_steps == 0:
                         # 假设你想要获取的环境变量名为 'MY_ENV_VAR'
                         env_var_name = 'BREAK'
 

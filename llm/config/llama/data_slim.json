@@ -1,9 +1,9 @@
 {
-    "model_name_or_path": "../../../checkpoint/piqa_full/",
-    "dataset_name_or_path": "./piqa/",
+    "model_name_or_path": "meta-llama/Meta-Llama-3-8B",
+    "dataset_name_or_path": "./ARC-Easy/",
     "output_dir": "../../../checkpoints/arc-e",
     "logging_dir": "../../../checkpoints/arc-e",
-    "per_device_train_batch_size": 8,
+    "per_device_train_batch_size": 1,
     "gradient_accumulation_steps": 2,
     "per_device_eval_batch_size": 1,
     "eval_accumulation_steps": 2,
@@ -20,7 +20,7 @@
     "max_length": 4096,
     "bf16": true,
     "fp16_opt_level": "O2",
-    "do_train": false,
+    "do_train": true,
     "do_eval": true,
     "disable_tqdm": true,
     "load_best_model_at_end": false,
@@ -31,7 +31,7 @@
     "pipeline_parallel_degree": 1,
     "pipeline_parallel_config": "disable_p2p_cache_shape",
     "sharding": "stage2",
-    "zero_padding": false,
+    "zero_padding": true,
     "unified_checkpoint": true,
     "use_flash_attention": true
   }
