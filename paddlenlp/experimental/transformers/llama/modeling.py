@@ -1076,6 +1076,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         dim_head=self.hidden_size // self.num_attention_heads,
                         ffn_hidden_size=self.intermediate_size,
                         num_key_value_heads=self.num_key_value_heads,
+                        mp_size=self.config.tensor_parallel_degree,
                     )
                 self.transformer_block.act_scales = act_scale_loader.scale
 
@@ -1101,6 +1102,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                             dim_heads=self.hidden_size // self.num_attention_heads,
                             is_channel_wise=False,
                             num_key_value_heads=self.num_key_value_heads,
+                            mp_size=self.config.tensor_parallel_degree,
                         )
 
                     for k, v in cache_scales_loader.scale.items():
