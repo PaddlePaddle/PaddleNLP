@@ -351,7 +351,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.num_layers = config.num_hidden_layers
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
-        self.quant_type = config.quant_type
+        self.quant_type = config.get("quant_type", "")
 
         self.rope_theta = config.rope_theta
         self.use_neox = True
@@ -368,6 +368,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             self.shift = config.quantization_config.shift
             self.smooth = config.quantization_config.smooth
             self.shift_smooth_all_linears = config.quantization_config.shift_smooth_all_linears
+
+        self.use_fake_parameter = config.get("use_fake_parameter", False)
 
         if self.use_weight_only:
             assert (
@@ -902,18 +904,26 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     if self.use_fake_parameter:
                         if "llama.layers.{}.self_attn.o_proj.shift_bias".format(idx) not in state_dict:
                             state_dict["llama.layers.{}.self_attn.o_proj.shift_bias".format(idx)] = paddle.zeros(
-                                shape=[self.num_attention_heads * (self.hidden_size // self.num_attention_heads)],
+                                shape=[
+                                    (self.num_attention_heads // self.config.tensor_parallel_degree)
+                                    * (self.hidden_size // self.num_attention_heads)
+                                ],
                                 dtype=paddle.get_default_dtype(),
                             )
                             state_dict["llama.layers.{}.self_attn.o_proj.smooth_weight".format(idx)] = paddle.ones(
-                                shape=[self.num_attention_heads * (self.hidden_size // self.num_attention_heads)],
+                                shape=[
+                                    (self.num_attention_heads // self.config.tensor_parallel_degree)
+                                    * (self.hidden_size // self.num_attention_heads)
+                                ],
                                 dtype=paddle.get_default_dtype(),
                             )
                             state_dict["llama.layers.{}.mlp.down_proj.shift_bias".format(idx)] = paddle.zeros(
-                                shape=[self.intermediate_size], dtype=paddle.get_default_dtype()
+                                shape=[self.intermediate_size // self.config.tensor_parallel_degree],
+                                dtype=paddle.get_default_dtype(),
                             )
                             state_dict["llama.layers.{}.mlp.down_proj.smooth_weight".format(idx)] = paddle.ones(
-                                shape=[self.intermediate_size], dtype=paddle.get_default_dtype()
+                                shape=[self.intermediate_size // self.config.tensor_parallel_degree],
+                                dtype=paddle.get_default_dtype(),
                             )
                     self.transformer_block.linear_shifts[idx].set_value(
                         paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.shift_bias".format(idx)])
