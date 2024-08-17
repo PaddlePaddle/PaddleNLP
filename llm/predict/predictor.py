@@ -948,8 +948,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
 
-        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64")
-        output_tensor = output_tensor.cpu()
+        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
         tensor_queue.put(output_tensor)
 
         read_res_process = mp.Process(
@@ -1074,8 +1073,7 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
 
-        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64")
-        output_tensor = output_tensor.cpu()
+        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
         tensor_queue.put(output_tensor)
 
         read_res_process = mp.Process(
@@ -1108,10 +1106,11 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
 
 def get_ptq_multicards_num(directory):
     count = 0
-    prefix = "act_scales_"
-    for filename in os.listdir(directory):
-        if filename.startswith(prefix):
-            count += 1
+    if os.path.exists(directory):
+        prefix = "act_scales_"
+        for filename in os.listdir(directory):
+            if filename.startswith(prefix):
+                count += 1
     return count
 
 
