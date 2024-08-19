@@ -128,7 +128,6 @@ class CheckpointConverter:
             state_dict_in_cpu = []
             for k, v in self.auto_parallel_state_dict.items():
                 if v.place.is_cpu_place():
-                    print("v is cpu place", flush=1)
                     state_dict_in_cpu.append(k)
                     self.auto_parallel_state_dict[k] = v.cuda()
             _load_state_dict(self.auto_parallel_state_dict, source_state_dict, [metadata])
@@ -148,7 +147,6 @@ class CheckpointConverter:
             state_dict_in_cpu = []
             for k, v in self.auto_parallel_state_dict.items():
                 if v.place.is_cpu_place():
-                    print("v is cpu place", flush=1)
                     state_dict_in_cpu.append(k)
                     self.auto_parallel_state_dict[k] = v.cuda()
             _load_state_dict(self.auto_parallel_state_dict, source_state_dict, [metadata])
@@ -859,16 +857,12 @@ class CheckpointConverter:
     def rename_using_parameter_to_structured_name_mapping(self, state_dict, parameter_to_structured_name):
         renamed_state_dict = {}
 
-        print("parameter_to_structured_name: ", parameter_to_structured_name, flush=1)
-
         def rename(old_name, parameter_to_structured_name):
             for i in range(1, len(old_name) + 1):
                 param_name = old_name[:i]  # param_name
                 suffix = old_name[i:]  # suffix
                 if param_name in parameter_to_structured_name:
-                    print("param_name: ", param_name, flush=1)
                     structure_name = parameter_to_structured_name[param_name]
-                    print("structure_name: ", structure_name, flush=1)
                     if "moment1" in suffix:
                         return structure_name + ".moment1"
                     elif "moment2" in suffix:
@@ -882,12 +876,9 @@ class CheckpointConverter:
             return None
 
         for key, value in state_dict.items():
-            print("key: ", key, flush=1)
             if key in parameter_to_structured_name.values():
-                print("key is a param")
                 new_name = key
             else:
-                print("key is a opt", flush=1)
                 new_name = rename(key, parameter_to_structured_name)
             assert new_name is not None
             renamed_state_dict[new_name] = value
