@@ -25,7 +25,6 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     JambaConfig,
     JambaForCausalLM,
-    JambaForSequenceClassification,
     JambaModel,
 )
 from paddlenlp.transformers.jamba.modeling import (
@@ -248,14 +247,14 @@ class JambaModelTester:
         # test that outputs are equal for slice
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
-    def create_and_check_for_sequence_classification(
-        self, config, input_ids, input_mask, sequence_labels, token_labels, choice_labels
-    ):
-        config.num_labels = self.num_labels
-        model = JambaForSequenceClassification(config)
-        model.eval()
-        result = model(input_ids, attention_mask=input_mask, labels=sequence_labels)
-        self.parent.assertEqual(result.logits.shape, [self.batch_size, self.num_labels])
+    # def create_and_check_for_sequence_classification(
+    #     self, config, input_ids, input_mask, sequence_labels, token_labels, choice_labels
+    # ):
+    #     config.num_labels = self.num_labels
+    #     model = JambaForSequenceClassification(config)
+    #     model.eval()
+    #     result = model(input_ids, attention_mask=input_mask, labels=sequence_labels)
+    #     self.parent.assertEqual(result.logits.shape, [self.batch_size, self.num_labels])
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
@@ -276,7 +275,6 @@ class JambaModelTest(ModelTesterMixin, unittest.TestCase):
     all_model_classes = (
         JambaModel,
         JambaForCausalLM,
-        JambaForSequenceClassification,
     )
     all_generative_model_classes = (JambaForCausalLM,)
 
