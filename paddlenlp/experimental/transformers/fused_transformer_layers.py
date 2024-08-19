@@ -40,7 +40,7 @@ if core.is_compiled_with_xpu() or core.is_compiled_with_cuda():
     from paddlenlp_ops import rebuild_padding_v2
 
 if core.is_compiled_with_cuda():
-    if os.getenv("FLAGS_CUTLASS_FP8_GEMM", "True") == "True":
+    if os.getenv("FLAGS_CUTLASS_FP8_GEMM", "False") == "True":
         logger.info("cutlass fp8 gemm is used. you can turn it off by setting FLAGS_CUTLASS_FP8_GEMM to False.")
         from paddlenlp_ops import (
             cutlass_fp8_fp8_fp8_dual_gemm_fused as fp8_dual_gemm_fused,
@@ -72,7 +72,7 @@ __all__ = [
 
 
 def use_cutlass_fp8_gemm():
-    return os.getenv("FLAGS_CUTLASS_FP8_GEMM", "True") == "True"
+    return os.getenv("FLAGS_CUTLASS_FP8_GEMM", "False") == "True"
 
 
 # for distributed tensor model parallel
