@@ -496,7 +496,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 concated_ffn1_weight = np.concatenate(
                     [unfused_state_dict["mlp.gate_proj.weight"], unfused_state_dict["mlp.up_proj.weight"]], axis=-1
                 )
-            ffn1_weight = paddle.to_tensor(concated_ffn1_weight)
+            ffn1_weight = paddle.to_tensor(concated_ffn1_weight).cast(paddle.get_default_dtype())
 
             if self.use_weight_only:
                 ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(ffn1_weight, algo=self.quant_algo)
@@ -612,7 +612,6 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 if not self.shift_smooth_all_linears
                 else f"{current_work_dir}/ptq_scales_map_shift_smooth.json"
             )
-            print(f"scale_map_file = {scale_map_file}")
             with open(scale_map_file) as json_file:
                 scale_map_dict = json.load(json_file)
                 act_scale_map_dict = scale_map_dict["act_scale"]
@@ -633,8 +632,6 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                     act_scale_json_path, act_scale_map_dict, num_of_layers=self.config.num_hidden_layers
                 )
                 self.transformer_block.act_scales = act_scale_loader.scale
-                print(f"weight_scale_json_path = {weight_scale_json_path}")
-                # print(f'weight_scale_map_dict = {weight_scale_map_dict}')
                 weight_scales_loader = WeightScalesLoader(
                     weight_scale_json_path,
                     weight_scale_map_dict,
