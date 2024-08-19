@@ -320,6 +320,10 @@ class FusedMultiTransformerBase(Layer):
             self._is_moe = config.is_moe
             self._moe_every2 = config.moe_every2
             self._moe_topk = config.moe_topk
+        else:
+            self._is_moe = False
+            self._moe_every2 = False
+            self._moe_topk = 1
 
         # tensor model parallel
         if config.nranks > 1:
