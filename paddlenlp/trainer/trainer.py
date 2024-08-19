@@ -1827,7 +1827,18 @@ class Trainer:
         # Multi-gpu training
         if self.args.world_size > 1 and (not self.args.use_hybrid_parallel):
             # MOE use DDP to broadcaset parameters.
-            model = paddle.DataParallel(model)
+            ddp_kwargs = {}
+            if self.args.ddp_find_unused_parameters is not None:
+                ddp_kwargs["find_unused_parameters"] = self.args.ddp_find_unused_parameters
+            elif isinstance(model, PretrainedModel):
+                # find_unused_parameters breaks checkpointing as per
+                # https://github.com/huggingface/transformers/pull/4659#issuecomment-643356021
+                ddp_kwargs["find_unused_parameters"] = not any(
+                    hasattr(m, "enable_recompute") and m.enable_recompute for m in model.sublayers(include_self=True)
+                )
+            else:
+                ddp_kwargs["find_unused_parameters"] = True
+            model = paddle.DataParallel(model, **ddp_kwargs)
             # Distributed training (should be after fp16 initialization)
 
             if self.args.amp_master_grad:
