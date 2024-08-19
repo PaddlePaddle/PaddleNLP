@@ -25,14 +25,6 @@ from utils.argument import (
     TrainingArguments,
 )
 from utils.data import get_convert_example
-from utils.utils import (
-    CausalLMTrainer,
-    ZeroPaddingIterDatasetCallback,
-    compute_metrics,
-    get_lora_target_modules,
-    get_prefix_tuning_params,
-    init_chat_template,
-)
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import (
@@ -62,6 +54,14 @@ from paddlenlp.transformers import (
     LlamaTokenizer,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
+from paddlenlp.utils.llm_utils import (
+    CausalLMTrainer,
+    ZeroPaddingIterDatasetCallback,
+    compute_metrics,
+    get_lora_target_modules,
+    get_prefix_tuning_params,
+    init_chat_template,
+)
 from paddlenlp.utils.log import logger
 
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
@@ -391,6 +391,7 @@ def main():
                 train_ds,
                 tokenizer=tokenizer,
                 max_length=data_args.max_length,
+                greedy_zero_padding=data_args.greedy_zero_padding,
             )
             if train_ds is not None
             else None
@@ -400,6 +401,7 @@ def main():
                 ptq_ds,
                 tokenizer=tokenizer,
                 max_length=data_args.max_length,
+                greedy_zero_padding=data_args.greedy_zero_padding,
             )
             if ptq_ds is not None
             else None

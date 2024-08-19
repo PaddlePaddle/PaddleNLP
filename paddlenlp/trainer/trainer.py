@@ -149,6 +149,7 @@ from .training_args import TrainingArguments
 from .utils import reshard as reshard_util
 from .utils.async_save import AsyncSaver
 from .utils.helper import (  # nested_truncate,
+    broadcast_dataset_rank0_model,
     broadcast_dp_optimizer,
     broadcast_moe_optimizer,
     distributed_concat,
@@ -1162,6 +1163,8 @@ class Trainer:
                         self.state.best_model_checkpoint,
                         safe_serialization=True,
                     )
+                    if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
+                        broadcast_dataset_rank0_model(self.model)
                 else:
                     weight_name = PADDLE_WEIGHTS_NAME
                     best_model_path = os.path.join(
@@ -1204,6 +1207,8 @@ class Trainer:
                 self.state.best_model_checkpoint,
                 safe_serialization=True,
             )
+            if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
+                broadcast_dataset_rank0_model(self.model)
             return
 
         convert_tp = False
@@ -1399,12 +1404,16 @@ class Trainer:
             raise ValueError("We don't need train_dataset when should_load_dataset is False.")
 
         train_dataset = self.train_dataset
+        if self.args.distributed_dataloader:
+            is_iterable_dataset = self._is_iterable_dataset_distributed(train_dataset)
+        else:
+            is_iterable_dataset = self._is_iterable_dataset(train_dataset)
         if is_datasets_available() and train_dataset is not None and isinstance(train_dataset, datasets.Dataset):
             train_dataset = self._remove_unused_columns(train_dataset, description="training")
         _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
-        if self._is_iterable_dataset(train_dataset):
-            if self.args.dataset_world_size > 1:
+        if is_iterable_dataset:  # For iterable dataset
+            if self.args.dataset_world_size > 1 and train_dataset is not None:
                 train_dataset = IterableDatasetShard(
                     train_dataset,
                     batch_size=self.args.per_device_train_batch_size,
@@ -1413,24 +1422,28 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
+            if self.args.distributed_dataloader:
+                logger.info("Training using DistDataLoader.")
+                additional_configs = {"is_iterable_dataset": True}
+            else:
+                additional_configs = {}
             return _DataLoader(
                 train_dataset,
                 batch_size=self.args.per_device_train_batch_size,
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
+                **additional_configs,
             )
-
-        train_sampler = self._get_train_sampler()
-
-        if self.args.distributed_dataloader:
-            logger.info("Training using DistDataLoader.")
-
-        return _DataLoader(
-            train_dataset,
-            batch_sampler=train_sampler,
-            collate_fn=self.data_collator,
-            num_workers=self.args.dataloader_num_workers,
-        )
+        else:
+            train_sampler = self._get_train_sampler()
+            if self.args.distributed_dataloader:
+                logger.info("Training using DistDataLoader.")
+            return _DataLoader(
+                train_dataset,
+                batch_sampler=train_sampler,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+            )
 
     def _get_eval_sampler(self, eval_dataset: Dataset):
         if eval_dataset is None or not has_length(eval_dataset):
@@ -1477,12 +1490,16 @@ class Trainer:
             raise ValueError("We don't need eval_dataset when should_load_dataset is False.")
 
         eval_dataset = eval_dataset if eval_dataset is not None else self.eval_dataset
-
+        if self.args.distributed_dataloader:
+            is_iterable_dataset = self._is_iterable_dataset_distributed(eval_dataset)
+        else:
+            is_iterable_dataset = self._is_iterable_dataset(eval_dataset)
         if is_datasets_available() and eval_dataset is not None and isinstance(eval_dataset, datasets.Dataset):
             eval_dataset = self._remove_unused_columns(eval_dataset, description="evaluation")
+        _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
-        if self._is_iterable_dataset(eval_dataset):
-            if self.args.dataset_world_size > 1:
+        if is_iterable_dataset:
+            if self.args.dataset_world_size > 1 and eval_dataset is not None:
                 eval_dataset = IterableDatasetShard(
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
@@ -1490,41 +1507,31 @@ class Trainer:
                     num_processes=self.args.dataset_world_size,
                     process_index=self.args.dataset_rank,
                 )
-
             if self.args.distributed_dataloader:
-                return DistDataLoader(
-                    eval_dataset,
-                    batch_size=self.args.per_device_eval_batch_size,
-                    collate_fn=self.data_collator,
-                    num_workers=0,
-                    eval=True,
-                )
+                logger.info("Eval using DistDataLoader.")
+                additional_configs = {"eval": True, "is_iterable_dataset": True}
             else:
-                return DataLoader(
-                    eval_dataset,
-                    batch_size=self.args.per_device_eval_batch_size,
-                    collate_fn=self.data_collator,
-                    num_workers=0,
-                )
-
-        eval_sampler = self._get_eval_sampler(eval_dataset)
-
-        if self.args.distributed_dataloader:
-            logger.info("Eval using DistDataLoader.")
-
-            return DistDataLoader(
+                additional_configs = {}
+            return _DataLoader(
                 eval_dataset,
-                batch_sampler=eval_sampler,
+                batch_size=self.args.per_device_eval_batch_size,
                 collate_fn=self.data_collator,
-                num_workers=self.args.dataloader_num_workers,
-                eval=True,
+                num_workers=0,
+                **additional_configs,
             )
         else:
-            return DataLoader(
+            eval_sampler = self._get_eval_sampler(eval_dataset)
+            if self.args.distributed_dataloader:
+                logger.info("Eval using DistDataLoader.")
+                additional_configs = {"eval": True}
+            else:
+                additional_configs = {}
+            return _DataLoader(
                 eval_dataset,
                 batch_sampler=eval_sampler,
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
+                **additional_configs,
             )
 
     def get_test_dataloader(self, test_dataset: Dataset) -> DataLoader:
@@ -1543,11 +1550,16 @@ class Trainer:
         if not self.args.should_load_dataset and test_dataset is not None:
             raise ValueError("We don't need test_dataset when should_load_dataset is False.")
 
+        if self.args.distributed_dataloader:
+            is_iterable_dataset = self._is_iterable_dataset_distributed(test_dataset)
+        else:
+            is_iterable_dataset = self._is_iterable_dataset(test_dataset)
         if is_datasets_available() and test_dataset is not None and isinstance(test_dataset, datasets.Dataset):
             test_dataset = self._remove_unused_columns(test_dataset, description="test")
+        _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
-        if self._is_iterable_dataset(test_dataset):
-            if self.args.dataset_world_size > 1:
+        if is_iterable_dataset:
+            if self.args.dataset_world_size > 1 and test_dataset is not None:
                 test_dataset = IterableDatasetShard(
                     test_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
@@ -1557,40 +1569,31 @@ class Trainer:
                 )
 
             if self.args.distributed_dataloader:
-                return DistDataLoader(
-                    test_dataset,
-                    batch_size=self.args.per_device_eval_batch_size * self.world_size,
-                    collate_fn=self.data_collator,  # _get_collator_with_removed_columns
-                    num_workers=self.args.dataloader_num_workers,
-                    eval=True,
-                )
+                logger.info("Test using DistDataLoader.")
+                additional_config = {"eval": True, "is_iterable_dataset": True}
             else:
-                return DataLoader(
-                    test_dataset,
-                    batch_size=self.args.per_device_eval_batch_size * self.world_size,
-                    collate_fn=self.data_collator,  # _get_collator_with_removed_columns
-                    num_workers=self.args.dataloader_num_workers,
-                )
-
-        test_sampler = self._get_eval_sampler(test_dataset)
-
-        if self.args.distributed_dataloader:
-            logger.info("Test using DistDataLoader.")
-
-            # We use the same batch_size as for eval.
-            return DistDataLoader(
+                additional_config = {}
+            return _DataLoader(
                 test_dataset,
-                batch_sampler=test_sampler,
+                batch_size=self.args.per_device_eval_batch_size * self.world_size,
                 collate_fn=self.data_collator,
-                drop_last=self.args.dataloader_drop_last,
-                eval=True,
+                num_workers=self.args.dataloader_num_workers,
+                **additional_config,
             )
         else:
-            return DataLoader(
+            test_sampler = self._get_eval_sampler(test_dataset)
+            if self.args.distributed_dataloader:
+                logger.info("Test using DistDataLoader.")
+                additional_config = {"eval": True}
+            else:
+                additional_config = {}
+            # We use the same batch_size as for eval.
+            return _DataLoader(
                 test_dataset,
                 batch_sampler=test_sampler,
                 collate_fn=self.data_collator,
                 drop_last=self.args.dataloader_drop_last,
+                **additional_config,
             )
 
     def create_optimizer_and_scheduler(self, num_training_steps: int):
@@ -1695,6 +1698,8 @@ class Trainer:
 
         if self.args.use_hybrid_parallel:
             if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:
+                if self.args.tensor_parallel_degree <= 1:
+                    checkpoint_rng_state["hybrid_parallel_rng_state_tracker"].pop("model_parallel_rng", None)
                 fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
                     checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
                 )
@@ -3204,6 +3209,15 @@ class Trainer:
 
     def _is_iterable_dataset(self, dataset):
         return isinstance(dataset, paddle.io.IterableDataset)
+
+    def _is_iterable_dataset_distributed(self, dataset):
+        # For distributed dataloaer.
+        is_iterable_dataset_tensor = paddle.to_tensor(self._is_iterable_dataset(dataset)).reshape([1])
+        if dist.get_world_size() > 1:
+            dist.all_reduce(is_iterable_dataset_tensor, op=dist.ReduceOp.MAX)
+        if is_iterable_dataset_tensor.item() == 1:
+            return True
+        return False
 
     def print_config(self, args=None, key=""):
         """

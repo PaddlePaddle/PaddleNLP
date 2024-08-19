@@ -1040,7 +1040,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 act_scale_map_dict = scale_map_dict["act_scale"]
                 weight_scale_map_dict = scale_map_dict["weight_scale"]
                 cache_scale_map_dict = scale_map_dict["cachekv_scale"]
-                # TODO(RichardWooSJTU): support multi-cards
 
                 act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
                 weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
@@ -1068,7 +1067,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_scales.json")
                     if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
                         cache_scale_json_path = os.path.join(
-                            self.quant_model_path, f"cachekv_act_scales_{self.config.tensor_parallel_rank}.json"
+                            self.quant_model_path, f"cachekv_scales_{self.config.tensor_parallel_rank}.json"
                         )
                     cache_scales_loader = CacheScaleLoader(
                         cache_scale_json_path,
