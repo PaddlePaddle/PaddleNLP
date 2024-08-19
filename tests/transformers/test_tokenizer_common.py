@@ -55,6 +55,7 @@ def filter_roberta_detectors(_, pretrained_name: str):
 class TokenizerTesterMixin:
 
     tokenizer_class = None
+    test_rust_tokenizer = True
     space_between_special_tokens = False
     from_pretrained_kwargs = None
     from_pretrained_filter = None
@@ -71,19 +72,23 @@ class TokenizerTesterMixin:
     only_english_character: bool = True
 
     def setUp(self) -> None:
-        tokenizers_list = [
-            (
-                self.tokenizer_class,
-                pretrained_name,
-                self.from_pretrained_kwargs if self.from_pretrained_kwargs is not None else {},
-            )
-            for pretrained_name in self.tokenizer_class.pretrained_resource_files_map[
-                self.from_pretrained_vocab_key
-            ].keys()
-            if self.from_pretrained_filter is None
-            or (self.from_pretrained_filter is not None and self.from_pretrained_filter(pretrained_name))
-        ]
-        self.tokenizers_list = tokenizers_list[:1]
+
+        if self.test_rust_tokenizer:
+            tokenizers_list = [
+                (
+                    self.tokenizer_class,
+                    pretrained_name,
+                    self.from_pretrained_kwargs if self.from_pretrained_kwargs is not None else {},
+                )
+                for pretrained_name in self.tokenizer_class.pretrained_resource_files_map[
+                    self.from_pretrained_vocab_key
+                ].keys()
+                if self.from_pretrained_filter is None
+                or (self.from_pretrained_filter is not None and self.from_pretrained_filter(pretrained_name))
+            ]
+            self.tokenizers_list = tokenizers_list[:1]
+        else:
+            self.tokenizers_list = []
 
         with open(f"{get_tests_dir()}/sample_text.txt", encoding="utf-8") as f_data:
             self._data = f_data.read().replace("\n\n", "\n").strip()

@@ -659,7 +659,7 @@ class TestPaddleCheckpointOnN1C2Reset(TestMultipleGpus):
         self.need_allclose = True
         self.rtol = 1e-7
 
-        self.run_pretrain_file = "llm/llama/run_pretrain.py"
+        self.run_pretrain_file = "llm/run_pretrain.py"
 
     def runfirst(self, train_args):
         train_args["unified_checkpoint"] = 0
@@ -701,7 +701,7 @@ class TestUnifiedCheckpointOnN1C2Reset(TestMultipleGpus):
         self.need_allclose = True
         self.rtol = 1e-7
 
-        self.run_pretrain_file = "llm/llama/run_pretrain.py"
+        self.run_pretrain_file = "llm/run_pretrain.py"
         self.filelists = [
             "config.json",
             "master_weights-00001-of-00002.safetensors",
@@ -1130,24 +1130,6 @@ class TestUnifiedCheckpointOnN2C4ToN1C8AsyncSaveToDisk(TestUnifiedCheckpointBase
             self.run_n1c8(self.run_pretrain_file, **config)
             res = check_acc()
             np.testing.assert_allclose(res[0], res[-1], rtol=self.rtol)
-
-
-@pytest.mark.skipif(True, reason="Skip for None CE")
-class TestUnifiedCheckpointOnN1C8EnableAll(TestUnifiedCheckpointBase):
-    def setUp(self):
-        super().setUp()
-        for config_key in self.configs:
-            self.configs[config_key]["unified_checkpoint"] = 1
-            self.configs[config_key]["unified_checkpoint_config"] = "enable_all_options"
-
-        self.need_allclose = True
-        self.rtol = 1e-7
-
-    def runfirst(self, train_args):
-        self.run_n1c8(self.run_pretrain_file, **train_args)
-
-    def rerun(self, train_args):
-        self.run_n1c8(self.run_pretrain_file, **train_args)
 
 
 @pytest.mark.skipif(True, reason="Skip for None CE")
