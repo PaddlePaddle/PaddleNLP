@@ -101,6 +101,20 @@ class MambaTokenizer(PretrainedTokenizer):
             unk_token=unk_token,
         )
 
+        # NOTE: add special tokens to the vocab
+        value = kwargs.pop("added_tokens_decoder", {})
+        additional_special_tokens = []
+        for _, token_kwargs in value.items():
+            if isinstance(token_kwargs, AddedToken):
+                content = token_kwargs
+            else:
+                content = AddedToken(**token_kwargs)
+            additional_special_tokens.append(content)
+        if len(additional_special_tokens) > 0:
+            self._build_special_tokens_map_extended(
+                additional_special_tokens=additional_special_tokens,
+            )
+
         self._vocab_file = vocab_file
         self._merges_file = merges_file
         self.max_length = max_length if max_length is not None else int(1e12)
