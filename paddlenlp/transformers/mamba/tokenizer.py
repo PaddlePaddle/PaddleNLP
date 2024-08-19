@@ -105,7 +105,10 @@ class MambaTokenizer(PretrainedTokenizer):
         value = kwargs.pop("added_tokens_decoder", {})
         additional_special_tokens = []
         for _, token_kwargs in value.items():
-            content = AddedToken(**token_kwargs)
+            if isinstance(token_kwargs, AddedToken):
+                content = token_kwargs
+            else:
+                content = AddedToken(**token_kwargs)
             additional_special_tokens.append(content)
         if len(additional_special_tokens) > 0:
             self._build_special_tokens_map_extended(
