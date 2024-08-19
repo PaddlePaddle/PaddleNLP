@@ -19,9 +19,9 @@ from dataclasses import dataclass, field
 import paddle
 from paddle.distributed import fleet
 from predict.predictor import ModelArgument, PredictorArgument, create_predictor
-from utils.utils import generate_rank_mapping, get_infer_model_path
 
 from paddlenlp.trainer import PdArgumentParser
+from paddlenlp.utils import llm_utils
 
 
 @dataclass
@@ -53,7 +53,7 @@ def main():
     predictor.model.eval()
 
     predictor.model.to_static(
-        get_infer_model_path(export_args.output_path, predictor_args.model_prefix),
+        llm_utils.get_infer_model_path(export_args.output_path, predictor_args.model_prefix),
         {
             "dtype": predictor_args.dtype,
             "export_precache": predictor_args.export_precache,
@@ -61,9 +61,13 @@ def main():
         },
     )
     predictor.model.config.save_pretrained(export_args.output_path)
-    predictor.model.generation_config.save_pretrained(export_args.output_path)
+    if predictor.generation_config is not None:
+        predictor.generation_config.save_pretrained(export_args.output_path)
+    else:
+        predictor.model.generation_config.save_pretrained(export_args.output_path)
+
     predictor.tokenizer.save_pretrained(export_args.output_path)
-    generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
+    llm_utils.generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 
     if tensor_parallel_degree > 1:
         export_args.output_path = os.path.join(export_args.output_path, f"rank_{tensor_parallel_rank}")

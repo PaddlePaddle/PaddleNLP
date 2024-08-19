@@ -28,9 +28,11 @@
 
 **PaddleNLP**是一款基于飞桨深度学习框架的大语言模型(LLM)开发套件，支持在多种硬件上进行高效的大模型训练、无损压缩以及高性能推理。PaddleNLP 具备**简单易用**和**性能极致**的特点，致力于助力开发者实现高效的大模型产业级应用。
 
+<a href="https://trendshift.io/repositories/2246" target="_blank"><img src="https://trendshift.io/api/badge/repositories/2246" alt="PaddlePaddle%2FPaddleNLP | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+
 ## News 📢
 
-* **2024.08.08 📚《飞桨产业级大语言模型开发利器 PaddleNLP 3.0 重磅发布》**，训压推全流程贯通，主流模型全覆盖。大模型自动并行，千亿模型训推全流程开箱即用。提供产业级高性能精调与对齐解决方案，压缩推理领先，多硬件适配。覆盖产业级智能助手、内容创作、知识问答、关键信息抽取等应用场景。直播时间：8月15日（周四）19：00。报名链接：https://www.wjx.top/vm/Y2f7FFY.aspx?udsid=143844
+* **2024.08.08 📚《飞桨产业级大语言模型开发利器 PaddleNLP 3.0 重磅发布》**，训压推全流程贯通，主流模型全覆盖。大模型自动并行，千亿模型训推全流程开箱即用。提供产业级高性能精调与对齐解决方案，压缩推理领先，多硬件适配。覆盖产业级智能助手、内容创作、知识问答、关键信息抽取等应用场景。直播时间：8月22日（周四）19：00。报名链接：https://www.wjx.top/vm/Y2f7FFY.aspx?udsid=143844
 
 * **2024.06.27 [PaddleNLP v3.0 Beta](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta0)**：拥抱大模型，体验全升级。统一大模型套件，实现国产计算芯片全流程接入；全面支持飞桨4D 并行配置、高效精调策略、高效对齐算法、高性能推理等大模型产业级应用流程；自研极致收敛的 RsLoRA+算法、自动扩缩容存储机制 Unified Checkpoint 和通用化支持的 FastFFN、FusedQKV 助力大模型训推；主流模型持续支持更新，提供高效解决方案。
 
@@ -80,6 +82,7 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 |     [Qwen](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/)     | qwen/qwen-7b, qwen/qwen-7b-chat, qwen/qwen-14b, qwen/qwen-14b-chat, qwen/qwen-72b, qwen/qwen-72b-chat,                                                                                                                                                                                                                                                                                        |
 |   [Qwen1.5](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/)    | Qwen/Qwen1.5-0.5B, Qwen/Qwen1.5-0.5B-Chat, Qwen/Qwen1.5-1.8B, Qwen/Qwen1.5-1.8B-Chat, Qwen/Qwen1.5-4B, Qwen/Qwen1.5-4B-Chat, Qwen/Qwen1.5-7B, Qwen/Qwen1.5-7B-Chat, Qwen/Qwen1.5-14B, Qwen/Qwen1.5-14B-Chat, Qwen/Qwen1.5-32B, Qwen/Qwen1.5-32B-Chat, Qwen/Qwen1.5-72B, Qwen/Qwen1.5-72B-Chat, Qwen/Qwen1.5-110B, Qwen/Qwen1.5-110B-Chat, Qwen/Qwen1.5-MoE-A2.7B, Qwen/Qwen1.5-MoE-A2.7B-Chat |
 |    [Qwen2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/)     | Qwen/Qwen2-0.5B, Qwen/Qwen2-0.5B-Instruct, Qwen/Qwen2-1.5B, Qwen/Qwen2-1.5B-Instruct, Qwen/Qwen2-7B, Qwen/Qwen2-7B-Instruct, Qwen/Qwen2-72B, Qwen/Qwen2-72B-Instruct, Qwen/Qwen2-57B-A14B, Qwen/Qwen2-57B-A14B-Instruct                                                                                                                                                                       |
+|    [Yuan2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/yuan/)     | IEITYuan/Yuan2-2B, IEITYuan/Yuan2-51B, IEITYuan/Yuan2-102B                                                                                                                                                                                                                                                                                                                                    |
 
 * 4D 并行和算子优化已支持 LLaMA 系列、Baichuan 系列、Bloom 系列、ChatGLM 系列、Gemma 系列、Mistral 系列、OPT 系列和 Qwen 系列，【LLM】模型4D 并行和算子支持列表如下：
 
@@ -105,6 +108,7 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 |      GPT-2/GPT-3      |    ✅     |      ✅       |    ✅     |      ✅       |   ✅    |   ✅    |     ✅      |
 |          OPT          |    ✅     |      ✅       |    🚧    |      ✅       |   ✅    |   ✅    |     🚧     |
 |         Gemma         |    ✅     |      ✅       |    ✅     |      ✅       |   ✅    |   ✅    |     ✅      |
+|         Yuan2         |    ✅     |      ✅       |    ✅     |      ✅       |   ✅    |   ✅    |     🚧     |
 
 * 大模型预训练、精调（包含 SFT、PEFT 技术）、对齐、量化已支持 LLaMA 系列、Baichuan 系列、Bloom 系列、ChatGLM 系列、Mistral 系列、OPT 系列和 Qwen 系列，【LLM】模型预训练、精调、对齐、量化支持列表如下：
 
@@ -113,14 +117,14 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 |       LLaMA        |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  ✅   |      ✅       |       ✅       |
 |        Qwen        |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      🚧      |       ✅       |
 |      Mixtral       |    ✅     |  ✅  |  ✅   |       ❌       | 🚧  |  🚧  |      🚧      |      🚧       |
-|      Mistral       |    ❌     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      🚧      |       ✅       |
+|      Mistral       |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      🚧      |       ✅       |
 | Baichuan/Baichuan2 |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      ✅       |       ✅       |
-|     ChatGLM-6B     |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ❌       |
-| ChatGLM2/ChatGLM3  |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅       |
-|       Bloom        |    ❌     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅       |
+|     ChatGLM-6B     |    ✅     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ❌       |
+| ChatGLM2/ChatGLM3  |    ✅     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅       |
+|       Bloom        |    ✅     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅       |
 |       GPT-3        |    ✅     |  ✅  |  🚧  |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
-|        OPT         |    🚧    |  ✅  |  ✅   |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
-
+|        OPT         |    ✅     |  ✅  |  ✅   |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
+|       Yuan2        |    ✅     |  ✅  |  ✅   |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
 ------------------------------------------------------------------------------------------
 
 ## 安装
