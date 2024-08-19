@@ -20,24 +20,12 @@ import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from threading import Thread
-from typing import List, Optional
 
 import numpy as np
 import paddle
-import paddle.distributed.fleet.base.topology as tp
 import paddle.incubate.multiprocessing as mp
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
 from paddle.distributed import fleet
-from utils.utils import (
-    dybatch_preprocess,
-    get_alibi_slopes,
-    get_infer_model_path,
-    get_model_max_position_embeddings,
-    get_prefix_tuning_params,
-    init_chat_template,
-    load_real_time_tokens,
-    read_res,
-)
 
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
@@ -54,6 +42,7 @@ from paddlenlp.transformers import (
     PretrainedModel,
     PretrainedTokenizer,
 )
+from paddlenlp.utils import llm_utils
 from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
@@ -157,50 +146,6 @@ def batchfy_text(texts, batch_size):
     return batch_texts
 
 
-def init_dist_env():
-    tensor_parallel_degree = paddle.distributed.get_world_size()
-    tensor_parallel_rank = paddle.distributed.get_rank()
-
-    if tensor_parallel_degree > 1:
-        # refer to: https://github.com/PaddlePaddle/Paddle/blob/4abea956ee852ce52791a1e08fa92ed4d3be150d/python/paddle/distributed/fleet/fleet.py#L298C23-L298C45
-        hcg = tp._HYBRID_PARALLEL_GROUP
-        if hcg is None:
-            strategy = fleet.DistributedStrategy()
-            strategy.hybrid_configs = {
-                "dp_degree": 1,
-                "mp_degree": tensor_parallel_degree,
-                "pp_degree": 1,
-                "sharding_degree": 1,
-            }
-            fleet.init(is_collective=True, strategy=strategy)
-            hcg = fleet.get_hybrid_communicate_group()
-
-        tensor_parallel_rank = hcg.get_model_parallel_rank()
-    return tensor_parallel_rank, tensor_parallel_degree
-
-
-def get_eos_token_id(
-    tokenizer: PretrainedTokenizer, generation_config: Optional[GenerationConfig] = None
-) -> List[List[int]]:
-    """get eos_token_id from generation_config or tokenizer
-
-    Returns:
-        List[int]: eos_token_id to stop the generation
-    """
-    eos_token_ids = []
-    if tokenizer.eos_token_id is not None:
-        eos_token_ids.append(tokenizer.eos_token_id)
-
-    if generation_config is not None and generation_config.eos_token_id is not None:
-        if isinstance(generation_config.eos_token_id, int):
-            eos_token_ids.append(generation_config.eos_token_id)
-        else:
-            eos_token_ids.extend(generation_config.eos_token_id)
-
-    eos_token_ids_dict = {str(item): item for item in eos_token_ids}
-    return list(eos_token_ids_dict.values())
-
-
 class BasePredictor:
     def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
         self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
@@ -211,8 +156,11 @@ class BasePredictor:
         self.tokenizer = tokenizer
 
         self.return_tensors = "pd"
-        self.tensor_parallel_rank, self.tensor_parallel_degree = init_dist_env()
-        self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = init_dist_env()
+        self.tensor_parallel_rank, self.tensor_parallel_degree = llm_utils.init_dist_env()
+        self.model_config.tensor_parallel_rank, self.model_config.tensor_parallel_degree = (
+            self.tensor_parallel_rank,
+            self.tensor_parallel_degree,
+        )
 
         try:
             self.generation_config = GenerationConfig.from_pretrained(config.model_name_or_path)
@@ -293,7 +241,7 @@ class DygraphPredictor(BasePredictor):
             )
             self.model.merge()
         if config.prefix_path is not None:
-            prefix_tuning_params = get_prefix_tuning_params(self.model)
+            prefix_tuning_params = llm_utils.get_prefix_tuning_params(self.model)
             self.model = PrefixModelForCausalLM.from_pretrained(
                 model=self.model,
                 prefix_path=config.prefix_path,
@@ -307,7 +255,7 @@ class DygraphPredictor(BasePredictor):
             **inputs,
             max_new_tokens=self.config.max_length,
             bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
+            eos_token_id=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config),
             pad_token_id=self.tokenizer.pad_token_id,
             decode_strategy=self.config.decode_strategy,
             temperature=self.config.temperature,
@@ -326,7 +274,7 @@ class DygraphPredictor(BasePredictor):
             streamer=text_streamer,
             max_new_tokens=self.config.max_length,
             bos_token_id=self.tokenizer.bos_token_id,
-            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
+            eos_token_id=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config),
             pad_token_id=self.tokenizer.pad_token_id,
             decode_strategy=(
                 "greedy_search" if self.config.top_k == 1 and self.config.top_p == 1.0 else self.config.decode_strategy
@@ -465,7 +413,7 @@ class InferencePredictorMixin(BasePredictor):
 
     def _postprocess(self, predictions, return_tokens=False):
         if paddle.distributed.get_rank() == 0:
-            tokens: np.ndarray = load_real_time_tokens()
+            tokens: np.ndarray = llm_utils.load_real_time_tokens()
             decoded_predictions = self.tokenizer.batch_decode(
                 tokens.tolist(), skip_special_tokens=True, clean_up_tokenization_spaces=False
             )
@@ -487,7 +435,7 @@ class InferencePredictorMixin(BasePredictor):
             source = [source] if isinstance(source, str) else source
             source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
 
-        inputs = dybatch_preprocess(
+        inputs = llm_utils.dybatch_preprocess(
             self.tokenizer,
             source,
             self.config.src_length,
@@ -495,7 +443,7 @@ class InferencePredictorMixin(BasePredictor):
             self.architectures,
             top_p=self.config.top_p,
             temperature=self.config.temperature,
-            eos_token_id=get_eos_token_id(self.tokenizer, self.generation_config),
+            eos_token_id=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config),
             benchmark=self.config.benchmark,
             pre_caches_length=pre_caches_length,
         )
@@ -546,7 +494,7 @@ class InferencePredictorMixin(BasePredictor):
 
             inputs["tgt_pos"] = inputs["tgt_pos"] + pre_caches_length
             # alibi encoder
-            alibi_slopes = get_alibi_slopes(self.model_config.n_head)
+            alibi_slopes = llm_utils.get_alibi_slopes(self.model_config.n_head)
             inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
             arange_tensor_encoder = paddle.arange(self.config.total_max_length, dtype=self.config.dtype)
             alibi = alibi_slopes[None, :, None, None] * arange_tensor_encoder
@@ -667,7 +615,9 @@ class StaticInferencePredictor(InferencePredictorMixin):
             import_module("paddlenlp_ops.transpose_remove_padding")
             import_module("paddlenlp_ops.write_cache_kv")
 
-        infer_model_path = get_infer_model_path(predictor_args.model_name_or_path, predictor_args.model_prefix)
+        infer_model_path = llm_utils.get_infer_model_path(
+            predictor_args.model_name_or_path, predictor_args.model_prefix
+        )
 
         config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
@@ -854,7 +804,7 @@ class BlockInferencePredictorMixin(BasePredictor):
             shape=[config.batch_size, 1], fill_value=config.temperature, dtype="float32"
         )
         self.model_inputs["eos_token_id"] = paddle.to_tensor(
-            np.array(get_eos_token_id(self.tokenizer, self.generation_config)).reshape(-1, 1).astype("int64")
+            np.array(llm_utils.get_eos_token_id(self.tokenizer, self.generation_config)).reshape(-1, 1).astype("int64")
         )
         self.model_inputs["penalty_score"] = paddle.full(
             shape=[config.batch_size, 1], fill_value=config.repetition_penalty, dtype="float32"
@@ -871,7 +821,7 @@ class BlockInferencePredictorMixin(BasePredictor):
         self.model_inputs["max_length"] = paddle.full(
             shape=[config.batch_size, 1], fill_value=config.max_length, dtype="int64"
         )
-        self.model_inputs["rope_emb"] = self._get_rotary_position_embedding(
+        self.model_inputs["rope_emb"] = llm_utils.get_rotary_position_embedding(
             paddle.arange(config.total_max_length).reshape((1, -1)), self.head_dim, self.rope_theta, self.rope_scaling
         )
         self.model_inputs["bad_tokens"] = paddle.to_tensor([-1], dtype="int64")
@@ -888,7 +838,7 @@ class BlockInferencePredictorMixin(BasePredictor):
                 shape=[config.batch_size, 1, 1, config.total_max_length], fill_value=1, dtype=self.dtype
             )
             arange_tensor_encoder = paddle.arange(config.total_max_length).astype(self.dtype)
-            alibi_slopes = get_alibi_slopes(self.num_attention_heads)
+            alibi_slopes = llm_utils.get_alibi_slopes(self.num_attention_heads)
             alibi = alibi_slopes[None, :, None, None] * arange_tensor_encoder
             alibi_encoder = alibi.tile([config.batch_size, 1, config.total_max_length, 1])
             alibi_decoder = alibi.tile(
@@ -906,57 +856,6 @@ class BlockInferencePredictorMixin(BasePredictor):
             self.model_inputs["tgt_mask"] = (
                 alibi_decoder + (1 - self.model_inputs["tgt_mask"]) * paddle.finfo(self.dtype).min
             ).cast(self.dtype)
-
-    def _get_rotary_position_embedding(self, position_ids, head_dim, rope_theta=10000.0, rope_scaling: dict = None):
-        """
-        Pre-calculate rotary position embedding for position_ids.
-
-        Args:
-            position_ids: [1, S]
-            head_dim: D
-
-        Returns:
-            rot_emb: [2, 1, S, 1, D], cos + sin
-        """
-        bsz, max_seq_len = position_ids.shape[:2]
-        rot_emb = paddle.zeros((2, bsz, max_seq_len, 1, head_dim), dtype="float32")
-        inv_freq = rope_theta ** (-paddle.arange(0, head_dim, 2, dtype="float32") / head_dim)
-
-        if rope_scaling is not None:
-            rope_type = rope_scaling.get("rope_type", None)
-            if rope_type is not None and rope_type == "llama3":
-                factor = rope_scaling.get("factor", 8.0)
-                low_freq_factor = rope_scaling.get("low_freq_factor", 1.0)
-                high_freq_factor = rope_scaling.get("high_freq_factor", 4.0)
-                original_max_position_embeddings = rope_scaling.get("original_max_position_embeddings", 8192)
-
-                low_freq_wavelen = original_max_position_embeddings / low_freq_factor
-                high_freq_wavelen = original_max_position_embeddings / high_freq_factor
-                new_freqs = []
-                for freq in inv_freq:
-                    import math
-
-                    wavelen = 2 * math.pi / freq
-                    if wavelen < high_freq_wavelen:
-                        new_freqs.append(freq)
-                    elif wavelen > low_freq_wavelen:
-                        new_freqs.append(freq / factor)
-                    else:
-                        assert low_freq_wavelen != high_freq_wavelen
-                        smooth = (original_max_position_embeddings / wavelen - low_freq_factor) / (
-                            high_freq_factor - low_freq_factor
-                        )
-                        new_freqs.append((1 - smooth) * freq / factor + smooth * freq)
-                inv_freq = paddle.to_tensor(new_freqs, dtype=inv_freq.dtype)
-
-        # shape: [B, S, D/2]
-        freqs = paddle.einsum("ij,k->ijk", position_ids.cast("float32"), inv_freq)
-        # shape: [B, S, 1, D]
-        emb = paddle.concat([freqs, freqs], axis=-1).reshape((bsz, max_seq_len, 1, head_dim))
-
-        rot_emb[0] = paddle.cos(emb)
-        rot_emb[1] = paddle.sin(emb)
-        return rot_emb
 
     def _preprocess(self, input_text: list[str]):
         if self.tokenizer.chat_template is not None:
@@ -1053,7 +952,9 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         output_tensor = output_tensor.cpu()
         tensor_queue.put(output_tensor)
 
-        read_res_process = mp.Process(target=read_res, args=[self.model_name_or_path, tensor_queue, result_queue])
+        read_res_process = mp.Process(
+            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue]
+        )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
 
@@ -1119,7 +1020,9 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
                 "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
             )
 
-        infer_model_path = get_infer_model_path(predictor_args.model_name_or_path, predictor_args.model_prefix)
+        infer_model_path = llm_utils.get_infer_model_path(
+            predictor_args.model_name_or_path, predictor_args.model_prefix
+        )
 
         config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
@@ -1175,7 +1078,9 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
         output_tensor = output_tensor.cpu()
         tensor_queue.put(output_tensor)
 
-        read_res_process = mp.Process(target=read_res, args=[self.model_name_or_path, tensor_queue, result_queue])
+        read_res_process = mp.Process(
+            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue]
+        )
 
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
@@ -1220,7 +1125,7 @@ def create_predictor(
         predictor_args.model_name_or_path,
     )
     # init chat_template for tokenizer
-    init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
+    llm_utils.init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
 
     # TODO(wj-Mcat): fix llama tokenzier pad_token bug
     if (isinstance(tokenizer, (LlamaTokenizer, Llama3Tokenizer))) and not tokenizer.pad_token:
@@ -1228,7 +1133,7 @@ def create_predictor(
 
     config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
 
-    max_position_embeddings = get_model_max_position_embeddings(config)
+    max_position_embeddings = llm_utils.get_model_max_position_embeddings(config)
     if max_position_embeddings is None:
         max_position_embeddings = predictor_args.src_length + predictor_args.max_length
         logger.warning(
@@ -1247,7 +1152,7 @@ def create_predictor(
         predictor_args.top_p = 0.0
         predictor_args.temperature = 1.0
 
-    tensor_parallel_rank, tensor_parallel_degree = init_dist_env()
+    tensor_parallel_rank, tensor_parallel_degree = llm_utils.init_dist_env()
     if not predictor_args.inference_model:
         tokenizer.padding_side = "left"
         if predictor_args.mode == "dynamic":

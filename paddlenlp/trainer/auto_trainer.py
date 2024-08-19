@@ -130,12 +130,7 @@ class AutoTrainer(Trainer):
 
     def _wrap_amp_model(self, args, model):
         logger.info("Using half precision")
-        if args.to_static:
-            return
-        self.enable_autocast_context_manager = True
-        self.do_grad_scaling = True if self.args.fp16 else False
         self.amp_dtype = "float16" if self.args.fp16 else "bfloat16"
-        self.scaler = dist.shard_scaler(paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss))
         if self.args.fp16_opt_level == "O2":
             paddle.amp.decorate(
                 models=model,
@@ -144,6 +139,11 @@ class AutoTrainer(Trainer):
                 master_grad=self.args.amp_master_grad,
                 excluded_layers=QuantizationLinear,
             )
+        if args.to_static:
+            return
+        self.enable_autocast_context_manager = True
+        self.do_grad_scaling = True if self.args.fp16 else False
+        self.scaler = dist.shard_scaler(paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss))
 
     def _get_item_from_loss(self, loss):
         if isinstance(loss, paddle.Tensor):
