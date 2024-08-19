@@ -759,6 +759,9 @@ void TuneCublasltGemm(const paddle::Tensor& M,
       case 1024:
         step = 1024;
         break;
+      case 8192:
+        step = 4096;
+        break;
     }
   }
 
