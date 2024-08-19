@@ -316,9 +316,10 @@ class FusedMultiTransformerBase(Layer):
         self.head_dim = config.embed_dim // config.num_heads
         assert self.head_dim * config.num_heads == config.embed_dim, "embed_dim must be divisible by num_heads"
 
-        self._is_moe = config.is_moe
-        self._moe_every2 = config.moe_every2
-        self._moe_topk = config.moe_topk
+        if config.is_moe:
+            self._is_moe = config.is_moe
+            self._moe_every2 = config.moe_every2
+            self._moe_topk = config.moe_topk
 
         # tensor model parallel
         if config.nranks > 1:
