@@ -28,7 +28,14 @@ from paddlenlp.transformers import (
     JambaForSequenceClassification,
     JambaModel,
 )
-from paddlenlp.transformers.jamba.modeling import HybridMambaAttentionDynamicCache
+from paddlenlp.transformers.jamba.modeling import (
+    FakeMLPForwardBackward,
+    HybridMambaAttentionDynamicCache,
+    get_triangle_upper_mask,
+    is_autocast_enabled,
+    is_casual_mask,
+    repeat_kv,
+)
 
 from ...testing_utils import slow
 
@@ -531,6 +538,62 @@ class JambaModelTest(ModelTesterMixin, unittest.TestCase):
     @parameterized.expand([(1, False), (1, True), (4, False)])
     def test_new_cache_format(self, num_beams, do_sample):
         pass
+
+    def test_config_num_key_value_heads_none(self):
+        config = JambaConfig(num_attention_heads=4, num_key_value_heads=None)
+        self.assertTrue(
+            config.num_key_value_heads == config.num_attention_heads,
+        )
+
+    def test_is_autocast_enabled(self):
+        self.assertFalse(is_autocast_enabled())
+
+    def test_get_triangle_upper_mask(self):
+        bsz = 1
+        n_head = 2
+        q_len = 10
+        kv_seq_len = 16
+        x = paddle.randn([bsz, n_head, q_len, kv_seq_len], dtype="float32")
+        mask = paddle.randint(0, 2, [bsz, n_head, q_len, kv_seq_len], dtype="int64").cast("bool")
+        tri_mask1 = get_triangle_upper_mask(x, mask=None)
+        tri_mask2 = get_triangle_upper_mask(x, mask=mask)
+        self.assertTrue(
+            tri_mask1.shape == [bsz, 1, q_len, kv_seq_len],
+        )
+        self.assertTrue(paddle.equal_all(tri_mask2, mask))
+        self.assertTrue(is_casual_mask(tri_mask1))
+        self.assertFalse(is_casual_mask(tri_mask2))
+
+    def test_repeat_kv(self):
+        shape = [1, 2, 3, 4]
+        hidden_states = paddle.randn(shape, dtype="float32")
+        output = repeat_kv(hidden_states, n_rep=1)
+        self.assertTrue(paddle.equal_all(hidden_states, output))
+
+    def test_FakeMLPForwardBackward(self):
+        x = paddle.randn([1, 2, 3], dtype="float32")
+        x.stop_gradient = False
+        gate_weight = paddle.randn([4, 5, 6], dtype="float32")
+        gate_weight.stop_gradient = False
+        up_weight = paddle.randn([1, 3, 5], dtype="float32")
+        up_weight.stop_gradient = False
+        down_weight = paddle.randn([2, 4, 6], dtype="float32")
+        down_weight.stop_gradient = False
+        out = FakeMLPForwardBackward.apply(x, gate_weight=gate_weight, up_weight=up_weight, down_weight=down_weight)
+        loss = out.sum()
+        loss.backward()
+        self.assertTrue(
+            loss == 0
+            and x.grad.sum() == 0
+            and gate_weight.grad.sum() == 0
+            and up_weight.grad.sum() == 0
+            and down_weight.grad.sum() == 0
+        )
+
+    def test_from_hf_hub(self):
+        model_id = "ai21labs/Jamba-tiny-random"
+        model = JambaForCausalLM.from_pretrained(model_id, dtype="bfloat16", from_hf_hub=True, convert_from_torch=True)
+        self.assertTrue(model.config.vocab_size == 65536)
 
 
 class JambaModelIntegrationTest(unittest.TestCase):
