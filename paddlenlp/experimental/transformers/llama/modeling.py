@@ -43,7 +43,12 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
     GenerationInferenceModel,
 )
-from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
+from paddlenlp.experimental.transformers.utils import (
+    EmptyActScale,
+    EmptyCacheScale,
+    EmptyWeightScale,
+    infererence_model_from_pretrained,
+)
 from paddlenlp.transformers import LlamaConfig, LlamaPretrainedModel
 from paddlenlp.transformers.conversion_utils import split_param_func
 from paddlenlp.transformers.llama.modeling import LlamaLMHead
@@ -346,7 +351,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.num_layers = config.num_hidden_layers
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
-        self.quant_type = config.quant_type
+        self.quant_type = config.get("quant_type", "")
 
         self.rope_theta = config.rope_theta
         self.use_neox = True
@@ -364,6 +369,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             self.smooth = config.quantization_config.smooth
             self.shift_smooth_all_linears = config.quantization_config.shift_smooth_all_linears
 
+        self.use_fake_parameter = config.get("use_fake_parameter", False)
+
         if self.use_weight_only:
             assert (
                 self.quant_type == "weight_only_int8" or self.quant_type == "weight_only_int4"
@@ -371,7 +378,17 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 self.quant_type
             )
 
-        self.embed_tokens = nn.Embedding(self.vocab_size, self.hidden_size)
+        if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
+            self.embed_tokens = fleet.meta_parallel.VocabParallelEmbedding(
+                self.vocab_size,
+                self.hidden_size,
+                weight_attr=paddle.ParamAttr(initializer=nn.initializer.XavierNormal()),
+            )
+        else:
+            self.embed_tokens = nn.Embedding(
+                self.vocab_size,
+                self.hidden_size,
+            )
 
         # get ring_id
         ring_id = -1
@@ -884,6 +901,30 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
             if "a8w8" in self.quant_type:
                 if self.shift_smooth_all_linears:
+                    if self.use_fake_parameter:
+                        if "llama.layers.{}.self_attn.o_proj.shift_bias".format(idx) not in state_dict:
+                            state_dict["llama.layers.{}.self_attn.o_proj.shift_bias".format(idx)] = paddle.zeros(
+                                shape=[
+                                    (self.num_attention_heads // self.config.tensor_parallel_degree)
+                                    * (self.hidden_size // self.num_attention_heads)
+                                ],
+                                dtype=paddle.get_default_dtype(),
+                            )
+                            state_dict["llama.layers.{}.self_attn.o_proj.smooth_weight".format(idx)] = paddle.ones(
+                                shape=[
+                                    (self.num_attention_heads // self.config.tensor_parallel_degree)
+                                    * (self.hidden_size // self.num_attention_heads)
+                                ],
+                                dtype=paddle.get_default_dtype(),
+                            )
+                            state_dict["llama.layers.{}.mlp.down_proj.shift_bias".format(idx)] = paddle.zeros(
+                                shape=[self.intermediate_size // self.config.tensor_parallel_degree],
+                                dtype=paddle.get_default_dtype(),
+                            )
+                            state_dict["llama.layers.{}.mlp.down_proj.smooth_weight".format(idx)] = paddle.ones(
+                                shape=[self.intermediate_size // self.config.tensor_parallel_degree],
+                                dtype=paddle.get_default_dtype(),
+                            )
                     self.transformer_block.linear_shifts[idx].set_value(
                         paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.shift_bias".format(idx)])
                     )
@@ -898,6 +939,33 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     )
 
                 if self.shift:
+                    if self.use_fake_parameter:
+                        if "llama.layers.{}.input_layernorm.bias".format(idx) not in state_dict:
+                            state_dict["llama.layers.{}.input_layernorm.bias".format(idx)] = paddle.zeros(
+                                shape=[self.hidden_size], dtype=paddle.get_default_dtype()
+                            )
+                            state_dict["llama.layers.{}.post_attention_layernorm.bias".format(idx)] = paddle.zeros(
+                                [self.hidden_size], dtype=paddle.get_default_dtype()
+                            )
+                            unfused_state_dict["self_attn.q_proj.bias"] = paddle.zeros(
+                                shape=[self.num_attention_heads * (self.hidden_size // self.num_attention_heads)],
+                                dtype=paddle.get_default_dtype(),
+                            )
+                            unfused_state_dict["self_attn.k_proj.bias"] = paddle.zeros(
+                                shape=[self.num_key_value_heads * (self.hidden_size // self.num_attention_heads)],
+                                dtype=paddle.get_default_dtype(),
+                            )
+                            unfused_state_dict["self_attn.v_proj.bias"] = paddle.zeros(
+                                shape=[self.num_key_value_heads * (self.hidden_size // self.num_attention_heads)],
+                                dtype=paddle.get_default_dtype(),
+                            )
+                            unfused_state_dict["mlp.gate_proj.bias"] = paddle.zeros(
+                                shape=[self.intermediate_size], dtype=paddle.get_default_dtype()
+                            )
+                            unfused_state_dict["mlp.up_proj.bias"] = paddle.zeros(
+                                shape=[self.intermediate_size], dtype=paddle.get_default_dtype()
+                            )
+
                     self.transformer_block.ln_biases[idx].set_value(
                         paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.bias".format(idx)])
                     )
@@ -938,6 +1006,14 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     self.transformer_block.ffn1_biases[idx].set_value(paddle.to_tensor(concated_ffn1_bias))
 
                     if self.shift_smooth_all_linears:
+                        if self.use_fake_parameter:
+                            if "llama.layers.{}.self_attn.o_proj.bias".format(idx) not in state_dict:
+                                state_dict["llama.layers.{}.self_attn.o_proj.bias".format(idx)] = paddle.zeros(
+                                    [self.hidden_size], dtype=paddle.get_default_dtype()
+                                )
+                                state_dict["llama.layers.{}.mlp.down_proj.layer.bias".format(idx)] = paddle.zeros(
+                                    [self.hidden_size], dtype=paddle.get_default_dtype()
+                                )
                         self.transformer_block.linear_biases[idx].set_value(
                             paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.bias".format(idx)])
                         )
@@ -970,43 +1046,65 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 act_scale_map_dict = scale_map_dict["act_scale"]
                 weight_scale_map_dict = scale_map_dict["weight_scale"]
                 cache_scale_map_dict = scale_map_dict["cachekv_scale"]
-                # TODO(RichardWooSJTU): support multi-cards
 
-                act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
-                weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
-                if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                    act_scale_json_path = os.path.join(
-                        self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
+                if not self.use_fake_parameter:
+                    act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
+                    weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
+                    if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
+                        act_scale_json_path = os.path.join(
+                            self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
+                        )
+                        weight_scale_json_path = os.path.join(
+                            self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
+                        )
+                    act_scale_loader = ActScalesLoader(
+                        act_scale_json_path, act_scale_map_dict, num_of_layers=self.config.num_hidden_layers
                     )
-                    weight_scale_json_path = os.path.join(
-                        self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
+                    weight_scales_loader = WeightScalesLoader(
+                        weight_scale_json_path,
+                        weight_scale_map_dict,
+                        num_of_layers=self.config.num_hidden_layers,
+                        concat_qkv=True,
+                        concat_ffn1=True,
                     )
-                act_scale_loader = ActScalesLoader(
-                    act_scale_json_path, act_scale_map_dict, num_of_layers=self.config.num_hidden_layers
-                )
+                else:
+                    act_scale_loader = EmptyActScale(act_scale_map_dict, num_of_layers=self.config.num_hidden_layers)
+                    weight_scales_loader = EmptyWeightScale(
+                        weight_scale_map_dict,
+                        num_of_layers=self.config.num_hidden_layers,
+                        num_head=self.num_attention_heads,
+                        dim_head=self.hidden_size // self.num_attention_heads,
+                        ffn_hidden_size=self.intermediate_size,
+                        num_key_value_heads=self.num_key_value_heads,
+                        mp_size=self.config.tensor_parallel_degree,
+                    )
                 self.transformer_block.act_scales = act_scale_loader.scale
 
-                weight_scales_loader = WeightScalesLoader(
-                    weight_scale_json_path,
-                    weight_scale_map_dict,
-                    num_of_layers=self.config.num_hidden_layers,
-                    concat_qkv=True,
-                    concat_ffn1=True,
-                )
-
                 if self.config.cachekv_int8_type == "static":
-                    cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_scales.json")
-                    if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                        cache_scale_json_path = os.path.join(
-                            self.quant_model_path, f"cachekv_act_scales_{self.config.tensor_parallel_rank}.json"
+                    if not self.use_fake_parameter:
+                        cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_scales.json")
+                        if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
+                            cache_scale_json_path = os.path.join(
+                                self.quant_model_path, f"cachekv_scales_{self.config.tensor_parallel_rank}.json"
+                            )
+                        cache_scales_loader = CacheScaleLoader(
+                            cache_scale_json_path,
+                            cache_scale_map_dict,
+                            num_of_layers=self.config.num_hidden_layers,
+                            num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                            num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
                         )
-                    cache_scales_loader = CacheScaleLoader(
-                        cache_scale_json_path,
-                        cache_scale_map_dict,
-                        num_of_layers=self.config.num_hidden_layers,
-                        num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
-                        num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
-                    )
+                    else:
+                        cache_scales_loader = EmptyCacheScale(
+                            cache_scale_map_dict,
+                            num_of_layers=self.config.num_hidden_layers,
+                            num_heads=self.num_attention_heads,
+                            dim_heads=self.hidden_size // self.num_attention_heads,
+                            is_channel_wise=False,
+                            num_key_value_heads=self.num_key_value_heads,
+                            mp_size=self.config.tensor_parallel_degree,
+                        )
+
                     for k, v in cache_scales_loader.scale.items():
                         for i_layer, weight_scale in enumerate(v):
                             weight_scale = weight_scale.astype("float32")
@@ -1247,58 +1345,6 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         self.lm_head = LlamaLMHead(config)
 
     @classmethod
-    def _get_tensor_parallel_mappings(cls, config: LlamaConfig, is_split=True):
-
-        from paddlenlp.transformers.conversion_utils import split_or_merge_func
-
-        fn = split_or_merge_func(
-            is_split=is_split,
-            tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_rank=config.tensor_parallel_rank,
-            num_attention_heads=config.num_attention_heads,
-        )
-
-        def get_tensor_parallel_split_mappings(num_layers):
-            final_actions = {}
-
-            base_actions = {
-                "lm_head.weight": partial(fn, is_column=True),
-                # Row Linear
-                "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
-                "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
-            }
-
-            # Column Linear
-            if config.fuse_attention_qkv:
-                base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
-            else:
-                base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
-                # if we have enough num_key_value_heads to split, then split it.
-                if config.num_key_value_heads % config.tensor_parallel_degree == 0:
-                    base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
-                    base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
-
-            if config.fuse_attention_ffn:
-                base_actions["layers.0.mlp.gate_up_fused_proj.weight"] = partial(
-                    fn, is_column=True, is_naive_2fuse=True
-                )
-            else:
-                base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
-
-            for key, action in base_actions.items():
-                if "layers.0." in key:
-                    for i in range(num_layers):
-                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
-                final_actions[key] = action
-
-            return final_actions
-
-        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
-
-        return mappings
-
-    @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
         return infererence_model_from_pretrained(cls, pretrained_model_name_or_path, args, kwargs)
 
@@ -1477,6 +1523,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             base_actions = {
                 "lm_head.weight": partial(fn, is_column=True),
                 # Row Linear
+                "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }

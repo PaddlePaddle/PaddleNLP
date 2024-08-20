@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .configuration import *
-from .modeling import *
-from .modeling_auto import *
-from .modeling_auto_static import *
-from .modeling_pp import *
-from .tokenizer import *
-from .tokenizer_fast import *
+from ..llama import LlamaTokenizer
+
+__all__ = ["JambaTokenizer"]
+
+
+class JambaTokenizer(LlamaTokenizer):
+    model_input_names = ["input_ids", "attention_mask"]
+    resource_files_names = {
+        "vocab_file": "sentencepiece.bpe.model",
+    }
+    pretrained_resource_files_map = {}
+    pretrained_init_configuration = {}

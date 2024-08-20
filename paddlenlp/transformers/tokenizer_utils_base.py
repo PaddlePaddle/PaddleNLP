@@ -22,8 +22,8 @@ import os
 import shutil
 import tempfile
 import warnings
-from collections import OrderedDict, UserDict
-from dataclasses import dataclass, field
+from collections import UserDict
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 
@@ -41,35 +41,47 @@ from huggingface_hub.utils import EntryNotFoundError
 
 from ..utils.download import resolve_file_path
 from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME, TOKENIZER_CONFIG_NAME
+from ..utils.import_utils import is_tokenizers_available
 from ..utils.log import logger
 
+if is_tokenizers_available():
+    from tokenizers import AddedToken
+    from tokenizers import Encoding as EncodingFast
+else:
 
-@dataclass(frozen=True, eq=True)
-class AddedToken:
-    """
-    AddedToken represents a token to be added to a Tokenizer An AddedToken can have special options defining the
-    way it should behave.
-    """
+    @dataclass(frozen=False, eq=True)
+    class AddedToken:
+        """
+        AddedToken represents a token to be added to a Tokenizer An AddedToken can have special options defining the
+        way it should behave.
+        The `normalized` will default to `not special` if it is not specified, similarly to the definition in
+        `tokenizers`.
+        """
 
-    content: str = field(default_factory=str)
-    single_word: bool = False
-    lstrip: bool = False
-    rstrip: bool = False
-    normalized: bool = True
-    special: bool = True
+        def __init__(
+            self, content: str, single_word=False, lstrip=False, rstrip=False, special=False, normalized=None
+        ):
+            self.content = content
+            self.single_word = single_word
+            self.lstrip = lstrip
+            self.rstrip = rstrip
+            self.special = special
+            self.normalized = normalized if normalized is not None else not special
 
-    def __getstate__(self):
-        return self.__dict__
+        def __getstate__(self):
+            return self.__dict__
 
-    def __str__(self):
-        return self.content
+        def __str__(self):
+            return self.content
 
+        def __repr__(self) -> str:
+            return f"AddedToken(content={self.content}, single_word={self.single_word}, lstrip={self.lstrip}, rstrip={self.rstrip}, special={self.special}, normalized={self.normalized})"
 
-@dataclass
-class FastEncoding:
-    """This is dummy class reserved for fast tokenizer"""
+    @dataclass
+    class EncodingFast:
+        """This is dummy class reserved for fast tokenizer"""
 
-    pass
+        pass
 
 
 class ExplicitEnum(Enum):
@@ -203,14 +215,14 @@ class BatchEncoding(UserDict):
     def __init__(
         self,
         data: Optional[Dict[str, Any]] = None,
-        encoding: Optional[Union[FastEncoding, Sequence[FastEncoding]]] = None,
+        encoding: Optional[Union[EncodingFast, Sequence[EncodingFast]]] = None,
         tensor_type: Union[None, str] = None,
         prepend_batch_axis: bool = False,
         n_sequences: Optional[int] = None,
     ):
         super().__init__(data)
 
-        if isinstance(encoding, FastEncoding):
+        if isinstance(encoding, EncodingFast):
             encoding = [encoding]
 
         self._encodings = encoding
@@ -239,7 +251,7 @@ class BatchEncoding(UserDict):
         """
         return self._encodings is not None
 
-    def __getitem__(self, item: Union[int, str]) -> Union[Any, FastEncoding]:
+    def __getitem__(self, item: Union[int, str]) -> Union[Any, EncodingFast]:
         """
         If the key is a string, returns the value of the dict associated to `key` ('input_ids', 'attention_mask',
         etc.).
@@ -286,9 +298,9 @@ class BatchEncoding(UserDict):
     # not yet supported
 
     @property
-    def encodings(self) -> Optional[List[FastEncoding]]:
+    def encodings(self) -> Optional[List[EncodingFast]]:
         """
-        `Optional[List[FastEncoding]]`: The list all encodings from the tokenization process. Returns `None` if
+        `Optional[List[EncodingFast]]`: The list all encodings from the tokenization process. Returns `None` if
         the input was tokenized through Python (i.e., not a fast) tokenizer.
         """
         return self._encodings
@@ -1196,12 +1208,16 @@ class SpecialTokensMixin:
         Don't convert tokens of `AddedToken` type to string so they can be used to control more finely how
         special tokens are tokenized.
         """
-        all_toks = []
-        set_attr = self.special_tokens_map_extended
-        for attr_value in set_attr.values():
-            all_toks = all_toks + (list(attr_value) if isinstance(attr_value, (list, tuple)) else [attr_value])
-        all_toks = list(OrderedDict.fromkeys(all_toks))
-        return all_toks
+        all_tokens = []
+        seen = set()
+        for value in self.special_tokens_map_extended.values():
+            if isinstance(value, (list, tuple)):
+                tokens_to_add = [token for token in value if str(token) not in seen]
+            else:
+                tokens_to_add = [value] if str(value) not in seen else []
+            seen.update(map(str, tokens_to_add))
+            all_tokens.extend(tokens_to_add)
+        return all_tokens
 
     @property
     def all_special_ids(self) -> List[int]:
@@ -1322,6 +1338,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             )
 
         self.model_input_names = kwargs.pop("model_input_names", self.model_input_names)
+
+        # By default, do not split special tokens for both fast and slow tokenizers
+        self.split_special_tokens = kwargs.pop("split_special_tokens", False)
 
         self.deprecation_warnings = (
             {}
@@ -1523,6 +1542,21 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 init_kwargs = json.load(f)
         else:
             init_kwargs = init_configuration
+
+        # Handle tokenizer serialization of added and special tokens
+        added_tokens_decoder: Dict[int, AddedToken] = {}
+        # if we have info on the slow added tokens
+        if "added_tokens_decoder" in init_kwargs:
+            for idx, token in init_kwargs["added_tokens_decoder"].items():
+                if isinstance(token, dict):
+                    token = AddedToken(**token)
+                if isinstance(token, AddedToken):
+                    added_tokens_decoder[int(idx)] = token
+                else:
+                    raise ValueError(
+                        f"Found a {token.__class__} in the saved `added_tokens_decoder`, should be a dictionary or an AddedToken instance"
+                    )
+            init_kwargs["added_tokens_decoder"] = added_tokens_decoder
 
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())

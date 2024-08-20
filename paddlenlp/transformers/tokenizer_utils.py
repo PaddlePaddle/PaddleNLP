@@ -45,8 +45,8 @@ except ImportError:
     from backports.functools_lru_cache import lru_cache
 
 from ..data.vocab import Vocab
+from ..utils.import_utils import is_tokenizers_available
 from .tokenizer_utils_base import (
-    AddedToken,
     BatchEncoding,
     EncodedInput,
     EncodedInputPair,
@@ -60,6 +60,11 @@ from .tokenizer_utils_base import (
     TruncationStrategy,
 )
 from .utils import InitTrackerMeta, convert_to_dict_message, fn_args_to_dict
+
+if is_tokenizers_available():
+    from tokenizers import AddedToken
+else:
+    from .tokenizer_utils_base import AddedToken
 
 __all__ = [
     "PretrainedTokenizer",
@@ -1021,6 +1026,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                 token != self.unk_token
                 and self.convert_tokens_to_ids(token) == self.convert_tokens_to_ids(self.unk_token)
                 and token not in tokens_to_add
+                and token not in self.added_tokens_encoder.keys()
             ):
                 tokens_to_add.append(token)
                 if self.verbose:
@@ -1095,6 +1101,9 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         Returns:
             `List[str]`: The list of tokens.
         """
+
+        split_special_tokens = kwargs.pop("split_special_tokens", self.split_special_tokens)
+
         # Simple mapping string => AddedToken for special tokens with specific tokenization behaviors
         all_special_tokens_extended = dict(
             (str(t), t) for t in self.all_special_tokens_extended if isinstance(t, AddedToken)
@@ -1111,8 +1120,13 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             pattern = r"(" + r"|".join(escaped_special_toks) + r")|" + r"(.+?)"
             text = re.sub(pattern, lambda m: m.groups()[0] or m.groups()[1].lower(), text)
 
-        no_split_token = set(self.unique_no_split_tokens)
-        tokens = self.tokens_trie.split(text)
+        if split_special_tokens:
+            no_split_token = []
+            tokens = [text]
+        else:
+            no_split_token = set(self.unique_no_split_tokens)  # don't split on any of the added tokens
+            # "This is something<special_token_1>  else"
+            tokens = self.tokens_trie.split(text)
 
         # ["This is something", "<special_token_1>", "  else"]
         for i, token in enumerate(tokens):
