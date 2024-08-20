@@ -155,7 +155,7 @@ class CheckpointConverter:
             logger.info("Calling _load_state_dict to load the required weights.")
             _load_state_dict(self.auto_parallel_state_dict, source_state_dict, [metadata])
             logger.info("Calling _load_state_dict completed, restored the required weights.")
-            logger.info("Successfully loaded hybrid_parallel checkpoint!")
+        logger.info("Successfully loaded hybrid_parallel checkpoint!")
 
     def gen_metadata_and_prepare_source_state_dict(self):
         """
