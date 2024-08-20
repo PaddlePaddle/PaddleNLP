@@ -157,6 +157,12 @@ class MoeConfig:
     norm_topk_prob: bool = True
     moe_every2: bool = False
 
+    def has_moe(self) -> bool:
+        return self.num_experts > 1
+
+    def use_moe(self, i: int) -> bool:
+        return self.has_moe() and (self.moe_every2 is False or (self.moe_every2 and i % 2 == 1))
+
 
 class FusedMultiTransformerConfig:
     def __init__(
@@ -270,13 +276,8 @@ class FusedMultiTransformerConfig:
         self.rank_id = rank_id
         self.trans_qkvw = trans_qkvw
         self.ring_id = ring_id
-        if moe_config:
-            self.is_moe = True
-            self.moe_every2 = moe_config.moe_every2
-            self.moe_topk = moe_config.top_k
-            self.num_experts = moe_config.num_experts
-        else:
-            self.is_moe = False
+
+        self.moe_config = moe_config
 
 
 class FusedMultiTransformerBase(Layer):
@@ -432,16 +433,16 @@ class FusedMultiTransformerBase(Layer):
                 )
 
             gate_weight = None
-            if config.is_moe is True and ((config.moe_every2 is True and i % 2 == 1) or config.moe_every2 is False):
+            if config.moe_config.use_moe(i):
                 gate_weight = self.create_parameter(
-                    shape=[config.embed_dim, config.num_experts],
+                    shape=[config.embed_dim, self.config.moe_config.num_experts],
                     attr=gate_weight_attr,
                     dtype="float32",
                     is_bias=False,
                     default_initializer=paddle.nn.initializer.Constant(0),
                 )
 
-            if config.is_moe is True and ((config.moe_every2 is True and i % 2 == 1) or config.moe_every2 is False):
+            if config.moe_config.use_moe(i):
                 ffn1_weight = self.create_parameter(
                     shape=self.moe_ffn1_weight_shape,
                     attr=ffn1_weight_attr,
@@ -458,13 +459,11 @@ class FusedMultiTransformerBase(Layer):
 
             ffn1_bias = None
             if ffn1_bias_attr:
-                if self.config.is_moe is True and (
-                    (self.config.moe_every2 is True and i % 2 == 1) or self.config.moe_every2 is False
-                ):
+                if self.config.moe_config.use_moe(i):
                     ffn1_bias = self.create_parameter(
-                        shape=[config.num_experts, self.dim_feedforward * 2]
+                        shape=[self.config.moe_config.num_experts, self.dim_feedforward * 2]
                         if self.activation.endswith("glu")
-                        else [config.num_experts, self.dim_feedforward],
+                        else [self.config.moe_config.num_experts, self.dim_feedforward],
                         attr=ffn1_bias_attr,
                         dtype=self._dtype,
                         is_bias=True,
@@ -477,9 +476,7 @@ class FusedMultiTransformerBase(Layer):
                         is_bias=True,
                     )
 
-            if self.config.is_moe is True and (
-                (self.config.moe_every2 is True and i % 2 == 1) or self.config.moe_every2 is False
-            ):
+            if self.config.moe_config.use_moe(i):
                 ffn2_weight = self.create_parameter(
                     shape=self.moe_ffn2_weight_shape,
                     attr=ffn2_weight_attr,
@@ -496,11 +493,9 @@ class FusedMultiTransformerBase(Layer):
 
             ffn2_bias = None
             if ffn2_bias_attr:
-                if config.is_moe is True and (
-                    (config.moe_every2 is True and i % 2 == 1) or config.moe_every2 is False
-                ):
+                if config.moe_config.use_moe(i):
                     ffn2_bias = self.create_parameter(
-                        shape=[config.num_experts, config.embed_dim],
+                        shape=[self.config.moe_config.num_experts, config.embed_dim],
                         attr=ffn2_bias_attr,
                         dtype=self._dtype,
                         is_bias=True,
@@ -636,13 +631,13 @@ class FusedMultiTransformerBase(Layer):
         )
         self.ffn2_weight_shape = [self.dim_feedforward, self.embed_dim]
 
-        if self.config.is_moe is True:
+        if self.config.moe_config.has_moe() is True:
             self.moe_ffn1_weight_shape = (
-                [config.num_experts, self.embed_dim, self.dim_feedforward * 2]
+                [self.config.moe_config.num_experts, self.embed_dim, self.dim_feedforward * 2]
                 if self.activation.endswith("glu")
-                else [config.num_experts, self.embed_dim, self.dim_feedforward]
+                else [self.config.moe_config.num_experts, self.embed_dim, self.dim_feedforward]
             )
-            self.moe_ffn2_weight_shape = [config.num_experts, self.dim_feedforward, self.embed_dim]
+            self.moe_ffn2_weight_shape = [self.config.moe_config.num_experts, self.dim_feedforward, self.embed_dim]
 
     def get_weight_create_dype(self):
         return self._dtype
@@ -817,7 +812,7 @@ class FusedMultiTransformerBase(Layer):
             None,
             None,
             "None",
-            self.config.moe_topk,
+            self.config.moe_config.top_k,
         )
         return fused_moe_out
 
@@ -962,9 +957,7 @@ class FusedMultiTransformerBase(Layer):
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
 
-            if self.config.is_moe is True and (
-                (self.config.moe_every2 is True and i % 2 == 1) or self.config.moe_every2 is False
-            ):
+            if self.config.moe_config.use_moe(i):
                 # fused moe
                 ffn2_out = self.compute_fused_moe(tmp_out, i)
 
