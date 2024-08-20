@@ -22,29 +22,10 @@ from paddlenlp.transformers import ChineseBertTokenizer
 class TestChineseBertTokenizer:
     @pytest.fixture
     def tokenizer(self):
-        # Mock the base class BertTokenizer and other dependencies
-        class MockBertTokenizer:
-            def __init__(self, vocab_file, do_lower_case, **kwargs):
-                self.vocab_file = vocab_file
-                self.do_lower_case = do_lower_case
-                self.padding_side = "right"  # Default value for padding side
-                self.pad_token_id = 0  # Default value for pad token id
-                self.pad_token_type_id = 0  # Default value for pad token type id
+        # Load pretrained model and replace some methods
+        tokenizer = ChineseBertTokenizer.from_pretrained("ChineseBERT-base")
 
-        tokenizer = ChineseBertTokenizer(
-            vocab_file="vocab.txt",
-            do_lower_case=True,
-            pinyin_map={},
-            id2pinyin={},
-            pinyin2tensor={},
-            unk_token="[UNK]",
-            sep_token="[SEP]",
-            pad_token="[PAD]",
-            cls_token="[CLS]",
-            mask_token="[MASK]",
-        )
-
-        # Mock internal methods
+        # Mock some methods
         tokenizer.tokenize = MagicMock(return_value=["[CLS]", "hello", "[SEP]"])
         tokenizer.convert_tokens_to_ids = MagicMock(side_effect=[[101, 7592, 102]])
         tokenizer.num_special_tokens_to_add = MagicMock(return_value=2)
