@@ -147,7 +147,7 @@ def get_lora_target_modules(model):
         ]
     elif model.base_model_prefix == "bloom":
         target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
-    elif model.base_model_prefix == "llama" or isinstance(model, LlamaForCausalLMPipe):
+    elif model.base_model_prefix in ["llama", "jamba"] or isinstance(model, LlamaForCausalLMPipe):
         target_modules = [
             ".*q_proj.*",
             ".*v_proj.*",
@@ -769,7 +769,7 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
             continue
         bsz = int(output_tensor[1, 0])
         output_numpy = output_tensor[2 : bsz + 2].numpy()
-        output_numpy[output_numpy == -1] = 2
+        output_numpy[output_numpy == -1] = tokenizer.eos_token_id
         outputs.append(output_numpy)
         if int(output_tensor[0, 0]) == -1:
             break

@@ -101,7 +101,7 @@ class PredictorArgument:
             "help": "If benchmark set as `True`, we will force model decode to max_length, which is helpful to compute throughput. "
         },
     )
-
+    use_fake_parameter: bool = field(default=False, metadata={"help": "use fake parameter, for ptq scales now."})
     block_attn: bool = field(default=False, metadata={"help": "whether use block attention"})
     block_size: int = field(default=64, metadata={"help": "the block size for cache_kvs."})
     cachekv_int8_type: str = field(
@@ -124,7 +124,7 @@ class PredictorArgument:
 
     @property
     def total_max_length(self):
-        return self.src_length + self.max_length
+        return 8192  # Maximum sequence length.
 
 
 @dataclass
@@ -948,8 +948,7 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
 
-        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64")
-        output_tensor = output_tensor.cpu()
+        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
         tensor_queue.put(output_tensor)
 
         read_res_process = mp.Process(
@@ -1074,8 +1073,7 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
 
-        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64")
-        output_tensor = output_tensor.cpu()
+        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
         tensor_queue.put(output_tensor)
 
         read_res_process = mp.Process(
@@ -1108,10 +1106,11 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
 
 def get_ptq_multicards_num(directory):
     count = 0
-    prefix = "act_scales_"
-    for filename in os.listdir(directory):
-        if filename.startswith(prefix):
-            count += 1
+    if os.path.exists(directory):
+        prefix = "act_scales_"
+        for filename in os.listdir(directory):
+            if filename.startswith(prefix):
+                count += 1
     return count
 
 
@@ -1204,6 +1203,7 @@ def create_predictor(
             config.model_name_or_path = predictor_args.model_name_or_path
             config.quant_type = predictor_args.quant_type
             config.cachekv_int8_type = predictor_args.cachekv_int8_type
+            config.use_fake_parameter = predictor_args.use_fake_parameter
             config.single_card_ptq = True
             if predictor_args.avx_model:
                 config.avx_type = predictor_args.avx_type
@@ -1407,15 +1407,10 @@ def create_predictor(
 
         elif predictor_args.mode == "static":
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
-            config.quant_type = predictor_args.quant_type
-            config.cachekv_int8_type = predictor_args.cachekv_int8_type
 
             if config.quantization_config.quant_type is not None:
-                predictor_args.quant_type = config.quantization_config.quant_type
-                config.quant_type = config.quantization_config.quant_type
-                if "c8" in config.quant_type:
+                if "c8" in config.quantization_config.quant_type:
                     predictor_args.cachekv_int8_type = "static"
-                    config.cachekv_int8_type = "static"
 
             if "llama" in config.architectures[0].lower():
                 if predictor_args.block_attn:

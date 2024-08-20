@@ -124,6 +124,7 @@ MAPPING_NAMES = OrderedDict(
         ("Gemma", "gemma"),
         ("Yuan", "yuan"),
         ("Mamba", "mamba"),
+        ("Jamba", "jamba"),
     ]
 )
 

@@ -93,7 +93,7 @@ class MambaTokenizer(PretrainedTokenizer):
         pad_token = AddedToken(pad_token, lstrip=False, rstrip=False) if isinstance(pad_token, str) else pad_token
         eos_token = AddedToken(eos_token, lstrip=False, rstrip=False) if isinstance(eos_token, str) else eos_token
         unk_token = AddedToken(unk_token, lstrip=False, rstrip=False) if isinstance(unk_token, str) else unk_token
-        bos_token = AddedToken(unk_token, lstrip=False, rstrip=False) if isinstance(bos_token, str) else bos_token
+        bos_token = AddedToken(bos_token, lstrip=False, rstrip=False) if isinstance(bos_token, str) else bos_token
 
         self._build_special_tokens_map_extended(
             bos_token=bos_token,
@@ -105,7 +105,10 @@ class MambaTokenizer(PretrainedTokenizer):
         value = kwargs.pop("added_tokens_decoder", {})
         additional_special_tokens = []
         for _, token_kwargs in value.items():
-            content = AddedToken(**token_kwargs)
+            if isinstance(token_kwargs, AddedToken):
+                content = token_kwargs
+            else:
+                content = AddedToken(**token_kwargs)
             additional_special_tokens.append(content)
         if len(additional_special_tokens) > 0:
             self._build_special_tokens_map_extended(

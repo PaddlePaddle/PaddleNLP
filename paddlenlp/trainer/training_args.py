@@ -343,6 +343,9 @@ class TrainingArguments:
             The list of integrations to report the results and logs to.
             Supported platforms are `"visualdl"`/`"wandb"`/`"tensorboard"`.
             `"none"` for no integrations.
+        ddp_find_unused_parameters (`bool`, *optional*):
+            When using distributed training, the value of the flag `find_unused_parameters` passed to
+            `paddle.DataParallel`. Will default to `False` if recompute is used, `True` otherwise.
         wandb_api_key (`str`, *optional*):
             Weights & Biases (WandB) API key(s) for authentication with the WandB service.
         resume_from_checkpoint (`str`, *optional*):
@@ -761,6 +764,15 @@ class TrainingArguments:
     )
     report_to: Optional[List[str]] = field(
         default=None, metadata={"help": "The list of integrations to report the results and logs to."}
+    )
+    ddp_find_unused_parameters: Optional[bool] = field(
+        default=None,
+        metadata={
+            "help": (
+                "When using distributed training, the value of the flag `find_unused_parameters` passed to "
+                "`DataParallel`."
+            )
+        },
     )
     wandb_api_key: Optional[str] = field(
         default=None,
