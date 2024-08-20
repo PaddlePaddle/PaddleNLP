@@ -13,24 +13,32 @@
 # limitations under the License.
 from __future__ import annotations
 
+import inspect
 import json
+import logging
 import os
 from functools import partial
 
 import numpy as np
 import paddle
 from paddle import nn
+from paddle.base import core
+from paddle.base.executor import Executor, global_scope
+from paddle.base.framework import _current_expected_place as _get_device
+from paddle.base.framework import in_dygraph_mode
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
 
 from paddlenlp.experimental.model_utils import (
     ActScalesLoader,
     CacheScaleLoader,
+    PerTensorWeightScalesLoader,
     WeightScalesLoader,
 )
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerA8W8,
+    FusedBlockMultiTransformerFP8,
     FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerA8W8,
     FusedMultiTransformerBase,
@@ -150,13 +158,28 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         ffn_ln_scale_attrs = [
             paddle.ParamAttr(name="fuseqwen2.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
         ]
-
-        ffn1_weight_attrs = [
-            paddle.ParamAttr(
-                name="fuseqwen2.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
-            )
-            for i in range(self.num_layers)
-        ]
+        if self.quant_type == "a8w8_fp8":
+            ffn1_0_weight_attrs = [
+                paddle.ParamAttr(
+                    name="fuseqwen2.{}.ffn1_0_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                )
+                for i in range(self.num_layers)
+            ]
+            ffn1_1_weight_attrs = [
+                paddle.ParamAttr(
+                    name="fuseqwen2.{}.ffn1_1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                )
+                for i in range(self.num_layers)
+            ]
+            ffn1_0_bias_attrs = None
+            ffn1_1_bias_attrs = None
+        else:
+            ffn1_weight_attrs = [
+                paddle.ParamAttr(
+                    name="fuseqwen2.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                )
+                for i in range(self.num_layers)
+            ]
         ffn2_weight_attrs = [
             paddle.ParamAttr(
                 name="fuseqwen2.{}.ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
@@ -270,51 +293,87 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 paddle.ParamAttr(name="fuseqwen2.{}.cache_v_out_scale".format(i)) for i in range(self.num_layers)
             ]
 
-        transformer_config = FusedMultiTransformerConfig(
-            embed_dim=self.hidden_size,
-            num_heads=self.num_attention_heads,
-            kv_num_heads=self.num_key_value_heads,
-            dim_feedforward=self.intermediate_size,
-            quant_type=self.quant_type,
-            activation="swiglu",
-            num_layers=config.num_hidden_layers,
-            nranks=config.tensor_parallel_degree,
-            ring_id=ring_id,
-            ln_scale_attrs=ln_scale_attrs,
-            qkv_weight_attrs=qkv_weight_attrs,
-            qkv_weight_scale_attrs=qkv_weight_scale_attrs,
-            linear_weight_attrs=out_proj_weight_attrs,
-            linear_weight_scale_attrs=out_proj_weight_scale_attrs,
-            ffn_ln_scale_attrs=ffn_ln_scale_attrs,
-            ffn1_weight_attrs=ffn1_weight_attrs,
-            ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
-            ffn2_weight_attrs=ffn2_weight_attrs,
-            ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
-            qkv_out_scale_attrs=qkv_out_scale_attrs,
-            linear_out_scale_attrs=linear_out_scale_attrs,
-            ffn1_out_scale_attrs=ffn1_out_scale_attrs,
-            ffn2_out_scale_attrs=ffn2_out_scale_attrs,
-            linear_shift_attrs=linear_shift_attrs,
-            linear_smooth_attrs=linear_smooth_attrs,
-            ffn2_shift_attrs=ffn2_shift_attrs,
-            ffn2_smooth_attrs=ffn2_smooth_attrs,
-            ln_bias_attrs=ln_bias_attrs,
-            qkv_bias_attrs=qkv_bias_attrs,
-            linear_bias_attrs=out_proj_bias_attrs,
-            ffn_ln_bias_attrs=ffn_ln_bias_attrs,
-            ffn1_bias_attrs=ffn1_bias_attrs,
-            ffn2_bias_attrs=ffn2_bias_attrs,
-            cache_k_scale_attrs=cache_k_scale_attrs,
-            cache_v_scale_attrs=cache_v_scale_attrs,
-            cache_k_out_scale_attrs=cache_k_out_scale_attrs,
-            cache_v_out_scale_attrs=cache_v_out_scale_attrs,
-            epsilon=self.rms_norm_eps,
-            norm_type="rmsnorm",
-            use_neox_rotary_style=self.use_neox,
-            cachekv_int8_type=config.cachekv_int8_type,
-            rank_id=config.tensor_parallel_rank,
-            trans_qkvw=(False if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8" else True),
-        )
+        if self.quant_type == "a8w8_fp8":
+            transformer_config = FusedMultiTransformerConfig(
+                embed_dim=self.hidden_size,
+                num_heads=self.num_attention_heads,
+                kv_num_heads=self.num_key_value_heads,
+                dim_feedforward=self.intermediate_size,
+                quant_type=self.quant_type,
+                activation="swiglu",
+                num_layers=config.num_hidden_layers,
+                nranks=config.tensor_parallel_degree,
+                ring_id=ring_id,
+                ln_scale_attrs=ln_scale_attrs,
+                ln_bias_attrs=ln_bias_attrs,
+                qkv_weight_attrs=qkv_weight_attrs,
+                qkv_bias_attrs=qkv_bias_attrs,
+                linear_weight_attrs=out_proj_weight_attrs,
+                linear_bias_attrs=out_proj_bias_attrs,
+                ffn_ln_scale_attrs=ffn_ln_scale_attrs,
+                ffn_ln_bias_attrs=ffn_ln_bias_attrs,
+                cache_k_scale_attrs=cache_k_scale_attrs,
+                cache_v_scale_attrs=cache_v_scale_attrs,
+                cache_k_out_scale_attrs=cache_k_out_scale_attrs,
+                cache_v_out_scale_attrs=cache_v_out_scale_attrs,
+                ffn1_0_weight_attrs=ffn1_0_weight_attrs,
+                ffn1_1_weight_attrs=ffn1_1_weight_attrs,
+                ffn1_0_bias_attrs=ffn1_0_bias_attrs,
+                ffn1_1_bias_attrs=ffn1_1_bias_attrs,
+                ffn2_weight_attrs=ffn2_weight_attrs,
+                ffn2_bias_attrs=ffn2_bias_attrs,
+                epsilon=self.rms_norm_eps,
+                norm_type="rmsnorm",
+                use_neox_rotary_style=self.use_neox,
+                rank_id=config.tensor_parallel_rank,
+            )
+
+        else:
+            transformer_config = FusedMultiTransformerConfig(
+                embed_dim=self.hidden_size,
+                num_heads=self.num_attention_heads,
+                kv_num_heads=self.num_key_value_heads,
+                dim_feedforward=self.intermediate_size,
+                quant_type=self.quant_type,
+                activation="swiglu",
+                num_layers=config.num_hidden_layers,
+                nranks=config.tensor_parallel_degree,
+                ring_id=ring_id,
+                ln_scale_attrs=ln_scale_attrs,
+                qkv_weight_attrs=qkv_weight_attrs,
+                qkv_weight_scale_attrs=qkv_weight_scale_attrs,
+                linear_weight_attrs=out_proj_weight_attrs,
+                linear_weight_scale_attrs=out_proj_weight_scale_attrs,
+                ffn_ln_scale_attrs=ffn_ln_scale_attrs,
+                ffn1_weight_attrs=ffn1_weight_attrs,
+                ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
+                ffn2_weight_attrs=ffn2_weight_attrs,
+                ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
+                qkv_out_scale_attrs=qkv_out_scale_attrs,
+                linear_out_scale_attrs=linear_out_scale_attrs,
+                ffn1_out_scale_attrs=ffn1_out_scale_attrs,
+                ffn2_out_scale_attrs=ffn2_out_scale_attrs,
+                linear_shift_attrs=linear_shift_attrs,
+                linear_smooth_attrs=linear_smooth_attrs,
+                ffn2_shift_attrs=ffn2_shift_attrs,
+                ffn2_smooth_attrs=ffn2_smooth_attrs,
+                ln_bias_attrs=ln_bias_attrs,
+                qkv_bias_attrs=qkv_bias_attrs,
+                linear_bias_attrs=out_proj_bias_attrs,
+                ffn_ln_bias_attrs=ffn_ln_bias_attrs,
+                ffn1_bias_attrs=ffn1_bias_attrs,
+                ffn2_bias_attrs=ffn2_bias_attrs,
+                cache_k_scale_attrs=cache_k_scale_attrs,
+                cache_v_scale_attrs=cache_v_scale_attrs,
+                cache_k_out_scale_attrs=cache_k_out_scale_attrs,
+                cache_v_out_scale_attrs=cache_v_out_scale_attrs,
+                epsilon=self.rms_norm_eps,
+                norm_type="rmsnorm",
+                use_neox_rotary_style=self.use_neox,
+                cachekv_int8_type=config.cachekv_int8_type,
+                rank_id=config.tensor_parallel_rank,
+                trans_qkvw=(False if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8" else True),
+            )
 
         self.set_transformer_block(transformer_config)
 
@@ -714,6 +773,276 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                                 )
                             )
 
+    def set_state_dict_fp8(self, state_dict: dict[str, np.ndarray | paddle.Tensor], use_structured_name=True):
+        """transpose qkv shape & cast dtype for layernorm
+
+        Args:
+            state_dict (dict[str, np.ndarray | paddle.Tensor]): the state dict of model
+            use_structured_name (bool, optional): _description_. Defaults to True.
+        """
+        unfused_state_dict = {}
+        head_size = self.hidden_size // self.num_attention_heads
+        split_fn = split_param_func()
+
+        self.embed_tokens.weight.set_value(
+            paddle.to_tensor(state_dict["qwen2.embed_tokens.weight"]).cast(self.embed_tokens.weight.dtype)
+        )
+        self.norm.weight.set_value(paddle.to_tensor(state_dict["qwen2.norm.weight"]).cast(self.norm.weight.dtype))
+
+        for key in state_dict.keys():
+            state_dict[key] = paddle.to_tensor(state_dict[key])
+
+        for key in list(state_dict.keys()):
+            if "qwen2.layers" in key:
+                state_dict[key.replace("qwen2.layers", "transformer_block.fuseqwen2")] = state_dict.pop(key)
+
+        for idx in range(self.config.num_hidden_layers):
+            if "transformer_block.fuseqwen2.{}.self_attn.qkv_proj.weight".format(idx) in list(state_dict.keys()):
+                concated_qkv_weight = paddle.concat(
+                    split_fn(
+                        state_dict["transformer_block.fuseqwen2.{}.self_attn.qkv_proj.weight".format(idx)],
+                        is_qkv=True,
+                        num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                        num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
+                    ),
+                    axis=-1,
+                ).transpose([1, 0])
+            else:
+                unfused_state_dict = {}
+                unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
+                    "transformer_block.fuseqwen2.{}.self_attn.q_proj.weight".format(idx)
+                ]
+                unfused_state_dict["self_attn.k_proj.weight"] = state_dict[
+                    "transformer_block.fuseqwen2.{}.self_attn.k_proj.weight".format(idx)
+                ]
+                unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
+                    "transformer_block.fuseqwen2.{}.self_attn.v_proj.weight".format(idx)
+                ]
+                concated_qkv_weight = (
+                    paddle.concat(
+                        [
+                            unfused_state_dict["self_attn.q_proj.weight"],
+                            unfused_state_dict["self_attn.k_proj.weight"],
+                            unfused_state_dict["self_attn.v_proj.weight"],
+                        ],
+                        axis=-1,
+                    )
+                    .transpose([1, 0])
+                    .reshape(
+                        [
+                            (
+                                self.num_attention_heads // self.config.tensor_parallel_degree
+                                + 2 * self.num_key_value_heads // self.config.tensor_parallel_degree
+                            )
+                            * (head_size),
+                            self.hidden_size,
+                        ]
+                    )
+                )
+                state_dict[
+                    "transformer_block.fuseqwen2.{}.self_attn.qkv_proj.weight".format(idx)
+                ] = concated_qkv_weight
+            if "transformer_block.fuseqwen2.{}.self_attn.qkv_proj.bias".format(idx) in list(state_dict.keys()):
+                concated_qkv_bias = paddle.concat(
+                    split_fn(
+                        state_dict["transformer_block.fuseqwen2.{}.self_attn.qkv_proj.bias".format(idx)],
+                        is_qkv=True,
+                        num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                        num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
+                    ),
+                    axis=-1,
+                )
+            else:
+                unfused_state_dict = {}
+                unfused_state_dict["self_attn.q_proj.bias"] = state_dict[
+                    "transformer_block.fuseqwen2.{}.self_attn.q_proj.bias".format(idx)
+                ]
+                unfused_state_dict["self_attn.k_proj.bias"] = state_dict[
+                    "transformer_block.fuseqwen2.{}.self_attn.k_proj.bias".format(idx)
+                ]
+                unfused_state_dict["self_attn.v_proj.bias"] = state_dict[
+                    "transformer_block.fuseqwen2.{}.self_attn.v_proj.bias".format(idx)
+                ]
+                concated_qkv_bias = paddle.concat(
+                    [
+                        unfused_state_dict["self_attn.q_proj.bias"],
+                        unfused_state_dict["self_attn.k_proj.bias"],
+                        unfused_state_dict["self_attn.v_proj.bias"],
+                    ],
+                    axis=-1,
+                )
+                state_dict["transformer_block.fuseqwen2.{}.self_attn.qkv_proj.bias".format(idx)] = concated_qkv_bias
+
+        for key in list(state_dict.keys()):
+            if key.endswith(".input_layernorm.weight"):
+                state_dict[key.replace(".input_layernorm.weight", ".ln_scale")] = state_dict.pop(key).cast(
+                    self.transformer_block.ln_scales[idx].dtype
+                )
+            elif key.endswith(".post_attention_layernorm.weight"):
+                state_dict[key.replace(".post_attention_layernorm.weight", ".ffn_ln_scale")] = state_dict.pop(
+                    key
+                ).cast(self.transformer_block.ffn_ln_scales[idx].dtype)
+            elif key.endswith(".self_attn.qkv_proj.weight"):
+                state_dict[key.replace(".self_attn.qkv_proj.weight", ".qkv_weight")] = state_dict.pop(key).view(
+                    "float8_e4m3fn"
+                )
+            elif key.endswith(".self_attn.qkv_proj.bias"):
+                state_dict[key.replace(".self_attn.qkv_proj.bias", ".qkv_bias")] = state_dict.pop(key).cast(
+                    self.transformer_block.qkv_biases[idx].dtype
+                )
+            elif key.endswith(".self_attn.o_proj.weight"):
+                state_dict[key.replace(".self_attn.o_proj.weight", ".out_proj_weight")] = (
+                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                )
+            elif key.endswith(".mlp.gate_proj.weight"):
+                state_dict[key.replace(".mlp.gate_proj.weight", ".ffn1_0_weight")] = (
+                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                )
+            elif key.endswith(".mlp.up_proj.weight"):
+                state_dict[key.replace(".mlp.up_proj.weight", ".ffn1_1_weight")] = (
+                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                )
+            elif key.endswith(".mlp.down_proj.weight"):
+                state_dict[key.replace(".mlp.down_proj.weight", ".ffn2_weight")] = (
+                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                )
+
+        self.set_state_dict_to_params(state_dict, True)
+
+        current_work_dir = os.path.dirname(__file__)
+        scale_map_file = f"{current_work_dir}/ptq_fp8_scales_map.json"
+        with open(scale_map_file) as json_file:
+            scale_map_dict = json.load(json_file)
+            act_scale_map_dict = scale_map_dict["act_scale"]
+            weight_scale_map_dict = scale_map_dict["weight_scale"]
+            act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
+            weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
+            if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
+                act_scale_json_path = os.path.join(
+                    self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
+                )
+                weight_scale_json_path = os.path.join(
+                    self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
+                )
+
+            act_scales = ActScalesLoader(
+                act_scale_json_path, act_scale_map_dict, num_of_layers=self.config.num_hidden_layers
+            )
+
+            weight_scales = PerTensorWeightScalesLoader(
+                weight_scale_json_path,
+                weight_scale_map_dict,
+                num_of_layers=self.config.num_hidden_layers,
+            )
+
+            for weight_name in weight_scales.scale:
+                weight_scales.scale[weight_name] = weight_scales.scale[weight_name].astype(np.float32)
+            for act_name in act_scales.scale:
+                act_scales.scale[act_name] = act_scales.scale[act_name].astype(np.float32)
+            self.transformer_block.act_scales = act_scales
+            self.transformer_block.weight_scales = weight_scales
+        return self
+
+    def set_state_dict_to_params(self, state_dict: dict[str, np.ndarray | paddle.Tensor], use_structured_name=True):
+        """
+        set_state_dict_to_params
+        """
+        if in_dygraph_mode:
+            for k, v in self.state_dict(use_hook=False).items():
+                if k in state_dict:
+                    v_new = state_dict.pop(k)
+                    if v_new.shape != v.shape:
+                        logger.warning(
+                            f"key {k} has diff shape between "
+                            + f"state_dict and model params: {v_new.shape} vs {v.shape}."
+                        )
+                    v.copy_(v_new, False)
+                else:
+                    logger.warning(f"key {k} is not found in state_dict.")
+        else:
+            # static mode code copy from nn.layers.Layer.set_state_dict
+            logger.warning("set_state_dict_to_params in static mode.")
+            missing_keys = []
+            match_keys = set()
+            unexpected_keys = []
+
+            def _check_match(key, param):
+                state = state_dict.get(key, None)
+                if state is None:
+                    missing_keys.append(key)
+                    raise ValueError(f"{key} is not found in the provided dict.")
+                if isinstance(state, (dict, list)):
+                    if len(state) != len(param):
+                        missing_keys.append(key)
+                        raise ValueError(
+                            "{} receieves the length of {}, "
+                            "but the expected shape is {}".format(key, len(state), len(param))
+                        )
+                    else:
+                        match_keys.add(key)
+                        return param, state
+                else:
+                    state_shape = state.shape() if inspect.ismethod(state.shape) else state.shape
+
+                    if list(state_shape) != list(param.shape):
+                        missing_keys.append(key)
+                        raise ValueError(
+                            "{} receives a shape {}, but the expected shape is {}.".format(
+                                key, list(state_shape), list(param.shape)
+                            )
+                        )
+                    match_keys.add(key)
+                    return param, state
+
+            matched_param_state = []
+            for key, param in self._state_dict_impl(use_hook=False).items():
+                key_name = key if use_structured_name else param.name
+                try:
+                    match_res = _check_match(key_name, param)
+                    matched_param_state.append(match_res)
+                except ValueError as err:
+                    logging.warning(f"Skip loading for {key}. " + str(err))
+            for key in state_dict.keys():
+                if key not in match_keys:
+                    unexpected_keys.append(key)
+
+            def _set_var(var, ndarray):
+                t = global_scope().find_var(var.name).get_tensor()
+                p = t._place()
+                if p.is_cpu_place():
+                    place = core.CPUPlace()
+                elif p.is_cuda_pinned_place():
+                    place = core.CUDAPinnedPlace()
+                elif p.is_xpu_place():
+                    p = core.Place()
+                    p.set_place(t._place())
+                    place = core.XPUPlace(p.xpu_device_id())
+                else:
+                    p = core.Place()
+                    p.set_place(t._place())
+                    place = core.CUDAPlace(p.gpu_device_id())
+                t.set(ndarray, place)
+
+            try:
+                executor = Executor(_get_device())._default_executor
+                # restore parameter states
+                core._create_loaded_parameter(
+                    [param for param, state in matched_param_state],
+                    global_scope(),
+                    executor,
+                )
+                for param, state in matched_param_state:
+                    _set_var(param, state)
+            except ValueError:
+                raise ValueError(
+                    "This error might happens in dy2static, "
+                    + "while calling 'set_state_dict' dynamicly in 'forward', "
+                    + "which is not supported. "
+                    + "If you only need call 'set_state_dict' once, "
+                    + "move it to '__init__'."
+                )
+        return self
+
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
@@ -1001,7 +1330,10 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
         if "lm_head.weight" in state_dict:
             lm_head_weight = paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
             self.lm_head.weight.set_value(lm_head_weight)
-        self.qwen2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+        if self.qwen2.quant_type == "a8w8_fp8":
+            self.qwen2.set_state_dict_fp8({k: state_dict[k] for k in state_dict.keys()})
+        else:
+            self.qwen2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
 
 @register_base_model
@@ -1016,6 +1348,8 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
         elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
             self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
+        elif self.quant_type == "a8w8_fp8":
+            self.transformer_block = FusedBlockMultiTransformerFP8(transformer_config)
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
@@ -1261,4 +1595,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
             self.lm_head.weight.set_value(
                 paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
             )
-        self.qwen2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+        if self.qwen2.quant_type == "a8w8_fp8":
+            self.qwen2.set_state_dict_fp8({k: state_dict[k] for k in state_dict.keys()})
+        else:
+            self.qwen2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
