@@ -143,11 +143,11 @@ class CheckpointConverter:
             for param_name, param_value in model_params.items():
                 if param_value.is_dist():
                     master_weight = self.auto_parallel_state_dict[param_name + ".master_weight"]
-                    cast_master_weight = paddle.cast(master_weight._local_value(), "bfloat16")
+                    cast_master_weight = paddle.cast(master_weight._local_value(), param_value.dtype)
                     paddle.assign(cast_master_weight, param_value._local_value())
                 else:
                     master_weight = self.auto_parallel_state_dict[param_name + ".master_weight"]
-                    cast_master_weight = paddle.cast(master_weight, "bfloat16")
+                    cast_master_weight = paddle.cast(master_weight, param_value.dtype)
                     paddle.assign(cast_master_weight, param_value)
             for master_weight_name in appended_master_weight_names:
                 self.auto_parallel_state_dict.pop(master_weight_name)
