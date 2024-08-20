@@ -15,18 +15,18 @@
 
 ## 🛠️ 支持模型列表 🛠️
 
-| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Torch convert |
-|----------------------------------------|----------|-----|------|---------------|-----|------|--------------|---------------|
-| [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅   | ✅    | ✅            | ✅             |
-| [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧   | 🚧           | ✅             |
-| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | 🚧  | 🚧   | 🚧           | 🚧            |
-| [Mistral](./config/mistral)            | ❌        | ✅   | ✅    | ✅             | ✅   | 🚧   | 🚧           | ✅             |
-| [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧   | ✅            | ✅             |
-| [ChatGLM-6B](./config/chatglm)         | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ❌             |
-| [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ✅             |
-| [Bloom](./config/bloom)                | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ✅             |
-| [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧  | 🚧   | 🚧           | ✅             |
-| [OPT](./config/opt)                    | 🚧       | ✅   | ✅    | 🚧            | 🚧  | 🚧   | 🚧           | ✅             |
+| Model                                  | Pretrain | SFT | LoRA  | DPO | RLHF | Quantization | Torch convert |
+|----------------------------------------|----------|-----|---------------|-----|------|--------------|---------------|
+| [LLaMA](./config/llama)                | ✅        | ✅   | ✅         | ✅   | ✅    | ✅            | ✅             |
+| [Qwen](./config/qwen)                  | ✅        | ✅   | ✅               | ✅   | 🚧   | 🚧           | ✅             |
+| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅               | 🚧  | 🚧   | 🚧           | 🚧            |
+| [Mistral](./config/mistral)            | ❌        | ✅   | ✅           | ✅   | 🚧   | 🚧           | ✅             |
+| [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅            | ✅   | 🚧   | ✅            | ✅             |
+| [ChatGLM-6B](./config/chatglm)         | ❌        | ✅   | ✅            | 🚧  | 🚧   | ✅            | ❌             |
+| [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅             | 🚧  | 🚧   | ✅            | ✅             |
+| [Bloom](./config/bloom)                | ❌        | ✅   | ✅              | 🚧  | 🚧   | ✅            | ✅             |
+| [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧           | 🚧  | 🚧   | 🚧           | ✅             |
+| [OPT](./config/opt)                    | 🚧       | ✅   | ✅           | 🚧  | 🚧   | 🚧           | ✅             |
 
 - ✅: Supported
 - 🚧: In Progress
@@ -90,7 +90,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 
 ### 2. 精调
 
-PaddleNLP 支持多个主流大模型的 SFT、LoRA、Prefix Tuning 等精调策略，提供统一、高效精调方案：
+PaddleNLP 支持多个主流大模型的 SFT、LoRA 等精调策略，提供统一、高效精调方案：
 
 - **统一训练入口**。飞桨大模型套件精调方案可适配业界主流大模型，用户只需修改配置文件，即能在单卡或多卡（支持4D 并行分布式策略）进行多种大模型精调。
 - **高效数据和分布式策略**。Zero Padding 零填充优化策略结合 FlashMask 策略有效提升模型训练效率。独创 PEFT 结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛，支持单卡（A100 80G）百亿模型微调、单机（A100 80G * 8）千亿模型微调。
@@ -140,12 +140,6 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py
 python  run_finetune.py ./config/llama/lora_argument.json
 ```
 
-#### 2.4 Prefix Tuning
-
-```bash
-# Prefix Tuning 启动命令参考
-python  run_finetune.py ./config/llama/pt_argument.json
-```
 
 更多大模型精调分布式使用文档、训练细节和效果请参见[大模型精调教程](./docs/finetune.md)。
 
@@ -228,7 +222,7 @@ python  run_finetune.py ./config/llama/ptq_argument.json
 
 PaddleNLP 除了提供常用模型推理外，还提供了高性能推理，内置动态插入和全环节算子融合策略，极大加快并行推理的速度。
 
-- **常用模型推理**：PaddleNLP 提供了动态图推理和静态图推理两种方式，方便用户快速验证模型推理效果（包含 LoRA、PrefixTuning）。
+- **常用模型推理**：PaddleNLP 提供了动态图推理和静态图推理两种方式，方便用户快速验证模型推理效果（包含 LoRA）。
 
 ```shell
 # 动态图模型推理命令参考
@@ -241,7 +235,7 @@ python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat
 python ./predict/predictor.py --model_name_or_path ./inference --data_file ./data/dev.json --dtype float16 --mode static
 ```
 
-- **InferenceModel 高性能推理**：PaddleNLP 还提供了高性能推理模型加快并行推理的速度，同时支持 FP16、Prefix Tuning、WINT8、A8W8多种推理方式。
+- **InferenceModel 高性能推理**：PaddleNLP 还提供了高性能推理模型加快并行推理的速度，同时支持 FP16、WINT8、A8W8多种推理方式。
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/fb248224-0ad1-4d6a-a1ca-3a8dd765c41d">
