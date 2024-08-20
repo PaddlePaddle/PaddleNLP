@@ -217,7 +217,7 @@ class FusedMultiTransformerConfig:
         kv_num_heads=-1,
         cachekv_int8_type=None,
         rank_id=-1,
-        moe_config=None,
+        moe_config=MoeConfig(),
     ):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
