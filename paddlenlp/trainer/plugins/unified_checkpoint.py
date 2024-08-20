@@ -478,11 +478,6 @@ class UnifiedCheckpointHandler:
                 returned_optim_state_dict["master_weights"][static_name] = weight
                 returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, FP32_MASTER])
 
-        returned_optim_state_dict = nested_copy_place(
-            returned_optim_state_dict,
-            place=paddle.framework._current_expected_place(),
-        )
-
         return returned_optim_state_dict
 
     def save_unified_optimizer(self, model, optimizer, output_dir):
@@ -1014,10 +1009,6 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             static_name = struct2static_name_mappings[key]
             returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight.pop(key)
             returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, FP32_MASTER])
-
-    returned_optim_state_dict = nested_copy_place(
-        returned_optim_state_dict, place=paddle.framework._current_expected_place()
-    )
 
     return returned_optim_state_dict
 
