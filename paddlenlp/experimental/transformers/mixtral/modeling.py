@@ -774,7 +774,6 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                 act_scale_map_dict = scale_map_dict["act_scale"]
                 weight_scale_map_dict = scale_map_dict["weight_scale"]
                 cache_scale_map_dict = scale_map_dict["cachekv_scale"]
-                # TODO(RichardWooSJTU): support multi-cards
 
                 act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
                 weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
