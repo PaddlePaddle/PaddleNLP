@@ -26,6 +26,7 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
+from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
 from .argparser import strtobool
 from .trainer import SCALER_NAME, SCHEDULER_NAME, TRAINER_STATE_NAME, TRAINING_ARGS_NAME
@@ -309,12 +310,23 @@ class AutoTrainer(Trainer):
 
                 # Skip past any already trained steps if resuming training
                 # We use consumed_samples to reset the status
-                if steps_trained_in_current_epoch > 0:
+                if isinstance(train_dataloader._dataloader, paddle.io.DataLoader) and isinstance(
+                    train_dataloader._dataloader.batch_sampler, NlpDistributedBatchSampler
+                ):
+                    if step == 0:
+                        if steps_trained_progress_bar is not None:
+                            steps_trained_progress_bar.update(steps_trained_in_current_epoch)
+                            steps_trained_progress_bar.close()
+                            steps_trained_progress_bar = None
+                        self._load_rng_state(resume_from_checkpoint)
+                    step += steps_trained_in_current_epoch
+                elif steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
                     if steps_trained_progress_bar is not None:
                         steps_trained_progress_bar.update(1)
                     if steps_trained_in_current_epoch == 0:
                         self._load_rng_state(resume_from_checkpoint)
+                    self.timers and self.timers("read-data").start()
                     continue
                 elif steps_trained_progress_bar is not None:
                     steps_trained_progress_bar.close()
