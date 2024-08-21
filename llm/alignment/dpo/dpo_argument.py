@@ -63,11 +63,10 @@ class DPODataArgument:
         default=False,
         metadata={"help": "Whether to run benchmark by autotuner. True for from_scratch."},
     )
-    greedy_intokens: bool = field(
-        default=True,
-        metadata={"help": "Whether apply greedy intokens."},
+    greedy_zero_padding: bool = field(
+        default=False,
+        metadata={"help": "Whether to use Greedy Zero Padding data stream."},
     )
-    buffer_size: int = field(default=500, metadata={"help": "Buffer size for greedy_intokens strategy."})
 
 
 @dataclass
@@ -87,9 +86,7 @@ class DPOModelArgument:
             "help": "The granularity of recompute training can be selected as `full` or `full_attn` or `core_attn`."
         },
     )
-    flash_mask: bool = field(
-        default=False, metadata={"help": "Whether to use flash mask in flash attention."}
-    )
+    flash_mask: bool = field(default=False, metadata={"help": "Whether to use flash mask in flash attention."})
     virtual_pp_degree: int = field(
         default=1,
         metadata={"help": "virtual_pp_degree"},

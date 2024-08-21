@@ -233,7 +233,7 @@ def run(args):
     set_seed(args)
 
     train_examples, dev_examples, test_examples = load_dataset(
-        "clue", "cmrc2018", split=["train", "validation", "test"]
+        "clue", "cmrc2018", split=["train", "validation", "test"], trust_remote_code=True
     )
 
     column_names = train_examples.column_names

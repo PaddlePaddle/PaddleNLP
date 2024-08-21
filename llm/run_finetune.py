@@ -342,7 +342,7 @@ def main():
 
     if data_args.zero_padding:
         if (
-            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen", "mistral"]
+            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen", "mistral", "jamba"]
             and training_args.pipeline_parallel_degree < 1
         ):
             raise NotImplementedError(
@@ -391,6 +391,7 @@ def main():
                 train_ds,
                 tokenizer=tokenizer,
                 max_length=data_args.max_length,
+                greedy_zero_padding=data_args.greedy_zero_padding,
             )
             if train_ds is not None
             else None
@@ -400,6 +401,7 @@ def main():
                 ptq_ds,
                 tokenizer=tokenizer,
                 max_length=data_args.max_length,
+                greedy_zero_padding=data_args.greedy_zero_padding,
             )
             if ptq_ds is not None
             else None
