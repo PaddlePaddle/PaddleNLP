@@ -191,7 +191,7 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 
 ```bash
 # DPO 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./dpo/run_dpo.py ./config/llama/dpo_argument.json
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
 
 #### 3.2 RLHF
