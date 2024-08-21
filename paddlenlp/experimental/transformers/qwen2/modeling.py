@@ -743,7 +743,6 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                                     .reshape([-1])
                                 )
                             self.transformer_block.qkv_out_scales[i_layer].set_value(tmp)
-                        pass
                     elif "out_linear_" in k:
                         for i_layer, weight_scale in enumerate(v):
                             tmp = paddle.to_tensor(
@@ -780,6 +779,39 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             state_dict (dict[str, np.ndarray | paddle.Tensor]): the state dict of model
             use_structured_name (bool, optional): _description_. Defaults to True.
         """
+        current_work_dir = os.path.dirname(__file__)
+        scale_map_file = f"{current_work_dir}/ptq_fp8_scales_map.json"
+        with open(scale_map_file) as json_file:
+            scale_map_dict = json.load(json_file)
+            act_scale_map_dict = scale_map_dict["act_scale"]
+            weight_scale_map_dict = scale_map_dict["weight_scale"]
+            act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
+            weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
+            if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
+                act_scale_json_path = os.path.join(
+                    self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
+                )
+                weight_scale_json_path = os.path.join(
+                    self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
+                )
+
+            act_scales = ActScalesLoader(
+                act_scale_json_path, act_scale_map_dict, num_of_layers=self.config.num_hidden_layers
+            )
+
+            weight_scales = PerTensorWeightScalesLoader(
+                weight_scale_json_path,
+                weight_scale_map_dict,
+                num_of_layers=self.config.num_hidden_layers,
+            )
+
+            for weight_name in weight_scales.scale:
+                weight_scales.scale[weight_name] = weight_scales.scale[weight_name].astype(np.float32)
+            for act_name in act_scales.scale:
+                act_scales.scale[act_name] = act_scales.scale[act_name].astype(np.float32)
+            self.transformer_block.act_scales = act_scales
+            self.transformer_block.weight_scales = weight_scales
+
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
         split_fn = split_param_func()
@@ -809,15 +841,25 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 ).transpose([1, 0])
             else:
                 unfused_state_dict = {}
-                unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
-                    "transformer_block.fuseqwen2.{}.self_attn.q_proj.weight".format(idx)
-                ]
-                unfused_state_dict["self_attn.k_proj.weight"] = state_dict[
-                    "transformer_block.fuseqwen2.{}.self_attn.k_proj.weight".format(idx)
-                ]
-                unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
-                    "transformer_block.fuseqwen2.{}.self_attn.v_proj.weight".format(idx)
-                ]
+                q_wgt_scale = self.transformer_block.weight_scales.scale["q_weight_scale"][idx]
+                k_wgt_scale = self.transformer_block.weight_scales.scale["k_weight_scale"][idx]
+                v_wgt_scale = self.transformer_block.weight_scales.scale["v_weight_scale"][idx]
+                qkv_wgt_scale = self.transformer_block.weight_scales.scale["qkv_weight_scale"][idx]
+                unfused_state_dict["self_attn.q_proj.weight"] = (
+                    state_dict["transformer_block.fuseqwen2.{}.self_attn.q_proj.weight".format(idx)].cast("float32")
+                    * q_wgt_scale
+                    / qkv_wgt_scale
+                )
+                unfused_state_dict["self_attn.k_proj.weight"] = (
+                    state_dict["transformer_block.fuseqwen2.{}.self_attn.k_proj.weight".format(idx)].cast("float32")
+                    * k_wgt_scale
+                    / qkv_wgt_scale
+                )
+                unfused_state_dict["self_attn.v_proj.weight"] = (
+                    state_dict["transformer_block.fuseqwen2.{}.self_attn.v_proj.weight".format(idx)].cast("float32")
+                    * v_wgt_scale
+                    / qkv_wgt_scale
+                )
                 concated_qkv_weight = (
                     paddle.concat(
                         [
@@ -883,7 +925,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                     key
                 ).cast(self.transformer_block.ffn_ln_scales[idx].dtype)
             elif key.endswith(".self_attn.qkv_proj.weight"):
-                state_dict[key.replace(".self_attn.qkv_proj.weight", ".qkv_weight")] = state_dict.pop(key).view(
+                state_dict[key.replace(".self_attn.qkv_proj.weight", ".qkv_weight")] = state_dict.pop(key).cast(
                     "float8_e4m3fn"
                 )
             elif key.endswith(".self_attn.qkv_proj.bias"):
@@ -892,55 +934,23 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 )
             elif key.endswith(".self_attn.o_proj.weight"):
                 state_dict[key.replace(".self_attn.o_proj.weight", ".out_proj_weight")] = (
-                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                    state_dict.pop(key).transpose([1, 0]).cast("float8_e4m3fn")
                 )
             elif key.endswith(".mlp.gate_proj.weight"):
                 state_dict[key.replace(".mlp.gate_proj.weight", ".ffn1_0_weight")] = (
-                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                    state_dict.pop(key).transpose([1, 0]).cast("float8_e4m3fn")
                 )
             elif key.endswith(".mlp.up_proj.weight"):
                 state_dict[key.replace(".mlp.up_proj.weight", ".ffn1_1_weight")] = (
-                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                    state_dict.pop(key).transpose([1, 0]).cast("float8_e4m3fn")
                 )
             elif key.endswith(".mlp.down_proj.weight"):
                 state_dict[key.replace(".mlp.down_proj.weight", ".ffn2_weight")] = (
-                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                    state_dict.pop(key).transpose([1, 0]).cast("float8_e4m3fn")
                 )
 
         self.set_state_dict_to_params(state_dict, True)
 
-        current_work_dir = os.path.dirname(__file__)
-        scale_map_file = f"{current_work_dir}/ptq_fp8_scales_map.json"
-        with open(scale_map_file) as json_file:
-            scale_map_dict = json.load(json_file)
-            act_scale_map_dict = scale_map_dict["act_scale"]
-            weight_scale_map_dict = scale_map_dict["weight_scale"]
-            act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
-            weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
-            if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                act_scale_json_path = os.path.join(
-                    self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
-                )
-                weight_scale_json_path = os.path.join(
-                    self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
-                )
-
-            act_scales = ActScalesLoader(
-                act_scale_json_path, act_scale_map_dict, num_of_layers=self.config.num_hidden_layers
-            )
-
-            weight_scales = PerTensorWeightScalesLoader(
-                weight_scale_json_path,
-                weight_scale_map_dict,
-                num_of_layers=self.config.num_hidden_layers,
-            )
-
-            for weight_name in weight_scales.scale:
-                weight_scales.scale[weight_name] = weight_scales.scale[weight_name].astype(np.float32)
-            for act_name in act_scales.scale:
-                act_scales.scale[act_name] = act_scales.scale[act_name].astype(np.float32)
-            self.transformer_block.act_scales = act_scales
-            self.transformer_block.weight_scales = weight_scales
         return self
 
     def set_state_dict_to_params(self, state_dict: dict[str, np.ndarray | paddle.Tensor], use_structured_name=True):
