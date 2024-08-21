@@ -92,6 +92,56 @@ __all__ = [
     "register_base_model",
 ]
 
+def cal_abs_min_max_channel(inputs, quant_axis=1):
+    reduce_axis = tuple(
+        [i for i in range(len(inputs.shape)) if i != quant_axis])
+    abs_max_values = np.max(inputs, axis=reduce_axis)
+    abs_min_values = np.min(inputs, axis=reduce_axis)
+    abs_max_values = np.where(
+        abs_max_values == np.array(0, dtype=inputs.dtype),
+        np.array(1e-8, dtype=inputs.dtype), abs_max_values)
+    abs_min_values = np.where(
+        abs_min_values == np.array(0, dtype=inputs.dtype),
+        np.array(1e-8, dtype=inputs.dtype), abs_min_values)
+    return abs_max_values, abs_min_values
+
+def asymmetry_qdq_weight(x, quant_bit=8, quant_axis=-1, mins=None, maxs=None, dequant=False, rank=-1, world_size=1, peek=False):
+    if mins is None:
+        maxs, mins = cal_abs_min_max_channel(x)
+    bnt = (1 << (quant_bit)) - 1
+    scales = maxs - mins
+    if not dequant:
+        # quant
+        quant_x = np.clip(np.round((x - mins) / scales * bnt), 0, bnt)
+        return quant_x.astype(np.uint8), mins, maxs
+    else:
+        quant_x = x
+        # dequant
+        if not peek:
+            if len(scales.shape) == 0 or quant_x.shape[-1] == scales.shape[-1]:
+                qdq_x = (quant_x / bnt * scales) + mins
+            else:
+                qdq_x = (quant_x / bnt * scales[rank * scales.shape[0] // world_size: (rank + 1) * scales.shape[0] // world_size]) + mins[rank * mins.shape[0] // world_size: (rank + 1) * mins.shape[0] // world_size]
+            return qdq_x.astype(np.float32), scales
+        else:
+            if len(scales.shape) == 0 or quant_x.shape[-1] == scales.shape[-1]:
+                qdq_x = (quant_x / bnt * scales.unsqueeze(0).expand(quant_x.shape)) + mins
+                #print(f'quant_x dtype: {quant_x.dtype}, {quant_x}')
+                #print(f'quant_x / bnt dtype: {(quant_x/bnt).dtype}, {quant_x/bnt}')
+                #print(f'scales dtype: {(scales).dtype}, {scales}')
+                #print(f'mins dtype: {(mins).dtype}, {mins}')
+                #print(f'maxs dtype: {(maxs).dtype}, {maxs}')
+                #print(f'qdq dtype: {qdq_x.dtype}, {qdq_x}')
+            else:
+                qdq_x = (quant_x / bnt * scales[rank * scales.shape[0] // world_size: (rank + 1) * scales.shape[0] // world_size].unsqueeze(0).expand(quant_x.shape)) + mins[rank * mins.shape[0] // world_size: (rank + 1) * mins.shape[0] // world_size]
+                #print(f'quant_x dtype: {quant_x.dtype}, {quant_x}')
+                #print(f'quant_x / bnt dtype: {(quant_x/bnt).dtype}, {quant_x/bnt}')
+                #print(f'scales dtype: {(scales).dtype}, {scales}')
+                #print(f'mins dtype: {(mins).dtype}, {mins}')
+                #print(f'maxs dtype: {(maxs).dtype}, {maxs}')
+                #print(f'qdq dtype: {qdq_x.dtype}, {qdq_x}')
+            return qdq_x.astype(paddle.float32), scales
+
 def cal_abs_max_channel(inputs, quant_axis=1):
     reduce_axis = tuple(
         [i for i in range(len(inputs.shape)) if i != quant_axis])
@@ -124,10 +174,11 @@ def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-
             return qdq_x.astype(np.float32), scales
         else:
             if len(scales.shape) == 0 or quant_x.shape[-1] == scales.shape[-1]:
-                qdq_x = quant_x / bnt * scales
+                #print(qdq_x, quant_x, bnt, scales)
+                qdq_x = quant_x / bnt * scales.unsqueeze(0).expand(quant_x.shape)
             else:
                 #print("scales cut: ", rank * scales.shape[0] // world_size,  (rank + 1) * scales.shape[0] // world_size)
-                qdq_x = quant_x / bnt * scales[rank * scales.shape[0] // world_size: (rank + 1) * scales.shape[0] // world_size]
+                qdq_x = quant_x / bnt * scales[rank * scales.shape[0] // world_size: (rank + 1) * scales.shape[0] // world_size].unsqueeze(0).expand(quant_x.shape)
             #print(f"{quant_x.shape}, * {scales.shape} == {qdq_x.shape}")
             # fp32 , int8, int, fp32 or fp64
             #print(quant_x.dtype, scales.dtype, bnt, qdq_x.dtype)
@@ -402,6 +453,11 @@ def load_state_dict(
                 for key in f.keys():
                     if key.endswith("_codebook"):
                         scale = f.get_tensor(key)
+                        #print(scale)
+                        #print(scale.shape)
+                        #scale = paddle.Tensor(scale, zero_copy=True)
+                        np.save('tmp.npy', scale)
+                        scale = paddle.Tensor(scale, zero_copy=True)
                         scale_dict[key] = scale
                     if fliter_dict_keys is not None and key not in fliter_dict_keys:
                         continue
@@ -460,30 +516,40 @@ def load_state_dict(
                 elif env_var_value == '1':
                     # set eps
                     eps = 1e-8
-                    # dequant m1 first
-                    for scale_key in scale_dict.keys():
-                        quant_key = scale_key[:-len("_codebook")]
-                        scales = scale_dict[scale_key]
-                        weight = state_dict[quant_key]
-                        weight, _ = qdq_weight(weight, scales=scales, quant_bit=8, dequant=True, rank=rank, world_size=world_size, peek=True)
-                        state_dict[quant_key] = weight
+                    ## dequant m1 first
+                    #for scale_key in scale_dict.keys():
+                    #    quant_key = scale_key[:-len("_codebook")]
+                    #    scales = scale_dict[scale_key]
+                    #    weight = state_dict[quant_key]
+                    #    weight, _ = qdq_weight(weight, scales=scales, quant_bit=8, dequant=True, rank=rank, world_size=world_size, peek=True)
+                    #    state_dict[quant_key] = weight
 
-                    # cal m2 by ratio
                     for quant_key in state_dict.keys():
-                        if not quant_key.endswith("moment2_0"):
-                            continue
-                        # 1. cast fp32
-                        weight = state_dict[quant_key].astype(paddle.float32)
-                        # 2. fetch dequanted m1
-                        m1_key = quant_key[:-len("moment2_0")] + "moment1_0"
-                        m1_weight = state_dict[m1_key]
-                        # 3. cal m2
-                        weight = np.square((m1_weight / (weight + eps)) - eps)
-                        # 4. set sd
-                        state_dict[quant_key] = weight
+                        is_moment1 = "moment1_0" in quant_key
+                        is_moment2 = "moment2_0" in quant_key
+                        if is_moment1:
+                            # dequant m1
+                            scale_key = quant_key + "_codebook"
+                            weight = state_dict[quant_key]
+                            scales = scale_dict[scale_key]
+                            weight, _ = qdq_weight(weight, scales=scales, quant_bit=8, dequant=True, rank=rank, world_size=world_size, peek=True)
+                            state_dict[quant_key] = weight
+                        elif is_moment2:
+                            # dequant ratio
+                            weight = state_dict[quant_key]
+                            min_scale_key = quant_key + "_min_codebook"
+                            max_scale_key = quant_key + "_max_codebook"
+                            mins, maxs = scale_dict[min_scale_key], scale_dict[max_scale_key]
+                            weight, _ = asymmetry_qdq_weight(weight, mins=mins, maxs=maxs, quant_bit=8, dequant=True, rank=rank, world_size=world_size, peek=True)
+                            # cal m2
+                            #all_positive = paddle.all(weight > 0)
+                            #if not all_positive:
+                            #    logger.info(f"{quant_key}'s ratio not all positive, {weight}, {weight.mean().item()}, {weight.max().item()}, {weight.min().item()}")
 
-                #print("=="*60)
-                #print(state_dict)
+                            weight = paddle.square(1.0 / weight - eps)
+                            #print(weight)
+                            state_dict[quant_key] = weight
+
             return state_dict
 
     state_dict = paddlenlp_load(checkpoint_file, map_location="cpu")

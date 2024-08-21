@@ -16,9 +16,10 @@ export PYTHONPATH=../:$PYTHONPATH
 #for task in  "ARC-Challenge"; do
 #for task in  "ARC-Challenge" "ARC-Easy" "data_slim" "data" "boolq" "winogrande" "piqa" "hellaswag"; do
 #for task in "boolq" "winogrande" "piqa" "hellaswag"; do
-for task in "piqa" "hellaswag"; do
+#for task in "piqa" "hellaswag"; do
+for task in  "winogrande" "data" "piqa" "hellaswag" "boolq"; do
     export BREAK=1
-    export QUANT=2
+    export QUANT=1
     export REMOVE_MW=0
     for i in $(seq 10); do
         echo "${task}: ${i}"

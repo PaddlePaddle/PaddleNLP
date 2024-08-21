@@ -39,6 +39,7 @@ from paddlenlp.transformers.model_utils import (
     load_state_dict,
     unwrap_model,
     qdq_weight,
+    asymmetry_qdq_weight,
 )
 from paddlenlp.transformers.utils import (
     device_guard,
@@ -119,8 +120,8 @@ class UnifiedCheckpointOption(ExplicitEnum):
     IGNORE_MERGE_OPTIMIZER = "ignore_merge_optimizer"
 
 
-def cal_radio(m, v, eps=1e-8):
-    return (m/(np.sqrt(v) + eps)).astype(np.float16)
+def cal_ratio(m, v, eps=1e-8):
+    return (1/(np.sqrt(v) + eps))
 
 class UnifiedCheckpointHandler:
     def __init__(self, args):
@@ -211,11 +212,14 @@ class UnifiedCheckpointHandler:
                     elif env_var_value == '1':
                         if momentum2:
                             # m1: m1_quant_weight, m2: ratio
-                            m1_key = k.split('/')[0] + 'moment1_0'
-                            quant_weight = cal_radio(state_dict[m1_key], state_dict[k])
+                            m1_key = k.split('/')[0] + '/moment1_0'
+                            ratio = cal_ratio(state_dict[m1_key], state_dict[k])
                             m1_quant, codebook = qdq_weight(state_dict[m1_key], quant_bit=8)
+                            quant_weight, mins, maxs = asymmetry_qdq_weight(ratio, quant_bit=8)
                             state_dict[m1_key] = m1_quant
                             codebook_dict[m1_key + '_codebook'] = codebook
+                            codebook_dict[k + '_min_codebook'] = mins
+                            codebook_dict[k + '_max_codebook'] = maxs
                         elif not momentum1:
                             quant_weight = state_dict[k]
 
