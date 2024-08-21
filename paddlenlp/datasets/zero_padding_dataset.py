@@ -63,6 +63,8 @@ class ZeroPadding:
 
         # append padding to the max_length
         if "attn_mask_startend_row_indices" in batch_records[0]:
+            # attn_mask_startend_row_indices is a list of row indices `0`,
+            # which indicates that all tokens are masked.
             batch_records.append(
                 {
                     "input_ids": [pad_token] * reserved_length,
@@ -71,6 +73,8 @@ class ZeroPadding:
                 }
             )
         elif "attention_mask" in batch_records[0]:
+            # attention_mask is a fullly masked attention matrix (all False)
+            # which indicates that all tokens are masked.
             batch_records.append(
                 {
                     "input_ids": [pad_token] * reserved_length,
