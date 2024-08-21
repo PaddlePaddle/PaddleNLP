@@ -806,13 +806,14 @@ class FusedMultiTransformerBase(Layer):
             tmp_out,
             self.gate_weights[i],
             self.ffn1_weights[i],
-            self.ffn1_biases[i],
             self.ffn2_weights[i],
-            self.ffn2_biases[i],
+            self.ffn1_biases[i],
             None,
+            self.ffn2_biases[i],
             None,
             "None",
             self.config.moe_config.top_k,
+            self.config.moe_config.norm_topk_prob,
         )
         return fused_moe_out
 
