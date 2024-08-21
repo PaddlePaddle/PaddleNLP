@@ -28,7 +28,6 @@ from paddlenlp.trainer import Trainer
 
 from ..utils.log import logger
 from .argparser import strtobool
-from .ckpt_converter import CheckpointConverter
 from .trainer import SCALER_NAME, SCHEDULER_NAME, TRAINER_STATE_NAME, TRAINING_ARGS_NAME
 from .trainer_callback import TrainerState
 from .trainer_utils import (  # set_hyrbid_parallel_seed,
@@ -40,6 +39,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     has_length,
     speed_metrics,
 )
+from .utils.ckpt_converter import CheckpointConverter
 from .utils.helper import distributed_file, distributed_isfile  # nested_truncate,
 
 try:
@@ -730,7 +730,7 @@ class AutoTrainer(Trainer):
                 for state_name, state_value in self.model_wrapped.state_dict().items():
                     parameter_to_structured_name[state_value.name] = state_name
 
-            if self.args.resume_form_hybrid_parallel:
+            if self.args.auto_parallel_resume_form_hybrid_parallel:
                 CheckpointConverter(
                     resume_from_checkpoint, state_dict, parameter_to_structured_name
                 ).load_from_hybrid_parallel_checkpoint()

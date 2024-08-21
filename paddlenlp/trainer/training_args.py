@@ -349,7 +349,7 @@ class TrainingArguments:
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
-        resume_form_hybrid_parallel (`bool`, *optional*):
+        auto_parallel_resume_form_hybrid_parallel (`bool`, *optional*):
             Wether hybrid paralle checkpoints be loaded in auto parallel mode.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
@@ -772,7 +772,7 @@ class TrainingArguments:
         default=None,
         metadata={"help": "The path to a folder with a valid checkpoint for your model."},
     )
-    resume_form_hybrid_parallel: Optional[bool] = field(
+    auto_parallel_resume_form_hybrid_parallel: Optional[bool] = field(
         default=False,
         metadata={"help": "Wether hybrid paralle checkpoints be loaded in auto parallel mode."},
     )
