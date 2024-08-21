@@ -24,7 +24,11 @@ def clone_git_repo(version, repo_url, destination_path):
         subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path], check=True)
         return True
     except subprocess.CalledProcessError as e:
-        print(f"Git clone operation failed with the following error: {e}")
+        print(f"Git clone {repo_url} operation failed with the following error: {e}")
+        print("Please check your network connection or access rights to the repository.")
+        print(
+            "If the problem persists, please refer to the README file for instructions on how to manually download and install the necessary components."
+        )
         return False
 
 
