@@ -53,32 +53,31 @@ class ZeroPadding:
     ]
 
     @classmethod
-    def _pad_batch_records_to_max_length(cls, batch_records, max_length):
-        for records in batch_records:
-            # confirm the at least one item in the pack
-            if len(records) == 0:
-                continue
-            # count all records total length
-            total_length = sum([len(record["input_ids"]) for record in records])
-            reserved_length = max_length - total_length
+    def _pad_batch_records_to_max_length(cls, batch_records, max_length, pad_token=0):
+        # confirm the at least one item in the pack
+        if len(batch_records) == 0:
+            return batch_records
+        # count all records total length
+        total_length = sum([len(record["input_ids"]) for record in batch_records])
+        reserved_length = max_length - total_length
 
-            # append padding to the max_length
-            if "attn_mask_startend_row_indices" in records[0]:
-                records.append(
-                    {
-                        "input_ids": [-100] * reserved_length,
-                        "labels": [-100] * reserved_length,
-                        "attn_mask_startend_row_indices": [0] * reserved_length,
-                    }
-                )
-            elif "attention_mask" in records[0]:
-                records.append(
-                    {
-                        "input_ids": [-100] * reserved_length,
-                        "labels": [-100] * reserved_length,
-                        "attention_mask": [True] * reserved_length,
-                    }
-                )
+        # append padding to the max_length
+        if "attn_mask_startend_row_indices" in batch_records[0]:
+            batch_records.append(
+                {
+                    "input_ids": [pad_token] * reserved_length,
+                    "labels": [-100] * reserved_length,
+                    "attn_mask_startend_row_indices": [0] * reserved_length,
+                }
+            )
+        elif "attention_mask" in batch_records[0]:
+            batch_records.append(
+                {
+                    "input_ids": [pad_token] * reserved_length,
+                    "labels": [-100] * reserved_length,
+                    "attention_mask": np.zeros((reserved_length, reserved_length), dtype=bool),
+                }
+            )
 
         return batch_records
 
