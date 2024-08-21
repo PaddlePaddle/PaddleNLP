@@ -12,8 +12,8 @@
     "sequence_parallel": 1,   
     "sharding_parallel_degree": 16,
     "sharding": "stage1",
-    "pipeline_parallel_config": "enable_delay_scale_loss enable_sharding_comm_overlap enable_release_grads ",
-    "tensor_parallel_config": "enable_delay_scale_loss enable_mp_async_allreduce enable_sp_async_reduce_scatter enable_mp_skip_c_identity enable_mp_fused_linear_param_grad_add",
+    "pipeline_parallel_config": "enable_sharding_comm_overlap enable_release_grads ",
+    "tensor_parallel_config": "enable_mp_async_allreduce enable_sp_async_reduce_scatter enable_mp_skip_c_identity enable_mp_fused_linear_param_grad_add",
     "per_device_train_batch_size": 2,
     "use_flash_attention": true,
     "use_fused_rms_norm": true,
@@ -31,7 +31,7 @@
     "weight_decay": 0.01,
     "warmup_ratio": 0.01,
     "max_grad_norm": 1.0,
-    "logging_steps": 1,
+    "logging_steps": 5,
     "dataloader_num_workers": 1,
     "eval_steps": 1000,
     "disable_tqdm": true,
@@ -42,5 +42,5 @@
     "pp_recompute_interval": 1,
     "device": "gpu",
     "amp_master_grad": true,
-    "sharding_parallel_config": "split_param enable_stage1_overlap"
+    "sharding_parallel_config": "split_param enable_stage1_overlap enable_stage1_allgather_overlap"
   }

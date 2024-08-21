@@ -25,14 +25,6 @@ from utils.argument import (
     TrainingArguments,
 )
 from utils.data import get_convert_example
-from utils.utils import (
-    CausalLMTrainer,
-    ZeroPaddingIterDatasetCallback,
-    compute_metrics,
-    get_lora_target_modules,
-    get_prefix_tuning_params,
-    init_chat_template,
-)
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import (
@@ -62,6 +54,14 @@ from paddlenlp.transformers import (
     LlamaTokenizer,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
+from paddlenlp.utils.llm_utils import (
+    CausalLMTrainer,
+    ZeroPaddingIterDatasetCallback,
+    compute_metrics,
+    get_lora_target_modules,
+    get_prefix_tuning_params,
+    init_chat_template,
+)
 from paddlenlp.utils.log import logger
 
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
@@ -564,7 +564,7 @@ def main():
             neft_post_hook_handle.remove()
         if training_args.benchmark:
             total_effective_tokens = (
-                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * training_args.num_train_epochs
+                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * train_result.metrics["progress_or_epoch"]
             )
             effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
             logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")

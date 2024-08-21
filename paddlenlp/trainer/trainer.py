@@ -149,6 +149,7 @@ from .training_args import TrainingArguments
 from .utils import reshard as reshard_util
 from .utils.async_save import AsyncSaver
 from .utils.helper import (  # nested_truncate,
+    broadcast_dataset_rank0_model,
     broadcast_dp_optimizer,
     broadcast_moe_optimizer,
     distributed_concat,
@@ -764,7 +765,8 @@ class Trainer:
                 self._load_optimizer_and_scheduler(resume_from_checkpoint)
         else:
             model = self.model_wrapped
-            self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+            if delay_optimizer_creation:
+                self.create_optimizer_and_scheduler(num_training_steps=max_steps)
 
         logger.info(f"{self.runtime_timer.log()}")
         logger.info("***** Running training *****")
@@ -1161,6 +1163,8 @@ class Trainer:
                         self.state.best_model_checkpoint,
                         safe_serialization=True,
                     )
+                    if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
+                        broadcast_dataset_rank0_model(self.model)
                 else:
                     weight_name = PADDLE_WEIGHTS_NAME
                     best_model_path = os.path.join(
@@ -1203,6 +1207,8 @@ class Trainer:
                 self.state.best_model_checkpoint,
                 safe_serialization=True,
             )
+            if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
+                broadcast_dataset_rank0_model(self.model)
             return
 
         convert_tp = False
@@ -2730,6 +2736,9 @@ class Trainer:
 
         if self.args.pipeline_parallel_degree > 1:
             # Only accept wrapped model for pipeline_parallel mode
+            if self.model is self.model_wrapped:
+                # NOTE(gongenlei): when do_train=False, do_eval=True, we need to wrap model for pipeline
+                self.model_wrapped = fleet.distributed_model(self.model_wrapped)
             model = self.model_wrapped
         else:
             model = self.model
