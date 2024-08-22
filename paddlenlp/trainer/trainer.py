@@ -94,6 +94,7 @@ from ..transformers.model_utils import (
 )
 from ..transformers.segment_parallel_utils import split_inputs_sequence_dim
 from ..transformers.tokenizer_utils import PretrainedTokenizer
+from ..utils.align_utils import float_to_md5
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     LORA_WEIGHTS_NAME,
@@ -1047,6 +1048,11 @@ class Trainer:
 
                             if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
                                 fused_allreduce_gradients_no_sync(list(parameters_list), self.optimizer._hcg)
+
+                    # Case 4: Pure Data parallel in align mode, we scale the gradiant eraly 
+                    # to align the behavior of gradients with auto parallel mode
+                    self._maybe_early_scale_in_align_mode(model.parameters())
+
                     self.timers and self.timers("all-reduce").stop()
                     self.timers and self.timers("optimizer-step").start()
 
@@ -1292,6 +1298,20 @@ class Trainer:
         assert isinstance(loss, paddle.Tensor) and loss._is_initialized()
         return loss.item()
 
+    def _maybe_process_align_mode(self, logs):
+        if not os.environ.get('FLAGS_auto_parallel_align_mode', None):
+            return
+
+        if not self.args.enable_auto_parallel:
+            global_scaler = max(self.args.sharding_parallel_degree, 1) * max(self.args.data_parallel_degree, 1)
+            logs["loss"] *= global_scaler
+
+            if "loss_cur_dp" in logs:
+                logs["loss_cur_dp"] *= global_scaler
+
+        loss_md5 = float_to_md5(logs["loss"])
+        logger.info(f"[align] loss md5:{loss_md5}")
+
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
 
@@ -1306,6 +1326,8 @@ class Trainer:
             logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
+
+            self._maybe_process_align_mode(logs)
 
             divisor = 2**30
             # TODO(@gexiao): replace these codes with unified APIs in Paddle
@@ -2077,12 +2099,17 @@ class Trainer:
 
         # We don't use .loss here since the model may return tuples instead of ModelOutput.
         loss = outputs["loss"] if isinstance(outputs, dict) else outputs
+
         if isinstance(outputs, dict):
             loss = outputs["loss"]
         elif isinstance(outputs, tuple):
             loss = outputs[0]
         else:
             loss = outputs
+        
+        if os.environ.get('FLAGS_auto_parallel_align_mode', None):
+            global_scaler = max(self.args.sharding_parallel_degree, 1) * max(self.args.data_parallel_degree, 1)
+            loss /= global_scaler
 
         return (loss, outputs) if return_outputs else loss
 
@@ -3290,3 +3317,7 @@ class Trainer:
             is_unified_checkpoint_type = True
 
         return is_unified_checkpoint_type
+
+    def _maybe_early_scale_in_align_mode(self, parameters_list):
+        if os.environ.get('FLAGS_auto_parallel_align_mode', None) and paddle.distributed.get_world_size() == self.args.data_parallel_degree:
+                fused_allreduce_gradients(list(parameters_list), None)
