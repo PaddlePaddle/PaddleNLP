@@ -540,6 +540,11 @@ class TrainingArguments:
             )
         },
     )
+    sharding_comm_buffer_size_MB: int = field(
+        default=-1,
+        metadata={"help": ("Sharding fused comm buffer size in communication between sharding ranks. ")},
+    )
+
     save_sharded_model: bool = field(
         default=False,
         metadata={
@@ -1163,19 +1168,19 @@ class TrainingArguments:
                         # sync_param = True, sync_grad = False, sync_moment = False, sync_param_name = ["embedding", "layer_norm", ".b_"].
 
                         if sync_param or sync_grad or sync_moment:
-                            print(f"setting sync_param_name")
+                            print("setting sync_param_name")
                             strategy.sync_param_name = [""]
 
                         if sync_param:
-                            print(f"setting sync_param")
+                            print("setting sync_param")
                             strategy.hybrid_configs["mp_configs"].sync_param = True
 
                         if sync_grad:
-                            print(f"setting sync_grad")
+                            print("setting sync_grad")
                             strategy.hybrid_configs["mp_configs"].sync_grad = True
 
                         if sync_moment:
-                            print(f"setting sync_moment")
+                            print("setting sync_moment")
                             strategy.hybrid_configs["mp_configs"].sync_moment = True
 
                     except:
@@ -1263,6 +1268,11 @@ class TrainingArguments:
                             )
 
                     try:
+                        if self.sharding_comm_buffer_size_MB > 0:
+                            strategy.hybrid_configs["sharding_configs"].comm_buffer_size_MB = int(
+                                self.sharding_comm_buffer_size_MB
+                            )
+
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
 
