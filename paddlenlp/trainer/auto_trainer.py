@@ -155,15 +155,13 @@ class AutoTrainer(Trainer):
             return loss
 
     def _split_batches_for_accumulation(self, inputs):
-        _in_pir_mode = paddle.base.framework.get_flags(
-            "FLAGS_enable_pir_api"
-        )["FLAGS_enable_pir_api"]
+        _in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
         if self.args.gradient_accumulation_steps == 1:
             return [inputs]
 
         if self.args.to_static and self.args.pipeline_parallel_degree > 1:
             return [inputs]
-        
+
         if self.args.to_static and _in_pir_mode and self.args.gradient_accumulation_steps > 1:
             return [inputs]
 
