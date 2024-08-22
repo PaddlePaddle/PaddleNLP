@@ -633,11 +633,20 @@ class MixtralInferenceModel(MixtralPretrainedModel):
             else:
                 self.transformer_block.linear_weights[idx].set_value(linear_weight_tensor)
 
-            ffn1_weight_tensor = paddle.to_tensor(concated_ffn1_weight).cast(paddle.get_default_dtype())
+            ffn1_weight_tensor = paddle.to_tensor(concated_ffn1_weight)
             if self.use_weight_only:
-                ffn1_quanted_weight_tensor, ffn1_weight_scale_tensor = weight_quantize(
-                    ffn1_weight_tensor, algo=self.quant_algo
-                )
+                ffn1_quanted_weight_list = []
+                ffn1_quanted_weight_scale = []
+                for i in range(len(ffn1_weight_tensor)):
+                    ffn1_quanted_weight_list_i, ffn1_quanted_weight_scale_i = weight_quantize(
+                        ffn1_weight_tensor[i], algo=self.quant_algo
+                    )
+                    ffn1_quanted_weight_list.append(
+                        ffn1_quanted_weight_list_i.reshape([self.transformer_block.config.embed_dim, -1])
+                    )
+                    ffn1_quanted_weight_scale.append(ffn1_quanted_weight_scale_i)
+                ffn1_quanted_weight_tensor = paddle.to_tensor(ffn1_quanted_weight_list)
+                ffn1_weight_scale_tensor = paddle.to_tensor(ffn1_quanted_weight_scale)
                 self.transformer_block.ffn1_weights[idx].set_value(ffn1_quanted_weight_tensor)
                 self.transformer_block.ffn1_weights_scale[idx].set_value(ffn1_weight_scale_tensor)
             elif "a8w8" in self.quant_type:
@@ -650,6 +659,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                         paddle.cast(paddle.to_tensor(concated_ffn1_weight).transpose((1, 0)), "int8")
                     )
             else:
+                ffn1_weight_tensor = ffn1_weight_tensor.cast(paddle.get_default_dtype())
                 self.transformer_block.ffn1_weights[idx].set_value(ffn1_weight_tensor)
 
             ffn2_weight = []
@@ -657,12 +667,21 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                 ffn2_weight.append(
                     state_dict["mixtral.layers.{}.block_sparse_moe.experts.{}.w2.weight".format(idx, e_id)]
                 )
-            ffn2_weight_tensor = paddle.to_tensor(ffn2_weight).cast(paddle.get_default_dtype())
+            ffn2_weight_tensor = paddle.to_tensor(ffn2_weight)
 
             if self.use_weight_only:
-                ffn2_quanted_weight_tensor, ffn2_weight_scale_tensor = weight_quantize(
-                    ffn2_weight_tensor, algo=self.quant_algo
-                )
+                ffn2_quanted_weight_list = []
+                ffn2_quanted_weight_scale = []
+                for i in range(len(ffn2_weight_tensor)):
+                    ffn2_quanted_weight_list_i, ffn2_quanted_weight_scale_i = weight_quantize(
+                        ffn2_weight_tensor[i], algo=self.quant_algo
+                    )
+                    ffn2_quanted_weight_list.append(
+                        ffn2_quanted_weight_list_i.reshape([-1, self.transformer_block.config.embed_dim])
+                    )
+                    ffn2_quanted_weight_scale.append(ffn2_quanted_weight_scale_i)
+                ffn2_quanted_weight_tensor = paddle.to_tensor(ffn2_quanted_weight_list)
+                ffn2_weight_scale_tensor = paddle.to_tensor(ffn2_quanted_weight_scale)
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_quanted_weight_tensor)
                 self.transformer_block.ffn2_weights_scale[idx].set_value(ffn2_weight_scale_tensor)
             elif "a8w8" in self.quant_type:
@@ -682,6 +701,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                         )
                     )
             else:
+                ffn2_weight_tensor = ffn2_weight_tensor.cast(paddle.get_default_dtype())
                 self.transformer_block.ffn2_weights[idx].set_value(ffn2_weight_tensor)
 
             if "a8w8" in self.quant_type:

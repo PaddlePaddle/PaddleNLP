@@ -1054,32 +1054,50 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             ffn2_weight_scale_attr = self.get_attr(config.ffn2_weight_scale_attrs, i)
 
             qkv_weight_scale = self.create_parameter(
-                shape=[(config.num_heads + 2 * config.kv_num_heads) * self.head_dim],
+                shape=[(self.num_heads + 2 * self.kv_num_heads) * self.head_dim],
                 attr=qkv_weight_scale_attr,
                 dtype=self.weight_scale_dtype,
                 is_bias=False,
             )
 
             linear_weight_scale = self.create_parameter(
-                shape=[config.embed_dim],
+                shape=[self.embed_dim],
                 attr=linear_weight_scale_attr,
                 dtype=self.weight_scale_dtype,
                 is_bias=False,
             )
 
-            ffn1_weight_scale = self.create_parameter(
-                shape=[config.dim_feedforward * 2] if config.activation.endswith("glu") else [config.dim_feedforward],
-                attr=ffn1_weight_scale_attr,
-                dtype=self.weight_scale_dtype,
-                is_bias=False,
-            )
+            if self.config.moe_config.use_moe(i):
+                ffn1_weight_scale = self.create_parameter(
+                    shape=[config.moe_config.num_experts, self.dim_feedforward * 2]
+                    if config.activation.endswith("glu")
+                    else [config.moe_config.num_experts, self.dim_feedforward],
+                    attr=ffn1_weight_scale_attr,
+                    dtype=self.weight_scale_dtype,
+                    is_bias=False,
+                )
+            else:
+                ffn1_weight_scale = self.create_parameter(
+                    shape=[self.dim_feedforward * 2] if config.activation.endswith("glu") else [self.dim_feedforward],
+                    attr=ffn1_weight_scale_attr,
+                    dtype=self.weight_scale_dtype,
+                    is_bias=False,
+                )
 
-            ffn2_weight_scale = self.create_parameter(
-                shape=[config.embed_dim],
-                attr=ffn2_weight_scale_attr,
-                dtype=self.weight_scale_dtype,
-                is_bias=False,
-            )
+            if self.config.moe_config.use_moe(i):
+                ffn2_weight_scale = self.create_parameter(
+                    shape=[config.moe_config.num_experts, self.embed_dim],
+                    attr=ffn2_weight_scale_attr,
+                    dtype=self.weight_scale_dtype,
+                    is_bias=False,
+                )
+            else:
+                ffn2_weight_scale = self.create_parameter(
+                    shape=[self.embed_dim],
+                    attr=ffn2_weight_scale_attr,
+                    dtype=self.weight_scale_dtype,
+                    is_bias=False,
+                )
 
             self.qkv_weights_scale.append(qkv_weight_scale)
             self.linear_weights_scale.append(linear_weight_scale)
@@ -1111,6 +1129,14 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             self.ffn1_weight_shape[0] //= 2
             self.ffn2_weight_shape[0] //= 2
 
+        if self.config.moe_config.has_moe() is True:
+            self.moe_ffn1_weight_shape = (
+                [self.config.moe_config.num_experts, self.embed_dim, self.dim_feedforward * 2]
+                if self.activation.endswith("glu")
+                else [self.config.moe_config.num_experts, self.embed_dim, self.dim_feedforward]
+            )
+            self.moe_ffn2_weight_shape = [self.config.moe_config.num_experts, self.dim_feedforward, self.embed_dim]
+
     def compute_qkv_linear(self, ln_out, i):
         return weight_only_linear(
             ln_out,
@@ -1127,6 +1153,29 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             weight_scale=self.linear_weights_scale[i],
             weight_dtype=self.weight_dtype,
         )
+
+    def compute_fused_moe(self, tmp_out, i):
+        # todo[xinhw]: make bias optional
+        if self.ffn1_biases[i] is None:
+            shape1 = paddle.to_tensor([self.ffn1_weights[i].shape[0], 1, self.dim_feedforward * 2])
+            self.ffn1_biases[i] = paddle.zeros(shape1)
+        if self.ffn2_biases[i] is None:
+            shape2 = paddle.to_tensor([self.ffn1_weights[i].shape[0], 1, self.embed_dim])
+            self.ffn2_biases[i] = paddle.zeros(shape2)
+        fused_moe_out = fused_moe(
+            tmp_out,
+            self.gate_weights[i],
+            self.ffn1_weights[i],
+            self.ffn2_weights[i],
+            self.ffn1_biases[i],
+            self.ffn1_weights_scale[i],
+            self.ffn2_biases[i],
+            self.ffn2_weights_scale[i],
+            self.quant_type,
+            self.config.moe_config.top_k,
+            self.config.moe_config.norm_topk_prob,
+        )
+        return fused_moe_out
 
     def compute_ffn1(self, tmp_out, i):
         return weight_only_linear(
