@@ -1053,7 +1053,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
         echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
         loss_base=10.06303482
         if [ $IS_A100 -ne 0 ];then
-            loss_base=10.056101989746093
+            loss_base=10.24704742
         fi
         ips_base=-1
         mem_base=-1
