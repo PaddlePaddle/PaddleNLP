@@ -97,7 +97,7 @@ PaddleNLP 支持多个主流大模型的 SFT、LoRA、Prefix Tuning 等精调策
 - **支持多轮对话**。支持统一对话模板，支持多轮对话高效训练，详参[多轮对话文档](./docs/chat_template.md)。
 
 <div align="center">
-    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/a1d982f8-d2ef-4a78-bb49-6d6683d6ecce">
+    <img width="500" alt="llm" src="https://github.com/user-attachments/assets/cb226f26-ce86-433e-8bb3-02fc04e8d813">
 </div>
 <div align="center">
     <font size ="1">
