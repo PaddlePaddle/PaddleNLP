@@ -1211,7 +1211,10 @@ class Trainer:
                         )
 
         self._total_loss_scalar += tr_loss.item()
-        train_loss = self._total_loss_scalar / (self.state.global_step - self.skip_global_steps)
+        if self.state.global_step == self.skip_global_steps:
+            train_loss = 0.0
+        else:
+            train_loss = self._total_loss_scalar / (self.state.global_step - self.skip_global_steps)
 
         metrics = speed_metrics("train", start_time, num_samples=num_train_samples, num_steps=self.state.max_steps)
 
