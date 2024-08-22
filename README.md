@@ -137,7 +137,7 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 ### pip 安装
 
 ```shell
-pip install --upgrade paddlenlp==3.0.0b0
+pip install --upgrade paddlenlp==3.0.0b1
 ```
 
 或者可通过以下命令安装最新 develop 分支代码：

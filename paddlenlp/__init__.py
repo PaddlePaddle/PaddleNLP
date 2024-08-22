@@ -19,7 +19,7 @@ from datetime import datetime
 PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
 
 
-__version__ = "3.0.0b0.post"
+__version__ = "3.0.0b1.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 else:
