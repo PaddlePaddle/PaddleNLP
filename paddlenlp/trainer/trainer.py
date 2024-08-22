@@ -278,7 +278,7 @@ class Trainer:
         # Seed must be set before instantiating the model when using model
         set_seed(seed=self.args.seed)
 
-        if model is None:
+        if model is None and not args.debug_data:
             raise RuntimeError("`Trainer` requires either a `model` or `model_init` argument")
 
         if self.args.to_static:
@@ -340,7 +340,7 @@ class Trainer:
                 "You should subclass `Trainer` and override the `create_optimizer_and_scheduler` method."
             )
 
-        if self.args.pipeline_parallel_degree > 1 and self.args.use_hybrid_parallel:
+        if self.args.pipeline_parallel_degree > 1 and self.args.use_hybrid_parallel and not args.debug_data:
             from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
             assert (isinstance(model, LoRAModel) and isinstance(model.model, PipelineLayer)) or isinstance(
@@ -379,26 +379,28 @@ class Trainer:
 
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False
-        if args.fp16 or args.bf16:
-            # set do_grad_scaling, enable_autocast_context_manager
-            self._wrap_amp_model(args, model)
 
-        if args.recompute:
+        if not args.debug_data:
+            if args.fp16 or args.bf16:
+                # set do_grad_scaling, enable_autocast_context_manager
+                self._wrap_amp_model(args, model)
 
-            def fn(layer):
-                if hasattr(layer, "enable_recompute") and (
-                    layer.enable_recompute is False or layer.enable_recompute == 0
-                ):
-                    layer.enable_recompute = True
+            if args.recompute:
 
-            model.apply(fn)
+                def fn(layer):
+                    if hasattr(layer, "enable_recompute") and (
+                        layer.enable_recompute is False or layer.enable_recompute == 0
+                    ):
+                        layer.enable_recompute = True
 
-        default_label_names = (
-            ["start_positions", "end_positions"]
-            if "QusetionAnswering" in type(self.model).__name__ or "UIE" in type(self.model).__name__
-            else ["labels"]
-        )
-        self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
+                model.apply(fn)
+
+            default_label_names = (
+                ["start_positions", "end_positions"]
+                if "QusetionAnswering" in type(self.model).__name__ or "UIE" in type(self.model).__name__
+                else ["labels"]
+            )
+            self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
 
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
         self.print_config()
