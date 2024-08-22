@@ -49,6 +49,7 @@ except:
 MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
 DIST_CKPT_PATH = "dist_ckpt"
+DIST_MODEL_PATH = "dist_model"
 FREE_SVAE_LOAD_KEY_PATTERNS = ["learning_rate_", "gradient_merge_", "@GRAD@MERG", "eager_tmp"]
 
 
@@ -555,6 +556,18 @@ class AutoTrainer(Trainer):
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         with _exec_mode_guard("dynamic"):
             super()._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, **kwargs)
+
+    def _save_model(self):
+        if not self.args.to_static:
+            return
+        with _exec_mode_guard("static"):
+            output_dir = f"{self.args.output_dir}/{DIST_MODEL_PATH}"
+            os.makedirs(output_dir, exist_ok=True)
+            logger.info(f"Saving model files into {output_dir}")
+            model_file = os.path.join(output_dir, "rank_" + str(paddle.distributed.get_rank()) + ".pd_dist_model")
+            if os.path.exists(model_file):
+                os.remove(model_file)
+            paddle.save(self.model_wrapped.dist_main_program("train"), model_file)
 
     def _save_checkpoint(self, model, metrics=None):
 

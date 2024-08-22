@@ -20,6 +20,7 @@ import contextlib
 import json
 import math
 import os
+import sys
 import types
 import warnings
 from dataclasses import asdict, dataclass, field
@@ -343,6 +344,9 @@ class TrainingArguments:
             The list of integrations to report the results and logs to.
             Supported platforms are `"visualdl"`/`"wandb"`/`"tensorboard"`.
             `"none"` for no integrations.
+        ddp_find_unused_parameters (`bool`, *optional*):
+            When using distributed training, the value of the flag `find_unused_parameters` passed to
+            `paddle.DataParallel`. Will default to `False` if recompute is used, `True` otherwise.
         wandb_api_key (`str`, *optional*):
             Weights & Biases (WandB) API key(s) for authentication with the WandB service.
         resume_from_checkpoint (`str`, *optional*):
@@ -761,6 +765,15 @@ class TrainingArguments:
     )
     report_to: Optional[List[str]] = field(
         default=None, metadata={"help": "The list of integrations to report the results and logs to."}
+    )
+    ddp_find_unused_parameters: Optional[bool] = field(
+        default=None,
+        metadata={
+            "help": (
+                "When using distributed training, the value of the flag `find_unused_parameters` passed to "
+                "`DataParallel`."
+            )
+        },
     )
     wandb_api_key: Optional[str] = field(
         default=None,
@@ -1569,31 +1582,35 @@ class TrainingArguments:
             self.unified_checkpoint = False
 
         if self.unified_checkpoint:
-            if self.ignore_save_lr_and_optim:
-                self.unified_checkpoint_config = ""
-                logger.info("Setting unified_checkpoint_config to empty for using ignore_save_lr_and_optim.")
-            else:
-                unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
-                for x in unified_checkpoint_config:
-                    if len(x) > 0:
-                        if x not in [
-                            "skip_save_model_weight",
-                            "master_weight_compatible",
-                            "async_save",
-                            "enable_all_options",
-                        ]:
-                            raise ValueError(
-                                f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
-                                + "master_weight_compatible, async_save, enable_all_options."
-                            )
-                if "enable_all_options" in unified_checkpoint_config:
-                    self.unified_checkpoint_config = [
+            unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
+            if sys.platform.startswith("win") and "async_save" in self.unified_checkpoint_config:
+                raise ValueError("Currently do not support asynchronous saving for Windows system!")
+            if (
+                "skip_save_model_weight" in self.unified_checkpoint_config
+                and "ignore_merge_optimizer" in self.unified_checkpoint_config
+            ):
+                raise ValueError("`skip_save_model_weight` and `ignore_merge_optimizer` cannot both be True.")
+            for x in unified_checkpoint_config:
+                if len(x) > 0:
+                    if x not in [
                         "skip_save_model_weight",
                         "master_weight_compatible",
-                        # "async_save",
-                    ]
-                else:
-                    self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
+                        "async_save",
+                        "enable_all_options",
+                        "ignore_merge_optimizer",
+                    ]:
+                        raise ValueError(
+                            f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
+                            + "master_weight_compatible, async_save, enable_all_options, ignore_merge_optimizer."
+                        )
+            if "enable_all_options" in unified_checkpoint_config:
+                self.unified_checkpoint_config = [
+                    "skip_save_model_weight",
+                    "master_weight_compatible",
+                    # "async_save",
+                ]
+            else:
+                self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
 
         if self.report_to is None:
             logger.info(

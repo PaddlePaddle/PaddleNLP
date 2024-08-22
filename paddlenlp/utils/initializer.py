@@ -41,7 +41,8 @@ __all__ = [
 
 def _no_grad_uniform_(tensor, a, b):
     with paddle.no_grad():
-        tensor.uniform_(min=a, max=b)
+        nn.initializer.Uniform(a, b)(tensor)
+        # tensor.uniform_(min=a, max=b)  # NOTE uniform_ ops donot suprort on cpu
     return tensor
 
 
