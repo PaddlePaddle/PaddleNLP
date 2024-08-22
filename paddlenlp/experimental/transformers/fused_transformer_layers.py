@@ -439,10 +439,13 @@ class FusedMultiTransformerBase(Layer):
                     is_bias=True,
                 )
 
+            blha_use_tensorcore = bool(paddle.get_flags("FLAGS_blha_use_tensorcore")["FLAGS_blha_use_tensorcore"])
+            cachekv_scale_shape = [self.kv_num_heads * self.head_dim] if blha_use_tensorcore else [self.kv_num_heads]
+
             cache_k_scale = None
             if cache_k_scale_attr:
                 cache_k_scale = self.create_parameter(
-                    shape=[self.kv_num_heads],
+                    shape=cachekv_scale_shape,
                     attr=cache_k_scale_attr,
                     dtype=self._dtype,
                     is_bias=False,
@@ -451,7 +454,7 @@ class FusedMultiTransformerBase(Layer):
             cache_v_scale = None
             if cache_v_scale_attr:
                 cache_v_scale = self.create_parameter(
-                    shape=[self.kv_num_heads],
+                    shape=cachekv_scale_shape,
                     attr=cache_v_scale_attr,
                     dtype=self._dtype,
                     is_bias=False,
@@ -460,7 +463,7 @@ class FusedMultiTransformerBase(Layer):
             cache_k_out_scale = None
             if cache_k_out_scale_attr:
                 cache_k_out_scale = self.create_parameter(
-                    shape=[self.kv_num_heads],
+                    shape=cachekv_scale_shape,
                     attr=cache_k_out_scale_attr,
                     dtype=self._dtype,
                     is_bias=False,
@@ -469,7 +472,7 @@ class FusedMultiTransformerBase(Layer):
             cache_v_out_scale = None
             if cache_v_out_scale_attr:
                 cache_v_out_scale = self.create_parameter(
-                    shape=[self.kv_num_heads],
+                    shape=cachekv_scale_shape,
                     attr=cache_v_out_scale_attr,
                     dtype=self._dtype,
                     is_bias=False,

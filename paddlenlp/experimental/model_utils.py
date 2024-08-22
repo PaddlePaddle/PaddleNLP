@@ -388,6 +388,29 @@ class WeightScalesLoader:
                     np.concatenate([self.scale["ffn1_1_weight_scale"][i, :], self.scale["ffn1_2_weight_scale"][i, :]])
                 )
 
+def permute_scale_v(x, dim_heads=128):
+    """
+    This function is to permute scale of cacheV in tensor-core c4
+    """
+    tmp = [i for i in x]
+    step = dim_heads // 4 # For CacheV, in tensor-core, once calculation number is 4
+    for i in range(step):
+        for j in range(4):
+            x[i * 4 + j] = tmp[j * step + i]
+    return x
+
+
+def permute_scale_k(x, dim_heads=128):
+    """
+    This function is to permute scale of cacheK in tensor-core c4
+    """
+    tmp = [i for i in x]
+    step = dim_heads // 16 # For Cachek, in tensor-core, once calculation number is 16
+    for i in range(0, step, 2):
+        for j in range(16):
+            x[i * 16 + j * 2] = tmp[j * step + i]
+            x[i * 16 + j * 2 + 1] = tmp[j * step + i + 1]
+    return x
 
 class CacheScaleLoader:
     def __init__(
@@ -397,7 +420,9 @@ class CacheScaleLoader:
         num_of_layers=None,
         num_heads=None,
         num_key_value_heads=None,
+        dim_heads=128,
     ):
+        blha_use_tensorcore = bool(paddle.get_flags("FLAGS_blha_use_tensorcore")["FLAGS_blha_use_tensorcore"])
         with open(scale_json_file_path) as json_file:
             self.scale_dict = json.load(json_file)
         self.key_map = key_map_dict
@@ -407,21 +432,31 @@ class CacheScaleLoader:
                 scale_type_out = "cache_k_out_scale"
             else:
                 scale_type_out = "cache_v_out_scale"
-            self.scale[scale_type] = np.full([num_of_layers, num_key_value_heads], fill_value=-1.0)
-            self.scale[scale_type_out] = np.full([num_of_layers, num_key_value_heads], fill_value=-1.0)
+            
+            col_dims = num_key_value_heads * dim_heads if blha_use_tensorcore else num_key_value_heads
+
+            self.scale[scale_type] = np.full([num_of_layers, col_dims], fill_value=-1.0)
+            self.scale[scale_type_out] = np.full([num_of_layers, col_dims], fill_value=-1.0)
 
             for i in range(num_of_layers):
                 if key_template.replace("#", str(i)) in self.scale_dict.keys():
-                    if num_heads != num_key_value_heads:
-                        self.scale[scale_type][i, :] = [
-                            127.0 / self.scale_dict[key_template.replace("#", str(i))][j]
-                            for j in range(0, num_heads, num_heads // num_key_value_heads)
-                        ]
+                    scale_data = list(np.array(self.scale_dict[key_template.replace("#", str(i))]).flatten())
+                    scale_list = []
+                    if len(scale_data) < col_dims:
+                        for hi in range(num_key_value_heads):
+                            scale_list.extend([scale_data[hi]] * dim_heads)
                     else:
-                        self.scale[scale_type][i, :] = [
-                            127.0 / self.scale_dict[key_template.replace("#", str(i))][j]
-                            for j in range(0, num_key_value_heads)
-                        ]
+                        scale_list.extend(scale_data)
+                    if blha_use_tensorcore:
+                        for hi in range(num_key_value_heads):
+                            if 'cachek_matmul' in scale_type:
+                                scale_list[hi * dim_heads : (hi + 1) * dim_heads] = permute_scale_k(
+                                        scale_list[hi * dim_heads : (hi + 1) * dim_heads], dim_heads)
+                            else :
+                                scale_list[hi * dim_heads : (hi + 1) * dim_heads] = permute_scale_v(
+                                        scale_list[hi * dim_heads : (hi + 1) * dim_heads], dim_heads)
+
+                    self.scale[scale_type][i, :] = [127.0 / value for value in scale_list]
                     self.scale[scale_type_out][i, :] = [
-                        1.0 / self.scale[scale_type][i, j] for j in range(0, num_key_value_heads)
+                        1.0 / self.scale[scale_type][i, j] for j in range(0, col_dims)
                     ]
