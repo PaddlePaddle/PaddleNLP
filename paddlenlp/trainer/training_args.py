@@ -549,6 +549,11 @@ class TrainingArguments:
             )
         },
     )
+    sharding_comm_buffer_size_MB: int = field(
+        default=-1,
+        metadata={"help": ("Sharding fused comm buffer size in communication between sharding ranks. ")},
+    )
+
     save_sharded_model: bool = field(
         default=False,
         metadata={
@@ -1293,6 +1298,11 @@ class TrainingArguments:
                             )
 
                     try:
+                        if self.sharding_comm_buffer_size_MB > 0:
+                            strategy.hybrid_configs["sharding_configs"].comm_buffer_size_MB = int(
+                                self.sharding_comm_buffer_size_MB
+                            )
+
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
 
