@@ -443,7 +443,7 @@ class CacheScaleLoader:
                     scale_data = list(np.array(self.scale_dict[key_template.replace("#", str(i))]).flatten())
                     scale_list = []
                     if len(scale_data) < col_dims:
-                        for hi in range(num_key_value_heads):
+                        for hi in range(0, num_heads, num_heads // num_key_value_heads):
                             scale_list.extend([scale_data[hi]] * dim_heads)
                     else:
                         scale_list.extend(scale_data)
@@ -452,7 +452,7 @@ class CacheScaleLoader:
                             if 'cachek_matmul' in scale_type:
                                 scale_list[hi * dim_heads : (hi + 1) * dim_heads] = permute_scale_k(
                                         scale_list[hi * dim_heads : (hi + 1) * dim_heads], dim_heads)
-                            else :
+                            else:
                                 scale_list[hi * dim_heads : (hi + 1) * dim_heads] = permute_scale_v(
                                         scale_list[hi * dim_heads : (hi + 1) * dim_heads], dim_heads)
 
