@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.framework import LayerHelper, core, in_dynamic_mode, in_dynamic_or_pir_mode
@@ -313,28 +314,25 @@ class FusedMultiTransformerBase(Layer):
         self.create_params_type = self.get_weight_create_dype()
 
         self.ln_scales, self.ln_biases = [], []
-        self.qkv_weights, self.qkv_biases = [], []
-        self.linear_weights, self.linear_biases = [], []
         self.ffn_ln_scales, self.ffn_ln_biases = [], []
-        self.ffn1_weights, self.ffn1_biases = [], []
-        self.ffn2_weights, self.ffn2_biases = [], []
         self.cache_k_scales, self.cache_v_scales = [], []
         self.cache_k_out_scales, self.cache_v_out_scales = [], []
+
+        self.qkv_biases = []
+        self.linear_biases = []
+        self.ffn1_biases = []
+        self.ffn2_biases = []
 
         for i in range(self.num_layers):
             ln_scale_attr = self.get_attr(config.ln_scale_attrs, i)
             ln_bias_attr = self.get_attr(config.ln_bias_attrs, i)
-            qkv_weight_attr = self.get_attr(config.qkv_weight_attrs, i)
 
             qkv_bias_attr = self.get_attr(config.qkv_bias_attrs, i)
-            linear_weight_attr = self.get_attr(config.linear_weight_attrs, i)
             linear_bias_attr = self.get_attr(config.linear_bias_attrs, i)
 
             ffn_ln_scale_attr = self.get_attr(config.ffn_ln_scale_attrs, i)
             ffn_ln_bias_attr = self.get_attr(config.ffn_ln_bias_attrs, i)
-            ffn1_weight_attr = self.get_attr(config.ffn1_weight_attrs, i)
             ffn1_bias_attr = self.get_attr(config.ffn1_bias_attrs, i)
-            ffn2_weight_attr = self.get_attr(config.ffn2_weight_attrs, i)
             ffn2_bias_attr = self.get_attr(config.ffn2_bias_attrs, i)
 
             cache_k_scale_attr = self.get_attr(config.cache_k_scale_attrs, i)
@@ -358,13 +356,6 @@ class FusedMultiTransformerBase(Layer):
                 )
             self.init_weight_shape(config)
 
-            qkv_weight = self.create_parameter(
-                shape=self.qkv_weight_shape,
-                attr=qkv_weight_attr,
-                dtype=self.create_params_type,
-                is_bias=False,
-            )
-
             qkv_bias = None
             if qkv_bias_attr:
                 qkv_bias = self.create_parameter(
@@ -373,13 +364,6 @@ class FusedMultiTransformerBase(Layer):
                     dtype=self._dtype,
                     is_bias=True,
                 )
-
-            linear_weight = self.create_parameter(
-                shape=self.linear_weight_shape,
-                attr=linear_weight_attr,
-                dtype=self.create_params_type,
-                is_bias=False,
-            )
 
             linear_bias = None
             if linear_bias_attr:
@@ -407,13 +391,6 @@ class FusedMultiTransformerBase(Layer):
                     dtype=self._norm_weight_dtype,
                 )
 
-            ffn1_weight = self.create_parameter(
-                shape=self.ffn1_weight_shape,
-                attr=ffn1_weight_attr,
-                dtype=self.create_params_type,
-                is_bias=False,
-            )
-
             ffn1_bias = None
             if ffn1_bias_attr:
                 ffn1_bias = self.create_parameter(
@@ -422,13 +399,6 @@ class FusedMultiTransformerBase(Layer):
                     dtype=self._dtype,
                     is_bias=True,
                 )
-
-            ffn2_weight = self.create_parameter(
-                shape=self.ffn2_weight_shape,
-                attr=ffn2_weight_attr,
-                dtype=self.create_params_type,
-                is_bias=False,
-            )
 
             ffn2_bias = None
             if ffn2_bias_attr:
@@ -478,26 +448,17 @@ class FusedMultiTransformerBase(Layer):
             # tensor model parallel
             if config.nranks > 1:
                 # column parallel
-                _set_var_distributed(qkv_weight)
                 _set_var_distributed(qkv_bias)
-                _set_var_distributed(ffn1_weight)
                 _set_var_distributed(ffn1_bias)
-                # row parallel
-                _set_var_distributed(linear_weight)
-                _set_var_distributed(ffn2_weight)
 
             self.ln_scales.append(ln_scale)
             self.ln_biases.append(ln_bias)
-            self.qkv_weights.append(qkv_weight)
             self.qkv_biases.append(qkv_bias)
-            self.linear_weights.append(linear_weight)
             self.linear_biases.append(linear_bias)
 
             self.ffn_ln_scales.append(ffn_ln_scale)
             self.ffn_ln_biases.append(ffn_ln_bias)
-            self.ffn1_weights.append(ffn1_weight)
             self.ffn1_biases.append(ffn1_bias)
-            self.ffn2_weights.append(ffn2_weight)
             self.ffn2_biases.append(ffn2_bias)
 
             self.cache_k_scales.append(cache_k_scale)
@@ -507,16 +468,12 @@ class FusedMultiTransformerBase(Layer):
 
             self._add_parameter(ln_scale)
             self._add_parameter(ln_bias)
-            self._add_parameter(qkv_weight)
             self._add_parameter(qkv_bias)
-            self._add_parameter(linear_weight)
             self._add_parameter(linear_bias)
 
             self._add_parameter(ffn_ln_scale)
             self._add_parameter(ffn_ln_bias)
-            self._add_parameter(ffn1_weight)
             self._add_parameter(ffn1_bias)
-            self._add_parameter(ffn2_weight)
             self._add_parameter(ffn2_bias)
 
             self._add_parameter(cache_k_scale)
@@ -529,6 +486,62 @@ class FusedMultiTransformerBase(Layer):
         from paddle.incubate.nn.functional import fused_linear
 
         self.linear = fused_linear
+
+    def init_weight(self):
+        self.qkv_weights = []
+        self.linear_weights = []
+        self.ffn1_weights = []
+        self.ffn2_weights = []
+
+        for i in range(self.num_layers):
+            qkv_weight_attr = self.get_attr(self.config.qkv_weight_attrs, i)
+            linear_weight_attr = self.get_attr(self.config.linear_weight_attrs, i)
+            ffn1_weight_attr = self.get_attr(self.config.ffn1_weight_attrs, i)
+            ffn2_weight_attr = self.get_attr(self.config.ffn2_weight_attrs, i)
+
+            qkv_weight = self.create_parameter(
+                shape=self.qkv_weight_shape,
+                attr=qkv_weight_attr,
+                dtype=self.create_params_type,
+                is_bias=False,
+            )
+            linear_weight = self.create_parameter(
+                shape=self.linear_weight_shape,
+                attr=linear_weight_attr,
+                dtype=self.create_params_type,
+                is_bias=False,
+            )
+            ffn1_weight = self.create_parameter(
+                shape=self.ffn1_weight_shape,
+                attr=ffn1_weight_attr,
+                dtype=self.create_params_type,
+                is_bias=False,
+            )
+            ffn2_weight = self.create_parameter(
+                shape=self.ffn2_weight_shape,
+                attr=ffn2_weight_attr,
+                dtype=self.create_params_type,
+                is_bias=False,
+            )
+
+            # tensor model parallel
+            if self.config.nranks > 1:
+                # column parallel
+                _set_var_distributed(qkv_weight)
+                _set_var_distributed(ffn1_weight)
+                # row parallel
+                _set_var_distributed(linear_weight)
+                _set_var_distributed(ffn2_weight)
+
+            self.qkv_weights.append(qkv_weight)
+            self.linear_weights.append(linear_weight)
+            self.ffn1_weights.append(ffn1_weight)
+            self.ffn2_weights.append(ffn2_weight)
+
+            self._add_parameter(qkv_weight)
+            self._add_parameter(linear_weight)
+            self._add_parameter(ffn1_weight)
+            self._add_parameter(ffn2_weight)
 
     def get_attr(self, attrs, idx):
         if isinstance(attrs, (list, tuple)):
@@ -1266,7 +1279,66 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             self._add_parameter(ffn2_shift)
             self._add_parameter(ffn2_smooth)
 
-    def get_weight_create_dype(self):
+    def init_weight(self):
+        self.qkv_weights = []
+        self.linear_weights = []
+        self.ffn1_weights = []
+        self.ffn2_weights = []
+
+        for i in range(self.num_layers):
+            qkv_weight_attr = self.get_attr(self.config.qkv_weight_attrs, i)
+            linear_weight_attr = self.get_attr(self.config.linear_weight_attrs, i)
+            ffn1_weight_attr = self.get_attr(self.config.ffn1_weight_attrs, i)
+            ffn2_weight_attr = self.get_attr(self.config.ffn2_weight_attrs, i)
+
+            qkv_weight = self.create_parameter(
+                shape=self.qkv_weight_shape,
+                attr=qkv_weight_attr,
+                dtype=self.get_weight_create_dype("qkv_weight_scale", i),
+                is_bias=False,
+            )
+            linear_weight = self.create_parameter(
+                shape=self.linear_weight_shape,
+                attr=linear_weight_attr,
+                dtype=self.get_weight_create_dype("out_linear_weight_scale", i),
+                is_bias=False,
+            )
+            ffn1_weight = self.create_parameter(
+                shape=self.ffn1_weight_shape,
+                attr=ffn1_weight_attr,
+                dtype=self.get_weight_create_dype("ffn1_weight_scale", i),
+                is_bias=False,
+            )
+            ffn2_weight = self.create_parameter(
+                shape=self.ffn2_weight_shape,
+                attr=ffn2_weight_attr,
+                dtype=self.get_weight_create_dype("ffn2_weight_scale", i),
+                is_bias=False,
+            )
+
+            # tensor model parallel
+            if self.config.nranks > 1:
+                # column parallel
+                _set_var_distributed(qkv_weight)
+                _set_var_distributed(ffn1_weight)
+                # row parallel
+                _set_var_distributed(linear_weight)
+                _set_var_distributed(ffn2_weight)
+
+            self.qkv_weights.append(qkv_weight)
+            self.linear_weights.append(linear_weight)
+            self.ffn1_weights.append(ffn1_weight)
+            self.ffn2_weights.append(ffn2_weight)
+
+            self._add_parameter(qkv_weight)
+            self._add_parameter(linear_weight)
+            self._add_parameter(ffn1_weight)
+            self._add_parameter(ffn2_weight)
+
+    def get_weight_create_dype(self, layer_name=None, layer_idx=None):
+        if layer_name is not None and layer_idx is not None:
+            if hasattr(self, "weight_scales") and np.all(self.weight_scales[layer_name][layer_idx] == -1):
+                return self._dtype
         return "int8"
 
     def init_weight_shape(self, config):
@@ -1320,7 +1392,8 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         attn_mask,
         i,
     ):
-        qkv_out = dequant_int8(qkv_out, self.qkv_out_scales[i], self._dtype)
+        if hasattr(self, "weight_scales") and not np.all(self.weight_scales["qkv_weight_scale"][i] == -1):
+            qkv_out = dequant_int8(qkv_out, self.qkv_out_scales[i], self._dtype)
         if self.qkv_biases[i] is not None:
             qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
 
@@ -1400,7 +1473,10 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
         else:
             out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
-        return dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
+        if hasattr(self, "weight_scales") and np.all(self.weight_scales["out_linear_weight_scale"][i] == -1):
+            return out_linear_out
+        else:
+            return dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
 
     def compute_ffn_layernorm(self, out_linear_out, residual_input, i):
         norm_out = self.norm_func(
@@ -1446,8 +1522,10 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i])
         else:
             ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i], False, True)
-        ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
-        return ffn2_out
+        if hasattr(self, "weight_scales") and np.all(self.weight_scales["ffn2_weight_scale"][i] == -1):
+            return ffn2_out
+        else:
+            return dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
 
     def compute_bias_residual_layernorm(self, ffn2_out, residual_input, i, num_layers):
         if i != num_layers - 1:

@@ -290,6 +290,8 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        self.transformer_block.init_weight()
+
         # find the real name.
         def key(name):
             result_list = []

@@ -377,6 +377,7 @@ class ChatGLMStackDyBatch(nn.Layer):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict, use_structured_name=True):
+        self.transformer_block.init_weight()
         dtype = paddle.get_default_dtype()
         config = self.config
         embed_dim = config.hidden_size
