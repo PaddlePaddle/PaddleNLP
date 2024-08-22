@@ -1107,7 +1107,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
                     for k, v in cache_scales_loader.scale.items():
                         for i_layer, weight_scale in enumerate(v):
-                            weight_scale = weight_scale.astype("float32")
+                            weight_scale = paddle.to_tensor(weight_scale).cast(paddle.get_default_dtype())
                             if k == "cache_k_scale":
                                 self.transformer_block.cache_k_scales[i_layer].set_value(weight_scale)
                             elif k == "cache_v_scale":
