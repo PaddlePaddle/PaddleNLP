@@ -83,8 +83,10 @@ class BlendableDataset(paddle.io.Dataset):
 
         # Build indecies.
         start_time = time.time()
-        assert num_datasets < 255
-        self.dataset_index = np.zeros(self.size, dtype=np.uint8)
+
+        # int16 so num_datasets < 32767
+        assert num_datasets < 32767
+        self.dataset_index = np.zeros(self.size, dtype=np.int16)
         self.dataset_sample_index = np.zeros(self.size, dtype=np.int64)
 
         # local_rank = 0 if fleet.local_rank() is None else int(fleet.local_rank(

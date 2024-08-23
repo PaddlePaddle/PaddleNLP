@@ -118,8 +118,10 @@ class BlendableDataset(paddle.io.Dataset):
         # Build indicies.
         def _build_indices():
             start_time = time.time()
-            assert num_datasets < 255
-            dataset_index = np.zeros(self.size, dtype=np.uint8)
+
+            # int16 so num_datasets < 32767
+            assert num_datasets < 32767
+            dataset_index = np.zeros(self.size, dtype=np.int16)
             dataset_sample_index = np.zeros(self.size, dtype=np.int64)
 
             from tool_helpers import helpers
