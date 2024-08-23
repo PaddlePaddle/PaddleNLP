@@ -940,8 +940,11 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         init_dict.pop("self", None)
         super(PretrainedTokenizer, self).__init__(**init_dict)
 
-        self.added_tokens_encoder: Dict[str, int] = {}
-        self.added_tokens_decoder: Dict[int, str] = {}
+        # self.added_tokens_encoder: Dict[str, int] = {}
+        # self.added_tokens_decoder: Dict[int, str] = {}
+        self.added_tokens_encoder: Dict[int, AddedToken] = {}
+        self.added_tokens_decoder.update(kwargs.pop("added_tokens_decoder", {}))
+        self.added_tokens_encoder: Dict[str, int] = {k.content: v for v, k in self.added_tokens_decoder.items()}
         self.unique_no_split_tokens: List[str] = []
         self.tokens_trie = Trie()
 
@@ -1022,8 +1025,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                 raise TypeError(f"Token {token} is not a string but a {type(token)}.")
             if not special_tokens and hasattr(self, "do_lower_case") and self.do_lower_case:
                 token = token.lower()
-            if (
-                token != self.unk_token
+            if (self.convert_tokens_to_ids(token) == self.convert_tokens_to_ids(self.unk_token)
                 and self.convert_tokens_to_ids(token) == self.convert_tokens_to_ids(self.unk_token)
                 and token not in tokens_to_add
                 and token not in self.added_tokens_encoder.keys()

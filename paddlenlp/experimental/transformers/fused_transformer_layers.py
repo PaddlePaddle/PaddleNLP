@@ -13,7 +13,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-import pdb
 import paddle
 import paddle.distributed as dist
 from paddle.framework import LayerHelper, core, in_dynamic_mode
@@ -203,10 +202,12 @@ class FusedMultiTransformerConfig:
         moe_topk=1,
         num_experts=1,
         norm_topk_prob=True,
-        gate_weight_attrs=None,
         shared_expert_intermediate_size=1,
+        gate_weight_attrs=None,
         shared_expert_ffn1_weight_attrs=None,
+        shared_expert_ffn1_weight_scale_attrs=None,
         shared_expert_ffn2_weight_attrs=None,
+        shared_expert_ffn2_weight_scale_attrs=None,
         shared_expert_gate_weight_attrs=None,
     ):
         self.embed_dim = embed_dim
@@ -270,10 +271,12 @@ class FusedMultiTransformerConfig:
         self.moe_topk = moe_topk
         self.num_experts = num_experts
         self.norm_topk_prob = norm_topk_prob
-        self.gate_weight_attrs = gate_weight_attrs
         self.shared_expert_intermediate_size = shared_expert_intermediate_size
+        self.gate_weight_attrs = gate_weight_attrs
         self.shared_expert_ffn1_weight_attrs = shared_expert_ffn1_weight_attrs
+        self.shared_expert_ffn1_weight_scale_attrs = shared_expert_ffn1_weight_scale_attrs
         self.shared_expert_ffn2_weight_attrs = shared_expert_ffn2_weight_attrs
+        self.shared_expert_ffn2_weight_scale_attrs = shared_expert_ffn2_weight_scale_attrs
         self.shared_expert_gate_weight_attrs = shared_expert_gate_weight_attrs
 
 class FusedMultiTransformerBase(Layer):
@@ -369,16 +372,17 @@ class FusedMultiTransformerBase(Layer):
             ffn2_weight_attr = self.get_attr(config.ffn2_weight_attrs, i)
             ffn2_bias_attr = self.get_attr(config.ffn2_bias_attrs, i)
 
-            # moe config
-            gate_weight_attr = self.get_attr(config.gate_weight_attrs, i)
-            shared_expert_ffn1_weight_attr = self.get_attr(config.shared_expert_ffn1_weight_attrs, i)
-            shared_expert_ffn2_weight_attr = self.get_attr(config.shared_expert_ffn2_weight_attrs, i)
-            shared_expert_gate_weight_attr = self.get_attr(config.shared_expert_gate_weight_attrs, i)
-
             cache_k_scale_attr = self.get_attr(config.cache_k_scale_attrs, i)
             cache_v_scale_attr = self.get_attr(config.cache_v_scale_attrs, i)
             cache_k_out_scale_attr = self.get_attr(config.cache_k_out_scale_attrs, i)
             cache_v_out_scale_attr = self.get_attr(config.cache_v_out_scale_attrs, i)
+
+            # moe config
+            if self.is_moe:
+                gate_weight_attr = self.get_attr(config.gate_weight_attrs, i)
+                shared_expert_ffn1_weight_attr = self.get_attr(config.shared_expert_ffn1_weight_attrs, i)
+                shared_expert_ffn2_weight_attr = self.get_attr(config.shared_expert_ffn2_weight_attrs, i)
+                shared_expert_gate_weight_attr = self.get_attr(config.shared_expert_gate_weight_attrs, i)
 
             ln_scale = self.create_parameter(
                 attr=ln_scale_attr,
@@ -476,32 +480,6 @@ class FusedMultiTransformerBase(Layer):
                     is_bias=True,
                 )
 
-            # moe config
-            gate_weight = self.create_parameter(
-                shape=self.gate_weight_shape,
-                attr=gate_weight_attr,
-                dtype="float32",
-                is_bias=False,
-            )
-
-            shared_expert_ffn1_weight = self.create_parameter(
-                shape=self.shared_expert_ffn1_weight_shape,
-                attr=shared_expert_ffn1_weight_attr,
-                dtype=self.create_params_type,
-            )
-
-            shared_expert_ffn2_weight = self.create_parameter(
-                shape=self.shared_expert_ffn2_weight_shape,
-                attr=shared_expert_ffn2_weight_attr,
-                dtype=self.create_params_type,
-            )
-
-            shared_expert_gate_weight = self.create_parameter(
-                shape=self.shared_expert_gate_weight_shape,
-                attr=shared_expert_gate_weight_attr,
-                dtype=self.create_params_type,
-            )
-
             cache_k_scale = None
             if cache_k_scale_attr:
                 cache_k_scale = self.create_parameter(
@@ -537,6 +515,33 @@ class FusedMultiTransformerBase(Layer):
                     dtype="float32",
                     is_bias=False,
                 )
+            
+            # moe config
+            if self.is_moe:
+                gate_weight = self.create_parameter(
+                    shape=self.gate_weight_shape,
+                    attr=gate_weight_attr,
+                    dtype="float32",
+                    is_bias=False,
+                )
+
+                shared_expert_ffn1_weight = self.create_parameter(
+                    shape=self.shared_expert_ffn1_weight_shape,
+                    attr=shared_expert_ffn1_weight_attr,
+                    dtype=self.create_params_type,
+                )
+
+                shared_expert_ffn2_weight = self.create_parameter(
+                    shape=self.shared_expert_ffn2_weight_shape,
+                    attr=shared_expert_ffn2_weight_attr,
+                    dtype=self.create_params_type,
+                )
+
+                shared_expert_gate_weight = self.create_parameter(
+                    shape=self.shared_expert_gate_weight_shape,
+                    attr=shared_expert_gate_weight_attr,
+                    dtype=self._helper.get_default_dtype(),
+                )
 
             # tensor model parallel
             if config.nranks > 1:
@@ -548,6 +553,7 @@ class FusedMultiTransformerBase(Layer):
                 # row parallel
                 _set_var_distributed(linear_weight)
                 _set_var_distributed(ffn2_weight)
+                # TODO: moe part to add
 
             self.ln_scales.append(ln_scale)
             self.ln_biases.append(ln_bias)
@@ -562,12 +568,6 @@ class FusedMultiTransformerBase(Layer):
             self.ffn1_biases.append(ffn1_bias)
             self.ffn2_weights.append(ffn2_weight)
             self.ffn2_biases.append(ffn2_bias)
-
-            # moe config
-            self.gate_weights.append(gate_weight)
-            self.shared_expert_ffn1_weights.append(shared_expert_ffn1_weight)
-            self.shared_expert_ffn2_weights.append(shared_expert_ffn2_weight)
-            self.shared_expert_gate_weights.append(shared_expert_gate_weight)
 
             self.cache_k_scales.append(cache_k_scale)
             self.cache_v_scales.append(cache_v_scale)
@@ -588,16 +588,22 @@ class FusedMultiTransformerBase(Layer):
             self._add_parameter(ffn2_weight)
             self._add_parameter(ffn2_bias)
 
-            # moe config
-            self._add_parameter(gate_weight)
-            self._add_parameter(shared_expert_ffn1_weight)
-            self._add_parameter(shared_expert_ffn2_weight)
-            self._add_parameter(shared_expert_gate_weight)
-
             self._add_parameter(cache_k_scale)
             self._add_parameter(cache_v_scale)
             self._add_parameter(cache_k_out_scale)
             self._add_parameter(cache_v_out_scale)
+
+            # moe config
+            if self.is_moe:
+                self.gate_weights.append(gate_weight)
+                self.shared_expert_ffn1_weights.append(shared_expert_ffn1_weight)
+                self.shared_expert_ffn2_weights.append(shared_expert_ffn2_weight)
+                self.shared_expert_gate_weights.append(shared_expert_gate_weight)
+
+                self._add_parameter(gate_weight)
+                self._add_parameter(shared_expert_ffn1_weight)
+                self._add_parameter(shared_expert_ffn2_weight)
+                self._add_parameter(shared_expert_gate_weight)
 
         self.dropout_rate = config.dropout_rate
 
@@ -992,7 +998,6 @@ class FusedMultiTransformerBase(Layer):
 
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
-
             mlp_out = None
             if self.is_moe == False:
                 # ffn1 matmul
@@ -1079,6 +1084,8 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         self.linear_weights_scale = []
         self.ffn1_weights_scale = []
         self.ffn2_weights_scale = []
+        self.shared_expert_ffn1_weights_scale = []
+        self.shared_expert_ffn2_weights_scale = []
 
         for i in range(self.num_layers):
 
@@ -1086,6 +1093,13 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             linear_weight_scale_attr = self.get_attr(config.linear_weight_scale_attrs, i)
             ffn1_weight_scale_attr = self.get_attr(config.ffn1_weight_scale_attrs, i)
             ffn2_weight_scale_attr = self.get_attr(config.ffn2_weight_scale_attrs, i)
+            if self.is_moe:
+                shared_expert_ffn1_weight_scale_attr = self.get_attr(
+                    config.shared_expert_ffn1_weight_scale_attrs, i
+                )
+                shared_expert_ffn2_weight_scale_attr = self.get_attr(
+                    config.shared_expert_ffn2_weight_scale_attrs, i
+                )
 
             qkv_weight_scale = self.create_parameter(
                 shape=[(config.num_heads + 2 * config.kv_num_heads) * self.head_dim],
@@ -1101,29 +1115,71 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 is_bias=False,
             )
 
-            ffn1_weight_scale = self.create_parameter(
-                shape=[config.dim_feedforward * 2] if config.activation.endswith("glu") else [config.dim_feedforward],
-                attr=ffn1_weight_scale_attr,
-                dtype=self.weight_scale_dtype,
-                is_bias=False,
-            )
+            ffn1_weight_scale = None
+            ffn2_weight_scale = None
+            shared_expert_ffn1_weight_scale = None
+            shared_expert_ffn2_weight_scale = None
+            if self.is_moe is False:
+                ffn1_weight_scale = self.create_parameter(
+                    shape=[config.dim_feedforward * 2] if config.activation.endswith("glu") else [config.dim_feedforward],
+                    attr=ffn1_weight_scale_attr,
+                    dtype=self.weight_scale_dtype,
+                    is_bias=False,
+                )
 
-            ffn2_weight_scale = self.create_parameter(
-                shape=[config.embed_dim],
-                attr=ffn2_weight_scale_attr,
-                dtype=self.weight_scale_dtype,
-                is_bias=False,
-            )
+                ffn2_weight_scale = self.create_parameter(
+                    shape=[config.embed_dim],
+                    attr=ffn2_weight_scale_attr,
+                    dtype=self.weight_scale_dtype,
+                    is_bias=False,
+                )
+            else:
+                ffn1_weight_scale = self.create_parameter(
+                    shape=[config.num_experts, config.dim_feedforward * 2] if config.activation.endswith("glu") 
+                    else [config.num_experts, config.dim_feedforward],
+                    attr=ffn1_weight_scale_attr,
+                    dtype=self.weight_scale_dtype,
+                    is_bias=False,
+                )
+
+                ffn2_weight_scale = self.create_parameter(
+                    shape=[config.num_experts, config.embed_dim],
+                    attr=ffn2_weight_scale_attr,
+                    dtype=self.weight_scale_dtype,
+                    is_bias=False,
+                )
+
+                shared_expert_ffn1_weight_scale = self.create_parameter(
+                    shape=[config.shared_expert_intermediate_size * 2],
+                    attr=shared_expert_ffn1_weight_scale_attr,
+                    dtype=self.weight_scale_dtype,
+                    is_bias=False,
+                )
+
+                shared_expert_ffn2_weight_scale = self.create_parameter(
+                    shape=[config.embed_dim],
+                    attr=shared_expert_ffn2_weight_scale_attr,
+                    dtype=self.weight_scale_dtype,
+                    is_bias=False,
+                )
 
             self.qkv_weights_scale.append(qkv_weight_scale)
             self.linear_weights_scale.append(linear_weight_scale)
             self.ffn1_weights_scale.append(ffn1_weight_scale)
             self.ffn2_weights_scale.append(ffn2_weight_scale)
+            self.shared_expert_ffn1_weights_scale.append(
+                shared_expert_ffn1_weight_scale
+            )
+            self.shared_expert_ffn2_weights_scale.append(
+                shared_expert_ffn2_weight_scale
+            )
 
             self._add_parameter(qkv_weight_scale)
             self._add_parameter(linear_weight_scale)
             self._add_parameter(ffn1_weight_scale)
             self._add_parameter(ffn2_weight_scale)
+            self._add_parameter(shared_expert_ffn1_weight_scale)
+            self._add_parameter(shared_expert_ffn2_weight_scale)
 
     def get_weight_create_dype(self):
         return "int8"  # If use weightonly int4, params dtype is int8, and one of the dimension will be half.
@@ -1132,18 +1188,45 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         super().init_weight_shape(config)
 
         self.linear_weight_shape = [self.embed_dim, self.num_heads * self.head_dim]
-        self.ffn1_weight_shape = (
-            [self.dim_feedforward * 2, self.embed_dim]
-            if self.activation.endswith("glu")
-            else [self.dim_feedforward, self.embed_dim]
-        )
-        self.ffn2_weight_shape = [self.embed_dim, self.dim_feedforward]
+        if self.is_moe is False:
+            self.ffn1_weight_shape = (
+                [self.dim_feedforward * 2, self.embed_dim]
+                if self.activation.endswith("glu")
+                else [self.dim_feedforward, self.embed_dim]
+            )
+            self.ffn2_weight_shape = [self.embed_dim, self.dim_feedforward]
 
-        if config.quant_type == "weight_only_int4":
-            self.qkv_weight_shape[0] //= 2
-            self.linear_weight_shape[0] //= 2
-            self.ffn1_weight_shape[0] //= 2
-            self.ffn2_weight_shape[0] //= 2
+            if config.quant_type == "weight_only_int4":
+                self.qkv_weight_shape[0] //= 2
+                self.linear_weight_shape[0] //= 2
+                self.ffn1_weight_shape[0] //= 2
+                self.ffn2_weight_shape[0] //= 2
+        else:
+            self.ffn1_weight_shape = (
+                [self.num_experts, self.embed_dim, self.dim_feedforward * 2]
+                if self.activation.endswith("glu")
+                else [self.num_experts, self.embed_dim, self.dim_feedforward]
+            )
+
+            self.ffn2_weight_shape = [self.num_experts, self.dim_feedforward, self.embed_dim]
+
+            self.gate_weight_shape = [
+                self.embed_dim,
+                self.num_experts,
+            ]
+            self.shared_expert_ffn1_weight_shape = [
+                self.shared_expert_intermediate_size * 2,
+                self.embed_dim, 
+            ]
+            self.shared_expert_ffn2_weight_shape = [
+                self.embed_dim,
+                self.shared_expert_intermediate_size,
+            ]
+            self.shared_expert_gate_weight_shape = [
+                self.embed_dim,
+                1,
+            ]
+
 
     def compute_qkv_linear(self, ln_out, i):
         return weight_only_linear(
@@ -1177,6 +1260,53 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             weight_scale=self.ffn2_weights_scale[i],
             weight_dtype=self.weight_dtype,
         )
+
+    def compute_fused_moe(self, tmp_out, i):
+        if self.ffn1_biases[i] is not None:
+            ffn1_bias = self.ffn1_biases[i]
+        else:
+            ffn1_bias = paddle.zeros([self.num_experts, 1, self.dim_feedforward * 2])
+        if self.ffn2_biases[i] is not None:
+            ffn2_bias = self.ffn2_biases[i]
+        else:
+            ffn2_bias = paddle.zeros([self.num_experts, 1, self.embed_dim])
+        fused_moe_out = fused_moe(
+            tmp_out,
+            self.gate_weights[i],
+            self.ffn1_weights[i],
+            ffn1_bias,
+            self.ffn2_weights[i],
+            ffn2_bias,
+            self.ffn1_weights_scale[i],
+            self.ffn2_weights_scale[i],
+            self.quant_type,
+            self.moe_topk,
+            self.norm_topk_prob,
+        )
+        return fused_moe_out
+
+    def compute_shared_expert(self, tmp_out, i):
+        ffn1_out = weight_only_linear(
+            tmp_out,
+            weight=self.shared_expert_ffn1_weights[i],
+            weight_scale=self.shared_expert_ffn1_weights_scale[i],
+            weight_dtype=self.weight_dtype,
+        )
+
+        ffn1_out = fused_act_bias_wrapper(ffn1_out, None, act_method=self.activation)
+
+        ffn2_out = weight_only_linear(
+            ffn1_out,
+            weight=self.shared_expert_ffn2_weights[i],
+            weight_scale=self.shared_expert_ffn2_weights_scale[i],
+            weight_dtype=self.weight_dtype,
+        )
+
+        gate_out = paddle.matmul(tmp_out, self.shared_expert_gate_weights[i])
+        gate_out = paddle.nn.functional.sigmoid(gate_out)
+
+        shared_expert_output = gate_out * ffn2_out
+        return shared_expert_output
 
 
 class FusedMultiTransformerWeightOnlyPostLayernorm(
