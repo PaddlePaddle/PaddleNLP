@@ -595,6 +595,7 @@ class JambaModelTest(ModelTesterMixin, unittest.TestCase):
         self.assertTrue(model.config.vocab_size == 65536)
 
 
+@slow
 class JambaModelIntegrationTest(unittest.TestCase):
     model = None
     tokenizer = None
