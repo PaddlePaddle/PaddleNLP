@@ -11,9 +11,9 @@ PaddleNLP在昆仑XPU（[了解昆仑](https://www.kunlunxin.com/)）上对llama
 
 #### 依赖环境说明
 - **机器：** 昆仑R480 32G，大概需要 17.5G（bs=1）
-- **镜像：** registry.baidubce.com/device/paddle-xpu:ubuntu18-x86_64-gcc82
-- **GCC路径：** /opt/compiler/gcc-8.2/bin/gcc
-- **python版本：**3.9
+- **镜像：** registry.baidubce.com/device/paddle-xpu:ubuntu20-x86_64-gcc84-py310
+- **GCC路径：** /usr/bin/gcc (8.4)
+- **python版本：**3.10
 **注：本示例使用8卡机器：如果要验证您的机器是否为昆仑芯片，只需系统环境下输入命令，看是否有输出：**
 ```
 lspci | grep 1d22
@@ -32,12 +32,12 @@ d5:00.0 Communication controller: Device 1d22:3684
 
 1. 拉取镜像
 ```
-# 注意此镜像仅为开发环境，镜像中不包含预编译的飞桨安装包docker pull registry.baidubce.com/device/paddle-xpu:ubuntu18-x86_64-gcc82
+# 注意此镜像仅为开发环境，镜像中不包含预编译的飞桨安装包docker pull registry.baidubce.com/device/paddle-xpu:ubuntu20-x86_64-gcc84-py310
 ```
 
 2. 参考如下命令启动容器，可以通过设置 FLAGS_selected_xpus 指定容器可见的昆仑芯片卡号
 ```
-docker run -it --privileged=true  --net host --device=/dev/xpu0:/dev/xpu0 --device=/dev/xpu1:/dev/xpu1 --device=/dev/xpu2:/dev/xpu2 --device=/dev/xpu3:/dev/xpu3 --device=/dev/xpu4:/dev/xpu4 --device=/dev/xpu5:/dev/xpu5 --device=/dev/xpu6:/dev/xpu6 --device=/dev/xpu7:/dev/xpu7 --device=/dev/xpuctrl:/dev/xpuctrl --name paddle-xpu-dev -v $(pwd):/work -w=/work -v xxx registry.baidubce.com/device/paddle-xpu:ubuntu18-x86_64-gcc82 /bin/bash
+docker run -it --privileged=true  --net host --device=/dev/xpu0:/dev/xpu0 --device=/dev/xpu1:/dev/xpu1 --device=/dev/xpu2:/dev/xpu2 --device=/dev/xpu3:/dev/xpu3 --device=/dev/xpu4:/dev/xpu4 --device=/dev/xpu5:/dev/xpu5 --device=/dev/xpu6:/dev/xpu6 --device=/dev/xpu7:/dev/xpu7 --device=/dev/xpuctrl:/dev/xpuctrl --name paddle-xpu-dev -v $(pwd):/work -w=/work -v xxx registry.baidubce.com/device/paddle-xpu:ubuntu20-x86_64-gcc84-py310 /bin/bash
 ```
 
 3. 安装paddlepaddle-xpu
@@ -53,18 +53,17 @@ python3 -m pip install -U paddlepaddle_xpu-xxx
 # PaddleNLP是基于paddlepaddle『飞桨』的自然语言处理和大语言模型(LLM)开发库，存放了基于『飞桨』框架实现的各种大模型，llama2-7B模型也包含其中。为了便于您更好地使用PaddleNLP，您需要clone整个仓库。
 # Clone PaddleNLP
 git clone https://github.com/PaddlePaddle/PaddleNLP
-# pip install ./PaddleNLP 使用develop版本
-pip install PaddleNLP
 cd PaddleNLP
 # 安装依赖
 pip install -r requirements.txt
+python -m pip install -e .
 
 # 下载XPU自定义算子
 cd csrc/xpu/src
 # 设置 XDNN, XRE and XTDK 的路径后一键执行。
-wget https://klx-sdk-release-public.su.bcebos.com/xtdk/release/2.7.0.2/xtdk-ubuntu_1604_x86_64.tar.gz
-wget https://klx-sdk-release-public.su.bcebos.com/xre/release/4.31.0.1/xre-ubuntu_1804_x86_64.tar.gz
-wget https://klx-sdk-release-public.su.bcebos.com/xdnn/release/2.10.0.1/xdnn-ubuntu_x86_64.tar.gz
+wget https://baidu-kunlun-product.su.bcebos.com/KL-SDK/klsdk-dev/release_paddle/20240429/xdnn-ubuntu_x86_64.tar.gz
+wget https://baidu-kunlun-product.su.bcebos.com/KL-SDK/klsdk-dev/release_paddle/20240429/xre-ubuntu_x86_64.tar.gz
+wget https://klx-sdk-release-public.su.bcebos.com/xtdk_llvm15/release_paddle/2.7.98.2/xtdk-llvm15-ubuntu1604_x86_64.tar.gz
 
 # 解压到当前目录
 tar -xf xdnn-ubuntu_x86_64.tar.gz
@@ -102,29 +101,20 @@ cd predict
 export PYTHONPATH=$PYTHONPATH:../../PaddleNLP/
 ```
 
-静态图模型推理命令参考
-```
-#step1 : 静态图导出
-python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --output_path ./inference --dtype float16 --device xpu
-#step2: 静态图推理
-python ./predict/predictor.py --model_name_or_path ./inference --data_file ./data/dev.json --dtype float16 --mode static --device xpu
-```
 动态图推理命令参考
 ```
-#动态图推理
-python ./predict/predictor.py --model_name_or_path ./inference --dtype float16 --src_length 2048 --max_length 2048 --mode "static" --batch_size 1 --inference_model --block_attn --device xpu
+python predictor.py --model_name_or_path ./inference --dtype float16 --src_length 2048 --max_length 2048 --mode "static" --batch_size 1 --inference_model --block_attn --device xpu
 ```
-
 
 最终，预期结果：
 ```
-[2024-06-12 16:11:03,218] [    INFO] - Start read result message
-[2024-06-12 16:11:03,219] [    INFO] - Current path is /ssd3/luowei14/PaddleNLP/llm
-[2024-06-12 16:11:22,284] [    INFO] - running spend 19.09010887145996
-[2024-06-12 16:11:22,300] [    INFO] - Finish read result message
-[2024-06-12 16:11:22,301] [    INFO] - End predict
-[2024-06-12 16:11:22,302] [    INFO] - Start predict
-[2024-06-12 16:11:22,310] [    INFO] - preprocess spend 0.00814199447631836
+[[2024-08-22 13:23:34,969] [    INFO] - preprocess spend 0.012732744216918945
+[2024-08-22 13:23:34,994] [    INFO] - We are using <class 'paddlenlp.transformers.llama.tokenizer.LlamaTokenizer'> to load './inference'.
+[2024-08-22 13:23:35,014] [    INFO] - Start read result message
+[2024-08-22 13:23:35,014] [    INFO] - Current path is /home/workspace/wangy_test/PaddleNLP/llm
+[2024-08-22 13:23:53,313] [    INFO] - running spend 18.322898864746094
+[2024-08-22 13:23:53,326] [    INFO] - Finish read result message
+[2024-08-22 13:23:53,327] [    INFO] - End predict
 ***********Source**********
 解释一下“温故而知新”
 ***********Target**********
@@ -135,13 +125,14 @@ The word "温故" (wēn gǔ) means "old" or "ancient," while "知新" (zhī xīn
 In other words, "温故而知新" means that one should have a foundation of knowledge and understanding before being open to new ideas or experiences. This can help prevent one from being too quick to dismiss the old in favor of the new, and instead allow for a more nuanced and informed appreciation of both.
 For example, if someone is learning a new language, they may find it helpful to study the grammar and syntax of the language's ancestor languages in order to better understand the nuances of the new language. Similarly, if someone is learning a new skill or craft, they may find it helpful to study the traditional techniques and methods of the craft in order to better understand the new approaches and technologies that are being introduced.
 Overall, "温故而知新" is a reminder to approach new things with a sense of respect and appreciation for the past, and to be open to learning and growing in a way that is informed by a deep understanding of both the old and the new.
-
-[2024-06-12 16:11:22,333] [    INFO] - We are using <class 'paddlenlp.transformers.llama.tokenizer.LlamaTokenizer'> to load './inference'.
-[2024-06-12 16:11:22,356] [    INFO] - Start read result message
-[2024-06-12 16:11:22,357] [    INFO] - Current path is /ssd3/luowei14/PaddleNLP/llm
-[2024-06-12 16:11:27,000] [    INFO] - running spend 4.673656940460205
-[2024-06-12 16:11:27,005] [    INFO] - Finish read result message
-[2024-06-12 16:11:27,006] [    INFO] - End predict
+[2024-08-22 13:23:53,328] [    INFO] - Start predict
+[2024-08-22 13:23:53,335] [    INFO] - preprocess spend 0.007447242736816406
+[2024-08-22 13:23:53,357] [    INFO] - We are using <class 'paddlenlp.transformers.llama.tokenizer.LlamaTokenizer'> to load './inference'.
+[2024-08-22 13:23:53,386] [    INFO] - Start read result message
+[2024-08-22 13:23:53,386] [    INFO] - Current path is /home/workspace/wangy_test/PaddleNLP/llm
+[2024-08-22 13:23:57,859] [    INFO] - running spend 4.506801605224609
+[2024-08-22 13:23:57,863] [    INFO] - Finish read result message
+[2024-08-22 13:23:57,864] [    INFO] - End predict
 ***********Source**********
 你好，请问你是谁?
 ***********Target**********
