@@ -56,7 +56,7 @@ class BlendableDataset(paddle.io.Dataset):
             else:
                 assert (
                     num_datasets < 255
-                ), f"Detect num_datasets:({num_datasets})>=255. When 'tool_helpers<=0.1.1', num_datasets should be less than 255. To support num_datasets greater than 255, please upgrade tool_helpers>=0.1.1."
+                ), f"Detect num_datasets:({num_datasets})>=255. When 'tool_helpers<=0.1.1', num_datasets should be less than 255. To support num_datasets greater than 255, please upgrade `tool_helpers>=0.1.2`."
                 dataset_index = np.zeros(self.size, dtype=np.uint8)
             dataset_sample_index = np.zeros(self.size, dtype=np.int64)
 
