@@ -28,6 +28,14 @@ from paddlenlp.generation import (
 __all__ = ["GenerationInferenceModel", "GenerationBlockInferenceModel", "GenerationAvxInferenceModel"]
 
 
+def TopKProcess(probs: paddle.Tensor, top_k: int, min_tokens_to_keep: int):
+    top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
+    topk_probs, _ = paddle.topk(probs, k=top_k)
+
+    probs = paddle.where(probs >= topk_probs[:, -1:], probs, paddle.full_like(probs, -float("inf")))
+    return probs
+
+
 class ForcedDecodingEOSTokenLogitsProcessor(LogitsProcessor):
     """
     This `LogitsProcessor` enforces the last generated token to be the selected `forced_eos_token`.
@@ -271,6 +279,7 @@ class GenerationInferenceModel(GenerationMixin):
         cache_kvs=[],
         top_p=None,
         temperature=None,
+        min_tokens_to_keep=1,
         inputs_embeds=None,
         **model_kwargs,
     ):
@@ -330,6 +339,10 @@ class GenerationInferenceModel(GenerationMixin):
                 eos_token_id,
             )
             logits = logits / temperature
+
+            # sample
+            if self.config.top_k is not None and self.config.top_k != 0:
+                logits = TopKProcess(logits, self.config.top_k, min_tokens_to_keep)
 
             # sample
             probs = F.softmax(logits)
@@ -671,6 +684,8 @@ class GenerationBlockInferenceModel(GenerationMixin):
             )
 
             # sample
+            if self.config.top_k is not None and self.config.top_k != 0:
+                logits = TopKProcess(logits, self.config.top_k, min_tokens_to_keep)
             probs = F.softmax(logits)
             _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 

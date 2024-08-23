@@ -1204,6 +1204,7 @@ def create_predictor(
             config.quant_type = predictor_args.quant_type
             config.cachekv_int8_type = predictor_args.cachekv_int8_type
             config.use_fake_parameter = predictor_args.use_fake_parameter
+            config.top_k = predictor_args.top_k
             config.single_card_ptq = True
             if predictor_args.avx_model:
                 config.avx_type = predictor_args.avx_type
