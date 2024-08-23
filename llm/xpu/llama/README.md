@@ -100,7 +100,6 @@ tar -zxvf infernce.tar.gz
 ```
 #可以通过设置 FLAGS_selected_xpus 指定容器可见的昆仑芯片卡号
 export FLAGS_selected_xpus=0
-cd predict
 #设置环境变量
 export PYTHONPATH=$PYTHONPATH:../../PaddleNLP/
 ```
