@@ -42,10 +42,9 @@ docker run -it --privileged=true  --net host --device=/dev/xpu0:/dev/xpu0 --devi
 
 3. 安装paddlepaddle-xpu
 ```
-# paddlepaddle『飞桨』深度学习框架，提供运算基础能力python -m pip install --pre paddlepaddle-xpu -i https://www.paddlepaddle.org.cn/packages/nightly/xpu/
-或者直接下载到本地安装：
-https://www.paddlepaddle.org.cn/packages/nightly/xpu/paddlepaddle-xpu/
-python3 -m pip install -U paddlepaddle_xpu-xxx
+# paddlepaddle『飞桨』深度学习框架，提供运算基础能力
+wget https://paddle-whl.bj.bcebos.com/nightly/xpu/paddlepaddle-xpu/paddlepaddle_xpu-3.0.0.dev20240612-cp310-cp310-linux_x86_64.whl
+python -m pip install paddlepaddle_xpu-3.0.0.dev20240612-cp310-cp310-linux_x86_64.whl
 ```
 
 4. 克隆PaddleNLP仓库代码，并安装依赖
