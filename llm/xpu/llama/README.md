@@ -35,7 +35,7 @@ d5:00.0 Communication controller: Device 1d22:3684
 # 注意此镜像仅为开发环境，镜像中不包含预编译的飞桨安装包docker pull registry.baidubce.com/device/paddle-xpu:ubuntu20-x86_64-gcc84-py310
 ```
 
-2. 参考如下命令启动容器，可以通过设置 FLAGS_selected_xpus 指定容器可见的昆仑芯片卡号
+2. 参考如下命令启动容器
 ```
 docker run -it --privileged=true  --net host --device=/dev/xpu0:/dev/xpu0 --device=/dev/xpu1:/dev/xpu1 --device=/dev/xpu2:/dev/xpu2 --device=/dev/xpu3:/dev/xpu3 --device=/dev/xpu4:/dev/xpu4 --device=/dev/xpu5:/dev/xpu5 --device=/dev/xpu6:/dev/xpu6 --device=/dev/xpu7:/dev/xpu7 --device=/dev/xpuctrl:/dev/xpuctrl --name paddle-xpu-dev -v $(pwd):/work -w=/work -v xxx registry.baidubce.com/device/paddle-xpu:ubuntu20-x86_64-gcc84-py310 /bin/bash
 ```
@@ -45,6 +45,9 @@ docker run -it --privileged=true  --net host --device=/dev/xpu0:/dev/xpu0 --devi
 # paddlepaddle『飞桨』深度学习框架，提供运算基础能力
 wget https://paddle-whl.bj.bcebos.com/nightly/xpu/paddlepaddle-xpu/paddlepaddle_xpu-3.0.0.dev20240612-cp310-cp310-linux_x86_64.whl
 python -m pip install paddlepaddle_xpu-3.0.0.dev20240612-cp310-cp310-linux_x86_64.whl
+
+nightly版本链接：
+https://www.paddlepaddle.org.cn/packages/nightly/xpu/paddlepaddle-xpu/
 ```
 
 4. 克隆PaddleNLP仓库代码，并安装依赖
@@ -56,6 +59,8 @@ cd PaddleNLP
 # 安装依赖
 pip install -r requirements.txt
 python -m pip install -e .
+# 切换到对应指定依赖的提交
+git checkout 0844a5b730c636ad77975fd30a485ad5dc217eac
 
 # 下载XPU自定义算子
 cd csrc/xpu/src
@@ -93,14 +98,14 @@ tar -zxvf infernce.tar.gz
 
 ### (3）推理：(这将花费您10~15min时间)
 ```
-#指定卡
+#可以通过设置 FLAGS_selected_xpus 指定容器可见的昆仑芯片卡号
 export FLAGS_selected_xpus=0
 cd predict
 #设置环境变量
 export PYTHONPATH=$PYTHONPATH:../../PaddleNLP/
 ```
 
-动态图推理命令参考
+高性能动态图推理命令参考
 ```
 python predictor.py --model_name_or_path ./inference --dtype float16 --src_length 2048 --max_length 2048 --mode "static" --batch_size 1 --inference_model --block_attn --device xpu
 ```
