@@ -1210,21 +1210,21 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 k_wgt_scale = self.transformer_block.weight_scales.scale["k_weight_scale"][idx]
                 v_wgt_scale = self.transformer_block.weight_scales.scale["v_weight_scale"][idx]
                 qkv_wgt_scale = self.transformer_block.weight_scales.scale["qkv_weight_scale"][idx]
-                unfused_state_dict["self_attn.q_proj.weight"] = state_dict[
-                    "transformer_block.fusellama.{}.self_attn.q_proj.weight".format(idx).cast("float32")
+                unfused_state_dict["self_attn.q_proj.weight"] = (
+                    state_dict["transformer_block.fusellama.{}.self_attn.q_proj.weight".format(idx)].cast("float32")
                     * q_wgt_scale
                     / qkv_wgt_scale
-                ]
-                unfused_state_dict["self_attn.k_proj.weight"] = state_dict[
-                    "transformer_block.fusellama.{}.self_attn.k_proj.weight".format(idx).cast("float32")
+                )
+                unfused_state_dict["self_attn.k_proj.weight"] = (
+                    state_dict["transformer_block.fusellama.{}.self_attn.k_proj.weight".format(idx)].cast("float32")
                     * k_wgt_scale
                     / qkv_wgt_scale
-                ]
-                unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
-                    "transformer_block.fusellama.{}.self_attn.v_proj.weight".format(idx).cast("float32")
+                )
+                unfused_state_dict["self_attn.v_proj.weight"] = (
+                    state_dict["transformer_block.fusellama.{}.self_attn.v_proj.weight".format(idx)].cast("float32")
                     * v_wgt_scale
                     / qkv_wgt_scale
-                ]
+                )
                 concated_qkv_weight = (
                     paddle.concat(
                         [
@@ -1260,7 +1260,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     key
                 ).cast(self.transformer_block.ffn_ln_scales[idx].dtype)
             elif key.endswith(".self_attn.qkv_proj.weight"):
-                state_dict[key.replace(".self_attn.qkv_proj.weight", ".qkv_weight")] = state_dict.pop(key).view(
+                state_dict[key.replace(".self_attn.qkv_proj.weight", ".qkv_weight")] = state_dict.pop(key).cast(
                     "float8_e4m3fn"
                 )
             elif key.endswith(".self_attn.qkv_proj.bias"):
@@ -1269,19 +1269,19 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 )
             elif key.endswith(".self_attn.o_proj.weight"):
                 state_dict[key.replace(".self_attn.o_proj.weight", ".out_proj_weight")] = (
-                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                    state_dict.pop(key).transpose([1, 0]).cast("float8_e4m3fn")
                 )
             elif key.endswith(".mlp.gate_proj.weight"):
                 state_dict[key.replace(".mlp.gate_proj.weight", ".ffn1_0_weight")] = (
-                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                    state_dict.pop(key).transpose([1, 0]).cast("float8_e4m3fn")
                 )
             elif key.endswith(".mlp.up_proj.weight"):
                 state_dict[key.replace(".mlp.up_proj.weight", ".ffn1_1_weight")] = (
-                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                    state_dict.pop(key).transpose([1, 0]).cast("float8_e4m3fn")
                 )
             elif key.endswith(".mlp.down_proj.weight"):
                 state_dict[key.replace(".mlp.down_proj.weight", ".ffn2_weight")] = (
-                    state_dict.pop(key).transpose([1, 0]).view("float8_e4m3fn")
+                    state_dict.pop(key).transpose([1, 0]).cast("float8_e4m3fn")
                 )
 
         self.set_state_dict_to_params(state_dict, True)
