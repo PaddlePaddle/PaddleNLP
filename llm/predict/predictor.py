@@ -1482,7 +1482,6 @@ def create_predictor(
                 if predictor_args.block_attn:
                     config.block_size = predictor_args.block_size
                     config.max_seq_len = predictor_args.total_max_length
-                    config.use_dynamic_cachekv_quant = predictor_args.use_cachekv_int8 == "dynamic"
                     from paddlenlp.experimental.transformers import (
                         Qwen2MoeForCausalLMBlockInferenceModel as Qwen2MoeInferenceModel,
                     )
