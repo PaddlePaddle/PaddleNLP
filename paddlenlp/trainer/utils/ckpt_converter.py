@@ -39,9 +39,15 @@ MODEL_STATE_FILE_MIN_SIZE = 512
 
 
 class CheckpointConverter:
-    def __init__(self, hybrid_parallel_ckpt_path, state_dict, parameter_to_structured_name, patch_dict=None):
+    def __init__(
+        self, hybrid_parallel_ckpt_path, state_dict, parameter_to_structured_name, trainging_args=None, patch_dict=None
+    ):
         self.use_dist = True if paddle.distributed.get_world_size() > 1 else False
         self.path = hybrid_parallel_ckpt_path
+
+        if trainging_args.ignore_load_lr_and_optim:
+            state_dict.pop("optimizer")
+
         self.auto_parallel_state_dict = self.flatten_state_dict(state_dict)
         self.parameter_to_structured_name = self.gather_global_object(parameter_to_structured_name)
         model_state_global_shape = {}
@@ -74,9 +80,9 @@ class CheckpointConverter:
             for k, v in self.auto_parallel_state_dict.items():
                 if k in self.patch_dict:
                     del_keys.append(k)
-
             for k in del_keys:
                 self.auto_parallel_state_dict[self.patch_dict[k]] = self.auto_parallel_state_dict[k]
+            for k in del_keys:
                 self.auto_parallel_state_dict.pop(k)
 
         flags = [
