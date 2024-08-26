@@ -29,6 +29,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
+    MoeConfig,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
@@ -99,12 +100,19 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
                 self.quant_type
             )
 
-        # Moe config
         self.num_experts = config.num_experts
         self.moe_topk = config.num_experts_per_tok
         self.norm_topk_prob = config.norm_topk_prob
         self.moe_intermediate_size = config.moe_intermediate_size
         self.shared_expert_intermediate_size = config.shared_expert_intermediate_size
+
+        moe_config = MoeConfig(
+            num_experts=self.num_experts,
+            top_k=self.moe_topk,
+            norm_topk_prob=self.norm_topk_prob,
+            moe_every2=False,
+            has_shared_expert=True,
+        )
 
         self.embed_tokens = nn.Embedding(self.vocab_size, self.hidden_size)
 
@@ -213,12 +221,8 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             epsilon=self.rms_norm_eps,
             norm_type="rmsnorm",
             use_neox_rotary_style=self.use_neox,
-            # moe config
-            is_moe=True,
-            moe_topk=self.moe_topk,
-            num_experts=self.num_experts,
+            moe_config=moe_config,
             shared_expert_intermediate_size=self.shared_expert_intermediate_size,
-            norm_topk_prob=self.norm_topk_prob,
             gate_weight_attrs=gate_weight_attrs,
             shared_expert_ffn1_weight_attrs=shared_expert_ffn1_weight_attrs,
             shared_expert_ffn1_weight_scale_attrs=shared_expert_ffn1_weight_scale_attrs,

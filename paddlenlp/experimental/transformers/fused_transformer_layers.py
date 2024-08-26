@@ -532,7 +532,7 @@ class FusedMultiTransformerBase(Layer):
             shared_expert_ffn1_weight = None
             shared_expert_ffn2_weight = None
             shared_expert_gate_weight = None
-            if self.config.moe_config.use_moe(i) and config.moe_config.use_shared_expert:
+            if self.config.moe_config.use_moe(i) and config.moe_config.has_shared_expert:
                 shared_expert_ffn1_weight = self.create_parameter(
                     shape=self.shared_expert_ffn1_weight_shape,
                     attr=shared_expert_ffn1_weight_attr,
@@ -697,7 +697,7 @@ class FusedMultiTransformerBase(Layer):
             )
             self.moe_ffn2_weight_shape = [self.config.moe_config.num_experts, self.dim_feedforward, self.embed_dim]
         
-        if self.config.moe_config.has_shared_expert is True:
+        if self.config.moe_config.has_moe() and config.moe_config.has_shared_expert:
             self.shared_expert_ffn1_weight_shape = [
                 self.embed_dim, 
                 self.shared_expert_intermediate_size * 2
@@ -1041,7 +1041,7 @@ class FusedMultiTransformerBase(Layer):
 
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
-            ffn2_out = None
+
             if self.config.moe_config.use_moe(i):
                 # fused moe
                 ffn2_out = self.compute_fused_moe(tmp_out, i)
@@ -1062,7 +1062,7 @@ class FusedMultiTransformerBase(Layer):
                 dist.all_reduce(ffn2_out)
             # norm + residual_add_bias
             tmp_out, residual_input = self.compute_bias_residual_layernorm(
-                mlp_out, residual_input, i, self.num_layers
+                ffn2_out, residual_input, i, self.num_layers
             )
             src = tmp_out
             
@@ -1193,7 +1193,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                     is_bias=False,
                 )
 
-            if self.config.moe_config.has_shared_expert is True:
+            if self.config.moe_config.use_moe(i) and config.moe_config.has_shared_expert:
                 shared_expert_ffn1_weight_scale = self.create_parameter(
                     shape=[self.shared_expert_intermediate_size * 2],
                     attr=shared_expert_ffn1_weight_scale_attr,
@@ -1255,7 +1255,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             )
             self.moe_ffn2_weight_shape = [self.config.moe_config.num_experts, self.dim_feedforward, self.embed_dim]
 
-         if self.config.moe_config.has_shared_expert is True:
+        if self.config.moe_config.has_moe() and config.moe_config.has_shared_expert:
             self.shared_expert_ffn1_weight_shape = [
                 self.shared_expert_intermediate_size * 2,
                 self.embed_dim, 
