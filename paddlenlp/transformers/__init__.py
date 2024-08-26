@@ -25,6 +25,7 @@ from .tokenizer_utils import (
     tokenize_special_chars,
     convert_to_unicode,
 )
+from .tokenizer_utils_fast import PretrainedTokenizerFast
 from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .image_processing_utils import ImageProcessingMixin
@@ -299,3 +300,9 @@ from .deberta_v2.configuration import *
 from .qwen2 import *
 from .qwen2_moe import *
 from .yuan import *
+from .mamba.configuration import *
+from .mamba.modeling import *
+from .mamba.tokenizer import *
+from .jamba.modeling import *
+from .jamba.configuration import *
+from .jamba.tokenizer import *

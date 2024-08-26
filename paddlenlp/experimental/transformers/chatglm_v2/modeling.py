@@ -22,9 +22,7 @@ from paddle.nn.quant import weight_quantize
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
-    FusedBlockMultiTransformerA8W8,
     FusedBlockMultiTransformerWeightOnly,
-    FusedMultiTransformerA8W8,
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
@@ -80,6 +78,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         self.num_heads = config.num_attention_heads
         self.head_size = self.hidden_size // self.num_heads
         self.multi_query_group_num = config.multi_query_group_num
+        self.use_neox = True
 
         self.quant_type = config.quant_type
         self.use_weight_only = False
@@ -176,6 +175,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
             ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
             ffn2_weight_attrs=ffn2_weight_attrs,
             ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
+            use_neox_rotary_style=self.use_neox,
             epsilon=config.layernorm_epsilon,
             norm_type="rmsnorm",
             kv_num_heads=config.multi_query_group_num,
@@ -192,8 +192,6 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
-        elif self.quant_type == "a8w8":
-            self.transformer_block = FusedMultiTransformerA8W8(transformer_config)
         else:
             self.transformer_block = FusedMultiTransformerBase(transformer_config)
 

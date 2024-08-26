@@ -514,7 +514,11 @@ function before_hook_for_gpt() {
     export https_proxy=${proxy}
     if [[ $FLAGS_install_deps == 0 ]];then
         echo -e "\033[31m ---- Install requirements for GPT dygraph cases  \033[0m"
+        cp requirements.txt requirements_nlp.txt
+        sed -i '/paddlenlp/d' requirements.txt
         python -m pip install -r requirements.txt --force-reinstall
+        sed -i '/paddlenlp/!d' requirements_nlp.txt
+        python -m pip install -r requirements_nlp.txt
         python -m pip install -r $root_path/requirements.txt
         python -m pip install -r $root_path/requirements-dev.txt
         python -m pip install --no-cache-dir https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-ci-py3-none-any.whl --force-reinstall --no-dependencies

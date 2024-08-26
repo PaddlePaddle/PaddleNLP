@@ -17,7 +17,6 @@
 import os
 import sys
 import time
-import inspect
 from functools import partial
 
 import paddle
@@ -30,16 +29,18 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
     set_seed,
 )
-from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
+from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    LlamaForCausalLM,
+    LlamaForCausalLMPipe,
+)
 from paddlenlp.trl import (
     DPOTrainer,
     calculate_effective_tokens,
     preference_collate_fn,
     preprocess_preference_data,
-)
-from paddlenlp.transformers import (
-    LlamaForCausalLM,
-    LlamaForCausalLMPipe,
 )
 from paddlenlp.utils.log import logger
 
@@ -132,9 +133,7 @@ def main():
         model.set_state_dict(ref_model.state_dict())
 
     if model_args.flash_mask and not model.config.use_flash_attention:
-        logger.warning(
-            "`flash_mask` must use with zero padding and flash attention."
-        )
+        logger.warning("`flash_mask` must use with zero padding and flash attention.")
         model.config.use_flash_attention = True
 
     if model_args.flash_mask and not any(isinstance(model, cls) for cls in flash_mask_support_list):
@@ -161,6 +160,7 @@ def main():
                 train_ds.map(trans_func),
                 tokenizer=tokenizer,
                 max_length=data_args.max_seq_len,
+                greedy_zero_padding=data_args.greedy_zero_padding,
             )
             if train_ds is not None
             else None
