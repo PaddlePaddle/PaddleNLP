@@ -989,7 +989,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         """
         Size of the full vocabulary with the added tokens.
         """
-        return len(dict(self.encoder, **self.added_tokens_encoder))
+        return self.vocab_size + len(self.added_tokens_encoder)
 
     def _add_tokens(self, new_tokens: Union[List[str], List[AddedToken]], special_tokens: bool = False) -> int:
         """
