@@ -18,6 +18,7 @@ setup(
     name="paddlenlp_ops",
     ext_modules=CUDAExtension(
         sources=[
+            "./generation/pass/remove_assign_out_pass.cc",
             "./generation/save_with_output.cc",
             "./generation/set_value_by_flags.cu",
             "./generation/token_penalty_multi_scores.cu",

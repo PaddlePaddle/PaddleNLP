@@ -310,6 +310,12 @@ class StaticGraphPredictor(BasePredictor):
             if in_cinn_mode():
                 inference_config.enable_cinn()
 
+        if is_paddlenlp_ops_available():
+            import paddlenlp_ops
+            inference_config.enable_custom_passes([
+                "remove_assign_out_pass", # remove the assign_out_ op at the end of while loop
+            ])
+
         with static_mode_guard():
             self.predictor = paddle.inference.create_predictor(inference_config)
 
