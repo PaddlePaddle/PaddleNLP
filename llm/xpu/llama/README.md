@@ -56,11 +56,11 @@ https://www.paddlepaddle.org.cn/packages/nightly/xpu/paddlepaddle-xpu/
 # Clone PaddleNLP
 git clone https://github.com/PaddlePaddle/PaddleNLP
 cd PaddleNLP
+# 切换到对应指定依赖的提交
+git checkout 0844a5b730c636ad77975fd30a485ad5dc217eac
 # 安装依赖
 pip install -r requirements.txt
 python -m pip install -e .
-# 切换到对应指定依赖的提交
-git checkout 0844a5b730c636ad77975fd30a485ad5dc217eac
 
 # 下载XPU自定义算子
 cd csrc/xpu/src
