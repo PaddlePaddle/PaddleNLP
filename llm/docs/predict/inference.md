@@ -205,12 +205,11 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 
 更多硬件大模型推理教程：
 
-- [X86 CPU](../../../csrc/cpu/README.md)
-- [昆仑XPU](../../../csrc/xpu/README.md)
+- [昆仑XPU](../../xpu/llama/README.md)
 - [昇腾NPU](../../npu/llama/README.md)
-- [海光DCU](../dcu_install.md)
-- [海光K100]()
-- [燧原GCU]()
+- [海光K100](../dcu_install.md)
+- [燧原GCU](../../gcu/llama/README.md)
+- [X86 CPU](../../../csrc/cpu/README.md)
 
 
 
