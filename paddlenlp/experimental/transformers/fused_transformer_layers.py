@@ -238,7 +238,6 @@ class FusedMultiTransformerConfig:
         self.norm_type = norm_type
         self.shared_expert_intermediate_size = shared_expert_intermediate_size
 
-
         self.use_neox_rotary_style = use_neox_rotary_style
         self.normalize_before = normalize_before
         self.ln_scale_attrs = ln_scale_attrs
