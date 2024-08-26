@@ -54,7 +54,7 @@ function llama_case_list_auto() {
     llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
 
     llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
-    llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1
+    llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
 }
 
 function llm_gpt_case_list_auto() {
@@ -1063,7 +1063,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
     echo "=========== $FUNCNAME run  end ==========="
 }
 
-function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
+function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=3
@@ -1072,7 +1072,7 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
     export FLAGS_max_inplace_grad_add=3
 
     echo "---- run hybrid and save ckpt ----"
-    dy_task_name="llama_hybrid_ckpt_bs2_bf16_DP2-MP1-PP1"
+    dy_task_name="llama_hybrid_ckpt_bs2_fp32_DP2-MP1-PP1"
     dy_case_out_dir="dy_output/$dy_task_name"
     dy_case_log_dir="dy_output/$dy_task_name""_log"
     rm -rf $dy_case_out_dir
@@ -1115,11 +1115,11 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
         --recompute_use_reentrant true \
         --recompute_granularity full \
         --pp_recompute_interval 0 \
-        --bf16 1\
+        --bf16 0 \
         --fp16_opt_level "O2"  \
         --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
         --amp_custom_white_list "lookup_table" "lookup_table_v2" \
-        --amp_master_grad true \
+        --amp_master_grad false \
         --enable_linear_fused_grad_add false \
         --fuse_attention_ffn true \
         --fuse_attention_qkv false \
@@ -1144,7 +1144,7 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
     echo "hybrid result: loss=$dy_loss ips=$dy_ips mem=$dy_mem"
 
     echo "---- run auto parallel resueme from hybrid ckpt ----"
-    auto_task_name="llama_auto_parallel_bs2_bf16_DP2-MP1-PP1"
+    auto_task_name="llama_auto_parallel_bs2_fp32_DP2-MP1-PP1"
     auto_case_out_dir="auto_output/$auto_task_name"
     auto_case_log_dir="auto_output/$auto_task_name""_log"
     rm -rf $auto_case_out_dir
@@ -1188,11 +1188,11 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
         --recompute_use_reentrant true \
         --recompute_granularity full \
         --pp_recompute_interval 0 \
-        --bf16 1\
+        --bf16 0 \
         --fp16_opt_level "O2"  \
         --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
         --amp_custom_white_list "lookup_table" "lookup_table_v2" \
-        --amp_master_grad true \
+        --amp_master_grad false \
         --fuse_attention_ffn true \
         --fuse_attention_qkv false \
         --fuse_sequence_parallel_allreduce false \
@@ -1210,7 +1210,7 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
         --sharding "" \
         --to_static 1 \
         --num_hidden_layers 2 \
-        --resume_from_checkpoint "dy_output/llama_hybrid_ckpt_bs2_bf16_DP2-MP1-PP1/checkpoint-3" \
+        --resume_from_checkpoint "dy_output/llama_hybrid_ckpt_bs2_fp32_DP2-MP1-PP1/checkpoint-3" \
         --auto_parallel_resume_form_hybrid_parallel 1 \
         >>${log_path}/$FUNCNAME 2>&1
     auto_loss=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 4' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`

@@ -33,6 +33,7 @@ from paddle.distributed.fleet.utils.log_util import logger
 MODEL_WEIGHT_SUFFIX = ".pdparams"
 OPTIMIZER_WEIGHT_SUFFIX = ".pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
+SCALAR_NAME = "scalar.pdparams"
 MODEL_META_FILE_NAME = "model_meta.json"
 OPTIMIZER_STATE_NAME_SUFFIX = [".moment1", ".moment2", ".beta1_pow_acc", ".beta2_pow_acc", ".master_weight"]
 MODEL_STATE_FILE_MIN_SIZE = 512
@@ -902,25 +903,26 @@ class CheckpointConverter:
         return renamed_state_dict
 
     def rename_using_optimizer_state_order(self, model_state_keys, optimizer_state_dict):
-
         name_mapping = {}
         suffix_bucket = {}
         assert len(optimizer_state_dict) % len(model_state_keys) == 0
         for suffix in OPTIMIZER_STATE_NAME_SUFFIX:
             suffix_bucket[suffix] = []
-        for satte_name, satte_value in optimizer_state_dict.items():
-            if "moment1" in satte_name:
-                suffix_bucket[".moment1"].append(satte_name)
-            elif "moment2" in satte_name:
-                suffix_bucket[".moment2"].append(satte_name)
-            elif "beta1_pow_acc" in satte_name:
-                suffix_bucket[".beta1_pow_acc"].append(satte_name)
-            elif "beta2_pow_acc" in satte_name:
-                suffix_bucket[".beta2_pow_acc"].append(satte_name)
+        for opt_name, opt_value in optimizer_state_dict.items():
+            if "moment1" in opt_name:
+                suffix_bucket[".moment1"].append(opt_name)
+            elif "moment2" in opt_name:
+                suffix_bucket[".moment2"].append(opt_name)
+            elif "beta1_pow_acc" in opt_name:
+                suffix_bucket[".beta1_pow_acc"].append(opt_name)
+            elif "beta2_pow_acc" in opt_name:
+                suffix_bucket[".beta2_pow_acc"].append(opt_name)
             else:
-                suffix_bucket[".master_weight"].append(satte_name)
+                suffix_bucket[".master_weight"].append(opt_name)
 
         for suffix, old_names in suffix_bucket.items():
+            if len(old_names) == 0:
+                continue
             assert len(old_names) == len(model_state_keys)
             for i in range(len(old_names)):
                 name_mapping[old_names[i]] = model_state_keys[i] + suffix
@@ -1017,6 +1019,9 @@ class CheckpointConverter:
                 cur_rank_optimizer_state_file_names.append(file_name)
         if SCHEDULER_NAME in cur_rank_model_state_file_names:
             cur_rank_model_state_file_names.remove(SCHEDULER_NAME)
+        if SCALAR_NAME in cur_rank_model_state_file_names:
+            cur_rank_model_state_file_names.remove(SCALAR_NAME)
+
         return cur_rank_model_state_file_names, cur_rank_optimizer_state_file_names
 
     def get_distribution_rank_from_file_name(self, file_name):
