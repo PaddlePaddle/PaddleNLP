@@ -54,6 +54,7 @@ function llama_case_list_auto() {
     llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
 
     llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
+    llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1
 }
 
 function llm_gpt_case_list_auto() {
@@ -1059,6 +1060,164 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
         mem_base=-1
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     done
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
+    echo "=========== $FUNCNAME run begin ==========="
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_enable_pir_api=1
+    export FLAGS_max_inplace_grad_add=3
+
+    echo "------------ llama_hybrid_ckpt_bs2_bf16_DP2-MP1-PP1 run begin and save ckpt ------------"
+    dy_task_name="llama_hybrid_ckpt_bs2_bf16_DP2-MP1-PP1"
+    dy_case_out_dir="dy_output/$dy_task_name"
+    dy_case_log_dir="dy_output/$dy_task_name""_log"
+    rm -rf $dy_case_out_dir
+    rm -rf $dy_case_log_dir
+
+    python -u -m paddle.distributed.launch \
+        --gpus "0,1" \
+        --log_dir $dy_case_log_dir \
+        ../../run_pretrain.py \
+        --model_name_or_path "facebook/llama-7b" \
+        --tokenizer_name_or_path "facebook/llama-7b" \
+        --input_dir "./data" \
+        --output_dir $dy_case_out_dir \
+        --split 949,50,1 \
+        --weight_decay 0.01 \
+        --warmup_ratio 0.01 \
+        --warmup_steps 30 \
+        --max_grad_norm 0.0 \
+        --learning_rate 3e-05 \
+        --min_learning_rate 3e-06 \
+        --max_steps 5 \
+        --logging_steps 1 \
+        --eval_steps 1000 \
+        --save_steps 3 \
+        --continue_training 0 \
+        --do_train true \
+        --do_eval false \
+        --do_predict false \
+        --disable_tqdm true \
+        --skip_profile_timer true \
+        --save_total_limit 2 \
+        --device gpu \
+        --disable_tqdm true \
+        --dataloader_num_workers 1 \
+        --distributed_dataloader 0 \
+        --per_device_train_batch_size 1 \
+        --gradient_accumulation_steps 1 \
+        --per_device_eval_batch_size 2 \
+        --recompute false \
+        --recompute_use_reentrant true \
+        --recompute_granularity full \
+        --pp_recompute_interval 0 \
+        --bf16 1\
+        --fp16_opt_level "O2"  \
+        --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
+        --amp_custom_white_list "lookup_table" "lookup_table_v2" \
+        --amp_master_grad true \
+        --enable_linear_fused_grad_add false \
+        --fuse_attention_ffn false \
+        --fuse_attention_qkv false \
+        --fuse_sequence_parallel_allreduce false \
+        --use_flash_attention 0 \
+        --use_fused_rope false \
+        --use_fused_rms_norm 0 \
+        --max_seq_length 4096 \
+        --sep_parallel_degree 1 \
+        --sequence_parallel false \
+        --pipeline_parallel_degree 1 \
+        --sharding_parallel_degree 1 \
+        --tensor_parallel_degree 1 \
+        --virtual_pp_degree 1 \
+        --sharding "" \
+        --to_static 0 \
+        --num_hidden_layers 2 \
+        >>${log_path}/$FUNCNAME 2>&1
+    dy_loss=`cat $dy_case_log_dir/workerlog.0 | grep 'global_step: 4' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    dy_ips=-1
+    dy_mem=-1
+    echo "hybrid result: loss=$dy_loss ips=$dy_ips mem=$dy_mem"
+
+    echo "------------ llama_auto_parallel_resume_from_hybrid_ckpt_bs2_bf16_DP2-MP1-PP1 run begin ------------"
+    auto_task_name="llama_auto_parallel_bs2_bf16_DP2-MP1-PP1"
+    auto_case_out_dir="auto_output/$auto_task_name"
+    auto_case_log_dir="auto_output/$auto_task_name""_log"
+    rm -rf $auto_case_out_dir
+    rm -rf $auto_case_log_dir
+
+    python -u -m paddle.distributed.launch \
+        --gpus "0,1" \
+        --log_dir $auto_case_log_dir \
+        run_pretrain_auto.py \
+        --model_name_or_path "facebook/llama-7b" \
+        --tokenizer_name_or_path "facebook/llama-7b" \
+        --input_dir "./data" \
+        --output_dir $auto_case_out_dir \
+        --split 949,50,1 \
+        --weight_decay 0.01 \
+        --warmup_ratio 0.01 \
+        --warmup_steps 30 \
+        --max_grad_norm 0.0 \
+        --learning_rate 3e-05 \
+        --min_learning_rate 3e-06 \
+        --max_steps 4 \
+        --logging_steps 1 \
+        --eval_steps 1000 \
+        --save_steps 1000 \
+        --continue_training 0 \
+        --do_train true \
+        --do_eval false \
+        --do_predict false \
+        --disable_tqdm true \
+        --skip_profile_timer true \
+        --save_total_limit 2 \
+        --device gpu \
+        --disable_tqdm true \
+        --dataloader_num_workers 1 \
+        --distributed_dataloader 0 \
+        --per_device_train_batch_size 1 \
+        --gradient_accumulation_steps 1 \
+        --per_device_eval_batch_size 2 \
+        --recompute false \
+        --recompute_use_reentrant true \
+        --recompute_granularity full \
+        --pp_recompute_interval 0 \
+        --bf16 1\
+        --fp16_opt_level "O2"  \
+        --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
+        --amp_custom_white_list "lookup_table" "lookup_table_v2" \
+        --amp_master_grad true \
+        --fuse_attention_ffn false \
+        --fuse_attention_qkv false \
+        --fuse_sequence_parallel_allreduce false \
+        --use_flash_attention 0 \
+        --use_fused_rope false \
+        --use_fused_rms_norm 0 \
+        --max_seq_length 4096 \
+        --sep_parallel_degree 1 \
+        --sequence_parallel false \
+        --pipeline_parallel_degree 1 \
+        --sharding_parallel_degree 1 \
+        --tensor_parallel_degree 1 \
+        --virtual_pp_degree 1 \
+        --pipeline_schedule_mode "VPP" \
+        --sharding "" \
+        --to_static 1 \
+        --num_hidden_layers 2 \
+        --resume_from_checkpoint "dy_output/llama_hybrid_ckpt_bs2_bf16_DP2-MP1-PP1/checkpoint-3" \
+        --auto_parallel_resume_form_hybrid_parallel 1 \
+        >>${log_path}/$FUNCNAME 2>&1
+    auto_loss=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 4' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    auto_ips=-1
+    auto_mem=-1
+    echo "auto result: loss=$auto_loss ips=$auto_ips mem=$auto_mem"
+
+    check_result $FUNCNAME ${dy_loss} ${auto_loss} ${dy_ips} ${auto_ips} ${dy_mem} ${auto_mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
