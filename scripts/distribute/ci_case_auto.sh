@@ -1071,7 +1071,7 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
     export FLAGS_enable_pir_api=1
     export FLAGS_max_inplace_grad_add=3
 
-    echo "------------ run hybrid and save ckpt ------------"
+    echo "---- run hybrid and save ckpt ----"
     dy_task_name="llama_hybrid_ckpt_bs2_bf16_DP2-MP1-PP1"
     dy_case_out_dir="dy_output/$dy_task_name"
     dy_case_log_dir="dy_output/$dy_task_name""_log"
@@ -1121,7 +1121,7 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
         --amp_custom_white_list "lookup_table" "lookup_table_v2" \
         --amp_master_grad true \
         --enable_linear_fused_grad_add false \
-        --fuse_attention_ffn false \
+        --fuse_attention_ffn true \
         --fuse_attention_qkv false \
         --fuse_sequence_parallel_allreduce false \
         --use_flash_attention 0 \
@@ -1143,7 +1143,7 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
     dy_mem=-1
     echo "hybrid result: loss=$dy_loss ips=$dy_ips mem=$dy_mem"
 
-    echo "------------ auto_parallel run by resueme from hybrid ckpt ------------"
+    echo "---- run auto parallel resueme from hybrid ckpt ----"
     auto_task_name="llama_auto_parallel_bs2_bf16_DP2-MP1-PP1"
     auto_case_out_dir="auto_output/$auto_task_name"
     auto_case_log_dir="auto_output/$auto_task_name""_log"
@@ -1193,7 +1193,7 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
         --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
         --amp_custom_white_list "lookup_table" "lookup_table_v2" \
         --amp_master_grad true \
-        --fuse_attention_ffn false \
+        --fuse_attention_ffn true \
         --fuse_attention_qkv false \
         --fuse_sequence_parallel_allreduce false \
         --use_flash_attention 0 \
