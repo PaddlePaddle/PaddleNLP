@@ -815,6 +815,7 @@ class LlamaAttention(nn.Layer):
 
         self.config = config
 
+        self.attn_func = scaled_dot_product_attention
     def _init_rope(self):
         if (
             hasattr(self.config, "rope_scaling")
@@ -1063,7 +1064,7 @@ class LlamaAttention(nn.Layer):
             and self.recompute_granularity == "core_attn"
         ):
             outputs = recompute(
-                scaled_dot_product_attention,
+                self.attn_func,
                 query_states,
                 self.config,
                 key_states,
@@ -1077,7 +1078,7 @@ class LlamaAttention(nn.Layer):
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
-            outputs = scaled_dot_product_attention(
+            outputs = self.attn_func(
                 query_states,
                 self.config,
                 key_states,

@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from curses import meta
 from dataclasses import dataclass, field
-from typing import Optional
+from optparse import Option
+from typing import List, Optional, Dict
 
 from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import IntervalStrategy
@@ -55,6 +57,11 @@ class TrainingArguments(TrainingArguments):
         metadata={"help": "Configs to unify hybrid parallel checkpoint.\n"},
     )
 
+    do_ceval: bool = field(
+        default=False,
+        metadata={"help": "Whether to run C-Eval"},
+    )
+
     def __post_init__(self):
         super().__post_init__()
         # NOTE(gongenlei): new add autotuner_benchmark
@@ -86,12 +93,6 @@ class DataArgument:
     dataset_name_or_path: str = field(default=None, metadata={"help": "Name or path for dataset"})
     task_name: str = field(default=None, metadata={"help": "Additional name to select a more specific task."})
     zero_padding: bool = field(default=False, metadata={"help": "Whether to use Zero Padding data stream"})
-    greedy_zero_padding: bool = field(
-        default=False,
-        metadata={
-            "help": "Whether to use Greedy Zero Padding data stream, should be used together with `zero_padding=True`."
-        },
-    )
     pad_to_multiple_of: int = field(
         default=None, metadata={"help": "If set will pad the sequence to a multiple of the provided value."}
     )
@@ -229,10 +230,64 @@ class ModelArgument:
 @dataclass
 class QuantArgument:
     quant_type: str = field(
-        default="a8w8",
-        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
+        default="W8A8",
+        metadata={"help": "Quantization type. Supported values: W8A8, W8A8C8, WINT4, WINT8"},
     )
 
+    load_quant_model: bool = field(default=False, metadata={"help": "Whether to load quant model"})
+
+    do_quant_debug: bool = field(default=False, metadata={"help": "Whether to use debug"})
+
+    test_sample: Optional[str] = field(default=None, metadata={"help": "Test sample for quantization"})
+
+    use_fp8: str = field(
+        default="",
+        metadata={"help": "Whether to use FP8 on (activation, weight, cachekv), e.g. WAC means weight , activation, cachekv use fp8"},
+    )
+    fp8_type: List[str] = field(
+        default_factory = lambda: ["e4m3","e4m3"],
+        metadata={"help": "Quantization type for (weight, activation, cachekv)", "nargs": "+"},
+    )
+    skip_list_names: List[str] = field(
+        default=lambda: [],
+        metadata={"help": "Skip scales for quantization", "nargs": "+"}
+    )
+
+    weight_quant_method: str = field(
+        default="abs_max_channel_wise",
+        metadata={"help": "Weight quantization method, choosen from ['abs_max_channel_wise', 'groupwise']"},
+    )
+
+    act_quant_method: str = field(
+        default="avg",
+        metadata={"help": "Activation quantization method, choosen from ['abs_max', 'avg']"},
+    )
+
+    cachekv_quant_method: str = field(
+        default="avg_headwise",
+        metadata={"help": "KV quantization method, choosen from ['abs_max_headwise', 'avg_headwise']"},
+    )
+
+    search_alpha_min: float = field(
+        default=0.2, 
+        metadata={"help": "The minimum alpha for piece search"},
+    )
+
+    search_alpha_max: float = field(
+        default=0.8,
+        metadata={"help": "The maximum alpha for piece search"},
+    )
+
+    search_scale_min: float = field(
+        default=1.0,
+        metadata={"help": "The minimum scale for piece search"},
+    )
+
+    search_scale_max: float = field(
+        default=5.0,
+        metadata={"help": "The maximum scale for piece search"},
+    )
+    
     # QAT related parameters
     # Not Yet support
     do_qat: bool = field(default=False, metadata={"help": "Whether to use QAT technique"})
@@ -289,3 +344,22 @@ class GenerateArgument:
     top_p: float = field(
         default=1.0, metadata={"help": "The cumulative probability for top-p-filtering in the sampling strategy."}
     )
+
+
+@dataclass
+class CEvalArgument:
+    cot: bool = field(default=False, metadata={"help": "Whether to use chain of thought"})
+    few_shot: bool = field(default=False, metadata={"help": "Whether to use few shot"})
+    ntrain: int = field(default=5, metadata={"help": "Number of few shot"})
+    with_prompt: bool = field(default=False, metadata={"help": "Whether to use prompt"})
+    constrained_decoding: bool = field(
+        default=True, metadata={"help": "Whether to use constrained decoding"}
+    )
+    temperature: float = field(default=0.2, metadata={"help": "Temperature for decoding"})
+    n_times: int = field(default=1, metadata={"help": "Number of times to run"})
+    do_save_csv: bool = field(default=False, metadata={"help": "Whether to save csv"})
+    do_test: bool = field(default=False, metadata={"help": "Whether to run test"})
+    ceval_data_path: str = field(
+        default="../dataset/ceval", metadata={"help": "Path to the data for ceval"}
+    )
+

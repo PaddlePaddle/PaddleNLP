@@ -25,6 +25,14 @@ from utils.argument import (
     TrainingArguments,
 )
 from utils.data import get_convert_example
+from utils.utils import (
+    CausalLMTrainer,
+    ZeroPaddingIterDatasetCallback,
+    compute_metrics,
+    get_lora_target_modules,
+    get_prefix_tuning_params,
+    init_chat_template,
+)
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import (
@@ -54,15 +62,10 @@ from paddlenlp.transformers import (
     LlamaTokenizer,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.utils.llm_utils import (
-    CausalLMTrainer,
-    ZeroPaddingIterDatasetCallback,
-    compute_metrics,
-    get_lora_target_modules,
-    get_prefix_tuning_params,
-    init_chat_template,
-)
 from paddlenlp.utils.log import logger
+
+
+from utils.argument import CEvalArgument
 
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "False"
@@ -71,14 +74,12 @@ flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
 
 
 def main():
-    # Arguments
-    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
-    # Support format as "args.json --arg1 value1 --arg2 value2.”
-    # In case of conflict, command line arguments take precedence.
+    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments, CEvalArgument))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+        gen_args, quant_args, model_args, data_args, training_args, ceval_args = parser.parse_json_file_and_cmd_lines()
     else:
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        gen_args, quant_args, model_args, data_args, training_args, ceval_args = parser.parse_args_into_dataclasses()
+
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     training_args.print_config(quant_args, "Quant")
@@ -89,7 +90,6 @@ def main():
             "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
         )
 
-    # Setup GPU & distributed training
     paddle.set_device(training_args.device)
     logger.warning(
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
@@ -100,11 +100,6 @@ def main():
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        # if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
-        #     raise ValueError(
-        #         f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-        #         "Use --overwrite_output_dir to overcome."
-        #     )
         if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
@@ -233,7 +228,7 @@ def main():
             )[0]
         else:
             dev_ds = None
-        if quant_args.do_ptq or quant_args.do_gptq:
+        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
             if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
                 ptq_ds = load_dataset(
                     "json",
@@ -278,7 +273,7 @@ def main():
             )[0]
         else:
             dev_ds = None
-        if quant_args.do_ptq or quant_args.do_gptq:
+        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
             if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant")):
                 ptq_ds = load_dataset(
                     "json",
@@ -307,7 +302,7 @@ def main():
             dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
         else:
             dev_ds = None
-        if quant_args.do_ptq or quant_args.do_gptq:
+        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
             ptq_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
             logger.info("Set train dataset as PTQ calibration dataset.")
         else:
@@ -342,7 +337,7 @@ def main():
 
     if data_args.zero_padding:
         if (
-            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen", "mistral", "jamba"]
+            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen", "mistral"]
             and training_args.pipeline_parallel_degree < 1
         ):
             raise NotImplementedError(
@@ -391,7 +386,6 @@ def main():
                 train_ds,
                 tokenizer=tokenizer,
                 max_length=data_args.max_length,
-                greedy_zero_padding=data_args.greedy_zero_padding,
             )
             if train_ds is not None
             else None
@@ -401,7 +395,6 @@ def main():
                 ptq_ds,
                 tokenizer=tokenizer,
                 max_length=data_args.max_length,
-                greedy_zero_padding=data_args.greedy_zero_padding,
             )
             if ptq_ds is not None
             else None
@@ -554,6 +547,12 @@ def main():
         data_args=data_args,
     )
 
+        
+    # Evaluation dev set
+    if training_args.do_eval:
+
+        before_eval_result = trainer.evaluate(dev_ds)
+
     # Train
     if training_args.do_train:
         checkpoint = None
@@ -566,7 +565,7 @@ def main():
             neft_post_hook_handle.remove()
         if training_args.benchmark:
             total_effective_tokens = (
-                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * train_result.metrics["progress_or_epoch"]
+                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * training_args.num_train_epochs
             )
             effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
             logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
@@ -661,10 +660,6 @@ def main():
         apply_gptq(quant_args, trainer, ptq_dataloader)
         trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
 
-    # Evaluation dev set
-    if training_args.do_eval:
-        eval_result = trainer.evaluate(dev_ds)
-        trainer.log_metrics("eval", eval_result)
 
     # Evaluation test set
     if training_args.do_predict:
@@ -683,6 +678,83 @@ def main():
             )
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
+
+    if quant_args.load_quant_model and not quant_args.do_ptq:
+        if isinstance(model, LoRAModel):
+            raise NotImplementedError(
+                "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
+            )
+        from utils.quant import (
+            apply_autoclip,
+            apply_ptq,
+            apply_shift,
+            apply_smooth,
+            get_ptq_model_config,
+            load_quant_model
+        )
+
+        trainer.model.eval()
+        trainer.model.config.quantization_config.quant_type = quant_args.quant_type
+        trainer.model.config.quantization_config.smooth = quant_args.smooth
+        trainer.model.config.quantization_config.shift = quant_args.shift
+        trainer.model.config.quantization_config.shift_smooth_all_linears = (
+            quant_args.smooth_all_linears or quant_args.shift_all_linears
+        )
+        ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
+        if quant_args.shift or quant_args.smooth:
+            ptq_model_config = get_ptq_model_config(trainer.model)
+
+        if quant_args.shift:
+            apply_shift(quant_args, trainer, ptq_dataloader, ptq_model_config)
+
+        if quant_args.smooth:
+            apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config)
+
+        load_quant_model(trainer.model, quant_args, training_args.output_dir)
+
+    # Evaluation dev set
+    if training_args.do_eval:
+
+        logger.info("*** Evaluate result before train/ptq/qat/ etc.***")
+        trainer.log_metrics("eval", before_eval_result)
+
+        logger.info("*** Evaluate result after train/ptq/qat/ etc.***")
+        eval_result = trainer.evaluate(dev_ds)
+        trainer.log_metrics("eval", eval_result)
+
+    
+    if training_args.do_ceval:
+        logger.info("*** Evaluate on C-Eval ***")
+        ceval_args.output_dir = training_args.output_dir
+        if 'Llama' in model_args.model_name_or_path:
+            from experimental.ceval.default.eval import run_eval
+            run_eval(tokenizer, trainer.model, ceval_args)
+        elif 'Qwen' in model_args.model_name_or_path:
+            from experimental.ceval.default.eval import run_eval
+            run_eval(tokenizer, trainer.model, ceval_args)
+
+    if quant_args.test_sample is not None:
+        test_sample = quant_args.test_sample
+    else:
+        test_sample = "介绍一下你自己。"
+
+    if quant_args.do_quant_debug:
+        from utils.quant import add_quant_inp_out_hook, save_dict
+        os.makedirs('./debug',exist_ok=True)
+        def tag_func(name):
+            tag1 = 'activation_quanter_k'
+            tag2 = 'activation_quanter_v'
+            if len(name) > len(tag1) and \
+                name[-len(tag1):] == tag1 or name[-len(tag2):] == tag2:
+                return True
+            return False
+        inp_dict, out_dict = add_quant_inp_out_hook(trainer.model, tag_func)
+        logger.info("Test one sample")
+        input_features = tokenizer(test_sample, return_tensors="pd")
+        outputs = trainer.model.generate(**input_features, max_length=3)
+        print(tokenizer.batch_decode(outputs[0]))
+        save_dict(inp_dict, "debug/input.pkl")
+        save_dict(out_dict, "debug/output.pkl")
 
 
 if __name__ == "__main__":
