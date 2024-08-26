@@ -940,11 +940,8 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         init_dict.pop("self", None)
         super(PretrainedTokenizer, self).__init__(**init_dict)
 
-        # self.added_tokens_encoder: Dict[str, int] = {}
-        # self.added_tokens_decoder: Dict[int, str] = {}
-        self.added_tokens_encoder: Dict[int, AddedToken] = {}
-        self.added_tokens_decoder.update(kwargs.pop("added_tokens_decoder", {}))
-        self.added_tokens_encoder: Dict[str, int] = {k.content: v for v, k in self.added_tokens_decoder.items()}
+        self.added_tokens_encoder: Dict[str, int] = {}
+        self.added_tokens_decoder: Dict[int, str] = {}
         self.unique_no_split_tokens: List[str] = []
         self.tokens_trie = Trie()
 

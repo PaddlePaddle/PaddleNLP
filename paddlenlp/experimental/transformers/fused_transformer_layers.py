@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import paddle
 import paddle.distributed as dist
-from paddle.framework import LayerHelper, core, in_dynamic_mode
+from paddle.framework import LayerHelper, core, in_dynamic_or_pir_mode
 from paddle.incubate.nn.functional import (
     fused_layer_norm,
     fused_moe,
@@ -93,7 +93,7 @@ def fused_act_bias_wrapper(
     quant_max_bound=0,
     quant_min_bound=0,
 ):
-    if in_dynamic_mode():
+    if in_dynamic_or_pir_mode():
         return paddle._C_ops.fused_bias_act(
             x,
             bias,
@@ -236,6 +236,8 @@ class FusedMultiTransformerConfig:
         self.dropout_rate = dropout_rate
         self.activation = activation
         self.norm_type = norm_type
+        self.shared_expert_intermediate_size = shared_expert_intermediate_size
+
 
         self.use_neox_rotary_style = use_neox_rotary_style
         self.normalize_before = normalize_before
@@ -290,7 +292,6 @@ class FusedMultiTransformerConfig:
         self.ring_id = ring_id
 
         self.moe_config = moe_config
-        self.shared_expert_intermediate_size = shared_expert_intermediate_size
 
 
 class FusedMultiTransformerBase(Layer):
@@ -586,7 +587,7 @@ class FusedMultiTransformerBase(Layer):
                     dtype="float32",
                     is_bias=False,
                 )
-            
+
             # tensor model parallel
             if config.nranks > 1:
                 # column parallel
@@ -688,7 +689,7 @@ class FusedMultiTransformerBase(Layer):
             else [self.embed_dim, self.dim_feedforward]
         )
         self.ffn2_weight_shape = [self.dim_feedforward, self.embed_dim]
-        
+
         if self.config.moe_config.has_moe() is True:
             self.moe_ffn1_weight_shape = (
                 [self.config.moe_config.num_experts, self.embed_dim, self.dim_feedforward * 2]
@@ -1060,12 +1061,13 @@ class FusedMultiTransformerBase(Layer):
             # all_reduce
             if self.nranks > 1:
                 dist.all_reduce(ffn2_out)
+
             # norm + residual_add_bias
             tmp_out, residual_input = self.compute_bias_residual_layernorm(
                 ffn2_out, residual_input, i, self.num_layers
             )
             src = tmp_out
-            
+
         kwargs["time_step"] = time_step
         kwargs["multi_block_output"] = tmp_out
         kwargs["seq_lens"] = seq_lens
@@ -1246,7 +1248,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             self.linear_weight_shape[0] //= 2
             self.ffn1_weight_shape[0] //= 2
             self.ffn2_weight_shape[0] //= 2
-       
+
         if self.config.moe_config.has_moe() is True:
             self.moe_ffn1_weight_shape = (
                 [self.config.moe_config.num_experts, self.embed_dim, self.dim_feedforward * 2]
