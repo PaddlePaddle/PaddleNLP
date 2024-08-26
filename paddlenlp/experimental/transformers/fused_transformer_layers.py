@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import paddle
 import paddle.distributed as dist
-from paddle.framework import LayerHelper, core, in_dynamic_or_pir_mode
+from paddle.framework import LayerHelper, core, in_dynamic_mode, in_dynamic_or_pir_mode
 from paddle.incubate.nn.functional import (
     fused_layer_norm,
     fused_moe,
@@ -94,6 +94,7 @@ def fused_act_bias_wrapper(
     quant_min_bound=0,
 ):
     if in_dynamic_or_pir_mode():
+
         return paddle._C_ops.fused_bias_act(
             x,
             bias,
