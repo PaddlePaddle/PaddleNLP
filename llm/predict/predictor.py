@@ -1262,6 +1262,35 @@ def create_predictor(
                     )
                 model.eval()
 
+            elif "mixtral" in config.architectures[0].lower():
+                if predictor_args.block_attn:
+                    config.max_seq_len = predictor_args.total_max_length
+                    config.block_size = predictor_args.block_size
+                    from paddlenlp.experimental.transformers import (
+                        MixtralForCausalLMBlockInferenceModel as MixtralInferenceModel,
+                    )
+
+                    model = MixtralInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        MixtralForCausalLMInferenceModel as MixtralInferenceModel,
+                    )
+
+                    model = MixtralInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
+                    )
+                model.eval()
+
             elif "opt" in config.architectures[0].lower():
                 if model_args.model_type == "opt-img2txt":
                     # we use opt for img2txt.
@@ -1403,6 +1432,20 @@ def create_predictor(
                     )
 
                 cache_kvs_shape = LlamaInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
+            elif "mixtral" in config.architectures[0].lower():
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                    from paddlenlp.experimental.transformers import (
+                        MixtralForCausalLMBlockInferenceModel as MixtralInferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        MixtralForCausalLMInferenceModel as MixtralInferenceModel,
+                    )
+                cache_kvs_shape = MixtralInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "chatglmv2forcausallm" in config.architectures[0].lower():

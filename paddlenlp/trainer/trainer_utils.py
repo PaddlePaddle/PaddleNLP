@@ -46,6 +46,7 @@ from ..trainer.argparser import strtobool
 from ..transformers.tokenizer_utils_base import BatchEncoding
 from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
 from ..utils.log import logger
+from .utils.helper import distributed_file
 
 __all__ = [
     "TrainOutput",
@@ -273,7 +274,7 @@ def get_last_checkpoint(folder, uc_async_save=False):
                 if os.path.exists(os.path.join(current_path, ".checkpoint_done")):
                     return current_path
             else:
-                saving_info = paddle.load(os.path.join(current_path, ".saving_info"))
+                saving_info = paddle.load(distributed_file(os.path.join(current_path, ".saving_info")))
                 pre_world_size = saving_info.get("world_size", 1)
                 ignore_save_lr_and_optim = saving_info.get("ignore_save_lr_and_optim", False)
                 skip_save_model_weight = saving_info.get("skip_save_model_weight", False)
