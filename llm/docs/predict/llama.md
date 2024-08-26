@@ -4,7 +4,7 @@
 
 ## 模型介绍
 
-LLaMA 系列大模型是由 Meta AI 发布的一个开放且高效的大型基础语言模型。
+* LLaMA 系列大模型是由 Meta AI 发布的一个开放且高效的大型基础语言模型。
 
 * [LLaMA 2](https://llama.meta.com/llama2/)：2023年7月，Meta发布了LLaMA 2系列，有7B、13B、34B和70B四个版本。该版本实现了开源商用，降低了初创公司创建类似ChatGPT聊天机器人的成本。
 
@@ -33,7 +33,7 @@ LLaMA 系列大模型是由 Meta AI 发布的一个开放且高效的大型基�
 BF16推理
 
 ```shell
-# 动态图模型推理
+# 动态图推理
 python ./predict/predictor.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1
 
 # 动转静导出模型
@@ -47,7 +47,7 @@ python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype
 WINT8推理
 
 ```shell
-# 动态图
+# 动态图推理
 python predict/predictor.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1 --quant_type weight_only_int8
 
 # 动转静导出模型
@@ -75,7 +75,7 @@ python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype
 INT8-A8W8C8推理
 
 ```shell
-# 动态图
+# 动态图推理
 python predict/predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1 --quant_type a8w8 --cachekv_int8_type static
 
 # 动转静导出模型
@@ -87,7 +87,7 @@ python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype
 
 FP8-A8W8推理
 ```shell
-# 动态图
+# 动态图推理
 python predict/predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1 --quant_type a8w8_fp8
 
 # 动转静导出模型

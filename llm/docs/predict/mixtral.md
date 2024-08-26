@@ -22,7 +22,7 @@
 BF16推理
 
 ```shell
-# 动态图模型推理命令参考
+# 动态图推理
 export DEVICES=0,1
 python -m paddle.distributed.launch \
     --gpus ${DEVICES} \
@@ -33,7 +33,7 @@ python -m paddle.distributed.launch \
     --inference_model \
     --block_attn
 
-# 动转静命令参考
+# 动转静导出模型
 export DEVICES=0,1
 python -m paddle.distributed.launch \
     --gpus ${DEVICES} \
@@ -44,7 +44,7 @@ python -m paddle.distributed.launch \
     --inference_model \
     --block_attn
 
-# 静态图推理命令参考
+# 静态图推理
 # 需要设置下面的环境变量，否则会导致多卡推理阻塞
 export FLAGS_dynamic_static_unified_comm=false
 export DEVICES=0,1
@@ -61,7 +61,7 @@ python -m paddle.distributed.launch \
 
 WINT8推理
 ```shell
-# Weight Only Int8 动态图推理参考
+# 动态图推理
 export DEVICES=0,1
 python -m paddle.distributed.launch \
     --gpus ${DEVICES} \
@@ -73,7 +73,7 @@ python -m paddle.distributed.launch \
     --inference_model \
     --block_attn
 
-# Weight Only Int8 动转静命令参考
+# 动转静导出模型
 export DEVICES=0,1
 python -m paddle.distributed.launch \
     --gpus ${DEVICES} \
@@ -85,7 +85,7 @@ python -m paddle.distributed.launch \
     --inference_model \
     --block_attn
 
-# Weight Only Int8 静态图推理命令参考
+# 静态图推理
 export FLAGS_dynamic_static_unified_comm=false
 export DEVICES=0,1
 python -m paddle.distributed.launch \
