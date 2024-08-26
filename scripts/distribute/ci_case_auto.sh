@@ -1071,7 +1071,7 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
     export FLAGS_enable_pir_api=1
     export FLAGS_max_inplace_grad_add=3
 
-    echo "------------ llama_hybrid_ckpt_bs2_bf16_DP2-MP1-PP1 run begin and save ckpt ------------"
+    echo "------------ run hybrid and save ckpt ------------"
     dy_task_name="llama_hybrid_ckpt_bs2_bf16_DP2-MP1-PP1"
     dy_case_out_dir="dy_output/$dy_task_name"
     dy_case_log_dir="dy_output/$dy_task_name""_log"
@@ -1143,7 +1143,7 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
     dy_mem=-1
     echo "hybrid result: loss=$dy_loss ips=$dy_ips mem=$dy_mem"
 
-    echo "------------ llama_auto_parallel_resume_from_hybrid_ckpt_bs2_bf16_DP2-MP1-PP1 run begin ------------"
+    echo "------------ auto_parallel run by resueme from hybrid ckpt ------------"
     auto_task_name="llama_auto_parallel_bs2_bf16_DP2-MP1-PP1"
     auto_case_out_dir="auto_output/$auto_task_name"
     auto_case_log_dir="auto_output/$auto_task_name""_log"
@@ -1180,6 +1180,7 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_bf16_DP2-MP1-PP1() {
         --disable_tqdm true \
         --dataloader_num_workers 1 \
         --distributed_dataloader 0 \
+        --enable_auto_parallel 1 \
         --per_device_train_batch_size 1 \
         --gradient_accumulation_steps 1 \
         --per_device_eval_batch_size 2 \
