@@ -40,6 +40,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     has_length,
     speed_metrics,
 )
+from .utils.ckpt_converter import CheckpointConverter
 from .utils.helper import distributed_file, distributed_isfile  # nested_truncate,
 
 try:
@@ -720,20 +721,16 @@ class AutoTrainer(Trainer):
                             )
                         )
 
-            ckpt_path = os.path.join(resume_from_checkpoint, DIST_CKPT_PATH)
-
-            if not os.path.isdir(ckpt_path):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
-
             if self.args.to_static:
-                opt_state_dict = {
+                model_state_dict = {
+                    key: value
+                    for key, value in self.model_wrapped.state_dict("param").items()
+                    if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
+                }
+                optim_state_dict = {
                     key: value
                     for key, value in self.model_wrapped.state_dict("opt").items()
                     if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
-                }
-                state_dict = {
-                    MODEL_NAME: self.model_wrapped.state_dict("param"),
-                    OPTIMIZER_NAME: opt_state_dict,
                 }
             else:
                 model_state_dict = self.model_wrapped.state_dict()
@@ -746,12 +743,27 @@ class AutoTrainer(Trainer):
                     optim_state_dict = self.optimizer.state_dict()
                     optim_state_dict.pop("LR_Scheduler", None)
 
-                state_dict = {
-                    MODEL_NAME: model_state_dict,
-                    OPTIMIZER_NAME: optim_state_dict,
-                }
+            state_dict = {
+                MODEL_NAME: model_state_dict,
+                OPTIMIZER_NAME: optim_state_dict,
+            }
 
-            self._load_ckpt_func(state_dict, ckpt_path)
+            parameter_to_structured_name = {}
+            if self.args.to_static:
+                parameter_to_structured_name = self.model_wrapped._parameter_to_structured_name
+            else:
+                for state_name, state_value in self.model_wrapped.state_dict().items():
+                    parameter_to_structured_name[state_value.name] = state_name
+
+            if self.args.auto_parallel_resume_form_hybrid_parallel:
+                CheckpointConverter(
+                    resume_from_checkpoint, state_dict, parameter_to_structured_name
+                ).load_from_hybrid_parallel_checkpoint()
+            else:
+                ckpt_path = os.path.join(resume_from_checkpoint, DIST_CKPT_PATH)
+                if not os.path.isdir(ckpt_path):
+                    raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+                self._load_ckpt_func(state_dict, ckpt_path)
 
             # release memory
             del state_dict
