@@ -989,7 +989,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         """
         Size of the full vocabulary with the added tokens.
         """
-        return self.vocab_size + len(self.added_tokens_encoder)
+        return len(dict(self.encoder, **self.added_tokens_encoder))
 
     def _add_tokens(self, new_tokens: Union[List[str], List[AddedToken]], special_tokens: bool = False) -> int:
         """
@@ -1213,7 +1213,9 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
         if isinstance(ids, int):
             if ids in self.added_tokens_decoder:
-                return self.added_tokens_decoder[ids].content
+                token = self.added_tokens_decoder[ids]
+                token = token.content if isinstance(token, AddedToken) else token
+                return token
             else:
                 return self._convert_id_to_token(ids)
         tokens = []
@@ -1222,7 +1224,9 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             if skip_special_tokens and index in self.all_special_ids:
                 continue
             if index in self.added_tokens_decoder:
-                tokens.append(self.added_tokens_decoder[index].content)
+                token = self.added_tokens_decoder[index]
+                token = token.content if isinstance(token, AddedToken) else token
+                tokens.append(token)
             else:
                 tokens.append(self._convert_id_to_token(index))
         return tokens
