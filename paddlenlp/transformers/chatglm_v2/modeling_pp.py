@@ -52,17 +52,29 @@ def get_attr(layer, name):
 
 def parse_args(args):
     if isinstance(args, tuple):
-        if len(args) == 3:
+        if len(args) == 6:
+            hidden_states, attention_mask, position_ids, rotary_pos_emb, kv_cache, use_cache = args
+        elif len(args) == 5:
+            hidden_states, attention_mask, position_ids, rotary_pos_emb, kv_cache = args
+            use_cache = None
+        elif len(args) == 4:
+            hidden_states, attention_mask, position_ids, rotary_pos_emb = args
+            kv_cache = None
+            use_cache = None
+        elif len(args) == 3:
             hidden_states, attention_mask, position_ids = args
+            rotary_pos_emb = None
+            kv_cache = None
+            use_cache = None
         elif len(args) == 2:
             hidden_states, attention_mask = args
             position_ids = None
-        elif len(args) == 1:
-            hidden_states = args
-            attention_mask, position_ids = None, None
+            rotary_pos_emb = None
+            kv_cache = None
+            use_cache = None
     else:
         hidden_states = args
-        attention_mask, position_ids = None, None
+        attention_mask, position_ids, rotary_pos_emb, kv_cache, use_cache = None, None, None, None, None
 
     if position_ids is not None:
         position_ids.stop_gradient = True
@@ -70,16 +82,34 @@ def parse_args(args):
     if attention_mask is not None:
         attention_mask.stop_gradient = True
 
-    return hidden_states, attention_mask, position_ids
+    if rotary_pos_emb is not None:
+        rotary_pos_emb.stop_gradient = True
+
+    if kv_cache is not None:
+        kv_cache.stop_gradient = True
+
+    if use_cache is not None:
+        use_cache.stop_gradient = True
+
+    return hidden_states, attention_mask, position_ids, rotary_pos_emb, kv_cache, use_cache
 
 
-def return_args(hidden_states, attention_mask=None, position_ids=None):
+def return_args(
+    hidden_states, attention_mask=None, position_ids=None, rotary_pos_emb=None, kv_cache=None, use_cache=None
+):
     ret = (hidden_states,)
 
     if attention_mask is not None:
         ret += (attention_mask.clone(),)
     if position_ids is not None:
         ret += (position_ids.clone(),)
+    if rotary_pos_emb is not None:
+        ret += (rotary_pos_emb.clone(),)
+    if kv_cache is not None:
+        ret += (kv_cache.clone(),)
+    if use_cache is not None:
+        ret += (use_cache.clone(),)
+
     if len(ret) == 1:
         ret = ret[0]
 
@@ -118,7 +148,7 @@ class EmbeddingPipe(Embedding):
         return get_attr(self.word_embeddings, "weight")
 
     def forward(self, args):
-        input_ids, attention_mask, position_ids = parse_args(args)
+        input_ids, attention_mask, position_ids, rotary_pos_emb, kv_cache, use_cache = parse_args(args)
         input_ids.stop_gradient = True
         inputs_embeds = super().forward(input_ids=input_ids, position_ids=position_ids)
         batch_size, seq_length = input_ids.shape
@@ -145,16 +175,31 @@ class EmbeddingPipe(Embedding):
         causal_mask = paddle.tril(paddle.ones([batch_size, 1, seq_length, seq_length])).astype("bool")
         attention_mask = attention_mask & causal_mask
 
-        return return_args(inputs_embeds, attention_mask, position_ids)
+        # Rotary positional embeddings
+        self.max_sequence_length = self.config.max_sequence_length
+        rotary_dim = (
+            self.config.hidden_size // self.config.num_attention_heads
+            if self.config.kv_channels is None
+            else self.config.kv_channels
+        )
+        rotary_pos_emb = forward_impl(self.max_sequence_length, rotary_dim // 2)
+        if position_ids is not None:
+            rotary_pos_emb = rotary_pos_emb[position_ids]
+        else:
+            rotary_pos_emb = rotary_pos_emb[None, :seq_length]
+
+        rotary_pos_emb = rotary_pos_emb.transpose([1, 0, 2, 3])
+
+        return return_args(inputs_embeds, attention_mask, position_ids, rotary_pos_emb, kv_cache, use_cache)
 
 
 class GLMBlockPipe(GLMBlock):
     """Extends GLMBlock to forward attention_mask through the pipeline."""
 
     def forward(self, args):
-        hiden_states, attention_mask, rotary_pos_emb, kv_cache, use_cache = parse_args(args)
-        hiden_states, kv_cache = super().forward(hiden_states, attention_mask, rotary_pos_emb, kv_cache, use_cache)
-        return return_args(hiden_states, kv_cache)
+        hidden_states, attention_mask, position_ids, rotary_pos_emb, kv_cache, use_cache = parse_args(args)
+        hidden_states, kv_cache = super().forward(hidden_states, attention_mask, rotary_pos_emb, kv_cache, use_cache)
+        return return_args(hidden_states, attention_mask, position_ids, rotary_pos_emb, kv_cache, use_cache)
 
 
 class RMSNormPipe(RMSNorm):
@@ -170,7 +215,7 @@ class Chatglmv2LMHeadPipe(Chatglmv2LMHead):
 
     @property
     def embedding_weight(self):
-        return get_attr(self, "weight")
+        return get_attr(self, "decoder_weight")
 
 
 class ChatGLMv2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
@@ -190,11 +235,7 @@ class ChatGLMv2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
     # NO base_model_prefix !!!!
 
-    def __init__(
-        self,
-        config,
-        pp_recompute_interval=1,
-    ):
+    def __init__(self, config):
         self.config = config
 
         virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
@@ -205,19 +246,6 @@ class ChatGLMv2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
-
-        # Rotary positional embeddings
-        # self.max_sequence_length = config.max_sequence_length
-        # rotary_dim = (
-        #     config.hidden_size // config.num_attention_heads if config.kv_channels is None else config.kv_channels
-        # )
-        # rotary_pos_emb = forward_impl(self.max_sequence_length, rotary_dim // 2)
-        # if position_ids is not None:
-        #     rotary_pos_emb = rotary_pos_emb[position_ids]
-        # else:
-        #     rotary_pos_emb = rotary_pos_emb[None, :seq_length]
-
-        # rotary_pos_emb = rotary_pos_emb.transpose([1, 0, 2, 3])
 
         self.add_sequential_layer(
             SharedLayerDesc(
