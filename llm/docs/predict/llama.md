@@ -6,11 +6,11 @@
 
 * LLaMA 系列大模型是由 Meta AI 发布的一个开放且高效的大型基础语言模型。
 
-* [LLaMA 2](https://llama.meta.com/llama2/)：2023年7月，Meta发布了LLaMA 2系列，有7B、13B、34B和70B四个版本。该版本实现了开源商用，降低了初创公司创建类似ChatGPT聊天机器人的成本。
+* [Llama 2](https://llama.meta.com/llama2/)：2023年7月，Meta发布了Llama 2系列，有7B、13B、34B和70B四个版本。该版本实现了开源商用，降低了初创公司创建类似ChatGPT聊天机器人的成本。
 
-* [LLaMA 3](https://llama.meta.com/)：2024年4月19日，Meta推出了Llama 3系列，包括8B和70B两个版本，400B的Llama-3还在训练中。该版本在多个基准测试中取得了全面进步，性能优异。
+* [Llama 3](https://llama.meta.com/)：2024年4月19日，Meta推出了Llama 3系列，包括8B和70B两个版本，400B的Llama-3还在训练中。该版本在多个基准测试中取得了全面进步，性能优异。
 
-* [LLaMA 3.1](https://llama.meta.com/)：2024年7月23日，Meta发布了LLAMA 3.1 8B、70B、405B模型，进一步提升了模型的性能和效率。
+* [Llama 3.1](https://llama.meta.com/)：2024年7月23日，Meta发布了Llama 3.1 8B、70B、405B模型，进一步提升了模型的性能和效率。
 
 ## 模型支持
 

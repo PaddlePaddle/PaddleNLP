@@ -34,13 +34,13 @@ PaddleNLP大模型推理支持如下主流开源大模型：
 PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 | Models | Example Models |
 |--------|----------------|
-|Llama 3.1, Llama 3, Llama 2|`meta-llama/Meta-Llama-3-8B`, `meta-llama/Meta-Llama-3.1-8B`, `meta-llama/Meta-Llama-3.1-405B`,  etc.|
-|Qwen 2| `Qwen/Qwen2-1.5B`, `Qwen/Qwen2-7B`, `Qwen/Qwen2-72B`, etc|
-|Qwen-Moe| `Qwen/Qwen1.5-MoE-A2.7B`, etc|
-|Mixtral| `mistralai/Mixtral-8x7B-Instruct-v0.1`, etc|
-|ChatGLM 3, ChatGLM 2| `THUDM/chatglm3-6b`, `THUDM/chatglm2-6b`, etc|
-|Baichuan 3, Baichuan 2, Baichuan|`baichuan-inc/Baichuan2-7B-Base`, `baichuan-inc/Baichuan2-7B-Chat` , etc|
-|Bloom|`bigscience/bloom-560m`, `bigscience/bloom-1b1`, `bigscience/bloom-3b`, etc|
+|Llama 3.1, Llama 3, Llama 2|`meta-llama/Meta-Llama-3.1-8B`, `meta-llama/Meta-Llama-3.1-8B-Instruct`, `meta-llama/Meta-Llama-3.1-405B`, `meta-llama/Meta-Llama-3.1-405B-Instruct`,`meta-llama/Meta-Llama-3-8B`, `meta-llama/Meta-Llama-3-8B-Instruct`, `meta-llama/Meta-Llama-3-70B`, `meta-llama/Meta-Llama-3-70B-Instruct`,  etc.|
+|Qwen 2| `Qwen/Qwen2-0.5B`, `Qwen/Qwen2-0.5B-Instruct`, `Qwen/Qwen2-1.5B`, `Qwen/Qwen2-1.5B-Instruct`, `Qwen/Qwen2-7B`, `Qwen/Qwen2-7B-Instruct`, `Qwen/Qwen2-72B`, `Qwen/Qwen2-72B-Instruct`, `Qwen/Qwen2-57B-A14B`, `Qwen/Qwen2-57B-A14B-Instruct`, etc.|
+|Qwen-Moe| `Qwen/Qwen1.5-MoE-A2.7B`, `Qwen/Qwen1.5-MoE-A2.7B-Chat`, `Qwen/Qwen2-57B-A14B`, `Qwen/Qwen2-57B-A14B-Instruct`, etc.|
+|Mixtral| `mistralai/Mixtral-8x7B-Instruct-v0.1`, etc.|
+|ChatGLM 3, ChatGLM 2| `THUDM/chatglm3-6b`, `THUDM/chatglm2-6b`, etc.|
+|Baichuan 3, Baichuan 2, Baichuan|`baichuan-inc/Baichuan2-7B-Base`, `baichuan-inc/Baichuan2-7B-Chat` , etc.|
+|Bloom|`bigscience/bloom-560m`, `bigscience/bloom-1b1`, `bigscience/bloom-3b`, etc.|
 
 
 ## 2. 硬件&精度支持
@@ -48,7 +48,7 @@ PaddleNLP 中已经添加高性能推理模型相关实现，支持：
 PaddleNLP 提供了多种硬件平台和精度支持，包括：
 
 | Precision      | Ada | Ampere | Turing | Volta | 昆仑XPU | 昇腾NPU | 海光K100 | 燧原GCU | x86 CPU |
-|----------------|-----|--------|--------|-------|--------|---------|---------|--------|---------|
+|:--------------:|:---:|:------:|:------:|:-----:|:------:|:-------:|:-------:|:------:|:-------:|
 | FP32           |  ✅ | ✅     | ✅      | ✅    | ✅      |  ✅     | ✅      | ✅      |   ✅    |
 | FP16           |  ✅ | ✅     | ✅      | ✅    | ✅      |  ✅     | ✅      | ✅      |   ✅    |
 | BF16           |  ✅ | ✅     | ❌      | ❌    | ❌      |  ❌     | ❌      | ❌      |   ✅    |
@@ -64,7 +64,7 @@ PaddleNLP 提供了多种参数，用于配置推理模型和优化推理性能�
 
 - `model_name_or_path`: 必需，预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为None。
 
-- `dtype`: 必需，模型参数dtype，默认为None。如果没有传入`lora_path`、`prefix_path`则必须传入。
+- `dtype`: 必需，模型参数dtype，默认为None。如果没有传入`lora_path`或`prefix_path`则必须传入`dtype`参数。
 
 - `lora_path`: LoRA参数和配置路径，对LoRA参数进行初始化，默认为None。
 
@@ -72,17 +72,22 @@ PaddleNLP 提供了多种参数，用于配置推理模型和优化推理性能�
 
 - `batch_size`: 批处理大小，默认为1。该参数越大，占用显存越高；该参数越小，占用显存越低。
 
-- `data_file`: 待推理json文件，默认为None。
+- `data_file`: 待推理json文件，默认为None。样例数据：
+
+    ```json
+    {"tgt":"", "src": "写一个300字的小说大纲，内容是李白穿越到现代，最后成为公司文职人员的故事"}
+    {"tgt":"", "src": "我要采访一位科幻作家，创建一个包含5个问题的列表"}
+    ```
 
 - `output_file`: 保存推理结果文件，默认为output.json。
 
-- `device`: 运行环境，默认为gpu。可选的数值有`cpu`, `gpu`, `xpu`。
+- `device`: 运行环境，默认为gpu，可选的数值有gpu、[cpu](../cpu_install.md)、[xpu](../../xpu/llama/README.md)、[npu](../../npu/llama/README.md)、[gcu](../../gcu/llama/README.md)等（[dcu](../dcu_install.md)与gpu推理命令一致）。
 
 - `model_type`: 初始化不同类型模型，gpt-3: GPTForCausalLM; ernie-3.5-se: Ernie35ForCausalLM; 默认为 None。
 
 - `mode`: 使用动态图或者静态图推理，可选值有`dynamic`、 `static`，默认为`dynamic`。
 
-- `avx_model`: 当使用CPU推理时，是否使用AvxModel，默认为False。参考[CPU推理教程]()。
+- `avx_model`: 当使用CPU推理时，是否使用AvxModel，默认为False。参考[CPU推理教程](../cpu_install.md)。
 
 - `avx_type`: avx计算类型，默认为None。可选的数值有`fp16`、 `bf16`。
 
@@ -160,7 +165,7 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 2. `a8w8`与`a8w8_fp8`需要额外的act和weight的scale校准表，推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
 3. `cachekv_int8_type`可选`dynamic`（已不再维护，不建议使用）和`static`两种，`static`需要额外的cache kv的scale校准表，传入的 `model_name_or_path` 为PTQ校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
 
-更多大模型推理教程，参考：
+更多大模型推理教程：
 
 -  [llama](./llama.md)
 -  [qwen](./qwen.md)
