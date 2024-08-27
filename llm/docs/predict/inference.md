@@ -17,7 +17,7 @@ PaddleNLP大模型推理提供压缩、推理、服务全流程体验 ：
 
 - 提供多种PTQ技术，提供WAC（权重/激活/缓存）灵活可配的量化能力，支持INT8、FP8、4Bit量化能力
 
-- 支持多硬件大模型推理，包括[昆仑XPU](../../xpu/llama/README.md)、[昇腾NPU](../../npu/llama/README.md)、[海光K100](../dcu_install.md)、[燧原GCU](../../gcu/llama/README.md)、[X86 CPU](../../../csrc/cpu/README.md)等
+- 支持多硬件大模型推理，包括[昆仑XPU](../../xpu/llama/README.md)、[昇腾NPU](../../npu/llama/README.md)、[海光K100](../dcu_install.md)、[燧原GCU](../../gcu/llama/README.md)、[X86 CPU](../cpu_install.md)等
 
 - 提供面向服务器场景的部署服务，支持连续批处理(continuous batching)、流式输出等功能，支持HTTP、RPC、RESTful多种Clent端形式
 
@@ -52,7 +52,7 @@ PaddleNLP 提供了多种硬件平台和精度支持，包括：
 | FP32           |  ✅ | ✅     | ✅      | ✅    | ✅      |  ✅     | ✅      | ✅      |   ✅    |
 | FP16           |  ✅ | ✅     | ✅      | ✅    | ✅      |  ✅     | ✅      | ✅      |   ✅    |
 | BF16           |  ✅ | ✅     | ❌      | ❌    | ❌      |  ❌     | ❌      | ❌      |   ✅    |
-| INT8           |  ✅ | ✅     | ✅      | ✅    | ❌      |  ❌     | ✅      | ❌      |   ✅    |
+| INT8           |  ✅ | ✅     | ✅      | ✅    | ✅      |  ✅     | ✅      | ❌      |   ✅    |
 | FP8            |  ✅ | ❌     | ❌      | ❌    | ❌      |  ❌     | ❌      | ❌      |   ❌    |
 
 
@@ -106,7 +106,7 @@ PaddleNLP 提供了多种量化策略，支持Weight Only INT8及INT4推理，�
 
 - `quant_type`: 是否使用量化推理，默认值为None。可选的数值有`weight_only_int8`、`weight_only_int4`、`a8w8`和`a8w8_fp8`。`a8w8`与`a8w8_fp8`需要额外的act和weight的scale校准表，推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
 
-- `cachekv_int8_type`: 是否使用cachekv int8量化，默认值为None。可选`dynamic`和`static`两种，`static`需要额外的cache kv的scale校准表，传入的 `model_name_or_path` 为PTQ校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
+- `cachekv_int8_type`: 是否使用cachekv int8量化，默认值为None。可选`dynamic`（已不再维护，不建议使用）和`static`两种，`static`需要额外的cache kv的scale校准表，传入的 `model_name_or_path` 为PTQ校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
 
 
 ### 3.4 解码策略参数
@@ -128,31 +128,7 @@ PaddleNLP 提供了多种量化策略，支持Weight Only INT8及INT4推理，�
 
 ### 4.1 环境准备
 
-git clone 代码到本地：
-
-```shell
-git clone https://github.com/PaddlePaddle/PaddleNLP.git
-export PYTHONPATH=/path/to/PaddleNLP:$PYTHONPATH
-```
-
-PaddleNLP 针对于Transformer 系列编写了高性能自定义算子，提升模型在推理和解码过程中的性能，使用之前需要预先安装自定义算子库：
-
-
-```shell
-git clone https://github.com/PaddlePaddle/PaddleNLP
-#GPU设备安装自定义算子
-cd ./paddlenlp/csrc && python setup_cuda.py install
-#XPU设备安装自定义算子
-cd ./paddlenlp/csrc/xpu/src && sh cmake_build.sh
-#DCU设备安装自定义算子
-cd ./paddlenlp/csrc && python setup_hip.py install
-```
-
-到达运行目录，即可开始：
-
-```shell
-cd PaddleNLP/llm
-```
+参考[安装教程](./installation.md)。
 
 ### 4.2 推理示例
 
@@ -182,7 +158,7 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 
 1. `quant_type`可选的数值有`weight_only_int8`、`weight_only_int4`、`a8w8`和`a8w8_fp8`。
 2. `a8w8`与`a8w8_fp8`需要额外的act和weight的scale校准表，推理传入的 `model_name_or_path` 为PTQ校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
-3. `cachekv_int8_type`可选`dynamic`和`static`两种，`static`需要额外的cache kv的scale校准表，传入的 `model_name_or_path` 为PTQ校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
+3. `cachekv_int8_type`可选`dynamic`（已不再维护，不建议使用）和`static`两种，`static`需要额外的cache kv的scale校准表，传入的 `model_name_or_path` 为PTQ校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
 
 更多大模型推理教程，参考：
 
@@ -209,7 +185,9 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 - [昇腾NPU](../../npu/llama/README.md)
 - [海光K100](../dcu_install.md)
 - [燧原GCU](../../gcu/llama/README.md)
-- [X86 CPU](../../../csrc/cpu/README.md)
+- [X86 CPU](../cpu_install.md)
+
+## 致谢
 
 
 
