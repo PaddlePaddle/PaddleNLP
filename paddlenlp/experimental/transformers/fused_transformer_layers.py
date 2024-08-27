@@ -1247,6 +1247,10 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             )
             self.moe_ffn2_weight_shape = [self.config.moe_config.num_experts, self.dim_feedforward, self.embed_dim]
 
+            if config.quant_type == "weight_only_int4":
+                self.moe_ffn1_weight_shape[2] //= 2
+                self.moe_ffn2_weight_shape[2] //= 2
+
         if self.config.moe_config.has_shared_expert():
             self.shared_expert_ffn1_weight_shape = [
                 self.config.moe_config.shared_expert_intermediate_size * 2,
