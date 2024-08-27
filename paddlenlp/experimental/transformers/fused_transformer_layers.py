@@ -1137,6 +1137,10 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             )
             self.moe_ffn2_weight_shape = [self.config.moe_config.num_experts, self.dim_feedforward, self.embed_dim]
 
+            if config.quant_type == "weight_only_int4":
+                self.moe_ffn1_weight_shape[2] //= 2
+                self.moe_ffn2_weight_shape[2] //= 2
+
     def compute_qkv_linear(self, ln_out, i):
         return weight_only_linear(
             ln_out,
