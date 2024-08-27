@@ -171,8 +171,8 @@ bool fp8_fp8_gemm_scale_bias_act(GemmEpilogueAllParams params) {
 
   int type_id = config_map[params.fuse_gemm_config];
   int M = (params.M+31)/32 *32;
-  int N = (params.N+31)/32 *32;
-  int K = (params.K+31)/32 *32;
+  int N = params.N;
+  int K = params.K;
 
   std::string mkn_string = "<"+ std::to_string(M)+ ", " +std::to_string(N) + ", "+ std::to_string(K)+ ">";
   std::string mkn_split_k_string =  "<"+ std::to_string(M)+ ", " +std::to_string(N) + ", "+ std::to_string(K)+ ">" + ", split_k";
