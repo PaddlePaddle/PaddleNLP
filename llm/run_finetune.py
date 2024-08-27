@@ -720,5 +720,12 @@ def main():
         logger.info("*** Evaluate result after train/ptq/qat/ etc.***")
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
+
+    if training_args.do_ceval:
+        logger.info("*** Evaluate on C-Eval ***")
+        ceval_args.output_dir = training_args.output_dir
+        from experimental.ceval.default.eval import run_eval
+        run_eval(tokenizer, trainer.model, ceval_args)
+
 if __name__ == "__main__":
     main()

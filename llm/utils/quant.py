@@ -312,7 +312,7 @@ def prepare_qconfig(args):
 
 
 
-def load_quant_model(model, quant_args, load_quant_path,dtype="float32", skip_list_names=[]):
+def load_quant_model(model, quant_args, load_quant_path,dtype="float32"):
     """
     Load quantized model and its scales
     """
@@ -321,6 +321,7 @@ def load_quant_model(model, quant_args, load_quant_path,dtype="float32", skip_li
     if cachekv is not None:
         set_wrapper_for_attn(model)
     
+    skip_list_names = [] if quant_args.skip_list_names is not None else quant_args.skip_list_names
     for cur_name, cur_layer in model.named_sublayers():
         skip = False
         for k in skip_list_names:
@@ -335,6 +336,7 @@ def load_quant_model(model, quant_args, load_quant_path,dtype="float32", skip_li
     
 
         if type(cur_layer) in [FuncWrapper] and cachekv is not None:
+            logger.info(f"PTQ layer: {cur_name}")
             # set both act and weight for attention, actually act-k and act-v are quantized
             q_config.add_name_config([cur_layer.full_name()], weight=cachekv[0], activation=cachekv[1])
         

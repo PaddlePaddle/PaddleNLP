@@ -11,7 +11,7 @@
   "output_dir": "../output/llama3.1/w8a8_ptq_ckpts_ceval",
   "do_eval": true,
   "eval_with_do_generation": false,
-  "do_ptq": true,
+  "do_ptq": false,
   "ptq_step": 1,
   "unified_checkpoint": false,
   "smooth": true,
