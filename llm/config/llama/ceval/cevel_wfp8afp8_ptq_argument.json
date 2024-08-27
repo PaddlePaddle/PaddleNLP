@@ -13,11 +13,13 @@
   "output_dir": "../output/llama3.1/wfp8afp8_ptq_ckpts_ceval",
   "do_eval": true,
   "eval_with_do_generation": false,
-  "do_ptq": true,
-  "ptq_step": 16,
+  "do_ptq": false,
+  "ptq_step": 1,
   "unified_checkpoint": false,
   "smooth": false,
   "weight_quant_method": "abs_max",
   "act_quant_method": "abs_max",
-  "cachekv_quant_method": "abs_max"
+  "cachekv_quant_method": "abs_max",
+  "load_quant_model": true,
+  "do_ceval": true
   }

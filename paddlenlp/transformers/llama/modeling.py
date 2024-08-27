@@ -1072,8 +1072,8 @@ class LlamaAttention(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
-                attn_mask_startend_row_indices,
-                self.sequence_parallel,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                sequence_parallel=self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
@@ -1085,9 +1085,9 @@ class LlamaAttention(nn.Layer):
                 value_states,
                 attention_mask,
                 output_attentions,
-                alibi,
-                attn_mask_startend_row_indices,
-                self.sequence_parallel,
+                alibi=alibi,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                sequence_parallel=self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
                 npu_is_casual=npu_is_casual,
             )
