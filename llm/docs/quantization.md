@@ -7,7 +7,7 @@
 - **PTQ**。PaddleSlim 团队自研的自适应 PiecewiseSearchSmooth(PSS)量化算法，在[SmoothQuant](https://arxiv.org/abs/2211.10438)和[Outlier Suppression+](https://arxiv.org/abs/2304.09145)基础上
 新增 PieceWiseSearch 参数搜索算法并将算法扩展至**所有线性层**，对模型权重和激活分布进行调整，减少后续 A8W8 PTQ 量化损失。
 - **GPTQ**。[GPTQ](https://arxiv.org/abs/2210.17323)是业界主流的权重量化算法，可以将大模型权重进行4位整数无损量化，提高模型推理速度。
-- **AWQ**。[GPTQ](https://arxiv.org/abs/2306.00978)是业界主流的权重量化算法，可以将大模型权重进行4位整数无损量化，提高模型推理速度。
+- **AWQ**。[AWQ](https://arxiv.org/abs/2306.00978)是业界主流的权重量化算法，可以将大模型权重进行4位整数无损量化，提高模型推理速度。
 
 <div align="center">
     <img width="800" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/fe8f941b-4b35-48ca-814f-96533d7e24ce">
