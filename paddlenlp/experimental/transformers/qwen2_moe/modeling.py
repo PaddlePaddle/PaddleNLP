@@ -13,7 +13,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-import os
 from functools import partial
 
 import numpy as np
@@ -33,6 +32,7 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
     GenerationInferenceModel,
 )
+from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
 from paddlenlp.transformers import Qwen2MoeConfig, Qwen2MoePretrainedModel
 from paddlenlp.transformers.model_outputs import (  # CausalLMOutputWithCrossAttentions,
     BaseModelOutputWithPast,
@@ -43,9 +43,11 @@ from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
     register_base_model,
 )
-from paddlenlp.transformers.qwen2_moe.modeling import Qwen2MoeLMHead, Qwen2MoePretrainingCriterion
+from paddlenlp.transformers.qwen2_moe.modeling import (
+    Qwen2MoeLMHead,
+    Qwen2MoePretrainingCriterion,
+)
 from paddlenlp.utils.log import logger
-from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
 
 __all__ = ["Qwen2MoeForCausalLMInferenceModel", "Qwen2MoeForCausalLMBlockInferenceModel"]
 
@@ -143,19 +145,22 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         ]
         shared_expert_ffn1_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen2_moe.{}.shared_expert_ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseqwen2_moe.{}.shared_expert_ffn1_weight".format(i),
+                initializer=paddle.nn.initializer.Constant(value=0),
             )
             for i in range(self.num_layers)
         ]
         shared_expert_ffn2_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen2_moe.{}.shared_expert_ffn2_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseqwen2_moe.{}.shared_expert_ffn2_weight".format(i),
+                initializer=paddle.nn.initializer.Constant(value=0),
             )
             for i in range(self.num_layers)
         ]
         shared_expert_gate_weight_attrs = [
             paddle.ParamAttr(
-                name="fuseqwen2_moe.{}.shared_expert_gate_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fuseqwen2_moe.{}.shared_expert_gate_weight".format(i),
+                initializer=paddle.nn.initializer.Constant(value=0),
             )
             for i in range(self.num_layers)
         ]
@@ -172,7 +177,8 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
                 paddle.ParamAttr(name="fuseqwen2_moe.{}.qkv_weight_scale".format(i)) for i in range(self.num_layers)
             ]
             out_proj_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2_moe.{}.out_proj_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseqwen2_moe.{}.out_proj_weight_scale".format(i))
+                for i in range(self.num_layers)
             ]
             ffn1_weight_scale_attrs = [
                 paddle.ParamAttr(name="fuseqwen2_moe.{}.ffn1_weight_scale".format(i)) for i in range(self.num_layers)
@@ -181,10 +187,12 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
                 paddle.ParamAttr(name="fuseqwen2_moe.{}.ffn2_weight_scale".format(i)) for i in range(self.num_layers)
             ]
             shared_expert_ffn1_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2_moe.{}.shared_expert_ffn1_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseqwen2_moe.{}.shared_expert_ffn1_weight_scale".format(i))
+                for i in range(self.num_layers)
             ]
             shared_expert_ffn2_weight_scale_attrs = [
-                paddle.ParamAttr(name="fuseqwen2_moe.{}.shared_expert_ffn2_weight_scale".format(i)) for i in range(self.num_layers)
+                paddle.ParamAttr(name="fuseqwen2_moe.{}.shared_expert_ffn2_weight_scale".format(i))
+                for i in range(self.num_layers)
             ]
 
         moe_config = MoeConfig(
@@ -192,8 +200,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             top_k=self.moe_topk,
             norm_topk_prob=self.norm_topk_prob,
             moe_every2=False,
-            has_shared_expert=True,
-            shared_expert_intermediate_size = self.shared_expert_intermediate_size,
+            shared_expert_intermediate_size=self.shared_expert_intermediate_size,
             shared_expert_ffn1_weight_attrs=shared_expert_ffn1_weight_attrs,
             shared_expert_ffn1_weight_scale_attrs=shared_expert_ffn1_weight_scale_attrs,
             shared_expert_ffn2_weight_attrs=shared_expert_ffn2_weight_attrs,
@@ -252,7 +259,9 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
     def set_state_dict(self, state_dict):
         head_size = self.hidden_size // self.num_attention_heads
         dtype = paddle.get_default_dtype()
-        embed_tokens_weight = paddle.to_tensor(state_dict["qwen2_moe.embed_tokens.weight"]).cast(self.embed_tokens.weight.dtype)
+        embed_tokens_weight = paddle.to_tensor(state_dict["qwen2_moe.embed_tokens.weight"]).cast(
+            self.embed_tokens.weight.dtype
+        )
         norm_weight = paddle.to_tensor(state_dict["qwen2_moe.norm.weight"]).cast(self.norm.weight.dtype)
         self.embed_tokens.weight.set_value(embed_tokens_weight)
         self.norm.weight.set_value(norm_weight)
@@ -325,9 +334,9 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             qkv_bias = paddle.to_tensor(concated_qkv_biases).cast(self.transformer_block.qkv_biases[idx].dtype)
             self.transformer_block.qkv_biases[idx].set_value(qkv_bias)
 
-            linear_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.self_attn.o_proj.weight".format(idx)]).cast(
-                dtype
-            )
+            linear_weight = paddle.to_tensor(
+                state_dict["qwen2_moe.layers.{}.self_attn.o_proj.weight".format(idx)]
+            ).cast(dtype)
 
             if self.use_weight_only:
                 linear_quanted_weight, linear_weight_scale = weight_quantize(linear_weight, algo=self.quant_algo)
@@ -342,17 +351,22 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
                 self.transformer_block.ffn_ln_scales[idx].dtype,
             )
             self.transformer_block.ffn_ln_scales[idx].set_value(ffn_ln_scale)
-            
-            # set Moe state_dict
+
             ffn1_weights = []
             ffn2_weights = []
             ffn1_scales = []
             ffn2_scales = []
             for expert_idx in range(self.num_experts):
-                up_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{0}.mlp.experts.{1}.up_proj.weight".format(idx, expert_idx)]).cast(dtype)
-                gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{0}.mlp.experts.{1}.gate_proj.weight".format(idx, expert_idx)]).cast(dtype)
-                down_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{0}.mlp.experts.{1}.down_proj.weight".format(idx, expert_idx)]).cast(dtype)
-                
+                up_weight = paddle.to_tensor(
+                    state_dict["qwen2_moe.layers.{0}.mlp.experts.{1}.up_proj.weight".format(idx, expert_idx)]
+                ).cast(dtype)
+                gate_weight = paddle.to_tensor(
+                    state_dict["qwen2_moe.layers.{0}.mlp.experts.{1}.gate_proj.weight".format(idx, expert_idx)]
+                ).cast(dtype)
+                down_weight = paddle.to_tensor(
+                    state_dict["qwen2_moe.layers.{0}.mlp.experts.{1}.down_proj.weight".format(idx, expert_idx)]
+                ).cast(dtype)
+
                 if self.use_weight_only:
                     ffn1_weight = paddle.concat(x=[gate_weight, up_weight], axis=-1)
                     ffn1_quanted_weight, ffn1_weight_scale = weight_quantize(ffn1_weight, algo=self.quant_algo)
@@ -364,36 +378,50 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
                 else:
                     ffn1_weights.append(paddle.concat(x=[gate_weight, up_weight], axis=-1))
                     ffn2_weights.append(down_weight)
-                
+
             fused_moe_ffn1_weight = paddle.to_tensor(ffn1_weights)
             fused_moe_ffn2_weight = paddle.to_tensor(ffn2_weights)
             fused_moe_ffn1_weight_scale = paddle.to_tensor(ffn1_scales)
             fused_moe_ffn2_weight_scale = paddle.to_tensor(ffn2_scales)
-            gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.gate.weight".format(idx)]).cast("float32")
+            gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.gate.weight".format(idx)]).cast(
+                "float32"
+            )
 
             self.transformer_block.ffn1_weights[idx].set_value(fused_moe_ffn1_weight)
             self.transformer_block.ffn2_weights[idx].set_value(fused_moe_ffn2_weight)
             self.transformer_block.gate_weights[idx].set_value(gate_weight)
-            
+
             if self.use_weight_only:
                 self.transformer_block.ffn1_weights_scale[idx].set_value(fused_moe_ffn1_weight_scale)
                 self.transformer_block.ffn2_weights_scale[idx].set_value(fused_moe_ffn2_weight_scale)
 
-            shared_expert_ffn1gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert.gate_proj.weight".format(idx)]).cast(dtype)
-            shared_expert_ffn1up_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert.up_proj.weight".format(idx)]).cast(dtype)
-            shared_expert_ffn1_weight = paddle.concat(x=[shared_expert_ffn1gate_weight, shared_expert_ffn1up_weight], axis=-1)
+            shared_expert_ffn1gate_weight = paddle.to_tensor(
+                state_dict["qwen2_moe.layers.{}.mlp.shared_expert.gate_proj.weight".format(idx)]
+            ).cast(dtype)
+            shared_expert_ffn1up_weight = paddle.to_tensor(
+                state_dict["qwen2_moe.layers.{}.mlp.shared_expert.up_proj.weight".format(idx)]
+            ).cast(dtype)
+            shared_expert_ffn1_weight = paddle.concat(
+                x=[shared_expert_ffn1gate_weight, shared_expert_ffn1up_weight], axis=-1
+            )
 
-            shared_expert_ffn2_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert.down_proj.weight".format(idx)]).cast(dtype)
-            shared_expert_gate_weight = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.mlp.shared_expert_gate.weight".format(idx)]).cast(dtype)
-            
+            shared_expert_ffn2_weight = paddle.to_tensor(
+                state_dict["qwen2_moe.layers.{}.mlp.shared_expert.down_proj.weight".format(idx)]
+            ).cast(dtype)
+            shared_expert_gate_weight = paddle.to_tensor(
+                state_dict["qwen2_moe.layers.{}.mlp.shared_expert_gate.weight".format(idx)]
+            ).cast(dtype)
+
             if self.use_weight_only:
                 shared_expert_ffn1_quanted_weight, shared_expert_ffn1_weight_scale = weight_quantize(
-                    shared_expert_ffn1_weight, algo=self.quant_algo)
+                    shared_expert_ffn1_weight, algo=self.quant_algo
+                )
                 self.transformer_block.shared_expert_ffn1_weights[idx].set_value(shared_expert_ffn1_quanted_weight)
                 self.transformer_block.shared_expert_ffn1_weights_scale[idx].set_value(shared_expert_ffn1_weight_scale)
 
                 shared_expert_ffn2_quanted_weight, shared_expert_ffn2_weight_scale = weight_quantize(
-                    shared_expert_ffn2_weight, algo=self.quant_algo)
+                    shared_expert_ffn2_weight, algo=self.quant_algo
+                )
                 self.transformer_block.shared_expert_ffn2_weights[idx].set_value(shared_expert_ffn2_quanted_weight)
                 self.transformer_block.shared_expert_ffn2_weights_scale[idx].set_value(shared_expert_ffn2_weight_scale)
                 # shared_expert_gate_weight is not quanted
@@ -403,7 +431,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
                 self.transformer_block.shared_expert_ffn1_weights[idx].set_value(shared_expert_ffn1_weight)
                 self.transformer_block.shared_expert_ffn2_weights[idx].set_value(shared_expert_ffn2_weight)
                 self.transformer_block.shared_expert_gate_weights[idx].set_value(shared_expert_gate_weight)
-
 
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(paddle.max(seq_lens_this_time) - seq_lens_this_time)
@@ -515,9 +542,9 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
                 rotary_emb_dims=1,
                 time_step=paddle.increment(paddle.shape(attention_mask)[-1], -1) if is_decoder else None,
             )
-        
+
         hidden_states = self.norm(hidden_states)
-        
+
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
 
@@ -537,7 +564,9 @@ class Qwen2MoeForCausalLMInferenceModel(GenerationInferenceModel, Qwen2MoePretra
         super(Qwen2MoeForCausalLMInferenceModel, self).__init__(config)
         self.qwen2_moe = Qwen2MoeInferenceModel(config)
         if config.tie_word_embeddings:
-            self.lm_head = Qwen2MoeLMHead(config, embedding_weights=self.qwen2_moe.embed_tokens.weight, transpose_y=True)
+            self.lm_head = Qwen2MoeLMHead(
+                config, embedding_weights=self.qwen2_moe.embed_tokens.weight, transpose_y=True
+            )
             self.tie_weights()
         else:
             self.lm_head = Qwen2MoeLMHead(config)
@@ -774,7 +803,9 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
         super().__init__(config)
         self.qwen2_moe = Qwen2MoeBlockInferenceModel(config)
         if config.tie_word_embeddings:
-            self.lm_head = Qwen2MoeLMHead(config, embedding_weights=self.qwen2_moe.embed_tokens.weight, transpose_y=True)
+            self.lm_head = Qwen2MoeLMHead(
+                config, embedding_weights=self.qwen2_moe.embed_tokens.weight, transpose_y=True
+            )
             self.tie_weights()
         else:
             self.lm_head = Qwen2MoeLMHead(config)
