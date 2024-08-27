@@ -40,6 +40,8 @@ from paddlenlp.transformers.model_utils import (
     unwrap_model,
     qdq_weight,
     asymmetry_qdq_weight,
+    group_wise_quant_dequant,
+    merge_int4,
 )
 from paddlenlp.transformers.utils import (
     device_guard,
@@ -173,6 +175,7 @@ class UnifiedCheckpointHandler:
                 if isinstance(state_dict[k], paddle.Tensor):
                     state_dict[k] = state_dict.pop(k).cpu().numpy()
 
+            del_key = []
             if quant and state_dict_type == "optimizer_weight":
                 codebook_dict = {}
                 opt_keys = state_dict.keys()
@@ -185,7 +188,9 @@ class UnifiedCheckpointHandler:
                         all_bits += k_size * 4
 
                     quant_weight = None
+
                     if env_var_value == '2':
+                        # m1: wint8, m2: wint8, fusion
                         if momentum2:
                             # moment2
                             sqrt_m2 = np.sqrt(state_dict[k])
@@ -210,6 +215,7 @@ class UnifiedCheckpointHandler:
                         else:
                             quant_weight = state_dict[k]
                     elif env_var_value == '1':
+                        # m1: wint8, 1/(sqrt(m2)+eps): wint8
                         if momentum2:
                             # m1: m1_quant_weight, m2: ratio
                             m1_key = k.split('/')[0] + '/moment1_0'
@@ -222,10 +228,31 @@ class UnifiedCheckpointHandler:
                             codebook_dict[k + '_max_codebook'] = maxs
                         elif not momentum1:
                             quant_weight = state_dict[k]
+                    elif env_var_value == '3':
+                        # m1: bw-wint4, 1/(sqrt(m2)+eps): bw-wint4
+                        if momentum2:
+                            if len(state_dict[k].shape) < 2:
+                                continue
+                            # m1: m1_quant_weight, m2: ratio
+                            m1_key = k.split('/')[0] + '/moment1_0'
+                            ratio = cal_ratio(state_dict[m1_key], state_dict[k])
+                            m1_quant, m1_mins, m1_maxs = group_wise_quant_dequant(state_dict[m1_key], quant_bits=4)
+                            quant_weight, r_mins, r_maxs = group_wise_quant_dequant(ratio, quant_bits=4)
+                            quant_weight = merge_int4(m1_quant, quant_weight)
+                            codebook_dict[m1_key + '_min_codebook'] = m1_mins
+                            codebook_dict[m1_key + '_max_codebook'] = m1_maxs
+                            codebook_dict[k + '_min_codebook'] = r_mins
+                            codebook_dict[k + '_max_codebook'] = r_maxs
+                            del_key.append(m1_key)
+                        elif not momentum1:
+                            quant_weight = state_dict[k]
 
                     #print(f'{k}: {state_dict[k].dtype}')
                     if quant_weight is not None:
                         state_dict[k] = quant_weight
+
+                for k in del_key:
+                    state_dict.pop(k, None)
 
                 state_dict.update(codebook_dict)
 
@@ -234,7 +261,7 @@ class UnifiedCheckpointHandler:
                     dist.all_reduce(quant_bits)
 
                 model_numel = all_bits / 4
-                all_bits = model_numel * 14.0
+                all_bits = model_numel * 7.0
                 quant_bits_mw = quant_bits + model_numel * 6.0
                 quant_bits = quant_bits + model_numel * 2.0
                 logger.info(f"all bits: {all_bits.item()}, quant bits: {quant_bits.item()}, quant bits mw: {quant_bits_mw.item()}")
