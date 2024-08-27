@@ -333,7 +333,6 @@ class FusedMultiTransformerBase(Layer):
         self.kv_num_heads = config.kv_num_heads // config.nranks
         dim_feedforward = config.dim_feedforward // config.nranks
         self.dim_feedforward = dim_feedforward
-        self.shared_expert_intermediate_size = config.moe_config.shared_expert_intermediate_size
 
         self.num_layers = config.num_layers
         assert self.num_layers > 0
@@ -350,9 +349,10 @@ class FusedMultiTransformerBase(Layer):
         self.gate_weights = []
         self.ffn1_weights, self.ffn1_biases = [], []
         self.ffn2_weights, self.ffn2_biases = [], []
-        self.shared_expert_gate_weights = []
-        self.shared_expert_ffn1_weights = []
-        self.shared_expert_ffn2_weights = []
+        if self.config.moe_config.has_moe() and self.config.moe_config.has_shared_expert:
+            self.shared_expert_gate_weights = []
+            self.shared_expert_ffn1_weights = []
+            self.shared_expert_ffn2_weights = []
         self.cache_k_scales, self.cache_v_scales = [], []
         self.cache_k_out_scales, self.cache_v_out_scales = [], []
         
@@ -374,9 +374,11 @@ class FusedMultiTransformerBase(Layer):
             ffn1_bias_attr = self.get_attr(config.ffn1_bias_attrs, i)
             ffn2_weight_attr = self.get_attr(config.ffn2_weight_attrs, i)
             ffn2_bias_attr = self.get_attr(config.ffn2_bias_attrs, i)
-            shared_expert_gate_weight_attr = self.get_attr(config.moe_config.shared_expert_gate_weight_attrs, i)
-            shared_expert_ffn1_weight_attr = self.get_attr(config.moe_config.shared_expert_ffn1_weight_attrs, i)
-            shared_expert_ffn2_weight_attr = self.get_attr(config.moe_config.shared_expert_ffn2_weight_attrs, i)
+
+            if self.config.moe_config.use_moe(i) and config.moe_config.has_shared_expert:
+                shared_expert_gate_weight_attr = self.get_attr(config.moe_config.shared_expert_gate_weight_attrs, i)
+                shared_expert_ffn1_weight_attr = self.get_attr(config.moe_config.shared_expert_ffn1_weight_attrs, i)
+                shared_expert_ffn2_weight_attr = self.get_attr(config.moe_config.shared_expert_ffn2_weight_attrs, i)
 
             cache_k_scale_attr = self.get_attr(config.cache_k_scale_attrs, i)
             cache_v_scale_attr = self.get_attr(config.cache_v_scale_attrs, i)
@@ -523,9 +525,6 @@ class FusedMultiTransformerBase(Layer):
                         is_bias=True,
                     )
 
-            shared_expert_ffn1_weight = None
-            shared_expert_ffn2_weight = None
-            shared_expert_gate_weight = None
             if self.config.moe_config.use_moe(i) and config.moe_config.has_shared_expert:
                 shared_expert_ffn1_weight = self.create_parameter(
                     shape=self.shared_expert_ffn1_weight_shape,
@@ -607,12 +606,12 @@ class FusedMultiTransformerBase(Layer):
             self.ffn1_biases.append(ffn1_bias)
             self.ffn2_weights.append(ffn2_weight)
             self.ffn2_biases.append(ffn2_bias)
-            if shared_expert_ffn1_weight is not None:
-                self.shared_expert_ffn1_weights.append(shared_expert_ffn1_weight)
-            if shared_expert_ffn2_weight is not None:
+
+            if self.config.moe_config.use_moe(i) and config.moe_config.has_shared_expert:
+                self.shared_expert_ffn1_weights.append(
+                    shared_expert_ffn1_weight)
                 self.shared_expert_ffn2_weights.append(
                     shared_expert_ffn2_weight)
-            if shared_expert_gate_weight is not None:
                 self.shared_expert_gate_weights.append(
                     shared_expert_gate_weight)
 
@@ -636,11 +635,10 @@ class FusedMultiTransformerBase(Layer):
             self._add_parameter(ffn1_bias)
             self._add_parameter(ffn2_weight)
             self._add_parameter(ffn2_bias)
-            if shared_expert_ffn1_weight is not None:
+
+            if self.config.moe_config.use_moe(i) and config.moe_config.has_shared_expert:
                 self._add_parameter(shared_expert_ffn1_weight)
-            if shared_expert_ffn2_weight is not None:
                 self._add_parameter(shared_expert_ffn2_weight)
-            if shared_expert_gate_weight is not None:
                 self._add_parameter(shared_expert_gate_weight)
 
             self._add_parameter(cache_k_scale)
@@ -694,10 +692,10 @@ class FusedMultiTransformerBase(Layer):
         if self.config.moe_config.has_moe() and config.moe_config.has_shared_expert:
             self.shared_expert_ffn1_weight_shape = [
                 self.embed_dim, 
-                self.shared_expert_intermediate_size * 2
+                self.config.moe_config.shared_expert_intermediate_size * 2
             ]
             self.shared_expert_ffn2_weight_shape = [
-                self.shared_expert_intermediate_size,
+                self.config.moe_config.shared_expert_intermediate_size,
                 self.embed_dim,
             ]
             self.shared_expert_gate_weight_shape = [
@@ -919,13 +917,10 @@ class FusedMultiTransformerBase(Layer):
 
     def compute_shared_expert(self, tmp_out, i):
         ffn1_out = paddle.matmul(tmp_out, self.shared_expert_ffn1_weights[i])
-        # moe: bias is none which is needed to be fixed 
         ffn1_out = fused_act_bias_wrapper(ffn1_out, None, act_method=self.activation)
         ffn2_out = paddle.matmul(ffn1_out, self.shared_expert_ffn2_weights[i])
-
         gate_out = paddle.matmul(tmp_out, self.shared_expert_gate_weights[i])
         gate_out = paddle.nn.functional.sigmoid(gate_out)
-
         shared_expert_output = gate_out * ffn2_out
         return shared_expert_output
 
@@ -1126,8 +1121,9 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         self.linear_weights_scale = []
         self.ffn1_weights_scale = []
         self.ffn2_weights_scale = []
-        self.shared_expert_ffn1_weights_scale = []
-        self.shared_expert_ffn2_weights_scale = []
+        if self.config.moe_config.has_moe() and config.moe_config.has_shared_expert:
+            self.shared_expert_ffn1_weights_scale = []
+            self.shared_expert_ffn2_weights_scale = []
 
         for i in range(self.num_layers):
 
@@ -1135,12 +1131,13 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             linear_weight_scale_attr = self.get_attr(config.linear_weight_scale_attrs, i)
             ffn1_weight_scale_attr = self.get_attr(config.ffn1_weight_scale_attrs, i)
             ffn2_weight_scale_attr = self.get_attr(config.ffn2_weight_scale_attrs, i)
-            shared_expert_ffn1_weight_scale_attr = self.get_attr(
-                config.moe_config.shared_expert_ffn1_weight_scale_attrs, i
-            )
-            shared_expert_ffn2_weight_scale_attr = self.get_attr(
-                config.moe_config.shared_expert_ffn2_weight_scale_attrs, i
-            )
+            if self.config.moe_config.use_moe(i) and config.moe_config.has_shared_expert:
+                shared_expert_ffn1_weight_scale_attr = self.get_attr(
+                    config.moe_config.shared_expert_ffn1_weight_scale_attrs, i
+                )
+                shared_expert_ffn2_weight_scale_attr = self.get_attr(
+                    config.moe_config.shared_expert_ffn2_weight_scale_attrs, i
+                )
 
             qkv_weight_scale = self.create_parameter(
                 shape=[(self.num_heads + 2 * self.kv_num_heads) * self.head_dim],
@@ -1190,7 +1187,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
 
             if self.config.moe_config.use_moe(i) and config.moe_config.has_shared_expert:
                 shared_expert_ffn1_weight_scale = self.create_parameter(
-                    shape=[self.shared_expert_intermediate_size * 2],
+                    shape=[self.config.moe_config.shared_expert_intermediate_size * 2],
                     attr=shared_expert_ffn1_weight_scale_attr,
                     dtype=self.weight_scale_dtype,
                     is_bias=False,
@@ -1208,19 +1205,21 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             self.linear_weights_scale.append(linear_weight_scale)
             self.ffn1_weights_scale.append(ffn1_weight_scale)
             self.ffn2_weights_scale.append(ffn2_weight_scale)
-            self.shared_expert_ffn1_weights_scale.append(
-                shared_expert_ffn1_weight_scale
-            )
-            self.shared_expert_ffn2_weights_scale.append(
-                shared_expert_ffn2_weight_scale
-            )
+            if self.config.moe_config.use_moe(i) and config.moe_config.has_shared_expert:
+                self.shared_expert_ffn1_weights_scale.append(
+                    shared_expert_ffn1_weight_scale
+                )
+                self.shared_expert_ffn2_weights_scale.append(
+                    shared_expert_ffn2_weight_scale
+                )
 
             self._add_parameter(qkv_weight_scale)
             self._add_parameter(linear_weight_scale)
             self._add_parameter(ffn1_weight_scale)
             self._add_parameter(ffn2_weight_scale)
-            self._add_parameter(shared_expert_ffn1_weight_scale)
-            self._add_parameter(shared_expert_ffn2_weight_scale)
+            if self.config.moe_config.use_moe(i) and config.moe_config.has_shared_expert:
+                self._add_parameter(shared_expert_ffn1_weight_scale)
+                self._add_parameter(shared_expert_ffn2_weight_scale)
 
     def get_weight_create_dype(self):
         return "int8"  # If use weightonly int4, params dtype is int8, and one of the dimension will be half.
@@ -1252,12 +1251,12 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
 
         if self.config.moe_config.has_moe() and config.moe_config.has_shared_expert:
             self.shared_expert_ffn1_weight_shape = [
-                self.shared_expert_intermediate_size * 2,
+                self.config.moe_config.shared_expert_intermediate_size * 2,
                 self.embed_dim, 
             ]
             self.shared_expert_ffn2_weight_shape = [
                 self.embed_dim,
-                self.shared_expert_intermediate_size,
+                self.config.moe_config.shared_expert_intermediate_size,
             ]
             self.shared_expert_gate_weight_shape = [
                 self.embed_dim,
