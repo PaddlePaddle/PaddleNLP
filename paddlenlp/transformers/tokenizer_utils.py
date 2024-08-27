@@ -1022,7 +1022,8 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                 raise TypeError(f"Token {token} is not a string but a {type(token)}.")
             if not special_tokens and hasattr(self, "do_lower_case") and self.do_lower_case:
                 token = token.lower()
-            if (self.convert_tokens_to_ids(token) == self.convert_tokens_to_ids(self.unk_token)
+            if (
+                token != self.unk_token
                 and self.convert_tokens_to_ids(token) == self.convert_tokens_to_ids(self.unk_token)
                 and token not in tokens_to_add
                 and token not in self.added_tokens_encoder.keys()

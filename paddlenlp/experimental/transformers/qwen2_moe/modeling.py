@@ -1,6 +1,4 @@
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2018 The OpenAI Team Authors and HuggingFace Inc. team.
-# Copyright (c) 2018, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -106,14 +104,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         self.moe_intermediate_size = config.moe_intermediate_size
         self.shared_expert_intermediate_size = config.shared_expert_intermediate_size
 
-        moe_config = MoeConfig(
-            num_experts=self.num_experts,
-            top_k=self.moe_topk,
-            norm_topk_prob=self.norm_topk_prob,
-            moe_every2=False,
-            has_shared_expert=True,
-        )
-
         self.embed_tokens = nn.Embedding(self.vocab_size, self.hidden_size)
 
         ln_scale_attrs = [paddle.ParamAttr(name="fuseqwen2_moe.{}.ln_scale".format(i)) for i in range(self.num_layers)]
@@ -197,6 +187,20 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
                 paddle.ParamAttr(name="fuseqwen2_moe.{}.shared_expert_ffn2_weight_scale".format(i)) for i in range(self.num_layers)
             ]
 
+        moe_config = MoeConfig(
+            num_experts=self.num_experts,
+            top_k=self.moe_topk,
+            norm_topk_prob=self.norm_topk_prob,
+            moe_every2=False,
+            has_shared_expert=True,
+            shared_expert_intermediate_size = self.shared_expert_intermediate_size,
+            shared_expert_ffn1_weight_attrs=shared_expert_ffn1_weight_attrs,
+            shared_expert_ffn1_weight_scale_attrs=shared_expert_ffn1_weight_scale_attrs,
+            shared_expert_ffn2_weight_attrs=shared_expert_ffn2_weight_attrs,
+            shared_expert_ffn2_weight_scale_attrs=shared_expert_ffn2_weight_scale_attrs,
+            shared_expert_gate_weight_attrs=shared_expert_gate_weight_attrs,
+        )
+
         transformer_config = FusedMultiTransformerConfig(
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
@@ -213,6 +217,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             linear_weight_attrs=out_proj_weight_attrs,
             linear_weight_scale_attrs=out_proj_weight_scale_attrs,
             ffn_ln_scale_attrs=ffn_ln_scale_attrs,
+            gate_weight_attrs=gate_weight_attrs,
             ffn1_weight_attrs=ffn1_weight_attrs,
             ffn1_weight_scale_attrs=ffn1_weight_scale_attrs,
             ffn2_weight_attrs=ffn2_weight_attrs,
@@ -222,13 +227,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             norm_type="rmsnorm",
             use_neox_rotary_style=self.use_neox,
             moe_config=moe_config,
-            shared_expert_intermediate_size=self.shared_expert_intermediate_size,
-            gate_weight_attrs=gate_weight_attrs,
-            shared_expert_ffn1_weight_attrs=shared_expert_ffn1_weight_attrs,
-            shared_expert_ffn1_weight_scale_attrs=shared_expert_ffn1_weight_scale_attrs,
-            shared_expert_ffn2_weight_attrs=shared_expert_ffn2_weight_attrs,
-            shared_expert_ffn2_weight_scale_attrs=shared_expert_ffn2_weight_scale_attrs,
-            shared_expert_gate_weight_attrs=shared_expert_gate_weight_attrs,
         )
 
         self.set_transformer_block(transformer_config)

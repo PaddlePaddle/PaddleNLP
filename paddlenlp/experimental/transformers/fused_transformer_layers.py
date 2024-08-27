@@ -24,7 +24,6 @@ from paddle.incubate.nn.functional import (
     fused_rms_norm,
     masked_multihead_attention,
     variable_length_memory_efficient_attention,
-    fused_moe,
 )
 from paddle.nn import Layer
 from paddle.nn.initializer import Constant
@@ -158,6 +157,12 @@ class MoeConfig:
     norm_topk_prob: bool = True
     moe_every2: bool = False
     has_shared_expert: bool = False
+    shared_expert_intermediate_size: int = 0,
+    shared_expert_ffn1_weight_attrs: Optional[List[paddle.ParamAttr]] = None,
+    shared_expert_ffn1_weight_scale_attrs: Optional[List[paddle.ParamAttr]] = None,
+    shared_expert_ffn2_weight_attrs: Optional[List[paddle.ParamAttr]] = None,
+    shared_expert_ffn2_weight_scale_attrs: Optional[List[paddle.ParamAttr]] = None,
+    shared_expert_gate_weight_attrs: Optional[List[paddle.ParamAttr]] = None,
 
     def has_moe(self) -> bool:
         return self.num_experts > 1
@@ -195,11 +200,6 @@ class FusedMultiTransformerConfig:
         ffn2_weight_attrs=None,
         ffn2_weight_scale_attrs=None,
         ffn2_bias_attrs=None,
-        shared_expert_ffn1_weight_attrs=None,
-        shared_expert_ffn1_weight_scale_attrs=None,
-        shared_expert_ffn2_weight_attrs=None,
-        shared_expert_ffn2_weight_scale_attrs=None,
-        shared_expert_gate_weight_attrs=None,
         qkv_out_scale_attrs=None,
         linear_out_scale_attrs=None,
         ffn1_out_scale_attrs=None,
@@ -225,7 +225,6 @@ class FusedMultiTransformerConfig:
         cachekv_int8_type=None,
         rank_id=-1,
         moe_config=MoeConfig(),
-        shared_expert_intermediate_size=0,
     ):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -237,7 +236,6 @@ class FusedMultiTransformerConfig:
         self.dropout_rate = dropout_rate
         self.activation = activation
         self.norm_type = norm_type
-        self.shared_expert_intermediate_size = shared_expert_intermediate_size
 
         self.use_neox_rotary_style = use_neox_rotary_style
         self.normalize_before = normalize_before
@@ -258,11 +256,6 @@ class FusedMultiTransformerConfig:
         self.ffn2_weight_attrs = ffn2_weight_attrs
         self.ffn2_weight_scale_attrs = ffn2_weight_scale_attrs
         self.ffn2_bias_attrs = ffn2_bias_attrs
-        self.shared_expert_ffn1_weight_attrs = shared_expert_ffn1_weight_attrs
-        self.shared_expert_ffn1_weight_scale_attrs = shared_expert_ffn1_weight_scale_attrs
-        self.shared_expert_ffn2_weight_attrs = shared_expert_ffn2_weight_attrs
-        self.shared_expert_ffn2_weight_scale_attrs = shared_expert_ffn2_weight_scale_attrs
-        self.shared_expert_gate_weight_attrs = shared_expert_gate_weight_attrs
 
         self.qkv_out_scale_attrs = qkv_out_scale_attrs
         self.linear_out_scale_attrs = linear_out_scale_attrs
@@ -340,7 +333,7 @@ class FusedMultiTransformerBase(Layer):
         self.kv_num_heads = config.kv_num_heads // config.nranks
         dim_feedforward = config.dim_feedforward // config.nranks
         self.dim_feedforward = dim_feedforward
-        self.shared_expert_intermediate_size = config.shared_expert_intermediate_size
+        self.shared_expert_intermediate_size = config.moe_config.shared_expert_intermediate_size
 
         self.num_layers = config.num_layers
         assert self.num_layers > 0
@@ -381,9 +374,9 @@ class FusedMultiTransformerBase(Layer):
             ffn1_bias_attr = self.get_attr(config.ffn1_bias_attrs, i)
             ffn2_weight_attr = self.get_attr(config.ffn2_weight_attrs, i)
             ffn2_bias_attr = self.get_attr(config.ffn2_bias_attrs, i)
-            shared_expert_gate_weight_attr = self.get_attr(config.shared_expert_gate_weight_attrs, i)
-            shared_expert_ffn1_weight_attr = self.get_attr(config.shared_expert_ffn1_weight_attrs, i)
-            shared_expert_ffn2_weight_attr = self.get_attr(config.shared_expert_ffn2_weight_attrs, i)
+            shared_expert_gate_weight_attr = self.get_attr(config.moe_config.shared_expert_gate_weight_attrs, i)
+            shared_expert_ffn1_weight_attr = self.get_attr(config.moe_config.shared_expert_ffn1_weight_attrs, i)
+            shared_expert_ffn2_weight_attr = self.get_attr(config.moe_config.shared_expert_ffn2_weight_attrs, i)
 
             cache_k_scale_attr = self.get_attr(config.cache_k_scale_attrs, i)
             cache_v_scale_attr = self.get_attr(config.cache_v_scale_attrs, i)
@@ -1143,10 +1136,10 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             ffn1_weight_scale_attr = self.get_attr(config.ffn1_weight_scale_attrs, i)
             ffn2_weight_scale_attr = self.get_attr(config.ffn2_weight_scale_attrs, i)
             shared_expert_ffn1_weight_scale_attr = self.get_attr(
-                config.shared_expert_ffn1_weight_scale_attrs, i
+                config.moe_config.shared_expert_ffn1_weight_scale_attrs, i
             )
             shared_expert_ffn2_weight_scale_attr = self.get_attr(
-                config.shared_expert_ffn2_weight_scale_attrs, i
+                config.moe_config.shared_expert_ffn2_weight_scale_attrs, i
             )
 
             qkv_weight_scale = self.create_parameter(
