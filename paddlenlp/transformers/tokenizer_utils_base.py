@@ -1543,7 +1543,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         else:
             init_kwargs = init_configuration
 
-        pass_special_tokens_map_file = False
         pass_added_tokens_file = False
         # Handle tokenizer serialization of added and special tokens
         added_tokens_decoder: Dict[int, AddedToken] = {}
@@ -1560,7 +1559,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                     )
             init_kwargs["added_tokens_decoder"] = added_tokens_decoder
 
-            pass_special_tokens_map_file = True
             pass_added_tokens_file = True
 
         # position args are stored in kwargs, maybe better not include
@@ -1618,7 +1616,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             tokenizer.init_chat_template(chat_template)
 
         special_tokens_map_file = resolved_vocab_files.pop("special_tokens_map_file", None)
-        special_tokens_map_file = None if pass_special_tokens_map_file else special_tokens_map_file
         if special_tokens_map_file is not None:
             with open(special_tokens_map_file, encoding="utf-8") as special_tokens_map_handle:
                 special_tokens_map = json.load(special_tokens_map_handle)
