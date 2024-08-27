@@ -644,7 +644,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                     ffn1_quanted_weight_list.append(
                         ffn1_quanted_weight_list_i.reshape(
                             [self.transformer_block.embed_dim, self.transformer_block.dim_feedforward * 2]
-                            if self.transformer_block.config.quant_type == "weight_only_int8"
+                            if self.quant_type == "weight_only_int8"
                             else [self.transformer_block.embed_dim, self.transformer_block.dim_feedforward]
                         )
                     )
@@ -683,7 +683,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                     ffn2_quanted_weight_list.append(
                         ffn2_quanted_weight_list_i.reshape(
                             [self.transformer_block.dim_feedforward, self.transformer_block.embed_dim]
-                            if self.transformer_block.config.quant_type == "weight_only_int8"
+                            if self.quant_type == "weight_only_int8"
                             else [self.transformer_block.dim_feedforward, self.transformer_block.embed_dim // 2]
                         )
                     )
