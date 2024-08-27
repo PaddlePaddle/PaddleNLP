@@ -1359,6 +1359,32 @@ def create_predictor(
                     dtype=predictor_args.dtype,
                 )
                 model.eval()
+            elif "qwen2moe" in config.architectures[0].lower():
+                if predictor_args.block_attn:
+                    config.max_seq_len = predictor_args.total_max_length
+                    config.block_size = predictor_args.block_size
+                    from paddlenlp.experimental.transformers import (
+                        Qwen2MoeForCausalLMBlockInferenceModel as Qwen2MoeInferenceModel,
+                    )
+
+                    model = Qwen2MoeInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        Qwen2MoeForCausalLMInferenceModel as Qwen2MoeInferenceModel,
+                    )
+
+                    model = Qwen2MoeInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                    )
+                model.eval()
             elif "qwen2" in config.architectures[0].lower():
                 if predictor_args.block_attn:
                     config.max_seq_len = predictor_args.total_max_length
@@ -1493,6 +1519,20 @@ def create_predictor(
                 )
 
                 cache_kvs_shape = GPTForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
+            elif "qwen2moe" in config.architectures[0].lower():
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                    from paddlenlp.experimental.transformers import (
+                        Qwen2MoeForCausalLMBlockInferenceModel as Qwen2MoeInferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        Qwen2MoeForCausalLMInferenceModel as Qwen2MoeInferenceModel,
+                    )
+                cache_kvs_shape = Qwen2MoeInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "qwen2" in config.architectures[0].lower():
