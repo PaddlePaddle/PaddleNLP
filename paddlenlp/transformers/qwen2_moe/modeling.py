@@ -1553,4 +1553,4 @@ class Qwen2MoeForCausalLM(Qwen2MoePretrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
             router_logits=outputs.router_logits,
-        ) 
+        )
