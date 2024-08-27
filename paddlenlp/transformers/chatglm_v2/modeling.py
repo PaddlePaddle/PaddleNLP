@@ -277,6 +277,7 @@ class SelfAttention(nn.Layer):
         self.multi_query_group_num = config.multi_query_group_num
         self.num_attention_heads_per_partition = config.num_attention_heads
         self.config = config
+        self.seq_length = config.seq_length
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
         self.tensor_parallel_degree = config.tensor_parallel_degree
@@ -336,7 +337,7 @@ class SelfAttention(nn.Layer):
     def forward(
         self, hidden_states, attention_mask, rotary_pos_emb, kv_cache=None, use_cache=True, output_attentions=False
     ):
-        seq_length = self.config.seq_length
+        # seq_length, batch_size = self.config.seq_length, hidden_states.shape[0]//self.config.seq_length
         mixed_x_layer = self.query_key_value(hidden_states)
         (query_layer, key_layer, value_layer) = mixed_x_layer.split(
             [
@@ -346,16 +347,26 @@ class SelfAttention(nn.Layer):
             ],
             axis=-1,
         )
-
-        query_layer = query_layer.reshape(
-            [seq_length, -1, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
-        )
-        key_layer = key_layer.reshape(
-            [seq_length, -1, self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
-        )
-        value_layer = value_layer.reshape(
-            [seq_length, -1, self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
-        )
+        if self.sequence_parallel:
+            query_layer = query_layer.reshape(
+                [self.seq_length, -1, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
+            )
+            key_layer = key_layer.reshape(
+                [self.seq_length, -1, self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
+            )
+            value_layer = value_layer.reshape(
+                [self.seq_length, -1, self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
+            )
+        else:
+            query_layer = query_layer.reshape(
+                [0, 0, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
+            )
+            key_layer = key_layer.reshape(
+                [0, 0, self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
+            )
+            value_layer = value_layer.reshape(
+                [0, 0, self.num_multi_query_groups_per_partition, self.hidden_size_per_attention_head]
+            )
 
         # apply relative positional encoding (rotary embedding)
         if rotary_pos_emb is not None:
@@ -390,6 +401,7 @@ class SelfAttention(nn.Layer):
             attention_fuc = self._flash_attention
         else:
             attention_fuc = self._core_attention
+
         has_gradient = (
             (not query_layer.stop_gradient) or (not key_layer.stop_gradient) or (not value_layer.stop_gradient)
         )
@@ -477,7 +489,7 @@ class GLMBlock(nn.Layer):
         self.apply_residual_connection_post_layernorm = config.apply_residual_connection_post_layernorm
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
-
+        self.config = config
         self.fp32_residual_connection = config.fp32_residual_connection
 
         LayerNormFunc = RMSNorm if config.rmsnorm else nn.LayerNorm
@@ -495,7 +507,6 @@ class GLMBlock(nn.Layer):
 
         # MLP
         self.mlp = MLP(config)
-        self.config = config
 
     def forward(
         self,
