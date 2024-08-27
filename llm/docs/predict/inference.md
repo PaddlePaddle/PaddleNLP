@@ -24,29 +24,28 @@ PaddleNLP大模型推理提供压缩、推理、服务全流程体验 ：
 
 ## 1. 模型支持
 
-PaddleNLP 中已经添加高性能推理模型相关实现，支持：
+PaddleNLP 中已经添加高性能推理模型相关实现，已验证过的模型如下：
 | Models | Example Models |
 |--------|----------------|
-|Llama 3.1, Llama 3, Llama 2|`meta-llama/Meta-Llama-3.1-8B`, `meta-llama/Meta-Llama-3.1-8B-Instruct`, `meta-llama/Meta-Llama-3.1-405B`, `meta-llama/Meta-Llama-3.1-405B-Instruct`,`meta-llama/Meta-Llama-3-8B`, `meta-llama/Meta-Llama-3-8B-Instruct`, `meta-llama/Meta-Llama-3-70B`, `meta-llama/Meta-Llama-3-70B-Instruct`,  etc.|
-|Qwen 2| `Qwen/Qwen2-0.5B`, `Qwen/Qwen2-0.5B-Instruct`, `Qwen/Qwen2-1.5B`, `Qwen/Qwen2-1.5B-Instruct`, `Qwen/Qwen2-7B`, `Qwen/Qwen2-7B-Instruct`, `Qwen/Qwen2-72B`, `Qwen/Qwen2-72B-Instruct`, `Qwen/Qwen2-57B-A14B`, `Qwen/Qwen2-57B-A14B-Instruct`, etc.|
-|Qwen-Moe| `Qwen/Qwen1.5-MoE-A2.7B`, `Qwen/Qwen1.5-MoE-A2.7B-Chat`, `Qwen/Qwen2-57B-A14B`, `Qwen/Qwen2-57B-A14B-Instruct`, etc.|
-|Mixtral| `mistralai/Mixtral-8x7B-Instruct-v0.1`, etc.|
-|ChatGLM 3, ChatGLM 2| `THUDM/chatglm3-6b`, `THUDM/chatglm2-6b`, etc.|
-|Baichuan 3, Baichuan 2, Baichuan|`baichuan-inc/Baichuan2-7B-Base`, `baichuan-inc/Baichuan2-7B-Chat` , etc.|
-|Bloom|`bigscience/bloom-560m`, `bigscience/bloom-1b1`, `bigscience/bloom-3b`, etc.|
+|Llama 3.1, Llama 3, Llama 2|`meta-llama/Meta-Llama-3.1-8B`, `meta-llama/Meta-Llama-3.1-8B-Instruct`, `meta-llama/Meta-Llama-3.1-405B`, `meta-llama/Meta-Llama-3.1-405B-Instruct`,`meta-llama/Meta-Llama-3-8B`, `meta-llama/Meta-Llama-3-8B-Instruct`, `meta-llama/Meta-Llama-3-70B`, `meta-llama/Meta-Llama-3-70B-Instruct`, `meta-llama/Llama-Guard-3-8B`, `Llama-2-7b, meta-llama/Llama-2-7b-chat`, `meta-llama/Llama-2-13b`, `meta-llama/Llama-2-13b-chat`, `meta-llama/Llama-2-70b`, `meta-llama/Llama-2-70b-chat`|
+|Qwen 2| `Qwen/Qwen2-0.5B`, `Qwen/Qwen2-0.5B-Instruct`, `Qwen/Qwen2-1.5B`, `Qwen/Qwen2-1.5B-Instruct`, `Qwen/Qwen2-7B`, `Qwen/Qwen2-7B-Instruct`, `Qwen/Qwen2-72B`, `Qwen/Qwen2-72B-Instruct`, `Qwen/Qwen2-57B-A14B`, `Qwen/Qwen2-57B-A14B-Instruct`|
+|Qwen-Moe| `Qwen/Qwen1.5-MoE-A2.7B`, `Qwen/Qwen1.5-MoE-A2.7B-Chat`, `Qwen/Qwen2-57B-A14B`, `Qwen/Qwen2-57B-A14B-Instruct`|
+|Mixtral| `mistralai/Mixtral-8x7B-Instruct-v0.1`|
+|ChatGLM 3, ChatGLM 2| `THUDM/chatglm3-6b`, `THUDM/chatglm2-6b`|
+|Baichuan 2, Baichuan|`baichuan-inc/Baichuan2-7B-Base`, `baichuan-inc/Baichuan2-7B-Chat`, `baichuan-inc/Baichuan2-13B-Base`, `baichuan-inc/Baichuan2-13B-Chat`, `baichuan-inc/Baichuan-7B`, `baichuan-inc/Baichuan-13B-Base`, `baichuan-inc/Baichuan-13B-Chat`|
 
 
 ## 2. 硬件&精度支持
 
 PaddleNLP 提供了多种硬件平台和精度支持，包括：
 
-| Precision      | Ada | Ampere | Turing | Volta | 昆仑XPU | 昇腾NPU | 海光K100 | 燧原GCU | x86 CPU |
-|:--------------:|:---:|:------:|:------:|:-----:|:------:|:-------:|:-------:|:------:|:-------:|
-| FP32           |  ✅ | ✅     | ✅      | ✅    | ✅      |  ✅     | ✅      | ✅      |   ✅    |
-| FP16           |  ✅ | ✅     | ✅      | ✅    | ✅      |  ✅     | ✅      | ✅      |   ✅    |
-| BF16           |  ✅ | ✅     | ❌      | ❌    | ❌      |  ❌     | ❌      | ❌      |   ✅    |
-| INT8           |  ✅ | ✅     | ✅      | ✅    | ✅      |  ✅     | ✅      | ❌      |   ✅    |
-| FP8            |  ✅ | ❌     | ❌      | ❌    | ❌      |  ❌     | ❌      | ❌      |   ❌    |
+| Precision      | Hopper| Ada | Ampere | Turing | Volta | 昆仑XPU | 昇腾NPU | 海光K100 | 燧原GCU | x86 CPU |
+|:--------------:|:-----:|:---:|:------:|:------:|:-----:|:------:|:-------:|:-------:|:------:|:-------:|
+| FP32           |  ✅   |  ✅ | ✅     | ✅      | ✅    | ✅      |  ✅     | ✅      | ✅      |   ✅    |
+| FP16           |  ✅   |  ✅ | ✅     | ✅      | ✅    | ✅      |  ✅     | ✅      | ✅      |   ✅    |
+| BF16           |  ✅   |  ✅ | ✅     | ❌      | ❌    | ❌      |  ❌     | ❌      | ❌      |   ✅    |
+| INT8           |  ✅   |  ✅ | ✅     | ✅      | ✅    | ✅      |  ✅     | ✅      | ❌      |   ✅    |
+| FP8            |  🚧   |  ✅ | ❌     | ❌      | ❌    | ❌      |  ❌     | ❌      | ❌      |   ❌    |
 
 
 ## 3. 推理参数
