@@ -19,14 +19,7 @@ PaddleNLP大模型推理提供压缩、推理、服务全流程体验 ：
 
 - 支持多硬件大模型推理，包括[昆仑XPU](../../xpu/llama/README.md)、[昇腾NPU](../../npu/llama/README.md)、[海光K100](../dcu_install.md)、[燧原GCU](../../gcu/llama/README.md)、[X86 CPU](../cpu_install.md)等
 
-- 提供面向服务器场景的部署服务，支持连续批处理(continuous batching)、流式输出等功能，支持HTTP、RPC、RESTful多种Clent端形式
-
-
-PaddleNLP大模型推理支持如下主流开源大模型：
-
-- 基于Transformer的大模型（如Llama、Qwen）
-
-- 混合专家大模型（如Mixtral）
+- 提供面向服务器场景的部署服务，支持连续批处理(continuous batching)、流式输出等功能，支持gRPC、HTTP协议的服务接口
 
 
 ## 1. 模型支持
@@ -194,5 +187,5 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 
 ## 致谢
 
-
+我们参考[PageAttention](https://github.com/vllm-project/vllm)的page分块的思想实现了generation阶段的block attention。基于[Flash Decoding](https://github.com/Dao-AILab/flash-attention)的KV分块思想实现了长sequence场景下的推理加速。基于[Flash Attention2](https://github.com/Dao-AILab/flash-attention)实现了prefill阶段的attention加速。FP8 GEMM基于[CUTLASS](https://github.com/NVIDIA/cutlass)的高性能模板库实现。有部分算子如gemm_dequant参考了[TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM)和[FasterTransformer](https://github.com/NVIDIA/FasterTransformer.git)的实现和优化思路。
 
