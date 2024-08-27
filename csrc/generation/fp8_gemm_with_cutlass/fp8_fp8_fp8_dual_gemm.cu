@@ -114,7 +114,7 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_fp8_dual_gemm(
   }
   std::string act = (activation_type == "") ? "swiglu" : activation_type;
 
-  std::string gemm_config =
+  std::string fuse_gemm_config =
       input_dtype + "_" + output_dtype + "_" + isbias + bias_dtype + act;
 
   DualGemmEpilogueAllParams params = {
@@ -139,7 +139,7 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_fp8_dual_gemm(
       bias_data1,
       bias_dims0,
       bias_dims1,
-      gemm_config};
+      fuse_gemm_config};
 
   fp8_fp8_dual_gemm_scale_bias_act(params);
   return {out};
