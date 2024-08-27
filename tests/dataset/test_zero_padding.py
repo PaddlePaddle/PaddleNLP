@@ -19,7 +19,11 @@ import unittest
 
 import numpy as np
 
-from paddlenlp.datasets import InTokensIterableDataset, InTokensMapDataset, load_dataset
+from paddlenlp.datasets import (
+    ZeroPaddingIterableDataset,
+    ZeroPaddingMapDataset,
+    load_dataset,
+)
 from paddlenlp.transformers import AutoTokenizer
 from tests.testing_utils import get_tests_dir
 
@@ -31,7 +35,7 @@ def read_local_dataset(path):
             yield json.loads(line.strip())
 
 
-class InTokensTestCommon:
+class ZeroPaddingTestCommon:
     tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/micro-random-llama")
     expected_output = {
         "input_ids": [1, 29871, 30429, 1, 29871, 30429, 2, 1, 29871, 31427, 1, 29871, 31427, 2],
@@ -90,7 +94,7 @@ class InTokensTestCommon:
         return model_inputs
 
 
-class TestInTokensMapDataset(InTokensTestCommon, unittest.TestCase):
+class TestZeroPaddingMapDataset(ZeroPaddingTestCommon, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         fixture_path = get_tests_dir(os.path.join("fixtures", "dummy"))
@@ -111,26 +115,28 @@ class TestInTokensMapDataset(InTokensTestCommon, unittest.TestCase):
         )
 
     def test_long_max_length(self):
-        inData = InTokensMapDataset(self.dataset, self.tokenizer, max_length=128)
+        inData = ZeroPaddingMapDataset(self.dataset, self.tokenizer, max_length=128)
         self.assertEqual(set(inData[0].keys()), {"input_ids", "labels", "position_ids", "attention_mask"})
         self.assertEqual(len(inData), 1)
         self.assertEqual(type(inData[0]["input_ids"]), list)
         self.assertEqual(np.array(inData[0]["input_ids"]).shape, (70,))
 
-        inData_input_labels_only = InTokensMapDataset(self.dataset_input_labels_only, self.tokenizer, max_length=128)
+        inData_input_labels_only = ZeroPaddingMapDataset(
+            self.dataset_input_labels_only, self.tokenizer, max_length=128
+        )
         self.assertEqual(set(inData_input_labels_only[0].keys()), {"input_ids", "labels", "attention_mask"})
         self.assertEqual(len(inData_input_labels_only), 1)
         self.assertEqual(type(inData_input_labels_only[0]["input_ids"]), list)
         self.assertEqual(np.array(inData_input_labels_only[0]["input_ids"]).shape, (70,))
 
     def test_short_max_length(self):
-        inData = InTokensMapDataset(self.dataset, self.tokenizer, max_length=16)
+        inData = ZeroPaddingMapDataset(self.dataset, self.tokenizer, max_length=16)
         self.assertEqual(inData[0]["input_ids"], self.expected_output["input_ids"])
         self.assertEqual(inData[0]["labels"], self.expected_output["labels"])
         self.assertTrue((inData[0]["position_ids"] == self.expected_output["position_ids"]).all())
         self.assertTrue((inData[0]["attention_mask"] == self.expected_output["attention_mask"]).all())
 
-        inData_input_labels_only = InTokensMapDataset(self.dataset_input_labels_only, self.tokenizer, max_length=16)
+        inData_input_labels_only = ZeroPaddingMapDataset(self.dataset_input_labels_only, self.tokenizer, max_length=16)
         self.assertEqual(inData_input_labels_only[0]["input_ids"], self.expected_output["input_ids"])
         self.assertEqual(inData_input_labels_only[0]["labels"], self.expected_output["labels"])
         self.assertTrue(
@@ -138,19 +144,19 @@ class TestInTokensMapDataset(InTokensTestCommon, unittest.TestCase):
         )
 
     def test_2d_position_id(self):
-        inData_2d = InTokensMapDataset(self.dataset_position_2d, self.tokenizer, max_length=16)
+        inData_2d = ZeroPaddingMapDataset(self.dataset_position_2d, self.tokenizer, max_length=16)
         self.assertTrue(inData_2d[0]["position_ids"] == self.expected_output["position_ids_2d"])
 
     def test_missing_data(self):
         orginal_input_ids = [item["input_ids"] for item in self.dataset]
         orginal_input_ids = [sum(orginal_input_ids, [])]
-        inData = InTokensMapDataset(self.dataset, self.tokenizer, max_length=16)
+        inData = ZeroPaddingMapDataset(self.dataset, self.tokenizer, max_length=16)
         tgt_input_ids = [item["input_ids"] for item in inData]
         tgt_input_ids = [sum(tgt_input_ids, [])]
         self.assertEqual(orginal_input_ids, tgt_input_ids)
 
 
-class TestInTokensIterableDataset(InTokensTestCommon, unittest.TestCase):
+class TestZeroPaddingIterableDataset(ZeroPaddingTestCommon, unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         fixture_path = get_tests_dir(os.path.join("fixtures", "dummy"))
@@ -168,13 +174,13 @@ class TestInTokensIterableDataset(InTokensTestCommon, unittest.TestCase):
         )
 
     def test_long_max_length(self):
-        inData = InTokensIterableDataset(self.dataset, self.tokenizer, max_length=128)
+        inData = ZeroPaddingIterableDataset(self.dataset, self.tokenizer, max_length=128)
         example = next(iter(inData))
         self.assertEqual(set(example.keys()), {"input_ids", "labels", "position_ids", "attention_mask"})
         self.assertEqual(type(example["input_ids"]), list)
         self.assertEqual(np.array(example["input_ids"]).shape, (70,))
 
-        inData_input_labels_only = InTokensIterableDataset(
+        inData_input_labels_only = ZeroPaddingIterableDataset(
             self.dataset_input_labels_only, self.tokenizer, max_length=128
         )
         example = next(iter(inData_input_labels_only))
@@ -183,14 +189,14 @@ class TestInTokensIterableDataset(InTokensTestCommon, unittest.TestCase):
         self.assertEqual(np.array(example["input_ids"]).shape, (70,))
 
     def test_short_max_length(self):
-        inData = InTokensIterableDataset(self.dataset, self.tokenizer, max_length=16)
+        inData = ZeroPaddingIterableDataset(self.dataset, self.tokenizer, max_length=16)
         example = next(iter(inData))
         self.assertEqual(example["input_ids"], self.expected_output["input_ids"])
         self.assertEqual(example["labels"], self.expected_output["labels"])
         self.assertTrue((example["position_ids"] == self.expected_output["position_ids"]).all())
         self.assertTrue((example["attention_mask"] == self.expected_output["attention_mask"]).all())
 
-        inData_input_labels_only = InTokensIterableDataset(
+        inData_input_labels_only = ZeroPaddingIterableDataset(
             self.dataset_input_labels_only, self.tokenizer, max_length=16
         )
         example = next(iter(inData_input_labels_only))
@@ -199,13 +205,13 @@ class TestInTokensIterableDataset(InTokensTestCommon, unittest.TestCase):
         self.assertTrue((example["attention_mask"] == self.expected_output["attention_mask"]).all())
 
     def test_2d_position_id(self):
-        inData_2d = InTokensIterableDataset(self.dataset_position_2d, self.tokenizer, max_length=16)
+        inData_2d = ZeroPaddingIterableDataset(self.dataset_position_2d, self.tokenizer, max_length=16)
         example = next(iter(inData_2d))
         self.assertTrue(example["position_ids"] == self.expected_output["position_ids_2d"])
 
     def test_missing_data(self):
         orginal_input_ids = [item["input_ids"] for item in self.dataset]
         orginal_input_ids = [sum(orginal_input_ids, [])]
-        inData = InTokensIterableDataset(self.dataset, self.tokenizer, max_length=128)
+        inData = ZeroPaddingIterableDataset(self.dataset, self.tokenizer, max_length=128)
         tgt_input_ids = [item["input_ids"] for item in inData]
         self.assertEqual(orginal_input_ids, tgt_input_ids)

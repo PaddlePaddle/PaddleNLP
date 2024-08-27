@@ -87,6 +87,8 @@ git clone https://github.com/PaddlePaddle/PaddleNLP
 cd ./paddlenlp/csrc && python setup_cuda.py install
 #XPU设备安装自定义算子
 cd ./paddlenlp/csrc/xpu/src && sh cmake_build.sh
+#DCU设备安装自定义算子
+cd ./paddlenlp/csrc && python setup_hip.py install
 ```
 
 ### 2.3 关闭BlockAttention的高性能推理
