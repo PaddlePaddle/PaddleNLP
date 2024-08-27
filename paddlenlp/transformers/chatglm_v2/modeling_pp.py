@@ -143,6 +143,10 @@ def forward_impl(self, seq_len: int, n_elem: int, base: int = 10000):
 class EmbeddingPipe(Embedding):
     """Extends Embedding to forward attention_mask through the pipeline."""
 
+    def __init__(self, config: ChatGLMv2Config):
+        super().__init__(config)
+        self.default_dtype = paddle.get_default_dtype()
+
     @property
     def embedding_weight(self):
         return get_attr(self.word_embeddings, "weight")
@@ -150,7 +154,7 @@ class EmbeddingPipe(Embedding):
     def forward(self, args):
         input_ids, attention_mask, position_ids, rotary_pos_emb, kv_cache, use_cache = parse_args(args)
         input_ids.stop_gradient = True
-        inputs_embeds = super().forward(input_ids=input_ids, position_ids=position_ids)
+        inputs_embeds = super().forward(input_ids=input_ids)
         batch_size, seq_length = input_ids.shape
 
         if self.config.sequence_parallel:
@@ -174,7 +178,9 @@ class EmbeddingPipe(Embedding):
 
         causal_mask = paddle.tril(paddle.ones([batch_size, 1, seq_length, seq_length])).astype("bool")
         attention_mask = attention_mask & causal_mask
-
+        zero = paddle.zeros(attention_mask.shape, dtype=inputs_embeds.dtype)
+        neg_inf = paddle.full_like(attention_mask, paddle.finfo(inputs_embeds.dtype).min, dtype=inputs_embeds.dtype)
+        attention_mask = paddle.where(attention_mask, zero, neg_inf)
         # Rotary positional embeddings
         self.max_sequence_length = self.config.max_sequence_length
         rotary_dim = (
@@ -182,7 +188,7 @@ class EmbeddingPipe(Embedding):
             if self.config.kv_channels is None
             else self.config.kv_channels
         )
-        rotary_pos_emb = forward_impl(self.max_sequence_length, rotary_dim // 2)
+        rotary_pos_emb = forward_impl(self, self.max_sequence_length, rotary_dim // 2)
         if position_ids is not None:
             rotary_pos_emb = rotary_pos_emb[position_ids]
         else:
@@ -204,7 +210,7 @@ class GLMBlockPipe(GLMBlock):
 
 class RMSNormPipe(RMSNorm):
     def forward(self, args):
-        hidden_states = parse_args(args)
+        hidden_states, attention_mask, position_ids, rotary_pos_emb, kv_cache, use_cache = parse_args(args)
         hidden_states = super().forward(hidden_states)
         return hidden_states
 
@@ -255,11 +261,14 @@ class ChatGLMv2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         )
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
-                LayerDesc(GLMBlockPipe, config=config),
+                LayerDesc(GLMBlockPipe, config=config, layer_number=i),
                 f"chatglmv2.decoder.layers.{i}",
             )
 
-        self.add_sequential_layer(LayerDesc(RMSNormPipe, config=config), "encoder.final_layernorm")
+        self.add_sequential_layer(
+            LayerDesc(RMSNormPipe, hidden_size=config.hidden_size, config=config, epsilon=config.layernorm_epsilon),
+            "encoder.final_layernorm",
+        )
         self.add_sequential_layer(
             SharedLayerDesc(
                 "chatglmv2_shared_weight", Chatglmv2LMHeadPipe, shared_weight_attr="embedding_weight", config=config

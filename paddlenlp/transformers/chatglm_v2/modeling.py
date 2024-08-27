@@ -869,7 +869,7 @@ class Embedding(nn.Layer):
 
     def __init__(self, config: ChatGLMv2Config):
         super(Embedding, self).__init__()
-
+        self.config = config
         self.hidden_size = config.hidden_size
         if config.tensor_parallel_degree > 1:
             self.word_embeddings = fleet.meta_parallel.VocabParallelEmbedding(
@@ -1006,7 +1006,7 @@ class ChatGLMv2PretrainingCriterion(nn.Layer):
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none")
 
-    def forward(self, prediction_scores, masked_lm_labels, loss_mask=None):
+    def forward(self, prediction_scores, masked_lm_labels):
         """
         Args:
             prediction_scores(Tensor):
@@ -1026,6 +1026,7 @@ class ChatGLMv2PretrainingCriterion(nn.Layer):
 
         """
         with paddle.amp.auto_cast(False):
+            loss_mask = (masked_lm_labels != -100).astype("float32")
             reshaped_logits = prediction_scores.reshape([-1, prediction_scores.shape[-1]]).astype("float32")
             reshaped_labels = masked_lm_labels.reshape([-1])
             loss = self.loss_func(reshaped_logits, reshaped_labels)
@@ -1057,7 +1058,7 @@ class Chatglmv2LMHead(nn.Layer):
                 )
         self.config = config
 
-    def forward(self, hidden_states, return_last_logit):
+    def forward(self, hidden_states, return_last_logit=False):
         if return_last_logit:
             hidden_states = hidden_states[-1:]
         if self.config.sequence_parallel:
@@ -1181,8 +1182,7 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
         # shape = [batch_size, seq_length, vocab_size]
         loss = None
         if labels is not None:
-            loss_mask = (labels != -100).astype("float32")
-            loss = self.criterion(lm_logits, labels, loss_mask)
+            loss = self.criterion(lm_logits, labels)
             lm_logits = lm_logits.astype(hidden_states.dtype)
             loss = loss.astype(hidden_states.dtype)
 
