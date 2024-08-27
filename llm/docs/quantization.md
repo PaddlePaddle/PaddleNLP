@@ -131,8 +131,6 @@ python run_finetune.py ./config/llama/ceval_quant_argument.json
 - `search_scale_min`: 分段搜索时 scale 最小值，默认为1.0。
 - `search_scale_max`: 分段搜索时 scale 最大值，默认为5.0。
 - `load_quant_model`: 是否加载量化模型，默认为 False。用于验证量化后的模型效果， 若设为True，则从output_dir中加载权重。启动该过程需要设`do_ptq`为 False。如果量化时使用了smooth或shift，加载时需要保持相同的配置（shift_step/search_step可设为8）。注意，当前该函数只支持pdparams格式加载，若要使用该功能，设置`"unified_checkpoint": false`。
-- `do_quant_debug`: 是否进行量化调试，默认为 False。若设为True，则在量化完后测试一条样本的模型输出结果。
-- `test_sample`: 测试样本，配合`do_quant_debug`使用，默认为None。若设为空字符串则使用"介绍一下你自己。"作为样本。
 - `skip_list_names`: 需要量化跳过的层名称列表，默认为空列表。可以使用层名的部分字符串作为匹配，如['down_proj']表示跳过所有ffn2层。
 - `do_gptq`: 是否进行 GPTQ 量化，GPTQ 对模型进行 WINT4量化，相比于普通 PTQ 量化精度更高，量化时间较长。默认为 False。
 - `gptq_step`: GPTQ 量化步数，也即模型前向次数，默认为8。

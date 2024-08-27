@@ -732,30 +732,5 @@ def main():
         elif 'Qwen' in model_args.model_name_or_path:
             from experimental.ceval.default.eval import run_eval
             run_eval(tokenizer, trainer.model, ceval_args)
-
-    if quant_args.test_sample is not None:
-        test_sample = quant_args.test_sample
-    else:
-        test_sample = "介绍一下你自己。"
-
-    if quant_args.do_quant_debug:
-        from utils.quant import add_quant_inp_out_hook, save_dict
-        os.makedirs('./debug',exist_ok=True)
-        def tag_func(name):
-            tag1 = 'activation_quanter_k'
-            tag2 = 'activation_quanter_v'
-            if len(name) > len(tag1) and \
-                name[-len(tag1):] == tag1 or name[-len(tag2):] == tag2:
-                return True
-            return False
-        inp_dict, out_dict = add_quant_inp_out_hook(trainer.model, tag_func)
-        logger.info("Test one sample")
-        input_features = tokenizer(test_sample, return_tensors="pd")
-        outputs = trainer.model.generate(**input_features, max_length=3)
-        print(tokenizer.batch_decode(outputs[0]))
-        save_dict(inp_dict, "debug/input.pkl")
-        save_dict(out_dict, "debug/output.pkl")
-
-
 if __name__ == "__main__":
     main()
