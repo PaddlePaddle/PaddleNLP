@@ -42,9 +42,7 @@ from paddleslim.quant.observers import (
     AbsMaxChannelWiseWeightObserver,
     AVGObserver,
     GroupWiseWeightObserver,
-    AvgHeadwiseObserver,
 )
-# from paddleslim.quant.observers.avg_headwise import AvgHeadwiseObserverLayer
 
 from paddleslim.common.wrapper_function import FuncWrapper
 from experimental.layers.custom_attention import QuantizedCustomAttentionLayer
@@ -61,8 +59,6 @@ from paddlenlp.peft.lora.lora_quant_layers import (
     RowParallelQuantedLoRALinear,
 )
 from paddlenlp.utils.log import logger
-
-from paddlenlp.transformers.model_utils import load_sharded_checkpoint
 
 from experimental.observer.avg_headwise import AvgHeadwiseObserver
 from experimental.observer.channel_wise import ChannelWiseObserver
@@ -322,6 +318,9 @@ def load_quant_model(model, quant_args, load_quant_path,dtype="float32", skip_li
     """
     activation, weight, cachekv, q_config = prepare_qconfig(quant_args)
     
+    if cachekv is not None:
+        set_wrapper_for_attn(model)
+    
     for cur_name, cur_layer in model.named_sublayers():
         skip = False
         for k in skip_list_names:
@@ -407,6 +406,9 @@ def apply_ptq(quant_args, trainer, ptq_dataloader):
     logger.info("***** Running PTQ *****")
     activation, weight, cachekv, q_config = prepare_qconfig(quant_args)
 
+    if cachekv is not None:
+        set_wrapper_for_attn(trainer.model)
+    
     skip_list_names = [] if quant_args.skip_list_names is None else quant_args.skip_list_names
 
     for cur_name, cur_layer in trainer.model.named_sublayers():
@@ -422,6 +424,7 @@ def apply_ptq(quant_args, trainer, ptq_dataloader):
             q_config.add_name_config([cur_layer.full_name()], activation=activation, weight=weight)
     
         if cachekv is not None and type(cur_layer) in [FuncWrapper]:
+            logger.info(f"PTQ layer: {cur_name}")
             # set both act and weight for attention, actually act-k and act-v are quantized
             q_config.add_name_config([cur_layer.full_name()], weight=cachekv[0], activation=cachekv[1])
     
@@ -495,6 +498,11 @@ def apply_gptq(quant_args, trainer, ptq_dataloader):
             setattr(parent_layer, sub_name, cur_layer)
     logger.info("***** GPTQ done *****")
 
+def set_wrapper_for_attn(model:nn.Layer, attn_name='attn_func'):
+    for cur_name, cur_layer in model.named_sublayers():
+        if hasattr(cur_layer, attn_name):
+            logger.info(f"Set wrapper for {attn_name} in {cur_name}")
+            cur_layer.attn_func = FuncWrapper(cur_layer.attn_func)
 
 def get_ptq_model_config(model):
     if isinstance(model, PrefixModelForCausalLM):

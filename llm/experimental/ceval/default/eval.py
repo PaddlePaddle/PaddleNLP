@@ -107,7 +107,7 @@ def run_eval(tokenizer, model, ceval_args):
     choices = ["A", "B", "C", "D"]
     evaluator = ModelEvaluator(choices=choices, k=ceval_args.ntrain, tokenizer=tokenizer, model=model, temperature=ceval_args.temperature)
     for i in range(ceval_args.n_times):
-        run_eval_one_time(ceval_args, evaluator=evaluator, take=i, data_pth=ceval_args.ceval_data_path)
+        run_eval_one_time(ceval_args, evaluator=evaluator, take=i)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
