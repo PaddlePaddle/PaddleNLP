@@ -527,6 +527,7 @@ def main():
         or training_args.sequence_parallel
         or training_args.autotuner_benchmark
         or data_args.zero_padding
+        or data_args.pad_to_max_length
     ):
         # NOTE(gongenlei): new add autotuner_benchmark
         max_length = data_args.max_length
