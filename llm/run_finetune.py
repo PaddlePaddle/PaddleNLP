@@ -36,13 +36,14 @@ from paddlenlp.datasets import (
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import (
     LoRAConfig,
+    LoRALinear,
     LoRAModel,
     PrefixConfig,
     PrefixModelForCausalLM,
     VeRAConfig,
     VeRAModel,
 )
-from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
+from paddlenlp.trainer import PdArgumentParser, TrainerCallback, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
@@ -560,6 +561,17 @@ def main():
         gen_args=gen_args,
         data_args=data_args,
     )
+
+    class CallbackStep(TrainerCallback):
+        def on_step_begin(self, args, state, control, model, **kwargs):
+            for module in model.sublayers():
+                if isinstance(module, LoRALinear):
+                    maximum_rank = module.get_dimension()
+
+                    new_rank = paddle.randint(low=0, high=maximum_rank, shape=[1]).item()
+                    module.set_rank(new_rank, frozen=True)
+
+    trainer.add_callback(CallbackStep)
 
     # Evaluation dev set
     if training_args.do_eval:

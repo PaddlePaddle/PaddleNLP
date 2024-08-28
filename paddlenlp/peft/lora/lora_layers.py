@@ -47,6 +47,7 @@ from ...transformers.mc2_parallel_linear import (
     MC2RowParallelCoreLinear,
     MC2RowSeqParallelCoreLinear,
 )
+from .DyLoRA import dynamic
 from .lora_quick_layers import quick_lora
 
 
@@ -95,6 +96,10 @@ class LoRALinear(nn.Linear):
                 learning_rate=lora_plus_scale,
             ),
         )
+
+        self.nd_lora_A = dynamic(maximum_rank=self.r)
+        self.nd_lora_B = dynamic(maximum_rank=self.r)
+
         self.apply_pissa = False
 
         if not rslora and not pissa:
@@ -112,6 +117,18 @@ class LoRALinear(nn.Linear):
     @property
     def use_quick_lora(self):
         return self._use_quick_lora and self.training and not self.merged
+
+    def get_dimension(self):
+        assert self.nd_lora_A.get_dimension() == self.nd_lora_B.get_dimension()
+        return self.nd_lora_A.get_dimension()
+
+    def get_rank(self):
+        assert self.nd_lora_A.get_rank() == self.nd_lora_B.get_rank()
+        return self.nd_lora_A.get_rank()
+
+    def set_rank(self, rank, frozen=False):
+        self.nd_lora_A.set_rank(rank, frozen=frozen)
+        self.nd_lora_B.set_rank(rank, frozen=frozen)
 
     def pissa_init(self, rank):
         weight = self.weight
@@ -155,7 +172,10 @@ class LoRALinear(nn.Linear):
             result = quick_lora(input, self.lora_A, self.lora_B, self.weight, self.bias, self.scaling)
         else:
             result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
-            result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
+            lora_A = self.nd_lora_A(self.lora_A)
+            lora_B = self.nd_lora_B(self.lora_B.T).T
+            result += (self.lora_dropout(input) @ lora_A @ lora_B) * self.scaling
+            # result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
         return result
 
     def extra_repr(self):

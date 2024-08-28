@@ -25,6 +25,7 @@ from ...quantization.quantization_linear import (
     QuantizationLinear,
     RowParallelQuantizationLinear,
 )
+from .DyLoRA import dynamic
 
 
 class QuantizationLoRALinear(QuantizationLinear):
@@ -108,6 +109,21 @@ class QuantizationLoRALinear(QuantizationLinear):
         self.scaling = self.lora_alpha / self.r
         self.disable_lora = False
 
+        self.nd_lora_A = dynamic(maximum_rank=self.r)
+        self.nd_lora_B = dynamic(maximum_rank=self.r)
+
+    def get_dimension(self):
+        assert self.nd_lora_A.get_dimension() == self.nd_lora_B.get_dimension()
+        return self.nd_lora_A.get_dimension()
+
+    def get_rank(self):
+        assert self.nd_lora_A.get_rank() == self.nd_lora_B.get_rank()
+        return self.nd_lora_A.get_rank()
+
+    def set_rank(self, rank, frozen=False):
+        self.nd_lora_A.set_rank(rank, frozen=frozen)
+        self.nd_lora_B.set_rank(rank, frozen=frozen)
+
     def dequantize_weight(self):
         if self.quant_algo in ["fp4", "nf4"]:
             new_weight = (
@@ -177,7 +193,10 @@ class QuantizationLoRALinear(QuantizationLinear):
     def forward(self, x: paddle.Tensor):
         result = super().forward(x)
         if not self.merged and not self.disable_lora:
-            result += (self.lora_dropout(x) @ self.lora_A @ self.lora_B) * self.scaling
+            lora_A = self.nd_lora_A(self.lora_A)
+            lora_B = self.nd_lora_B(self.lora_B.T).T
+            result += (self.lora_dropout(x) @ lora_A @ lora_B) * self.scaling
+            # result += (self.lora_dropout(x) @ self.lora_A @ self.lora_B) * self.scaling
         return result
 
 
