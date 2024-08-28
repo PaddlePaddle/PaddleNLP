@@ -551,7 +551,13 @@ class TrainingArguments:
     )
     sharding_comm_buffer_size_MB: int = field(
         default=-1,
-        metadata={"help": ("Sharding fused comm buffer size in communication between sharding ranks. ")},
+        metadata={
+            "help": (
+                "Set the size of the fuse gradient in sharding communication. This option only takes effect when "
+                "the sharding option is turned on.The default value is -1, which means that the gradient size of "
+                "all communication fuses follows the default configuration, which is 256MB. "
+            )
+        },
     )
 
     save_sharded_model: bool = field(
