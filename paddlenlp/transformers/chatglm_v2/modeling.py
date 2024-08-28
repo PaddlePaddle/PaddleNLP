@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import math
 from functools import partial
 from typing import Any, Dict, List, Optional, Tuple
@@ -59,6 +60,20 @@ __all__ = [
     "ChatGLMv2PretrainedModel",
     "ChatGLMv2ForCausalLM",
 ]
+
+
+def seed_guard_context(name=None):
+    if (
+        not isinstance(paddle.base.framework._current_expected_place(), paddle.core.CPUPlace)
+        and name in get_rng_state_tracker().states_
+    ):
+        # todo fix it
+        #  ValueError: Length of gpu state list should be equal to the gpu device count
+        #  /usr/local/lib/python3.10/dist-packages/paddle/incubate/framework/random.py:119: ValueError
+        # return contextlib.nullcontext()
+        return get_rng_state_tracker().rng_state(name)
+    else:
+        return contextlib.nullcontext()
 
 
 def parallel_matmul(lm_output, logit_weights, parallel_output):
@@ -227,7 +242,8 @@ class CoreAttention(nn.Layer):
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
-        attention_probs = self.attention_dropout(attention_probs)
+        with seed_guard_context("local_seed"):
+            attention_probs = self.attention_dropout(attention_probs)
         # [batch_size, num_heads, query_length, key_length]
 
         # value_layer -> context layer.
@@ -318,14 +334,25 @@ class SelfAttention(nn.Layer):
             self.dense = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=config.add_bias_linear)
 
     def _flash_attention(self, q, k, v, attention_mask=None, output_attentions=False):
-        out, weights = flash_attention(
-            query=q,
-            key=k,
-            value=v,
-            dropout=self.config.attention_dropout,
-            causal=q.shape[0] != 1,
-            return_softmax=output_attentions,
-        )
+        """
+        q: [seq_len, bs, num_head, head_dim]
+        k: [seq_len, bs, num_head, head_dim]
+        v: [seq_len, bs, num_head, head_dim]
+        """
+        q = q.transpose([1, 0, 2, 3])
+        k = k.transpose([1, 0, 2, 3])
+        v = v.transpose([1, 0, 2, 3])
+
+        with seed_guard_context("local_seed"):
+            out, weights = flash_attention(
+                query=q,
+                key=k,
+                value=v,
+                dropout=self.config.attention_dropout,
+                causal=q.shape[0] != 1,
+                return_softmax=output_attentions,
+                trainging=self.training,
+            )
         # [bs, seq_len, num_head, head_dim] -> [bs, seq_len, num_head * head_dim]
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
         return (out, weights) if output_attentions else out
@@ -543,7 +570,10 @@ class GLMBlock(nn.Layer):
         else:
             residual = hidden_states
 
-        layernorm_input = F.dropout(attention_output, p=self.hidden_dropout, training=self.training)
+        current_seed = "local_seed" if self.config.sequence_parallel else "global_seed"
+
+        with seed_guard_context(current_seed):
+            layernorm_input = F.dropout(attention_output, p=self.hidden_dropout, training=self.training)
         layernorm_input = residual + layernorm_input
 
         # Layer norm post the self attention.
@@ -558,7 +588,8 @@ class GLMBlock(nn.Layer):
         else:
             residual = layernorm_input
 
-        output = F.dropout(mlp_output, p=self.hidden_dropout, training=self.training)
+        with seed_guard_context(current_seed):
+            output = F.dropout(mlp_output, p=self.hidden_dropout, training=self.training)
         output = residual + output
         return output, kv_cache
 
