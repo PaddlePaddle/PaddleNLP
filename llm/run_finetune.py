@@ -18,6 +18,7 @@ from functools import partial
 
 import paddle
 from utils.argument import (
+    CEvalArgument,
     DataArgument,
     GenerateArgument,
     ModelArgument,
@@ -25,14 +26,6 @@ from utils.argument import (
     TrainingArguments,
 )
 from utils.data import get_convert_example
-from utils.utils import (
-    CausalLMTrainer,
-    ZeroPaddingIterDatasetCallback,
-    compute_metrics,
-    get_lora_target_modules,
-    get_prefix_tuning_params,
-    init_chat_template,
-)
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import (
@@ -62,10 +55,15 @@ from paddlenlp.transformers import (
     LlamaTokenizer,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
+from paddlenlp.utils.llm_utils import (
+    CausalLMTrainer,
+    ZeroPaddingIterDatasetCallback,
+    compute_metrics,
+    get_lora_target_modules,
+    get_prefix_tuning_params,
+    init_chat_template,
+)
 from paddlenlp.utils.log import logger
-
-
-from utils.argument import CEvalArgument
 
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "False"
@@ -74,7 +72,9 @@ flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
 
 
 def main():
-    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments, CEvalArgument))
+    parser = PdArgumentParser(
+        (GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments, CEvalArgument)
+    )
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         gen_args, quant_args, model_args, data_args, training_args, ceval_args = parser.parse_json_file_and_cmd_lines()
     else:
@@ -90,6 +90,7 @@ def main():
             "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
         )
 
+    # Setup GPU & distributed training
     paddle.set_device(training_args.device)
     logger.warning(
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
@@ -337,7 +338,7 @@ def main():
 
     if data_args.zero_padding:
         if (
-            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen", "mistral"]
+            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen", "mistral", "jamba"]
             and training_args.pipeline_parallel_degree < 1
         ):
             raise NotImplementedError(
@@ -386,6 +387,7 @@ def main():
                 train_ds,
                 tokenizer=tokenizer,
                 max_length=data_args.max_length,
+                greedy_zero_padding=data_args.greedy_zero_padding,
             )
             if train_ds is not None
             else None
@@ -395,6 +397,7 @@ def main():
                 ptq_ds,
                 tokenizer=tokenizer,
                 max_length=data_args.max_length,
+                greedy_zero_padding=data_args.greedy_zero_padding,
             )
             if ptq_ds is not None
             else None
@@ -552,7 +555,6 @@ def main():
         data_args=data_args,
     )
 
-        
     # Evaluation dev set
     if training_args.do_eval:
         before_eval_result = trainer.evaluate(dev_ds)
@@ -569,7 +571,7 @@ def main():
             neft_post_hook_handle.remove()
         if training_args.benchmark:
             total_effective_tokens = (
-                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * training_args.num_train_epochs
+                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * train_result.metrics["progress_or_epoch"]
             )
             effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
             logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
@@ -664,7 +666,6 @@ def main():
         apply_gptq(quant_args, trainer, ptq_dataloader)
         trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
 
-
     # Evaluation test set
     if training_args.do_predict:
         test_ds = load_dataset(
@@ -694,7 +695,7 @@ def main():
             apply_shift,
             apply_smooth,
             get_ptq_model_config,
-            load_quant_model
+            load_quant_model,
         )
 
         trainer.model.eval()
@@ -730,7 +731,9 @@ def main():
         logger.info("*** Evaluate on C-Eval ***")
         ceval_args.output_dir = training_args.output_dir
         from experimental.ceval.default.eval import run_eval
+
         run_eval(tokenizer, trainer.model, ceval_args)
+
 
 if __name__ == "__main__":
     main()
