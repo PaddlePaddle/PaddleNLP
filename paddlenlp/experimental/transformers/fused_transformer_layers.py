@@ -18,7 +18,7 @@ from typing import List, Optional
 
 import paddle
 import paddle.distributed as dist
-from paddle.framework import LayerHelper, core, in_dynamic_mode, in_dynamic_or_pir_mode
+from paddle.framework import core, in_dynamic_mode
 from paddle.incubate.nn.functional import (
     fused_bias_act,
     fused_layer_norm,
