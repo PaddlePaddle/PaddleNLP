@@ -18,6 +18,7 @@ from functools import partial
 
 import paddle
 from utils.argument import (
+    CEvalArgument,
     DataArgument,
     GenerateArgument,
     ModelArgument,
@@ -71,14 +72,14 @@ flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
 
 
 def main():
-    # Arguments
-    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
-    # Support format as "args.json --arg1 value1 --arg2 value2.”
-    # In case of conflict, command line arguments take precedence.
+    parser = PdArgumentParser(
+        (GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments, CEvalArgument)
+    )
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+        gen_args, quant_args, model_args, data_args, training_args, ceval_args = parser.parse_json_file_and_cmd_lines()
     else:
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        gen_args, quant_args, model_args, data_args, training_args, ceval_args = parser.parse_args_into_dataclasses()
+
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     training_args.print_config(quant_args, "Quant")
@@ -100,11 +101,6 @@ def main():
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        # if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
-        #     raise ValueError(
-        #         f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-        #         "Use --overwrite_output_dir to overcome."
-        #     )
         if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
@@ -233,7 +229,7 @@ def main():
             )[0]
         else:
             dev_ds = None
-        if quant_args.do_ptq or quant_args.do_gptq:
+        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
             if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
                 ptq_ds = load_dataset(
                     "json",
@@ -278,7 +274,7 @@ def main():
             )[0]
         else:
             dev_ds = None
-        if quant_args.do_ptq or quant_args.do_gptq:
+        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
             if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant")):
                 ptq_ds = load_dataset(
                     "json",
@@ -307,7 +303,7 @@ def main():
             dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
         else:
             dev_ds = None
-        if quant_args.do_ptq or quant_args.do_gptq:
+        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
             ptq_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
             logger.info("Set train dataset as PTQ calibration dataset.")
         else:
@@ -559,6 +555,10 @@ def main():
         data_args=data_args,
     )
 
+    # Evaluation dev set
+    if training_args.do_eval:
+        before_eval_result = trainer.evaluate(dev_ds)
+
     # Train
     if training_args.do_train:
         checkpoint = None
@@ -666,11 +666,6 @@ def main():
         apply_gptq(quant_args, trainer, ptq_dataloader)
         trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
 
-    # Evaluation dev set
-    if training_args.do_eval:
-        eval_result = trainer.evaluate(dev_ds)
-        trainer.log_metrics("eval", eval_result)
-
     # Evaluation test set
     if training_args.do_predict:
         test_ds = load_dataset(
@@ -688,6 +683,56 @@ def main():
             )
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
+
+    if quant_args.load_quant_model and not quant_args.do_ptq:
+        if isinstance(model, LoRAModel):
+            raise NotImplementedError(
+                "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
+            )
+        from utils.quant import (
+            apply_autoclip,
+            apply_ptq,
+            apply_shift,
+            apply_smooth,
+            get_ptq_model_config,
+            load_quant_model,
+        )
+
+        trainer.model.eval()
+        trainer.model.config.quantization_config.quant_type = quant_args.quant_type
+        trainer.model.config.quantization_config.smooth = quant_args.smooth
+        trainer.model.config.quantization_config.shift = quant_args.shift
+        trainer.model.config.quantization_config.shift_smooth_all_linears = (
+            quant_args.smooth_all_linears or quant_args.shift_all_linears
+        )
+        ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
+        if quant_args.shift or quant_args.smooth:
+            ptq_model_config = get_ptq_model_config(trainer.model)
+
+        if quant_args.shift:
+            apply_shift(quant_args, trainer, ptq_dataloader, ptq_model_config)
+
+        if quant_args.smooth:
+            apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config)
+
+        load_quant_model(trainer.model, quant_args, training_args.output_dir)
+
+    # Evaluation dev set
+    if training_args.do_eval:
+
+        logger.info("*** Evaluate result before train/ptq/qat/ etc.***")
+        trainer.log_metrics("eval", before_eval_result)
+
+        logger.info("*** Evaluate result after train/ptq/qat/ etc.***")
+        eval_result = trainer.evaluate(dev_ds)
+        trainer.log_metrics("eval", eval_result)
+
+    if training_args.do_ceval:
+        logger.info("*** Evaluate on C-Eval ***")
+        ceval_args.output_dir = training_args.output_dir
+        from experimental.ceval.default.eval import run_eval
+
+        run_eval(tokenizer, trainer.model, ceval_args)
 
 
 if __name__ == "__main__":
