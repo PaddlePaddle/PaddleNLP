@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,7 +36,6 @@ def run_eval_one_time(args, evaluator, take):
     subject_list = [val_file.replace("_val.csv", "") for val_file in filenames]
     accuracy, summary = {}, {}
 
-    # run_date = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime(time.time()))
     output_dir = args.output_dir
     save_result_dir = os.path.join(output_dir, f"take{take}")
     if not os.path.exists(save_result_dir):
@@ -44,9 +43,6 @@ def run_eval_one_time(args, evaluator, take):
 
     all_answers = {}
     for index, subject_name in enumerate(subject_list):
-        # print(
-        #     f"{index/len(subject_list)} Inference starts at {run_date} on {args.model_name_or_path} with subject of {subject_name}!"
-        # )
         val_file_path = os.path.join(val_path, f"{subject_name}_val.csv")
         dev_file_path = os.path.join(dev_path, f"{subject_name}_dev.csv")
         test_file_path = os.path.join(test_path, f"{subject_name}_test.csv")
@@ -54,7 +50,6 @@ def run_eval_one_time(args, evaluator, take):
         val_df = pd.read_csv(val_file_path) if args.do_test is False else pd.read_csv(test_file_path)
         dev_df = pd.read_csv(dev_file_path) if args.few_shot else None
 
-        # import pdb;pdb.set_trace()
         correct_ratio, answers = evaluator.eval_subject(
             subject_name,
             val_df,

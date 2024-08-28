@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -90,7 +90,6 @@ class MSEObserverLayer(UniformObserver):
                 self.calibration_loss = mse_loss
                 scale_mse = scale
 
-        # import pdb;pdb.set_trace()
         if self._moving_avg and self._max is not None:
             update_factor = 1.0 / self._current_iters
             update_factor = max(update_factor, self._range_update_factor_min)
