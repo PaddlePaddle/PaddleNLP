@@ -351,10 +351,17 @@ class SelfAttention(nn.Layer):
                 dropout=self.config.attention_dropout,
                 causal=q.shape[0] != 1,
                 return_softmax=output_attentions,
-                trainging=self.training,
+                training=self.training,
             )
         # [bs, seq_len, num_head, head_dim] -> [bs, seq_len, num_head * head_dim]
         out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
+        # [bs, seq_len, num_head * head_dim]-> [seq_len, bs, num_head * head_dim]
+        out = out.transpose([1, 0, 2])
+
+        if self.config.sequence_parallel:
+            sq, bs, hp = out.shape
+            out = out.reshape([sq * bs, hp])
+
         return (out, weights) if output_attentions else out
 
     def _core_attention(self, q, k, v, attention_mask=None, output_attentions=False):
