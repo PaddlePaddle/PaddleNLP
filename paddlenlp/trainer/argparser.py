@@ -136,7 +136,7 @@ class PdArgumentParser(ArgumentParser):
             elif field.default is dataclasses.MISSING:
                 kwargs["required"] = True
         else:
-            kwargs["type"] = field.type
+            kwargs["type"] = json.loads if field.type is dict else field.type
             if field.default is not dataclasses.MISSING:
                 kwargs["default"] = field.default
             elif field.default_factory is not dataclasses.MISSING:
@@ -246,6 +246,8 @@ class PdArgumentParser(ArgumentParser):
             for key, value in data.items():
                 if isinstance(value, list):
                     json_args.extend([f"--{key}", *[str(v) for v in value]])
+                elif isinstance(value, dict):
+                    json_args.extend([f"--{key}", json.dumps(value)])
                 else:
                     json_args.extend([f"--{key}", str(value)])
             return json_args

@@ -26,6 +26,7 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
+from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
 from .argparser import strtobool
 from .trainer import SCALER_NAME, SCHEDULER_NAME, TRAINER_STATE_NAME, TRAINING_ARGS_NAME
@@ -39,6 +40,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     has_length,
     speed_metrics,
 )
+from .utils.ckpt_converter import CheckpointConverter
 from .utils.helper import distributed_file, distributed_isfile  # nested_truncate,
 
 try:
@@ -49,6 +51,7 @@ except:
 MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
 DIST_CKPT_PATH = "dist_ckpt"
+DIST_MODEL_PATH = "dist_model"
 FREE_SVAE_LOAD_KEY_PATTERNS = ["learning_rate_", "gradient_merge_", "@GRAD@MERG", "eager_tmp"]
 
 
@@ -130,12 +133,7 @@ class AutoTrainer(Trainer):
 
     def _wrap_amp_model(self, args, model):
         logger.info("Using half precision")
-        if args.to_static:
-            return
-        self.enable_autocast_context_manager = True
-        self.do_grad_scaling = True if self.args.fp16 else False
         self.amp_dtype = "float16" if self.args.fp16 else "bfloat16"
-        self.scaler = dist.shard_scaler(paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss))
         if self.args.fp16_opt_level == "O2":
             paddle.amp.decorate(
                 models=model,
@@ -144,6 +142,11 @@ class AutoTrainer(Trainer):
                 master_grad=self.args.amp_master_grad,
                 excluded_layers=QuantizationLinear,
             )
+        if args.to_static:
+            return
+        self.enable_autocast_context_manager = True
+        self.do_grad_scaling = True if self.args.fp16 else False
+        self.scaler = dist.shard_scaler(paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss))
 
     def _get_item_from_loss(self, loss):
         if isinstance(loss, paddle.Tensor):
@@ -158,20 +161,43 @@ class AutoTrainer(Trainer):
         if self.args.gradient_accumulation_steps == 1:
             return [inputs]
 
-        # if self.args.to_static:
         if self.args.to_static and self.args.pipeline_parallel_degree > 1:
             return [inputs]
 
         local_batches = [{} for i in range(self.args.gradient_accumulation_steps)]
+        assert isinstance(inputs, dict)
 
-        for key, value in inputs.items():
-            ori_mesh, ori_placements = value.process_mesh, value.placements
-            replicate_value = dist.reshard(value, ori_mesh, [dist.Replicate(), dist.Replicate()])
+        def split_dtensor_by_axis(dtensor, axis):
+            mesh = dtensor.process_mesh
+            placements = [dist.Replicate() for _ in range(len(mesh.shape))]
+            replicate_value = dist.reshard(dtensor, mesh, placements)
             local_datas = replicate_value.split(self.args.gradient_accumulation_steps, axis=0)
+            return local_datas
 
-            for index, data in enumerate(local_datas):
-                local_batches[index].update({key: dist.reshard(data, ori_mesh, ori_placements)})
-
+        for key, dtensors in inputs.items():
+            if isinstance(dtensors, paddle.Tensor):
+                mesh, placements = dtensors.process_mesh, dtensors.placements
+                local_datas = split_dtensor_by_axis(dtensors, 0)
+                for index, data in enumerate(local_datas):
+                    local_batches[index].update({key: dist.reshard(data, mesh, placements)})
+            elif isinstance(dtensors, (list, tuple)):
+                if len(dtensors) == 0:
+                    for i in range(self.args.gradient_accumulation_steps):
+                        local_batches[i].update({key: []})
+                else:
+                    for dtensor in dtensors:
+                        if isinstance(dtensor, paddle.Tensor):
+                            mesh, placements = dtensor.process_mesh, dtensor.placements
+                            local_datas = split_dtensor_by_axis(dtensor, 0)
+                            for index, data in enumerate(local_datas):
+                                if key in local_batches[index].keys():
+                                    local_batches[index][key].append(dist.reshard(data, mesh, placements))
+                                else:
+                                    local_batches[index].update({key: [dist.reshard(data, mesh, placements)]})
+                        else:
+                            raise ValueError(f"unsupported type: {type(dtensor)}")
+            else:
+                raise ValueError(f"unsupported type: {type(dtensors)}")
         return local_batches
 
     def _inner_training_loop(
@@ -285,12 +311,23 @@ class AutoTrainer(Trainer):
 
                 # Skip past any already trained steps if resuming training
                 # We use consumed_samples to reset the status
-                if steps_trained_in_current_epoch > 0:
+                if isinstance(train_dataloader._dataloader, paddle.io.DataLoader) and isinstance(
+                    train_dataloader._dataloader.batch_sampler, NlpDistributedBatchSampler
+                ):
+                    if step == 0:
+                        if steps_trained_progress_bar is not None:
+                            steps_trained_progress_bar.update(steps_trained_in_current_epoch)
+                            steps_trained_progress_bar.close()
+                            steps_trained_progress_bar = None
+                        self._load_rng_state(resume_from_checkpoint)
+                    step += steps_trained_in_current_epoch
+                elif steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
                     if steps_trained_progress_bar is not None:
                         steps_trained_progress_bar.update(1)
                     if steps_trained_in_current_epoch == 0:
                         self._load_rng_state(resume_from_checkpoint)
+                    self.timers and self.timers("read-data").start()
                     continue
                 elif steps_trained_progress_bar is not None:
                     steps_trained_progress_bar.close()
@@ -529,6 +566,18 @@ class AutoTrainer(Trainer):
         with _exec_mode_guard("dynamic"):
             super()._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, **kwargs)
 
+    def _save_model(self):
+        if not self.args.to_static:
+            return
+        with _exec_mode_guard("static"):
+            output_dir = f"{self.args.output_dir}/{DIST_MODEL_PATH}"
+            os.makedirs(output_dir, exist_ok=True)
+            logger.info(f"Saving model files into {output_dir}")
+            model_file = os.path.join(output_dir, "rank_" + str(paddle.distributed.get_rank()) + ".pd_dist_model")
+            if os.path.exists(model_file):
+                os.remove(model_file)
+            paddle.save(self.model_wrapped.dist_main_program("train"), model_file)
+
     def _save_checkpoint(self, model, metrics=None):
 
         # Save model checkpoint
@@ -672,20 +721,18 @@ class AutoTrainer(Trainer):
                             )
                         )
 
-            ckpt_path = os.path.join(resume_from_checkpoint, DIST_CKPT_PATH)
-
-            if not os.path.isdir(ckpt_path):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
-
             if self.args.to_static:
-                opt_state_dict = {
+                if self.model_wrapped._mode is None:
+                    self.model_wrapped.train()
+                model_state_dict = {
+                    key: value
+                    for key, value in self.model_wrapped.state_dict("param").items()
+                    if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
+                }
+                optim_state_dict = {
                     key: value
                     for key, value in self.model_wrapped.state_dict("opt").items()
                     if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
-                }
-                state_dict = {
-                    MODEL_NAME: self.model_wrapped.state_dict("param"),
-                    OPTIMIZER_NAME: opt_state_dict,
                 }
             else:
                 model_state_dict = self.model_wrapped.state_dict()
@@ -698,12 +745,27 @@ class AutoTrainer(Trainer):
                     optim_state_dict = self.optimizer.state_dict()
                     optim_state_dict.pop("LR_Scheduler", None)
 
-                state_dict = {
-                    MODEL_NAME: model_state_dict,
-                    OPTIMIZER_NAME: optim_state_dict,
-                }
+            state_dict = {
+                MODEL_NAME: model_state_dict,
+                OPTIMIZER_NAME: optim_state_dict,
+            }
 
-            self._load_ckpt_func(state_dict, ckpt_path)
+            parameter_to_structured_name = {}
+            if self.args.to_static:
+                parameter_to_structured_name = self.model_wrapped._parameter_to_structured_name
+            else:
+                for state_name, state_value in self.model_wrapped.state_dict().items():
+                    parameter_to_structured_name[state_value.name] = state_name
+
+            if self.args.auto_parallel_resume_form_hybrid_parallel:
+                CheckpointConverter(
+                    resume_from_checkpoint, state_dict, parameter_to_structured_name, self.args
+                ).load_from_hybrid_parallel_checkpoint()
+            else:
+                ckpt_path = os.path.join(resume_from_checkpoint, DIST_CKPT_PATH)
+                if not os.path.isdir(ckpt_path):
+                    raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+                self._load_ckpt_func(state_dict, ckpt_path)
 
             # release memory
             del state_dict

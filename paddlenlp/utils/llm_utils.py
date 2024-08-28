@@ -17,17 +17,19 @@ import glob
 import math
 import os
 import struct
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 import paddle
 import paddle.distributed as dist
+import paddle.distributed.fleet.base.topology as tp
 import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
 
 from paddlenlp.datasets import ZeroPaddingIterableDataset
+from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer import Trainer, TrainerCallback
 from paddlenlp.trainer.trainer_utils import IterableDatasetShard, has_length
 from paddlenlp.transformers import (
@@ -145,7 +147,7 @@ def get_lora_target_modules(model):
         ]
     elif model.base_model_prefix == "bloom":
         target_modules = [".*query_key_value.*", ".*dense.*", ".*dense_h_to_4h.*", ".*dense_4h_to_h.*"]
-    elif model.base_model_prefix == "llama" or isinstance(model, LlamaForCausalLMPipe):
+    elif model.base_model_prefix in ["llama", "jamba"] or isinstance(model, LlamaForCausalLMPipe):
         target_modules = [
             ".*q_proj.*",
             ".*v_proj.*",
@@ -216,6 +218,16 @@ def get_lora_target_modules(model):
             ".*v_proj.*",
             ".*o_proj.*",
             # ".*gate.*", # TODO(DrownFish19): Does the gate weight require training?
+            ".*gate_proj.*",
+            ".*up_proj.*",
+            ".*down_proj.*",
+        ]
+    elif model.base_model_prefix == "yuan":
+        target_modules = [
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*o_proj.*",
             ".*gate_proj.*",
             ".*up_proj.*",
             ".*down_proj.*",
@@ -738,45 +750,11 @@ def get_model_max_position_embeddings(config: PretrainedConfig) -> Optional[int]
     return None
 
 
-def get_default_max_decoding_length(config: PretrainedConfig, default: int = 1024) -> int:
-    """get the default max decoding length from config.
-
-    Args:
-        config (PretrainedConfig): the instance of PretrainedConfig
-        default (int): the default value of max decoding length
-
-    Returns:
-        int: the default max_length of decoding length
-    """
-    max_position_embeddings = get_model_max_position_embeddings(config)
-    if max_position_embeddings is None:
-        return default
-    return max_position_embeddings // 4
-
-
-def get_default_max_encoding_length(config: PretrainedConfig, default: int = 1024) -> int:
-    """get the default max encoding length from config.
-
-    Args:
-        config (PretrainedConfig): the instance of PretrainedConfig
-        default (int): the default value of max encoding length
-
-    Returns:
-        int: the default max_length of encoding length
-    """
-
-    max_position_embeddings = get_model_max_position_embeddings(config)
-    if max_position_embeddings is None:
-        return default
-    return max_position_embeddings // 4 * 3
-
-
 def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue):
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_name_or_path,
-    )
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
     paddle.device.set_device("cpu")
+    paddle.disable_static()
     outputs = []
     output_tensor = tensor_queue.get(timeout=1)
 
@@ -787,13 +765,13 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
 
     while True:
         get_output(output_tensor, 0, True)
-        if output_tensor[0, 0] == -2:  # read none
+        if int(output_tensor[0, 0]) == -2:  # read none
             continue
-        bsz = output_tensor[1, 0].numpy()
+        bsz = int(output_tensor[1, 0])
         output_numpy = output_tensor[2 : bsz + 2].numpy()
-        output_numpy[output_numpy == -1] = 2
+        output_numpy[output_numpy == -1] = tokenizer.eos_token_id
         outputs.append(output_numpy)
-        if output_tensor[0, 0] == -1:
+        if int(output_tensor[0, 0]) == -1:
             break
     output = np.concatenate(outputs, axis=1).tolist()
     seqs = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)
@@ -801,3 +779,97 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
         result_queue.put([i, out, seq])
 
     logger.info("Finish read result message")
+
+
+def get_rotary_position_embedding(position_ids, head_dim, rope_theta=10000.0, rope_scaling: dict = None):
+    """
+    Pre-calculate rotary position embedding for position_ids.
+
+    Args:
+        position_ids: [1, S]
+        head_dim: D
+
+    Returns:
+        rot_emb: [2, 1, S, 1, D], cos + sin
+    """
+    bsz, max_seq_len = position_ids.shape[:2]
+    rot_emb = paddle.zeros((2, bsz, max_seq_len, 1, head_dim), dtype="float32")
+    inv_freq = rope_theta ** (-paddle.arange(0, head_dim, 2, dtype="float32") / head_dim)
+
+    if rope_scaling is not None:
+        rope_type = rope_scaling.get("rope_type", None)
+        if rope_type is not None and rope_type == "llama3":
+            factor = rope_scaling.get("factor", 8.0)
+            low_freq_factor = rope_scaling.get("low_freq_factor", 1.0)
+            high_freq_factor = rope_scaling.get("high_freq_factor", 4.0)
+            original_max_position_embeddings = rope_scaling.get("original_max_position_embeddings", 8192)
+
+            low_freq_wavelen = original_max_position_embeddings / low_freq_factor
+            high_freq_wavelen = original_max_position_embeddings / high_freq_factor
+            new_freqs = []
+            for freq in inv_freq:
+                wavelen = 2 * math.pi / freq
+                if wavelen < high_freq_wavelen:
+                    new_freqs.append(freq)
+                elif wavelen > low_freq_wavelen:
+                    new_freqs.append(freq / factor)
+                else:
+                    assert low_freq_wavelen != high_freq_wavelen
+                    smooth = (original_max_position_embeddings / wavelen - low_freq_factor) / (
+                        high_freq_factor - low_freq_factor
+                    )
+                    new_freqs.append((1 - smooth) * freq / factor + smooth * freq)
+            inv_freq = paddle.to_tensor(new_freqs, dtype=inv_freq.dtype)
+
+    # shape: [B, S, D/2]
+    freqs = paddle.einsum("ij,k->ijk", position_ids.cast("float32"), inv_freq)
+    # shape: [B, S, 1, D]
+    emb = paddle.concat([freqs, freqs], axis=-1).reshape((bsz, max_seq_len, 1, head_dim))
+
+    rot_emb[0] = paddle.cos(emb)
+    rot_emb[1] = paddle.sin(emb)
+    return rot_emb
+
+
+def init_dist_env():
+    tensor_parallel_degree = paddle.distributed.get_world_size()
+    tensor_parallel_rank = paddle.distributed.get_rank()
+
+    if tensor_parallel_degree > 1:
+        # refer to: https://github.com/PaddlePaddle/Paddle/blob/4abea956ee852ce52791a1e08fa92ed4d3be150d/python/paddle/distributed/fleet/fleet.py#L298C23-L298C45
+        hcg = tp._HYBRID_PARALLEL_GROUP
+        if hcg is None:
+            strategy = fleet.DistributedStrategy()
+            strategy.hybrid_configs = {
+                "dp_degree": 1,
+                "mp_degree": tensor_parallel_degree,
+                "pp_degree": 1,
+                "sharding_degree": 1,
+            }
+            fleet.init(is_collective=True, strategy=strategy)
+            hcg = fleet.get_hybrid_communicate_group()
+
+        tensor_parallel_rank = hcg.get_model_parallel_rank()
+    return tensor_parallel_rank, tensor_parallel_degree
+
+
+def get_eos_token_id(
+    tokenizer: PretrainedTokenizer, generation_config: Optional[GenerationConfig] = None
+) -> List[List[int]]:
+    """get eos_token_id from generation_config or tokenizer
+
+    Returns:
+        List[int]: eos_token_id to stop the generation
+    """
+    eos_token_ids = []
+    if tokenizer.eos_token_id is not None:
+        eos_token_ids.append(tokenizer.eos_token_id)
+
+    if generation_config is not None and generation_config.eos_token_id is not None:
+        if isinstance(generation_config.eos_token_id, int):
+            eos_token_ids.append(generation_config.eos_token_id)
+        else:
+            eos_token_ids.extend(generation_config.eos_token_id)
+
+    eos_token_ids_dict = {str(item): item for item in eos_token_ids}
+    return list(eos_token_ids_dict.values())

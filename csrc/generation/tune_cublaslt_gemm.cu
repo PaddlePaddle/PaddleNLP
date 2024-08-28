@@ -327,7 +327,7 @@ void FindAlgo(const cublasLtHandle_t& ltHandle,
                   sizeof(customOption)));
               CUDA_CHECK(cublasLtMatmulAlgoConfigSetAttribute(
                   &algo, CUBLASLT_ALGO_CONFIG_CTA_SWIZZLING, &k, sizeof(k)));
-              int splitK_val = 0;
+              int splitK_val = 1;
               uint32_t redScheme = CUBLASLT_REDUCTION_SCHEME_NONE;
               CUDA_CHECK(cublasLtMatmulAlgoConfigSetAttribute(
                   &algo,
@@ -346,10 +346,10 @@ void FindAlgo(const cublasLtHandle_t& ltHandle,
                     CUBLASLT_ALGO_CONFIG_SPLITK_NUM,
                     &splitKSequenceA[l - 1],
                     sizeof(splitKSequenceA[l - 1])));
-                for (redScheme = 0;
+                for (redScheme = 1;
                      redScheme < (int)CUBLASLT_REDUCTION_SCHEME_MASK &&
                      (AlgoCount < AlgoCombinations);
-                     redScheme++) {
+                     redScheme <<= 1) {
                   CUDA_CHECK(cublasLtMatmulAlgoConfigSetAttribute(
                       &algo,
                       CUBLASLT_ALGO_CONFIG_REDUCTION_SCHEME,
@@ -758,6 +758,9 @@ void TuneCublasltGemm(const paddle::Tensor& M,
         break;
       case 1024:
         step = 1024;
+        break;
+      case 8192:
+        step = 4096;
         break;
     }
   }

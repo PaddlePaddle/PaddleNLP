@@ -1,0 +1,619 @@
+From e479452fdedfd1f0a54cc1134966f2235df14874 Mon Sep 17 00:00:00 2001
+From: bukejiyu <395822456@qq.com>
+Date: Wed, 21 Aug 2024 22:01:52 +0800
+Subject: [PATCH] fp16_bf16
+
+---
+ cmake/mkl.cmake                  |   2 +-
+ cmake/mklml.cmake                |   2 +-
+ cmake/onednn.cmake               |   1 +
+ cmake/xdnn.cmake                 |   2 +-
+ include/dtype.h                  |   5 +
+ include/layers_decoder.h         |  21 +--
+ src/layers/attention.h           |   9 +-
+ src/layers/decoder_layer.cpp     | 256 ++++++++++++++++++++++++-------
+ src/layers/decoder_layer.h       |   4 +-
+ tests/ut/layers_decoder_test.cpp |  52 ++++---
+ 10 files changed, 255 insertions(+), 99 deletions(-)
+
+diff --git a/cmake/mkl.cmake b/cmake/mkl.cmake
+index 0ef2e66..92c6d06 100644
+--- a/cmake/mkl.cmake
++++ b/cmake/mkl.cmake
+@@ -25,7 +25,7 @@ set(MKL_3rdparty_DIR "${CMAKE_SOURCE_DIR}/3rdparty/mkl")
+ if(NOT EXISTS ${MKL_3rdparty_DIR})
+     find_package(Python COMPONENTS Interpreter Development)
+     execute_process(COMMAND ${Python_EXECUTABLE} -m pip install --force-reinstall
+-                            --prefix=${MKL_3rdparty_DIR} mkl-static==2024.0.0 mkl-include==2024.0.0
++                            --prefix=${MKL_3rdparty_DIR} mkl-static==2024.0.0 mkl-include==2024.0.0 -i https://mirrors.aliyun.com/pypi/simple
+                     RESULT_VARIABLE EXIT_CODE)
+ 
+     if(NOT ${EXIT_CODE} EQUAL 0)
+diff --git a/cmake/mklml.cmake b/cmake/mklml.cmake
+index 4baec46..d89ce46 100644
+--- a/cmake/mklml.cmake
++++ b/cmake/mklml.cmake
+@@ -28,7 +28,7 @@ include(ExternalProject)
+ ExternalProject_Add(mklml
+   URL               https://github.com/oneapi-src/oneDNN/releases/download/v0.21/mklml_lnx_2019.0.5.20190502.tgz
+   URL_HASH          MD5=dfcea335652dbf3518e1d02cab2cea97
+-  TIMEOUT           60
++  TIMEOUT           360
+   SOURCE_DIR        ${CMAKE_SOURCE_DIR}/3rdparty/mklml
+   CONFIGURE_COMMAND ""
+   BUILD_COMMAND     ""
+diff --git a/cmake/onednn.cmake b/cmake/onednn.cmake
+index 8efabd1..bfa558a 100644
+--- a/cmake/onednn.cmake
++++ b/cmake/onednn.cmake
+@@ -36,6 +36,7 @@ if(NOT EXISTS ${ONEDNN_3rdparty_DIR})
+     ExternalProject_Add(onednn
+       GIT_REPOSITORY    https://github.com/oneapi-src/oneDNN.git
+       GIT_TAG           v3.5
++      TIMEOUT           360
+       SOURCE_DIR        ${ONEDNN_3rdparty_DIR}
+       BINARY_DIR        ${ONEDNN_3rdparty_DIR}
+       CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory "build" && ${CMAKE_COMMAND} -E chdir "build" ${CMAKE_COMMAND} ${ONEDNN_BUILD_OPTIONS} ..
+diff --git a/cmake/xdnn.cmake b/cmake/xdnn.cmake
+index 7c0e051..721bfe3 100644
+--- a/cmake/xdnn.cmake
++++ b/cmake/xdnn.cmake
+@@ -28,7 +28,7 @@ include(ExternalProject)
+ ExternalProject_Add(xdnn_lib
+   URL               https://github.com/intel/xFasterTransformer/releases/download/IntrinsicGemm/xdnn_v1.5.2.tar.gz
+   URL_HASH          MD5=884f2e1e2c846ff19f33c889681f8dc2
+-  TIMEOUT           120
++  TIMEOUT           360
+   SOURCE_DIR        ${CMAKE_SOURCE_DIR}/3rdparty/xdnn
+   CONFIGURE_COMMAND ""
+   BUILD_COMMAND     ""
+diff --git a/include/dtype.h b/include/dtype.h
+index de72bce..9e0a448 100644
+--- a/include/dtype.h
++++ b/include/dtype.h
+@@ -31,6 +31,7 @@ enum DataType {
+     w8a8_int8,
+     w8a8_int4,
+     w8a8_nf4,
++    fp16_int8,
+     unknown,
+ };
+ 
+@@ -51,4 +52,8 @@ enum ActivationType {
+     SILU,
+ };
+ 
++enum RopeType {
++    LLAMA_ROPE = 0,
++};
++
+ } // namespace xft
+diff --git a/include/layers_decoder.h b/include/layers_decoder.h
+index 34f6aa5..a30e34d 100644
+--- a/include/layers_decoder.h
++++ b/include/layers_decoder.h
+@@ -17,13 +17,14 @@
+ #include "dtype.h"
+ 
+ namespace xft {
+-
+-void invokeLayerLLaMA(DataType dt, ActivationType at, NormType nt, int batchSize, int inputSeqLen, int attHeadDim,
+-        int attHeadNum, int kvHeadNum, int maxPositions, int maxPosEmbed, int pastSeqLen, int currentSeqLen, int step,
+-        int hiddenSize, int intermediateSize, void *output, int outputStride, const void *input, int inputStride,
+-        const float *ln1Gamma, const float *ln1Beta, const void *queryWeight, const void *keyWeight,
+-        const void *valueWeight, const void *attnOutWeight, const float *ln2Gamma, const float *ln2Beta,
+-        const void *gateWeight, const void *upWeight, const void *downWeight, const float *queryBias = nullptr,
+-        const float *keyBias = nullptr, const float *valueBias = nullptr, const float *attnOutBias = nullptr);
+-
+-} // namespace xft
+\ No newline at end of file
++void invokeLayerLLaMA(DataType dt, DataType kvcdt, RopeType rt, ActivationType at, NormType nt, int batchSize,
++        int inputSeqLen, int attHeadDim, int attHeadNum, int kvHeadNum, int maxPositions, int maxPosEmbed,
++        int pastSeqLen, int currentSeqLen, int step, int hiddenSize, int intermediateSize, void *output,
++        int outputStride, const void *input, int inputStride, const float *ln1Gamma, const float *ln1Beta,
++        const void *queryWeight, const void *keyWeight, const void *valueWeight, const void *attnOutWeight,
++        const float *ln2Gamma, const float *ln2Beta, const void *gateWeight, const void *upWeight,
++        const void *downWeight, const float *queryBias = nullptr, const float *keyBias = nullptr,
++        const float *valueBias = nullptr, const float *attnOutBias = nullptr, const void *myqkvWeight = nullptr,
++        const float *gateBias = nullptr, const float *upBias = nullptr, const float *downBias = nullptr,
++        const float *myqkvBias = nullptr);
++} // namespace xft
+diff --git a/src/layers/attention.h b/src/layers/attention.h
+index 092b3d6..b438837 100644
+--- a/src/layers/attention.h
++++ b/src/layers/attention.h
+@@ -84,7 +84,8 @@ public:
+             const float *queryBias, const OriWeiT *keyWeight, const float *keyScale, const float *keyZero,
+             const float *keyBias, const OriWeiT *valueWeight, const float *valueScale, const float *valueZero,
+             const float *valueBias, const OriWeiT *attnOutWeight, const float *attnOutScale, const float *attnOutZero,
+-            const float *attnOutBias, bool doLNorm, const float *gamma1, const float *beta1, bool trans = true) {
++            const float *attnOutBias, bool doLNorm, const float *gamma1, const float *beta1, bool trans = true,
++            const OriWeiT *myqkvWeight = nullptr) {
+         int hiddenSize = ctx->hiddenSize;
+         int headSize = ctx->attHeadSize;
+ 
+@@ -107,7 +108,10 @@ public:
+                     valueWeight + this->startKVHead * headSize * hiddenSize / sizeFactor,
+                     hiddenSize * kvResponsibleCols * sizeof(OriWeiT) / sizeFactor);
+         } else {
+-            int qkvStride = (ctx->attHeadNum + ctx->kvHeadNum + ctx->kvHeadNum) * ctx->attHeadSize;
++            if (myqkvWeight != nullptr) {
++                memcpy(concatBuf, myqkvWeight, hiddenSize * responsibleCols * sizeof(OriWeiT) / sizeFactor);
++            } else {
++                int qkvStride = (ctx->attHeadNum + ctx->kvHeadNum + ctx->kvHeadNum) * ctx->attHeadSize;
+ #pragma omp parallel for
+             for (int i = 0; i < hiddenSize; ++i) {
+                 memcpy(concatBuf + i * responsibleCols / sizeFactor,
+@@ -120,6 +124,7 @@ public:
+                                 + kvResponsibleCols / sizeFactor,
+                         valueWeight + i * qkvStride / sizeFactor + this->startKVHead * headSize / sizeFactor,
+                         kvResponsibleCols * sizeof(OriWeiT) / sizeFactor);
++                }
+             }
+         }
+         float *concatScale = nullptr;
+diff --git a/src/layers/decoder_layer.cpp b/src/layers/decoder_layer.cpp
+index 02f13cb..0f30f21 100644
+--- a/src/layers/decoder_layer.cpp
++++ b/src/layers/decoder_layer.cpp
+@@ -21,19 +21,21 @@
+ #include "layers_mlp.h"
+ #include "mlp_llama.h"
+ #include "rms_norm.h"
++#include "numa_allocator.h"
+ 
+ #include <unordered_map>
+ 
+ namespace xft {
+ 
+-template <typename DataT, typename NormT>
++template <typename DataT, typename KVCacheT, typename RopeT, typename NormT>
+ void LayerLLaMAImpl(DataType dt, ActivationType at, NormType nt, int batchSize, int inputSeqLen, int attHeadDim,
+         int attHeadNum, int kvHeadNum, int maxPositions, int maxPosEmbed, int pastSeqLen, int currentSeqLen, int step,
+         int hiddenSize, int intermediateSize, void *output, int outputStride, const void *input, int inputStride,
+         const float *ln1Gamma, const float *ln1Beta, const void *queryWeight, const void *keyWeight,
+         const void *valueWeight, const void *attnOutWeight, const float *ln2Gamma, const float *ln2Beta,
+         const void *gateWeight, const void *upWeight, const void *downWeight, const float *queryBias,
+-        const float *keyBias, const float *valueBias, const float *attnOutBias) {
++        const float *keyBias, const float *valueBias, const float *attnOutBias,
++        MMHelper *mmHelper, DecoderContext *ctx, KVCacheManager<KVCacheT> *kvCacheMgr,const void *myqkvWeight = nullptr) {
+ 
+     // TODO: will deprecate attention mask in future, so need to change this
+     auto prepareAttnMask = [&](DecoderContext *ctx, int step) {
+@@ -83,67 +85,46 @@ void LayerLLaMAImpl(DataType dt, ActivationType at, NormType nt, int batchSize,
+         return mask;
+     };
+ 
+-    using DECODER = Decoder<Attention<DataT, LlamaRotaryEmbedding, NormT>, LlamaMLP<DataT>>;
+-    static std::unordered_map<std::string, DECODER *> llama_layer_hub;
+-    static MMHelper *mmHelper;
+-    static DecoderContext *ctx;
+-    static KVCacheManager<float16_t> *kvCacheMgr;
+-
+-    std::string actType;
+-    if (at == ActivationType::SILU)
+-        actType = "silu";
+-    else if (at == ActivationType::RELU)
+-        actType = "relu";
+-    else if (at == ActivationType::GELU)
+-        actType = "gelu";
+-    else if (at == ActivationType::SWIGLU)
+-        actType = "swiglu";
+-    else
+-        printf(">> unsupported activation type\n");
+-
+-    if (ctx == nullptr
+-            || (ctx != nullptr && (ctx->hiddenSize != hiddenSize || ctx->intermediateSize != intermediateSize))) {
+-        if (ctx != nullptr) delete ctx;
+-        printf(">> create context: %d %d\n", hiddenSize, intermediateSize);
+-        mmHelper = new MMHelper(Env::getInstance().getEngineKind(), Env::getInstance().getEngineIndex());
+-        ctx = new DecoderContext(1, hiddenSize, attHeadDim, attHeadNum, kvHeadNum, intermediateSize, actType, 1e-6, 0,
+-                0, maxPositions, maxPosEmbed, -1, 0, 1, mmHelper);
+-        if (kvCacheMgr != nullptr) delete kvCacheMgr;
+-        kvCacheMgr = new KVCacheManager<float16_t>(1);
+-    }
+-
++    using DECODER = Decoder<Attention<DataT, RopeT, NormT>, LlamaMLP<DataT>>;
++    DECODER *llama_layer;
++    static xft::Matrix<float> actBuffers ;
++    //static std::unordered_map<std::string, DECODER *> llama_layer_hub;
++    static std::unordered_map<std::string, std::tuple<DECODER*>> llama_layer_hub;
+     // create hash key and value: if hidden and intermediateSize is changed , then memory pointer is also changed.
+     std::stringstream weights_addr;
+     weights_addr << queryWeight << "_" << keyWeight << "_" << valueWeight << "_" << attnOutWeight << "_" << gateWeight
+                  << "_" << upWeight << "_" << downWeight << "_" << dt << "_" << at << "_" << nt << "_" << attHeadDim
+                  << "_" << attHeadNum << "_" << kvHeadNum;
+     std::string llama_layer_key = weights_addr.str();
+-    DECODER *llama_layer;
+ 
+     auto it_created = llama_layer_hub.find(llama_layer_key);
+     if (it_created == llama_layer_hub.end()) {
++        int firstNode = getenv("FIRST_TOKEN_WEIGHT_LOCATION") ? atoi(getenv("FIRST_TOKEN_WEIGHT_LOCATION")) : -1;
++        int nextNode = getenv("NEXT_TOKEN_WEIGHT_LOCATION") ? atoi(getenv("NEXT_TOKEN_WEIGHT_LOCATION")) : -1;
++        if (step == 0)
++                xft_set_preferred_node(firstNode);
++        else
++                xft_set_preferred_node(nextNode);
+         llama_layer = new DECODER(ctx, 0);
+         llama_layer->setWeights(ctx, (const float *)queryWeight, nullptr, nullptr, queryBias, (const float *)keyWeight,
+                 nullptr, nullptr, keyBias, (const float *)valueWeight, nullptr, nullptr, valueBias,
+                 (const float *)attnOutWeight, nullptr, nullptr, attnOutBias, ln1Gamma, ln1Beta,
+                 (const float *)gateWeight, nullptr, nullptr, nullptr, (const float *)upWeight, nullptr, nullptr,
+-                nullptr, ln2Gamma, ln2Beta, (const float *)downWeight, nullptr, nullptr, false);
+-        llama_layer_hub[llama_layer_key] = llama_layer;
+-        printf(">> create llama_layer_key: %s\n", llama_layer_key.c_str());
++                nullptr, ln2Gamma, ln2Beta, (const float *)downWeight, nullptr, nullptr, false,(const float *)myqkvWeight);
++
++
++        llama_layer_hub[llama_layer_key] = std::make_tuple(llama_layer);;
++        // printf(">> create llama_layer_key: %s\n", llama_layer_key.c_str());
++        xft_set_preferred_node(-1);
+     } else {
+-        llama_layer = it_created->second;
++        llama_layer = std::get<0>(it_created->second);
+     }
+-
+-    ctx->resize(batchSize, inputSeqLen, pastSeqLen);
+-    xft::Matrix<float> actBuffers;
+     actBuffers.Resize(batchSize * inputSeqLen * 2, hiddenSize);
++    ctx->resize(batchSize, inputSeqLen, pastSeqLen);
+     float *attnMask = prepareAttnMask(ctx, step);
+ 
+-    int workers = 1;
+-    int headsPerSplit = (ctx->kvHeadNum + workers - 1) / workers;
+-    kvCacheMgr->resize(maxPositions, batchSize, headsPerSplit, attHeadDim);
+-    KVCacheTensor<float16_t> &presentKey = kvCacheMgr->getKey(0);
+-    KVCacheTensor<float16_t> &presentValue = kvCacheMgr->getValue(0);
++    KVCacheTensor<KVCacheT> &presentKey = kvCacheMgr->getKey(0);
++    KVCacheTensor<KVCacheT> &presentValue = kvCacheMgr->getValue(0);
+ 
+     float *attnOut = (float *)(ctx->tmpBuf.Data());
+ 
+@@ -159,45 +140,168 @@ void LayerLLaMAImpl(DataType dt, ActivationType at, NormType nt, int batchSize,
+     llama_layer->forwardFFN(ctx, attnOut, (float *)output, inputStride, outputStride, true);
+ }
+ 
+-void invokeLayerLLaMA(DataType dt, ActivationType at, NormType nt, int batchSize, int inputSeqLen, int attHeadDim,
++template <typename KVCacheT, typename RopeT>
++void LayerLLaMAWrapper(DataType dt, ActivationType at, NormType nt, int batchSize, int inputSeqLen, int attHeadDim,
+         int attHeadNum, int kvHeadNum, int maxPositions, int maxPosEmbed, int pastSeqLen, int currentSeqLen, int step,
+         int hiddenSize, int intermediateSize, void *output, int outputStride, const void *input, int inputStride,
+         const float *ln1Gamma, const float *ln1Beta, const void *queryWeight, const void *keyWeight,
+         const void *valueWeight, const void *attnOutWeight, const float *ln2Gamma, const float *ln2Beta,
+         const void *gateWeight, const void *upWeight, const void *downWeight, const float *queryBias,
+-        const float *keyBias, const float *valueBias, const float *attnOutBias) {
++        const float *keyBias, const float *valueBias, const float *attnOutBias,const void *myqkvWeight=nullptr) {
+     static std::mutex mutex;
+     std::lock_guard<std::mutex> lock(mutex);
+ 
++    std::string actType;
++    if (at == ActivationType::SILU)
++        actType = "silu";
++    else if (at == ActivationType::RELU)
++        actType = "relu";
++    else if (at == ActivationType::GELU)
++        actType = "gelu";
++    else if (at == ActivationType::SWIGLU)
++        actType = "swiglu";
++    else {
++        printf(">> unsupported activation type\n");
++        return;
++    }
++
++    static MMHelper *mmHelper;
++    static DecoderContext *ctx;
++    if (ctx == nullptr
++            || (ctx != nullptr && (ctx->hiddenSize != hiddenSize || ctx->intermediateSize != intermediateSize))) {
++        if (ctx != nullptr) delete ctx;
++        // printf(">> create context: %d %d\n", hiddenSize, intermediateSize);
++        mmHelper = new MMHelper(Env::getInstance().getEngineKind(), Env::getInstance().getEngineIndex());
++        ctx = new DecoderContext(1, hiddenSize, attHeadDim, attHeadNum, kvHeadNum, intermediateSize, actType, 1e-6, 0,
++                0, maxPositions, maxPosEmbed, -1, 0, 1, mmHelper);
++    }
++
++    KVCacheManager<KVCacheT> *kvCacheMgr;
++    static std::unordered_map<std::string, KVCacheManager<KVCacheT> *> kv_hub;
++
++    // create hash key and value: if hidden and intermediateSize is changed , then memory pointer is also changed.
++    std::stringstream layer_key;
++    layer_key << queryWeight << "_" << keyWeight << "_" << valueWeight << "_" << attnOutWeight << "_" << gateWeight
++                 << "_" << upWeight << "_" << downWeight << "_" << dt << "_" << at << "_" << nt << "_" << attHeadDim
++                 << "_" << attHeadNum << "_" << kvHeadNum;
++    std::string kv_hub_key = layer_key.str();
++
++    auto it_created = kv_hub.find(kv_hub_key);
++    if (it_created == kv_hub.end()) {
++        int kvcNode = getenv("KVCACHE_LOCATION") ? atoi(getenv("KVCACHE_LOCATION")) : -1;
++        xft_set_preferred_node(kvcNode);
++        kvCacheMgr = new KVCacheManager<KVCacheT>(1);
++        int workers = 1;
++        int headsPerSplit = (ctx->kvHeadNum + workers - 1) / workers;
++        kvCacheMgr->resize(maxPositions, batchSize, headsPerSplit, attHeadDim);
++        kv_hub[kv_hub_key] = kvCacheMgr;
++        // printf(">> create kv_hub_key: %s\n", kv_hub_key.c_str());
++        xft_set_preferred_node(-1);
++    } else {
++        kvCacheMgr = it_created->second;
++    }
++
+     if (dt == DataType::bf16) {
+-        if (nt == NormType::RMS)
+-            LayerLLaMAImpl<bfloat16_t, RmsNorm>(dt, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++        if (nt == NormType::RMS) {
++            LayerLLaMAImpl<bfloat16_t, KVCacheT, RopeT, RmsNorm>(dt, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
+                     maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step, hiddenSize, intermediateSize, output,
+                     outputStride, input, inputStride, ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight,
+                     attnOutWeight, ln2Gamma, ln2Beta, gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias,
+-                    attnOutBias);
+-        else if (nt == NormType::LN) {
+-            LayerLLaMAImpl<bfloat16_t, LayerNorm>(dt, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++                    attnOutBias, mmHelper, ctx, kvCacheMgr,myqkvWeight);
++        } else if (nt == NormType::LN) {
++            LayerLLaMAImpl<bfloat16_t, KVCacheT, RopeT, LayerNorm>(dt, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
+                     maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step, hiddenSize, intermediateSize, output,
+                     outputStride, input, inputStride, ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight,
+                     attnOutWeight, ln2Gamma, ln2Beta, gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias,
+-                    attnOutBias);
++                    attnOutBias, mmHelper, ctx, kvCacheMgr,myqkvWeight);
+         } else {
+             printf(">> unsupported norm type\n");
+         }
+     } else if (dt == DataType::fp16) {
+-        if (nt == NormType::RMS)
+-            LayerLLaMAImpl<float16_t, RmsNorm>(dt, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++        if (nt == NormType::RMS) {
++            LayerLLaMAImpl<float16_t, KVCacheT, RopeT, RmsNorm>(dt, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
+                     maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step, hiddenSize, intermediateSize, output,
+                     outputStride, input, inputStride, ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight,
+                     attnOutWeight, ln2Gamma, ln2Beta, gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias,
+-                    attnOutBias);
+-        else if (nt == NormType::LN) {
+-            LayerLLaMAImpl<float16_t, LayerNorm>(dt, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++                    attnOutBias, mmHelper, ctx, kvCacheMgr,myqkvWeight);
++        } else if (nt == NormType::LN) {
++            LayerLLaMAImpl<float16_t, KVCacheT, RopeT, LayerNorm>(dt, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
+                     maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step, hiddenSize, intermediateSize, output,
+                     outputStride, input, inputStride, ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight,
+                     attnOutWeight, ln2Gamma, ln2Beta, gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias,
+-                    attnOutBias);
++                    attnOutBias, mmHelper, ctx, kvCacheMgr,myqkvWeight);
++        } else {
++            printf(">> unsupported norm type\n");
++        }
++    } else if (dt == DataType::bf16_int8) {
++        if (nt == NormType::RMS) {
++            auto firstTokenFunc = LayerLLaMAImpl<bfloat16_t, KVCacheT, RopeT, RmsNorm>;
++            auto nextTokenFunc = LayerLLaMAImpl<int8_t, KVCacheT, RopeT, RmsNorm>;
++            if (step == 0) {
++                    firstTokenFunc(DataType::bf16, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++                        maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step, hiddenSize, intermediateSize, output,
++                        outputStride, input, inputStride, ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight,
++                        attnOutWeight, ln2Gamma, ln2Beta, gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias,
++                        attnOutBias, mmHelper, ctx, kvCacheMgr,myqkvWeight);
++
++            } else {
++                    nextTokenFunc(DataType::int8, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++                        maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step, hiddenSize, intermediateSize, output,
++                        outputStride, input, inputStride, ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight,
++                        attnOutWeight, ln2Gamma, ln2Beta, gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias,
++                        attnOutBias, mmHelper, ctx, kvCacheMgr,myqkvWeight);
++            }
++        } else if (nt == NormType::LN) {
++            auto firstTokenFunc = LayerLLaMAImpl<bfloat16_t, KVCacheT, RopeT, LayerNorm>;
++            auto nextTokenFunc = LayerLLaMAImpl<int8_t, KVCacheT, RopeT, LayerNorm>;
++            if (step == 0)
++                    firstTokenFunc(DataType::bf16, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++                        maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step, hiddenSize, intermediateSize, output,
++                        outputStride, input, inputStride, ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight,
++                        attnOutWeight, ln2Gamma, ln2Beta, gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias,
++                        attnOutBias, mmHelper, ctx, kvCacheMgr,myqkvWeight);
++            else
++                    nextTokenFunc(DataType::int8, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++                        maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step, hiddenSize, intermediateSize, output,
++                        outputStride, input, inputStride, ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight,
++                        attnOutWeight, ln2Gamma, ln2Beta, gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias,
++                        attnOutBias, mmHelper, ctx, kvCacheMgr,myqkvWeight);
++        } else {
++            printf(">> unsupported norm type\n");
++        }
++    } else if (dt == DataType::fp16_int8) {
++        if (nt == NormType::RMS) {
++            auto firstTokenFunc = LayerLLaMAImpl<float16_t, KVCacheT, RopeT, RmsNorm>;
++            auto nextTokenFunc = LayerLLaMAImpl<int8_t, KVCacheT, RopeT, RmsNorm>;
++            if (step == 0) {
++                    firstTokenFunc(DataType::fp16, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++                        maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step, hiddenSize, intermediateSize, output,
++                        outputStride, input, inputStride, ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight,
++                        attnOutWeight, ln2Gamma, ln2Beta, gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias,
++                        attnOutBias, mmHelper, ctx, kvCacheMgr,myqkvWeight);
++
++            } else {
++                    nextTokenFunc(DataType::int8, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++                        maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step, hiddenSize, intermediateSize, output,
++                        outputStride, input, inputStride, ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight,
++                        attnOutWeight, ln2Gamma, ln2Beta, gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias,
++                        attnOutBias, mmHelper, ctx, kvCacheMgr,myqkvWeight);
++            }
++        } else if (nt == NormType::LN) {
++            auto firstTokenFunc = LayerLLaMAImpl<bfloat16_t, KVCacheT, RopeT, LayerNorm>;
++            auto nextTokenFunc = LayerLLaMAImpl<int8_t, KVCacheT, RopeT, LayerNorm>;
++            if (step == 0)
++                    firstTokenFunc(DataType::fp16, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++                        maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step, hiddenSize, intermediateSize, output,
++                        outputStride, input, inputStride, ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight,
++                        attnOutWeight, ln2Gamma, ln2Beta, gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias,
++                        attnOutBias, mmHelper, ctx, kvCacheMgr,myqkvWeight);
++            else
++                    nextTokenFunc(DataType::int8, at, nt, batchSize, inputSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++                        maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step, hiddenSize, intermediateSize, output,
++                        outputStride, input, inputStride, ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight,
++                        attnOutWeight, ln2Gamma, ln2Beta, gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias,
++                        attnOutBias, mmHelper, ctx, kvCacheMgr,myqkvWeight);
+         } else {
+             printf(">> unsupported norm type\n");
+         }
+@@ -206,4 +310,40 @@ void invokeLayerLLaMA(DataType dt, ActivationType at, NormType nt, int batchSize
+     }
+ }
+ 
++void invokeLayerLLaMA(DataType dt, DataType kvcdt, RopeType rt, ActivationType at, NormType nt, int batchSize, int inputSeqLen, int attHeadDim,
++        int attHeadNum, int kvHeadNum, int maxPositions, int maxPosEmbed, int pastSeqLen, int currentSeqLen, int step,
++        int hiddenSize, int intermediateSize, void *output, int outputStride, const void *input, int inputStride,
++        const float *ln1Gamma, const float *ln1Beta, const void *queryWeight, const void *keyWeight,
++        const void *valueWeight, const void *attnOutWeight, const float *ln2Gamma, const float *ln2Beta,
++        const void *gateWeight, const void *upWeight, const void *downWeight, const float *queryBias,
++        const float *keyBias, const float *valueBias, const float *attnOutBias, const void *myqkvWeight ,
++        const float *gateBias , const float *upBias , const float *downBias, const float *myqkvBias) {
++
++    if (kvcdt == DataType::fp16) {
++        if (rt == RopeType::LLAMA_ROPE)
++            return LayerLLaMAWrapper<float16_t, LlamaRotaryEmbedding>(dt, at, nt, batchSize, inputSeqLen, attHeadDim,
++                attHeadNum, kvHeadNum, maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step,
++                hiddenSize, intermediateSize, output, outputStride, input, inputStride,
++                ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight, attnOutWeight, ln2Gamma, ln2Beta,
++                gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias, attnOutBias,myqkvWeight) ;
++        else {
++            printf(">> unsupported Rope type: %d\n", rt);
++        }
++    } else if (kvcdt == DataType::int8) {
++        if (rt == RopeType::LLAMA_ROPE)
++            return LayerLLaMAWrapper<int8_t, LlamaRotaryEmbedding>(dt, at, nt, batchSize, inputSeqLen, attHeadDim,
++                attHeadNum, kvHeadNum, maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step,
++                hiddenSize, intermediateSize, output, outputStride, input, inputStride,
++                ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight, attnOutWeight, ln2Gamma, ln2Beta,
++                gateWeight, upWeight, downWeight, queryBias, keyBias, valueBias, attnOutBias,myqkvWeight) ;
++        else {
++            printf(">> unsupported Rope type: %d\n", rt);
++        }
++    } else {
++        printf(">> unsupported KVcache data type: %d\n", kvcdt);
++        return;
++    }
++
++}
++
+ } // namespace xft
+diff --git a/src/layers/decoder_layer.h b/src/layers/decoder_layer.h
+index 3cb5873..570b267 100644
+--- a/src/layers/decoder_layer.h
++++ b/src/layers/decoder_layer.h
+@@ -83,10 +83,10 @@ public:
+             const float *fc1Scales, const float *fc1Zeros, const float *fc1Bias, const OriWeiT *fc2Weight,
+             const float *fc2Scales, const float *fc2Zeros, const float *fc2Bias, const float *ln2Gamma,
+             const float *ln2Beta, const OriWeiT *fc3Weight, const float *fc3Scales, const float *fc3Zeros,
+-            bool trans = true) {
++            bool trans = true,const OriWeiT *myqkvWeight = nullptr) {
+         attn.setWeights(ctx, queryWeight, queryScale, queryZero, queryBias, keyWeight, keyScale, keyZero, keyBias,
+                 valueWeight, valueScale, valueZero, valueBias, attnOutWeight, attnOutScale, attnOutZero, attnOutBias,
+-                true, ln1Gamma, ln1Beta, trans);
++                true, ln1Gamma, ln1Beta, trans,myqkvWeight);
+ 
+         mlp.setWeights(ctx, fc1Weight, fc1Scales, fc1Zeros, fc1Bias, fc2Weight, fc2Scales, fc2Zeros, fc2Bias, ln2Gamma,
+                 ln2Beta, fc3Weight, fc3Scales, fc3Zeros, trans);
+diff --git a/tests/ut/layers_decoder_test.cpp b/tests/ut/layers_decoder_test.cpp
+index be75d94..0e56b10 100644
+--- a/tests/ut/layers_decoder_test.cpp
++++ b/tests/ut/layers_decoder_test.cpp
+@@ -21,8 +21,8 @@
+ #include "layers_decoder.h"
+ #include "gtest/gtest.h"
+ 
+-template <typename T>
+-static void compareLayerLLaMA(int step, int batchSize, int inputSeqLen, int pastSeqLen, int currentSeqLen,
++static void compareLayerLLaMA(xft::DataType dt, xft::DataType kvcdt, int step,
++        int batchSize, int inputSeqLen, int pastSeqLen, int currentSeqLen,
+         int attHeadDim, int attHeadNum, int kvHeadNum, int maxPositions, int maxPosEmbed, int hiddenSize,
+         int intermediateSize, const float *ln1Gamma, const float *ln1Beta, const void *queryWeight,
+         const void *keyWeight, const void *valueWeight, const void *attnOutWeight, const float *ln2Gamma,
+@@ -36,19 +36,8 @@ static void compareLayerLLaMA(int step, int batchSize, int inputSeqLen, int past
+         input[i] = static_cast<float>(1.0f * rand() / RAND_MAX);
+     }
+ 
+-    xft::DataType dt = xft::DataType::unknown;
+-    if constexpr (std::is_same<T, bfloat16_t>::value) {
+-        dt = xft::DataType::bf16;
+-    } else if constexpr (std::is_same<T, float16_t>::value) {
+-        dt = xft::DataType::fp16;
+-    } else {
+-        printf("Unsupported data type\n");
+-        GTEST_FAIL();
+-        return;
+-    }
+-
+     auto start = std::chrono::high_resolution_clock::now();
+-    invokeLayerLLaMA(dt, xft::ActivationType::SILU, xft::NormType::RMS, batchSize, inputSeqLen, attHeadDim, attHeadNum,
++    invokeLayerLLaMA(dt, kvcdt, xft::RopeType::LLAMA_ROPE, xft::ActivationType::SILU, xft::NormType::RMS, batchSize, inputSeqLen, attHeadDim, attHeadNum,
+             kvHeadNum, maxPositions, maxPosEmbed, pastSeqLen, currentSeqLen, step, hiddenSize, intermediateSize,
+             (void *)ourOutput, hiddenSize, input, hiddenSize, ln1Gamma, ln1Beta, queryWeight, keyWeight, valueWeight,
+             attnOutWeight, ln2Gamma, ln2Beta, gateW, upW, downW);
+@@ -60,8 +49,7 @@ static void compareLayerLLaMA(int step, int batchSize, int inputSeqLen, int past
+     free(ourOutput);
+ }
+ 
+-template <typename T>
+-void test_LayerLLaMA(void) {
++void test_LayerLLaMA(xft::DataType dt, xft::DataType kvcdt) {
+     int maxPosEmbed = 4096;
+     int maxPositions = maxPosEmbed;
+     int hiddenSize = 4096;
+@@ -111,16 +99,16 @@ void test_LayerLLaMA(void) {
+     int currentSeqLen = inputSeqLen;
+     int nextTokenNum = 1;
+ 
+-    compareLayerLLaMA<T>(step++, batchSize, inputSeqLen, pastSeqLen, currentSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++    compareLayerLLaMA(dt, kvcdt, step++, batchSize, inputSeqLen, pastSeqLen, currentSeqLen, attHeadDim, attHeadNum, kvHeadNum,
+             maxPositions, maxPosEmbed, hiddenSize, intermediateSize, ln1Gamma, ln1Beta, qkvProj, qkvProj + qSize,
+             qkvProj + kvSize, oProj, ln2Gamma, ln2Beta, gateW, upW, downW);
+     pastSeqLen += inputSeqLen;
+     currentSeqLen = nextTokenNum;
+-    compareLayerLLaMA<T>(step++, batchSize, inputSeqLen, pastSeqLen, currentSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++    compareLayerLLaMA(dt, kvcdt, step++, batchSize, inputSeqLen, pastSeqLen, currentSeqLen, attHeadDim, attHeadNum, kvHeadNum,
+             maxPositions, maxPosEmbed, hiddenSize, intermediateSize, ln1Gamma, ln1Beta, qkvProj, qkvProj + qSize,
+             qkvProj + kvSize, oProj, ln2Gamma, ln2Beta, gateW, upW, downW);
+     pastSeqLen += nextTokenNum;
+-    compareLayerLLaMA<T>(step++, batchSize, inputSeqLen, pastSeqLen, currentSeqLen, attHeadDim, attHeadNum, kvHeadNum,
++    compareLayerLLaMA(dt, kvcdt, step++, batchSize, inputSeqLen, pastSeqLen, currentSeqLen, attHeadDim, attHeadNum, kvHeadNum,
+             maxPositions, maxPosEmbed, hiddenSize, intermediateSize, ln1Gamma, ln1Beta, qkvProj, qkvProj + qSize,
+             qkvProj + kvSize, oProj, ln2Gamma, ln2Beta, gateW, upW, downW);
+ 
+@@ -135,15 +123,31 @@ void test_LayerLLaMA(void) {
+     free(downW);
+ }
+ 
+-TEST(LayerLLaMA, bfloat16_t) {
+-    test_LayerLLaMA<bfloat16_t>();
++TEST(LayerLLaMA, w_bf16_kv_fp16) {
++    test_LayerLLaMA(xft::DataType::bf16, xft::DataType::fp16);
++}
++
++TEST(LayerLLaMA, w_bf16_kv_int8) {
++    test_LayerLLaMA(xft::DataType::bf16, xft::DataType::int8);
++}
++
++TEST(LayerLLaMA, w_fp16_kv_fp16) {
++    test_LayerLLaMA(xft::DataType::fp16, xft::DataType::fp16);
+ }
+ 
+-TEST(LayerLLaMA, float16_t) {
+-    test_LayerLLaMA<float16_t>();
++TEST(LayerLLaMA, w_fp16_kv_int8) {
++    test_LayerLLaMA(xft::DataType::fp16, xft::DataType::int8);
++}
++
++TEST(LayerLLaMA, w_bf16_int8_kv_fp16) {
++    test_LayerLLaMA(xft::DataType::bf16_int8, xft::DataType::fp16);
++}
++
++TEST(LayerLLaMA, w_bf16_int8_kv_int8) {
++    test_LayerLLaMA(xft::DataType::bf16_int8, xft::DataType::int8);
+ }
+ 
+ int main(int argc, char **argv) {
+     ::testing::InitGoogleTest(&argc, argv);
+     return RUN_ALL_TESTS();
+-}
+\ No newline at end of file
++}
+-- 
+2.25.1
+

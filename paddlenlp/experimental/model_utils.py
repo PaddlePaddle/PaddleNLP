@@ -391,7 +391,12 @@ class WeightScalesLoader:
 
 class CacheScaleLoader:
     def __init__(
-        self, scale_json_file_path="cache_scales.json", key_map_dict=None, num_of_layers=None, num_heads=None
+        self,
+        scale_json_file_path="cache_scales.json",
+        key_map_dict=None,
+        num_of_layers=None,
+        num_heads=None,
+        num_key_value_heads=None,
     ):
         with open(scale_json_file_path) as json_file:
             self.scale_dict = json.load(json_file)
@@ -402,12 +407,21 @@ class CacheScaleLoader:
                 scale_type_out = "cache_k_out_scale"
             else:
                 scale_type_out = "cache_v_out_scale"
-            self.scale[scale_type] = np.full([num_of_layers, num_heads], fill_value=-1.0)
-            self.scale[scale_type_out] = np.full([num_of_layers, num_heads], fill_value=-1.0)
+            self.scale[scale_type] = np.full([num_of_layers, num_key_value_heads], fill_value=-1.0)
+            self.scale[scale_type_out] = np.full([num_of_layers, num_key_value_heads], fill_value=-1.0)
 
             for i in range(num_of_layers):
                 if key_template.replace("#", str(i)) in self.scale_dict.keys():
-                    self.scale[scale_type][i, :] = [
-                        127.0 / num for num in self.scale_dict[key_template.replace("#", str(i))]
+                    if num_heads != num_key_value_heads:
+                        self.scale[scale_type][i, :] = [
+                            127.0 / self.scale_dict[key_template.replace("#", str(i))][j]
+                            for j in range(0, num_heads, num_heads // num_key_value_heads)
+                        ]
+                    else:
+                        self.scale[scale_type][i, :] = [
+                            127.0 / self.scale_dict[key_template.replace("#", str(i))][j]
+                            for j in range(0, num_key_value_heads)
+                        ]
+                    self.scale[scale_type_out][i, :] = [
+                        1.0 / self.scale[scale_type][i, j] for j in range(0, num_key_value_heads)
                     ]
-                    self.scale[scale_type_out][i, :] = [1.0 / self.scale[scale_type][i, j] for j in range(num_heads)]
