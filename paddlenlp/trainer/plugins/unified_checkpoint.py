@@ -125,9 +125,6 @@ class UnifiedCheckpointHandler:
     def __init__(self, args):
         self.args = args
         self.global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
-        
-        # Load multi-thread.
-        self._load_thread_num = 1
 
         # Mainly for asynchronous saving.
         self._shm_model_weight = None
@@ -153,9 +150,6 @@ class UnifiedCheckpointHandler:
             self._shared_save_model_flag = multiprocessing.Array("i", 1)
             self._shared_save_master_weight_flag = multiprocessing.Array("i", 1)
             self._shared_save_optimizer_flag = multiprocessing.Array("i", 1)
-
-        if "load_multi_thread" in self.args.unified_checkpoint_config:
-            self._load_thread_num = 8
 
     def _file_save_async_or_sync(self, state_dict, path, is_sync=True, state_dict_type="model_weight"):
         if is_sync:
@@ -784,6 +778,10 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
     if len(resolved_archive_file) > 1:
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
+    load_thread_num = 1
+    if "load_multi_thread" in args.unified_checkpoint_config:
+        load_thread_num = 8
+
     for shard_file in resolved_archive_file:
         # TODO: check if  no expected_keys in shard_file, then don't load it
         if expected_keys.isdisjoint(sharded_metadata["file_map"][os.path.split(shard_file)[-1]]):
@@ -801,7 +799,7 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
                 tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
         # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
         state_dict = load_state_dict(
-            shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys, device="expected", thread_num=self._load_thread_num
+            shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys, device="expected", thread_num=load_thread_num
         )
 
         if not pre_tensor_parallel_split:
@@ -962,7 +960,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         if len(resolved_archive_file_mw) > 1:
             resolved_archive_file_mw = tqdm(resolved_archive_file_mw, desc="Loading master weights shards")
 
-    def load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, is_master_weights=False):
+    def load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, is_master_weights=False, load_thread_num=1):
         returned_state_dict = {}
         # load optimizer
         for shard_file in resolved_archive_file:
@@ -985,18 +983,22 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
                         tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)
 
                     # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-                    state_dict = load_state_dict(shard_file, tp_actions, expected_keys, device="expected", thread_num=self._load_thread_num)
+                    state_dict = load_state_dict(shard_file, tp_actions, expected_keys, device="expected", thread_num=load_thread_num)
                 else:
                     # for pipeline model, we don't need to use tp_actions
-                    state_dict = load_state_dict(shard_file, None, expected_keys, device="expected", thread_num=self._load_thread_num)
+                    state_dict = load_state_dict(shard_file, None, expected_keys, device="expected", thread_num=load_thread_num)
 
             returned_state_dict.update(state_dict)
             # force memory release
             del state_dict
             gc.collect()
         return returned_state_dict
+    
+    load_thread_num = 1
+    if "load_multi_thread" in args.unified_checkpoint_config:
+        load_thread_num = 8
 
-    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys)
+    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, load_thread_num)
     if has_master_weights:
         state_dict_master_weight = load_resolved_archive_file(
             resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weights=True
@@ -1708,7 +1710,11 @@ def load_single_card_checkpoint(args, model, resume_from_checkpoint: str):
     if len(missing_keys) > 0:
         raise ValueError(f"Missing keys: {missing_keys}")
 
-    state_dict = load_state_dict(resolved_archive_file[0], None, expected_keys, thread_num=self._load_thread_num)
+    load_thread_num = 1
+    if "load_multi_thread" in args.unified_checkpoint_config:
+        load_thread_num = 8
+
+    state_dict = load_state_dict(resolved_archive_file[0], None, expected_keys, thread_num=load_thread_num)
     error_msgs = _load_state_dict_into_model(model, state_dict, "")
     del state_dict
     gc.collect()
@@ -1737,10 +1743,14 @@ def load_single_card_optimizer(args, model, optimizer, resume_from_checkpoint: s
             index_filename=os.path.join(resume_from_checkpoint, SAFE_MASTER_WEIGHTS_INDEX_NAME),
         )
         expected_keys_mw = sharded_metadata_mw["all_optimizer_keys"]
+    
+    load_thread_num = 1
+    if "load_multi_thread" in args.unified_checkpoint_config:
+        load_thread_num = 8
 
-    state_dict_optim = load_state_dict(resolved_archive_file[0], None, expected_keys, thread_num=self._load_thread_num)
+    state_dict_optim = load_state_dict(resolved_archive_file[0], None, expected_keys, thread_num=load_thread_num)
     if has_master_weights:
-        state_dict_optim_mw = load_state_dict(resolved_archive_file_mw[0], None, expected_keys_mw, thread_num=self._load_thread_num)
+        state_dict_optim_mw = load_state_dict(resolved_archive_file_mw[0], None, expected_keys_mw, thread_num=load_thread_num)
 
     for key in list(state_dict_optim.keys()):
         key_name = key.split("/")

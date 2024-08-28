@@ -319,6 +319,7 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
     # TODO(wj-Mcat): get dtype of model when it's in DataParallel Mode.
     return last_dtype
 
+
 def _split_keys_evenly(keys: list, n: int) -> list:
     """Split a list into n lists with an equal number of elements.
 
@@ -343,6 +344,7 @@ def _split_keys_evenly(keys: list, n: int) -> list:
         index += part_size
 
     return result
+
 
 def _load_part_state_dict(keys, checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping, fliter_dict_keys, device):
     """load part state dict from checkpoint file.
@@ -405,7 +407,6 @@ def load_state_dict(
             with concurrent.futures.ThreadPoolExecutor(max_workers=thread_num) as executor:
                 future_to_key = {executor.submit(_load_part_state_dict, keys, checkpoint_file, tensor_parallel_split_mapping, fliter_dict_keys, device): keys for keys in keys_groups}
                 for future in concurrent.futures.as_completed(future_to_key):
-                    key = future_to_key[future]
                     result = future.result()
                     state_dict.update(result)            
 
