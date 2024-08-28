@@ -587,7 +587,7 @@ class Qwen2Attention(nn.Layer):
                 output_attentions,
                 training=self.training,
                 sequence_parallel=self.sequence_parallel,
-            )                
+            )
         if output_attentions:
             attn_output, attn_weights = outputs
         else:

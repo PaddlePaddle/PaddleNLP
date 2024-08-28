@@ -816,6 +816,7 @@ class LlamaAttention(nn.Layer):
         self.config = config
 
         self.attn_func = scaled_dot_product_attention
+
     def _init_rope(self):
         if (
             hasattr(self.config, "rope_scaling")
