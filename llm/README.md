@@ -214,7 +214,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo
      </font>
 </div>
 <div align="center">
-    <img width="300" alt="llm" src="./docs/assets/quant_result.png">
+    <img width="300" alt="llm" src="https://github.com/user-attachments/assets/ab8d04ba-d589-4f54-acf1-b00c0fd9159e">
 </div>
 <div align="center">
     <font size ="1">

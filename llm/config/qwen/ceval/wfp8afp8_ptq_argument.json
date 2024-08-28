@@ -10,7 +10,7 @@
   "bf16": true,
   "fp16_opt_level": "O2",
   "dataset_name_or_path": "../dataset/ceval_ptq",
-  "output_dir": "../output/qwen2/wfp8afp8cfp8_ptq_ckpts_ceval",
+  "output_dir": "../output/qwen2/wfp8afp8_ptq_ckpts_ceval",
   "do_eval": true,
   "eval_with_do_generation": false,
   "do_ptq": true,
