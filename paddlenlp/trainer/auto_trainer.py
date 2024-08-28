@@ -722,6 +722,8 @@ class AutoTrainer(Trainer):
                         )
 
             if self.args.to_static:
+                if self.model_wrapped._mode is None:
+                    self.model_wrapped.train()
                 model_state_dict = {
                     key: value
                     for key, value in self.model_wrapped.state_dict("param").items()
@@ -757,7 +759,7 @@ class AutoTrainer(Trainer):
 
             if self.args.auto_parallel_resume_form_hybrid_parallel:
                 CheckpointConverter(
-                    resume_from_checkpoint, state_dict, parameter_to_structured_name
+                    resume_from_checkpoint, state_dict, parameter_to_structured_name, self.args
                 ).load_from_hybrid_parallel_checkpoint()
             else:
                 ckpt_path = os.path.join(resume_from_checkpoint, DIST_CKPT_PATH)

@@ -510,14 +510,19 @@ def main():
         model.print_trainable_parameters()
 
     # Create trainer
-    max_length = (
-        data_args.max_length
-        if training_args.pipeline_parallel_degree > 1 or training_args.autotuner_benchmark
-        else None
-    )  # NOTE(gongenlei): new add autotuner_benchmark
-    padding = (
-        "max_length" if training_args.pipeline_parallel_degree > 1 or training_args.autotuner_benchmark else True
-    )  # NOTE(gongenlei): new add autotuner_benchmark
+
+    if (
+        training_args.pipeline_parallel_degree > 1
+        or training_args.sequence_parallel
+        or training_args.autotuner_benchmark
+    ):
+        # NOTE(gongenlei): new add autotuner_benchmark
+        max_length = data_args.max_length
+        padding = "max_length"
+    else:
+        max_length = None
+        padding = True
+
     if training_args.pipeline_parallel_degree > 1:
         metrics = None
     elif data_args.eval_with_do_generation:
