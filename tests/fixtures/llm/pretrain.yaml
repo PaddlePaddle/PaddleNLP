@@ -34,6 +34,7 @@ pretrain:
 inference-predict:
   default:
     mode: dynamic
+    src_length: 512
     max_length: 20
     batch_size: 2
     decode_strategy: greedy_search
@@ -43,6 +44,8 @@ inference-predict:
 inference-to-static:
   default:
     dtype: float16
+    src_length: 512
+    max_length: 20
 
 inference-infer:
   default:
@@ -50,5 +53,6 @@ inference-infer:
     dtype: float16
     batch_size: 2
     decode_strategy: greedy_search
+    src_length: 512
     max_length: 20
     chat_template: none

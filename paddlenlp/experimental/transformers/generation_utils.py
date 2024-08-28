@@ -18,12 +18,7 @@ from typing import List, Union
 import paddle
 import paddle.nn.functional as F
 
-from paddlenlp.generation import (
-    GenerationMixin,
-    LogitsProcessor,
-    LogitsProcessorList,
-    TopPProcess,
-)
+from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
 
 __all__ = ["GenerationInferenceModel", "GenerationBlockInferenceModel", "GenerationAvxInferenceModel"]
 
@@ -172,7 +167,8 @@ class GenerationInferenceModel(GenerationMixin):
         model_kwargs["frequency_score"] = frequency_score
         model_kwargs["presence_score"] = presence_score
         model_kwargs["logits_processors"] = logits_processors or LogitsProcessorList()
-        model_kwargs["pre_caches"] = pre_caches
+        if pre_caches is not None:
+            model_kwargs["pre_caches"] = pre_caches
 
         ret = self.sample(
             input_ids,
@@ -183,6 +179,7 @@ class GenerationInferenceModel(GenerationMixin):
             inputs_embeds=inputs_embeds,
             **model_kwargs,
         )
+
         return ret
 
     def update_model_kwargs_for_generation(self, cache, just_decoder, next_tokens, eos_token_id, model_kwargs):
@@ -281,7 +278,8 @@ class GenerationInferenceModel(GenerationMixin):
 
         # let inputs_embeds enter into model_kwargs.
         # because the code below directly use the model_kwargs as a parameter without using inputs_embeds.
-        model_kwargs["inputs_embeds"] = inputs_embeds
+        if inputs_embeds is not None:
+            model_kwargs["inputs_embeds"] = inputs_embeds
         model_kwargs["all_input_ids"] = input_ids
         logits_processors = model_kwargs.pop("logits_processors")
 
@@ -417,12 +415,12 @@ class GenerationBlockInferenceModel(GenerationMixin):
             ]
         else:
             precache_kv_spec = None
-        use_cachekv_int8 = config.get("use_cachekv_int8", "None")
+        cachekv_int8_type = config.get("cachekv_int8_type", "None")
 
-        if use_cachekv_int8 == "static" or use_cachekv_int8 == "dynamic":
+        if cachekv_int8_type is not None:
             cachekv_dtype = "uint8"
 
-        if use_cachekv_int8 == "dynamic":
+        if cachekv_int8_type == "dynamic":
             cache_k_quant_scales = [
                 paddle.static.InputSpec(
                     shape=[None, self.config.num_attention_heads],
@@ -669,8 +667,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
             # sample
             probs = F.softmax(logits)
-            # _, next_tokens = top_p_sampling(probs, top_p, -1)
-            _, next_tokens = paddle.topk(probs, 1, -1)
+            _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
@@ -939,10 +936,10 @@ class GenerationAvxInferenceModel(GenerationMixin):
             )
             logits = logits / temperature
             probs = F.softmax(logits)
-            min_tokens_to_keep = 1
-            if top_p is not None and top_p < 1.0:
-                probs = TopPProcess(probs, top_p, min_tokens_to_keep)
-            next_tokens = paddle.multinomial(probs)
+
+            from paddlenlp_ops import xft_greedy_search
+
+            next_tokens = xft_greedy_search(probs)
 
             model_kwargs = self.update_model_kwargs_for_generation(
                 cache, just_decoder, next_tokens, eos_token_id, model_kwargs

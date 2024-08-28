@@ -208,9 +208,9 @@ def load_squad_dataset(args):
     tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
     features_fn = prepare_train_features if args.is_training else prepare_validation_features
     if args.is_training:
-        raw_dataset = load_dataset("squad", split="train")
+        raw_dataset = load_dataset("squad", split="train", trust_remote_code=True)
     else:
-        raw_dataset = load_dataset("squad", split="validation")
+        raw_dataset = load_dataset("squad", split="validation", trust_remote_code=True)
     column_names = raw_dataset.column_names
     dataset = raw_dataset.map(
         partial(features_fn, tokenizer=tokenizer, args=args), batched=True, remove_columns=column_names, num_proc=4

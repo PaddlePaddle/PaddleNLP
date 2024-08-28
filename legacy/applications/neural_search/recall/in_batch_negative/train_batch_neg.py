@@ -68,7 +68,6 @@ parser.add_argument('--evaluate', action='store_true', help='whether evaluate wh
 parser.add_argument("--max_grad_norm", type=float, default=5.0, help="max grad norm for global norm clip")
 parser.add_argument("--use_amp", action="store_true", help="Whether to use AMP.")
 parser.add_argument("--amp_loss_scale", default=32768, type=float, help="The value of scale_loss for fp16. This is only used for AMP training.")
-parser.add_argument("--use_recompute", action='store_true', help="Using the recompute to scale up the batch size and save the memory.")
 parser.add_argument("--use_gradient_cache", action='store_true', help="Using the gradient cache to scale up the batch size and save the memory.")
 parser.add_argument("--chunk_numbers", type=int, default=50, help="The number of the chunks for model")
 args = parser.parse_args()
@@ -337,7 +336,7 @@ def do_train():
 
     train_ds = load_dataset(read_text_pair, data_path=args.train_set_file, lazy=False)
 
-    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path, enable_recompute=args.use_recompute)
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
