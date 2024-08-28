@@ -1915,7 +1915,7 @@ class FusedBlockMultiTransformerFP8(Layer):
             cache_k_scale = None
             if cache_k_scale_attr:
                 cache_k_scale = self.create_parameter(
-                    shape=[self.num_heads],
+                    shape=[self.kv_num_heads],
                     attr=cache_k_scale_attr,
                     dtype="float32",
                     is_bias=False,
@@ -1924,7 +1924,7 @@ class FusedBlockMultiTransformerFP8(Layer):
             cache_v_scale = None
             if cache_v_scale_attr:
                 cache_v_scale = self.create_parameter(
-                    shape=[self.num_heads],
+                    shape=[self.kv_num_heads],
                     attr=cache_v_scale_attr,
                     dtype="float32",
                     is_bias=False,
@@ -1933,7 +1933,7 @@ class FusedBlockMultiTransformerFP8(Layer):
             cache_k_out_scale = None
             if cache_k_out_scale_attr:
                 cache_k_out_scale = self.create_parameter(
-                    shape=[self.num_heads],
+                    shape=[self.kv_num_heads],
                     attr=cache_k_out_scale_attr,
                     dtype="float32",
                     is_bias=False,
@@ -1942,7 +1942,7 @@ class FusedBlockMultiTransformerFP8(Layer):
             cache_v_out_scale = None
             if cache_v_out_scale_attr:
                 cache_v_out_scale = self.create_parameter(
-                    shape=[self.num_heads],
+                    shape=[self.kv_num_heads],
                     attr=cache_v_out_scale_attr,
                     dtype="float32",
                     is_bias=False,
