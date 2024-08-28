@@ -210,7 +210,15 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo
 </div>
 <div align="center">
     <font size ="1">
-    飞桨量化算法效果展示
+    飞桨 W4和 W8A8量化算法效果展示
+     </font>
+</div>
+<div align="center">
+    <img width="300" alt="llm" src="https://github.com/user-attachments/assets/ab8d04ba-d589-4f54-acf1-b00c0fd9159e">
+</div>
+<div align="center">
+    <font size ="1">
+    飞桨 W8A8C8和 FP8量化效果展示
      </font>
 </div>
 
@@ -220,6 +228,12 @@ python  run_finetune.py ./config/llama/ptq_argument.json
 
 # GPTQ 量化启动命令参考
 python  run_finetune.py ./config/llama/ptq_argument.json
+
+# W8A8C8(INT)量化启动命令参考
+python  run_finetune.py ./config/llama/ptq_c8_argument.json
+
+# W8A8(FP8)量化启动命令参考
+python run_finetune.py ./config/llama/fp8_ptq_argument.json
 ```
 
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。
