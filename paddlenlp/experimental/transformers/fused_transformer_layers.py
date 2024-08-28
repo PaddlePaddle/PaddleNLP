@@ -29,6 +29,7 @@ from paddle.incubate.nn.functional import (
 from paddle.nn import Layer
 from paddle.nn.initializer import Constant
 from paddle.nn.quant import weight_only_linear
+from paddle.incubate.nn.functional import fused_bias_act
 
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
@@ -78,77 +79,6 @@ def _set_var_distributed(var):
         main_block = paddle.static.default_main_program().current_block()
         startup_block._find_var_recursive(var.name).is_distributed = True
         main_block._find_var_recursive(var.name).is_distributed = True
-
-
-def fused_act_bias_wrapper(
-    x,
-    bias=None,
-    dequant_scales=None,
-    shift=None,
-    smooth=None,
-    act_method="gelu",
-    compute_dtype="default",
-    quant_scale=-1,
-    quant_round_type=0,
-    quant_max_bound=0,
-    quant_min_bound=0,
-):
-    if in_dynamic_or_pir_mode():
-
-        return paddle._C_ops.fused_bias_act(
-            x,
-            bias,
-            dequant_scales,
-            shift,
-            smooth,
-            act_method,
-            compute_dtype,
-            quant_scale,
-            quant_round_type,
-            quant_max_bound,
-            quant_min_bound,
-        )
-    helper = LayerHelper("fused_bias_act")
-    if x.dtype == "int32":
-        if compute_dtype == "bf16":
-            dtype = "uint16"
-        elif compute_dtype == "fp16":
-            dtype = "float16"
-        elif compute_dtype == "fp32":
-            dtype = "float32"
-        out = helper.create_variable_for_type_inference(dtype=dtype)
-    else:
-        out = helper.create_variable_for_type_inference(dtype=x.dtype)
-
-    inputs = {}
-    inputs["x"] = x
-    if bias is not None:
-        inputs["bias"] = bias
-    if dequant_scales is not None:
-        inputs["dequant_scales"] = dequant_scales
-
-    if shift is not None:
-        inputs["shift"] = shift
-
-    if smooth is not None:
-        inputs["smooth"] = smooth
-
-    attrs = {
-        "act_method": act_method,
-        "compute_dtype": compute_dtype,
-        "quant_scale": quant_scale,
-        "quant_round_type": quant_round_type,
-        "quant_max_bound": quant_max_bound,
-        "quant_min_bound": quant_min_bound,
-    }
-
-    helper.append_op(
-        type="fused_bias_act",
-        inputs=inputs,
-        outputs={"out": out},
-        attrs=attrs,
-    )
-    return out
 
 
 @dataclass
@@ -885,7 +815,7 @@ class FusedMultiTransformerBase(Layer):
         return fused_moe_out
 
     def compute_activation(self, ffn1_out, i):
-        return fused_act_bias_wrapper(ffn1_out, self.ffn1_biases[i], act_method=self.activation)
+        return fused_bias_act(ffn1_out, self.ffn1_biases[i], act_method=self.activation)
 
     def compute_ffn1(self, tmp_out, i):
         return paddle.matmul(tmp_out, self.ffn1_weights[i])
@@ -920,7 +850,7 @@ class FusedMultiTransformerBase(Layer):
 
     def compute_shared_expert(self, tmp_out, i):
         ffn1_out = paddle.matmul(tmp_out, self.shared_expert_ffn1_weights[i])
-        ffn1_out = fused_act_bias_wrapper(ffn1_out, None, act_method=self.activation)
+        ffn1_out = fused_bias_act(ffn1_out, None, act_method=self.activation)
         ffn2_out = paddle.matmul(ffn1_out, self.shared_expert_ffn2_weights[i])
         gate_out = paddle.matmul(tmp_out, self.shared_expert_gate_weights[i])
         gate_out = paddle.nn.functional.sigmoid(gate_out)
@@ -1333,7 +1263,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             weight_dtype=self.weight_dtype,
         )
 
-        ffn1_out = fused_act_bias_wrapper(ffn1_out, None, act_method=self.activation)
+        ffn1_out = fused_bias_act(ffn1_out, None, act_method=self.activation)
 
         ffn2_out = weight_only_linear(
             ffn1_out,
@@ -1734,7 +1664,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         return tmp_out, residual_input
 
     def compute_activation(self, ffn1_out, i):
-        return fused_act_bias_wrapper(
+        return fused_bias_act(
             ffn1_out,
             self.ffn1_biases[i],
             act_method=self.activation,
