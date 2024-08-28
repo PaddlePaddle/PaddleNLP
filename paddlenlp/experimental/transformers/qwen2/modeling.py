@@ -158,7 +158,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         ffn_ln_scale_attrs = [
             paddle.ParamAttr(name="fuseqwen2.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
         ]
-        if self.quant_type == "a8w8_fp8":
+        if "fp8" in self.quant_type:
             ffn1_0_weight_attrs = [
                 paddle.ParamAttr(
                     name="fuseqwen2.{}.ffn1_0_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
@@ -293,7 +293,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 paddle.ParamAttr(name="fuseqwen2.{}.cache_v_out_scale".format(i)) for i in range(self.num_layers)
             ]
 
-        if self.quant_type == "a8w8_fp8":
+        if "fp8" in self.quant_type:
             transformer_config = FusedMultiTransformerConfig(
                 embed_dim=self.hidden_size,
                 num_heads=self.num_attention_heads,
@@ -785,6 +785,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             scale_map_dict = json.load(json_file)
             act_scale_map_dict = scale_map_dict["act_scale"]
             weight_scale_map_dict = scale_map_dict["weight_scale"]
+            cache_scale_map_dict = scale_map_dict["cachekv_scale"]
             act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
             weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
             if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
@@ -812,6 +813,33 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             self.transformer_block.act_scales = act_scales
             self.transformer_block.weight_scales = weight_scales
 
+        unfused_state_dict = {}
+        head_size = self.hidden_size // self.num_attention_heads
+        split_fn = split_param_func()
+        if self.config.cachekv_int8_type == "static":
+            cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_scales.json")
+            if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
+                cache_scale_json_path = os.path.join(
+                    self.quant_model_path, f"cachekv_scales_{self.config.tensor_parallel_rank}.json"
+                )
+            cache_scales_loader = CacheScaleLoader(
+                cache_scale_json_path,
+                cache_scale_map_dict,
+                num_of_layers=self.config.num_hidden_layers,
+                num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
+            )
+            for k, v in cache_scales_loader.scale.items():
+                for i_layer, weight_scale in enumerate(v):
+                    weight_scale = weight_scale.astype("float32")
+                    if k == "cache_k_scale":
+                        self.transformer_block.cache_k_scales[i_layer].set_value(weight_scale)
+                    elif k == "cache_v_scale":
+                        self.transformer_block.cache_v_scales[i_layer].set_value(weight_scale)
+                    elif k == "cache_k_out_scale":
+                        self.transformer_block.cache_k_out_scales[i_layer].set_value(weight_scale)
+                    else:
+                        self.transformer_block.cache_v_out_scales[i_layer].set_value(weight_scale)
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
         split_fn = split_param_func()
@@ -1340,7 +1368,7 @@ class Qwen2ForCausalLMInferenceModel(GenerationInferenceModel, Qwen2PretrainedMo
         if "lm_head.weight" in state_dict:
             lm_head_weight = paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
             self.lm_head.weight.set_value(lm_head_weight)
-        if self.qwen2.quant_type == "a8w8_fp8":
+        if "fp8" in self.qwen2.quant_type:
             self.qwen2.set_state_dict_fp8({k: state_dict[k] for k in state_dict.keys()})
         else:
             self.qwen2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
@@ -1358,7 +1386,7 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
         elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
             self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
-        elif self.quant_type == "a8w8_fp8":
+        elif "fp8" in self.quant_type:
             self.transformer_block = FusedBlockMultiTransformerFP8(transformer_config)
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
@@ -1605,7 +1633,7 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
             self.lm_head.weight.set_value(
                 paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
             )
-        if self.qwen2.quant_type == "a8w8_fp8":
+        if "fp8" in self.qwen2.quant_type:
             self.qwen2.set_state_dict_fp8({k: state_dict[k] for k in state_dict.keys()})
         else:
             self.qwen2.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
