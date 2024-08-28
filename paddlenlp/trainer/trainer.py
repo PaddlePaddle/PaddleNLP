@@ -1293,7 +1293,7 @@ class Trainer:
         loss_value = loss.item()
         if not self.args.fp16:
             if not np.isfinite(loss_value).all():
-                raise ValueError(f"Loss contains inf or nan values at rank {paddle.distributed.get_rank()}")
+                raise ValueError(f"Loss contains inf or nan values, its value is {loss_value}")
         return loss_value
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
