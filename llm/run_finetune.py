@@ -526,6 +526,7 @@ def main():
         training_args.pipeline_parallel_degree > 1
         or training_args.sequence_parallel
         or training_args.autotuner_benchmark
+        or data_args.zero_padding
     ):
         # NOTE(gongenlei): new add autotuner_benchmark
         max_length = data_args.max_length
