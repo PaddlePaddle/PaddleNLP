@@ -347,7 +347,7 @@ def load_quant_model(model, quant_args, load_quant_path, dtype="float32"):
     else:
         act_scales = {}
 
-    if "C8" in quant_args.quant_type or "C4" in quant_args.quant_type:
+    if cachekv is not None:
         with open(f"{load_quant_path}/cachekv_scales.json") as outfile:
             cachekv_scales = json.load(outfile)
     else:
