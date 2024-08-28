@@ -214,17 +214,21 @@ def prepare_qconfig(args):
     Prepare qconfig
     """
 
-    weight_observer = WEIGHT_OBSERVER.get(args.weight_quant_method, None)
-    if weight_observer is None:
-        weight_observer = FP8_OBSERVER.get(args.weight_quant_method, None)
-
-    act_observer = ACT_OBSERVER.get(args.act_quant_method, None)
-    if act_observer is None:
-        act_observer = FP8_OBSERVER.get(args.act_quant_method, None)
-
-    cachekv_observer = CACHEKV_OBSERVER.get(args.cachekv_quant_method, None)
-    if cachekv_observer is None:
-        cachekv_observer = FP8_OBSERVER.get(args.cachekv_quant_method, None)
+    weight_observer = (
+        WEIGHT_OBSERVER.get(args.weight_quant_method, None)
+        if "w" in args.use_fp8
+        else FP8_OBSERVER.get(args.weight_quant_method, None)
+    )
+    act_observer = (
+        ACT_OBSERVER.get(args.act_quant_method, None)
+        if "a" in args.use_fp8
+        else FP8_OBSERVER.get(args.act_quant_method, None)
+    )
+    cachekv_observer = (
+        CACHEKV_OBSERVER.get(args.cachekv_quant_method, None)
+        if "c" in args.use_fp8
+        else FP8_OBSERVER.get(args.cachekv_quant_method, None)
+    )
 
     args.quant_type = args.quant_type.lower()
     args.use_fp8 = args.use_fp8.lower()
