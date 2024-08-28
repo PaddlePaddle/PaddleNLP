@@ -1882,7 +1882,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             all_input_ids[prefix_offset:], skip_special_tokens=False, clean_up_tokenization_spaces=False
         )
 
-        if len(new_text) > len(prefix_text) and not new_text.endswith("�"):
+        if len(new_text) > len(prefix_text) and not prefix_text.endswith("�") and not new_text.endswith("�"):
             # utf-8 char at the end means it's a potential unfinished byte sequence
             # from byte fallback tokenization.
             # If it's in the middle, it's probably a real invalid id generated
