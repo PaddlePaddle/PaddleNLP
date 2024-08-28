@@ -30,6 +30,8 @@ from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .image_processing_utils import ImageProcessingMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
+from .sequence_parallel_utils import AllGatherVarlenOp, sequence_parallel_sparse_mask_labels
+from .tensor_parallel_utils import parallel_matmul, parallel_linear, fused_head_and_loss_fn
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
