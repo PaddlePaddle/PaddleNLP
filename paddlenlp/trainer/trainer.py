@@ -94,6 +94,7 @@ from ..transformers.model_utils import (
 )
 from ..transformers.segment_parallel_utils import split_inputs_sequence_dim
 from ..transformers.tokenizer_utils import PretrainedTokenizer
+from ..utils.align_utils import float_to_md5
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
     LORA_WEIGHTS_NAME,
@@ -182,6 +183,16 @@ try:
     from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
 except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
+
+try:
+    from paddle.distributed import in_auto_parallel_align_mode
+except Exception:
+
+    def in_auto_parallel_align_mode():
+        """
+        hack for paddlenlp develop branch.
+        """
+        return False
 
 
 __all__ = ["Trainer"]
@@ -1296,6 +1307,13 @@ class Trainer:
         assert isinstance(loss, paddle.Tensor) and loss._is_initialized()
         return loss.item()
 
+    def _maybe_process_align_mode(self, logs):
+        if not in_auto_parallel_align_mode():
+            return
+
+        loss_md5 = float_to_md5(logs["loss"])
+        logger.info(f"[align] loss md5:{loss_md5}")
+
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
 
@@ -1310,6 +1328,8 @@ class Trainer:
             logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
+
+            self._maybe_process_align_mode(logs)
 
             divisor = 2**30
             # TODO(@gexiao): replace these codes with unified APIs in Paddle
