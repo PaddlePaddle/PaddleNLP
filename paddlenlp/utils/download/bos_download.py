@@ -190,6 +190,9 @@ def bos_download(
 
     storage_folder = os.path.join(cache_dir, repo_id)
     os.makedirs(storage_folder, exist_ok=True)
+    if subfolder is not None:
+        storage_sub_folder = os.path.join(storage_folder, subfolder)
+        os.makedirs(storage_sub_folder, exist_ok=True)
 
     if url is None:
         url = bos_url(repo_id, filename, repo_type=REPO_TYPE, endpoint=endpoint)
