@@ -43,7 +43,7 @@ from paddlenlp.transformers import (
     PretrainedTokenizer,
 )
 from paddlenlp.utils import llm_utils
-from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
+from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
 # Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
@@ -92,7 +92,15 @@ class PredictorArgument:
     )
     avx_type: str = field(
         default=None,
-        metadata={"help": "avx compute type. Supported values: fp16, bf16"},
+        metadata={
+            "help": "avx compute type. Supported values: fp16, bf16,fp16_int8\
+        fp16: first_token and next_token run in fp16\
+        fp16_int8 : first_token run in fp16, next token run in int8"
+        },
+    )
+    avx_cachekv_type: str = field(
+        default="fp16",
+        metadata={"help": "avx cachekv type. Supported values: fp16,int8"},
     )
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
@@ -604,17 +612,6 @@ class StaticInferencePredictor(InferencePredictorMixin):
                 "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
             )
 
-        # register the custome ops
-        if predictor_args.device == "cpu" and predictor_args.avx_model:
-            import_module("paddlenlp_ops.xft_llama_layer")
-        else:
-            import_module("paddlenlp_ops.encode_rotary_qk")
-            import_module("paddlenlp_ops.get_padding_offset")
-            import_module("paddlenlp_ops.qkv_transpose_split")
-            import_module("paddlenlp_ops.rebuild_padding")
-            import_module("paddlenlp_ops.transpose_remove_padding")
-            import_module("paddlenlp_ops.write_cache_kv")
-
         infer_model_path = llm_utils.get_infer_model_path(
             predictor_args.model_name_or_path, predictor_args.model_prefix
         )
@@ -636,7 +633,9 @@ class StaticInferencePredictor(InferencePredictorMixin):
             )
         elif predictor_args.device == "cpu" and predictor_args.avx_model:
             config.disable_gpu()
-            config.switch_ir_optim(False)
+            config.enable_new_ir()
+            config.disable_mkldnn()
+            config.disable_glog_info()
         else:
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
             config.enable_use_gpu(100, device_id)
@@ -1205,9 +1204,6 @@ def create_predictor(
             config.cachekv_int8_type = predictor_args.cachekv_int8_type
             config.use_fake_parameter = predictor_args.use_fake_parameter
             config.single_card_ptq = True
-            if predictor_args.avx_model:
-                config.avx_type = predictor_args.avx_type
-
             if config.quantization_config.quant_type is not None:
                 predictor_args.quant_type = config.quantization_config.quant_type
                 config.quant_type = config.quantization_config.quant_type
@@ -1247,6 +1243,8 @@ def create_predictor(
                             "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/inference.md"
                         )
                     elif predictor_args.device == "cpu" and predictor_args.avx_model:
+                        config.avx_type = predictor_args.avx_type
+                        config.avx_cachekv_type = predictor_args.avx_cachekv_type
                         from paddlenlp.experimental.transformers import (
                             LlamaForCausalLMAvxInferenceModel as LlamaInferenceModel,
                         )
