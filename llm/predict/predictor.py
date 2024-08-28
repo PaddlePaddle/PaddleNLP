@@ -179,6 +179,7 @@ class BasePredictor:
             source,
             max_length=self.config.src_length,
             truncation=True,
+            return_position_ids=True if not isinstance(self.tokenizer, ChatGLMTokenizer) else False,
             truncation_side="left",
             return_tensors=self.return_tensors,
             padding=True,
@@ -305,6 +306,9 @@ class StaticGraphPredictor(BasePredictor):
             inference_config.disable_gpu()
         inference_config.disable_glog_info()
         inference_config.enable_new_executor()
+        # remove `gpu_cpu_map_matmul_v2_to_matmul_pass` to avoid mapping matmul_v2 -> matmul op
+        if config.dtype == "bfloat16":
+            inference_config.delete_pass("gpu_cpu_map_matmul_v2_to_matmul_pass")
         if in_pir_executor_mode():
             inference_config.enable_new_ir()
             if in_cinn_mode():
