@@ -20,7 +20,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import paddle.tensor as tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
@@ -46,10 +45,6 @@ try:
 except:
     pass
 
-try:
-    from paddle.nn.functional.flash_attention import flash_attention
-except:
-    flash_attention = None
 try:
     from paddle.incubate.nn.layer.fused_dropout_add import FusedDropoutAdd
 except:
@@ -298,7 +293,6 @@ class SelfAttention(nn.Layer):
         self.enable_recompute = False
         self.tensor_parallel_degree = config.tensor_parallel_degree
         self.sequence_parallel = config.sequence_parallel
-        self.use_flash_attention = config.use_flash_attention if flash_attention else False
 
         if config.sequence_parallel:
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
@@ -332,37 +326,6 @@ class SelfAttention(nn.Layer):
             )
             # Output.
             self.dense = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=config.add_bias_linear)
-
-    def _flash_attention(self, q, k, v, attention_mask=None, output_attentions=False):
-        """
-        q: [seq_len, bs, num_head, head_dim]
-        k: [seq_len, bs, num_head, head_dim]
-        v: [seq_len, bs, num_head, head_dim]
-        """
-        q = q.transpose([1, 0, 2, 3])
-        k = k.transpose([1, 0, 2, 3])
-        v = v.transpose([1, 0, 2, 3])
-
-        with seed_guard_context("local_seed"):
-            out, weights = flash_attention(
-                query=q,
-                key=k,
-                value=v,
-                dropout=self.config.attention_dropout,
-                causal=q.shape[0] != 1,
-                return_softmax=output_attentions,
-                training=self.training,
-            )
-        # [bs, seq_len, num_head, head_dim] -> [bs, seq_len, num_head * head_dim]
-        out = tensor.reshape(x=out, shape=[0, 0, out.shape[2] * out.shape[3]])
-        # [bs, seq_len, num_head * head_dim]-> [seq_len, bs, num_head * head_dim]
-        out = out.transpose([1, 0, 2])
-
-        if self.config.sequence_parallel:
-            sq, bs, hp = out.shape
-            out = out.reshape([sq * bs, hp])
-
-        return (out, weights) if output_attentions else out
 
     def _core_attention(self, q, k, v, attention_mask=None, output_attentions=False):
         outputs = self.core_attention(q, k, v, attention_mask)
@@ -431,10 +394,7 @@ class SelfAttention(nn.Layer):
         # ==================================
         # core attention computation
         # ==================================
-        if self.use_flash_attention:
-            attention_fuc = self._flash_attention
-        else:
-            attention_fuc = self._core_attention
+        attention_fuc = self._core_attention
 
         has_gradient = (
             (not query_layer.stop_gradient) or (not key_layer.stop_gradient) or (not value_layer.stop_gradient)
