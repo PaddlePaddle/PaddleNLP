@@ -318,7 +318,7 @@ def load_quant_model(model, quant_args, load_quant_path, dtype="float32"):
     if cachekv is not None:
         set_wrapper_for_attn(model)
 
-    skip_list_names = [] if quant_args.skip_list_names is not None else quant_args.skip_list_names
+    skip_list_names = [] if quant_args.skip_list_names is None else quant_args.skip_list_names
     for cur_name, cur_layer in model.named_sublayers():
         skip = False
         for k in skip_list_names:
