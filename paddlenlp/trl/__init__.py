@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .dpo_criterion import DPOCriterion
 from .dpo_trainer import DPOTrainer
 from .trl_data import *
 from .trl_utils import *
