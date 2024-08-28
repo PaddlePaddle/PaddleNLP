@@ -20,6 +20,7 @@ import paddle
 import paddle.distributed as dist
 from paddle.framework import LayerHelper, core, in_dynamic_mode, in_dynamic_or_pir_mode
 from paddle.incubate.nn.functional import (
+    fused_bias_act,
     fused_layer_norm,
     fused_moe,
     fused_rms_norm,
@@ -29,7 +30,6 @@ from paddle.incubate.nn.functional import (
 from paddle.nn import Layer
 from paddle.nn.initializer import Constant
 from paddle.nn.quant import weight_only_linear
-from paddle.incubate.nn.functional import fused_bias_act
 
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
