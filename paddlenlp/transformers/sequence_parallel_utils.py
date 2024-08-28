@@ -113,7 +113,6 @@ class AllGatherVarlenOp(PyLayer):
         input_shape[0] = ctx.max_shape0 * ctx.shape0_all.shape[0]
         output = paddle.zeros(shape=input_shape, dtype=grad.dtype)
 
-        # grad = paddle.put_along_axis(output, ctx.indices, grad, axis=0)
         grad = paddle.scatter(output, ctx.indices, grad)
         grad = scatter(grad)
 
