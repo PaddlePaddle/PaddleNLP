@@ -14,15 +14,19 @@
 import json
 import os
 
-from paddleslim.quant.observers.abs_max import AbsmaxObserver
-
 import paddle
+from experimental.layers.custom_attention import QuantizedCustomAttentionLayer
+from experimental.observer.abs_max_headwise import AbsMaxHeadwiseObserver
+from experimental.observer.avg_headwise import AvgHeadwiseObserver
+from experimental.observer.channel_wise import ChannelWiseObserver
 from paddle import nn
 from paddle.distributed.fleet.meta_parallel import (
     ColumnParallelLinear,
     RowParallelLinear,
 )
 from paddle.quantization import PTQ, QAT, QuantConfig
+from paddle.quantization.base_observer import BaseObserver
+from paddleslim.common.wrapper_function import FuncWrapper
 from paddleslim.quant.advanced import (
     GPTQ,
     AutoClip,
@@ -43,9 +47,7 @@ from paddleslim.quant.observers import (
     AVGObserver,
     GroupWiseWeightObserver,
 )
-
-from paddleslim.common.wrapper_function import FuncWrapper
-from experimental.layers.custom_attention import QuantizedCustomAttentionLayer
+from paddleslim.quant.observers.abs_max import AbsmaxObserver
 
 from paddlenlp.peft import PrefixModelForCausalLM
 from paddlenlp.peft.lora import (
@@ -59,12 +61,6 @@ from paddlenlp.peft.lora.lora_quant_layers import (
     RowParallelQuantedLoRALinear,
 )
 from paddlenlp.utils.log import logger
-
-from experimental.observer.avg_headwise import AvgHeadwiseObserver
-from experimental.observer.channel_wise import ChannelWiseObserver
-from experimental.observer.abs_max_headwise import AbsMaxHeadwiseObserver
-
-from paddle.quantization.base_observer import BaseObserver
 
 ACT_OBSERVER = dict(
     abs_max=AbsmaxObserver,
@@ -85,6 +81,7 @@ FP8_OBSERVER = dict(
     abs_max=AbsmaxObserver,
     avg=AVGObserver,
 )
+
 
 def create_qat_model(quant_args, model, dtype):
     from paddle.quantization.quanters import FakeQuanterWithAbsMaxObserver
@@ -219,108 +216,108 @@ def prepare_qconfig(args):
 
     weight_observer = WEIGHT_OBSERVER.get(args.weight_quant_method, None)
     if weight_observer is None:
-        weight_observer =  FP8_OBSERVER.get(args.weight_quant_method, None)
+        weight_observer = FP8_OBSERVER.get(args.weight_quant_method, None)
 
     act_observer = ACT_OBSERVER.get(args.act_quant_method, None)
     if act_observer is None:
         act_observer = FP8_OBSERVER.get(args.act_quant_method, None)
-    
+
     cachekv_observer = CACHEKV_OBSERVER.get(args.cachekv_quant_method, None)
     if cachekv_observer is None:
         cachekv_observer = FP8_OBSERVER.get(args.cachekv_quant_method, None)
 
-    
-
-    if 'C8' in args.quant_type:
-        quant_type = args.quant_type.replace('C8', '')
+    args.quant_type = args.quant_type.lower()
+    args.use_fp8 = args.use_fp8.lower()
+    if "c8" in args.quant_type:
+        quant_type = args.quant_type.replace("c8", "")
         cachekv_quant = True
 
-        if 'C' in args.use_fp8:
-            cachekv_quant_bits = 'fp8'
+        if "c" in args.use_fp8:
+            cachekv_quant_bits = "fp8"
         else:
-            cachekv_quant_bits = 'int8'
+            cachekv_quant_bits = "int8"
     else:
-        quant_type = args.quant_type.replace('C16', '')
+        quant_type = args.quant_type.replace("c16", "")
         cachekv_quant = False
 
     q_config = QuantConfig(activation=None, weight=None)
-    if quant_type == "W8A8":
+    if quant_type in ["a8w8", "w8a8"]:
 
-        if 'W' in args.use_fp8:
-            w_quant_bit = (4,3) if args.fp8_type[args.use_fp8.index('W')] == 'e4m3' else (5,2)
+        if "w" in args.use_fp8:
+            w_quant_bit = (4, 3) if args.fp8_type[args.use_fp8.index("w")] == "e4m3" else (5, 2)
         else:
             w_quant_bit = 8
-        
-        if 'A' in args.use_fp8:
-            a_quant_bit = (4,3) if args.fp8_type[args.use_fp8.index('A')] == 'e4m3' else (5,2)
+
+        if "a" in args.use_fp8:
+            a_quant_bit = (4, 3) if args.fp8_type[args.use_fp8.index("a")] == "e4m3" else (5, 2)
         else:
             a_quant_bit = 8
         activation = act_observer(quant_bits=w_quant_bit)
         weight = weight_observer(quant_bits=a_quant_bit)
-        
-    elif quant_type in ["WINT4", "W4A16"]:
+
+    elif quant_type in ["wint4", "w4a16", "weight_only_int8"]:
         activation = None
-        weight = GroupWiseWeightObserver(quant_bits=4, group_size=args.group_size) # TODO
-    elif quant_type in ["WINT8", "W8A16"]:
+        weight = GroupWiseWeightObserver(quant_bits=4, group_size=args.group_size)  # TODO
+    elif quant_type in ["wint8", "w8a16", "weight_only_int8"]:
         activation = None
 
-        if 'W' in args.use_fp8:
-            weight = weight_observer(quant_bits=(4,3))
+        if "w" in args.use_fp8:
+            weight = weight_observer(quant_bits=(4, 3))
         else:
             weight = weight_observer(quant_bits=8)
     else:
-        raise ValueError("quant_type should be in ['W8A8', 'W8A8C8', 'WINT4', 'W4A16', 'WINT8', 'W8A16']")
- 
+        raise ValueError(
+            "quant_type should be in ['weight_only_int8/wint8', 'weight_only_int4/wint4', 'a8w8', 'a8w8c8']"
+        )
+
     q_config.add_qat_layer_mapping(ColumnParallelLinear, QuantizedColumnParallelLinear)
     q_config.add_qat_layer_mapping(RowParallelLinear, QuantizedRowParallelLinear)
 
     cachekv = None
-    if cachekv_quant: 
-        if cachekv_quant_bits == 'int8':
+    if cachekv_quant:
+        if cachekv_quant_bits == "int8":
             cachekv_quant_bit = 8
-            if 'headwise' in args.cachekv_quant_method:
+            if "headwise" in args.cachekv_quant_method:
                 cachekv = [
-                    cachekv_observer(quant_bits=cachekv_quant_bit,quant_axis=1),
-                    cachekv_observer(quant_bits=cachekv_quant_bit,quant_axis=1)
+                    cachekv_observer(quant_bits=cachekv_quant_bit, quant_axis=1),
+                    cachekv_observer(quant_bits=cachekv_quant_bit, quant_axis=1),
                 ]
             else:
                 cachekv = [
                     cachekv_observer(quant_bits=cachekv_quant_bit),
-                    cachekv_observer(quant_bits=cachekv_quant_bit)
+                    cachekv_observer(quant_bits=cachekv_quant_bit),
                 ]
             q_config.add_qat_layer_mapping(FuncWrapper, QuantizedCustomAttentionLayer)
-        
-        elif cachekv_quant_bits == 'fp8':
-            cachekv_quant_bit = (4,3) if args.fp8_type[args.use_fp8.index('C')] == 'e4m3' else (5,2)
 
-            if 'headwise' in args.cachekv_quant_method:
+        elif cachekv_quant_bits == "fp8":
+            cachekv_quant_bit = (4, 3) if args.fp8_type[args.use_fp8.index("C")] == "e4m3" else (5, 2)
+
+            if "headwise" in args.cachekv_quant_method:
                 cachekv = [
-                    cachekv_observer(quant_bits=cachekv_quant_bit,quant_axis=1),
-                    cachekv_observer(quant_bits=cachekv_quant_bit,quant_axis=1)
+                    cachekv_observer(quant_bits=cachekv_quant_bit, quant_axis=1),
+                    cachekv_observer(quant_bits=cachekv_quant_bit, quant_axis=1),
                 ]
             else:
                 cachekv = [
                     cachekv_observer(quant_bits=cachekv_quant_bit),
-                    cachekv_observer(quant_bits=cachekv_quant_bit)
+                    cachekv_observer(quant_bits=cachekv_quant_bit),
                 ]
             q_config.add_qat_layer_mapping(FuncWrapper, QuantizedCustomAttentionLayer)
         else:
-            raise ValueError('cachekv_quant_bits should be 8')
-
+            raise ValueError("cachekv_quant_bits should be 8")
 
     return activation, weight, cachekv, q_config
 
 
-
-def load_quant_model(model, quant_args, load_quant_path,dtype="float32"):
+def load_quant_model(model, quant_args, load_quant_path, dtype="float32"):
     """
     Load quantized model and its scales
     """
     activation, weight, cachekv, q_config = prepare_qconfig(quant_args)
-    
+
     if cachekv is not None:
         set_wrapper_for_attn(model)
-    
+
     skip_list_names = [] if quant_args.skip_list_names is not None else quant_args.skip_list_names
     for cur_name, cur_layer in model.named_sublayers():
         skip = False
@@ -328,29 +325,29 @@ def load_quant_model(model, quant_args, load_quant_path,dtype="float32"):
             if k in cur_name:
                 logger.info(f"Skip layer {cur_name}")
                 skip = True
-        if skip: continue
+        if skip:
+            continue
 
         if type(cur_layer) in [paddle.nn.Linear, ColumnParallelLinear, RowParallelLinear]:
             logger.info(f"PTQ layer: {cur_name}")
             q_config.add_name_config([cur_layer.full_name()], activation=activation, weight=weight)
-    
 
         if type(cur_layer) in [FuncWrapper] and cachekv is not None:
             logger.info(f"PTQ layer: {cur_name}")
             # set both act and weight for attention, actually act-k and act-v are quantized
             q_config.add_name_config([cur_layer.full_name()], weight=cachekv[0], activation=cachekv[1])
-        
+
     ptq = PTQ(q_config)
     model = ptq.quantize(model, inplace=True)
- 
+
     logger.info("Load quant model...")
     if activation is not None:
         with open(f"{load_quant_path}/act_scales.json") as outfile:
             act_scales = json.load(outfile)
     else:
         act_scales = {}
-    
-    if 'C8' in quant_args.quant_type or 'C4' in quant_args.quant_type:
+
+    if "C8" in quant_args.quant_type or "C4" in quant_args.quant_type:
         with open(f"{load_quant_path}/cachekv_scales.json") as outfile:
             cachekv_scales = json.load(outfile)
     else:
@@ -358,28 +355,29 @@ def load_quant_model(model, quant_args, load_quant_path,dtype="float32"):
 
     with open(f"{load_quant_path}/weight_scales.json") as outfile:
         weight_scales = json.load(outfile)
-    
 
     for cur_name, cur_layer in model.named_sublayers():
-        if hasattr(cur_layer, 'scales'):
-            
-            if isinstance(cur_layer,ChannelWiseObserver) or isinstance(cur_layer, BaseObserver):
+        if hasattr(cur_layer, "scales"):
+
+            if isinstance(cur_layer, ChannelWiseObserver) or isinstance(cur_layer, BaseObserver):
                 logger.info(f"Load scale for layer {cur_name}")
-                if 'attn_func' in cur_name:
-                    cur_name = cur_name.replace('attn_func.activation_quanter_v', 'cachev_matmul.activation_quanter')
-                    cur_name = cur_name.replace('attn_func.activation_quanter_k', 'cachek_matmul.activation_quanter')
+                if "attn_func" in cur_name:
+                    cur_name = cur_name.replace("attn_func.activation_quanter_v", "cachev_matmul.activation_quanter")
+                    cur_name = cur_name.replace("attn_func.activation_quanter_k", "cachek_matmul.activation_quanter")
                     if cur_name in cachekv_scales:
                         cur_layer._scale = paddle.to_tensor(cachekv_scales[cur_name], dtype=dtype)
-                        if cur_name + '.zero_point' in cachekv_scales:
-                            cur_layer._zero_point = paddle.to_tensor(cachekv_scales[cur_name + '.zero_point'], dtype=dtype)
+                        if cur_name + ".zero_point" in cachekv_scales:
+                            cur_layer._zero_point = paddle.to_tensor(
+                                cachekv_scales[cur_name + ".zero_point"], dtype=dtype
+                            )
                         else:
                             cur_layer._zero_point = paddle.to_tensor(0.0, dtype=dtype)
                     else:
                         logger.info(f"No scale found for layer {cur_name}, remove it")
                         parent_layer, sub_name = find_parent_layer_and_sub_name(model, cur_name)
                         setattr(parent_layer, sub_name, None)
-                
-                elif 'activation_quanter' in cur_name:
+
+                elif "activation_quanter" in cur_name:
                     if cur_name in act_scales:
                         cur_layer._scale = paddle.to_tensor(act_scales[cur_name], dtype=dtype)
                         cur_layer._zero_point = paddle.to_tensor(0.0, dtype=dtype)
@@ -387,22 +385,23 @@ def load_quant_model(model, quant_args, load_quant_path,dtype="float32"):
                         logger.info(f"No scale found for layer {cur_name}, remove it")
                         parent_layer, sub_name = find_parent_layer_and_sub_name(model, cur_name)
                         setattr(parent_layer, sub_name, None)
-                elif 'weight_quanter' in cur_name:
+                elif "weight_quanter" in cur_name:
                     if cur_name in weight_scales:
                         cur_layer._scale = paddle.to_tensor(weight_scales[cur_name], dtype=dtype)
                     else:
                         logger.info(f"No scale found for layer {cur_name}, remove it")
                         parent_layer, sub_name = find_parent_layer_and_sub_name(model, cur_name)
                         setattr(parent_layer, sub_name, None)
-        
+
     model = ptq.convert(model, inplace=True)
     if os.path.exists(os.path.join(load_quant_path, "model_state.pdparams")):
         logger.info(f"Load model checkpoint from {load_quant_path}")
         model_path = os.path.join(load_quant_path, "model_state.pdparams")
         model_dict = paddle.load(model_path, return_numpy=True)
-        model.set_dict(model_dict) 
+        model.set_dict(model_dict)
     else:
-        raise Exception(f"Only support load model from pdparams now")
+        raise Exception("Only support load model from pdparams now")
+
 
 def apply_ptq(quant_args, trainer, ptq_dataloader):
     logger.info("***** Running PTQ *****")
@@ -410,7 +409,7 @@ def apply_ptq(quant_args, trainer, ptq_dataloader):
 
     if cachekv is not None:
         set_wrapper_for_attn(trainer.model)
-    
+
     skip_list_names = [] if quant_args.skip_list_names is None else quant_args.skip_list_names
 
     for cur_name, cur_layer in trainer.model.named_sublayers():
@@ -419,17 +418,18 @@ def apply_ptq(quant_args, trainer, ptq_dataloader):
             if k in cur_name:
                 logger.info(f"Skip layer {cur_name}")
                 skip = True
-        if skip: continue
+        if skip:
+            continue
 
         if type(cur_layer) in [paddle.nn.Linear, ColumnParallelLinear, RowParallelLinear]:
             logger.info(f"PTQ layer: {cur_name}")
             q_config.add_name_config([cur_layer.full_name()], activation=activation, weight=weight)
-    
+
         if cachekv is not None and type(cur_layer) in [FuncWrapper]:
             logger.info(f"PTQ layer: {cur_name}")
             # set both act and weight for attention, actually act-k and act-v are quantized
             q_config.add_name_config([cur_layer.full_name()], weight=cachekv[0], activation=cachekv[1])
-    
+
     ptq = PTQ(q_config)
     trainer.model = ptq.quantize(trainer.model, inplace=True)
 
@@ -448,15 +448,15 @@ def apply_ptq(quant_args, trainer, ptq_dataloader):
     act_scales = {}
     cachekv_scales = {}
     for cur_name, cur_layer in trainer.model.named_sublayers():
-        if isinstance(cur_layer,ChannelWiseObserver) or isinstance(cur_layer, BaseObserver):
+        if isinstance(cur_layer, ChannelWiseObserver) or isinstance(cur_layer, BaseObserver):
             if "_observer" not in cur_name:
-                if 'attn_func' in cur_name:
-                    cur_name = cur_name.replace('attn_func.activation_quanter_v', 'cachev_matmul.activation_quanter')
-                    cur_name = cur_name.replace('attn_func.activation_quanter_k', 'cachek_matmul.activation_quanter')
+                if "attn_func" in cur_name:
+                    cur_name = cur_name.replace("attn_func.activation_quanter_v", "cachev_matmul.activation_quanter")
+                    cur_name = cur_name.replace("attn_func.activation_quanter_k", "cachek_matmul.activation_quanter")
                     cachekv_scales[cur_name] = cur_layer.scales().cast("float32").numpy().tolist()
-                elif 'activation_quanter' in cur_name:
+                elif "activation_quanter" in cur_name:
                     act_scales[cur_name] = cur_layer.scales().cast("float32").numpy().tolist()
-                elif 'weight_quanter' in cur_name:
+                elif "weight_quanter" in cur_name:
                     weight_scales[cur_name] = cur_layer.scales().cast("float32").numpy().tolist()
 
     weight_scales_path = os.path.join(trainer.args.output_dir, "weight_scales.json")
@@ -470,7 +470,7 @@ def apply_ptq(quant_args, trainer, ptq_dataloader):
     logger.info(f"Activation scales saved in {act_scales_path}.")
 
     cachekv_scales_path = os.path.join(trainer.args.output_dir, "cachekv_scales.json")
-    with open (cachekv_scales_path, "w") as f:
+    with open(cachekv_scales_path, "w") as f:
         json.dump(cachekv_scales, f)
     logger.info(f"CacheKV scales saved in {cachekv_scales_path}.")
 
@@ -500,11 +500,13 @@ def apply_gptq(quant_args, trainer, ptq_dataloader):
             setattr(parent_layer, sub_name, cur_layer)
     logger.info("***** GPTQ done *****")
 
-def set_wrapper_for_attn(model:nn.Layer, attn_name='attn_func'):
+
+def set_wrapper_for_attn(model: nn.Layer, attn_name="attn_func"):
     for cur_name, cur_layer in model.named_sublayers():
         if hasattr(cur_layer, attn_name):
             logger.info(f"Set wrapper for {attn_name} in {cur_name}")
             cur_layer.attn_func = FuncWrapper(cur_layer.attn_func)
+
 
 def get_ptq_model_config(model):
     if isinstance(model, PrefixModelForCausalLM):
@@ -528,31 +530,33 @@ def get_ptq_model_config(model):
         )
     return model_config
 
-def enable_observer(model:nn.Layer):
+
+def enable_observer(model: nn.Layer):
     # TODO maybe not support pp,tp etc.
     for mod in model.sublayers():
         if hasattr(mod, "observer_enabled"):
             mod.observer_enabled = True
 
-def disable_observer(model:nn.Layer):
+
+def disable_observer(model: nn.Layer):
     # TODO maybe not support pp,tp etc.
     for mod in model.sublayers():
         if hasattr(mod, "observer_enabled"):
             mod.observer_enabled = False
 
 
-def add_quant_inp_out_hook(model:nn.Layer, tag_func):
-
+def add_quant_inp_out_hook(model: nn.Layer, tag_func):
     def get_hook():
         inp_ret = []
         out_ret = []
+
         def hook(layer, inp, out):
             nonlocal inp_ret, out_ret
             inp_ret.append(inp[0].flatten().numpy())
             out_ret.append(out.flatten().numpy())
             return out
-        
-        return hook,inp_ret,out_ret
+
+        return hook, inp_ret, out_ret
 
     inp_dict = dict()
     out_dict = dict()
@@ -565,10 +569,12 @@ def add_quant_inp_out_hook(model:nn.Layer, tag_func):
             inp_dict[cur_name] = inp_ret
             out_dict[cur_name] = out_ret
             handlers.append(handle)
-    
+
     return inp_dict, out_dict
-    
+
+
 def save_dict(inp_dict, file_path):
     import pickle
-    with open(file_path, 'wb') as f:
+
+    with open(file_path, "wb") as f:
         pickle.dump(inp_dict, f)
