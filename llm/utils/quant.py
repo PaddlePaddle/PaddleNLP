@@ -213,6 +213,9 @@ def prepare_qconfig(args):
     """
     Prepare qconfig
     """
+    args.quant_type = args.quant_type.lower()
+    args.use_fp8 = args.use_fp8.lower()
+
     weight_observer = (
         WEIGHT_OBSERVER.get(args.weight_quant_method, None)
         if "w" not in args.use_fp8
@@ -229,8 +232,6 @@ def prepare_qconfig(args):
         else FP8_OBSERVER.get(args.cachekv_quant_method, None)
     )
 
-    args.quant_type = args.quant_type.lower()
-    args.use_fp8 = args.use_fp8.lower()
     if "c8" in args.quant_type:
         quant_type = args.quant_type.replace("c8", "")
         cachekv_quant = True
@@ -293,7 +294,7 @@ def prepare_qconfig(args):
             q_config.add_qat_layer_mapping(FuncWrapper, QuantizedCustomAttentionLayer)
 
         elif cachekv_quant_bits == "fp8":
-            cachekv_quant_bit = (4, 3) if args.fp8_type[args.use_fp8.index("C")] == "e4m3" else (5, 2)
+            cachekv_quant_bit = (4, 3) if args.fp8_type[args.use_fp8.index("c")] == "e4m3" else (5, 2)
 
             if "headwise" in args.cachekv_quant_method:
                 cachekv = [
