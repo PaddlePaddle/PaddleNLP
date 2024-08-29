@@ -354,7 +354,17 @@ class Trainer:
         )
         self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
 
-        self._save_ckpt_func = dist.save_state_dict if self.args.enable_auto_parallel else paddle.save
+        def _save_ckpt_func(state_dict, path, signal_path=None):
+            if self.args.enable_auto_parallel:
+                dist.save_state_dict(state_dict, path)
+            else:
+                paddle.save(state_dict, path)
+
+            if signal_path is not None:
+                with open(signal_path, mode="w+") as f:
+                    f.write("1")
+
+        self._save_ckpt_func = _save_ckpt_func
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
         if self.args.use_async_save:
             self._async_optimizer_saver = AsyncSaver()
@@ -2297,9 +2307,8 @@ class Trainer:
                             self._save_ckpt_func(
                                 self._filter_moe_no_sync_optimizer_params(),
                                 os.path.join(output_dir, optimizer_name),
+                                saved_signal_path,
                             )
-                            with open(saved_signal_path, mode="w+") as f:
-                                f.write("1")
 
                         else:
                             state_dict = self.optimizer.state_dict()
@@ -2310,9 +2319,7 @@ class Trainer:
                                     state_dict, save_path, saved_signal_path=saved_signal_path
                                 )
                             else:
-                                self._save_ckpt_func(state_dict, save_path)
-                                with open(saved_signal_path, mode="w+") as f:
-                                    f.write("1")
+                                self._save_ckpt_func(state_dict, save_path, saved_signal_path)
                 else:
                     if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
@@ -2331,14 +2338,16 @@ class Trainer:
                     else:
                         if self.args.data_parallel_rank > 0 and self.args.use_expert_parallel:
                             self._save_ckpt_func(
-                                self._filter_moe_no_sync_optimizer_params(), os.path.join(output_dir, optimizer_name)
+                                self._filter_moe_no_sync_optimizer_params(),
+                                os.path.join(output_dir, optimizer_name),
+                                saved_signal_path,
                             )
-                            with open(saved_signal_path, mode="w+") as f:
-                                f.write("1")
                         else:
-                            self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, optimizer_name))
-                            with open(saved_signal_path, mode="w+") as f:
-                                f.write("1")
+                            self._save_ckpt_func(
+                                self.optimizer.state_dict(),
+                                os.path.join(output_dir, optimizer_name),
+                                saved_signal_path,
+                            )
 
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
