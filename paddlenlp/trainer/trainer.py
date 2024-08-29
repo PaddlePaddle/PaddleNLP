@@ -992,10 +992,6 @@ class Trainer:
                 else:
                     tr_loss_step = self.training_step(model, inputs)
 
-                if not args.fp16:
-                    if not paddle.isfinite(tr_loss_step).all().item():
-                        raise ValueError(f"Loss contains inf or nan values at rank {paddle.distributed.get_rank()}")
-
                 tr_loss += tr_loss_step
 
                 def fused_allreduce_gradients_no_sync(paramlist, hcg):
@@ -1294,7 +1290,11 @@ class Trainer:
 
     def _get_item_from_loss(self, loss):
         assert isinstance(loss, paddle.Tensor) and loss._is_initialized()
-        return loss.item()
+        loss_value = loss.item()
+        if not self.args.fp16:
+            if not np.isfinite(loss_value).all():
+                raise ValueError(f"Loss contains inf or nan values, its value is {loss_value}")
+        return loss_value
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
