@@ -811,7 +811,7 @@ class QWenModel(QWenPretrainedModel):
         hidden_states = inputs_embeds
         use_casual_mask = get_use_casual_mask()
         # bool 4D mask
-        if use_casual_mask is None:
+        if use_casual_mask is True:
             attention_mask = None
         else:
             attention_mask = self.get_masks(input_shape[0], input_shape[1], past_length, padding_mask=attention_mask)
