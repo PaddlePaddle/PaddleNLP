@@ -103,6 +103,7 @@ DEST_PLACE = paddle.CPUPlace()
 if paddle.device.is_compiled_with_cuda():
     DEST_PLACE = paddle.CUDAPinnedPlace()
 
+LOAD_THREAD_NUM = 8
 
 class UnifiedCheckpointOption(ExplicitEnum):
     """
@@ -780,7 +781,7 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
 
     load_thread_num = 1
     if "load_multi_thread" in args.unified_checkpoint_config:
-        load_thread_num = 8
+        load_thread_num = LOAD_THREAD_NUM
 
     for shard_file in resolved_archive_file:
         # TODO: check if  no expected_keys in shard_file, then don't load it
@@ -996,7 +997,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
     
     load_thread_num = 1
     if "load_multi_thread" in args.unified_checkpoint_config:
-        load_thread_num = 8
+        load_thread_num = LOAD_THREAD_NUM
 
     state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, load_thread_num=load_thread_num)
     if has_master_weights:
@@ -1712,7 +1713,7 @@ def load_single_card_checkpoint(args, model, resume_from_checkpoint: str):
 
     load_thread_num = 1
     if "load_multi_thread" in args.unified_checkpoint_config:
-        load_thread_num = 8
+        load_thread_num = LOAD_THREAD_NUM
 
     state_dict = load_state_dict(resolved_archive_file[0], None, expected_keys, thread_num=load_thread_num)
     error_msgs = _load_state_dict_into_model(model, state_dict, "")
@@ -1746,7 +1747,7 @@ def load_single_card_optimizer(args, model, optimizer, resume_from_checkpoint: s
     
     load_thread_num = 1
     if "load_multi_thread" in args.unified_checkpoint_config:
-        load_thread_num = 8
+        load_thread_num = LOAD_THREAD_NUM
 
     state_dict_optim = load_state_dict(resolved_archive_file[0], None, expected_keys, thread_num=load_thread_num)
     if has_master_weights:
