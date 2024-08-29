@@ -2000,7 +2000,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
                 if config.quantization_config.is_weight_quantize():
                     filter_dict_keys = None
-
                 state_dict = load_state_dict(
                     shard_file, tp_actions if pre_tensor_parallel_split else None, filter_dict_keys
                 )
@@ -2316,7 +2315,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             else:
                 raise ValueError(f"Unexpected file: {resolved_archive_file} for weight conversion.")
             # load pt weights early so that we know which dtype to init the model under
-
         if not is_sharded and state_dict is None:
             # 4. loading non-sharded ckpt from the state dict
             if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):

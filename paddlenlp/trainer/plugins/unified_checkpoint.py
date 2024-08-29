@@ -998,10 +998,10 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
     if "load_multi_thread" in args.unified_checkpoint_config:
         load_thread_num = 8
 
-    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, load_thread_num)
+    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, load_thread_num=load_thread_num)
     if has_master_weights:
         state_dict_master_weight = load_resolved_archive_file(
-            resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weights=True
+            resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weights=True, load_thread_num=load_thread_num
         )
     # rename optimizer param
     for key in list(state_dict_optim.keys()):
