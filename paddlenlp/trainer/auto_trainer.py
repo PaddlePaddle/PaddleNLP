@@ -117,11 +117,11 @@ class AutoTrainer(Trainer):
         dist_loader = self._wrap_for_dist_loader(train_dataloader)
 
         if ShardingOption.SHARD_OP in self.args.sharding:
-            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage1())
+            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage1(self.global_mesh))
         elif ShardingOption.SHARD_GRAD_OP in self.args.sharding:
-            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage2())
+            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage2(self.global_mesh))
         elif ShardingOption.FULL_SHARD in self.args.sharding:
-            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage3())
+            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage3(self.global_mesh))
 
         if self.args.to_static:
             unified_strategy = dist.Strategy()
