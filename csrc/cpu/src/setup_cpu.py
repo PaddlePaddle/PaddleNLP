@@ -53,19 +53,28 @@ def check_avx512_bf16__support():
         return False
 
 
-# cc flags
 paddle_extra_compile_args = [
     "-std=c++17",
     "-shared",
     "-fPIC",
     "-Wno-parentheses",
     "-DPADDLE_WITH_CUSTOM_KERNEL",
+    "-mavx512f",
+    "-mavx512vl",
+    "-fopenmp",
+    "-mavx512bw",
+    "-mno-mmx",
+    "-Wall",
+    "-march=skylake-avx512",
+    "-O3",
+    "-g",
 ]
 
 if check_avx512_bf16__support():
     paddle_extra_compile_args += [
         "-DAVX512_BF16_WEIGHT_ONLY_BF16=true",
-        "-DAVX512_BF16_WEIGHT_ONLY_BF16=true",
+        "-DAVX512_FP16_WEIGHT_ONLY_INT8=true",
+        "-DAVX512_FP16_WEIGHT_ONLY_FP16=true",
     ]
 else:
     paddle_extra_compile_args += [
@@ -81,15 +90,17 @@ XFT_LIBRARY_DIR = os.environ["XFT_LIB_DIR"]
 
 # include path third_party
 paddle_custom_kernel_include += [
-    os.path.join(XFT_INCLUDE_DIR, "include"),  # glog
-    os.path.join(XFT_INCLUDE_DIR, "src/common"),  # src
-    os.path.join(XFT_INCLUDE_DIR, "src/kernel"),  # src
-    os.path.join(XFT_INCLUDE_DIR, "src/layers"),  # src
-    os.path.join(XFT_INCLUDE_DIR, "src/models"),  # src
-    os.path.join(XFT_INCLUDE_DIR, "src/utils"),  # src
-    os.path.join(XFT_INCLUDE_DIR, "3rdparty/onednn/include"),  # src
-    os.path.join(XFT_INCLUDE_DIR, "3rdparty/onednn/build/include"),  # src
-    os.path.join(XFT_INCLUDE_DIR, "3rdparty/xdnn"),  # src
+    os.path.join(XFT_INCLUDE_DIR, "include"),
+    os.path.join(XFT_INCLUDE_DIR, "src/common"),
+    os.path.join(XFT_INCLUDE_DIR, "src/kernel"),
+    os.path.join(XFT_INCLUDE_DIR, "src/layers"),
+    os.path.join(XFT_INCLUDE_DIR, "src/models"),
+    os.path.join(XFT_INCLUDE_DIR, "src/utils"),
+    os.path.join(XFT_INCLUDE_DIR, "3rdparty/onednn/include"),
+    os.path.join(XFT_INCLUDE_DIR, "3rdparty/onednn/build/include"),
+    os.path.join(XFT_INCLUDE_DIR, "3rdparty/xdnn"),
+    os.path.join(XFT_INCLUDE_DIR, "3rdparty"),
+    os.path.join(XFT_INCLUDE_DIR, "3rdparty/mkl/include"),
 ]
 
 # libs path
@@ -101,11 +112,13 @@ libs = [":libxfastertransformer.so", ":libxft_comm_helper.so"]
 
 custom_kernel_dot_module = CppExtension(
     sources=[
-        "./src/xft_llama_layer.cc",
         "../generation/save_with_output.cc",
         "./src/token_penalty_multi_scores.cc",
         "./src/stop_generation_multi_ends.cc",
         "./src/set_value_by_flags.cc",
+        "./src/xft_transformer.cc",
+        "./src/avx_weight_only.cc",
+        "./src/xft_greedy_search.cc",
     ],
     include_dirs=paddle_custom_kernel_include,
     library_dirs=paddle_custom_kernel_library_dir,

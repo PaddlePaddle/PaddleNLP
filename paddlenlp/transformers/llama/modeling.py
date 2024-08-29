@@ -815,6 +815,8 @@ class LlamaAttention(nn.Layer):
 
         self.config = config
 
+        self.attn_func = scaled_dot_product_attention
+
     def _init_rope(self):
         if (
             hasattr(self.config, "rope_scaling")
@@ -1063,7 +1065,7 @@ class LlamaAttention(nn.Layer):
             and self.recompute_granularity == "core_attn"
         ):
             outputs = recompute(
-                scaled_dot_product_attention,
+                self.attn_func,
                 query_states,
                 self.config,
                 key_states,
@@ -1071,22 +1073,22 @@ class LlamaAttention(nn.Layer):
                 attention_mask,
                 output_attentions,
                 alibi,
-                attn_mask_startend_row_indices,
-                self.sequence_parallel,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                sequence_parallel=self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
-            outputs = scaled_dot_product_attention(
+            outputs = self.attn_func(
                 query_states,
                 self.config,
                 key_states,
                 value_states,
                 attention_mask,
                 output_attentions,
-                alibi,
-                attn_mask_startend_row_indices,
-                self.sequence_parallel,
+                alibi=alibi,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+                sequence_parallel=self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
                 npu_is_casual=npu_is_casual,
             )

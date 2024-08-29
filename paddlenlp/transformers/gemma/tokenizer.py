@@ -111,6 +111,18 @@ class GemmaTokenizer(PretrainedTokenizer):
         """Returns vocab size"""
         return self.sp_model.get_piece_size()
 
+    def __len__(self):
+        """
+        Returns the vocabulary size. added_tokens_encoder has to be added in the sp_model
+        """
+        added_size = 0
+
+        for id in self.added_tokens_decoder:
+            if id >= self.sp_model.get_piece_size():
+                added_size += 1
+
+        return self.vocab_size + added_size
+
     # Copied from transformers.models.llama.tokenization_llama.LlamaTokenizer.get_vocab
     def get_vocab(self):
         """Returns vocab as a dict"""
@@ -127,11 +139,15 @@ class GemmaTokenizer(PretrainedTokenizer):
     # Copied from transformers.models.llama.tokenization_llama.LlamaTokenizer._convert_token_to_id
     def _convert_token_to_id(self, token):
         """Converts a token (str) in an id using the vocab."""
-        return self.sp_model.piece_to_id(token)
+        if token in self.added_tokens_encoder:
+            return self.added_tokens_encoder[token]
+        return self.sp_model.PieceToId(token)
 
     # Copied from transformers.models.llama.tokenization_llama.LlamaTokenizer._convert_id_to_token
     def _convert_id_to_token(self, index):
         """Converts an index (integer) in a token (str) using the vocab."""
+        if index in self.added_tokens_decoder:
+            return self.added_tokens_decoder[index]
         token = self.sp_model.IdToPiece(index)
         return token
 
