@@ -80,6 +80,18 @@ class LlamaTokenizer(PretrainedTokenizer):
         """Returns vocab size"""
         return self.sp_model.get_piece_size()
 
+    def __len__(self):
+        """
+        Returns the vocabulary size. added_tokens_encoder has to be added in the sp_model
+        """
+        added_size = 0
+
+        for id in self.added_tokens_decoder:
+            if id >= self.sp_model.get_piece_size():
+                added_size += 1
+
+        return self.vocab_size + added_size
+
     @property
     def bos_token_id(self) -> Optional[int]:
         return self.sp_model.bos_id()
@@ -104,7 +116,7 @@ class LlamaTokenizer(PretrainedTokenizer):
 
     def _convert_id_to_token(self, index):
         """Converts an index (integer) in a token (str) using the vocab."""
-        token = self.sp_model.IdToPiece(index)
+        token = self.sp_model.id_to_piece(index)
         return token
 
     def convert_tokens_to_string(self, tokens):

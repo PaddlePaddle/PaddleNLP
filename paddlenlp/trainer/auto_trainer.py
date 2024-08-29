@@ -26,6 +26,7 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 
+from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
 from .argparser import strtobool
 from .trainer import SCALER_NAME, SCHEDULER_NAME, TRAINER_STATE_NAME, TRAINING_ARGS_NAME
@@ -39,6 +40,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     has_length,
     speed_metrics,
 )
+from .utils.ckpt_converter import CheckpointConverter
 from .utils.helper import distributed_file, distributed_isfile  # nested_truncate,
 
 try:
@@ -313,12 +315,23 @@ class AutoTrainer(Trainer):
 
                 # Skip past any already trained steps if resuming training
                 # We use consumed_samples to reset the status
-                if steps_trained_in_current_epoch > 0:
+                if isinstance(train_dataloader._dataloader, paddle.io.DataLoader) and isinstance(
+                    train_dataloader._dataloader.batch_sampler, NlpDistributedBatchSampler
+                ):
+                    if step == 0:
+                        if steps_trained_progress_bar is not None:
+                            steps_trained_progress_bar.update(steps_trained_in_current_epoch)
+                            steps_trained_progress_bar.close()
+                            steps_trained_progress_bar = None
+                        self._load_rng_state(resume_from_checkpoint)
+                    step += steps_trained_in_current_epoch
+                elif steps_trained_in_current_epoch > 0:
                     steps_trained_in_current_epoch -= 1
                     if steps_trained_progress_bar is not None:
                         steps_trained_progress_bar.update(1)
                     if steps_trained_in_current_epoch == 0:
                         self._load_rng_state(resume_from_checkpoint)
+                    self.timers and self.timers("read-data").start()
                     continue
                 elif steps_trained_progress_bar is not None:
                     steps_trained_progress_bar.close()
@@ -716,20 +729,18 @@ class AutoTrainer(Trainer):
                             )
                         )
 
-            ckpt_path = os.path.join(resume_from_checkpoint, DIST_CKPT_PATH)
-
-            if not os.path.isdir(ckpt_path):
-                raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
-
             if self.args.to_static:
-                opt_state_dict = {
+                if self.model_wrapped._mode is None:
+                    self.model_wrapped.train()
+                model_state_dict = {
+                    key: value
+                    for key, value in self.model_wrapped.state_dict("param").items()
+                    if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
+                }
+                optim_state_dict = {
                     key: value
                     for key, value in self.model_wrapped.state_dict("opt").items()
                     if not any(keyword in key for keyword in FREE_SVAE_LOAD_KEY_PATTERNS)
-                }
-                state_dict = {
-                    MODEL_NAME: self.model_wrapped.state_dict("param"),
-                    OPTIMIZER_NAME: opt_state_dict,
                 }
             else:
                 model_state_dict = self.model_wrapped.state_dict()
@@ -742,12 +753,27 @@ class AutoTrainer(Trainer):
                     optim_state_dict = self.optimizer.state_dict()
                     optim_state_dict.pop("LR_Scheduler", None)
 
-                state_dict = {
-                    MODEL_NAME: model_state_dict,
-                    OPTIMIZER_NAME: optim_state_dict,
-                }
+            state_dict = {
+                MODEL_NAME: model_state_dict,
+                OPTIMIZER_NAME: optim_state_dict,
+            }
 
-            self._load_ckpt_func(state_dict, ckpt_path)
+            parameter_to_structured_name = {}
+            if self.args.to_static:
+                parameter_to_structured_name = self.model_wrapped._parameter_to_structured_name
+            else:
+                for state_name, state_value in self.model_wrapped.state_dict().items():
+                    parameter_to_structured_name[state_value.name] = state_name
+
+            if self.args.auto_parallel_resume_form_hybrid_parallel:
+                CheckpointConverter(
+                    resume_from_checkpoint, state_dict, parameter_to_structured_name, self.args
+                ).load_from_hybrid_parallel_checkpoint()
+            else:
+                ckpt_path = os.path.join(resume_from_checkpoint, DIST_CKPT_PATH)
+                if not os.path.isdir(ckpt_path):
+                    raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
+                self._load_ckpt_func(state_dict, ckpt_path)
 
             # release memory
             del state_dict

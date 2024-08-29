@@ -12,31 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#1. download XFT
+#0.环境准备:安装numactl
+# apt-get update
+# apt-get install numactl
+
+# 1. download XFT
 if [ ! -d xFasterTransformer]; then
-    git clone --branch v1.7.2 https://github.com/intel/xFasterTransformer.git
+    git clone https://github.com/intel/xFasterTransformer.git
 fi
 
 #2.cp patch
 cd xFasterTransformer
-git checkout .
+git reset --hard 420a493f5c3c74f5fdd786f5399aacd04e021df7
 cd ..
 
 if lscpu | grep -q "avx512_bf16"; then
     echo "apply bf16 and fp16."
-    if [ ! -f 0001-patch-fp16-and-bf16.patch ]; then
-        echo "Error:  0001-patch-fp16-and-bf16.patch not exist."
+    if [ ! -f 0001-fp16_bf16.patch ]; then
+        echo "Error:  0001-fp16_bf16.patch not exist."
         exit 1
     fi
     # apply patch
-    cp ./0001-patch-fp16-and-bf16.patch  ./xFasterTransformer/paddle.patch
+    cp ./0001-fp16_bf16.patch  ./xFasterTransformer/paddle.patch
 else
     echo "apply fp32 "
-    if [ ! -f 0001-patch-fp32.patch ]; then
-        echo "Error:  does 0001-patch-fp32.patch not exist."
+    if [ ! -f 0001-fp32.patch ]; then
+        echo "Error:  does 0001-fp32.patch not exist."
         exit 1
     fi
-    cp ./0001-patch-fp32.patch  ./xFasterTransformer/paddle.patch
+    cp ./0001-fp32.patch  ./xFasterTransformer/paddle.patch
 fi
 
 #3. apply patch

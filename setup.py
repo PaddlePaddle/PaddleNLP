@@ -178,6 +178,7 @@ try:
             "paddlenlp.transformers.layoutxlm": get_package_data_files(
                 "paddlenlp.transformers.layoutxlm", ["visual_backbone.yaml"]
             ),
+            "paddlenlp.experimental": get_package_data_files("paddlenlp.experimental", ["transformers"]),
         },
         setup_requires=["cython", "numpy"],
         install_requires=REQUIRED_PACKAGES,

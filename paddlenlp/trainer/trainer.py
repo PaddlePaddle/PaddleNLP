@@ -19,6 +19,7 @@
 import collections
 import contextlib
 import inspect
+import json
 import math
 import os
 import random
@@ -1290,7 +1291,11 @@ class Trainer:
 
     def _get_item_from_loss(self, loss):
         assert isinstance(loss, paddle.Tensor) and loss._is_initialized()
-        return loss.item()
+        loss_value = loss.item()
+        if not self.args.fp16:
+            if not np.isfinite(loss_value).all():
+                raise ValueError(f"Loss contains inf or nan values, its value is {loss_value}")
+        return loss_value
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
@@ -2470,6 +2475,24 @@ class Trainer:
         logger.info(f"Saving model checkpoint to {output_dir}")
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
+
+        local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+        if (
+            strtobool(os.getenv("FLAG_LLM_PDC", "False"))
+            and local_rank == 0
+            and self.args.unified_checkpoint
+            and "async_save" in self.args.unified_checkpoint_config
+        ):
+            os.makedirs(self.args.logging_dir, exist_ok=True)
+            world_size = paddle.distributed.get_world_size()
+            save_info = {
+                "world_size": world_size,
+                "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
+                "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
+            }
+            if not os.path.exists(os.path.join(self.args.logging_dir, "async_save_info.json")):
+                with open(os.path.join(self.args.logging_dir, "async_save_info.json"), "w") as f:
+                    json.dump(save_info, f)
 
         if self.args.should_save:
             if self.tokenizer is not None:
