@@ -178,6 +178,13 @@ class MoeConfig:
         return self.use_moe(i) and self.shared_expert_intermediate_size > 0
 
 
+@dataclass
+class AvxConfig:
+    max_position_embeddings: int = 0
+    compute_type: str = "fp16"
+    cache_dtype: str = "fp16"
+
+
 class FusedMultiTransformerConfig:
     def __init__(
         self,
@@ -201,6 +208,9 @@ class FusedMultiTransformerConfig:
         ffn_ln_scale_attrs=None,
         ffn_ln_bias_attrs=None,
         gate_weight_attrs=None,
+        gate_bias_attrs=None,
+        up_weight_attrs=None,
+        up_bias_attrs=None,
         ffn1_weight_attrs=None,
         ffn1_weight_scale_attrs=None,
         ffn1_bias_attrs=None,
@@ -232,6 +242,7 @@ class FusedMultiTransformerConfig:
         cachekv_int8_type=None,
         rank_id=-1,
         moe_config=MoeConfig(),
+        avx_config=AvxConfig(),
     ):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -257,6 +268,9 @@ class FusedMultiTransformerConfig:
         self.ffn_ln_scale_attrs = ffn_ln_scale_attrs
         self.ffn_ln_bias_attrs = ffn_ln_bias_attrs
         self.gate_weight_attrs = gate_weight_attrs
+        self.gate_bias_attrs = gate_bias_attrs
+        self.up_weight_attrs = up_weight_attrs
+        self.up_bias_attrs = up_bias_attrs
         self.ffn1_weight_attrs = ffn1_weight_attrs
         self.ffn1_weight_scale_attrs = ffn1_weight_scale_attrs
         self.ffn1_bias_attrs = ffn1_bias_attrs
@@ -292,6 +306,7 @@ class FusedMultiTransformerConfig:
         self.ring_id = ring_id
 
         self.moe_config = moe_config
+        self.avx_config = avx_config
 
 
 class FusedMultiTransformerBase(Layer):
@@ -1356,72 +1371,239 @@ class FusedMultiTransformerWeightOnlyPostLayernorm(
         super().__init__(config)
 
 
-class FusedMultiTransformerAvx(FusedMultiTransformerBase):
-    def __init__(self, config: FusedMultiTransformerConfig, max_position_embeddings, compute_type):
-        super().__init__(config)
-        self._dtype = self._helper.get_default_dtype()
+class FusedMultiTransformerAvx(Layer):
+    def __init__(self, config: FusedMultiTransformerConfig):
+        super().__init__()
+        self.config = config
+        assert config.embed_dim > 0, "Expected embed_dim to be greater than 0, " "but received {}".format(
+            config.embed_dim
+        )
+        assert config.num_heads > 0, "Expected nhead to be greater than 0, " "but received {}".format(config.num_heads)
+        assert config.dim_feedforward > 0, "Expected dim_feedforward to be greater than 0, but received {}".format(
+            config.dim_feedforward
+        )
+        self._dtype = "float32"
+        self._epsilon = config.epsilon
+        self._residual_alpha = config.residual_alpha
+        self.norm_type = config.norm_type
+        if self.norm_type != "layernorm" and self.norm_type != "rmsnorm":
+            raise NotImplementedError("Only support norm type of [layernorm, rmsnorm]")
+
+        self._norm_weight_dtype = "float32" if self.norm_type == "layernorm" else self._dtype
+
         self.embed_dim = config.embed_dim
         self.head_dim = config.embed_dim // config.num_heads
-        self.num_heads = config.num_heads // config.nranks
-        self.kv_num_heads = config.kv_num_heads // config.nranks
+        assert self.head_dim * config.num_heads == config.embed_dim, "embed_dim must be divisible by num_heads"
+
+        assert config.num_heads % config.nranks == 0
+        assert config.dim_feedforward % config.nranks == 0
+
+        dim_feedforward = config.dim_feedforward
+        self.num_heads = config.num_heads
+        self.cache_dtype = self.config.avx_config.cache_dtype
+        self.kv_num_heads = config.kv_num_heads
         self.num_layers = config.num_layers
-        self.create_params_type = self.get_weight_create_dype()
+        assert self.num_layers > 0
+        if isinstance(config.qkv_weight_attrs, (list, tuple)):
+            assert self.num_layers == len(config.qkv_weight_attrs)
+
+        self.weight_dtype = self._dtype
+        self.create_params_type = self._dtype
         self.activation = config.activation
-        self.norm_type = config.norm_type
-        self.intermediate_size = config.dim_feedforward
-        self.max_positions = max_position_embeddings
-        self.max_pos_embed = max_position_embeddings
+        self.intermediate_size = dim_feedforward
+        self.max_positions = self.config.avx_config.max_position_embeddings
+        self.max_pos_embed = self.config.avx_config.max_position_embeddings
         self.hiddensize = self.num_heads * self.head_dim
-        self._compute_type = compute_type
+        self._compute_type = self.config.avx_config.compute_type
 
-        self.gate_weights = []
-        self.up_weights = []
+        self.ln_scales, self.ln_biases = [], []
+        self.qkv_weights, self.qkv_biases = [], []
+        self.linear_weights, self.linear_biases = [], []
+        self.ffn_ln_scales, self.ffn_ln_biases = [], []
 
-        gate_weight_attrs = [
-            paddle.ParamAttr(
-                name="fusellama.{}.gate_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
-            )
-            for i in range(self.num_layers)
-        ]
-        up_weight_attrs = [
-            paddle.ParamAttr(
-                name="fusellama.{}.up_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
-            )
-            for i in range(self.num_layers)
-        ]
+        self.ffn2_weights, self.ffn2_biases = [], []
+        self.gate_weights, self.gate_biases = [], []
+        self.up_weights, self.up_biases = [], []
 
         for i in range(self.num_layers):
-            gate_weight_attr = self.get_attr(gate_weight_attrs, i)
-            up_weight_attr = self.get_attr(up_weight_attrs, i)
+            ln_scale_attr = self.get_attr(config.ln_scale_attrs, i)
+            ln_bias_attr = self.get_attr(config.ln_bias_attrs, i)
+            qkv_weight_attr = self.get_attr(config.qkv_weight_attrs, i)
+
+            qkv_bias_attr = self.get_attr(config.qkv_bias_attrs, i)
+            linear_weight_attr = self.get_attr(config.linear_weight_attrs, i)
+            linear_bias_attr = self.get_attr(config.linear_bias_attrs, i)
+
+            ffn_ln_scale_attr = self.get_attr(config.ffn_ln_scale_attrs, i)
+            ffn_ln_bias_attr = self.get_attr(config.ffn_ln_bias_attrs, i)
+            gate_weight_attr = self.get_attr(config.gate_weight_attrs, i)
+            gate_bias_attr = self.get_attr(config.gate_bias_attrs, i)
+            up_weight_attr = self.get_attr(config.up_weight_attrs, i)
+            up_bias_attr = self.get_attr(config.up_bias_attrs, i)
+            ffn2_weight_attr = self.get_attr(config.ffn2_weight_attrs, i)
+            ffn2_bias_attr = self.get_attr(config.ffn2_bias_attrs, i)
+
+            ln_scale = self.create_parameter(
+                attr=ln_scale_attr,
+                shape=[config.embed_dim],
+                default_initializer=Constant(value=1.0),
+                dtype=self._norm_weight_dtype,
+            )
+            ln_bias = None
+            if ln_bias_attr:
+                ln_bias = self.create_parameter(
+                    attr=ln_bias_attr,
+                    shape=[config.embed_dim],
+                    is_bias=True,
+                    dtype=self._norm_weight_dtype,
+                )
+            self.init_weight_shape(config)
+            qkv_weight = self.create_parameter(
+                shape=self.qkv_weight_shape,
+                attr=qkv_weight_attr,
+                dtype=self.create_params_type,
+                is_bias=False,
+            )
+
+            qkv_bias = None
+            if qkv_bias_attr:
+                qkv_bias = self.create_parameter(
+                    shape=[(self.num_heads + 2 * self.kv_num_heads) * self.head_dim],
+                    attr=qkv_bias_attr,
+                    dtype=self._dtype,
+                    is_bias=True,
+                )
+            linear_weight = self.create_parameter(
+                shape=self.linear_weight_shape,
+                attr=linear_weight_attr,
+                dtype=self.create_params_type,
+                is_bias=False,
+            )
+            linear_bias = None
+            if linear_bias_attr:
+                linear_bias = self.create_parameter(
+                    shape=[config.embed_dim],
+                    attr=linear_bias_attr,
+                    dtype=self._dtype,
+                    is_bias=True,
+                )
+            ffn_ln_scale = self.create_parameter(
+                shape=[config.embed_dim],
+                attr=ffn_ln_scale_attr,
+                is_bias=False,
+                default_initializer=Constant(1.0),
+                dtype=self._norm_weight_dtype,
+            )
+
+            ffn_ln_bias = None
+            if ffn_ln_bias_attr:
+                ffn_ln_bias = self.create_parameter(
+                    shape=[config.embed_dim],
+                    attr=ffn_ln_bias_attr,
+                    is_bias=True,
+                    dtype=self._norm_weight_dtype,
+                )
             gate_weight = self.create_parameter(
                 shape=self.gate_weight_shape,
                 attr=gate_weight_attr,
                 dtype=self.create_params_type,
                 is_bias=False,
             )
+            gate_bias = None
+            if gate_bias_attr:
+                gate_bias = self.create_parameter(
+                    shape=[config.dim_feedforward],
+                    attr=gate_bias_attr,
+                    dtype=self._dtype,
+                    is_bias=True,
+                )
             up_weight = self.create_parameter(
                 shape=self.up_weight_shape,
                 attr=up_weight_attr,
                 dtype=self.create_params_type,
                 is_bias=False,
             )
+            up_bias = None
+            if up_bias_attr:
+                up_bias = self.create_parameter(
+                    shape=[config.dim_feedforward],
+                    attr=up_bias_attr,
+                    dtype=self._dtype,
+                    is_bias=True,
+                )
+            ffn2_weight = self.create_parameter(
+                shape=self.ffn2_weight_shape,
+                attr=ffn2_weight_attr,
+                dtype=self.create_params_type,
+                is_bias=False,
+            )
+            ffn2_bias = None
+            if ffn2_bias_attr:
+                ffn2_bias = self.create_parameter(
+                    shape=[config.embed_dim],
+                    attr=ffn2_bias_attr,
+                    dtype=self._dtype,
+                    is_bias=True,
+                )
+            self.ln_scales.append(ln_scale)
+            self.ln_biases.append(ln_bias)
+            self.qkv_weights.append(qkv_weight)
+            self.qkv_biases.append(qkv_bias)
+            self.linear_weights.append(linear_weight)
+            self.linear_biases.append(linear_bias)
+
+            self.ffn_ln_scales.append(ffn_ln_scale)
+            self.ffn_ln_biases.append(ffn_ln_bias)
             self.gate_weights.append(gate_weight)
+            self.gate_biases.append(gate_bias)
             self.up_weights.append(up_weight)
+            self.up_biases.append(up_bias)
+            self.ffn2_weights.append(ffn2_weight)
+            self.ffn2_biases.append(ffn2_bias)
+
+            self._add_parameter(ln_scale)
+            self._add_parameter(ln_bias)
+            self._add_parameter(qkv_weight)
+            self._add_parameter(qkv_bias)
+            self._add_parameter(linear_weight)
+            self._add_parameter(linear_bias)
+
+            self._add_parameter(ffn_ln_scale)
+            self._add_parameter(ffn_ln_bias)
             self._add_parameter(gate_weight)
+            self._add_parameter(gate_bias)
             self._add_parameter(up_weight)
+            self._add_parameter(up_bias)
+            self._add_parameter(ffn2_weight)
+            self._add_parameter(ffn2_bias)
+
+    def get_attr(self, attrs, idx):
+        """
+        For fake parameter
+        """
+        if isinstance(attrs, (list, tuple)):
+            assert (
+                len(attrs) == self.num_layers
+            ), f"length of attrs is {len(attrs)} is not equal to self.num_layers {self.num_layers}"
+            return attrs[idx]
+        return attrs
+
+    def _add_parameter(self, param):
+        """
+        For fake parameter
+        """
+        if param is None:
+            return
+        assert param.name not in self._parameters
+        self._parameters[param.name] = param
 
     def init_weight_shape(self, config):
-        self.gate_weight_shape = [self.embed_dim, self.dim_feedforward]
-        self.up_weight_shape = [self.embed_dim, self.dim_feedforward]
-        self.down_weight_shape = [self.dim_feedforward, self.embed_dim]
+        self.gate_weight_shape = [self.embed_dim, self.intermediate_size]
+        self.up_weight_shape = [self.embed_dim, self.intermediate_size]
+        self.down_weight_shape = [self.intermediate_size, self.embed_dim]
         self.qkv_weight_shape = [self.embed_dim, (self.num_heads + 2 * self.kv_num_heads) * self.head_dim]
         self.linear_weight_shape = [self.num_heads * self.head_dim, self.embed_dim]
-        self.ffn1_weight_shape = (
-            [self.embed_dim, self.dim_feedforward * 2]
-            if self.activation.endswith("glu")
-            else [self.embed_dim, self.dim_feedforward]
-        )
-        self.ffn2_weight_shape = [self.dim_feedforward, self.embed_dim]
+        self.ffn2_weight_shape = [self.intermediate_size, self.embed_dim]
 
     def forward(
         self,
@@ -1432,39 +1614,34 @@ class FusedMultiTransformerAvx(FusedMultiTransformerBase):
         step_idx=None,
         **kwargs,
     ):
-        for i in range(self.num_layers):
-            from paddlenlp_ops import xft_llama_layer
+        from paddlenlp_ops import xft_transformer
 
-            xft_out = xft_llama_layer(
-                src,
-                self.ln_scales[i],
-                self.qkv_weights[i],
-                self.linear_weights[i],
-                self.ffn_ln_scales[i],
-                self.gate_weights[i],
-                self.up_weights[i],
-                self.ffn2_weights[i],
-                past_seq_len,
-                cur_seq_len,
-                step_idx,
-                self.hiddensize,
-                self.num_layers,
-                self._compute_type,
-                self.activation,
-                self.norm_type,
-                i,
-                self.head_dim,
-                self.num_heads,
-                self.kv_num_heads,
-                self.max_positions,
-                self.max_pos_embed,
-                self.intermediate_size,
-            )
-            src = xft_out
-
-        src = src[:, -1, :]
-
-        return src
+        xft_out = xft_transformer(
+            paddle.cast(src, "float32"),  # input
+            self.ln_scales,  # ln1Gamma
+            self.qkv_weights,  # qkvWeight
+            self.linear_weights,  # attnOutWeight
+            self.ffn_ln_scales,  # ln2Gamma
+            self.gate_weights,  # gateWeight
+            self.up_weights,  # upWeight
+            self.ffn2_weights,  # downWeight
+            past_seq_len,  # pastSeqLen
+            cur_seq_len,  # currentSeqLen
+            step_idx,  # step
+            self.hiddensize,  # hiddensize
+            self.num_layers,  # totalLayer
+            self._compute_type,  # computeType
+            self.cache_dtype,  # cacheDtype
+            self.activation,  # activation
+            self.norm_type,  # normType
+            self.head_dim,  # attHeadDim
+            self.num_heads,  # attHeadNum
+            self.kv_num_heads,  # kvHeadNum
+            self.max_positions,  # maxPositions
+            self.max_pos_embed,  # maxPosEmbed
+            self.intermediate_size,  # intermediateSize
+        )
+        return xft_out[:, -1, :]
 
 
 class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
