@@ -54,6 +54,7 @@ if core.is_compiled_with_cuda():
     from paddlenlp_ops import (
         dequant_int8,
         encode_rotary_qk,
+        gemm_dequant,
         qkv_transpose_split,
         quant_int8,
         rebuild_padding,
@@ -1666,6 +1667,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         self.quant_round_type = config.quant_round_type
         self.quant_max_bound = config.quant_max_bound
         self.quant_min_bound = config.quant_min_bound
+        # self.use_gemm_dequant = False
 
         if self._dtype == "bfloat16":
             self._fuse_kernel_compute_dtype = "bf16"
@@ -1809,6 +1811,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         if paddle.is_compiled_with_rocm():
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i])
         else:
+            # TODO: add gemm_dequant after qkv_out
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
         return qkv_out
 
@@ -1904,9 +1907,14 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
     def compute_out_linear(self, fmha_out, i):
         if paddle.is_compiled_with_rocm():
             out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
+            out_linear_out = dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
         else:
-            out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
-        return dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
+            try:
+                out_linear_out = gemm_dequant(fmha_out, self.linear_weights[i], self.linear_out_scales[i], self._dtype)
+            except:
+                out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
+                out_linear_out = dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
+        return out_linear_out
 
     def compute_ffn_layernorm(self, out_linear_out, residual_input, i):
         norm_out = self.norm_func(
@@ -1950,9 +1958,13 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
     def compute_ffn2(self, ffn1_out, i):
         if paddle.device.is_compiled_with_rocm():
             ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i])
+            ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
         else:
-            ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i], False, True)
-        ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
+            try:
+                ffn2_out = gemm_dequant(ffn1_out, self.ffn2_weights[i], self.ffn2_out_scales[i], self._dtype)
+            except:
+                ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i], False, True)
+                ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
         return ffn2_out
 
     def compute_bias_residual_layernorm(self, ffn2_out, residual_input, i, num_layers):
