@@ -15,11 +15,16 @@
 
 import glob
 import os
+import sys
 import tempfile
-import unittest
+from pathlib import Path
 
 import paddle
 from paddle.distributed import fleet
+
+sys.path.append(str(Path(__file__).parent.parent.parent))
+from tests.parallel_launch import TestMultipleGpus
+from tests.testing_utils import require_paddle_at_least_2_gpu
 
 tp_size = paddle.distributed.get_world_size()
 tp_rank = 0
@@ -42,6 +47,7 @@ def prepare_config(config):
     config.num_layers = 2
     config.num_hidden_layers = 2
     config.num_attention_heads = 16
+    config.num_key_value_heads = 16
     config.intermediate_size = config.hidden_size * 3
     config.tensor_parallel_degree = tp_size
     config.tensor_parallel_rank = tp_rank
@@ -118,6 +124,15 @@ def _test_bloom():
     common_test_merge(model, BloomForCausalLM)
 
 
+def _test_qwen2():
+    from paddlenlp.transformers import Qwen2Config, Qwen2ForCausalLM
+
+    config = Qwen2Config()
+    config = prepare_config(config)
+    model = Qwen2ForCausalLM.from_config(config)
+    common_test_merge(model, Qwen2ForCausalLM)
+
+
 def _test_gemma():
     from paddlenlp.transformers import GemmaConfig, GemmaForCausalLM
 
@@ -127,15 +142,15 @@ def _test_gemma():
     common_test_merge(model, GemmaForCausalLM)
 
 
-# _test_llama()
-# _test_chatglm()
-# _test_bloom()
-
-
-class TestTensorParallel(unittest.TestCase):
-    @unittest.skipIf(tp_size < 2, "Need muti-gpu to run this test!")
+@require_paddle_at_least_2_gpu
+class TestTensorParallel(TestMultipleGpus):
     def test_model_load_merge(self):
-        _test_llama()
-        _test_chatglm()
-        _test_bloom()
-        _test_gemma()
+        self.run_2gpu(__file__)
+
+
+if __name__ == "__main__":
+    _test_llama()
+    _test_chatglm()
+    _test_bloom()
+    _test_gemma()
+    _test_qwen2()

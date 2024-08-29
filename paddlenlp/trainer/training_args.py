@@ -20,6 +20,7 @@ import contextlib
 import json
 import math
 import os
+import sys
 import types
 import warnings
 from dataclasses import asdict, dataclass, field
@@ -343,12 +344,17 @@ class TrainingArguments:
             The list of integrations to report the results and logs to.
             Supported platforms are `"visualdl"`/`"wandb"`/`"tensorboard"`.
             `"none"` for no integrations.
+        ddp_find_unused_parameters (`bool`, *optional*):
+            When using distributed training, the value of the flag `find_unused_parameters` passed to
+            `paddle.DataParallel`. Will default to `False` if recompute is used, `True` otherwise.
         wandb_api_key (`str`, *optional*):
             Weights & Biases (WandB) API key(s) for authentication with the WandB service.
         resume_from_checkpoint (`str`, *optional*):
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
+        auto_parallel_resume_form_hybrid_parallel (`bool`, *optional*):
+            Wether hybrid paralle checkpoints be loaded in auto parallel mode.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
         skip_profile_timer (`bool`, *optional*):
@@ -543,6 +549,17 @@ class TrainingArguments:
             )
         },
     )
+    sharding_comm_buffer_size_MB: int = field(
+        default=-1,
+        metadata={
+            "help": (
+                "Set the size of the fuse gradient in sharding communication. This option only takes effect when "
+                "the sharding option is turned on.The default value is -1, which means that the gradient size of "
+                "all communication fuses follows the default configuration, which is 256MB. "
+            )
+        },
+    )
+
     save_sharded_model: bool = field(
         default=False,
         metadata={
@@ -762,6 +779,15 @@ class TrainingArguments:
     report_to: Optional[List[str]] = field(
         default=None, metadata={"help": "The list of integrations to report the results and logs to."}
     )
+    ddp_find_unused_parameters: Optional[bool] = field(
+        default=None,
+        metadata={
+            "help": (
+                "When using distributed training, the value of the flag `find_unused_parameters` passed to "
+                "`DataParallel`."
+            )
+        },
+    )
     wandb_api_key: Optional[str] = field(
         default=None,
         metadata={"help": "Weights & Biases (WandB) API key(s) for authentication with the WandB service."},
@@ -769,6 +795,10 @@ class TrainingArguments:
     resume_from_checkpoint: Optional[str] = field(
         default=None,
         metadata={"help": "The path to a folder with a valid checkpoint for your model."},
+    )
+    auto_parallel_resume_form_hybrid_parallel: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Wether hybrid paralle checkpoints be loaded in auto parallel mode."},
     )
     skip_memory_metrics: bool = field(
         default=True, metadata={"help": "Whether or not to skip adding of memory profiler reports to metrics."}
@@ -1274,6 +1304,11 @@ class TrainingArguments:
                             )
 
                     try:
+                        if self.sharding_comm_buffer_size_MB > 0:
+                            strategy.hybrid_configs["sharding_configs"].comm_buffer_size_MB = int(
+                                self.sharding_comm_buffer_size_MB
+                            )
+
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
 
@@ -1569,31 +1604,35 @@ class TrainingArguments:
             self.unified_checkpoint = False
 
         if self.unified_checkpoint:
-            if self.ignore_save_lr_and_optim:
-                self.unified_checkpoint_config = ""
-                logger.info("Setting unified_checkpoint_config to empty for using ignore_save_lr_and_optim.")
-            else:
-                unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
-                for x in unified_checkpoint_config:
-                    if len(x) > 0:
-                        if x not in [
-                            "skip_save_model_weight",
-                            "master_weight_compatible",
-                            "async_save",
-                            "enable_all_options",
-                        ]:
-                            raise ValueError(
-                                f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
-                                + "master_weight_compatible, async_save, enable_all_options."
-                            )
-                if "enable_all_options" in unified_checkpoint_config:
-                    self.unified_checkpoint_config = [
+            unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
+            if sys.platform.startswith("win") and "async_save" in self.unified_checkpoint_config:
+                raise ValueError("Currently do not support asynchronous saving for Windows system!")
+            if (
+                "skip_save_model_weight" in self.unified_checkpoint_config
+                and "ignore_merge_optimizer" in self.unified_checkpoint_config
+            ):
+                raise ValueError("`skip_save_model_weight` and `ignore_merge_optimizer` cannot both be True.")
+            for x in unified_checkpoint_config:
+                if len(x) > 0:
+                    if x not in [
                         "skip_save_model_weight",
                         "master_weight_compatible",
-                        # "async_save",
-                    ]
-                else:
-                    self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
+                        "async_save",
+                        "enable_all_options",
+                        "ignore_merge_optimizer",
+                    ]:
+                        raise ValueError(
+                            f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
+                            + "master_weight_compatible, async_save, enable_all_options, ignore_merge_optimizer."
+                        )
+            if "enable_all_options" in unified_checkpoint_config:
+                self.unified_checkpoint_config = [
+                    "skip_save_model_weight",
+                    "master_weight_compatible",
+                    # "async_save",
+                ]
+            else:
+                self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
 
         if self.report_to is None:
             logger.info(

@@ -158,6 +158,12 @@ class MambaTokenizer(PretrainedTokenizer):
         """
         return len(self.encoder)
 
+    def __len__(self):
+        """
+        Size of the full vocabulary with the added tokens.
+        """
+        return len(dict(self.encoder, **self.added_tokens_encoder))
+
     def bpe(self, token):
         if token in self.cache:
             return self.cache[token]
