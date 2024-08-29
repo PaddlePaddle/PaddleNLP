@@ -88,7 +88,7 @@ def parallel_matmul(lm_output, logit_weights, parallel_output):
         # _c_concat has not grad backwards
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
     else:
-        logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+        logits = paddle.matmul(lm_output, logit_weights, transpose_y=False)
         return logits
 
 
@@ -1047,12 +1047,12 @@ class Chatglmv2LMHead(nn.Layer):
             if vocab_size != config.vocab_size:
                 with get_rng_state_tracker().rng_state():
                     self.decoder_weight = self.create_parameter(
-                        shape=[vocab_size, config.hidden_size],
+                        shape=[config.hidden_size, vocab_size],
                         dtype=paddle.get_default_dtype(),
                     )
             else:
                 self.decoder_weight = self.create_parameter(
-                    shape=[vocab_size, config.hidden_size], dtype=paddle.get_default_dtype()
+                    shape=[config.hidden_size, vocab_size], dtype=paddle.get_default_dtype()
                 )
         self.config = config
 
