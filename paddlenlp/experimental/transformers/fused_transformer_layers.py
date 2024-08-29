@@ -877,13 +877,6 @@ class FusedMultiTransformerBase(Layer):
         return tmp_out, residual_input
 
     def compute_fused_moe(self, tmp_out, i):
-        # todo[xinhw]: make bias optional
-        if self.ffn1_biases[i] is None:
-            shape1 = paddle.to_tensor([self.ffn1_weights[i].shape[0], 1, self.dim_feedforward * 2])
-            self.ffn1_biases[i] = paddle.zeros(shape1)
-        if self.ffn2_biases[i] is None:
-            shape2 = paddle.to_tensor([self.ffn1_weights[i].shape[0], 1, self.embed_dim])
-            self.ffn2_biases[i] = paddle.zeros(shape2)
         fused_moe_out = fused_moe(
             tmp_out,
             self.gate_weights[i],
@@ -1302,13 +1295,6 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
         )
 
     def compute_fused_moe(self, tmp_out, i):
-        # todo[xinhw]: make bias optional
-        if self.ffn1_biases[i] is None:
-            shape1 = paddle.to_tensor([self.ffn1_weights[i].shape[0], 1, self.dim_feedforward * 2])
-            self.ffn1_biases[i] = paddle.zeros(shape1)
-        if self.ffn2_biases[i] is None:
-            shape2 = paddle.to_tensor([self.ffn1_weights[i].shape[0], 1, self.embed_dim])
-            self.ffn2_biases[i] = paddle.zeros(shape2)
         fused_moe_out = fused_moe(
             tmp_out,
             self.gate_weights[i],
