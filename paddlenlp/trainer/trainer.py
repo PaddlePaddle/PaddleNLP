@@ -1500,7 +1500,7 @@ class Trainer:
                     eval_dataset,
                     batch_sampler=eval_sampler,
                     collate_fn=self.data_collator,
-                    num_workers=self.args.dataloader_num_workers,
+                    num_workers=0,
                     eval=True,
                 )
             else:
@@ -1508,7 +1508,7 @@ class Trainer:
                     eval_dataset,
                     batch_sampler=eval_sampler,
                     collate_fn=self.data_collator,
-                    num_workers=self.args.dataloader_num_workers,
+                    num_workers=0,
                 )
 
     def get_test_dataloader(self, test_dataset: Dataset) -> DataLoader:
