@@ -213,20 +213,19 @@ def prepare_qconfig(args):
     """
     Prepare qconfig
     """
-
     weight_observer = (
         WEIGHT_OBSERVER.get(args.weight_quant_method, None)
-        if "w" in args.use_fp8
+        if "w" not in args.use_fp8
         else FP8_OBSERVER.get(args.weight_quant_method, None)
     )
     act_observer = (
         ACT_OBSERVER.get(args.act_quant_method, None)
-        if "a" in args.use_fp8
+        if "a" not in args.use_fp8
         else FP8_OBSERVER.get(args.act_quant_method, None)
     )
     cachekv_observer = (
         CACHEKV_OBSERVER.get(args.cachekv_quant_method, None)
-        if "c" in args.use_fp8
+        if "c" not in args.use_fp8
         else FP8_OBSERVER.get(args.cachekv_quant_method, None)
     )
 
@@ -256,8 +255,8 @@ def prepare_qconfig(args):
             a_quant_bit = (4, 3) if args.fp8_type[args.use_fp8.index("a")] == "e4m3" else (5, 2)
         else:
             a_quant_bit = 8
-        activation = act_observer(quant_bits=w_quant_bit)
-        weight = weight_observer(quant_bits=a_quant_bit)
+        activation = act_observer(quant_bits=a_quant_bit)
+        weight = weight_observer(quant_bits=w_quant_bit)
 
     elif quant_type in ["wint4", "w4a16", "weight_only_int8"]:
         activation = None
