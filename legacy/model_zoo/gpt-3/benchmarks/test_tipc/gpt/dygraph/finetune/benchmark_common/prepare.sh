@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+cp ../requirements.txt ../requirements_nlp.txt
+sed -i '/paddlenlp/d' ../requirements.txt
 python -m pip install -r ../requirements.txt
+sed -i '/paddlenlp/!d' ../requirements_nlp.txt
+python -m pip install -r ../requirements_nlp.txt
 # get ckpt
 cd ../
 rm -rf ckpt
