@@ -137,6 +137,10 @@ class DataArgument:
             "help": "@deprecated Please use `zero_padding`. Whether to use InTokens data stream, same as `zero_padding`."
         },
     )  # Alias for zero_padding
+    pad_to_max_length: bool = field(
+        default=False,
+        metadata={"help": "Pad the input sequence to `max_length`."},
+    )
 
     def __post_init__(self):
         if self.task_name_or_path is not None:
