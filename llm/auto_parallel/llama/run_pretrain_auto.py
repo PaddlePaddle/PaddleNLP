@@ -579,6 +579,7 @@ def main():
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
 
+    training_args.strategy.pipeline.pp_degree = training_args.pipeline_parallel_degree
     if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
         pipeline = training_args.strategy.pipeline
         pipeline.vpp_degree = config.virtual_pp_degree

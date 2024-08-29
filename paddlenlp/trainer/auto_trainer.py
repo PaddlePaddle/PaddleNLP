@@ -69,6 +69,7 @@ class AutoTrainer(Trainer):
 
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
+        self._in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
 
     def _nested_gather(self, tensors):
         """
@@ -156,14 +157,13 @@ class AutoTrainer(Trainer):
             return loss
 
     def _split_batches_for_accumulation(self, inputs):
-        _in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
         if self.args.gradient_accumulation_steps == 1:
             return [inputs]
 
         if self.args.to_static and self.args.pipeline_parallel_degree > 1:
             return [inputs]
 
-        if self.args.to_static and _in_pir_mode and self.args.gradient_accumulation_steps > 1:
+        if self.args.to_static and self._in_pir_mode and self.args.gradient_accumulation_steps > 1:
             return [inputs]
 
         local_batches = [{} for i in range(self.args.gradient_accumulation_steps)]
@@ -336,7 +336,11 @@ class AutoTrainer(Trainer):
                     with _exec_mode_guard("dynamic"):
                         tr_loss += tr_loss_step
 
-                    disable_accumulation = self.args.pipeline_parallel_degree > 1 and self.args.to_static
+                    disable_accumulation = False
+                    if self.args.pipeline_parallel_degree > 1 and self.args.to_static:
+                        disable_accumulation = True
+                    if self.args.to_static and self._in_pir_mode and self.args.gradient_accumulation_steps > 1:
+                        disable_accumulation = True
                     # disable_accumulation = self.args.to_static
 
                     if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
