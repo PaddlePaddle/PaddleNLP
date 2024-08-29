@@ -127,3 +127,5 @@ FETCH_HEAD
 
 # third party
 csrc/gpu/cutlass_kernels/cutlass
+dataset/
+output/
