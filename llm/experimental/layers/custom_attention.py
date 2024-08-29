@@ -58,7 +58,6 @@ class QuantizedCustomAttentionLayer(ConvertibleQuantedLayer):
         **kwargs
     ):
         """forward"""
-        # import pdb;pdb.set_trace()
         if self.enable_fake_quant:
             self.collect_kv_quant_policy(q, k, v, **kwargs)
         perm = [0, 2, 1, 3]  # [1, 2, 0, 3] if self.sequence_parallel else [0, 2, 1, 3]
