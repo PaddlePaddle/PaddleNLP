@@ -17,6 +17,7 @@ import math
 from functools import partial
 from typing import Any, Dict, List, Optional, Tuple
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -794,6 +795,15 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
 
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
+        def split_or_merge_qkv_weights(tensor_parallel_degree, tensor_parallel_rank, hidden_size, is_split, tensor):
+            if is_split:
+                return split_qkv_weights(tensor_parallel_degree, tensor_parallel_rank, hidden_size, tensor)
+            else:
+                assert (
+                    len(tensor) == tensor_parallel_degree
+                ), "The length of tensor_list must match tensor_parallel_degree"
+                return merge_qkv_weights(tensor_parallel_degree, hidden_size, tensor)
+
         def split_qkv_weights(tensor_parallel_degree, tensor_parallel_rank, hidden_size, tensor):
             split_query_size = hidden_size // tensor_parallel_degree
             split_kv_size = (tensor.shape[-1] - hidden_size) // (2 * tensor_parallel_degree)
@@ -810,12 +820,46 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
 
             return paddle.concat([query_part, key_part, value_part], axis=-1)
 
+        def merge_qkv_weights(tensor_parallel_degree, hidden_size, tensor):
+            split_query_size = hidden_size // tensor_parallel_degree
+            split_kv_size = (tensor[0].shape[-1] - split_query_size) // 2
+            merge_q = tensor[0][..., :split_query_size]
+            merge_k = tensor[0][..., split_query_size : split_query_size + split_kv_size]
+            merge_v = tensor[0][..., split_query_size + split_kv_size :]
+            is_ndarry = isinstance(tensor[0], np.ndarray)
+            for i in range(1, tensor_parallel_degree):
+                if is_ndarry:
+                    merge_q = np.concatenate([merge_q, tensor[i][..., :split_query_size]], axis=-1)
+                    merge_k = np.concatenate(
+                        [merge_k, tensor[i][..., split_query_size : split_query_size + split_kv_size]], axis=-1
+                    )
+                    merge_v = np.concatenate([merge_v, tensor[i][..., split_query_size + split_kv_size :]], axis=-1)
+                else:
+                    merge_q = paddle.concat([merge_q, tensor[i][..., :split_query_size]], axis=-1)
+                    merge_k = paddle.concat(
+                        [merge_k, tensor[i][..., split_query_size : split_query_size + split_kv_size]], axis=-1
+                    )
+                    merge_v = paddle.concat([merge_v, tensor[i][..., split_query_size + split_kv_size :]], axis=-1)
+            if is_ndarry:
+                return np.concatenate([merge_q, merge_k, merge_v], axis=-1)
+            else:
+                return paddle.concat([merge_q, merge_k, merge_v], axis=-1)
+
         fn = split_or_merge_func(
             is_split=is_split,
             tensor_parallel_degree=config.tensor_parallel_degree,
             tensor_parallel_rank=config.tensor_parallel_rank,
             num_attention_heads=config.num_attention_heads,
         )
+
+        def split_or_merge_mlp_weights(tensor_parallel_degree, tensor_parallel_rank, is_split, tensor):
+            if is_split:
+                return split_mlp_weights(tensor_parallel_degree, tensor_parallel_rank, tensor)
+            else:
+                assert (
+                    len(tensor) == tensor_parallel_degree
+                ), "The length of tensor_list must match tensor_parallel_degree"
+                return merge_mlp_weights(tensor_parallel_degree, tensor)
 
         def split_mlp_weights(tensor_parallel_degree, tensor_parallel_rank, tensor):
             split_size = tensor.shape[-1] // tensor_parallel_degree // 2
@@ -825,19 +869,44 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
             gate_part = gate[..., tensor_parallel_rank * split_size : (tensor_parallel_rank + 1) * split_size]
             return paddle.concat([ffn_fc_part, gate_part], axis=-1)
 
+        def merge_mlp_weights(tensor_parallel_degree, tensor):
+            split_size = tensor[0].shape[-1] // 2
+            merge_ffn_fc = tensor[0][..., :split_size]
+            merge_gate = tensor[0][..., split_size:]
+            is_ndarry = isinstance(tensor[0], np.ndarray)
+            for i in range(1, tensor_parallel_degree):
+                if is_ndarry:
+                    merge_ffn_fc = np.concatenate([merge_ffn_fc, tensor[i][..., :split_size]], axis=-1)
+                    merge_gate = np.concatenate([merge_gate, tensor[i][..., split_size:]], axis=-1)
+                else:
+                    merge_ffn_fc = paddle.concat([merge_ffn_fc, tensor[i][..., :split_size]], axis=-1)
+                    merge_gate = paddle.concat([merge_gate, tensor[i][..., split_size:]], axis=-1)
+            if is_ndarry:
+                return np.concatenate([merge_ffn_fc, merge_gate], axis=-1)
+            else:
+                return paddle.concat([merge_ffn_fc, merge_gate], axis=-1)
+
         def get_tensor_parallel_split_mappings(num_hidden_layers):
             final_actions = {}
             base_actions = {
                 # Column Linear
                 "output_layer.weight": partial(fn, is_column=True),
                 "encoder.layers.0.mlp.dense_h_to_4h.weight": partial(
-                    split_mlp_weights, config.tensor_parallel_degree, config.tensor_parallel_rank
+                    split_or_merge_mlp_weights, config.tensor_parallel_degree, config.tensor_parallel_rank, is_split
                 ),
                 "encoder.layers.0.self_attention.query_key_value.bias": partial(
-                    split_qkv_weights, config.tensor_parallel_degree, config.tensor_parallel_rank, config.hidden_size
+                    split_or_merge_qkv_weights,
+                    config.tensor_parallel_degree,
+                    config.tensor_parallel_rank,
+                    config.hidden_size,
+                    is_split,
                 ),
                 "encoder.layers.0.self_attention.query_key_value.weight": partial(
-                    split_qkv_weights, config.tensor_parallel_degree, config.tensor_parallel_rank, config.hidden_size
+                    split_or_merge_qkv_weights,
+                    config.tensor_parallel_degree,
+                    config.tensor_parallel_rank,
+                    config.hidden_size,
+                    is_split,
                 ),
                 # Row Linear
                 "embedding.word_embeddings.weight": partial(fn, is_column=False),
