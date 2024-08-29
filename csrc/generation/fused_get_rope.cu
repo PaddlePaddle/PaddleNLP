@@ -45,7 +45,12 @@ __global__ __launch_bounds__(kBlockSize) void fused_get_rotary_embedding_neox(co
                                                                               const float inv_head_dim,
                                                                               const int32_t elem_cnt,
                                                                               const float theta,
-                                                                              float* rope_embedding) {
+                                                                              float* rope_embedding,
+                                                                              const bool use_rope_scaling,
+                                                                              const float factor,
+                                                                              const float low_freq_factor,
+                                                                              const float high_freq_factor,
+                                                                              const int32_t original_max_position_embeddings) {
     /*
     In Naive implementation, it will stacks [freqs, freqs]
     And actually, each threads can process 1 values, and store continuous 2 same values.
@@ -64,7 +69,24 @@ __global__ __launch_bounds__(kBlockSize) void fused_get_rotary_embedding_neox(co
         const int64_t position_offset = bsz_idx * max_position_seq_length + seq_idx + prompt_num;
         const int32_t half_head_idx = (idx % half_head_dim) * PackSize;
         const float exponent_factor = -static_cast<float>(half_head_idx) * inv_head_dim; // * inv_head_dim equals to / head_dim.
-        const float inv_freq_val = powf(theta, exponent_factor);
+        float inv_freq_val = powf(theta, exponent_factor); 
+
+        if (use_rope_scaling) {
+            const float low_freq_wavelen = original_max_position_embeddings / low_freq_factor;
+            const float high_freq_wavelen = original_max_position_embeddings / high_freq_factor;
+            const float wavelen = 2 * M_PI / inv_freq_val;
+
+            if (wavelen < high_freq_wavelen) {
+                // Use original frequency
+            } else if (wavelen > low_freq_wavelen) {
+                inv_freq_val /= factor;
+            } else {
+                assert(low_freq_wavelen != high_freq_wavelen);
+                const float smooth = (original_max_position_embeddings / wavelen - low_freq_factor) / (high_freq_factor - low_freq_factor);
+                inv_freq_val = (1 - smooth) * inv_freq_val / factor + smooth * inv_freq_val;
+            }
+        }     
+
         const float freqs_val = static_cast<float>(position_ids[position_offset]) * inv_freq_val;
         const float cos_embedding_val = cos(freqs_val);
         const float sin_embedding_val = sin(freqs_val);
@@ -102,7 +124,12 @@ __global__ __launch_bounds__(kBlockSize) void fused_get_rotary_embedding(const i
                                                                          const float inv_head_dim, 
                                                                          const int32_t elem_cnt, 
                                                                          const float theta,
-                                                                         float* rope_embedding) {
+                                                                         float* rope_embedding,
+                                                                         const bool use_rope_scaling,
+                                                                         const float factor,
+                                                                         const float low_freq_factor,
+                                                                         const float high_freq_factor,
+                                                                         const int32_t original_max_position_embeddings) {
     /*
     In Naive implementation, it will stacks [freqs, freqs]
     And actually, each threads can process 1 values, and store continuous 2 same values. 
@@ -121,7 +148,24 @@ __global__ __launch_bounds__(kBlockSize) void fused_get_rotary_embedding(const i
         const int64_t position_offset = bsz_idx * max_position_seq_length + seq_idx + prompt_num;
         const int32_t half_head_idx = (idx % half_head_dim) * PackSize; 
         const float exponent_factor = -static_cast<float>(half_head_idx) * inv_head_dim; // * inv_head_dim equals to / head_dim. 
-        const float inv_freq_val = powf(theta, exponent_factor); 
+        float inv_freq_val = powf(theta, exponent_factor); 
+
+        if (use_rope_scaling) {
+            const float low_freq_wavelen = original_max_position_embeddings / low_freq_factor;
+            const float high_freq_wavelen = original_max_position_embeddings / high_freq_factor;
+            const float wavelen = 2 * M_PI / inv_freq_val;
+
+            if (wavelen < high_freq_wavelen) {
+                // Use original frequency
+            } else if (wavelen > low_freq_wavelen) {
+                inv_freq_val /= factor;
+            } else {
+                assert(low_freq_wavelen != high_freq_wavelen);
+                const float smooth = (original_max_position_embeddings / wavelen - low_freq_factor) / (high_freq_factor - low_freq_factor);
+                inv_freq_val = (1 - smooth) * inv_freq_val / factor + smooth * inv_freq_val;
+            }
+        } 
+
         const float freqs_val = static_cast<float>(position_ids[position_offset]) * inv_freq_val; 
         const float cos_embedding_val = cos(freqs_val); 
         const float sin_embedding_val = sin(freqs_val); 
@@ -148,7 +192,12 @@ std::vector<paddle::Tensor> GetRoPE(const paddle::Tensor& input_ids,
                                     const paddle::Tensor& head_dim_shape_tensor,
                                     int prompt_num,
                                     float theta,
-                                    bool use_neox) {
+                                    bool use_neox,
+                                    bool use_rope_scaling,
+                                    float factor = 8.0,
+                                    float low_freq_factor = 1.0,
+                                    float high_freq_factor = 4.0,
+                                    int original_max_position_embeddings = 8192) {
     const int64_t batch_size = input_ids.shape()[0]; 
     const int64_t max_seq_length = input_ids.shape()[1]; 
     const int64_t max_position_seq_length = position_ids.shape()[1];
@@ -174,7 +223,12 @@ std::vector<paddle::Tensor> GetRoPE(const paddle::Tensor& input_ids,
           inv_head_dim,
           elem_cnt,
           theta,
-          reinterpret_cast<float*>(rotary_embedding.data<float>()));
+          reinterpret_cast<float*>(rotary_embedding.data<float>()),
+          use_rope_scaling,
+          factor,
+          low_freq_factor,
+          high_freq_factor,
+          original_max_position_embeddings);
     } else {
       fused_get_rotary_embedding<<<grid_size, kBlockSize, 0, cu_stream>>> (
           position_ids.data<int64_t>(),
@@ -186,7 +240,12 @@ std::vector<paddle::Tensor> GetRoPE(const paddle::Tensor& input_ids,
           inv_head_dim, 
           elem_cnt, 
           theta,
-          reinterpret_cast<float*>(rotary_embedding.data<float>()));
+          reinterpret_cast<float*>(rotary_embedding.data<float>()),
+          use_rope_scaling,
+          factor,
+          low_freq_factor,
+          high_freq_factor,
+          original_max_position_embeddings);
     }
     return {rotary_embedding};
 }
@@ -215,7 +274,12 @@ PD_BUILD_OP(fused_get_rotary_embedding)
     .Outputs({"rotary_embedding"})
     .Attrs({"prompt_num: int",
             "theta: float",
-            "use_neox: bool"})
+            "use_neox: bool",
+            "use_rope_scaling: bool",
+            "factor: float",
+            "low_freq_factor: float",
+            "high_freq_factor: float",
+            "original_max_position_embeddings: int"})
     .SetKernelFn(PD_KERNEL(GetRoPE))
     .SetInferShapeFn(PD_INFER_SHAPE(GetRoPEInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(GetRoPEInferDtype));
