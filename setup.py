@@ -124,12 +124,12 @@ else:
 def append_version_py(filename="paddlenlp/__init__.py"):
     assert os.path.exists(filename), f"{filename} does not exist!"
 
-    with open("setup.py", "r") as file:
+    with open(filename, "r") as file:
         file_content = file.read()
 
     pattern = r"^# \[VERSION_INFO\].*$"
-    modified_content = re.sub(pattern, rf'\n__version__ = "{__version__}"\n\n', file_content)
-    with open("setup.py", "w") as file:
+    modified_content = re.sub(pattern, f'\n__version__ = "{__version__}"\n\n', file_content, flags=re.MULTILINE)
+    with open(filename, "w") as file:
         file.write(modified_content)
 
 
