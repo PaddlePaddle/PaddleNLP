@@ -59,6 +59,8 @@ class ImageProcessorLoadTester(unittest.TestCase):
             "aistudio/paddlenlp-test-model", subfolder="clip-vit-base-patch32", from_aistudio=True
         )
 
+
+class ImageProcessorSubfolderLoadTester(unittest.TestCase):
     def test_clip_subfolder_load(self):
         logger.info("Download model with subfolder")
         clip_processor = CLIPImageProcessor.from_pretrained(  # noqa: F841
