@@ -127,6 +127,18 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 |       Yuan2        |    ✅     |  ✅  |  ✅   |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
 ------------------------------------------------------------------------------------------
 
+* [大模型推理](./llm/docs/predict/inference.md)已支持 LLaMA 系列、Qwen 系列、Mistral 系列、ChatGLM 系列、Bloom 系列和Baichuan 系列，支持Weight Only INT8及INT4推理，支持WAC（权重、激活、Cache KV）进行INT8、FP8量化的推理，【LLM】模型推理支持列表如下：
+
+|                模型名称/量化类型支持            | FP16/BF16 | WINT8 | WINT4 | INT8-A8W8 | FP8-A8W8 | INT8-A8W8C8 |
+|:--------------------------------------------:|:---------:|:-----:|:-----:|:---------:|:--------:|:-----------:|
+| [LLaMA](./llm/docs/predict/llama.md)         | ✅        | ✅     | ✅      | ✅        | ✅       | ✅           |
+| [Qwen](./llm/docs/predict/qwen.md)           | ✅        | ✅     | ✅      | ✅        | ✅       | ✅           |
+| [Qwen-Moe](./llm/docs/predict/qwen.md)       | ✅        | ✅     | ✅      | 🚧        | 🚧       | 🚧           |
+| [Mixtral](./llm/docs/predict/mixtral.md)     | ✅        | ✅     | ✅      | 🚧        | 🚧       | 🚧           |
+| ChatGLM                                      | ✅        | ✅     | ✅      | 🚧        | 🚧       | 🚧           |
+| Bloom                                        | ✅        | ✅     | ✅      | 🚧        | 🚧       | 🚧           |
+| BaiChuan                                     | ✅        | ✅     | ✅      | ✅        | ✅       | 🚧           |
+
 ## 安装
 
 ### 环境依赖
