@@ -1309,6 +1309,7 @@ class Trainer:
         if timer_info or paddle_timer_info:
             logger.info(f"[Profile global_step: {self.state.global_step}] {timer_info} {paddle_timer_info}")
 
+    # debug dataloader
     def _get_item_from_loss(self, loss):
         assert isinstance(loss, paddle.Tensor) and loss._is_initialized()
         loss_value = loss.item()
@@ -1319,7 +1320,7 @@ class Trainer:
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
-
+            print("Debug Dataloader loss mean6666:", tr_loss.mean())
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
