@@ -1,4 +1,4 @@
-# 大模型量化教程
+p# 大模型量化教程
 
 ## 1.算法介绍
 
@@ -111,8 +111,8 @@ python run_finetune.py ./config/llama/ceval_quant_argument.json
 - `use_fp8`: 是否使用 FP8 量化，默认为空字符串。输入`"WA"`(不区分大小写)则将权重和激活的8位量化转换为 FP8量化。
 - `fp8_type`: FP8量化类型，长度应与`use_fp8`相同。默认为`["e4m3","e4m3"]`。
 - `do_ptq`: 是否进行 PTQ 量化，默认为 False。
-- `weight_quant_method`: 权重量化方式，现可选 groupwise 或者 abs_max_channel_wise。
-- `act_quant_method`: 激活量化方式，现可选 avg 或者 abs_max。
+- `weight_quant_method`: 权重量化方式，INT8量化可选 groupwise 或者 abs_max_channel_wise，FP8量化可选 abs_max 或 avg。
+- `act_quant_method`: 激活量化方式，INT8可选 avg 或者 abs_max，FP8量化可选 abs_max 或 avg。
 - `cachekv_quant_method`: kvcache 量化方式，现可选 abs_max_headwise, avg_headwise。
 - `ptq_step`: PTQ 量化步数，也即模型前向次数，默认为32。
 - `shift`: 是否在 PTQ 量化前进行[Shift 策略](https://arxiv.org/abs/2304.09145)，默认为 False。使用 Shift 策略需要设`do_ptq`为 True。
