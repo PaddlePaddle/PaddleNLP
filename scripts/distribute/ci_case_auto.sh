@@ -55,7 +55,7 @@ function llama_case_list_auto() {
 
     llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
 
-    llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp16_DP2-MP1-PP1
+    llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp32_DP2-MP1-PP1
     llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
 }
 
@@ -1065,7 +1065,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
     echo "=========== $FUNCNAME run  end ==========="
 }
 
-function llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp16_DP2-MP1-PP1() {
+function llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=3
@@ -1073,7 +1073,7 @@ function llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp16_DP2-MP1-PP1() {
     export FLAGS_enable_pir_api=1
     export FLAGS_max_inplace_grad_add=3
 
-    task_name="llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp16_dp2"
+    task_name="llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp32_dp2"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
 
@@ -1120,6 +1120,7 @@ function llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp16_DP2-MP1-PP1() {
             --recompute_granularity full \
             --pp_recompute_interval 0 \
             --bf16 0 \
+            --fp16 0 \
             --fp16_opt_level "O2" \
             --fuse_attention_ffn true \
             --fuse_attention_qkv false \
