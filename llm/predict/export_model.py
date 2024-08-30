@@ -29,6 +29,15 @@ class ExportArgument:
     output_path: str = field(default=None, metadata={"help": "The output path of model."})
 
 
+def add_inference_args_to_config(model_config, args):
+    """Add export arguments to config."""
+    model_config.infer_model_block_size = args.block_size
+    model_config.infer_model_max_seq_len = args.total_max_length
+    model_config.infer_model_cachekv_int8_type = args.cachekv_int8_type
+    model_config.infer_model_dtype = args.dtype
+    model_config.infer_model_paddle_commit = paddle.version.commit
+
+
 def main():
     parser = PdArgumentParser((PredictorArgument, ModelArgument, ExportArgument))
     predictor_args, model_args, export_args = parser.parse_args_into_dataclasses()
@@ -60,6 +69,7 @@ def main():
             "cachekv_int8_type": predictor_args.cachekv_int8_type,
         },
     )
+    add_inference_args_to_config(predictor.model.config, predictor_args)
     predictor.model.config.save_pretrained(export_args.output_path)
     if predictor.generation_config is not None:
         predictor.generation_config.save_pretrained(export_args.output_path)

@@ -243,7 +243,7 @@ void StepPaddle(const paddle::Tensor& stop_flags,
     const int length = input_ids.shape()[1];
     const int pre_id_length = pre_ids.shape()[1];
     constexpr int BlockSize = 512; // bsz < 256
-    const int max_decoder_block_num = pre_id_length / block_size - encoder_decoder_block_num;
+    const int max_decoder_block_num = length / block_size;
 #ifdef DEBUG_STEP
     printf("bsz: %d, block_num_per_seq: %d, length: %d, max_decoder_block_num: %d\n", bsz, block_num_per_seq, length, max_decoder_block_num);
 #endif

@@ -12,14 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddlenlp_ops import tune_cublaslt_gemm
-import paddle
-
-M_tensor = paddle.to_tensor([1024])
-K_tensor = paddle.to_tensor([1024, 2048])
-N_tensor = paddle.to_tensor([4096, 8192])
-
-Dtype = "int8"
-Path = "./search.csv"
-
-tune_cublaslt_gemm(M_tensor, K_tensor, N_tensor, Dtype, True, False, Path)
+from .modeling import *
