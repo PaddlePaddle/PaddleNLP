@@ -1119,7 +1119,6 @@ function llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
             --recompute_use_reentrant true \
             --recompute_granularity full \
             --pp_recompute_interval 0 \
-            --bf16 0 \
             --fp16 0 \
             --fp16_opt_level "O2" \
             --fuse_attention_ffn true \
@@ -1128,7 +1127,7 @@ function llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
             --use_flash_attention 0 \
             --use_fused_rope false \
             --use_fused_rms_norm 0 \
-            --max_seq_length 4096 \
+            --max_seq_length 2048 \
             --sep_parallel_degree 1 \
             --sequence_parallel false \
             --pipeline_parallel_degree 1 \
