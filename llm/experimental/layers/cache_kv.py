@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -166,13 +166,7 @@ class QuantizedShiftSmoothCacheKVMatMul(ConvertibleQuantedLayer):
 
     def _smooth(self, x, y, use_smooth_x):
         # For ShiftSmooth
-        # smooth_shape = y.shape[2:]
         self.dtype = y.dtype
-        # if not hasattr(self, "smooth_weight"):
-        #     self.smooth_weight = self.create_parameter(
-        #         shape=smooth_shape,
-        #         attr=ParamAttr(initializer=Constant(value=1.)),
-        #         dtype=self.dtype)
         smooth_y = y
         smooth_y = paddle.divide(smooth_y, self.smooth_weight)
 
