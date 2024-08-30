@@ -179,21 +179,11 @@ class DPOCriterion(nn.Layer):
             response_indexs = response_indexs[0]
         if self.config.use_sparse_head_and_loss_fn:
             chosen_logps = paddle.stack(
-                [
-                    (per_token_logps[response_index[1] : response_index[2]]).sum()
-                    if response_index[3] != 0
-                    else paddle.to_tensor(100.0)
-                    for response_index in response_indexs
-                ],
+                [(per_token_logps[response_index[1] : response_index[2]]).sum() for response_index in response_indexs],
                 axis=0,
             )
             rejected_logps = paddle.stack(
-                [
-                    (per_token_logps[response_index[2] : response_index[3]]).sum()
-                    if response_index[3] != 0
-                    else paddle.to_tensor(100.0)
-                    for response_index in response_indexs
-                ],
+                [(per_token_logps[response_index[2] : response_index[3]]).sum() for response_index in response_indexs],
                 axis=0,
             )
         else:
@@ -220,8 +210,6 @@ class DPOCriterion(nn.Layer):
                 chosen_logps = paddle.stack(
                     [
                         (per_token_logps[response_index[0]][response_index[1] : response_index[2]]).sum()
-                        if response_index[3] != 0
-                        else paddle.to_tensor(100.0)
                         for response_index in response_indexs
                     ],
                     axis=0,
@@ -229,8 +217,6 @@ class DPOCriterion(nn.Layer):
                 rejected_logps = paddle.stack(
                     [
                         (per_token_logps[response_index[0]][response_index[2] : response_index[3]]).sum()
-                        if response_index[3] != 0
-                        else paddle.to_tensor(100.0)
                         for response_index in response_indexs
                     ],
                     axis=0,
@@ -246,13 +232,10 @@ class DPOCriterion(nn.Layer):
     def forward(
         self,
         logits,
-        chosen_labels,
-        rejected_labels,
-        response_indexs,
-        reference_chosen_logps,
-        reference_rejected_logps,
+        labels,
     ):
         """Forward"""
+        chosen_labels, rejected_labels, response_indexs, reference_chosen_logps, reference_rejected_logps = labels
         if self.dpo_config.loss_type in ["ipo", "or", "simpo"]:
             average_log_prob = True
         else:
@@ -262,7 +245,7 @@ class DPOCriterion(nn.Layer):
                 logits, chosen_labels, rejected_labels, response_indexs, average_log_prob
             )
             infohub.reference_chosen_logps.append(reference_chosen_logps)
-            infohub.reference_chosen_logps.append(reference_rejected_logps)
+            infohub.reference_rejected_logps.append(reference_rejected_logps)
             # pipeline mode requires return loss when self._compute_loss is True
             return paddle.zeros([1])
         policy_chosen_logps, policy_rejected_logps, sft_loss = self.dpo_logps(
@@ -272,7 +255,7 @@ class DPOCriterion(nn.Layer):
             policy_chosen_logps, policy_rejected_logps, reference_chosen_logps, reference_rejected_logps
         )
         infohub.policy_chosen_logps.append(policy_chosen_logps)
-        infohub.policy_chosen_logps.append(policy_rejected_logps)
+        infohub.policy_rejected_logps.append(policy_rejected_logps)
         infohub.sft_loss.append(sft_loss)
         infohub.dpo_loss.append(dpo_loss)
         loss = dpo_loss + sft_loss

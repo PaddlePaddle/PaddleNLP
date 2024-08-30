@@ -20,6 +20,7 @@ from paddle.distributed import fleet
 from paddlenlp.peft.lora.lora_model import AVAILABLE_LAYERS
 from paddlenlp.trainer import Trainer
 from paddlenlp.transformers.model_utils import unwrap_model
+from paddlenlp.trl import DPOCriterion
 from paddlenlp.utils import infohub
 
 DPO_INFO_KEYS = [
@@ -48,6 +49,7 @@ class DPOTrainer(Trainer):
         self,
         model,
         data_collator,
+        dpo_criterion=None,
         ref_model=None,
         dpo_config=None,
         disable_dropout: bool = True,
@@ -59,6 +61,12 @@ class DPOTrainer(Trainer):
             raise ValueError("dpo_config is None")
         else:
             self.dpo_config = dpo_config
+        if dpo_criterion is None:
+            self.dpo_criterion = DPOCriterion(self.model.config)
+        elif isinstance(dpo_criterion, DPOCriterion):
+            self.dpo_criterion = dpo_criterion
+        else:
+            raise ValueError("dpo_criterion should be None or DPOCriterion. Got {}".format(type(dpo_criterion)))
         if self.dpo_config.loss_type not in [
             "sigmoid",
             "hinge",
@@ -106,39 +114,39 @@ class DPOTrainer(Trainer):
         dpo_inputs = {
             "input_ids": batch["input_ids"],
             "position_ids": batch["position_ids"],
-            "chosen_labels": batch["chosen_labels"],
-            "rejected_labels": batch["rejected_labels"],
-            "response_indexs": batch["response_indexs"],
         }
         if "attention_mask" in batch:
             dpo_inputs["attention_mask"] = batch["attention_mask"]
         if "attn_mask_start_row_indices" in batch:
             dpo_inputs["attn_mask_start_row_indices"] = batch["attn_mask_start_row_indices"]
+        labels = (batch["chosen_labels"], batch["rejected_labels"], batch["response_indexs"], None, None)
         if self.dpo_config.reference_free:
-            reference_chosen_logps, reference_rejected_logps = paddle.zeros([1]), paddle.zeros([1])
-        elif self.dpo_config.lora:
-            with paddle.no_grad():
-                self.disable_lora(model)
-                model.eval()
-                model(**dpo_inputs)
-                self.enable_lora(model)
-                model.train()
+            infohub.reference_chosen_logps.append(paddle.zeros([1]))
+            infohub.reference_rejected_logps.append(paddle.zeros([1]))
         else:
-            with paddle.no_grad():
-                ref_model(**dpo_inputs)
-        dpo_inputs["reference_chosen_logps"] = reference_chosen_logps[0]
-        dpo_inputs["reference_rejected_logps"] = reference_rejected_logps[0]
-        loss = model(**dpo_inputs)
+            if self.dpo_config.lora:
+                with paddle.no_grad():
+                    self.disable_lora(model)
+                    model.eval()
+                    logits = model(**dpo_inputs)
+                    self.enable_lora(model)
+                    model.train()
+            else:
+                with paddle.no_grad():
+                    logits = ref_model(**dpo_inputs)
+            self.dpo_criterion(logits, labels)
+        labels = labels[:3] + (infohub.reference_chosen_logps[0], infohub.reference_rejected_logps[0])
+        logits = model(**dpo_inputs)
+        loss = self.dpo_criterion(logits, labels)
 
         # metrics
-        self.postprocess_infohub_tensor()
         metric_inputs = dict(
-            reference_chosen_logps=infohub.reference_chosen_logps,
-            reference_rejected_logps=infohub.reference_rejected_logps,
-            policy_chosen_logps=infohub.policy_chosen_logps,
-            policy_rejected_logps=infohub.policy_rejected_logps,
-            dpo_loss=infohub.dpo_loss,
-            sft_loss=infohub.sft_loss,
+            reference_chosen_logps=infohub.reference_chosen_logps[0],
+            reference_rejected_logps=infohub.reference_rejected_logps[0],
+            policy_chosen_logps=infohub.policy_chosen_logps[0],
+            policy_rejected_logps=infohub.policy_rejected_logps[0],
+            dpo_loss=infohub.dpo_loss[0],
+            sft_loss=infohub.sft_loss[0],
             train_eval=train_eval,
         )
         self.log_metric(**metric_inputs)
@@ -171,6 +179,13 @@ class DPOTrainer(Trainer):
         if self.args.pipeline_parallel_degree > 1:
             model._prepare_pipeline_inputs_func = prepare_pipeline_dpo_inputs_func
 
+        return model
+
+    def _wrap_model(self, model, training=True):
+        """Wrap model."""
+        model = super()._wrap_model(model, training)
+        if self.args.pipeline_parallel_degree > 1:
+            model._prepare_pipeline_inputs_func = prepare_pipeline_dpo_inputs_func
         return model
 
     def evaluate(self, eval_dataset=None, ignore_keys=None, metric_key_prefix="eval"):
@@ -233,57 +248,60 @@ class DPOTrainer(Trainer):
         """
         concatenated_inputs = {}
         # consider no drop last
-        if batch["input_ids"].shape[0] % self.args.per_device_train_batch_size != 0:
-            per_device_train_batch_size = 1
-            gradient_accumulation_steps = batch["input_ids"].shape[0]
-        else:
-            per_device_train_batch_size = self.args.per_device_train_batch_size
-            gradient_accumulation_steps = batch["input_ids"].shape[0] // self.args.per_device_train_batch_size
-
+        per_device_train_batch_size = self.args.per_device_train_batch_size
+        gradient_accumulation_steps = self.args.gradient_accumulation_steps
+        # preprocess inputs: tuple(List[Tensor])
         for key in batch.keys():
-            concatenated_inputs[key] = [
-                batch[key][i : i + per_device_train_batch_size] for i in range(gradient_accumulation_steps)
-            ]
+            if key not in "response_indexs":
+                concatenated_inputs[key] = [
+                    batch[key][i * per_device_train_batch_size : (i + 1) * per_device_train_batch_size]
+                    for i in range(gradient_accumulation_steps)
+                ]
+            else:
+                concatenated_inputs["response_indexs"] = [[] for _ in range(gradient_accumulation_steps)]
+                for i in range(gradient_accumulation_steps):
+                    for response_index in batch[key]:
+                        if response_index[0] in list(
+                            range(i * per_device_train_batch_size, (i + 1) * per_device_train_batch_size)
+                        ):
+                            response_index[0] -= i * per_device_train_batch_size
+                            concatenated_inputs["response_indexs"][i].append(response_index)
+                    concatenated_inputs["response_indexs"][i] = paddle.stack(concatenated_inputs["response_indexs"][i])
+                    if model._layers.config.use_sparse_head_and_loss_fn:
+                        last_batch_response_length = concatenated_inputs["response_indexs"][i][0, 1]
+                        concatenated_inputs["response_indexs"][i][:, 1:] -= last_batch_response_length
+
         concatenated_inputs["reference_chosen_logps"] = None
         concatenated_inputs["reference_rejected_logps"] = None
 
         self._pp_data_buffer = []
         inputs, labels = model._prepare_pipeline_inputs_func(concatenated_inputs)
-        model_config_backup = model.micro_batch_size, model.accumulate_steps
-        model.micro_batch_size = per_device_train_batch_size
-        model.accumulate_steps = gradient_accumulation_steps
         self.reset_dpo_infohub()
-
         if not self.dpo_config.reference_free:
             if self.dpo_config.lora:
                 self.disable_lora(model)
                 model.eval()
                 with paddle.no_grad():
                     with self.autocast_smart_context_manager():
-                        model.eval_batch(data=[inputs, labels])
+                        model.eval_batch(data=[inputs, labels], compute_loss=True)
                 self.enable_lora(model)
                 model._p2p_helper.clear_meta_cache()
                 model.train()
             else:
                 ref_model = self.ref_model_wrapped
-                ref_model_config_backup = ref_model.micro_batch_size, ref_model.accumulate_steps
-                ref_model.accumulate_steps = model.accumulate_steps
-                ref_model.micro_batch_size = model.micro_batch_size
                 with paddle.no_grad():
                     with self.autocast_smart_context_manager():
-                        ref_model.eval_batch(data=[inputs, labels])
-                ref_model.micro_batch_size, ref_model.accumulate_steps = ref_model_config_backup
+                        ref_model.eval_batch(data=[inputs, labels], compute_loss=True)
             reference_chosen_logps = infohub.reference_chosen_logps
             reference_rejected_logps = infohub.reference_rejected_logps
         else:
             reference_chosen_logps = [paddle.zeros([1]) for _ in range(model.accumulate_steps)]
             reference_rejected_logps = [paddle.zeros([1]) for _ in range(model.accumulate_steps)]
-        if model.is_pipeline_last_stage(ignore_virtual=model.config.virtual_pp_degree > 1):
+        if model.is_pipeline_last_stage(ignore_virtual=model._layers._num_virtual_pipeline_stages > 1):
             labels = labels[:3] + (reference_chosen_logps, reference_rejected_logps)
         with paddle.no_grad():
             with self.autocast_smart_context_manager():
-                loss = model.eval_batch(data=[inputs, labels])
-        model.micro_batch_size, model.accumulate_steps = model_config_backup
+                loss = model.eval_batch(data=[inputs, labels], compute_loss=True)
 
         # broadcast DPO_INFO_KEYS
         self.broadcast_last_stage_infohub_tensor()
@@ -356,7 +374,6 @@ class DPOTrainer(Trainer):
             ]
         concatenated_inputs["reference_chosen_logps"] = None
         concatenated_inputs["reference_rejected_logps"] = None
-
         self._pp_data_buffer = []
         inputs, labels = model._prepare_pipeline_inputs_func(concatenated_inputs)
         model_config_backup = model.micro_batch_size, model.accumulate_steps
@@ -370,7 +387,7 @@ class DPOTrainer(Trainer):
                 model.eval()
                 with paddle.no_grad():
                     with self.autocast_smart_context_manager():
-                        model.eval_batch(data=[inputs, labels])
+                        model.eval_batch(data=[inputs, labels], compute_loss=True)
                 self.enable_lora(model)
                 model._p2p_helper.clear_meta_cache()
                 model.train()
@@ -381,14 +398,14 @@ class DPOTrainer(Trainer):
                 ref_model.micro_batch_size = model.micro_batch_size
                 with paddle.no_grad():
                     with self.autocast_smart_context_manager():
-                        ref_model.eval_batch(data=[inputs, labels])
+                        ref_model.eval_batch(data=[inputs, labels], compute_loss=True)
                 ref_model.micro_batch_size, ref_model.accumulate_steps = ref_model_config_backup
             reference_chosen_logps = infohub.reference_chosen_logps
             reference_rejected_logps = infohub.reference_rejected_logps
         else:
             reference_chosen_logps = [paddle.zeros([1]) for _ in range(model.accumulate_steps)]
             reference_rejected_logps = [paddle.zeros([1]) for _ in range(model.accumulate_steps)]
-        if model.is_pipeline_last_stage(ignore_virtual=model.config.virtual_pp_degree > 1):
+        if model.is_pipeline_last_stage(ignore_virtual=model._layers._num_virtual_pipeline_stages > 1):
             labels = labels[:3] + (reference_chosen_logps, reference_rejected_logps)
         train_inputs = [inputs, labels]
         train_inputs = model._prepare_training(train_inputs, self.optimizer, self.lr_scheduler)
@@ -409,7 +426,7 @@ class DPOTrainer(Trainer):
             policy_rejected_logps=infohub.policy_rejected_logps,
             dpo_loss=infohub.dpo_loss,
             sft_loss=infohub.sft_loss,
-            train_eval="eval",
+            train_eval="train",
         )
         self.log_metric(**metric_inputs)
 
@@ -432,26 +449,19 @@ class DPOTrainer(Trainer):
         for key in DPO_INFO_KEYS:
             setattr(infohub, key, [])
 
-    def postprocess_infohub_tensor(self):
-        for key in DPO_INFO_KEYS:
-            if "loss" in key:
-                setattr(infohub, key, paddle.stack(getattr(infohub, key)).mean().detach())
-            elif "logps" in key:
-                setattr(infohub, key, paddle.concat(getattr(infohub, key), axis=0).detach())
-            else:
-                raise ValueError(f"Invalid key: {key}")
-
     def broadcast_last_stage_infohub_tensor(self):
-        ignore_virtual = self.model_wrapped.config.virtual_pp_degree > 1
-        if self.model_wrapped.is_pipeline_last_stage(ignore_virtual=ignore_virtual):
-            self.postprocess_infohub_tensor()
         for key in DPO_INFO_KEYS:
-            if self.model_wrapped.is_pipeline_last_stage(ignore_virtual=ignore_virtual):
+            if self.model_wrapped.is_pipeline_last_stage(
+                ignore_virtual=self.model_wrapped._layers._num_virtual_pipeline_stages > 1
+            ):
                 if "loss" in key:
-                    tensor = getattr(infohub, key)
+                    tensor = paddle.stack(getattr(infohub, key)).mean().detach()
                 elif "logps" in key:
-                    tensor = getattr(infohub, key)
-                    tensor_shape = tensor.shape
+                    if len(getattr(infohub, key)) == 0:
+                        tensor = paddle.zeros([1])
+                    else:
+                        tensor = paddle.concat(getattr(infohub, key), axis=0).detach()
+                    tensor_shape = paddle.to_tensor(tensor.shape, dtype="int64")
                     paddle.distributed.broadcast(
                         tensor_shape, src=self.model_wrapped.global_rank, group=self.model_wrapped.pp_group
                     )
@@ -464,7 +474,12 @@ class DPOTrainer(Trainer):
                 if "loss" in key:
                     tensor = paddle.zeros([], "float32")
                 elif "logps" in key:
-                    tensor_shape = paddle.zeros([1])
+                    tensor_shape = paddle.empty([1], dtype="int64")
+                    paddle.distributed.broadcast(
+                        tensor_shape,
+                        src=self.model_wrapped._hcg.get_rank_from_stage(self.model_wrapped.num_stages - 1),
+                        group=self.model_wrapped.pp_group,
+                    )
                     tensor = paddle.zeros(tensor_shape, "float32")
                 else:
                     raise ValueError(f"Invalid key: {key}")
@@ -473,7 +488,7 @@ class DPOTrainer(Trainer):
                     src=self.model_wrapped._hcg.get_rank_from_stage(self.model_wrapped.num_stages - 1),
                     group=self.model_wrapped.pp_group,
                 )
-                setattr(infohub, key, tensor)
+            setattr(infohub, key, tensor)
 
 
 def prepare_pipeline_dpo_inputs_func(inputs):

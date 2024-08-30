@@ -3012,7 +3012,6 @@ class Trainer:
         """
         prediction_step function for pipeline parallel mode.
         """
-        # TODO(lugim): fix without drop_last in this PR
         if hasattr(model, "_prepare_pipeline_inputs_func"):
             inputs, labels = model._prepare_pipeline_inputs_func(inputs)
             has_labels = labels is not None
