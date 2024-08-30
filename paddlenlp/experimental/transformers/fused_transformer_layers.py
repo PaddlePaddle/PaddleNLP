@@ -368,8 +368,9 @@ class FusedMultiTransformerBase(Layer):
 
         self.ln_scales, self.ln_biases = [], []
         self.ffn_ln_scales, self.ffn_ln_biases = [], []
-        self.gate_weights = []
-        self.ffn1_weights, self.ffn1_biases = [], []
+        self.qkv_biases = []
+        self.linear_biases = []
+        self.ffn1_biases = []
         self.ffn2_weights, self.ffn2_biases = [], []
         if self.config.moe_config.has_shared_expert():
             self.shared_expert_gate_weights = []
@@ -450,32 +451,6 @@ class FusedMultiTransformerBase(Layer):
                     attr=ffn_ln_bias_attr,
                     is_bias=True,
                     dtype=self._norm_weight_dtype,
-                )
-
-            gate_weight = None
-
-            if self.config.moe_config.use_moe(i):
-                gate_weight = self.create_parameter(
-                    shape=[config.embed_dim, self.config.moe_config.num_experts],
-                    attr=gate_weight_attr,
-                    dtype="float32",
-                    is_bias=False,
-                    default_initializer=paddle.nn.initializer.Constant(0),
-                )
-
-            if self.config.moe_config.use_moe(i):
-                ffn1_weight = self.create_parameter(
-                    shape=self.moe_ffn1_weight_shape,
-                    attr=ffn1_weight_attr,
-                    dtype=self.create_params_type,
-                    is_bias=False,
-                )
-            else:
-                ffn1_weight = self.create_parameter(
-                    shape=self.ffn1_weight_shape,
-                    attr=ffn1_weight_attr,
-                    dtype=self.create_params_type,
-                    is_bias=False,
                 )
 
             ffn1_bias = None
@@ -1977,13 +1952,15 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
                 out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
             else:
                 out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
-        else:            
+        else:
             if paddle.is_compiled_with_rocm():
                 out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
                 out_linear_out = dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
             else:
                 try:
-                    out_linear_out = gemm_dequant(fmha_out, self.linear_weights[i], self.linear_out_scales[i], self._dtype)
+                    out_linear_out = gemm_dequant(
+                        fmha_out, self.linear_weights[i], self.linear_out_scales[i], self._dtype
+                    )
                 except:
                     out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
                     out_linear_out = dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
@@ -2251,7 +2228,9 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
             v_quant_scales[i] if v_quant_scales is not None else None,
             k_dequant_scales[i] if k_dequant_scales is not None else None,
             v_dequant_scales[i] if v_dequant_scales is not None else None,
-            self.qkv_out_scales[i] if hasattr(self, "weight_scales") and not np.all(self.weight_scales["qkv_weight_scale"][i] == -1) else None,
+            self.qkv_out_scales[i]
+            if hasattr(self, "weight_scales") and not np.all(self.weight_scales["qkv_weight_scale"][i] == -1)
+            else None,
             self.qkv_biases[i] if len(self.qkv_biases) > 0 else None,
             self.linear_shifts[i] if len(self.linear_shifts) > 0 else None,
             self.linear_smooths[i] if len(self.linear_smooths) > 0 else None,
