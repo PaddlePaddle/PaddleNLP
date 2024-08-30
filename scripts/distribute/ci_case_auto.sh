@@ -1150,7 +1150,7 @@ function llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
     mem=-1
     ips_base=-1
     mem_base=-1
-    check_result $aaa ${loss1} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
+    check_result $FUNCNAME ${loss1} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
 }
 
 function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1() {
