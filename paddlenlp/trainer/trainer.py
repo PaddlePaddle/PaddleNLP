@@ -184,6 +184,16 @@ try:
 except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
+try:
+    from paddle.distributed import in_auto_parallel_align_mode
+except:
+
+    def in_auto_parallel_align_mode():
+        """
+        hack for paddlenlp develop branch.
+        """
+        return False
+
 
 __all__ = ["Trainer"]
 
@@ -1303,7 +1313,8 @@ class Trainer:
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
-            tr_loss_scalar = self._get_item_from_loss(self._nested_gather(tr_loss).mean())
+            avg_loss = self._nested_gather(tr_loss).mean()
+            tr_loss_scalar = self._get_item_from_loss(avg_loss)
 
             # reset tr_loss to zero
             tr_loss.subtract_(tr_loss)
@@ -1311,6 +1322,8 @@ class Trainer:
             logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
+            if in_auto_parallel_align_mode():
+                logs["loss_md5"] = avg_loss._md5sum()
 
             divisor = 2**30
             # TODO(@gexiao): replace these codes with unified APIs in Paddle
