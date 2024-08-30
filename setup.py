@@ -14,6 +14,7 @@
 import errno
 import io
 import os
+import re
 import subprocess
 from datetime import datetime
 
@@ -122,8 +123,14 @@ else:
 # write the version information for the develop version
 def append_version_py(filename="paddlenlp/__init__.py"):
     assert os.path.exists(filename), f"{filename} does not exist!"
-    with open(filename, "a") as file:  # append version info to __init__.py
-        file.write(f'\n__version__ = "{__version__}"\n\n')
+
+    with open("setup.py", "r") as file:
+        file_content = file.read()
+
+    pattern = r"^# \[VERSION_INFO\].*$"
+    modified_content = re.sub(pattern, rf'\n__version__ = "{__version__}"\n\n', file_content)
+    with open("setup.py", "w") as file:
+        file.write(modified_content)
 
 
 append_version_py(filename="paddlenlp/__init__.py")
