@@ -110,13 +110,23 @@ def show():
         f.write(content)
 
 
-__version__ = "3.0.0b0.post"
+# only use this file to contral the version
+__version__ = "3.0.0b1.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 else:
     formatted_date = datetime.now().date().strftime("%Y%m%d")
     __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
 
+
+# write the version information for the develop version
+def append_version_py(filename="paddlenlp/__init__.py"):
+    assert os.path.exists(filename), f"{filename} does not exist!"
+    with open(filename, "a") as file:  # append version info to __init__.py
+        file.write(f'\n__version__ = "{__version__}"\n\n')
+
+
+append_version_py(filename="paddlenlp/__init__.py")
 
 extras = {}
 REQUIRED_PACKAGES = read_requirements_file("requirements.txt")
@@ -197,6 +207,8 @@ try:
     )
 except Exception as e:
     git_checkout(paddlenlp_dir, "paddlenlp/version/__init__.py") if commit != "unknown" else None
+    git_checkout(paddlenlp_dir, "paddlenlp/__init__.py") if commit != "unknown" else None
     raise e
 
 git_checkout(paddlenlp_dir, "paddlenlp/version/__init__.py") if commit != "unknown" else None
+git_checkout(paddlenlp_dir, "paddlenlp/__init__.py") if commit != "unknown" else None
