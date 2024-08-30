@@ -27,7 +27,7 @@ else:
     formatted_date = datetime.now().date().strftime("%Y%m%d")
     __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
 
-# follows version replaced by setup.py for release version.
+# the next line will be replaced by setup.py for release version.
 # [VERSION_INFO]
 
 if "datasets" in sys.modules.keys():
