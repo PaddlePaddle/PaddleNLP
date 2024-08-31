@@ -1216,7 +1216,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
             --recompute_use_reentrant true \
             --recompute_granularity full \
             --pp_recompute_interval 0 \
-            --bf16 1\
+            --bf16 1 \
             --fp16_opt_level "O2"  \
             --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
             --amp_custom_white_list "lookup_table" "lookup_table_v2" \
