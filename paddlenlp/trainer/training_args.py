@@ -970,6 +970,7 @@ class TrainingArguments:
         if self.sharding_degree > 0:
             warnings.warn("`sharding_degree` is deprecated, please use `sharding_parallel_degree`")
             self.sharding_parallel_degree = max(self.sharding_degree, self.sharding_parallel_degree)
+        self.data_parallel_degree = 1
 
         delattr(self, "sharding_degree")
 
