@@ -55,7 +55,7 @@ function llama_case_list_auto() {
 
     llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
 
-    llama_align_dy2st_pir_and_programir_auto_grad_merge_bs2_fp32_DP2
+    llama_align_dy2st_pir_and_programir_auto_grad_merge_bs2_fp32_DP2-MP1-PP1
     llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
