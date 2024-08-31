@@ -55,7 +55,7 @@ function llama_case_list_auto() {
 
     llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
 
-    llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp32_DP2-MP1-PP1
+    llama_align_dy2st_pir_and_programir_auto_grad_merge_bs2_fp32_DP2
     llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
@@ -1256,19 +1256,21 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
     echo "=========== $FUNCNAME run  end ==========="
 }
 
-function llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
+function llama_align_dy2st_pir_and_programir_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
-    export FLAGS_enable_pir_api=1
     export FLAGS_max_inplace_grad_add=3
 
-    task_name="llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp32_dp2"
+    task_name="llama_align_dy2st_pir_and_programir_auto_grad_merge_bs2_fp32_DP2"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
+    to_static=1
 
-    for to_static in "0" "1"; do
+    for use_pir in "0" "1"; do
+        export FLAGS_enable_pir_api=${use_pir}
+        export FLAGS_enable_pir_in_executor=${use_pir}
         rm -rf $case_out_dir
         rm -rf $case_log_dir
         python -u -m paddle.distributed.launch \
@@ -1328,7 +1330,6 @@ function llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
             --sharding "" \
             --to_static ${to_static} \
             --num_hidden_layers 2 \
-            --data_parallel_config "enable_allreduce_avg_in_gradinent_scale" \
             >>${log_path}/$FUNCNAME 2>&1
         loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
         if [ $to_static -eq 0 ];then
