@@ -1328,6 +1328,7 @@ function llama_align_dygraph_dy2st_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
             --sharding "" \
             --to_static ${to_static} \
             --num_hidden_layers 2 \
+            --data_parallel_config "enable_allreduce_avg_in_gradinent_scale" \
             >>${log_path}/$FUNCNAME 2>&1
         loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
         if [ $to_static -eq 0 ];then
