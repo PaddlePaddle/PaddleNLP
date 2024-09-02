@@ -158,6 +158,7 @@ class DeepseekV2Config(PretrainedConfig):
         seq_aux=True,
         hidden_act="silu",
         max_position_embeddings=2048,
+        seq_length=32768,
         initializer_range=0.02,
         rms_norm_eps=1e-6,
         use_cache=True,
@@ -174,6 +175,7 @@ class DeepseekV2Config(PretrainedConfig):
     ):
         self.vocab_size = vocab_size
         self.max_position_embeddings = max_position_embeddings
+        self.seq_length = seq_length
         self.hidden_size = hidden_size
         self.intermediate_size = intermediate_size
         self.moe_intermediate_size = moe_intermediate_size
