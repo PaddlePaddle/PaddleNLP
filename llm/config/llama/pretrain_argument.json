@@ -28,7 +28,7 @@
     "warmup_ratio": 0.01,
     "max_grad_norm": 1.0,
     "dataloader_num_workers": 1,
-    "continue_training": 1,
+    "continue_training": 0,
     "do_train": true,
     "do_eval": true,
     "do_predict": true,
