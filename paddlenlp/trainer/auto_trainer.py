@@ -279,8 +279,6 @@ class AutoTrainer(Trainer):
         self.state.is_local_process_zero = self.is_local_process_zero()
         self.state.is_world_process_zero = self.is_world_process_zero()
 
-        self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
-
         tr_loss = paddle.to_tensor(0.0)
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
@@ -291,6 +289,9 @@ class AutoTrainer(Trainer):
             npu_accelerate_plugin(self.optimizer)
 
         model, dist_loader = self._wrap_for_auto(model, train_dataloader)
+
+        self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
+
         train_dataloader = dist_loader()
 
         if resume_from_checkpoint is not None:
