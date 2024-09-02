@@ -19,8 +19,8 @@ import os
 import pandas as pd
 from tqdm import tqdm
 
-input_path = "../../dataset/ceval/dev"
-output_path = "../../dataset/ceval_ptq"
+input_path = "../../../../dataset/ceval/dev"
+output_path = "../../../../dataset/ceval_ptq_test"
 os.makedirs(output_path, exist_ok=True)
 quant_json = os.path.join(output_path, "quant.json")
 dev_json = os.path.join(output_path, "dev.json")
@@ -126,3 +126,14 @@ while cnt < nums:
             break
     if break_cnt <= 0:
         break
+
+import json
+
+with open(quant_json, "w") as f:
+    for line in data_list:
+        f.write(json.dumps(line, ensure_ascii=False) + "\n")
+
+
+with open(dev_json, "w") as f:
+    for line in data_list:
+        f.write(json.dumps(line, ensure_ascii=False) + "\n")

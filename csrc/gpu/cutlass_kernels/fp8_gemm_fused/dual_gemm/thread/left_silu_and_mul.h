@@ -1,4 +1,5 @@
 /***************************************************************************************************
+ * Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
  * Copyright (c) 2017 - 2024 NVIDIA CORPORATION & AFFILIATES. All rights
  *reserved. SPDX-License-Identifier: BSD-3-Clause
  *
