@@ -2231,5 +2231,3 @@ elif [[ $exec_case =~ "llama" ]];then
 else
     echo -e "\033[31m ---- Invalid exec_case $exec_case \033[0m"
 fi
-
-$1
