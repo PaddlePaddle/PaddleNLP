@@ -1511,8 +1511,6 @@ class LlamaModel(LlamaPretrainedModel):
             else:
                 seq_length = 2048
 
-        print(seq_length)
-        seq_length = 4096
         flops_per_transformer = 0
         flops_recompute_transformer = 0
 
@@ -1541,14 +1539,11 @@ class LlamaModel(LlamaPretrainedModel):
 
         # 2 for mul + add in matmul
         # 1 for forward, 2 for backwards since we caluate gradients for input_x and input_y
-        ret = (
+        return (
             2
             * batch_size
             * (layer_num * (flops_per_transformer * 3 + flops_recompute_transformer) + 3 * flops_loggits)
         )
-
-        print(ret / 2**40)
-        return ret
 
     def get_input_embeddings(self):
         return self.embed_tokens

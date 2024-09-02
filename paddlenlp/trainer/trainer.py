@@ -1329,7 +1329,11 @@ class Trainer:
             model_flops = None
             if getattr(self, "is_pretraining", False) and hasattr(self.model, "config"):
                 seq_length = getattr(self.model.config, "seq_length", None)
-                model_flops = self.model.get_hardware_flops(seq_length=seq_length, recompute=self.args.recompute)
+                try:
+                    model_flops = self.model.get_hardware_flops(seq_length=seq_length, recompute=self.args.recompute)
+                except NotImplementedError:
+                    model_flops = None
+
             logs.update(
                 speed_metrics(
                     "interval",
