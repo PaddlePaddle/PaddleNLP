@@ -499,6 +499,8 @@ class Qwen2Attention(nn.Layer):
             base=self.rope_theta,
         )
 
+        self.attn_func = scaled_dot_product_attention
+
     def forward(
         self,
         hidden_states,
@@ -564,27 +566,27 @@ class Qwen2Attention(nn.Layer):
             and self.recompute_granularity == "core_attn"
         ):
             outputs = recompute(
-                scaled_dot_product_attention,
+                self.attn_func,
                 query_states,
                 self.config,
                 key_states,
                 value_states,
                 attention_mask,
                 output_attentions,
-                self.training,
-                self.sequence_parallel,
+                training=self.training,
+                sequence_parallel=self.sequence_parallel,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
-            outputs = scaled_dot_product_attention(
+            outputs = self.attn_func(
                 query_states,
                 self.config,
                 key_states,
                 value_states,
                 attention_mask,
                 output_attentions,
-                self.training,
-                self.sequence_parallel,
+                training=self.training,
+                sequence_parallel=self.sequence_parallel,
             )
         if output_attentions:
             attn_output, attn_weights = outputs
