@@ -59,7 +59,7 @@ unzip ceval-exam.zip -d dataset/ceval
 ```
 使用下述脚本和命令抽取 C-Eval 样本作为校准数据集：
 ```shell
-cd llm/experimental/ceval
+cd llm/experimental/ceval/default
 python prepare_data_for_ptq.py
 ```
 默认生成的校准数据集位于`dataset/ceval_ptq`。

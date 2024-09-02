@@ -55,11 +55,6 @@ class TrainingArguments(TrainingArguments):
         metadata={"help": "Configs to unify hybrid parallel checkpoint.\n"},
     )
 
-    do_ceval: bool = field(
-        default=False,
-        metadata={"help": "Whether to run C-Eval"},
-    )
-
     def __post_init__(self):
         super().__post_init__()
         # NOTE(gongenlei): new add autotuner_benchmark
@@ -237,16 +232,12 @@ class ModelArgument:
 
 @dataclass
 class QuantArgument:
+
+    # Quantization method config
     quant_type: str = field(
         default="a8w8",
         metadata={"help": "Quantization type. Supported values: weight_only_int8, weight_only_int4, a8w8, a8w8c8"},
     )
-
-    load_quant_model: bool = field(default=False, metadata={"help": "Whether to load quant model"})
-
-    do_quant_debug: bool = field(default=False, metadata={"help": "Whether to use debug"})
-
-    test_sample: Optional[str] = field(default=None, metadata={"help": "Test sample for quantization"})
 
     use_fp8: str = field(
         default="",
@@ -254,10 +245,12 @@ class QuantArgument:
             "help": "Whether to use FP8 on (activation, weight, cachekv), e.g. WAC means weight , activation, cachekv use fp8"
         },
     )
+
     fp8_type: List[str] = field(
         default_factory=lambda: ["e4m3", "e4m3"],
         metadata={"help": "Quantization type for (weight, activation, cachekv)", "nargs": "+"},
     )
+
     skip_list_names: List[str] = field(
         default=lambda: [], metadata={"help": "Skip scales for quantization", "nargs": "+"}
     )
@@ -342,6 +335,12 @@ class QuantArgument:
     awq_step: int = field(default=8, metadata={"help": "Step for AWQ Search"})
     autoclip_step: int = field(default=8, metadata={"help": "Step for AutoClip"})
 
+    # Other config
+    load_quant_model: bool = field(default=False, metadata={"help": "Whether to load quant model"})
+
+    do_quant_debug: bool = field(default=False, metadata={"help": "Whether to use debug"})
+    test_sample: Optional[str] = field(default=None, metadata={"help": "Test sample for quantization"})
+
 
 @dataclass
 class GenerateArgument:
@@ -358,6 +357,10 @@ class GenerateArgument:
 
 @dataclass
 class CEvalArgument:
+    do_ceval: bool = field(
+        default=False,
+        metadata={"help": "Whether to run C-Eval"},
+    )
     cot: bool = field(default=False, metadata={"help": "Whether to use chain of thought"})
     few_shot: bool = field(default=False, metadata={"help": "Whether to use few shot"})
     ntrain: int = field(default=5, metadata={"help": "Number of few shot"})
