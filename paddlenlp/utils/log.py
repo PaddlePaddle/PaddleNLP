@@ -15,6 +15,7 @@
 
 import contextlib
 import functools
+import json
 import logging
 import multiprocessing
 import signal
@@ -22,7 +23,6 @@ import threading
 import time
 
 import colorlog
-import jsonlines
 
 loggers = {}
 
@@ -170,10 +170,9 @@ class MetricsDumper(object):
                 metrics = queue.get(timeout=10)  # Timeout to allow graceful shutdown
                 if metrics is None:
                     break
-                with jsonlines.open(self.filename, "a") as writer:
-                    writer.write(metrics)
+                with open(self.filename, "a") as writer:
+                    writer.write(json.dumps(metrics) + "\n")
             except:
-                print("waiting for metrices input...")
                 continue
 
     def _signal_handler(self, sig, frame):
