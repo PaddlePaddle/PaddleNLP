@@ -36,8 +36,13 @@ class DPOCriterion(nn.Layer):
     def __init__(self, config):
         super(DPOCriterion, self).__init__()
         self.config = config
+        if getattr(self.config, "dpo_config", None):
+            raise ValueError("DPO Criterion requires model_config.dpo_config.")
         self.dpo_config = copy.deepcopy(config.dpo_config)
-        if self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1:
+        if (
+            getattr(self.config, "tensor_parallel_output", False)
+            and getattr(self.config, "tensor_parallel_degree", 1) > 1
+        ):
             self.logprobs = ParallelCrossEntropy()
         else:
             self.logprobs = nn.CrossEntropyLoss(reduction="none")
@@ -127,13 +132,20 @@ class DPOCriterion(nn.Layer):
         average_log_prob=False,
     ):
         """DPO logprobs"""
+        use_fused_head_and_loss_fn = getattr(self.config, "use_fused_head_and_loss_fn", False)
+        use_sparse_head_and_loss_fn = getattr(self.config, "use_sparse_head_and_loss_fn", False)
+        tensor_parallel_degree = getattr(self.config, "tensor_parallel_degree", 1)
+        tensor_parallel_output = getattr(self.config, "tensor_parallel_output", False)
+        sequence_parallel = getattr(self.config, "sequence_parallel", False)
+        chunk_size = getattr(self.config, "chunk_size", 1024)
         labels = chosen_labels + rejected_labels
-        if self.config.use_fused_head_and_loss_fn:
+        if use_fused_head_and_loss_fn:
             hidden_states, weight, bias, transpose_y = logits
-        elif self.config.use_sparse_head_and_loss_fn:
+        elif use_sparse_head_and_loss_fn:
             hidden_states, weight, bias = logits
-        if self.config.use_sparse_head_and_loss_fn:
-            if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
+
+        if use_sparse_head_and_loss_fn:
+            if tensor_parallel_degree > 1 and sequence_parallel:
                 labels, sparse_tgt_idx = sequence_parallel_sparse_mask_labels(labels, 0)
 
                 hidden_states = paddle.take_along_axis(hidden_states, sparse_tgt_idx, axis=0)
@@ -145,7 +157,8 @@ class DPOCriterion(nn.Layer):
 
                 hidden_states = hidden_states.reshape([-1, hidden_states.shape[-1]])
                 hidden_states = paddle.take_along_axis(hidden_states, sparse_tgt_idx.unsqueeze(-1), axis=0)
-        if self.config.use_fused_head_and_loss_fn:
+
+        if use_fused_head_and_loss_fn:
             per_token_logps = -fused_head_and_loss_fn(
                 hidden_states,
                 weight,
@@ -154,18 +167,18 @@ class DPOCriterion(nn.Layer):
                 None,
                 transpose_y,
                 self.config.vocab_size,
-                self.config.tensor_parallel_degree,
-                self.config.tensor_parallel_output,
-                self.config.fused_linear,
-                1024,
+                tensor_parallel_degree,
+                tensor_parallel_output,
+                False,  # fused_linear
+                chunk_size,
                 return_token_loss=True,
                 ignore_index=0,
             )
-        elif self.config.use_sparse_head_and_loss_fn:
+        elif use_sparse_head_and_loss_fn:
             if bias is None:
-                logits = parallel_matmul(hidden_states, weight, self.config.tensor_parallel_output)
+                logits = parallel_matmul(hidden_states, weight, tensor_parallel_output)
             else:
-                logits = parallel_linear(hidden_states, weight, bias, self.config.tensor_parallel_output)
+                logits = parallel_linear(hidden_states, weight, bias, tensor_parallel_output)
             logits = logits.astype("float32")
             per_token_logps = -self.logprobs(logits, labels)
         else:
@@ -177,7 +190,7 @@ class DPOCriterion(nn.Layer):
 
         if len(response_indexs.shape) == 3:
             response_indexs = response_indexs[0]
-        if self.config.use_sparse_head_and_loss_fn:
+        if use_sparse_head_and_loss_fn:
             chosen_logps = paddle.stack(
                 [(per_token_logps[response_index[1] : response_index[2]]).sum() for response_index in response_indexs],
                 axis=0,
