@@ -124,3 +124,8 @@ FETCH_HEAD
 # vscode
 .vscode
 ./ppdiffusers/ppdiffusers/version.py
+
+# third party
+csrc/gpu/cutlass_kernels/cutlass
+dataset/
+output/

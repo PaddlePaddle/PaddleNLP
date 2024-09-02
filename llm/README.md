@@ -97,7 +97,7 @@ PaddleNLP 支持多个主流大模型的 SFT、LoRA、Prefix Tuning 等精调策
 - **支持多轮对话**。支持统一对话模板，支持多轮对话高效训练，详参[多轮对话文档](./docs/chat_template.md)。
 
 <div align="center">
-    <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/a1d982f8-d2ef-4a78-bb49-6d6683d6ecce">
+    <img width="500" alt="llm" src="https://github.com/user-attachments/assets/cb226f26-ce86-433e-8bb3-02fc04e8d813">
 </div>
 <div align="center">
     <font size ="1">
@@ -191,7 +191,7 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 
 ```bash
 # DPO 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./dpo/run_dpo.py ./config/llama/dpo_argument.json
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
 
 #### 3.2 RLHF
@@ -210,38 +210,37 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./dpo/run_dpo.p
 </div>
 <div align="center">
     <font size ="1">
-    飞桨量化算法效果展示
+    飞桨 W4和 W8A8量化算法效果展示
+     </font>
+</div>
+<div align="center">
+    <img width="300" alt="llm" src="https://github.com/user-attachments/assets/ab8d04ba-d589-4f54-acf1-b00c0fd9159e">
+</div>
+<div align="center">
+    <font size ="1">
+    飞桨 W8A8C8和 FP8量化效果展示
      </font>
 </div>
 
 ```shell
 # PTQ 量化启动命令参考
-python  run_finetune.py ./config/llama/ptq_argument.json
+python run_finetune.py ./config/llama/ptq_argument.json
 
 # GPTQ 量化启动命令参考
-python  run_finetune.py ./config/llama/ptq_argument.json
+python run_finetune.py ./config/llama/ptq_argument.json
+
+# W8A8C8(INT)量化启动命令参考
+python run_finetune.py ./config/llama/ptq_c8_argument.json
+
+# W8A8(FP8)量化启动命令参考
+python run_finetune.py ./config/llama/fp8_ptq_argument.json
 ```
 
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。
 
 ### 5. 推理
 
-PaddleNLP 除了提供常用模型推理外，还提供了高性能推理，内置动态插入和全环节算子融合策略，极大加快并行推理的速度。
-
-- **常用模型推理**：PaddleNLP 提供了动态图推理和静态图推理两种方式，方便用户快速验证模型推理效果（包含 LoRA、PrefixTuning）。
-
-```shell
-# 动态图模型推理命令参考
-python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --data_file ./data/dev.json --dtype float16
-
-# 静态图模型推理命令参考
-# step1 : 静态图导出
-python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --output_path ./inference --dtype float16
-# step2: 静态图推理
-python ./predict/predictor.py --model_name_or_path ./inference --data_file ./data/dev.json --dtype float16 --mode static
-```
-
-- **InferenceModel 高性能推理**：PaddleNLP 还提供了高性能推理模型加快并行推理的速度，同时支持 FP16、Prefix Tuning、WINT8、A8W8多种推理方式。
+PaddleNLP 提供高性能推理，内置动态插入和全环节算子融合策略，极大加快并行推理的速度，同时支持 FP16/BF16、WINT8、WINT4、A8W8、A8W8C8多种推理方式。
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/fb248224-0ad1-4d6a-a1ca-3a8dd765c41d">
@@ -253,17 +252,17 @@ python ./predict/predictor.py --model_name_or_path ./inference --data_file ./dat
 </div>
 
 ```shell
-# 高性能动态图模型推理命令参考
+# 动态图模型推理命令参考
 python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16
 
-# 高性能静态图模型推理命令参考
+# 静态图模型推理命令参考
 # step1 : 静态图导出
 python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16
 # step2: 静态图推理
 python ./predict/predictor.py --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static"
 ```
 
-更多常用模型推理和高性能模型使用方法详见[大模型推理文档](./docs/inference.md)。
+更多模型推理使用方法详见[大模型推理文档](./docs/predict/inference.md)。
 
 ### 6. 服务化部署
 
@@ -287,7 +286,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_ser
 
 - `port`: Gradio UI 服务端口号，默认8011。
 - `flask_port`: Flask 服务端口号，默认8010。
-- 其他参数请参见[推理文档](./docs/inference.md)中推理参数配置。
+- 其他参数请参见[推理文档](./docs/predict/inference.md)中推理参数配置。
 
 此外，如果想通过 API 脚本的方式跑推理，可参考：`./predict/request_flask_server.py` 文件。
 

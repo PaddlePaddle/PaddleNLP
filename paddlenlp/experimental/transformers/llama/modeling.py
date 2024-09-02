@@ -29,6 +29,7 @@ from paddlenlp.experimental.model_utils import (
     WeightScalesLoader,
 )
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
+    AvxConfig,
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerA8W8,
     FusedBlockMultiTransformerWeightOnly,
@@ -92,6 +93,29 @@ class FusedLlamaRMSNorm(nn.Layer):
         return result
 
 
+class LLamaAvxLMHead(nn.Layer):
+    def __init__(self, config: LlamaConfig):
+        super().__init__()
+        self.config = config
+        self.avx_type = config.avx_type
+        self.alog = "fp16"
+        if self.avx_type == "fp16":
+            self.alog = "fp16"
+        elif self.avx_type == "fp16_int8" or self.avx_type == "bf16_int8":
+            self.alog = "int8"
+        self.weight = self.create_parameter(
+            shape=[self.config.hidden_size, self.config.vocab_size],
+            attr=None,
+            dtype=paddle.get_default_dtype(),
+            is_bias=False,
+        )
+
+    def forward(self, input):
+        from paddlenlp_ops import avx_weight_only
+
+        return avx_weight_only(input, self.weight, self.alog, trans=False)
+
+
 @register_base_model
 class LlamaAvxInferenceModel(LlamaPretrainedModel):
     """
@@ -116,6 +140,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             self.hidden_size,
         )
         self.compute_type = config.avx_type
+        self.cachekv_type = config.avx_cachekv_type
         ln_scale_attrs = [paddle.ParamAttr(name="fusellama.{}.ln_scale".format(i)) for i in range(self.num_layers)]
         qkv_weight_attrs = [
             paddle.ParamAttr(
@@ -132,9 +157,15 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
         ffn_ln_scale_attrs = [
             paddle.ParamAttr(name="fusellama.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
         ]
-        ffn1_weight_attrs = [
+        gate_weight_attrs = [
             paddle.ParamAttr(
-                name="fusellama.{}.ffn1_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+                name="fusellama.{}.gate_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
+            )
+            for i in range(self.num_layers)
+        ]
+        up_weight_attrs = [
+            paddle.ParamAttr(
+                name="fusellama.{}.up_weight".format(i), initializer=paddle.nn.initializer.Constant(value=0)
             )
             for i in range(self.num_layers)
         ]
@@ -145,27 +176,44 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             for i in range(self.num_layers)
         ]
 
-        transformer_config = FusedMultiTransformerConfig(
-            self.hidden_size,
-            self.num_attention_heads,
-            self.intermediate_size,
-            activation="silu",
-            num_layers=config.num_hidden_layers,
-            ln_scale_attrs=ln_scale_attrs,
-            qkv_weight_attrs=qkv_weight_attrs,
-            linear_weight_attrs=out_proj_weight_attrs,
-            ffn_ln_scale_attrs=ffn_ln_scale_attrs,
-            ffn1_weight_attrs=ffn1_weight_attrs,
-            ffn2_weight_attrs=ffn2_weight_attrs,
-            epsilon=self.epsilon,
-            norm_type="rmsnorm",
+        avx_config = AvxConfig(
+            max_position_embeddings=self.max_position_embeddings,
+            compute_type=self.compute_type,
+            cache_dtype=self.cachekv_type,
         )
 
-        self.set_transformer_block(transformer_config, config.max_position_embeddings, self.compute_type)
+        transformer_config = FusedMultiTransformerConfig(
+            embed_dim=self.hidden_size,
+            num_heads=self.num_attention_heads,
+            kv_num_heads=self.num_layers,
+            dim_feedforward=self.intermediate_size,
+            activation="silu",
+            num_layers=self.num_layers,
+            ln_scale_attrs=ln_scale_attrs,
+            ln_bias_attrs=None,
+            qkv_weight_attrs=qkv_weight_attrs,
+            qkv_bias_attrs=None,
+            linear_weight_attrs=out_proj_weight_attrs,
+            linear_bias_attrs=None,
+            ffn_ln_scale_attrs=ffn_ln_scale_attrs,
+            ffn_ln_bias_attrs=None,
+            gate_weight_attrs=gate_weight_attrs,
+            gate_bias_attrs=None,
+            up_weight_attrs=up_weight_attrs,
+            up_bias_attrs=None,
+            ffn2_weight_attrs=ffn2_weight_attrs,
+            ffn2_bias_attrs=None,
+            norm_type="rmsnorm",
+            epsilon=self.epsilon,
+            nranks=config.tensor_parallel_degree,
+            avx_config=avx_config,
+        )
+
+        self.set_transformer_block(transformer_config)
         self.norm = FusedLlamaRMSNorm(config)
 
-    def set_transformer_block(self, transformer_config, max_position_embeddings, compute_type):
-        self.transformer_block = FusedMultiTransformerAvx(transformer_config, max_position_embeddings, compute_type)
+    def set_transformer_block(self, transformer_config):
+        self.transformer_block = FusedMultiTransformerAvx(transformer_config)
 
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
@@ -217,8 +265,8 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
         all_hidden_states = () if output_hidden_states else None
         with dy2st_nocheck_guard_context():
             hidden_states = self.transformer_block(
-                input_ids,
-                hidden_states,
+                input_ids=input_ids,
+                src=hidden_states,
                 past_seq_len=past_seq_len,
                 cur_seq_len=cur_seq_len,
                 step_idx=step_idx,
@@ -231,14 +279,8 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
         if not return_dict:
             return tuple(v for v in [hidden_states, None, all_hidden_states, None] if v is not None)
 
-        return BaseModelOutputWithPastAndCrossAttentions(
-            last_hidden_state=hidden_states,
-            past_key_values=None,
-            hidden_states=all_hidden_states,
-            attentions=None,
-        )
-
     @paddle.no_grad()
+    # avx
     def set_state_dict(self, state_dict):
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
@@ -251,7 +293,11 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
 
         for idx in range(self.config.num_hidden_layers):
             logger.info(f"set state for layer {idx}")
-
+            self.transformer_block.ln_scales[idx].set_value(
+                paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.weight".format(idx)]).cast(
+                    self.transformer_block.ln_scales[idx].dtype
+                )
+            )
             if "llama.layers.{}.self_attn.qkv_proj.weight".format(idx) in state_dict.keys():
                 concated_qkv_weight = np.concatenate(
                     split_fn(
@@ -309,6 +355,12 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             self.transformer_block.linear_weights[idx].set_value(
                 linear_weight_tensor.cast(self.transformer_block.linear_weights[idx].dtype)
             )
+            # mlp
+            self.transformer_block.ffn_ln_scales[idx].set_value(
+                paddle.to_tensor(state_dict["llama.layers.{}.post_attention_layernorm.weight".format(idx)]).cast(
+                    self.transformer_block.ffn_ln_scales[idx].dtype
+                )
+            )
             self.transformer_block.gate_weights[idx].set_value(
                 gate_weight_tensor.cast(self.transformer_block.gate_weights[idx].dtype)
             )
@@ -319,17 +371,6 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             ffn2_weight_tensor = paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.weight".format(idx)])
             self.transformer_block.ffn2_weights[idx].set_value(
                 ffn2_weight_tensor.cast(self.transformer_block.ffn2_weights[idx].dtype)
-            )
-            self.transformer_block.ln_scales[idx].set_value(
-                paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.weight".format(idx)]).cast(
-                    self.transformer_block.ln_scales[idx].dtype
-                )
-            )
-
-            self.transformer_block.ffn_ln_scales[idx].set_value(
-                paddle.to_tensor(state_dict["llama.layers.{}.post_attention_layernorm.weight".format(idx)]).cast(
-                    self.transformer_block.ffn_ln_scales[idx].dtype
-                )
             )
 
 
@@ -1245,7 +1286,7 @@ class LlamaForCausalLMAvxInferenceModel(GenerationAvxInferenceModel, LlamaPretra
     def __init__(self, config):
         super().__init__(config)
         self.llama = LlamaAvxInferenceModel(config)
-        self.lm_head = LlamaLMHead(config)
+        self.lm_head = LLamaAvxLMHead(config)
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
@@ -1276,11 +1317,13 @@ class LlamaForCausalLMAvxInferenceModel(GenerationAvxInferenceModel, LlamaPretra
             past_seq_len = paddle.cast(seq_len_decoder, "int64")
             input_ids = tgt_ids
             inputs_embeds = None
+        cur_seq_len = (paddle.to_tensor(input_ids.shape[1], dtype="int64"),)
 
         model_inputs = {
             "input_ids": input_ids,
             "inputs_embeds": inputs_embeds,
             "past_seq_len": past_seq_len,
+            "cur_seq_len": cur_seq_len,
             "step_idx": step_idx,
         }
         return model_inputs
@@ -1290,13 +1333,10 @@ class LlamaForCausalLMAvxInferenceModel(GenerationAvxInferenceModel, LlamaPretra
         input_ids,
         inputs_embeds=None,
         past_seq_len=None,
+        cur_seq_len=None,
         step_idx=None,
-        output_hidden_states=None,
-        return_dict=None,
+        return_dict=False,
     ):
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
-        )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         outputs = self.llama(
             input_ids,
@@ -1304,31 +1344,21 @@ class LlamaForCausalLMAvxInferenceModel(GenerationAvxInferenceModel, LlamaPretra
             past_seq_len=past_seq_len,
             cur_seq_len=paddle.to_tensor(input_ids.shape[1], dtype="int64"),
             step_idx=step_idx,
-            output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
         hidden_states = outputs[0]
-        logits = self.lm_head(
-            hidden_states,
-            tensor_parallel_output=False,
-        )
+        logits = self.lm_head(hidden_states)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
             return output
 
-        return CausalLMOutputWithCrossAttentions(
-            loss=None,
-            logits=logits,
-            past_key_values=outputs.past_key_values,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
-
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
         if "lm_head.weight" in state_dict:
-            self.lm_head.weight.set_value(state_dict["lm_head.weight"])
+            self.lm_head.weight.set_value(
+                paddle.to_tensor(state_dict["lm_head.weight"]).cast(paddle.get_default_dtype())
+            )
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
 

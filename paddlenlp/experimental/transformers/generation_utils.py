@@ -18,12 +18,7 @@ from typing import List, Union
 import paddle
 import paddle.nn.functional as F
 
-from paddlenlp.generation import (
-    GenerationMixin,
-    LogitsProcessor,
-    LogitsProcessorList,
-    TopPProcess,
-)
+from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
 
 __all__ = ["GenerationInferenceModel", "GenerationBlockInferenceModel", "GenerationAvxInferenceModel"]
 
@@ -941,10 +936,10 @@ class GenerationAvxInferenceModel(GenerationMixin):
             )
             logits = logits / temperature
             probs = F.softmax(logits)
-            min_tokens_to_keep = 1
-            if top_p is not None and top_p < 1.0:
-                probs = TopPProcess(probs, top_p, min_tokens_to_keep)
-            next_tokens = paddle.multinomial(probs)
+
+            from paddlenlp_ops import xft_greedy_search
+
+            next_tokens = xft_greedy_search(probs)
 
             model_kwargs = self.update_model_kwargs_for_generation(
                 cache, just_decoder, next_tokens, eos_token_id, model_kwargs
