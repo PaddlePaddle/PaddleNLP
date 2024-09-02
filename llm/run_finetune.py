@@ -733,7 +733,8 @@ def main():
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
 
-    if training_args.do_ceval:
+    # C-Eval after qat/ptq/train
+    if ceval_args.do_ceval:
         logger.info("*** Evaluate on C-Eval ***")
         ceval_args.output_dir = training_args.output_dir
         from experimental.ceval.default.eval import run_eval
