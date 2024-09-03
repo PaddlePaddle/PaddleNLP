@@ -212,7 +212,7 @@ bool fp8_fp8_gemm_scale_bias_act(GemmEpilogueAllParams params) {
         for(const auto& config_pair : gemm_configs_map){
             bool is_valid = true;
             // warm up
-            for(int i = 0; i < warm_up_times; ++i){
+            for(int num_time = 0; num_time < warm_up_times; ++num_time){
                 if(!launch_gemm_kernel(type_id, i, config_pair.second, params)){
                     is_valid = false;
                     break;
