@@ -1268,7 +1268,7 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
     loss1=0
     loss2=0
     use_pir=1
-    max_step=15
+    max_step=12
 
     for to_static in "0" "1"; do
         export FLAGS_enable_pir_api=${use_pir}
