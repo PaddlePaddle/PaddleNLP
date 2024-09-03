@@ -146,6 +146,7 @@ def scaled_dot_product_attention(
     value_states,
     attention_mask,
     output_attentions,
+    softmax_scale=1.0,
     training=True,
     sequence_parallel=False,
 ):
@@ -165,6 +166,8 @@ def scaled_dot_product_attention(
                 causal=True,
                 return_softmax=output_attentions,
             )
+            attn_output *= (head_dim ** (0.5)) * softmax_scale
+            attn_weights *= (head_dim ** (0.5)) * softmax_scale
         else:
             attn_output = F.scaled_dot_product_attention(
                 query_states,
@@ -175,6 +178,7 @@ def scaled_dot_product_attention(
                 dropout_p=config.attention_dropout if training else 0.0,
                 training=training,
             )
+            attn_output *= (head_dim ** (0.5)) * softmax_scale
             attn_weights = None
 
         if sequence_parallel:
@@ -190,7 +194,7 @@ def scaled_dot_product_attention(
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
         # matmul and divide by sqrt(head_dim)
-        attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+        attn_weights = paddle.matmul(query_states * softmax_scale, key_states.transpose([0, 1, 3, 2]))
 
         if attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
@@ -555,10 +559,10 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
         sin = sin[position_ids].unsqueeze(2)  # [bs, seq_len, 1, axis]
 
     b, s, h, d = q.shape
-    q = q.view(b, s, h, d // 2, 2).transpose([0]).reshape(b, s, h, d)
+    q = q.reshape([b, s, h, d // 2, 2]).transpose([0, 1, 2, 4, 3]).reshape([b, s, h, d])
 
     b, s, h, d = k.shape
-    k = k.view(b, s, h, d // 2, 2).transpose(4, 3).reshape(b, s, h, d)
+    k = k.reshape([b, s, h, d // 2, 2]).transpose([0, 1, 2, 4, 3]).reshape([b, s, h, d])
 
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
@@ -994,6 +998,7 @@ class DeepseekV2Attention(nn.Layer):
                 value_states,
                 attention_mask,
                 output_attentions,
+                softmax_scale=self.softmax_scale,
                 training=self.training,
                 sequence_parallel=self.sequence_parallel,
                 use_reentrant=self.config.recompute_use_reentrant,
@@ -1006,6 +1011,7 @@ class DeepseekV2Attention(nn.Layer):
                 value_states,
                 attention_mask,
                 output_attentions,
+                softmax_scale=self.softmax_scale,
                 training=self.training,
                 sequence_parallel=self.sequence_parallel,
             )
