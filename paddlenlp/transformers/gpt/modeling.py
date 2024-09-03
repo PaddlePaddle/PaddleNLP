@@ -1105,6 +1105,85 @@ class GPTModel(GPTPretrainedModel):
             decoder_layers,
         )
 
+    def get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
+        # TFLOPs formula (from Equation 3 in Section 5.1 of https://arxiv.org/pdf/2104.04473.pdf).
+        hidden_size = self.config.hidden_size
+        intermediate_size = self.config.intermediate_size
+        layer_num = self.config.num_hidden_layers
+        vocab_size = self.config.vocab_size
+
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        flops_per_transformer = 0
+
+        # qkvo matmul
+        flops_per_transformer += seq_length * hidden_size**2 * 4
+        # [b,s,h] [b,h,s] bs^2h
+        # [b,s,s] [b,s,h] bs^2h
+        # q_states * k_states + attn_weight * v_states
+        flops_per_transformer += seq_length**2 * hidden_size * 2
+        # swiglu, matmul + dot
+        flops_per_transformer += seq_length * hidden_size * intermediate_size * 3 + seq_length * intermediate_size
+
+        # final loggits
+        flops_loggits = seq_length * hidden_size * vocab_size
+
+        # 2 for mul + add in matmul
+        # 1 for forward, 2 for backwards since we caluate gradients for input_x and input_y
+        # so, here got 6=2*(1+2)
+        return 6 * batch_size * (layer_num * flops_per_transformer + flops_loggits)
+
+    def get_hardware_flops(self, batch_size=1, seq_length=None, recompute=False, **kwargs):
+        # TFLOPs formula (from Equation 3 in Section 5.1 of https://arxiv.org/pdf/2104.04473.pdf).
+        hidden_size = self.config.hidden_size
+        intermediate_size = self.config.intermediate_size
+        layer_num = self.config.num_hidden_layers
+        vocab_size = self.config.vocab_size
+
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        flops_per_transformer = 0
+        flops_recompute_transformer = 0
+
+        # qkvo matmul
+        flops_qkvo_matmul = seq_length * hidden_size**2 * 4
+
+        # [b,s,h] [b,h,s] bs^2h
+        # [b,s,s] [b,s,h] bs^2h
+        # q_states * k_states + attn_weight * v_states
+        flops_core_attn = seq_length**2 * hidden_size * 2
+
+        # swiglu, matmul + dot
+        flops_ffn = seq_length * hidden_size * intermediate_size * 3 + seq_length * intermediate_size
+
+        flops_per_transformer = flops_qkvo_matmul + flops_core_attn + flops_ffn
+        if recompute:
+            if self.config.recompute_granularity == "full":
+                flops_recompute_transformer = flops_per_transformer
+            if self.config.recompute_granularity == "full_attn":
+                flops_recompute_transformer = flops_qkvo_matmul + flops_core_attn
+            if self.config.recompute_granularity == "core_attn":
+                flops_recompute_transformer = flops_core_attn
+
+        # final loggits
+        flops_loggits = seq_length * hidden_size * vocab_size
+
+        # 2 for mul + add in matmul
+        # 1 for forward, 2 for backwards since we caluate gradients for input_x and input_y
+        return (
+            2
+            * batch_size
+            * (layer_num * (flops_per_transformer * 3 + flops_recompute_transformer) + 3 * flops_loggits)
+        )
+
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
 
