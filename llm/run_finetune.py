@@ -53,6 +53,7 @@ from paddlenlp.transformers import (
     LlamaForCausalLM,
     LlamaForCausalLMPipe,
     LlamaTokenizer,
+    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.utils.llm_utils import (
@@ -193,7 +194,10 @@ def main():
             neft_post_hook_handle = model.get_input_embeddings().register_forward_post_hook(neft_post_hook)
         else:
             raise NotImplementedError("Only support neftune for model with get_input_embeddings")
-
+    if training_args.sequence_parallel:
+        register_sequence_parallel_allreduce_hooks(
+            model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
+        )
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
     # init chat_template for tokenizer
@@ -518,6 +522,8 @@ def main():
         training_args.pipeline_parallel_degree > 1
         or training_args.sequence_parallel
         or training_args.autotuner_benchmark
+        or data_args.zero_padding
+        or data_args.pad_to_max_length
     ):
         # NOTE(gongenlei): new add autotuner_benchmark
         max_length = data_args.max_length

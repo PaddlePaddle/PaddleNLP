@@ -970,6 +970,7 @@ class TrainingArguments:
         if self.sharding_degree > 0:
             warnings.warn("`sharding_degree` is deprecated, please use `sharding_parallel_degree`")
             self.sharding_parallel_degree = max(self.sharding_degree, self.sharding_parallel_degree)
+        self.data_parallel_degree = 1
 
         delattr(self, "sharding_degree")
 
@@ -1461,6 +1462,7 @@ class TrainingArguments:
                 pipeline.accumulate_steps = self.gradient_accumulation_steps
                 pipeline.micro_batch_size = self.per_device_train_batch_size
                 pipeline.schedule_mode = self.pipeline_schedule_mode
+                pipeline.pp_degree = self.pipeline_parallel_degree
 
                 logger.info(f"PP configs:{strategy.pipeline}, use master_grad: {self.amp_master_grad}")
 
