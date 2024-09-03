@@ -68,7 +68,7 @@ Detailed list 👉 [Supported Model List](https://github.com/PaddlePaddle/Paddle
 ### Pip Installation
 
 ```shell
-pip install --upgrade paddlenlp==3.0.0b0
+pip install --upgrade paddlenlp==3.0.0b1
 ```
 
 or you can install the latest develop branch code with the following command:
