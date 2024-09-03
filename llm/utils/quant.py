@@ -69,7 +69,7 @@ ACT_OBSERVER = dict(
 
 WEIGHT_OBSERVER = dict(
     abs_max_channel_wise=AbsMaxChannelWiseWeightObserver,
-    group_wise=GroupWiseWeightObserver,
+    groupwise=GroupWiseWeightObserver,
 )
 
 CACHEKV_OBSERVER = dict(
