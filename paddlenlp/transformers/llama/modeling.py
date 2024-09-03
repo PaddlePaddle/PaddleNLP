@@ -1653,7 +1653,7 @@ class LlamaModel(LlamaPretrainedModel):
                 is_casual = True
             else:
                 is_casual = is_casual_mask(attention_mask)
-            if get_env_device() != "npu" or get_env_device() != "mlu":
+            if get_env_device() not in ["npu", "mlu"]:
                 if is_casual and alibi is None:
                     attention_mask = None
             else:
