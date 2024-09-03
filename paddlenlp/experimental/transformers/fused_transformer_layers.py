@@ -39,8 +39,7 @@ if not is_paddlenlp_ops_available():
         "The paddlenlp_ops package is not installed. you can read the docs and install it by hand, "
         "you can refer to: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
     )
-if core.is_compiled_with_xpu() or core.is_compiled_with_cuda():
-    from paddlenlp_ops import rebuild_padding_v2
+from paddlenlp_ops import rebuild_padding_v2
 
 if core.is_compiled_with_cuda():
     if os.getenv("FLAGS_CUTLASS_FP8_GEMM", "False") == "True":

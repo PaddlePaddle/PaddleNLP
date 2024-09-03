@@ -134,7 +134,10 @@ class PredictorArgument:
 
     @property
     def total_max_length(self):
-        return 8192  # Maximum sequence length.
+        if self.device == "npu":
+            return self.src_length + self.max_length
+        else:
+            return 8192  # Maximum sequence length.
 
 
 @dataclass
@@ -861,6 +864,35 @@ class BlockInferencePredictorMixin(BasePredictor):
             self.model_inputs["tgt_mask"] = (
                 alibi_decoder + (1 - self.model_inputs["tgt_mask"]) * paddle.finfo(self.dtype).min
             ).cast(self.dtype)
+        elif config.device == "npu" and self.model_config.get("alibi", False):
+            lower_one_tril = paddle.tril(
+                paddle.ones(shape=(config.total_max_length, config.total_max_length), dtype=self.dtype)
+            )
+            lower_one_tril = lower_one_tril[None, None, :, :]
+            src_mask = lower_one_tril.tile([config.batch_size, 1, 1, 1])
+            tgt_mask = paddle.full(
+                shape=[config.batch_size, 1, 1, config.total_max_length], fill_value=1, dtype=self.dtype
+            )
+            arange_tensor_encoder = paddle.arange(config.total_max_length).astype(self.dtype)
+            alibi_slopes = llm_utils.get_alibi_slopes(self.num_attention_heads)
+            alibi = alibi_slopes[None, :, None, None] * arange_tensor_encoder
+            alibi_encoder = alibi.tile([config.batch_size, 1, config.total_max_length, 1])
+            alibi_decoder = alibi.tile(
+                [
+                    config.batch_size,
+                    1,
+                    1,
+                    1,
+                ]
+            )
+            # self.model_inputs["src_mask/tgt_mask"] is read only, will not be updated!
+            src_mask = (
+                alibi_encoder + (1 - src_mask) * paddle.finfo(self.dtype).min
+            ).cast(self.dtype)
+            tgt_mask = (
+                alibi_decoder + (1 - tgt_mask) * paddle.finfo(self.dtype).min
+            ).cast(self.dtype)
+            self.model_inputs["rope_emb"] = paddle.concat([src_mask.reshape([-1]), tgt_mask.reshape([-1])])
 
     def _preprocess(self, input_text: list[str]):
         if self.tokenizer.chat_template is not None:
