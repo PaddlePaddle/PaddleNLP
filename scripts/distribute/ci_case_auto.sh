@@ -1261,7 +1261,7 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
     export NVIDIA_TF32_OVERRIDE=0
     export FLAGS_max_inplace_grad_add=3
 
-    task_name="llama_align_dy2st_pir_and_programir_auto_grad_merge_bs2_fp32_DP1"
+    task_name="llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP2"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
 
