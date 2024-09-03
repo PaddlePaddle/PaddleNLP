@@ -634,6 +634,7 @@ class MoEGate(nn.Layer):
         self.weight = paddle.create_parameter(
             shape=[self.gating_dim, self.n_routed_experts],
             dtype=paddle.get_default_dtype(),
+            default_initializer=nn.initializer.Constant(1.0),
         )
 
     def forward(self, hidden_states):
@@ -1602,7 +1603,11 @@ class DeepSeekV2LMHead(nn.Layer):
         else:
             vocab_size = config.vocab_size
 
-        self.weight = self.create_parameter(shape=[config.hidden_size, vocab_size], dtype=paddle.get_default_dtype())
+        self.weight = self.create_parameter(
+            shape=[config.hidden_size, vocab_size],
+            dtype=paddle.get_default_dtype(),
+            default_initializer=nn.initializer.XavierNormal(1.0),
+        )
         # Must set distributed attr for Tensor Parallel !
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
 
