@@ -89,7 +89,7 @@ function llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1() {
 
     python -u -m paddle.distributed.launch --gpus "0" --log_dir $case_log_dir run_pretrain_auto_static.py \
         --model_type "llama" \
-        --model_name_or_path "facebook/llama-7b" \
+        --model_name_or_path "facebook/llama-7b" \ 
         --tokenizer_name_or_path "facebook/llama-7b" \
         --hidden_size 1024 \
         --intermediate_size 3072 \
@@ -1280,11 +1280,11 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
         /usr/bin/python -u -m paddle.distributed.launch \
             --gpus "0,1" \
             --log_dir $case_log_dir \
-            ../run_pretrain_auto.py \
+            run_pretrain_auto.py \
             --model_type "llama" \
             --model_name_or_path "facebook/llama-7b" \
             --tokenizer_name_or_path "facebook/llama-7b" \
-            --input_dir "../data" \
+            --input_dir "./data" \
             --output_dir $case_out_dir \
             --split 949,50,1 \
             --weight_decay 0.01 \
