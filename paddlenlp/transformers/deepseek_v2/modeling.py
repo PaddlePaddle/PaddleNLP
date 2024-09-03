@@ -968,11 +968,11 @@ class DeepseekV2Attention(nn.Layer):
         sin = sin[None, :, None, :]
         q_pe, k_pe = apply_rotary_pos_emb(q_pe, k_pe, cos, sin, position_ids)
 
-        query_states = paddle.empty([bsz, q_len, self.num_heads, self.q_head_dim], dtype=paddle.get_default_dtype())
+        query_states = paddle.empty([bsz, q_len, self.num_heads, self.q_head_dim], dtype=self.config.dtype)
         query_states[:, :, :, : self.qk_nope_head_dim] = q_nope
         query_states[:, :, :, self.qk_nope_head_dim :] = q_pe
 
-        key_states = paddle.empty([bsz, q_len, self.num_heads, self.q_head_dim], dtype=paddle.get_default_dtype())
+        key_states = paddle.empty([bsz, q_len, self.num_heads, self.q_head_dim], dtype=self.config.dtype)
         key_states[:, :, :, : self.qk_nope_head_dim] = k_nope
         key_states[:, :, :, self.qk_nope_head_dim :] = k_pe
 
