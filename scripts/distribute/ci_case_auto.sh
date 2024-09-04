@@ -57,7 +57,7 @@ function llama_case_list_auto() {
     llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
-    llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP2-MP1-PP1
+    llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1
 }
 
 function llm_gpt_case_list_auto() {
@@ -1255,7 +1255,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
     echo "=========== $FUNCNAME run  end ==========="
 }
 
-function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
+function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1() {
     echo "=========== $FUNCNAME run begin ==========="
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
@@ -1278,7 +1278,7 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
         rm -rf ${log_path}/$FUNCNAME
 
         /usr/bin/python -u -m paddle.distributed.launch \
-            --gpus "0,1" \
+            --gpus "0" \
             --log_dir $case_log_dir \
             run_pretrain_auto.py \
             --model_type "llama" \
@@ -1344,12 +1344,6 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
             loss2=($loss)
         fi
         echo "result: to_static=$to_static loss=$loss"
-        
-        for ((index=1; index<=12; index++));
-        do
-            loss=$(grep "global_step: $index" "$case_log_dir/workerlog.0" | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}')
-            echo "step=$index to_static=$to_static loss=$loss"
-        done
     done
 
     ips=-1
