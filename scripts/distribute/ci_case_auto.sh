@@ -89,7 +89,7 @@ function llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1() {
 
     python -u -m paddle.distributed.launch --gpus "0" --log_dir $case_log_dir run_pretrain_auto_static.py \
         --model_type "llama" \
-        --model_name_or_path "facebook/llama-7b" \ 
+        --model_name_or_path "facebook/llama-7b" \
         --tokenizer_name_or_path "facebook/llama-7b" \
         --hidden_size 1024 \
         --intermediate_size 3072 \
@@ -1344,6 +1344,12 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
             loss2=($loss)
         fi
         echo "result: to_static=$to_static loss=$loss"
+        
+        for ((index=1; index<=12; index++));
+        do
+            loss=$(grep "global_step: $index" "$case_log_dir/workerlog.0" | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}')
+            echo "step=$index to_static=$to_static loss=$loss"
+        done
     done
 
     ips=-1
