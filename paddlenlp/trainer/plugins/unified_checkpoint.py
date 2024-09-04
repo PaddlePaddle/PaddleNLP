@@ -349,7 +349,10 @@ class UnifiedCheckpointHandler:
         # save the config
         config_to_save = save_config(model_to_save)
         # Attach architecture to the config
-        config_to_save.architectures = [model_to_save.__class__.__name__]
+        if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
+            config_to_save.architectures = [model_to_save.model.__class__.__name__]
+        else:
+            config_to_save.architectures = [model_to_save.__class__.__name__]
         if self.args.should_save:
             config_to_save.save_pretrained(save_directory)
         paddle.device.cuda.empty_cache()
