@@ -303,3 +303,6 @@ from .yuan import *
 from .mamba.configuration import *
 from .mamba.modeling import *
 from .mamba.tokenizer import *
+from .jamba.modeling import *
+from .jamba.configuration import *
+from .jamba.tokenizer import *

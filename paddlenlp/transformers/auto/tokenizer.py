@@ -100,6 +100,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("GemmaTokenizer", "gemma"),
         ("YuanTokenizer", "yuan"),
         ("MambaTokenizer", "mamba"),
+        ("JambaTokenizer", "jamba"),
     ]
 )
 

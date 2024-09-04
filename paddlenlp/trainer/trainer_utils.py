@@ -46,6 +46,7 @@ from ..trainer.argparser import strtobool
 from ..transformers.tokenizer_utils_base import BatchEncoding
 from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
 from ..utils.log import logger
+from .utils.helper import distributed_file
 
 __all__ = [
     "TrainOutput",
@@ -239,7 +240,23 @@ PREFIX_CHECKPOINT_DIR = "checkpoint"
 _re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\-(\d+)$")
 
 
-def get_last_checkpoint(folder):
+def _check_checkpoint_files(folder_path, world_size, ignore_save_lr_and_optim, skip_save_model_weight):
+    files = os.listdir(folder_path)
+    model_weight_files = [f for f in files if f.startswith(".model_weight")]
+    a = len(model_weight_files) == world_size
+    if not ignore_save_lr_and_optim:
+        b = True
+        if not skip_save_model_weight:
+            master_weight_file = [f for f in files if f.startswith(".master_weight")]
+            b = len(master_weight_file) == world_size
+        optimizer_file = [f for f in files if f.startswith(".optimizer_weight")]
+        c = len(optimizer_file) == world_size
+        return a and b and c
+    else:
+        return a
+
+
+def get_last_checkpoint(folder, uc_async_save=False):
     content = os.listdir(folder)
     checkpoints = [
         path
@@ -253,8 +270,18 @@ def get_last_checkpoint(folder):
         for i in sorted(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0]), reverse=True):
             current_path = os.path.join(folder, i)
             # make sure the checkpoint is valid
-            if os.path.exists(os.path.join(current_path, ".checkpoint_done")):
-                return current_path
+            if not uc_async_save:
+                if os.path.exists(os.path.join(current_path, ".checkpoint_done")):
+                    return current_path
+            else:
+                saving_info = paddle.load(distributed_file(os.path.join(current_path, ".saving_info")))
+                pre_world_size = saving_info.get("world_size", 1)
+                ignore_save_lr_and_optim = saving_info.get("ignore_save_lr_and_optim", False)
+                skip_save_model_weight = saving_info.get("skip_save_model_weight", False)
+                if _check_checkpoint_files(
+                    current_path, pre_world_size, ignore_save_lr_and_optim, skip_save_model_weight
+                ):
+                    return current_path
         return
     else:
         return os.path.join(folder, max(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
