@@ -299,11 +299,6 @@ class QuantArgument:
     do_ptq: bool = field(default=False, metadata={"help": "Whether to use PTQ"})
     ptq_step: int = field(default=32, metadata={"help": "Step for PTQ"})
 
-    weight_quant_method: str = field(
-        default="abs_max_channel_wise",
-        metadata={"help": "Weight quantization method, choosen from ['abs_max_channel_wise', 'groupwise']"},
-    )
-
     # Pre-quant method Shift related parameters
     shift: bool = field(default=False, metadata={"help": "Whether to use Shift"})
     shift_all_linears: bool = field(default=False, metadata={"help": "Whether to shift all linears"})
