@@ -1337,7 +1337,7 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP2-MP1-PP1() {
             --data_parallel_config "gradient_sync_after_accumulate" \
             >>${log_path}/$FUNCNAME 2>&1
 
-        loss=$(grep "global_step: $index" "$case_log_dir/workerlog.0" | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}')
+        loss=$(grep "global_step: $max_step" "$case_log_dir/workerlog.0" | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}')
         if [ $to_static -eq 0 ];then
             loss1=($loss)
         else
