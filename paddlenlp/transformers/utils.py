@@ -57,6 +57,7 @@ from paddlenlp.utils.log import logger
 
 from ..utils.download import resolve_file_path
 from .aistudio_utils import aistudio_download
+from paddle.incubate.jit.inference_decorator import is_inference_mode
 
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
 
@@ -171,6 +172,7 @@ def adapt_stale_fwd_patch(self, name, value):
         # When use model = paddle.incubate.jit.inference(model), it reportes errors, we fix it here.
         if is_inference_mode(value):
             return value
+        
         
         if hasattr(inspect, "getfullargspec"):
             (
