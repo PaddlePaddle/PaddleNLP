@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-nohup python ./generation/test_fp8_gemm.py \
+nohup python ./gpu/test_fp8_gemm.py \
         --m_min 32 \
         --m_max 2049 \
         --n 4096 12288 \

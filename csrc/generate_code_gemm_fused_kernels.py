@@ -219,7 +219,7 @@ bool fp8_fp8_gemm_scale_bias_act(GemmEpilogueAllParams params) {
                 }
             }
             if(!is_valid){
-                break;
+                continue;
             }
             cudaEvent_t start, stop;
             cudaEventCreate(&start);
@@ -238,7 +238,7 @@ bool fp8_fp8_gemm_scale_bias_act(GemmEpilogueAllParams params) {
             if(is_valid){
                 cudaEventElapsedTime(&elapsedTime, start, stop);
             } else {
-                break;
+                continue;
             }
             cudaEventDestroy(start);
             cudaEventDestroy(stop);
@@ -491,7 +491,7 @@ if __name__ == "__main__":
         if sm == "89":
             fuse_gemm_configs = get_candidate_configs(sm, min_split_k, max_split_k, min_stages, max_stages)
             for fuse_gemm_config in fuse_gemm_configs:
-                file_name = f"generation/cutlass_kernels/fp8_gemm_fused/autogen/generic_gemm_kernel_sm{sm}_{fuse_gemm_config[3][0]}.cu"
+                file_name = f"gpu/cutlass_kernels/fp8_gemm_fused/autogen/generic_gemm_kernel_sm{sm}_{fuse_gemm_config[3][0]}.cu"
                 all_code = generate_source_cu(
                     inputs_type,
                     outputs_type,
@@ -511,7 +511,7 @@ if __name__ == "__main__":
 
             # hard code for act_tag
             act_tags = ["noact", "relu", "gelu"]
-            file_name = "generation/cutlass_kernels/fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.cu"
+            file_name = "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.cu"
             all_code = generate_dispatch_gemm_cu(
                 inputs_type,
                 outputs_type,

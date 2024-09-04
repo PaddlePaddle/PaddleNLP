@@ -50,13 +50,6 @@ def strtobool(v):
             f"Truthy value expected: got {v} but expected one of yes/no, true/false, t/f, y/n, 1/0 (case insensitive)."
         )
 
-def clone_git_repo(version, repo_url, destination_path):
-    try:
-        subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path], check=True)
-        return True
-    except subprocess.CalledProcessError:
-        return False
-
 
 def find_end_files(directory, end_str):
     gen_files = []
@@ -65,12 +58,6 @@ def find_end_files(directory, end_str):
             if file.endswith(end_str):
                 gen_files.append(os.path.join(root, file))
     return gen_files
-
-
-def get_sm_version():
-    prop = paddle.device.cuda.get_device_properties()
-    cc = prop.major * 10 + prop.minor
-    return cc
 
 
 def get_gencode_flags():
@@ -148,6 +135,7 @@ if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
 if cc >= 89:
+    sources += find_end_files("gpu/cutlass_kernels/fp8_gemm_fused/autogen", ".cu")
     sources += [
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
         "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.cu",
