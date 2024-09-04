@@ -125,6 +125,7 @@ MAPPING_NAMES = OrderedDict(
         ("Yuan", "yuan"),
         ("Mamba", "mamba"),
         ("Jamba", "jamba"),
+        ("DeepseekV2", "deepseek_v2"),
     ]
 )
 
