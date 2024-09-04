@@ -2278,6 +2278,13 @@ class Trainer:
 
                 if self.do_grad_scaling:
                     paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
+            else:
+                if self.args.unified_checkpoint and not self.args.use_hybrid_parallel:
+                    if "async_save" in self.args.unified_checkpoint_config:
+                        global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                        paddle.save(global_rank, os.path.join(output_dir, f".optimizer_weight.done.{global_rank}"))
+                        if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
+                            paddle.save(global_rank, os.path.join(output_dir, f".master_weight.done.{global_rank}"))
 
         self.runtime_timer.stop()
         # Determine the new best metric / best model checkpoint
