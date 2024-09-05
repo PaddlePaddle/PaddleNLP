@@ -18,3 +18,10 @@ nohup python ./gpu/test_fp8_gemm.py \
         --n 4096 12288 \
         --k 4096 11008 \
         >  tune_gemm.log 2>&1 &
+
+nohup python ./gpu/test_fp8_dual_gemm.py \
+        --m_min 32 \
+        --m_max 2049 \
+        --n 4096 12288 \
+        --k 4096 11008 \
+        >  tune_dual_gemm.log 2>&1 &

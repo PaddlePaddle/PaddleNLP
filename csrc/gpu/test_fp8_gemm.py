@@ -35,6 +35,7 @@ def gemm(m, n, k):
     res = cutlass_fp8_fp8_half_gemm_fused(
         A, B, bias=None, transpose_x=False, transpose_y=True, output_dtype="bfloat16", scale=0.5, act="identity"
     )
+    # print(res)
     return res
 
 
@@ -46,7 +47,8 @@ if __name__ == "__main__":
     ns = args.n
     ks = args.k
 
-    for m in range(m_min, m_max, 32):
+    # for m in range(m_min, m_max, 32):
+    for m in [32]:
         for n in ns:
             for k in ks:
                 gemm(m, n, k)

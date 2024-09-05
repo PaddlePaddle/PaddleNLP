@@ -55,6 +55,8 @@ typedef struct {
   const void *A;
   const void *B0;
   const void *B1;
+  void *D0 = nullptr;
+  void *D1 = nullptr;
   void *D;
   float scale0 = 1.0;
   float scale1 = 1.0;
@@ -74,6 +76,7 @@ typedef struct {
   std::vector<int64_t> &bias_dims0;
   std::vector<int64_t> &bias_dims1;
   std::string &fuse_gemm_config;
+  int split_k = 1;
 } DualGemmEpilogueAllParams;
 
 typedef bool (*func1)(DualGemmEpilogueAllParams);
