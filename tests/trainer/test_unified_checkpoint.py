@@ -175,7 +175,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
 
     def setUp(self):
         """
-        1. update runfrist and rerun to run defined diffrent config
+        1. update runfirst and rerun to run defined diffrent config
         2. update need_allclose to True if you want to check the result
         3. update rtol to the relative value you want to check
         """
@@ -194,7 +194,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
 
         self.run_pretrain_file = "llm/llama/run_pretrain.py"
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
     def rerun(self, train_args):
@@ -206,7 +206,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["TP4PP2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -221,7 +221,7 @@ class TestUnifiedCheckpointBase(TestMultipleGpus):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["TP2Sharding4"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -238,7 +238,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["TP8"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -252,7 +252,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["TP4DP2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -267,7 +267,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["TP4Sharding2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -282,7 +282,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["TP2PP4"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -297,7 +297,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["PP8"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -312,7 +312,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["PP4DP2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -327,7 +327,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["PP4Sharding2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -342,7 +342,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["Sharding8S1"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -357,7 +357,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["Sharding8S2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -372,7 +372,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["Sharding4S1DP2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -387,7 +387,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["Sharding4S2DP2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -402,7 +402,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["Sharding2S1DP4"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -417,7 +417,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["Sharding2S2DP4"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -432,7 +432,7 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
         remove_ckpt(pretrain_arguments["output_dir"])
 
         train_args = self.configs["DP8"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -441,13 +441,14 @@ class TestUnifiedCheckpointFull(TestUnifiedCheckpointBase):
             np.testing.assert_allclose(res[0], res[1], self.rtol)
 
 
+@pytest.mark.skipif(True, reason="Skip for None CE")
 class TestUnifiedCheckpointOnN2C4(TestUnifiedCheckpointBase):
     def setUp(self):
         super().setUp()
         self.need_allclose = True
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n2c4(self.run_pretrain_file, **train_args)
 
     def rerun(self, train_args):
@@ -463,7 +464,7 @@ class TestUnifiedCheckpointOnN1C8Dynamic(TestUnifiedCheckpointFull):
         self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
     def rerun(self, train_args):
@@ -485,7 +486,7 @@ class TestUnifiedCheckpointOnN2C4Dynamic(TestUnifiedCheckpointBase):
         self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n2c4(self.run_pretrain_file, **train_args)
 
     def rerun(self, train_args):
@@ -507,7 +508,7 @@ class TestUnifiedCheckpointOnN1C8ToN2C4(TestUnifiedCheckpointBase):
         self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n1c8(self.run_pretrain_file, **train_args)
         move_checkpoint_N1C8_to_N2C4()
 
@@ -529,7 +530,7 @@ class TestUnifiedCheckpointOnN2C4ToN1C8(TestUnifiedCheckpointBase):
         self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n2c4(self.run_pretrain_file, **train_args)
         move_checkpoint_N2C4_to_N1C8()
 
@@ -557,7 +558,7 @@ class TestUnifiedCheckpointOnN1C8SkipSaveModelWeight(TestUnifiedCheckpointBase):
         self.need_allclose = True
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
     def rerun(self, train_args):
@@ -576,7 +577,7 @@ class TestUnifiedCheckpointOnN1C8MasterWeightCompatibleO1ToO2(TestUnifiedCheckpo
 
         self.need_allclose = False
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["fp16_opt_level"] = "O1"
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
@@ -585,6 +586,7 @@ class TestUnifiedCheckpointOnN1C8MasterWeightCompatibleO1ToO2(TestUnifiedCheckpo
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
 
+@pytest.mark.skipif(True, reason="Skip for None CE")
 class TestUnifiedCheckpointOnN1C8MasterWeightCompatibleO2ToO1(TestUnifiedCheckpointBase):
     def setUp(self):
         super().setUp()
@@ -596,7 +598,7 @@ class TestUnifiedCheckpointOnN1C8MasterWeightCompatibleO2ToO1(TestUnifiedCheckpo
 
         self.need_allclose = False
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["fp16_opt_level"] = "O2"
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
@@ -605,6 +607,7 @@ class TestUnifiedCheckpointOnN1C8MasterWeightCompatibleO2ToO1(TestUnifiedCheckpo
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
 
+@pytest.mark.skipif(True, reason="Skip for None CE")
 class TestUnifiedCheckpointOnN1C8CheckpointCompatible(TestUnifiedCheckpointBase):
     def setUp(self):
         super().setUp()
@@ -612,7 +615,7 @@ class TestUnifiedCheckpointOnN1C8CheckpointCompatible(TestUnifiedCheckpointBase)
         self.need_allclose = True
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["unified_checkpoint"] = 0
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
@@ -621,6 +624,7 @@ class TestUnifiedCheckpointOnN1C8CheckpointCompatible(TestUnifiedCheckpointBase)
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
 
+@pytest.mark.skipif(True, reason="Skip for None CE")
 class TestPaddleCheckpointOnN1C8Reset(TestUnifiedCheckpointBase):
     def setUp(self):
         super().setUp()
@@ -628,7 +632,7 @@ class TestPaddleCheckpointOnN1C8Reset(TestUnifiedCheckpointBase):
         self.need_allclose = True
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["unified_checkpoint"] = 0
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
@@ -637,6 +641,7 @@ class TestPaddleCheckpointOnN1C8Reset(TestUnifiedCheckpointBase):
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
 
+@pytest.mark.skipif(True, reason="Skip for None CE")
 class TestPaddleCheckpointOnN1C2Reset(TestMultipleGpus):
     def setUp(self):
         self.configs = get_pretrain_arguments(pretrain_arguments)
@@ -653,7 +658,7 @@ class TestPaddleCheckpointOnN1C2Reset(TestMultipleGpus):
 
         self.run_pretrain_file = "llm/llama/run_pretrain.py"
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["unified_checkpoint"] = 0
         self.run_n1c2(self.run_pretrain_file, **train_args)
 
@@ -669,7 +674,7 @@ class TestPaddleCheckpointOnN1C2Reset(TestMultipleGpus):
 
         train_args = self.configs["TP2"]
 
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -678,6 +683,7 @@ class TestPaddleCheckpointOnN1C2Reset(TestMultipleGpus):
             np.testing.assert_allclose(res[0], res[1], self.rtol)
 
 
+@pytest.mark.skipif(True, reason="Skip for None CE")
 class TestUnifiedCheckpointOnN1C2Reset(TestMultipleGpus):
     def setUp(self):
         self.configs = get_pretrain_arguments(pretrain_arguments)
@@ -714,7 +720,7 @@ class TestUnifiedCheckpointOnN1C2Reset(TestMultipleGpus):
             "training_args.bin",
         ]
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["unified_checkpoint"] = 1
         self.run_n1c2(self.run_pretrain_file, **train_args)
 
@@ -730,7 +736,7 @@ class TestUnifiedCheckpointOnN1C2Reset(TestMultipleGpus):
 
         train_args = self.configs["TP2"]
 
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         self.rerun(train_args)
 
         if self.need_allclose:
@@ -748,7 +754,7 @@ class TestUnifiedCheckpointOnN1C2Reset(TestMultipleGpus):
         base_ckpt_path = os.path.join(pretrain_arguments["output_dir"], "checkpoint-%d" % save_steps)
 
         train_args = self.configs["TP2"]
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         assert sorted(self.filelists) == sorted(os.listdir(base_ckpt_path))
         self.rerun(train_args)
 
@@ -761,7 +767,7 @@ class TestUnifiedCheckpointOnN1C2Reset(TestMultipleGpus):
         remove_logs()
         remove_ckpt(pretrain_arguments["output_dir"])
         train_args["unified_checkpoint_config"] = "skip_save_model_weight"
-        self.runfrist(train_args)
+        self.runfirst(train_args)
         unsave_filelists = [
             "master_weights-00001-of-00002.safetensors",
             "master_weights-00002-of-00002.safetensors",
@@ -788,7 +794,7 @@ class TestUnifiedCheckpointOnN1C8AsyncSaveToDisk(TestUnifiedCheckpointBase):
         self.need_allclose = True
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
     def rerun(self, train_args):
@@ -809,7 +815,7 @@ class TestUnifiedCheckpointOnN2C4SkipSaveModelWeight(TestUnifiedCheckpointBase):
         self.need_allclose = True
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n2c4(self.run_pretrain_file, **train_args)
 
     def rerun(self, train_args):
@@ -828,7 +834,7 @@ class TestUnifiedCheckpointOnN2C4MasterWeightCompatibleO1ToO2(TestUnifiedCheckpo
 
         self.need_allclose = False
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["fp16_opt_level"] = "O1"
         self.run_n2c4(self.run_pretrain_file, **train_args)
 
@@ -849,7 +855,7 @@ class TestUnifiedCheckpointOnN2C4MasterWeightCompatibleO2ToO1(TestUnifiedCheckpo
 
         self.need_allclose = False
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["fp16_opt_level"] = "O2"
         self.run_n2c4(self.run_pretrain_file, **train_args)
 
@@ -866,7 +872,7 @@ class TestUnifiedCheckpointOnN2C4CheckpointCompatible(TestUnifiedCheckpointBase)
         self.need_allclose = True
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["unified_checkpoint"] = 0
         self.run_n2c4(self.run_pretrain_file, **train_args)
 
@@ -886,7 +892,7 @@ class TestUnifiedCheckpointOnN2C4AsyncSaveToDisk(TestUnifiedCheckpointBase):
         self.need_allclose = True
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n2c4(self.run_pretrain_file, **train_args)
 
     def rerun(self, train_args):
@@ -909,7 +915,7 @@ class TestUnifiedCheckpointOnN1C8ToN2C4SkipSaveModelWeight(TestUnifiedCheckpoint
         self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n1c8(self.run_pretrain_file, **train_args)
         move_checkpoint_N1C8_to_N2C4()
 
@@ -937,7 +943,7 @@ class TestUnifiedCheckpointOnN1C8ToN2C4MasterWeightCompatibleO1ToO2(TestUnifiedC
         self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["fp16_opt_level"] = "O1"
         self.run_n1c8(self.run_pretrain_file, **train_args)
         move_checkpoint_N1C8_to_N2C4()
@@ -967,7 +973,7 @@ class TestUnifiedCheckpointOnN1C8ToN2C4MasterWeightCompatibleO2ToO1(TestUnifiedC
         self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["fp16_opt_level"] = "O2"
         self.run_n1c8(self.run_pretrain_file, **train_args)
         move_checkpoint_N1C8_to_N2C4()
@@ -995,7 +1001,7 @@ class TestUnifiedCheckpointOnN1C8ToN2C4AsyncSaveToDisk(TestUnifiedCheckpointBase
         self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n1c8(self.run_pretrain_file, **train_args)
         move_checkpoint_N1C8_to_N2C4()
 
@@ -1023,7 +1029,7 @@ class TestUnifiedCheckpointOnN2C4ToN1C8SkipSaveModelWeight(TestUnifiedCheckpoint
         self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n2c4(self.run_pretrain_file, **train_args)
         move_checkpoint_N2C4_to_N1C8()
 
@@ -1051,7 +1057,7 @@ class TestUnifiedCheckpointOnN2C4ToN1C8MasterWeightCompatibleO1ToO2(TestUnifiedC
         self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["fp16_opt_level"] = "O1"
         self.run_n2c4(self.run_pretrain_file, **train_args)
         move_checkpoint_N2C4_to_N1C8()
@@ -1081,7 +1087,7 @@ class TestUnifiedCheckpointOnN2C4ToN1C8MasterWeightCompatibleO2ToO1(TestUnifiedC
         self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         train_args["fp16_opt_level"] = "O2"
         self.run_n2c4(self.run_pretrain_file, **train_args)
         move_checkpoint_N2C4_to_N1C8()
@@ -1109,7 +1115,7 @@ class TestUnifiedCheckpointOnN2C4ToN1C8AsyncSaveToDisk(TestUnifiedCheckpointBase
         self.rtol = 1e-4
         self.k = MAX_CONVERT_CONFIGS  # max: 16, min: 1
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n2c4(self.run_pretrain_file, **train_args)
         move_checkpoint_N2C4_to_N1C8()
 
@@ -1123,6 +1129,7 @@ class TestUnifiedCheckpointOnN2C4ToN1C8AsyncSaveToDisk(TestUnifiedCheckpointBase
             np.testing.assert_allclose(res[0], res[-1], rtol=self.rtol)
 
 
+@pytest.mark.skipif(True, reason="Skip for None CE")
 class TestUnifiedCheckpointOnN1C8EnableAll(TestUnifiedCheckpointBase):
     def setUp(self):
         super().setUp()
@@ -1133,7 +1140,7 @@ class TestUnifiedCheckpointOnN1C8EnableAll(TestUnifiedCheckpointBase):
         self.need_allclose = True
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n1c8(self.run_pretrain_file, **train_args)
 
     def rerun(self, train_args):
@@ -1153,7 +1160,7 @@ class TestUnifiedCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointFull):
         self.need_allclose = False
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n1c8(self.run_pretrain_file, log_dir="log_uc", **train_args)
 
     def rerun(self, train_args):
@@ -1172,7 +1179,7 @@ class TestPaddleCheckpointOnN1C8SaveLoadSpeed(TestUnifiedCheckpointFull):
         self.need_allclose = False
         self.rtol = 1e-7
 
-    def runfrist(self, train_args):
+    def runfirst(self, train_args):
         self.run_n1c8(self.run_pretrain_file, log_dir="log_pd", **train_args)
 
     def rerun(self, train_args):

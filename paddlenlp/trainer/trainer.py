@@ -1051,11 +1051,12 @@ class Trainer:
                     if optimizer_was_run:
                         self.lr_scheduler.step()
 
-                    if enable_release_grads and args.pipeline_parallel_degree > 1:
+                    if args.release_grads or enable_release_grads:
                         self.optimizer.clear_grad(set_to_zero=False)
-                        for _, buffers in model._chunk_2_comm_buffers.items():
-                            for buffer in buffers:
-                                buffer._clear_grad_storage()
+                        if args.pipeline_parallel_degree > 1:
+                            for _, buffers in model._chunk_2_comm_buffers.items():
+                                for buffer in buffers:
+                                    buffer._clear_grad_storage()
                     else:
                         self.optimizer.clear_grad()
 
@@ -1434,6 +1435,7 @@ class Trainer:
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
                     collate_fn=self.data_collator,
+                    drop_last=self.args.dataloader_drop_last,
                     num_workers=0,
                     eval=True,
                 )
@@ -1442,6 +1444,7 @@ class Trainer:
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
                     collate_fn=self.data_collator,
+                    drop_last=self.args.dataloader_drop_last,
                     num_workers=0,
                 )
 
@@ -1454,7 +1457,7 @@ class Trainer:
                 eval_dataset,
                 batch_sampler=eval_sampler,
                 collate_fn=self.data_collator,
-                num_workers=self.args.dataloader_num_workers,
+                num_workers=0,
                 eval=True,
             )
         else:
@@ -1462,7 +1465,7 @@ class Trainer:
                 eval_dataset,
                 batch_sampler=eval_sampler,
                 collate_fn=self.data_collator,
-                num_workers=self.args.dataloader_num_workers,
+                num_workers=0,
             )
 
     def get_test_dataloader(self, test_dataset: Dataset) -> DataLoader:
@@ -1500,6 +1503,7 @@ class Trainer:
                     batch_size=self.args.per_device_eval_batch_size * self.world_size,
                     collate_fn=self.data_collator,  # _get_collator_with_removed_columns
                     num_workers=0,
+                    drop_last=self.args.dataloader_drop_last,
                     eval=True,
                 )
             else:
@@ -1507,6 +1511,7 @@ class Trainer:
                     test_dataset,
                     batch_size=self.args.per_device_eval_batch_size * self.world_size,
                     collate_fn=self.data_collator,  # _get_collator_with_removed_columns
+                    drop_last=self.args.dataloader_drop_last,
                     num_workers=0,
                 )
 
@@ -1520,6 +1525,7 @@ class Trainer:
                 test_dataset,
                 batch_sampler=test_sampler,
                 collate_fn=self.data_collator,
+                num_workers=0,
                 drop_last=self.args.dataloader_drop_last,
                 eval=True,
             )
@@ -1529,6 +1535,7 @@ class Trainer:
                 batch_sampler=test_sampler,
                 collate_fn=self.data_collator,
                 drop_last=self.args.dataloader_drop_last,
+                num_workers=0,
             )
 
     def create_optimizer_and_scheduler(self, num_training_steps: int):
@@ -1748,16 +1755,8 @@ class Trainer:
         in_sep_parallel_mode = self.args.sep_parallel_degree > 1
 
         # Multi-gpu training
-        if (
-            self.args.world_size > 1
-            and not self.args.use_hybrid_parallel
-            or not (
-                in_pipeline_parallel_mode
-                or in_sharding_parallel_mode
-                or in_tensor_parallel_mode
-                or in_sep_parallel_mode
-            )
-        ):
+        if self.args.world_size > 1 and (not self.args.use_hybrid_parallel):
+            # MOE use DDP to broadcaset parameters.
             model = paddle.DataParallel(model)
             # Distributed training (should be after fp16 initialization)
 
