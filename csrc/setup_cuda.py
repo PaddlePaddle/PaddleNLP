@@ -14,12 +14,13 @@
 
 import os
 import subprocess
+from typing import List
 
 import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
 
 
-def clone_git_repo(version, repo_url, destination_path):
+def clone_git_repo(version, repo_url, destination_path) -> bool:
     try:
         subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path], check=True)
         return True
@@ -32,39 +33,17 @@ def clone_git_repo(version, repo_url, destination_path):
         return False
 
 
-def get_sm_version():
-    prop = paddle.device.cuda.get_device_properties()
-    cc = prop.major * 10 + prop.minor
-    return cc
+def get_sm_version() -> List[int]:
+    cc_s = paddle.version.cuda_archs()
+    return [int(cc) for cc in cc_s.split()]
 
 
-def strtobool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise ValueError(
-            f"Truthy value expected: got {v} but expected one of yes/no, true/false, t/f, y/n, 1/0 (case insensitive)."
-        )
-
-def get_gencode_flags():
-    if not strtobool(os.getenv("FLAG_LLM_PDC", "False")):
-        prop = paddle.device.cuda.get_device_properties()
-        cc = prop.major * 10 + prop.minor
-        return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
-    else:
-        # support more cuda archs
-        return [
-            "-gencode",
-            "arch=compute_80,code=sm_80",
-            "-gencode",
-            "arch=compute_75,code=sm_75",
-            "-gencode",
-            "arch=compute_70,code=sm_70",
-        ]
+def get_gencode_flags() -> List[str]:
+    cc_s = get_sm_version()
+    flags = []
+    for cc in cc_s:
+        flags += ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
+    return flags
 
 
 gencode_flags = get_gencode_flags()
@@ -120,11 +99,12 @@ nvcc_compile_args += [
     "-Igpu/fp8_gemm_with_cutlass",
     "-Igpu",
 ]
+
 cc = get_sm_version()
-if cc >= 80:
+if max(cc) >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
-if cc >= 89:
+if max(cc) >= 89:
     sources += [
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
         "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.cu",
