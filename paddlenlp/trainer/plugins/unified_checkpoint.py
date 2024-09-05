@@ -118,6 +118,7 @@ class UnifiedCheckpointOption(ExplicitEnum):
     ASYNC_SAVE = "async_save"
     IGNORE_MERGE_OPTIMIZER = "ignore_merge_optimizer"
 
+
 class UnifiedCheckpointHandler:
     def __init__(self, args):
         self.args = args
@@ -987,7 +988,6 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             gc.collect()
         return returned_state_dict
     
-
     state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys)
     if has_master_weights:
         state_dict_master_weight = load_resolved_archive_file(
