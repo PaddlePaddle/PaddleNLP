@@ -127,7 +127,12 @@ class AutoTrainer(Trainer):
         if self.args.to_static:
             unified_strategy = dist.Strategy()
             unified_strategy._from_legacy_strategy(self.args.strategy)
-            model = dist.to_static(model, dist_loader, self.criterion, self.optimizer, strategy=unified_strategy)
+            # dist.to_static() obtains the input spec information through next(dataloader), but this has side effects
+            # on the passed-in dataloader, altering the state of the sampler of the dataloader. In some cases, once
+            # the state of the sampler is changed, it cannot be reverted. Therefore, a temporary dataloader is
+            # constructed here to avoid side effects on the dataloader used for actual training.
+            temp_loader = self._wrap_for_dist_loader(self.get_train_dataloader())
+            model = dist.to_static(model, temp_loader, self.criterion, self.optimizer, strategy=unified_strategy)
 
         self.model_wrapped = model
         return model, dist_loader
