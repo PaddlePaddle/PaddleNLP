@@ -109,7 +109,7 @@ def assign_kv_heads(num_kv_heads: int, num_gpus: int):
     return assignment_list
 
 
-def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_output=True):
+def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
     is_fleet_init = True
     tensor_parallel_degree = 1
     try:
@@ -127,7 +127,7 @@ def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_out
     if is_fleet_init and tensor_parallel_degree > 1 and y_is_distributed:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, y, transpose_y=transpose_y)
+        logits = paddle.matmul(input_parallel, y, transpose_y=False)
 
         if tensor_parallel_output:
             return logits
@@ -135,7 +135,7 @@ def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_out
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
-        logits = paddle.matmul(x, y, transpose_y=transpose_y)
+        logits = paddle.matmul(x, y, transpose_y=False)
         return logits
 
 
@@ -570,7 +570,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
 
 
 class DeepseekV2MLP(nn.Layer):
-    def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None, is_tensor_parallel=True):
+    def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
@@ -583,7 +583,7 @@ class DeepseekV2MLP(nn.Layer):
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
 
-        if config.tensor_parallel_degree > 1 and is_tensor_parallel:
+        if config.tensor_parallel_degree > 1:
             self.gate_proj = ColumnParallelLinear(
                 self.hidden_size,
                 self.intermediate_size,
@@ -739,16 +739,14 @@ class DeepseekV2MoE(nn.Layer):
         self.ep_rank = 0
         self.experts = nn.LayerList(
             [
-                DeepseekV2MLP(config, intermediate_size=config.moe_intermediate_size, is_tensor_parallel=False)
+                DeepseekV2MLP(config, intermediate_size=config.moe_intermediate_size)
                 for i in range(config.n_routed_experts)
             ]
         )
         self.gate = MoEGate(config)
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
-            self.shared_experts = DeepseekV2MLP(
-                config=config, intermediate_size=intermediate_size, is_tensor_parallel=False
-            )
+            self.shared_experts = DeepseekV2MLP(config=config, intermediate_size=intermediate_size)
 
     def forward(self, hidden_states):
         identity = hidden_states
@@ -822,8 +820,6 @@ class DeepseekV2Attention(nn.Layer):
 
         # fmt: off
         if self.config.tensor_parallel_degree > 1:
-            assert self.num_heads % self.config.tensor_parallel_degree == 0
-
             # for tensor parallel
             if config.sequence_parallel:
                 ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
@@ -845,7 +841,6 @@ class DeepseekV2Attention(nn.Layer):
 
             self.o_proj = RowParallelLinear(self.num_heads * self.v_head_dim, self.hidden_size, has_bias=config.attention_bias, input_is_parallel=True)
 
-            self.num_heads = self.num_heads // self.config.tensor_parallel_degree
         else:
             # for without tensor parallel
             if self.q_lora_rank is None:
@@ -1213,7 +1208,10 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
             }
-            base_actions["lm_head.weight"] = partial(fn, is_column=True)
+            if config.tie_word_embeddings:
+                base_actions["lm_head.weight"] = partial(fn, is_column=False)
+            else:
+                base_actions["lm_head.weight"] = partial(fn, is_column=True)
 
             if not config.vocab_size % config.tensor_parallel_degree == 0:
                 base_actions.pop("lm_head.weight")
@@ -1222,12 +1220,12 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             # Column Linear
             base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.self_attn.q_proj.bias"] = partial(fn, is_column=True)
-            base_actions["layers.0.self_attn.q_b_proj.bias"] = partial(fn, is_column=True)
-
             # if we have enough num_key_value_heads to split, then split it.
             if config.num_key_value_heads % config.tensor_parallel_degree == 0:
-                base_actions["layers.0.self_attn.kv_b_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.kv_b_proj.bias"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
 
             base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
@@ -1620,7 +1618,7 @@ class DeepSeekV2LMHead(nn.Layer):
             hidden_states = paddle.reshape_(hidden_states, [-1, seq_length, self.config.hidden_size])
 
         if tensor_parallel_output is None:
-            tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
+            tensor_parallel_output = self.config.tensor_parallel_output
 
         logits = parallel_matmul(
             hidden_states, self.weight, transpose_y=False, tensor_parallel_output=tensor_parallel_output
@@ -1634,7 +1632,8 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
     def __init__(self, config: DeepseekV2Config):
         super().__init__(config)
         self.deepseek_v2 = DeepseekV2Model(config)
-        self.lm_head = DeepSeekV2LMHead(config)
+        self.vocab_size = config.vocab_size
+        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
         self.criterion = DeepSeekV2PretrainingCriterion(config)
 
     def get_input_embeddings(self):
