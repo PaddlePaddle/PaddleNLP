@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import os
 import subprocess
-from typing import List
 
 import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
@@ -33,12 +34,11 @@ def clone_git_repo(version, repo_url, destination_path) -> bool:
         return False
 
 
-def get_sm_version() -> List[int]:
-    cc_s = paddle.version.cuda_archs()
-    return [int(cc) for cc in cc_s.split()]
+def get_sm_version() -> list[int]:
+    return paddle.version.cuda_archs()
 
 
-def get_gencode_flags() -> List[str]:
+def get_gencode_flags() -> list[str]:
     cc_s = get_sm_version()
     flags = []
     for cc in cc_s:

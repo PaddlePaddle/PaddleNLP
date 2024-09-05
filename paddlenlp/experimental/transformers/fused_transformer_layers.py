@@ -19,9 +19,9 @@ from typing import List, Optional
 
 import paddle
 import paddle.distributed as dist
-from paddle.framework import core, in_dynamic_mode
+from paddle.framework import in_dynamic_mode
 from paddle.incubate.nn.functional import (
-    fused_act_bias,
+    fused_bias_act,
     fused_layer_norm,
     fused_moe,
     fused_rms_norm,
@@ -47,7 +47,7 @@ def use_cutlass_fp8_gemm() -> bool:
     return os.getenv("FLAGS_CUTLASS_FP8_GEMM", "False") == "True"
 
 
-if core.is_compiled_with_cuda():
+if paddle.is_compiled_with_cuda():
     if use_cutlass_fp8_gemm():
         logger.info("cutlass fp8 gemm is used. you can turn it off by setting FLAGS_CUTLASS_FP8_GEMM to False.")
         from paddlenlp_ops import (
@@ -854,7 +854,7 @@ class FusedMultiTransformerBase(Layer):
         return fused_moe_out
 
     def compute_activation(self, ffn1_out, i):
-        return fused_act_bias(ffn1_out, self.ffn1_biases[i], act_method=self.activation)
+        return fused_bias_act(ffn1_out, self.ffn1_biases[i], act_method=self.activation)
 
     def compute_ffn1(self, tmp_out, i):
         return paddle.matmul(tmp_out, self.ffn1_weights[i])
@@ -889,7 +889,7 @@ class FusedMultiTransformerBase(Layer):
 
     def compute_shared_expert(self, tmp_out, i):
         ffn1_out = paddle.matmul(tmp_out, self.shared_expert_ffn1_weights[i])
-        ffn1_out = fused_act_bias(ffn1_out, None, act_method=self.activation)
+        ffn1_out = fused_bias_act(ffn1_out, None, act_method=self.activation)
         ffn2_out = paddle.matmul(ffn1_out, self.shared_expert_ffn2_weights[i])
         gate_out = paddle.matmul(tmp_out, self.shared_expert_gate_weights[i])
         gate_out = paddle.nn.functional.sigmoid(gate_out)
@@ -1295,7 +1295,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
             weight_dtype=self.weight_dtype,
         )
 
-        ffn1_out = fused_act_bias(ffn1_out, None, act_method=self.activation)
+        ffn1_out = fused_bias_act(ffn1_out, None, act_method=self.activation)
 
         ffn2_out = weight_only_linear(
             ffn1_out,
@@ -1865,7 +1865,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         return tmp_out, residual_input
 
     def compute_activation(self, ffn1_out, i):
-        return fused_act_bias(
+        return fused_bias_act(
             ffn1_out,
             self.ffn1_biases[i],
             act_method=self.activation,
@@ -1928,7 +1928,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
 class FusedBlockMultiTransformer(FusedMultiTransformerBase):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__(config)
-        if core.is_compiled_with_xpu():
+        if paddle.is_compiled_with_xpu():
             self.cache_k_per_batch_maxs = paddle.full(shape=[10, 6], fill_value=0, dtype="float32")
             self.cache_v_per_batch_maxs = paddle.full(shape=[10, 6], fill_value=0, dtype="float32")
 
@@ -1958,7 +1958,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
             v_quant_scales = self.cache_v_scales
             k_dequant_scales = self.cache_k_out_scales
             v_dequant_scales = self.cache_v_out_scales
-        if core.is_compiled_with_xpu():
+        if paddle.is_compiled_with_xpu():
             fmha_out = paddle.incubate.nn.functional.block_multihead_attention_xpu(
                 qkv_out,
                 caches[2 * i],
