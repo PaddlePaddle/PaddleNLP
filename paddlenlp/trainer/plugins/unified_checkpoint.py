@@ -987,7 +987,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             del state_dict
             gc.collect()
         return returned_state_dict
-    
+
     state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys)
     if has_master_weights:
         state_dict_master_weight = load_resolved_archive_file(
