@@ -1,1 +1,1 @@
-../../../llm/docs/inference.md
+../../../llm/docs/predict/inference.md

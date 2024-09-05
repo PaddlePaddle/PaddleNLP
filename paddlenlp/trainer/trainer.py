@@ -19,6 +19,7 @@
 import collections
 import contextlib
 import inspect
+import json
 import math
 import os
 import random
@@ -183,6 +184,16 @@ try:
     from paddle.io.dataloader.dataloader_iter import _DataLoaderIterBase
 except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
+
+try:
+    from paddle.distributed import in_auto_parallel_align_mode
+except:
+
+    def in_auto_parallel_align_mode():
+        """
+        hack for paddlenlp develop branch.
+        """
+        return False
 
 
 __all__ = ["Trainer"]
@@ -354,7 +365,17 @@ class Trainer:
         )
         self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
 
-        self._save_ckpt_func = dist.save_state_dict if self.args.enable_auto_parallel else paddle.save
+        def _save_ckpt_func(state_dict, path, signal_path=None):
+            if self.args.enable_auto_parallel:
+                dist.save_state_dict(state_dict, path)
+            else:
+                paddle.save(state_dict, path)
+
+            if signal_path is not None:
+                with open(signal_path, mode="w+") as f:
+                    f.write("1")
+
+        self._save_ckpt_func = _save_ckpt_func
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
         if self.args.use_async_save:
             self._async_optimizer_saver = AsyncSaver()
@@ -1323,7 +1344,11 @@ class Trainer:
 
     def _get_item_from_loss(self, loss):
         assert isinstance(loss, paddle.Tensor) and loss._is_initialized()
-        return loss.item()
+        loss_value = loss.item()
+        if not self.args.fp16:
+            if not np.isfinite(loss_value).all():
+                raise ValueError(f"Loss contains inf or nan values, its value is {loss_value}")
+        return loss_value
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
@@ -1331,7 +1356,8 @@ class Trainer:
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
-            tr_loss_scalar = self._get_item_from_loss(self._nested_gather(tr_loss).mean())
+            avg_loss = self._nested_gather(tr_loss).mean()
+            tr_loss_scalar = self._get_item_from_loss(avg_loss)
 
             # reset tr_loss to zero
             tr_loss.subtract_(tr_loss)
@@ -1339,6 +1365,8 @@ class Trainer:
             logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
+            if in_auto_parallel_align_mode():
+                logs["loss_md5"] = avg_loss._md5sum()
 
             divisor = 2**30
             # TODO(@gexiao): replace these codes with unified APIs in Paddle
@@ -2325,7 +2353,9 @@ class Trainer:
                             self._save_ckpt_func(
                                 self._filter_moe_no_sync_optimizer_params(),
                                 os.path.join(output_dir, optimizer_name),
+                                saved_signal_path,
                             )
+
                         else:
                             state_dict = self.optimizer.state_dict()
                             save_path = os.path.join(output_dir, optimizer_name)
@@ -2335,9 +2365,7 @@ class Trainer:
                                     state_dict, save_path, saved_signal_path=saved_signal_path
                                 )
                             else:
-                                self._save_ckpt_func(state_dict, save_path)
-                                with open(saved_signal_path, mode="w+") as f:
-                                    f.write("1")
+                                self._save_ckpt_func(state_dict, save_path, saved_signal_path)
                 else:
                     if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
@@ -2356,10 +2384,16 @@ class Trainer:
                     else:
                         if self.args.data_parallel_rank > 0 and self.args.use_expert_parallel:
                             self._save_ckpt_func(
-                                self._filter_moe_no_sync_optimizer_params(), os.path.join(output_dir, OPTIMIZER_NAME)
+                                self._filter_moe_no_sync_optimizer_params(),
+                                os.path.join(output_dir, optimizer_name),
+                                saved_signal_path,
                             )
                         else:
-                            self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                            self._save_ckpt_func(
+                                self.optimizer.state_dict(),
+                                os.path.join(output_dir, optimizer_name),
+                                saved_signal_path,
+                            )
 
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
@@ -2503,6 +2537,24 @@ class Trainer:
         logger.info(f"Saving model checkpoint to {output_dir}")
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
+
+        local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+        if (
+            strtobool(os.getenv("FLAG_LLM_PDC", "False"))
+            and local_rank == 0
+            and self.args.unified_checkpoint
+            and "async_save" in self.args.unified_checkpoint_config
+        ):
+            os.makedirs(self.args.logging_dir, exist_ok=True)
+            world_size = paddle.distributed.get_world_size()
+            save_info = {
+                "world_size": world_size,
+                "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
+                "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
+            }
+            if not os.path.exists(os.path.join(self.args.logging_dir, "async_save_info.json")):
+                with open(os.path.join(self.args.logging_dir, "async_save_info.json"), "w") as f:
+                    json.dump(save_info, f)
 
         if self.args.should_save:
             if self.tokenizer is not None:
