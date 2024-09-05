@@ -21,17 +21,15 @@ import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
 
 
-def clone_git_repo(version, repo_url, destination_path) -> bool:
+def clone_git_repo(version, repo_url, destination_path):
     try:
         subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path], check=True)
-        return True
     except subprocess.CalledProcessError as e:
         print(f"Git clone {repo_url} operation failed with the following error: {e}")
         print("Please check your network connection or access rights to the repository.")
         print(
             "If the problem persists, please refer to the README file for instructions on how to manually download and install the necessary components."
         )
-        return False
 
 
 def get_sm_version() -> list[int]:
@@ -44,10 +42,6 @@ def get_gencode_flags() -> list[str]:
     for cc in cc_s:
         flags += ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
     return flags
-
-
-gencode_flags = get_gencode_flags()
-library_path = os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64")
 
 
 sources = [
@@ -78,14 +72,31 @@ sources = [
     "./gpu/tune_cublaslt_gemm.cu",
 ]
 
-cutlass_dir = "gpu/cutlass_kernels/cutlass"
-nvcc_compile_args = gencode_flags
+cc = get_sm_version()
+if max(cc) >= 80:
+    sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
+if max(cc) >= 89:
+    sources += [
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
+        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.cu",
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
+        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_dual_gemm_scale_bias_act.cu",
+    ]
+
+
+cutlass_dir = "gpu/cutlass_kernels/cutlass"
 if not os.path.exists(cutlass_dir) or not os.listdir(cutlass_dir):
     if not os.path.exists(cutlass_dir):
         os.makedirs(cutlass_dir)
+
     clone_git_repo("v3.5.0", "https://github.com/NVIDIA/cutlass.git", cutlass_dir)
 
+
+library_path = os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64")
+
+
+nvcc_compile_args = get_gencode_flags()
 nvcc_compile_args += [
     "-O3",
     "-U__CUDA_NO_HALF_OPERATORS__",
@@ -99,18 +110,6 @@ nvcc_compile_args += [
     "-Igpu/fp8_gemm_with_cutlass",
     "-Igpu",
 ]
-
-cc = get_sm_version()
-if max(cc) >= 80:
-    sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
-
-if max(cc) >= 89:
-    sources += [
-        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
-        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.cu",
-        "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
-        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_dual_gemm_scale_bias_act.cu",
-    ]
 
 setup(
     name="paddlenlp_ops",
