@@ -378,7 +378,7 @@ def _load_part_state_dict(keys, checkpoint_file: Union[str, os.PathLike], tensor
 
 
 def load_state_dict(
-    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None, device="cpu", thread_num=1
+    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None, device="cpu"
 ):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
@@ -401,6 +401,7 @@ def load_state_dict(
         if metadata.get("format", "np") == "pd":
             raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
         if metadata.get("format", "np") == "np":
+            thread_num = int(os.environ.get("LOAD_STATE_DICT_THREAD_NUM", "1"))
             state_dict = {}
             with safe_open(checkpoint_file, framework="np") as f:
                 keys_groups = _split_keys_evenly(list(f.keys()), thread_num)
