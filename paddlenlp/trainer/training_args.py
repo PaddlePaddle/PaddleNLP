@@ -1603,7 +1603,7 @@ class TrainingArguments:
                         "master_weight_compatible",
                         "async_save",
                         "enable_all_options",
-                        "ignore_merge_optimizer"
+                        "ignore_merge_optimizer",
                     ]:
                         raise ValueError(
                             f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "

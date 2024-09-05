@@ -103,6 +103,7 @@ DEST_PLACE = paddle.CPUPlace()
 if paddle.device.is_compiled_with_cuda():
     DEST_PLACE = paddle.CUDAPinnedPlace()
 
+
 class UnifiedCheckpointOption(ExplicitEnum):
     """
     "- skip_save_model_weight: do not save model weights when the masters weight exist\n"
@@ -116,8 +117,6 @@ class UnifiedCheckpointOption(ExplicitEnum):
     MASTER_WEIGHT_COMPATIBLE = "master_weight_compatible"
     ASYNC_SAVE = "async_save"
     IGNORE_MERGE_OPTIMIZER = "ignore_merge_optimizer"
-    LOAD_MULTI_THREAD = "load_multi_thread"
-
 
 class UnifiedCheckpointHandler:
     def __init__(self, args):
@@ -989,7 +988,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         return returned_state_dict
     
 
-    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, )
+    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys)
     if has_master_weights:
         state_dict_master_weight = load_resolved_archive_file(
             resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weights=True
@@ -1700,7 +1699,6 @@ def load_single_card_checkpoint(args, model, resume_from_checkpoint: str):
 
     if len(missing_keys) > 0:
         raise ValueError(f"Missing keys: {missing_keys}")
-
 
     state_dict = load_state_dict(resolved_archive_file[0], None, expected_keys)
     error_msgs = _load_state_dict_into_model(model, state_dict, "")
