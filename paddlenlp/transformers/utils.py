@@ -48,8 +48,8 @@ import tqdm
 from huggingface_hub import hf_hub_download, try_to_load_from_cache
 from huggingface_hub.utils import EntryNotFoundError
 from paddle.common_ops_import import convert_dtype
-from paddle.nn import Layer
 from paddle.incubate.jit.inference_decorator import is_inference_mode
+from paddle.nn import Layer
 from requests.exceptions import HTTPError
 
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
@@ -58,7 +58,6 @@ from paddlenlp.utils.log import logger
 
 from ..utils.download import resolve_file_path
 from .aistudio_utils import aistudio_download
-
 
 HUGGINGFACE_CO_RESOLVE_ENDPOINT = "https://huggingface.co"
 
@@ -169,13 +168,12 @@ def adapt_stale_fwd_patch(self, name, value):
             "StaticFunction"
         ):
             return value
-        
-        # NOTE(changwenbin & zhoukangkang): 
+
+        # NOTE(changwenbin & zhoukangkang):
         # When use model = paddle.incubate.jit.inference(model), it reportes errors, we fix it here.
         if is_inference_mode(value):
             return value
-        
-        
+
         if hasattr(inspect, "getfullargspec"):
             (
                 patch_spec_args,
