@@ -170,8 +170,13 @@ def adapt_stale_fwd_patch(self, name, value):
 
         # NOTE(changwenbin & zhoukangkang):
         # When use model = paddle.incubate.jit.inference(model), it reportes errors, we fix it here.
-        if hasattr(value, "__name__") and value.__name__ == "innermost_decorator":
-            return value
+        try:
+            from paddle.incubate.jit import is_inference_mode
+
+            if is_inference_mode(value):
+                return value
+        except:
+            pass
 
         if hasattr(inspect, "getfullargspec"):
             (
