@@ -1111,9 +1111,9 @@ def should_skip_data(global_step, skip_data_intervals):
     for interval in skip_data_intervals:
         if len(interval) != 2 or interval[0] > interval[1] or interval[0] <= 0:
             raise ValueError(f"Please check your skip interval {interval}")
-
-        start_global_step, end_step = interval[0], interval[1]
-        if start_global_step <= global_step + 1 <= end_step:
+        start_global_step, end_global_step = interval[0], interval[1]
+        # start_global_step and end_global_step start from 1, while global_step start from 0
+        if start_global_step <= global_step + 1 <= end_global_step:
             skip_flag = True
             break
     return skip_flag
