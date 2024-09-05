@@ -564,8 +564,11 @@ class UnifiedCheckpointHandler:
             optim_state_dict = load_single_card_optimizer(self.args, model, optimizer, resume_from_checkpoint)
             return optim_state_dict
 
-        has_optimizer_safetensors = distributed_isfile(os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME))
-        if "ignore_merge_optimizer" in self.args.unified_checkpoint_config and not has_optimizer_safetensors:
+        has_merge_optimizer_safetensors = distributed_isfile(
+            os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME)
+        )
+        # If not having merge optimizer, then load non-merge optimizer.
+        if not has_merge_optimizer_safetensors:
             if self.args.data_parallel_rank == 0:
                 returned_optim_state_dict = self.load_non_merge_optimizer(
                     model,
