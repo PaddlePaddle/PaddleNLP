@@ -48,7 +48,7 @@ import tqdm
 from huggingface_hub import hf_hub_download, try_to_load_from_cache
 from huggingface_hub.utils import EntryNotFoundError
 from paddle.common_ops_import import convert_dtype
-from paddle.incubate.jit.inference_decorator import is_inference_mode
+from paddle.incubate.jit import is_inference_mode
 from paddle.nn import Layer
 from requests.exceptions import HTTPError
 
