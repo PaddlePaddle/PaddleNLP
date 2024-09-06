@@ -984,16 +984,16 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
-
-        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
-        tensor_queue.put(output_tensor)
-
+        done_event = mp.Event()
         read_res_process = mp.Process(
-            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue]
+            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
         )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
 
+        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
+        tensor_queue.put(output_tensor)
+        done_event.wait()
         s_time = time.time()
         while self.model_inputs["not_need_stop"]:
             self._infer(self.model_inputs)
@@ -1109,17 +1109,17 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
 
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
-
-        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
-        tensor_queue.put(output_tensor)
+        done_event = mp.Event()
 
         read_res_process = mp.Process(
-            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue]
+            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
         )
 
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
-
+        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
+        tensor_queue.put(output_tensor)
+        done_event.wait()
         s_time = time.time()
         while self.model_inputs["not_need_stop"]:
             self.predictor.run(list(self.model_inputs.values()))
