@@ -134,8 +134,6 @@ python run_finetune.py ./config/llama/ceval_quant_argument.json
 - `do_gptq`: 是否进行 GPTQ 量化，GPTQ 对模型进行 WINT4量化，相比于普通 PTQ 量化精度更高，量化时间较长。默认为 False。
 - `gptq_step`: GPTQ 量化步数，也即模型前向次数，默认为8。
 - `do_awq`: 是否进行 AWQ 量化，AWQ 对模型进行 WINT4量化，相比于普通 PTQ 量化精度更高。默认为 False。
-- `do_ceval`: 是否启动 C-Eval 测试。默认为 False。
-- `ceval_data_path`: C-Eval 数据集路径，默认为"../dataset/ceval"。
 - `auto_clip`: AWQ 时是否进行自动搜索截断值并对模型权重进行截断操作，截断操作有利于量化模型精度，但搜索速度较慢。默认为 False。
 - `autoclip_step`: AutoClip 步数，也即模型前向次数，采样时默认 concat 每轮数据用来搜索截断值，默认为8。
 
@@ -145,6 +143,8 @@ python run_finetune.py ./config/llama/ceval_quant_argument.json
 <div>
 
 - `per_device_train_batch_size`: 量化前向批大小，默认为8。量化过程只有模型前向，相比于普通训练需要显存较少。
+- `do_ceval`: 是否启动 C-Eval 测试。默认为 False。
+- `ceval_data_path`: C-Eval 数据集路径，默认为"../dataset/ceval"。
 
 更多参数详见[精调文档](./finetune.md)中精调参数介绍。
 
