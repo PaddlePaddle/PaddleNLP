@@ -129,7 +129,7 @@ sources = [
     "./gpu/speculate_decoding_kernels/speculate_step.cu",
     "./gpu/speculate_decoding_kernels/speculate_update_input_ids_cpu.cc",
     "./gpu/speculate_decoding_kernels/speculate_update_seq_lens_this_time.cu",
-    "./gpu/speculate_decoding_kernels/speculate_update.cu",
+    "./gpu/speculate_decoding_kernels/speculate_verify_and_update.cu",
     "./gpu/speculate_decoding_kernels/topp_candidates.cu",
 ]
 sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
