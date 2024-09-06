@@ -21,6 +21,7 @@ from functools import partial
 
 import numpy as np
 import paddle
+import paddle.nn.functional as F
 from paddle import nn
 from paddle.base import core
 from paddle.base.executor import Executor, global_scope
@@ -46,6 +47,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
+    FusedSpeculateMultiTransformer,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationAvxInferenceModel,
@@ -71,12 +73,25 @@ from paddlenlp.transformers.model_utils import (
 )
 from paddlenlp.utils.download import resolve_file_path
 from paddlenlp.utils.log import logger
+from paddlenlp_ops import (
+    set_value_by_flags_and_idx_v2,
+    get_token_penalty_multi_scores_v2,
+    speculate_verify_and_update,
+    speculate_save_output,
+    speculate_clear_accept_nums,
+    speculate_set_value_by_flags_and_idx,
+    speculate_get_padding_offset,
+    speculate_get_seq_lens_output,
+    speculate_get_output_padding_offset,
+)
+
 
 __all__ = [
     "LlamaInferenceModel",
     "LlamaForCausalLMInferenceModel",
     "LlamaForCausalLMAvxInferenceModel",
     "LlamaForCausalLMBlockInferenceModel",
+    "LlamaForCausalLMSpeculateInferenceModel"
     "LlamaForMiniGPT4InferenceModel",
 ]
 
@@ -1665,6 +1680,81 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         )
 
 
+@register_base_model
+class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
+    def set_transformer_block(self, transformer_config):
+        # TODO(Wanglongzhi2001): check whether support quant for speculate decoding
+        if self.use_weight_only:
+            self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
+        elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
+            self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
+        elif "fp8" in self.quant_type:
+            self.transformer_block = FusedBlockMultiTransformerFP8(transformer_config)
+        else:
+            self.transformer_block = FusedSpeculateMultiTransformer(transformer_config)
+
+    def remove_padding(self, input_ids, draft_tokens, seq_lens_this_time, seq_lens_encoder):
+        """
+        remove_padding的重载，使用speculate_get_padding_offset算子，与基类的区别在于decoder为append场景
+        投机采样解码阶段每个 batch 的实际 draft tokens 数目可能不同，所以需要一个适配投机采样的decoder阶段的 remove_padding
+        """
+        cum_offsets_now = paddle.cumsum(self.max_len - seq_lens_this_time)
+        token_num = paddle.sum(seq_lens_this_time)
+        ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = speculate_get_padding_offset(
+            input_ids, draft_tokens, cum_offsets_now, token_num, seq_lens_this_time, seq_lens_encoder
+        )
+        return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
+
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        caches=None,
+        pre_caches=None,
+        output_attentions=False,
+        output_hidden_states=None,
+        return_dict=False,
+        draft_tokens=None,
+        output_padding_offset=None,
+        **kwargs,
+
+    ):
+        seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        rope_emb = kwargs.get("rope_emb", None)
+        ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+            input_ids, draft_tokens, seq_lens_this_time, seq_lens_encoder
+        )
+        kwargs["cu_seqlens_q"] = cu_seqlens_q
+        kwargs["cu_seqlens_k"] = cu_seqlens_k
+        kwargs["padding_offsets"] = padding_offset
+        kwargs["max_input_length"] = self.max_seq_len
+
+        inputs_embeds = self.embed_tokens(ids_remove_padding)
+
+        with dy2st_nocheck_guard_context():
+            hidden_states, _ = self.transformer_block(
+                input_ids=input_ids,
+                src=inputs_embeds,
+                cum_offsets=cum_offsets,
+                attn_mask=attention_mask,
+                caches=caches,
+                pre_caches=pre_caches,
+                rotary_embs=rope_emb,
+                **kwargs,
+            )
+        hidden_states = self.norm(hidden_states)
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=hidden_states,
+            past_key_values=None,
+            hidden_states=None,
+            attentions=None,
+        )
+
+
 class LlamaForCausalLMAvxInferenceModel(GenerationAvxInferenceModel, LlamaPretrainedModel):
 
     _keys_to_ignore_on_load_missing = [r"lm_head.weight"]
@@ -2122,6 +2212,159 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         else:
             self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
+
+class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceModel):
+    def __init__(self, config):
+        super().__init__(config)
+        self.max_seq_len = config.max_seq_len
+        self.llama = LlamaSpeculateInferenceModel(config)
+        self.verify_window = config.speculate_verify_window
+
+    def prepare_inputs_for_generation(self, **kwargs):
+        model_inputs = super(LlamaForCausalLMBlockInferenceModel, self).prepare_inputs_for_generation(**kwargs)
+        draft_tokens = kwargs["draft_tokens"]
+        output_padding_offset = kwargs["output_padding_offset"]
+        model_inputs["draft_tokens"] = draft_tokens
+        model_inputs["output_padding_offset"] = output_padding_offset
+
+        return model_inputs
+
+    # 与对input的变长处理一致，只不过需要把prefill阶段的token_num设置为1，无法复用输入的，因此重新生成
+    def get_output_padding_offset(self, seq_lens_this_time, seq_lens_encoder, seq_lens_decoder):
+        """
+        get_output_padding_offset
+        """
+        seq_lens_output = speculate_get_seq_lens_output(seq_lens_this_time, seq_lens_encoder, seq_lens_decoder)
+        out_token_num = paddle.sum(seq_lens_output)
+        output_cum_offsets_tmp = paddle.cumsum(self.max_seq_len - seq_lens_output)
+        output_padding_offset, output_cum_offsets = speculate_get_output_padding_offset(
+            output_cum_offsets_tmp, out_token_num, seq_lens_output, self.max_seq_len
+        )
+        return output_padding_offset, output_cum_offsets
+
+    def sample(
+        self,
+        eos_token_id,
+        top_k,
+        top_p,
+        penalty_score,
+        frequency_score,
+        presence_score,
+        temperature=None,
+        min_tokens_to_keep=1,
+        **model_kwargs
+    ):
+        def _forward_(**args):
+            model_inputs = self.prepare_inputs_for_generation(**args)
+            return self(**model_inputs)
+
+        def _post_process_(
+            outputs,
+            top_k,
+            top_p,
+            penalty_score,
+            frequency_score,
+            presence_score,
+            temperature,
+            model_kwargs,
+        ):
+            step_idx = model_kwargs["step_idx"]
+
+            set_value_by_flags_and_idx_v2(
+                model_kwargs["pre_ids"],
+                model_kwargs["input_ids"],
+                model_kwargs["seq_lens_this_time"],
+                model_kwargs["seq_lens_encoder"],
+                model_kwargs["seq_lens_decoder"],
+                step_idx,
+                model_kwargs["stop_flags"],
+            )
+
+            logits = paddle.cast(outputs, paddle.float32)
+
+            # pre-process distribution
+
+            logits = get_token_penalty_multi_scores_v2(
+                model_kwargs["pre_ids"],
+                logits,
+                penalty_score,
+                frequency_score,
+                presence_score,
+                temperature,
+                model_kwargs["bad_tokens"],
+                step_idx,
+                model_kwargs["min_dec_len"],
+                eos_token_id,
+            )
+
+            # sample
+            probs = F.softmax(logits)
+            verify_scores, verify_tokens, actual_candidate_len = paddle.tensor.search.top_p_candidates(
+                probs, top_p, self.max_candidate_len
+            )  # [token_num, max_candidate_len]
+
+            ###################################
+            ### Speculate Verify And Update ###
+            ###################################
+            speculate_verify_and_update(
+                model_kwargs["accept_tokens"],
+                model_kwargs["accept_num"],
+                model_kwargs["step_idx"],
+                model_kwargs["seq_lens_encoder"],
+                model_kwargs["seq_lens_decoder"],
+                model_kwargs["stop_flags"],
+                model_kwargs["not_need_stop"],
+                model_kwargs["draft_tokens"],  # 既是输入又是输出，需要把接收的最后1个token写入到第0个位置
+                model_kwargs["seq_lens_this_time"],  # 输入
+                verify_tokens,
+                verify_scores,
+                model_kwargs["max_dec_len"],
+                eos_token_id,
+                model_kwargs["is_block_step"],
+                model_kwargs["output_cum_offsets"],
+                actual_candidate_len,
+                model_kwargs["actual_draft_token_num"],
+                top_p,
+                model_kwargs["max_length"],
+                self.verify_window,
+                True,  # enable_topp
+            )
+            # Streaming output
+            speculate_save_output(
+                model_kwargs["accept_tokens"], model_kwargs["accept_num"], model_kwargs["not_need_stop"], self.rank
+            )
+
+            # If seq_lens_decoder is 0 (means stop), accept_num should be set to 0
+            speculate_clear_accept_nums(model_kwargs["accept_num"], model_kwargs["seq_lens_decoder"])
+
+            # Update pre_ids through accept tokens
+            speculate_set_value_by_flags_and_idx(
+                model_kwargs["pre_ids"],
+                model_kwargs["accept_tokens"],
+                model_kwargs["accept_num"],
+                model_kwargs["stop_flags"],
+                model_kwargs["seq_lens_this_time"],
+                model_kwargs["seq_lens_encoder"],
+                model_kwargs["seq_lens_decoder"],
+                model_kwargs["step_idx"],
+            )
+
+        # Prepare output padding offset
+        output_padding_offset, output_cum_offsets = self.get_output_padding_offset(
+            model_kwargs["seq_lens_this_time"], model_kwargs["seq_lens_encoder"], model_kwargs["seq_lens_decoder"]
+        )
+        model_kwargs["output_padding_offset"] = output_padding_offset
+        model_kwargs["output_cum_offsets"] = output_cum_offsets
+
+        # LLM
+        outputs = _forward_(**model_kwargs)
+
+        # Post-process
+        _post_process_(
+            outputs, top_k, top_p, penalty_score, frequency_score, presence_score, temperature, model_kwargs
+        )
+
+        return top_p
 
 class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
     """
