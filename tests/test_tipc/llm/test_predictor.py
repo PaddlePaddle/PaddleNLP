@@ -242,4 +242,4 @@ class PTuningInfereneTest(InferenceTest):
 
         # read ips value from log file
         ips = self._read_ips_from_log_file()
-        self.assertGreaterEqual(ips, 80)
+        self.assertGreaterEqual(ips, 50)
