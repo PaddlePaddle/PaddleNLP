@@ -94,11 +94,6 @@ python  run_finetune.py ./config/llama/ptq_c8_argument.json
 python  run_finetune.py ./config/llama/fp8_ptq_argument.json
 ```
 
-### 2.8 测试量化模型 C-Eval 得分
-
-```shell
-python run_finetune.py ./config/llama/ceval_quant_argument.json
-```
 
 
 ### 2.9 量化参数介绍
@@ -143,8 +138,6 @@ python run_finetune.py ./config/llama/ceval_quant_argument.json
 <div>
 
 - `per_device_train_batch_size`: 量化前向批大小，默认为8。量化过程只有模型前向，相比于普通训练需要显存较少。
-- `do_ceval`: 是否启动 C-Eval 测试。默认为 False。
-- `ceval_data_path`: C-Eval 数据集路径，默认为"../dataset/ceval"。
 
 更多参数详见[精调文档](./finetune.md)中精调参数介绍。
 
