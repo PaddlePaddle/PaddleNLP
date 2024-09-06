@@ -3289,7 +3289,7 @@ class Trainer:
 
     def _is_iterable_dataset_distributed(self, dataset):
         # For distributed dataloaer.
-        is_iterable_dataset_tensor = paddle.to_tensor(self._is_iterable_dataset(dataset)).reshape([1])
+        is_iterable_dataset_tensor = paddle.to_tensor(self._is_iterable_dataset(dataset)).astype("int32").reshape([1])
         if dist.get_world_size() > 1:
             dist.all_reduce(is_iterable_dataset_tensor, op=dist.ReduceOp.MAX)
         if is_iterable_dataset_tensor.item() == 1:
