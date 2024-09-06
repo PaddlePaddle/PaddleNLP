@@ -16,7 +16,9 @@ import os
 
 import paddle
 from experimental.layers.custom_attention import QuantizedCustomAttentionLayer
+from experimental.observer.abs_max import AbsmaxObserver
 from experimental.observer.abs_max_headwise import AbsMaxHeadwiseObserver
+from experimental.observer.avg import AVGObserver
 from experimental.observer.avg_headwise import AvgHeadwiseObserver
 from experimental.observer.channel_wise import ChannelWiseObserver
 from paddle import nn
@@ -44,10 +46,8 @@ from paddleslim.quant.layers import (
 )
 from paddleslim.quant.observers import (
     AbsMaxChannelWiseWeightObserver,
-    AVGObserver,
     GroupWiseWeightObserver,
 )
-from paddleslim.quant.observers.abs_max import AbsmaxObserver
 
 from paddlenlp.peft import PrefixModelForCausalLM
 from paddlenlp.peft.lora import (

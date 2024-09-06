@@ -19,6 +19,5 @@
   "unified_checkpoint": false,
   "smooth": false,
   "weight_quant_method": "abs_max",
-  "act_quant_method": "abs_max",
-  "cachekv_quant_method": "abs_max"
+  "act_quant_method": "abs_max"
   }

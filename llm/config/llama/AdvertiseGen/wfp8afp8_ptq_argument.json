@@ -11,7 +11,7 @@
   "fp16": true,
   "fp16_opt_level": "O2",
   "dataset_name_or_path": "../dataset/AdvertiseGen",
-  "output_dir": "../output/llama3.1/w8a8_ptq_ckpts_AdvertiseGen",
+  "output_dir": "../output/llama3.1/wfp8afp8_ptq_ckpts_AdvertiseGen",
   "do_eval": true,
   "eval_with_do_generation": false,
   "do_ptq": true,
@@ -19,6 +19,5 @@
   "unified_checkpoint": false,
   "smooth": false,
   "weight_quant_method": "abs_max",
-  "act_quant_method": "abs_max",
-  "cachekv_quant_method": "abs_max"
+  "act_quant_method": "abs_max"
   }
