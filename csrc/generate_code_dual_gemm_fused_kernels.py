@@ -23,6 +23,8 @@ def get_candidate_tiles():
 
     base_configs.extend(
         [
+            ("<16, 32, 64>", "<16, 32, 64>", "<16, 8, 32>"),
+            ("<16, 64, 64>", "<16, 32, 64>", "<16, 8, 32>"),
             ("<32, 128, 64>", "<32, 32, 64>", "<16, 8, 32>"),
             ("<64, 128, 64>", "<32, 64, 64>", "<16, 8, 32>"),
             ("<64, 64, 128>", "<32, 64, 64>", "<16, 8, 32>"),
@@ -184,8 +186,8 @@ bool fp8_fp8_dual_gemm_scale_bias_act(DualGemmEpilogueAllParams params) {
   int N = params.N;
   int K = params.K;
 
-  std::string mkn_string = "dual_gemm<"+ std::to_string(M)+ ", " +std::to_string(N) + ", "+ std::to_string(K)+ ">";
-  std::string mkn_split_k_string =  "dual_gemm<"+ std::to_string(M)+ ", " +std::to_string(N) + ", "+ std::to_string(K)+ ">" + ", split_k";
+  std::string mnk_string = "dual_gemm<"+ std::to_string(M)+ ", " +std::to_string(N) + ", "+ std::to_string(K)+ ">";
+  std::string mnk_split_k_string =  "dual_gemm<"+ std::to_string(M)+ ", " +std::to_string(N) + ", "+ std::to_string(K)+ ">" + ", split_k";
   int split_k;
   int kernel_id;
   std::string best_config;
@@ -193,16 +195,16 @@ bool fp8_fp8_dual_gemm_scale_bias_act(DualGemmEpilogueAllParams params) {
   if(getenv("FLAGS_use_cutlass_device_best_config_path")){ // run kernel
     std::string config_file_path = getenv("FLAGS_use_cutlass_device_best_config_path");
     nlohmann::json* config_json = best_config_mannager.get_gemm_best_configs(config_file_path);
-    if (config_json->contains(mkn_string)) {
-        best_config = config_json->at(mkn_string);
+    if (config_json->contains(mnk_string)) {
+        best_config = config_json->at(mnk_string);
     } else {
-        std::cerr << "Can not find the config for this gemm shape, please tune this shape: " << mkn_string <<std::endl;
+        std::cerr << "Can not find the config for this gemm shape, please tune this shape: " << mnk_string <<std::endl;
     }
 
-    if (config_json->contains(mkn_split_k_string)) {
-        split_k = config_json->at(mkn_split_k_string);
+    if (config_json->contains(mnk_split_k_string)) {
+        split_k = config_json->at(mnk_split_k_string);
     } else {
-        std::cerr << "Can not find the config(split_k) for this gemm shape, please tune this shape: " << mkn_string <<std::endl;
+        std::cerr << "Can not find the config(split_k) for this gemm shape, please tune this shape: " << mnk_string <<std::endl;
     }
 
     if (dual_gemm_config_map.find(best_config) == dual_gemm_config_map.end()) {
@@ -261,10 +263,10 @@ bool fp8_fp8_dual_gemm_scale_bias_act(DualGemmEpilogueAllParams params) {
     }
 
     nlohmann::json new_json;
-    new_json[mkn_string] = best_kernel_id;
-    new_json[mkn_split_k_string] = best_split_k;
+    new_json[mnk_string] = best_kernel_id;
+    new_json[mnk_split_k_string] = best_split_k;
     best_config_mannager.up_date_configs(new_json);
-    std::cout <<"Gemm tune result for " << mkn_string<< ": best config is: "<< best_kernel_id << ", split k: " << best_split_k << std::endl;
+    std::cout <<"Gemm tune result for " << mnk_string<< ": best config is: "<< best_kernel_id << ", split k: " << best_split_k << std::endl;
     return true;
   }
 }

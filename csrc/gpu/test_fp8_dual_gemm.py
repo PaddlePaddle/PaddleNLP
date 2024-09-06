@@ -82,14 +82,14 @@ def gemm(m, n, k):
     A = paddle.ones([m, k], dtype="float8_e4m3fn")
     B0 = paddle.ones([n, k], dtype="float8_e4m3fn")
     B1 = paddle.ones([n, k], dtype="float8_e4m3fn")
-    C0 = paddle.ones([n], dtype="float16")
-    C1 = paddle.ones([n], dtype="float16")
+    # C0 = paddle.ones([n], dtype="float16")
+    # C1 = paddle.ones([n], dtype="float16")
     res = cutlass_fp8_fp8_fp8_dual_gemm_fused(
         A,
         B0,
         B1,
-        bias0=C0,
-        bias1=C1,
+        bias0=None,
+        bias1=None,
         transpose_x=False,
         transpose_y=True,
         scale0=0.1,
@@ -109,8 +109,8 @@ if __name__ == "__main__":
     ns = args.n
     ks = args.k
 
-    # for m in range(m_min, m_max, 32):
-    for m in [32]:
+    for m in range(m_min, m_max, 32):
+        # for m in [32]:
         for n in ns:
             for k in ks:
                 gemm(m, n, k)

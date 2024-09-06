@@ -47,8 +47,8 @@ if __name__ == "__main__":
     ns = args.n
     ks = args.k
 
-    # for m in range(m_min, m_max, 32):
-    for m in [32]:
+    for m in range(m_min, m_max, 32):
+        # for m in [32]:
         for n in ns:
             for k in ks:
                 gemm(m, n, k)
