@@ -57,6 +57,7 @@ function llama_case_list_auto() {
     llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
+    llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1
 }
 
 function llm_gpt_case_list_auto() {
@@ -1252,6 +1253,104 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     done
     echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1() {
+    echo "=========== $FUNCNAME run begin ==========="
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_max_inplace_grad_add=3
+
+    task_name="llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP2"
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+
+    loss1=0
+    loss2=0
+    use_pir=1
+    max_step=12
+
+    for to_static in "0" "1"; do
+        export FLAGS_enable_pir_api=${use_pir}
+        export FLAGS_enable_pir_in_executor=${use_pir}
+        rm -rf $case_out_dir
+        rm -rf $case_log_dir
+        rm -rf ${log_path}/$FUNCNAME
+
+        /usr/bin/python -u -m paddle.distributed.launch \
+            --gpus "0" \
+            --log_dir $case_log_dir \
+            run_pretrain_auto.py \
+            --model_type "llama" \
+            --model_name_or_path "facebook/llama-7b" \
+            --tokenizer_name_or_path "facebook/llama-7b" \
+            --input_dir "./data" \
+            --output_dir $case_out_dir \
+            --split 949,50,1 \
+            --weight_decay 0.01 \
+            --warmup_ratio 0.01 \
+            --warmup_steps 30 \
+            --max_grad_norm 0.0 \
+            --learning_rate 3e-05 \
+            --min_learning_rate 3e-06 \
+            --max_steps $max_step \
+            --logging_steps 1 \
+            --eval_steps 1000 \
+            --save_steps 50000 \
+            --continue_training 0 \
+            --do_train true \
+            --do_eval false \
+            --do_predict false \
+            --disable_tqdm true \
+            --skip_profile_timer true \
+            --save_total_limit 2 \
+            --device gpu \
+            --disable_tqdm true \
+            --dataloader_num_workers 1 \
+            --distributed_dataloader 0 \
+            --enable_auto_parallel 1 \
+            --per_device_train_batch_size 1 \
+            --gradient_accumulation_steps 2 \
+            --per_device_eval_batch_size 2 \
+            --recompute false \
+            --recompute_use_reentrant true \
+            --recompute_granularity full \
+            --pp_recompute_interval 0 \
+            --fp16 0 \
+            --fp16_opt_level "O2" \
+            --fuse_attention_ffn true \
+            --fuse_attention_qkv false \
+            --fuse_sequence_parallel_allreduce false \
+            --use_flash_attention 0 \
+            --use_fused_rope false \
+            --use_fused_rms_norm 0 \
+            --max_seq_length 2048 \
+            --sep_parallel_degree 1 \
+            --sequence_parallel false \
+            --pipeline_parallel_degree 1 \
+            --sharding_parallel_degree 1 \
+            --tensor_parallel_degree 1 \
+            --virtual_pp_degree 1 \
+            --sharding "" \
+            --to_static ${to_static} \
+            --num_hidden_layers 2 \
+            --data_parallel_config "gradient_sync_after_accumulate" \
+            >>${log_path}/$FUNCNAME 2>&1
+
+        loss=$(grep "global_step: $max_step" "$case_log_dir/workerlog.0" | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}')
+        if [ $to_static -eq 0 ];then
+            loss1=($loss)
+        else
+            loss2=($loss)
+        fi
+        echo "result: to_static=$to_static loss=$loss"
+    done
+
+    ips=-1
+    mem=-1
+    ips_base=-1
+    mem_base=-1
+    check_result $FUNCNAME ${loss1} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
 }
 
 function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1() {
