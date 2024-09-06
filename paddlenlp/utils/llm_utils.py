@@ -750,14 +750,14 @@ def get_model_max_position_embeddings(config: PretrainedConfig) -> Optional[int]
     return None
 
 
-def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue):
+def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue, done_event: mp.Event):
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
     paddle.device.set_device("cpu")
     paddle.disable_static()
     outputs = []
     output_tensor = tensor_queue.get(timeout=1)
-
+    done_event.set()
     logger.info("Start read result message")
     logger.info(f"Current path is {os.getcwd()}")
 
