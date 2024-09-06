@@ -287,6 +287,20 @@ def SubstituteTemplate(template, values):
     return text
 
 
+def check_min_split_k(value):
+    ivalue = int(value)
+    if ivalue > 1:
+        raise argparse.ArgumentTypeError("Dual gemm split_k mode is not support.")
+    return ivalue
+
+
+def check_max_split_k(value):
+    ivalue = int(value)
+    if ivalue > 1:
+        raise argparse.ArgumentTypeError("Dual gemm split_k mode is not support..")
+    return ivalue
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="The argument for generating the generic_mixed_gemm_kernelLauncher instance."
@@ -301,14 +315,14 @@ def parse_args():
 
     parser.add_argument(
         "--min_split_k",
-        type=int,
+        type=check_min_split_k,
         default=1,
         help="The max split k for the gemm kernel.",
     )
 
     parser.add_argument(
         "--max_split_k",
-        type=int,
+        type=check_max_split_k,
         default=1,
         help="The max split k for the gemm kernel.",
     )
