@@ -50,7 +50,7 @@ __global__ void setup_kernel(curandState_t* state,
 }
 
 template <int THREADBLOCK_SIZE, bool ENABLE_TOPP, bool USE_TOPK>
-__global__ void speculate_update(int64_t* accept_tokens,
+__global__ void speculate_verify_and_update_kernel(int64_t* accept_tokens,
         int* accept_num,
         int64_t* step_idx,
         int* seq_lens_encoder,
@@ -76,14 +76,13 @@ __global__ void speculate_update(int64_t* accept_tokens,
         const int max_candidate_len,
         const int verify_window) {
     const int bid = threadIdx.x;
-    // Wang: 第 bid 个 batch 的 start 的 token_id
+    // start token's id of bid batch
     const int start_token_id = bid * max_seq_len - output_cum_offsets[bid];
     // verify and set stop flags
     int accept_num_now = 1;
     int stop_flag_now_int = 0;
 
     if (!(is_block_step[bid] || bid >= real_bsz)) {
-        // printf("bid %d\n", bid);
 
         if (stop_flags[bid]) {
             stop_flag_now_int = 1;
@@ -93,32 +92,27 @@ __global__ void speculate_update(int64_t* accept_tokens,
             auto* actual_candidate_len_now = actual_candidate_len + start_token_id;
 
             int i = 0;
-            // printf("seq_lens_this_time[%d]-1: %d \n",bid, seq_lens_this_time[bid]-1);
             for (; i < seq_lens_this_time[bid] - 1; i++) {
                 if (USE_TOPK) {
                     if (verify_tokens_now[i * max_candidate_len] == draft_tokens_now[i + 1]) {
                         accept_num_now++;
                         step_idx[bid]++;
                         auto accept_token = draft_tokens_now[i + 1];
-                        // printf("[USE_TOPK] bid %d Top 1 verify write accept %d is %lld\n", bid, i, accept_token);
                         accept_tokens[bid * max_draft_tokens + i] = accept_token;
                         if (is_in_end(accept_token, end_tokens, end_length) || step_idx[bid] >= max_dec_len[bid]) {
                             stop_flags[bid] = true;
                             stop_flag_now_int = 1;
                             if (step_idx[bid] >= max_dec_len[bid])
                                 accept_tokens[bid * max_draft_tokens + i] = end_tokens[0];
-                            // printf("[USE_TOPK] bid %d Top 1 verify write accept %d is %lld\n", bid, i, accept_token);
                             break;
                         }
                     } else {
                         break;
                     }
                 } else {
-                    // 
                     auto actual_candidate_len_value = actual_candidate_len_now[i] > max_candidate_len
                             ? max_candidate_len
                             : actual_candidate_len_now[i];
-                    // printf("actual_candidate_len[%d] %d \n",bid, actual_candidate_len_value);
                     if (is_in(verify_tokens_now + i * max_candidate_len,
                                 draft_tokens_now[i + 1],
                                 actual_candidate_len_value)) {
@@ -127,13 +121,11 @@ __global__ void speculate_update(int64_t* accept_tokens,
                         step_idx[bid]++;
                         auto accept_token = draft_tokens_now[i + 1];
                         accept_tokens[bid * max_draft_tokens + i] = accept_token;
-                        // printf("bid %d Top P verify write accept %d is %lld\n", bid, i, accept_token);
                         if (is_in_end(accept_token, end_tokens, end_length) || step_idx[bid] >= max_dec_len[bid]) {
                             stop_flags[bid] = true;
                             stop_flag_now_int = 1;
                             if (step_idx[bid] >= max_dec_len[bid])
                                 accept_tokens[bid * max_draft_tokens + i] = end_tokens[0];
-                            // printf("bid %d Top P verify write accept %d is %lld\n", bid, i, accept_token);
                             break;
                         }
                     } else {
@@ -154,15 +146,12 @@ __global__ void speculate_update(int64_t* accept_tokens,
                                 for (; i < ii; i++) {
                                     auto accept_token = draft_tokens_now[i + 1];
                                     accept_tokens[bid * max_draft_tokens + i] = accept_token;
-                                    // printf("bid %d TopK verify write accept %d is %lld\n", bid, i, accept_token);
                                     if (is_in_end(accept_token, end_tokens, end_length) ||
                                             step_idx[bid] >= max_dec_len[bid]) {
                                         stop_flags[bid] = true;
                                         stop_flag_now_int = 1;
                                         if (step_idx[bid] >= max_dec_len[bid])
                                             accept_tokens[bid * max_draft_tokens + i] = end_tokens[0];
-                                        // printf("bid %d TopK verify write accept %d is %lld\n", bid, i,
-                                        // end_tokens[0]);
                                         break;
                                     }
                                 }
@@ -193,13 +182,11 @@ __global__ void speculate_update(int64_t* accept_tokens,
                     accept_token = verify_tokens_now[i * max_candidate_len];
                 }
                 accept_tokens[bid * max_draft_tokens + i] = accept_token;
-                // printf("bid %d top-1 write accept %d is %lld\n", bid, i, accept_token);
                 if (is_in_end(accept_token, end_tokens, end_length) || step_idx[bid] >= max_dec_len[bid]) {
                     stop_flags[bid] = true;
                     stop_flag_now_int = 1;
                     if (step_idx[bid] >= max_dec_len[bid])
                         accept_tokens[bid * max_draft_tokens + i] = end_tokens[0];
-                    // printf("bid %d top-1 write accept %d is %lld\n", bid, i, end_tokens[0]);
                 }
                 step_idx[bid]++;
             }
@@ -233,7 +220,6 @@ __global__ void speculate_update(int64_t* accept_tokens,
             accept_num[bid] = accept_num_now;
             draft_tokens[bid * max_draft_tokens] = accept_tokens[bid * max_draft_tokens + accept_num_now - 1];
         }
-        // printf("bid %d exit\n", bid);
     }
     if (stop_flag_now_int) {
         seq_lens_decoder[bid] = 0;
@@ -243,16 +229,14 @@ __global__ void speculate_update(int64_t* accept_tokens,
     typedef cub::BlockReduce<int64_t, THREADBLOCK_SIZE> BlockReduce;
     __shared__ typename BlockReduce::TempStorage temp_storage;
 
-    // printf("stop_flag_now_int %d \n", stop_flag_now_int);
     int64_t stop_sum = BlockReduce(temp_storage).Sum(stop_flag_now_int);
 
     if (threadIdx.x == 0) {
-        // printf("stop_sum %d \n", stop_sum);
         not_need_stop[0] = stop_sum < real_bsz;
     }
 }
 
-void SpeculateUpdate(const paddle::Tensor& accept_tokens,
+void SpeculateVerifyAndUpdate(const paddle::Tensor& accept_tokens,
         const paddle::Tensor& accept_num,
         const paddle::Tensor& step_idx,
         const paddle::Tensor& seq_lens_encoder,
@@ -273,7 +257,6 @@ void SpeculateUpdate(const paddle::Tensor& accept_tokens,
         int max_seq_len,
         int verify_window,
         bool enable_topp) {
-    //   printf("Enter speculate update\n");
     auto bsz = accept_tokens.shape()[0];
     int real_bsz = seq_lens_this_time.shape()[0];
     auto max_draft_tokens = draft_tokens.shape()[1];
@@ -301,16 +284,14 @@ void SpeculateUpdate(const paddle::Tensor& accept_tokens,
         printf("err %d\n", err);
     }
 
-    //   printf("inited curand\n");
     bool use_topk = false;
     char* env_var = getenv("SPECULATE_VERIFY_USE_TOPK");
     if (env_var) {
         use_topk = (bool)std::stoi(env_var);
     }
     if (use_topk) {
-        // printf("use_topk \n");
         if (enable_topp) {
-            speculate_update<BlockSize, true, true>
+            speculate_verify_and_update_kernel<BlockSize, true, true>
                     <<<1, BlockSize, 0, accept_tokens.stream()>>>(const_cast<int64_t*>(accept_tokens.data<int64_t>()),
                             const_cast<int*>(accept_num.data<int>()),
                             const_cast<int64_t*>(step_idx.data<int64_t>()),
@@ -337,7 +318,7 @@ void SpeculateUpdate(const paddle::Tensor& accept_tokens,
                             max_candidate_len,
                             verify_window);
         } else {
-            speculate_update<BlockSize, false, true>
+            speculate_verify_and_update_kernel<BlockSize, false, true>
                     <<<1, BlockSize, 0, accept_tokens.stream()>>>(const_cast<int64_t*>(accept_tokens.data<int64_t>()),
                             const_cast<int*>(accept_num.data<int>()),
                             const_cast<int64_t*>(step_idx.data<int64_t>()),
@@ -366,7 +347,7 @@ void SpeculateUpdate(const paddle::Tensor& accept_tokens,
         }
     } else {
         if (enable_topp) {
-            speculate_update<BlockSize, true, false>
+            speculate_verify_and_update_kernel<BlockSize, true, false>
                     <<<1, BlockSize, 0, accept_tokens.stream()>>>(const_cast<int64_t*>(accept_tokens.data<int64_t>()),
                             const_cast<int*>(accept_num.data<int>()),
                             const_cast<int64_t*>(step_idx.data<int64_t>()),
@@ -393,7 +374,7 @@ void SpeculateUpdate(const paddle::Tensor& accept_tokens,
                             max_candidate_len,
                             verify_window);
         } else {
-            speculate_update<BlockSize, false, false>
+            speculate_verify_and_update_kernel<BlockSize, false, false>
                     <<<1, BlockSize, 0, accept_tokens.stream()>>>(const_cast<int64_t*>(accept_tokens.data<int64_t>()),
                             const_cast<int*>(accept_num.data<int>()),
                             const_cast<int64_t*>(step_idx.data<int64_t>()),
@@ -427,10 +408,9 @@ void SpeculateUpdate(const paddle::Tensor& accept_tokens,
     auto not_need_stop_cpu = not_need_stop_gpu.copy_to(not_need_stop.place(), true);
     bool* not_need_stop_data = const_cast<bool*>(not_need_stop.data<bool>());
     not_need_stop_data[0] = not_need_stop_cpu.data<bool>()[0];
-    //   printf("exit speculate_update\n");
 }
 
-PD_BUILD_OP(speculate_update)
+PD_BUILD_OP(speculate_verify_and_update)
         .Inputs({"accept_tokens",
                 "accept_num",
                 "step_idx",
@@ -466,4 +446,4 @@ PD_BUILD_OP(speculate_update)
                 {"stop_flags", "stop_flags_out"},
                 {"not_need_stop", "not_need_stop_out"},
                 {"draft_tokens", "draft_tokens_out"}})
-        .SetKernelFn(PD_KERNEL(SpeculateUpdate));
+        .SetKernelFn(PD_KERNEL(SpeculateVerifyAndUpdate));
