@@ -737,6 +737,15 @@ class LoRAModel(nn.Layer):
                 module_name = i[0]
                 if re.fullmatch(target_module, module_name):
                     self._find_and_replace_module(model, module_name, lora_config, enable_lora)
+
+        if lora_config.lqlora_state_dict is not None:
+            model = self.init_lqlora_model(model, lora_config)
+        return model
+
+    def init_lqlora_model(self, model: Union[PretrainedModel, nn.Layer], lora_config: LoRAConfig):
+        lqlora_state_dict = paddle.load(lora_config.lqlora_state_dict)
+        lqlora_state_dict = {k[6:]: v for k, v in lqlora_state_dict.items() if "lora_A" in k or "lora_B" in k}
+        model.set_state_dict(lqlora_state_dict)
         return model
 
     def restore_original_model(self):

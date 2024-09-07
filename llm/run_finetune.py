@@ -36,13 +36,14 @@ from paddlenlp.datasets import (
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import (
     LoRAConfig,
+    LoRALinear,
     LoRAModel,
     PrefixConfig,
     PrefixModelForCausalLM,
     VeRAConfig,
     VeRAModel,
 )
-from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
+from paddlenlp.trainer import PdArgumentParser, TrainerCallback, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
@@ -147,6 +148,11 @@ def main():
         model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
     if model_args.fuse_attention_ffn is not None:
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
+
+    if model_args.lqlora_quantize_cfg is not None:
+        model_config.lqlora_quantize_cfg = model_args.lqlora_quantize_cfg
+    if model_args.lqlora_state_dict is not None:
+        model_config.lqlora_state_dict = model_args.lqlora_state_dict
 
     model_config.seq_length = data_args.max_length
 
@@ -465,6 +471,7 @@ def main():
                 do_qat=quant_args.do_qat,
                 base_model_name_or_path=model_args.model_name_or_path,
                 use_quick_lora=model_args.use_quick_lora,
+                lqlora_state_dict=model_args.lqlora_state_dict,
             )
             model = LoRAModel(model, lora_config)
         else:
@@ -560,6 +567,17 @@ def main():
         gen_args=gen_args,
         data_args=data_args,
     )
+
+    class CallbackStep(TrainerCallback):
+        def on_step_begin(self, args, state, control, model, **kwargs):
+            for module in model.sublayers():
+                if isinstance(module, LoRALinear):
+                    maximum_rank = module.get_dimension()
+
+                    new_rank = paddle.randint(low=0, high=maximum_rank, shape=[1]).item()
+                    module.set_rank(new_rank, frozen=True)
+
+    trainer.add_callback(CallbackStep)
 
     # Evaluation dev set
     if training_args.do_eval:
