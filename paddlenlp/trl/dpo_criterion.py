@@ -36,7 +36,7 @@ class DPOCriterion(nn.Layer):
     def __init__(self, config):
         super(DPOCriterion, self).__init__()
         self.config = config
-        if getattr(self.config, "dpo_config", None):
+        if getattr(self.config, "dpo_config", None) is None:
             raise ValueError("DPO Criterion requires model_config.dpo_config.")
         self.dpo_config = copy.deepcopy(config.dpo_config)
         if (
