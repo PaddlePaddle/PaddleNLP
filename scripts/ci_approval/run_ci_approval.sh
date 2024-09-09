@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+python ./release.py
+
 failed_num=0
 echo_list=()
 approval_line=`curl -H "Authorization: token ${GITHUB_API_TOKEN}" https://api.github.com/repos/PaddlePaddle/PaddleNLP/pulls/${GIT_PR_ID}/reviews?per_page=10000`
