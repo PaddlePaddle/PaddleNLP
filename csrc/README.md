@@ -26,7 +26,7 @@ python setup_cuda.py install
 2. 拉取代码:
     git clone -b v3.5.0 --single-branch https://github.com/NVIDIA/cutlass.git
 
-3. 将下载的 `cutlass` 目录放在 `third_party/cutlass`下
+3. 将下载的 `cutlass` 目录放在 `csrc/third_party/cutlass`下
 
 4. 重新编译 Cuda 算子
 ```shell
