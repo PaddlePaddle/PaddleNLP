@@ -403,26 +403,36 @@ def load_state_dict(
         if metadata.get("format", "np") == "pd":
             raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
         if metadata.get("format", "np") == "np":
-            # Load state dict in multi-thread to speed up loading
             thread_num = int(os.environ.get("LOAD_STATE_DICT_THREAD_NUM", "1"))
             state_dict = {}
-            with safe_open(checkpoint_file, framework="np") as f:
-                keys_groups = _split_keys_evenly(list(f.keys()), thread_num)
-            with concurrent.futures.ThreadPoolExecutor(max_workers=thread_num) as executor:
-                future_to_key = {
-                    executor.submit(
-                        _load_part_state_dict,
-                        keys,
+            if thread_num <= 1:
+                with safe_open(checkpoint_file, framework="np") as f:
+                    state_dict = _load_part_state_dict(
+                        list(f.keys()),
                         checkpoint_file,
                         tensor_parallel_split_mapping,
                         fliter_dict_keys,
                         device,
-                    ): keys
-                    for keys in keys_groups
-                }
-                for future in concurrent.futures.as_completed(future_to_key):
-                    result = future.result()
-                    state_dict.update(result)
+                    )
+            else:
+                # Load state dict in multi-thread to speed up loading
+                with safe_open(checkpoint_file, framework="np") as f:
+                    keys_groups = _split_keys_evenly(list(f.keys()), thread_num)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=thread_num) as executor:
+                    future_to_key = {
+                        executor.submit(
+                            _load_part_state_dict,
+                            keys,
+                            checkpoint_file,
+                            tensor_parallel_split_mapping,
+                            fliter_dict_keys,
+                            device,
+                        ): keys
+                        for keys in keys_groups
+                    }
+                    for future in concurrent.futures.as_completed(future_to_key):
+                        result = future.result()
+                        state_dict.update(result)
 
             if device == "cpu":
                 for k in list(state_dict.keys()):
