@@ -17,8 +17,9 @@
 #ln -s $(which pip3.7) $run_env/pip
 #export PATH=$run_env:${PATH}
 
-chmod +x ../../scripts/paddle_log
-../../scripts/paddle_log
+script_dir=$(dirname "${BASH_SOURCE[0]}")
+chmod +x $script_dir/../../scripts/paddle_log
+$script_dir/../../scripts/paddle_log
 
 pip install -r requirements.txt
 pip install pybind11 regex sentencepiece tqdm visualdl

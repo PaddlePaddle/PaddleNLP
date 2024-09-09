@@ -43,8 +43,9 @@ all_P0case_dic=("msra_ner"]=15
     ["ernie"]=2 ["ernie_layout"]=5 ["ernie_csc"]=5 ["ernie_ctm"]=5 ["segment_parallel_utils"]=5 ["ring_flash_attention"]=5)
 ####################################
 
-chmod +x ../paddle_log
-../paddle_log
+script_dir=$(dirname "${BASH_SOURCE[0]}")
+chmod +x $script_dir/../paddle_log
+$script_dir/../paddle_log
 
 python -m pip config --user set global.index http://pip.baidu-int.com/search/
 python -m pip config --user set global.index-url http://pip.baidu-int.com/simple

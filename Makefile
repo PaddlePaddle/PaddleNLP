@@ -19,7 +19,7 @@ format:
 
 .PHONY: lint
 lint:
-	chmpd +x scripts/paddle_log
+	chmod +x scripts/paddle_log
 	scripts/paddle_log
 	$(eval modified_py_files := $(shell python scripts/get_modified_files.py $(check_dirs)))
 	@if test -n "$(modified_py_files)"; then \
@@ -37,7 +37,7 @@ lint:
 test: unit-test
 
 unit-test:
-	chmpd +x scripts/paddle_log
+	chmod +x scripts/paddle_log
 	scripts/paddle_log
 	PYTHONPATH=$(shell pwd) pytest -v \
 		-n auto \
@@ -50,7 +50,7 @@ unit-test:
 
 .PHONY: install
 install:
-	chmpd +x scripts/paddle_log
+	chmod +x scripts/paddle_log
 	scripts/paddle_log
 	pip install --pre paddlepaddle -i https://www.paddlepaddle.org.cn/packages/nightly/cpu/
 	pip install -r requirements-dev.txt
@@ -61,19 +61,19 @@ install:
 
 .PHONY: deploy-ppdiffusers
 deploy-ppdiffusers:
-	chmpd +x scripts/paddle_log
+	chmod +x scripts/paddle_log
 	scripts/paddle_log
 	cd ppdiffusers && make install && make
 
 .PHONY: deploy-paddle-pipelines
 deploy-paddle-pipelines:
-	chmpd +x scripts/paddle_log
+	chmod +x scripts/paddle_log
 	scripts/paddle_log
 	cd pipelines && make install && make
 
 .PHONY: deploy-paddlenlp
 deploy-paddlenlp:
-	chmpd +x scripts/paddle_log
+	chmod +x scripts/paddle_log
 	scripts/paddle_log
 	# install related package
 	make install
@@ -84,12 +84,12 @@ deploy-paddlenlp:
 
 .PHONY: regression-all
 release: 
-	chmpd +x scripts/paddle_log
+	chmod +x scripts/paddle_log
 	scripts/paddle_log
 	bash ./scripts/regression/run_release.sh 0 0,1 all
 
 .PHONY: regression-key
 key: 
-	chmpd +x scripts/paddle_log
+	chmod +x scripts/paddle_log
 	scripts/paddle_log
 	bash ./scripts/regression/run_release.sh 0 0,1 p0

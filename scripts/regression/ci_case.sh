@@ -29,8 +29,9 @@ if [ ! -d "unittest_logs" ]; then
     mkdir unittest_logs
 fi
 
-chmod +x ../paddle_log
-../paddle_log
+script_dir=$(dirname "${BASH_SOURCE[0]}")
+chmod +x $script_dir/../paddle_log
+$script_dir/../paddle_log
 
 print_info() {
     if [ $1 -ne 0 ]; then

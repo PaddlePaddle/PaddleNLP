@@ -3,6 +3,10 @@ set -xe
 # Test training benchmark for a model.
 # Usage：CUDA_VISIBLE_DEVICES=0 bash run_benchmark.sh ${run_mode} ${bs_item} ${fp_item} ${max_iter} ${model_item}
 
+script_dir=$(dirname "${BASH_SOURCE[0]}")
+chmod +x $script_dir/../scripts/paddle_log
+$script_dir/../scripts/paddle_log
+
 function _set_params(){
     run_mode=${1:-"sp"}         # sp or mp
     batch_size=${2:-"2"}

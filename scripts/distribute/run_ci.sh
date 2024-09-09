@@ -20,8 +20,9 @@ mkdir -p /workspace/case_logs
 export log_path=/workspace/case_logs
 export case_list=()
 
-chmod +x ../paddle_log
-../paddle_log
+script_dir=$(dirname "${BASH_SOURCE[0]}")
+chmod +x $script_dir/../paddle_log
+$script_dir/../paddle_log
 
 target_lists_for_gpt=(
     "legacy/model_zoo/gpt-3"

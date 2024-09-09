@@ -27,9 +27,9 @@ export llama_data_path=/llama_data
 export llm_gpt_case_path=$root_path/llm/auto_parallel/gpt-3
 
 unset CUDA_VISIBLE_DEVICES
-
-chmod +x ../paddle_log
-../paddle_log
+script_dir=$(dirname "${BASH_SOURCE[0]}")
+chmod +x $script_dir/../paddle_log
+$script_dir/../paddle_log
 
 function is_a100() {
     if [ $(nvidia-smi|grep A100|wc -l)  -ne 0 ];then

@@ -26,8 +26,9 @@ install_paddle(){
     python -m pip install paddlepaddle_gpu-0.0.0-cp37-cp37m-linux_x86_64.whl
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
 }
-chmod +x ../paddle_log
-../paddle_log
+script_dir=$(dirname "${BASH_SOURCE[0]}")
+chmod +x $script_dir/../paddle_log
+$script_dir/../paddle_log
 
 # Install paddlenlp 
 nlp_build (){

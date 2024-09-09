@@ -27,8 +27,9 @@ export llm_gpt_data_path=/llm_gpt_data
 
 unset CUDA_VISIBLE_DEVICES
 
-chmod +x ../paddle_log
-../paddle_log
+script_dir=$(dirname "${BASH_SOURCE[0]}")
+chmod +x $script_dir/../paddle_log
+$script_dir/../paddle_log
 
 function gpt_case_list_dygraph(){
     gpt_preprocess_data

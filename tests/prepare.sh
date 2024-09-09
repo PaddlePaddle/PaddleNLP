@@ -1,5 +1,9 @@
 MODE=$1
 
+script_dir=$(dirname "${BASH_SOURCE[0]}")
+chmod +x $script_dir/../scripts/paddle_log
+$script_dir/../scripts/paddle_log
+
 if [ ${MODE} = "lite_train_infer" ]; then
     cd ../examples/machine_translation/transformer/
     # The whole procedure of lite_train_infer should be less than 15min.

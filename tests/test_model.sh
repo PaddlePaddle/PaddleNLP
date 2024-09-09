@@ -9,6 +9,10 @@ dataline=$(cat ${FILENAME})
 IFS=$'\n'
 lines=(${dataline})
 
+script_dir=$(dirname "${BASH_SOURCE[0]}")
+chmod +x $script_dir/../scripts/paddle_log
+$script_dir/../scripts/paddle_log
+
 function func_parser_key(){
     strs=$1
     IFS=":"
