@@ -27,6 +27,9 @@ export llm_gpt_data_path=/llm_gpt_data
 
 unset CUDA_VISIBLE_DEVICES
 
+chmod +x ../paddle_log
+../paddle_log
+
 function gpt_case_list_dygraph(){
     gpt_preprocess_data
     gpt_345M_single

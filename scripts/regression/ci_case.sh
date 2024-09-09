@@ -29,6 +29,9 @@ if [ ! -d "unittest_logs" ]; then
     mkdir unittest_logs
 fi
 
+chmod +x ../paddle_log
+../paddle_log
+
 print_info() {
     if [ $1 -ne 0 ]; then
         if [[ $2 =~ 'tests' ]]; then

@@ -15,6 +15,8 @@
 # limitations under the License.
 
 export paddle=$1
+chmod +x ../paddle_log
+../paddle_log
 export nlp_dir=/workspace/PaddleNLP
 cd $nlp_dir
 

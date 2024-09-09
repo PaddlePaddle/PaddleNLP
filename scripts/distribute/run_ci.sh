@@ -20,6 +20,9 @@ mkdir -p /workspace/case_logs
 export log_path=/workspace/case_logs
 export case_list=()
 
+chmod +x ../paddle_log
+../paddle_log
+
 target_lists_for_gpt=(
     "legacy/model_zoo/gpt-3"
     "llm/auto_parallel/gpt-3"

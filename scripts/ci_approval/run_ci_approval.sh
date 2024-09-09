@@ -122,6 +122,9 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
     fi
 done
 
+chmod +x ../paddle_log
+../paddle_log
+
 if [ -n "${echo_list}" ];then
     echo "**************************************************************"
     echo "Please find RD for approval."
