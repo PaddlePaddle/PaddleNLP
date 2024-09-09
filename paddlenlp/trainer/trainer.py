@@ -868,6 +868,10 @@ class Trainer:
                     paddle.sum(paddle.stack(global_step_list) - global_step_list[0]) == 0
                 ), f"Error, get different globel step, please check! step list: {[x.item() for x in global_step_list]}"
 
+            # compatibility for older version
+            if self.state.last_saved_step == 0:
+                self.state.last_saved_step = self.state.global_step
+
             epochs_trained = self.state.global_step // num_update_steps_per_epoch
             if not args.ignore_data_skip:
                 steps_trained_in_current_epoch = self.state.global_step % (num_update_steps_per_epoch)
@@ -1365,6 +1369,16 @@ class Trainer:
                     seq_length=seq_length,
                 )
             )
+
+            if self.control.should_save:
+                trained_steps = self.state.global_step - self.state.last_saved_step
+                tokens_trained_this_ckpt_interval_in_billion = round(
+                    trained_steps * seq_length * total_train_batch_size / (10**9), 4
+                )
+                logs.update(
+                    {"tokens_trained_this_ckpt_interval_in_billion": tokens_trained_this_ckpt_interval_in_billion}
+                )
+                self.state.last_saved_step = self.state.global_step
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
