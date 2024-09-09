@@ -33,7 +33,7 @@ from paddlenlp.utils.tools import get_env_device
 class DPOCriterion(nn.Layer):
     """DPO Criterion"""
 
-    def __init__(self, config):
+    def __init__(self, config, use_infohub=False):
         super(DPOCriterion, self).__init__()
         self.config = config
         if getattr(self.config, "dpo_config", None) is None:
@@ -46,6 +46,7 @@ class DPOCriterion(nn.Layer):
             self.logprobs = ParallelCrossEntropy()
         else:
             self.logprobs = nn.CrossEntropyLoss(reduction="none")
+        self.use_infohub = use_infohub
 
     def dpo_loss(self, policy_chosen_logps, policy_rejected_logps, reference_chosen_logps, reference_rejected_logps):
         """DPO Loss"""
@@ -257,19 +258,25 @@ class DPOCriterion(nn.Layer):
             reference_chosen_logps, reference_rejected_logps, sft_loss = self.dpo_logps(
                 logits, chosen_labels, rejected_labels, response_indexs, average_log_prob
             )
-            infohub.reference_chosen_logps.append(reference_chosen_logps)
-            infohub.reference_rejected_logps.append(reference_rejected_logps)
-            # pipeline mode requires return loss when self._compute_loss is True
-            return paddle.zeros([1])
+            if self.use_infohub:
+                infohub.reference_chosen_logps.append(reference_chosen_logps)
+                infohub.reference_rejected_logps.append(reference_rejected_logps)
+                # pipeline mode requires return loss when self._compute_loss is True
+                return paddle.zeros([1])
+            else:
+                return reference_chosen_logps, reference_rejected_logps
         policy_chosen_logps, policy_rejected_logps, sft_loss = self.dpo_logps(
             logits, chosen_labels, rejected_labels, response_indexs, average_log_prob
         )
         dpo_loss = self.dpo_loss(
             policy_chosen_logps, policy_rejected_logps, reference_chosen_logps, reference_rejected_logps
         )
-        infohub.policy_chosen_logps.append(policy_chosen_logps)
-        infohub.policy_rejected_logps.append(policy_rejected_logps)
-        infohub.sft_loss.append(sft_loss)
-        infohub.dpo_loss.append(dpo_loss)
         loss = dpo_loss + sft_loss
-        return loss
+        if self.use_infohub:
+            infohub.policy_chosen_logps.append(policy_chosen_logps)
+            infohub.policy_rejected_logps.append(policy_rejected_logps)
+            infohub.sft_loss.append(sft_loss)
+            infohub.dpo_loss.append(dpo_loss)
+            return loss
+        else:
+            return policy_chosen_logps, policy_rejected_logps, sft_loss, dpo_loss, loss

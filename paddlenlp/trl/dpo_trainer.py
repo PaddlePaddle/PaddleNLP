@@ -54,6 +54,7 @@ class DPOTrainer(Trainer):
         dpo_config=None,
         disable_dropout: bool = True,
         padding_value: int = 0,
+        model_with_dpo_criterion: bool = False,
         **kwargs
     ):
         super().__init__(model, data_collator=data_collator, **kwargs)
@@ -61,12 +62,15 @@ class DPOTrainer(Trainer):
             raise ValueError("dpo_config is None")
         else:
             self.dpo_config = dpo_config
-        if dpo_criterion is None:
-            self.dpo_criterion = DPOCriterion(self.model.config)
-        elif isinstance(dpo_criterion, DPOCriterion):
-            self.dpo_criterion = dpo_criterion
-        else:
-            raise ValueError("dpo_criterion should be None or DPOCriterion. Got {}".format(type(dpo_criterion)))
+        if not model_with_dpo_criterion:
+            if dpo_criterion is None:
+                self.dpo_criterion = DPOCriterion(self.model.config)
+            elif isinstance(dpo_criterion, DPOCriterion):
+                self.dpo_criterion = dpo_criterion
+            else:
+                raise ValueError("dpo_criterion should be None or DPOCriterion. Got {}".format(type(dpo_criterion)))
+        # model_with_dpo_criterion will save memory (logits part)
+        self.model_with_dpo_criterion = model_with_dpo_criterion
         if self.dpo_config.loss_type not in [
             "sigmoid",
             "hinge",
@@ -110,7 +114,6 @@ class DPOTrainer(Trainer):
 
     def get_batch_metrics(self, ref_model, model, batch, train_eval="train"):
         """Compute the DPO loss and other metrics for the given batch of inputs for train or test."""
-        self.reset_dpo_infohub()
         dpo_inputs = {
             "input_ids": batch["input_ids"],
             "position_ids": batch["position_ids"],
@@ -119,34 +122,56 @@ class DPOTrainer(Trainer):
             dpo_inputs["attention_mask"] = batch["attention_mask"]
         if "attn_mask_start_row_indices" in batch:
             dpo_inputs["attn_mask_start_row_indices"] = batch["attn_mask_start_row_indices"]
-        labels = (batch["chosen_labels"], batch["rejected_labels"], batch["response_indexs"], None, None)
-        if self.dpo_config.reference_free:
-            infohub.reference_chosen_logps.append(paddle.zeros([1]))
-            infohub.reference_rejected_logps.append(paddle.zeros([1]))
-        else:
-            if self.dpo_config.lora:
-                with paddle.no_grad():
-                    self.disable_lora(model)
-                    model.eval()
-                    logits = model(**dpo_inputs)
-                    self.enable_lora(model)
-                    model.train()
+        if self.model_with_dpo_criterion:
+            dpo_inputs["chosen_labels"] = batch["chosen_labels"]
+            dpo_inputs["rejected_labels"] = batch["rejected_labels"]
+            dpo_inputs["response_indexs"] = batch["response_indexs"]
+            if self.dpo_config.reference_free:
+                reference_chosen_logps = paddle.zeros([1])
+                reference_rejected_logps = paddle.zeros([1])
             else:
-                with paddle.no_grad():
-                    logits = ref_model(**dpo_inputs)
-            self.dpo_criterion(logits, labels)
-        labels = labels[:3] + (infohub.reference_chosen_logps[0], infohub.reference_rejected_logps[0])
-        logits = model(**dpo_inputs)
-        loss = self.dpo_criterion(logits, labels)
+                if self.dpo_config.lora:
+                    with paddle.no_grad():
+                        self.disable_lora(model)
+                        model.eval()
+                        reference_chosen_logps, reference_rejected_logps = model(**dpo_inputs)
+                        self.enable_lora(model)
+                        model.train()
+                else:
+                    with paddle.no_grad():
+                        reference_chosen_logps, reference_rejected_logps = ref_model(**dpo_inputs)
+            dpo_inputs["reference_chosen_logps"] = reference_chosen_logps
+            dpo_inputs["reference_rejected_logps"] = reference_rejected_logps
+            policy_chosen_logps, policy_rejected_logps, sft_loss, dpo_loss, loss = model(**dpo_inputs)
+        else:
+            labels = (batch["chosen_labels"], batch["rejected_labels"], batch["response_indexs"], None, None)
+            if self.dpo_config.reference_free:
+                reference_chosen_logps = paddle.zeros([1])
+                reference_rejected_logps = paddle.zeros([1])
+            else:
+                if self.dpo_config.lora:
+                    with paddle.no_grad():
+                        self.disable_lora(model)
+                        model.eval()
+                        logits = model(**dpo_inputs)
+                        self.enable_lora(model)
+                        model.train()
+                else:
+                    with paddle.no_grad():
+                        logits = ref_model(**dpo_inputs)
+                reference_chosen_logps, reference_rejected_logps = self.dpo_criterion(logits, labels)
+            labels = labels[:3] + (reference_chosen_logps, reference_rejected_logps)
+            logits = model(**dpo_inputs)
+            policy_chosen_logps, policy_rejected_logps, sft_loss, dpo_loss, loss = self.dpo_criterion(logits, labels)
 
         # metrics
         metric_inputs = dict(
-            reference_chosen_logps=infohub.reference_chosen_logps[0],
-            reference_rejected_logps=infohub.reference_rejected_logps[0],
-            policy_chosen_logps=infohub.policy_chosen_logps[0],
-            policy_rejected_logps=infohub.policy_rejected_logps[0],
-            dpo_loss=infohub.dpo_loss[0],
-            sft_loss=infohub.sft_loss[0],
+            reference_chosen_logps=reference_chosen_logps,
+            reference_rejected_logps=reference_rejected_logps,
+            policy_chosen_logps=policy_chosen_logps,
+            policy_rejected_logps=policy_rejected_logps,
+            dpo_loss=dpo_loss,
+            sft_loss=sft_loss,
             train_eval=train_eval,
         )
         self.log_metric(**metric_inputs)
