@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
 import copy
 import gc
@@ -23,7 +24,6 @@ import re
 import sys
 import tempfile
 import warnings
-import concurrent.futures
 from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
@@ -326,11 +326,11 @@ def _split_keys_evenly(keys: list, n: int) -> list:
     Args:
         keys (list): the list to be split
         n (int): number of splits
-    
+
     Returns:
         result: list of lists
     """
-  
+
     total_len = len(keys)
     base_size = total_len // n
     extra = total_len % n
@@ -340,21 +340,23 @@ def _split_keys_evenly(keys: list, n: int) -> list:
     for _ in range(n):
         part_size = base_size + 1 if extra > 0 else base_size
         extra -= 1
-        result.append(keys[index:index + part_size])
+        result.append(keys[index : index + part_size])
         index += part_size
 
     return result
 
 
-def _load_part_state_dict(keys, checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping, fliter_dict_keys, device):
+def _load_part_state_dict(
+    keys, checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping, fliter_dict_keys, device
+):
     """load part state dict from checkpoint file.
-    
+
     Args:
         keys (list): the keys of part state dict
         checkpoint_file (str): the path of checkpoint file
         tensor_parallel_split_mapping (dict): mapping from key to function
         fliter_dict_keys (list): filter keys in state dict
-    
+
     Returns:
         part_state_dict (dict): the part state dict
 
@@ -401,15 +403,26 @@ def load_state_dict(
         if metadata.get("format", "np") == "pd":
             raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
         if metadata.get("format", "np") == "np":
+            # Load state dict in multi-thread to speed up loading
             thread_num = int(os.environ.get("LOAD_STATE_DICT_THREAD_NUM", "1"))
             state_dict = {}
             with safe_open(checkpoint_file, framework="np") as f:
                 keys_groups = _split_keys_evenly(list(f.keys()), thread_num)
             with concurrent.futures.ThreadPoolExecutor(max_workers=thread_num) as executor:
-                future_to_key = {executor.submit(_load_part_state_dict, keys, checkpoint_file, tensor_parallel_split_mapping, fliter_dict_keys, device): keys for keys in keys_groups}
+                future_to_key = {
+                    executor.submit(
+                        _load_part_state_dict,
+                        keys,
+                        checkpoint_file,
+                        tensor_parallel_split_mapping,
+                        fliter_dict_keys,
+                        device,
+                    ): keys
+                    for keys in keys_groups
+                }
                 for future in concurrent.futures.as_completed(future_to_key):
                     result = future.result()
-                    state_dict.update(result)            
+                    state_dict.update(result)
 
             if device == "cpu":
                 for k in list(state_dict.keys()):
