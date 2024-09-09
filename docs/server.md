@@ -202,6 +202,6 @@ texts = [
 在Client发送请求的过程中可以一些参数来控制服务化处理逻辑，例如上面的 `max_seq_len`和 `batch_size` 均可以控制服务化处理时的序列长度和处理batch_size 。
 
 ## 参考示例
-- [UIE 服务化部署](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/uie/deploy/serving/simple_serving)
-- [文本分类服务化部署](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class/deploy/simple_serving)
-- [预训练模型定制化post_handler](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/ernie-health/cblue/deploy/serving/simple_serving)
+- [UIE 服务化部署](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/uie/deploy/serving/simple_serving)
+- [文本分类服务化部署](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/applications/text_classification/multi_class/deploy/simple_serving)
+- [预训练模型定制化post_handler](https://github.com/PaddlePaddle/PaddleNLP/blob/release/2.8/model_zoo/ernie-health/cblue/deploy/serving/simple_serving)

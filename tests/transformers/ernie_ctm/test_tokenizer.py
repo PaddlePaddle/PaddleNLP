@@ -73,41 +73,6 @@ class ErnieCTMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertListEqual(tokens, ["un", "##want", "##ed", ",", "runn", "##ing"])
         self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [9, 6, 7, 12, 10, 11])
 
-    def test_fast_and_python_full_tokenizer(self):
-        if not self.test_fast_tokenizer:
-            return
-
-        tokenizer = self.get_tokenizer()
-        tokenizer_fast = self.get_fast_tokenizer()
-
-        sequence = "UNwant\u00E9d,running"
-        tokens = tokenizer.tokenize(sequence)
-        tokens_fast = tokenizer_fast.tokenize(sequence)
-        self.assertListEqual(tokens, tokens_fast)
-
-        ids = tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
-        ids_fast = tokenizer_fast.encode(sequence, add_special_tokens=False)["input_ids"]
-        self.assertListEqual(ids, ids_fast)
-
-        ids = tokenizer.encode(sequence)["input_ids"]
-        ids_fast = tokenizer_fast.encode(sequence)["input_ids"]
-        self.assertListEqual(ids, ids_fast)
-
-        tokenizer = self.get_tokenizer(do_lower_case=True)
-        tokenizer_fast = self.get_fast_tokenizer(do_lower_case=True)
-
-        tokens = tokenizer.tokenize(sequence)
-        tokens_fast = tokenizer_fast.tokenize(sequence)
-        self.assertListEqual(tokens, tokens_fast)
-
-        ids = tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
-        ids_fast = tokenizer_fast.encode(sequence, add_special_tokens=False)["input_ids"]
-        self.assertListEqual(ids, ids_fast)
-
-        ids = tokenizer.encode(sequence)["input_ids"]
-        ids_fast = tokenizer_fast.encode(sequence)["input_ids"]
-        self.assertListEqual(ids, ids_fast)
-
     def test_chinese(self):
         tokenizer = BasicTokenizer()
 

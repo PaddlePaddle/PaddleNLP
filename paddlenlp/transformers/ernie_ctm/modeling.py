@@ -100,7 +100,7 @@ class ErnieCtmEmbeddings(Layer):
     def forward(self, input_ids, token_type_ids=None, position_ids=None, inputs_embeds=None):
         if position_ids is None:
 
-            content_len = paddle.shape(input_ids)[1] - self.cls_num
+            content_len = input_ids.shape[1] - self.cls_num
             position_ids = paddle.concat(
                 [
                     paddle.zeros(shape=[self.cls_num], dtype="int64"),

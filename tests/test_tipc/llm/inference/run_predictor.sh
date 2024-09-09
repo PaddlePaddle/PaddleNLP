@@ -23,23 +23,25 @@ fused_model=${fused_model:-false}
 dtype=${dtype:-"float16"}
 inference_model=${inference_model:-"true"}
 decode_strategy=${decode_strategy:-"greedy_search"}
+top_p=${top_p:-"0.0"}
 data_file=${data_file:-"tests/fixtures/llm/zh_query.json"}
+benchmark=${benchmark:-"0"}
 
-common_arguments="--decode_strategy ${decode_strategy} --src_length 300 --max_length 100 --benchmark 1 --dtype ${dtype} --batch_size 2 --inference_model ${inference_model} "
-common_arguments+="--data_file ${data_file}"
+common_arguments="--decode_strategy ${decode_strategy} --src_length 300 --max_length 200 --benchmark ${benchmark} --dtype ${dtype} --batch_size 3 --inference_model ${inference_model} "
+common_arguments+="--data_file ${data_file} --top_p ${top_p} --chat_template none"
 
 echo "pwd -> "
 
 cd ..
 
 echo "==============================run-dynamic-predictor=============================="
-python ./llm/predictor.py --model_name_or_path ${model_name} --mode dynamic --output_file ${output_path}/dynamic.json ${common_arguments}
+python ./llm/predict/predictor.py --model_name_or_path ${model_name} --mode dynamic --output_file ${output_path}/dynamic.json ${common_arguments}
 
 echo "==============================run-export-predictor=============================="
-python ./llm/export_model.py --model_name_or_path ${model_name} --output_path ${output_path} ${common_arguments}
+python ./llm/predict/export_model.py --model_name_or_path ${model_name} --output_path ${output_path} ${common_arguments}
 
 echo "==============================run-static-predictor=============================="
-python ./llm/predictor.py --model_name_or_path ${output_path} --mode static --output_file ${output_path}/static.json ${common_arguments}
+python ./llm/predict/predictor.py --model_name_or_path ${output_path} --mode static --output_file ${output_path}/static.json ${common_arguments}
 
 
 echo "==============================dynamic result=============================="

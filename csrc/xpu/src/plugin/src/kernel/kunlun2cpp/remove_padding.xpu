@@ -1,0 +1,40 @@
+#include "xpu/kernel/cluster.h"
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/cluster_primitive.h"
+
+namespace xpu2 {
+namespace plugin {
+
+__global__ void remove_padding(int64_t *x_remove_padding,
+                               const int64_t *input_data,
+                               const int *seq_lens,
+                               const int *cum_offsets,
+                               const int sequence_length,
+                               const int bs) {
+  int cid = core_id();
+  int ncores = core_num();
+  int clusterid = cluster_id();
+  int nclusters = cluster_num();
+  int tid = clusterid * ncores + cid;
+
+  int buf_len = 32;
+  __simd__ int64_t input_lm[buf_len];
+  int seq_len_lm;
+  int cum_offset_lm;
+  for (int i = clusterid; i < bs; i += nclusters) {
+    GM2LM_ASYNC(seq_lens + i, &seq_len_lm, sizeof(int));
+    GM2LM(cum_offsets + i, &cum_offset_lm, sizeof(int));
+    for (int j = cid * buf_len; j < seq_len_lm; j += ncores * buf_len) {
+      int cur_len = min(seq_len_lm - j, buf_len);
+      GM2LM(input_data + i * sequence_length + j,
+            input_lm,
+            sizeof(int64_t) * cur_len);
+      LM2GM(input_lm,
+                  x_remove_padding + i * sequence_length - cum_offset_lm + j,
+                  sizeof(int64_t) * cur_len);
+    }
+  }
+}
+
+}  // namespace plugin
+}  // namespace xpu2

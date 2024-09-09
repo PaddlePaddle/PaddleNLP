@@ -1,0 +1,75 @@
+#include "xpu/kernel/cluster.h"
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/cluster_primitive.h"
+
+namespace xpu2 {
+namespace plugin {
+
+__global__ void update_inputs(bool *not_need_stop,
+                              int *seq_lens_this_time,
+                              int *seq_lens_encoder,
+                              int *seq_lens_decoder,
+                              int64_t *input_ids,
+                              const int64_t *stop_nums,
+                              const bool *stop_flags,
+                              const bool *is_block_step,
+                              const int64_t *next_tokens,
+                              const int bsz,
+                              const int max_bsz,
+                              const int input_ids_stride) {
+  int cid = core_id();
+  int ncores = core_num();
+  int clusterid = cluster_id();
+  int nclusters = cluster_num();
+  int tid = clusterid * ncores + cid;
+  if (clusterid != 0) return;
+
+  // assert bsz <= 1024
+  const int max_bs = 1024;
+  __shared__ bool stop_flags_sm[max_bs];
+  __shared__ int stop_flags_int_sm[max_bs];
+  if (cid == 0) {
+    GM2SM(stop_flags, stop_flags_sm, sizeof(bool) * bsz);
+  }
+  sync_all();
+  for (int i = cid; i < bsz; i += ncores) {
+    int seq_len_encoder;
+    int seq_len_decoder;
+    bool is_block_step_lm;
+    GM2LM_ASYNC(seq_lens_encoder + i, &seq_len_encoder, sizeof(int));
+    GM2LM_ASYNC(seq_lens_decoder + i, &seq_len_decoder, sizeof(int));
+    GM2LM_ASYNC(is_block_step + i, &is_block_step_lm, sizeof(bool));
+    mfence();
+
+    bool stop_flag_now = stop_flags_sm[i];
+    stop_flags_int_sm[i] = is_block_step_lm ? 0 : stop_flag_now;
+    int seq_len_decoder_update =
+        stop_flag_now
+            ? 0
+            : (seq_len_decoder == 0 ? seq_len_encoder : seq_len_decoder + 1);
+    LM2GM_ASYNC(&seq_len_decoder_update, seq_lens_decoder + i, sizeof(int));
+    int seq_len_this_time_update = !stop_flag_now;
+    LM2GM_ASYNC(&seq_len_this_time_update, seq_lens_this_time + i, sizeof(int));
+    int seq_len_encoder_update = 0;
+    LM2GM(&seq_len_encoder_update, seq_lens_encoder + i, sizeof(int));
+    int64_t input_ids_update;
+    GM2LM(next_tokens + i, &input_ids_update, sizeof(int64_t));
+    LM2GM(&input_ids_update, input_ids + i * input_ids_stride, sizeof(int64_t));
+  }
+  sync_cluster();
+
+  int stop_sum = 0;
+  if (cid == 0) {
+    for (int i = 0; i < bsz; i++) {
+      stop_sum += stop_flags_int_sm[i];
+    }
+    stop_sum += (max_bsz - bsz);
+    int64_t stop_num;
+    GM2LM(stop_nums, &stop_num, sizeof(int64_t));
+    bool not_need_stop_update = stop_sum < static_cast<int>(stop_num);
+    LM2GM(&not_need_stop_update, not_need_stop, sizeof(bool));
+  }
+}
+
+}  // namespace plugin
+}  // namespace xpu2

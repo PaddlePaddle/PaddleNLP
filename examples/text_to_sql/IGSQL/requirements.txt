@@ -1,4 +1,0 @@
-sqlparse
-pymysql
-progressbar
-nltk

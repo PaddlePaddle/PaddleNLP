@@ -188,7 +188,6 @@ msgstr ""
 #: ../FAQ.md:63
 msgid ""
 "从本地文件创建数据集时，我们 推荐 根据本地数据集的格式给出读取function并传入 load_dataset() 中创建数据集。 "
-"以waybill_ie快递单信息抽取任务中的数据为例："
 msgstr ""
 
 #: ../FAQ.md:84

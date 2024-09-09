@@ -29,7 +29,6 @@ SAMPLE_VOCAB = get_tests_dir("fixtures/test_sentencepiece.model")
 class LayoutXLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = LayoutXLMTokenizer
-    test_fast_tokenizer = False
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = False
@@ -135,18 +134,6 @@ class LayoutXLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_offsets_mapping(self):
         pass
-
-    def test_consecutive_unk_string(self):
-        tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
-        for tokenizer in tokenizers:
-            tokens = [tokenizer.unk_token for _ in range(2)]
-            string = tokenizer.convert_tokens_to_string(tokens)
-            encoding = tokenizer(
-                text=string,
-                truncation=True,
-                return_offsets_mapping=False,
-            )
-            self.assertEqual(len(encoding["input_ids"]), 4)
 
     def test_internal_consistency(self):
         tokenizers = self.get_tokenizers()

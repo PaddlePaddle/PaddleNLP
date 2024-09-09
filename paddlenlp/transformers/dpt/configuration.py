@@ -212,7 +212,7 @@ class DPTConfig(PretrainedConfig):
         self.semantic_loss_ignore_index = semantic_loss_ignore_index
         self.semantic_classifier_dropout = semantic_classifier_dropout
 
-    def to_dict(self):
+    def to_dict(self, *args, **kwargs):
         """
         Serializes this instance to a Python dictionary. Override the default [`~PretrainedConfig.to_dict`]. Returns:
             `Dict[str, any]`: Dictionary of all the attributes that make up this configuration instance,

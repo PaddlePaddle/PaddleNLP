@@ -37,6 +37,7 @@ test: unit-test
 unit-test:
 	PYTHONPATH=$(shell pwd) pytest -v \
 		-n auto \
+		--retries 1 --retry-delay 1 \
 		--durations 20 \
 		--cov paddlenlp \
 		--cov-report xml:coverage.xml
@@ -45,6 +46,7 @@ unit-test:
 
 .PHONY: install
 install:
+	pip install --pre paddlepaddle -i https://www.paddlepaddle.org.cn/packages/nightly/cpu/
 	pip install -r requirements-dev.txt
 	pip install -r requirements.txt
 	pip install -r paddlenlp/experimental/autonlp/requirements.txt

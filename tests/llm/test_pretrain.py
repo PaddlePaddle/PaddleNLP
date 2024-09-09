@@ -13,7 +13,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-import os
 import shutil
 import sys
 import tempfile
@@ -31,6 +30,9 @@ from .testing_utils import LLMTest
     ["model_dir"],
     [
         ["llama"],
+        ["qwen"],
+        ["qwen2"],
+        ["gpt"],
     ],
 )
 class PretrainTest(LLMTest, unittest.TestCase):
@@ -41,19 +43,25 @@ class PretrainTest(LLMTest, unittest.TestCase):
         LLMTest.setUp(self)
 
         self.dataset_dir = tempfile.mkdtemp()
-        self.model_codes_dir = os.path.join(self.root_path, self.model_dir)
-        sys.path.insert(0, self.model_codes_dir)
+        self.model_codes_dir = self.root_path
 
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
-
-        sys.path.remove(self.model_codes_dir)
         shutil.rmtree(self.dataset_dir)
 
     def test_pretrain(self):
+
+        pretrain_flag = False
+        for key, value in sys.modules.items():
+            if "run_pretrain" in key:
+                pretrain_flag = True
+                break
+        if pretrain_flag:
+            del sys.modules["run_pretrain"]
+
         # Run pretrain
-        URL = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy"
-        URL2 = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz"
+        URL = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin"
+        URL2 = "https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx"
         get_path_from_url(URL, root_dir=self.dataset_dir)
         get_path_from_url(URL2, root_dir=self.dataset_dir)
 
@@ -67,5 +75,8 @@ class PretrainTest(LLMTest, unittest.TestCase):
 
             main()
 
-        self.run_predictor({"inference_model": True})
+        # Now, only work for llama, not gpt or qwen
+        if self.model_dir == "llama":
+            self.run_predictor({"inference_model": True})
+
         self.run_predictor({"inference_model": False})

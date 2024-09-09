@@ -13,11 +13,13 @@
 # limitations under the License.
 
 import json
+import math
 import os
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional, Union
 
 from ...utils.env import LORA_CONFIG_NAME
+from ...utils.log import logger
 
 
 @dataclass
@@ -71,6 +73,41 @@ class LoRAConfig:
             "help": "The model multi head dimension.Only for LoRAMergedLinear and ColumnParallelLoRAMergedLinear."
         },
     )
+    do_qat: bool = field(default=False, metadata={"help": "Whether the lora model would do quant-aware training"})
+    rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
+    pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
+    lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+"})
+    base_model_name_or_path: Optional[str] = field(
+        default=None, metadata={"help": "The name of the base model to use."}
+    )
+    use_quick_lora: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use quick lora, The use of Quick LoRa will only take effect when lora_dropout is set to 0."
+        },
+    )
+
+    def __post_init__(self):
+        if self.use_quick_lora and self.lora_dropout > 0:
+            logger.warning(
+                "Quick LoRa is enabled, but lora_dropout is set to a non-zero value. "
+                "We will automatically set `use_quick_lora` to `False` to avoid potential inconsistencies."
+            )
+            self.use_quick_lora = False
+        if self.merge_weights:
+            logger.error(
+                "'merge_weights' is deprecated and will be removed in a future version. "
+                "Please apply model.merge() or model.unmerge() to merge/unmerge LoRA weight to base model."
+            )
+
+    @property
+    def scaling(self):
+        if not self.rslora and not self.pissa:
+            return self.lora_alpha / self.r
+        elif self.pissa:
+            return 1.0
+        else:
+            return self.lora_alpha / math.sqrt(self.r)
 
     @property
     def __dict__(self):
@@ -92,6 +129,7 @@ class LoRAConfig:
         os.makedirs(save_directory, exist_ok=True)
 
         output_dict = self.__dict__
+        output_dict["scaling"] = self.scaling
         output_path = os.path.join(save_directory, LORA_CONFIG_NAME)
 
         # save it
@@ -114,6 +152,7 @@ class LoRAConfig:
             raise ValueError(f"Can't find lora_config.json at '{pretrained_model_name_or_path}'")
 
         loaded_attributes = cls.from_json_file(config_file)
+        loaded_attributes.pop("scaling", None)
 
         config = cls(**kwargs)
 

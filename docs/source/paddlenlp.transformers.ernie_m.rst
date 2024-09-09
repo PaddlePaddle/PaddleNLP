@@ -10,6 +10,5 @@ ernie\_m
 .. toctree::
    :maxdepth: 4
 
-   paddlenlp.transformers.ernie_m.fast_tokenizer
    paddlenlp.transformers.ernie_m.modeling
    paddlenlp.transformers.ernie_m.tokenizer

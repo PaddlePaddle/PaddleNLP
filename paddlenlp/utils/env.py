@@ -65,18 +65,26 @@ DOWNLOAD_SERVER = "http://paddlepaddle.org.cn/paddlehub"
 FAILED_STATUS = -1
 SUCCESS_STATUS = 0
 
+SPECIAL_TOKENS_MAP_NAME = "special_tokens_map.json"
+ADDED_TOKENS_NAME = "added_tokens.json"
 LEGACY_CONFIG_NAME = "model_config.json"
 CONFIG_NAME = "config.json"
 TOKENIZER_CONFIG_NAME = "tokenizer_config.json"
 CHAT_TEMPLATE_CONFIG_NAME = "chat_template.json"
 GENERATION_CONFIG_NAME = "generation_config.json"
+# Fast tokenizers (provided by HuggingFace tokenizer's library) can be saved in a single file
+FULL_TOKENIZER_NAME = "tokenizer.json"
 
 
 LORA_CONFIG_NAME = "lora_config.json"
 LORA_WEIGHTS_NAME = "lora_model_state.pdparams"
 
+VERA_CONFIG_NAME = "vera_config.json"
+VERA_WEIGHTS_NAME = "vera_model_state.pdparams"
+
 PREFIX_CONFIG_NAME = "prefix_config.json"
 PREFIX_WEIGHTS_NAME = "prefix_model_state.pdparams"
+PADDLE_PEFT_WEIGHTS_INDEX_NAME = "peft_model.pdparams.index.json"
 
 PAST_KEY_VALUES_FILE_NAME = "pre_caches.npy"
 
@@ -88,3 +96,18 @@ PYTORCH_WEIGHTS_INDEX_NAME = "pytorch_model.bin.index.json"
 
 SAFE_WEIGHTS_NAME = "model.safetensors"
 SAFE_WEIGHTS_INDEX_NAME = "model.safetensors.index.json"
+
+PADDLE_OPTIMIZER_NAME = "optimizer.pdopt"
+PADDLE_OPTIMIZER_INDEX_NAME = "optimizer.pdopt.index.json"
+
+SAFE_OPTIMIZER_NAME = "optimizer.safetensors"
+SAFE_OPTIMIZER_INDEX_NAME = "optimizer.safetensors.index.json"
+
+PADDLE_MASTER_WEIGHTS_NAME = "master_weights.pdparams"
+PADDLE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.pdparams.index.json"
+
+SAFE_MASTER_WEIGHTS_NAME = "master_weights.safetensors"
+SAFE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.safetensors.index.json"
+
+SAFE_PEFT_WEIGHTS_NAME = "peft_model.safetensors"
+SAFE_PEFT_WEIGHTS_INDEX_NAME = "peft_model.safetensors.index.json"

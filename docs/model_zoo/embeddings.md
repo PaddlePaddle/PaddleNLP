@@ -125,7 +125,7 @@ print(score) # 8.611071
 
 ### 训练
 
-以下为`TokenEmbedding`简单的组网使用方法。有关更多`TokenEmbedding`训练流程相关的使用方法，请参考[Word Embedding with PaddleNLP](../../examples/word_embedding/README.md)。
+以下为`TokenEmbedding`简单的组网使用方法。有关更多`TokenEmbedding`训练流程相关的使用方法，请参考[Word Embedding with PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/examples/word_embedding)。
 
 ```python
 in_words = paddle.to_tensor([0, 2, 3])

@@ -27,6 +27,8 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import map_structure
 
+from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
+
 from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
@@ -252,60 +254,93 @@ class ChatGLMAttention(nn.Layer):
             k_layer = paddle.concat([cache_k, k_layer], axis=0)
             v_layer = paddle.concat([cache_v, v_layer], axis=0)
 
-        seq_length, batch_size, num_heads, hidden_size = k_layer.shape
-
         cache_kv = None
         if use_cache:
             cache_kv = (k_layer, v_layer)
+        version = paddle.version.full_version
+        version_check = True
+        if self.config.use_flash_attention and version != "0.0.0" and version <= "2.5.2":
+            logger.warning(
+                "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
+            )
+            version_check = False
+        if self.config.use_flash_attention and version_check:
+            # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
+            # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
+            # [s, b, n, h/n] = > [batch_size, seq_len, num_heads, head_dim]
+            q_layer = paddle.transpose(q_layer, [1, 0, 2, 3])
+            k_layer = paddle.transpose(k_layer, [1, 0, 2, 3])
+            v_layer = paddle.transpose(v_layer, [1, 0, 2, 3])
+            query_states, key_states, value_states = q_layer, k_layer, v_layer
 
-        attention_scale_coeff = float(layer_id) + 1.0
-        if self.attention_scale:
-            # [s, b, n, h/n]
-            q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
-            q_layer = q_layer.astype(self.default_dtype)
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=False,
+            )
+            attn_weights = None
+            # [batch_size, seq_len, num_heads, head_dim] => [ batch_size, seq_len, hidden_size]
+            attn_output = paddle.reshape(attn_output, [attn_output.shape[0], attn_output.shape[1], -1])
+            # [ batch_size, seq_len, hidden_size] = > [ seq_len, batch_size, hidden_size]
+            attn_output = paddle.transpose(attn_output, [1, 0, 2])
+            attn_output = self.dense(attn_output)
 
-        # [b, n, s, s]
-        output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
-
-        # [s, b * n, h/n]
-        q_layer = q_layer.reshape([output_shape[2], output_shape[0] * output_shape[1], -1])
-        k_layer = k_layer.reshape([output_shape[3], output_shape[0] * output_shape[1], -1])
-
-        # [b * n , s, s] = matmul([b * n, s, h/n],  [b * n, h/n, s])
-        attention_scores = paddle.matmul(q_layer.transpose([1, 0, 2]), k_layer.transpose([1, 2, 0]))
-        # [b, n, s, s]
-        attention_scores = attention_scores.reshape(output_shape)
-
-        if self.scale_mask_softmax:
-            self.scale_mask_softmax.scale = attention_scale_coeff
-            attention_probs = self.scale_mask_softmax(attention_scores, attention_mask)
+            output, attention_probs = attn_output, attn_weights
         else:
-            attention_scores = attention_scores + attention_mask
-            attention_scores = attention_scores.astype("float32")
-            attention_scores = attention_scores * attention_scale_coeff
-            attention_probs = F.softmax(attention_scores, axis=-1)
-            attention_probs = attention_probs.astype(self.default_dtype)
-            v_layer = v_layer.astype(self.default_dtype)
 
-        # [b, n, s, h/n]
-        output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
-        # [s, b * n, h/n]
-        v_layer = v_layer.reshape([v_layer.shape[0], output_shape[0] * output_shape[1], -1])
-        # [b * n, s, s]
-        attention_probs = attention_probs.reshape([output_shape[0] * output_shape[1], output_shape[2], -1])
+            seq_length, batch_size, num_heads, hidden_size = k_layer.shape
 
-        # [b * n, s, h/n]
-        context_layer = paddle.bmm(attention_probs, v_layer.transpose([1, 0, 2]))
-        context_layer = context_layer.reshape(output_shape)
+            attention_scale_coeff = float(layer_id) + 1.0
+            if self.attention_scale:
+                # [s, b, n, h/n]
+                q_layer = q_layer / (math.sqrt(self.attention_head_size) * attention_scale_coeff)
+                q_layer = q_layer.astype(self.default_dtype)
 
-        # [s, b, n, h/n]
-        context_layer = context_layer.transpose([2, 0, 1, 3])
+            # [b, n, s, s]
+            output_shape = [q_layer.shape[1], q_layer.shape[2], q_layer.shape[0], k_layer.shape[0]]
 
-        # [s, b, h]
-        new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
-        context_layer = context_layer.reshape(new_context_shape)
+            # [s, b * n, h/n]
+            q_layer = q_layer.reshape([output_shape[2], output_shape[0] * output_shape[1], -1])
+            k_layer = k_layer.reshape([output_shape[3], output_shape[0] * output_shape[1], -1])
 
-        output = self.dense(context_layer)
+            # [b * n , s, s] = matmul([b * n, s, h/n],  [b * n, h/n, s])
+            attention_scores = paddle.matmul(q_layer.transpose([1, 0, 2]), k_layer.transpose([1, 2, 0]))
+            # [b, n, s, s]
+            attention_scores = attention_scores.reshape(output_shape)
+
+            if self.scale_mask_softmax:
+                self.scale_mask_softmax.scale = attention_scale_coeff
+                attention_probs = self.scale_mask_softmax(attention_scores, attention_mask)
+            else:
+                attention_scores = attention_scores.astype("float32")
+                attention_scores = attention_scores * attention_scale_coeff
+                attention_scores = attention_scores + attention_mask
+
+                attention_probs = F.softmax(attention_scores, axis=-1)
+                attention_probs = attention_probs.astype(self.default_dtype)
+                v_layer = v_layer.astype(self.default_dtype)
+
+            # [b, n, s, h/n]
+            output_shape = [v_layer.shape[1], v_layer.shape[2], q_layer.shape[0], v_layer.shape[3]]
+            # [s, b * n, h/n]
+            v_layer = v_layer.reshape([v_layer.shape[0], output_shape[0] * output_shape[1], -1])
+            # [b * n, s, s]
+            attention_probs = attention_probs.reshape([output_shape[0] * output_shape[1], output_shape[2], -1])
+
+            # [b * n, s, h/n]
+            context_layer = paddle.bmm(attention_probs, v_layer.transpose([1, 0, 2]))
+            context_layer = context_layer.reshape(output_shape)
+
+            # [s, b, n, h/n]
+            context_layer = context_layer.transpose([2, 0, 1, 3])
+
+            # [s, b, h]
+            new_context_shape = context_layer.shape[:-2] + [self.num_attention_heads * self.attention_head_size]
+            context_layer = context_layer.reshape(new_context_shape)
+
+            output = self.dense(context_layer)
 
         return output, cache_kv, attention_probs
 
@@ -409,12 +444,21 @@ class ChatGLMStack(nn.Layer):
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
         self.num_attention_heads = config.num_attention_heads
-        self.rotary_embeddings = RotaryEmbeddings(
-            self.hidden_size // (self.num_attention_heads * 2)
-            if self.position_encoding_2d
-            else self.hidden_size // self.num_attention_heads,
-            base=10000.0,
-        )
+
+        if config.use_long_sequence_strategies:
+            self.rotary_embeddings = LongSequenceStrategies.build_long_sequence_strategy(
+                config.long_sequence_strategy_type,
+                config.long_sequence_strategy_name,
+                **config.long_sequence_init_args,
+            )
+
+        else:
+            self.rotary_embeddings = RotaryEmbeddings(
+                self.hidden_size // (self.num_attention_heads * 2)
+                if self.position_encoding_2d
+                else self.hidden_size // self.num_attention_heads,
+                base=10000.0,
+            )
         # self.embedding_dropout = nn.Dropout(config.embedding_dropout_prob)
 
         if self.config.tensor_parallel_degree > 1:
@@ -497,7 +541,6 @@ class ChatGLMStack(nn.Layer):
         cache: Optional[Tensor] = None,
         use_cache: bool = False,
     ):
-
         if input_ids is not None and inputs_embeds is not None:
             input_ids = None
             logger.warning("Specify both input_ids and inputs_embeds at the same time, will use inputs_embeds")
@@ -511,8 +554,17 @@ class ChatGLMStack(nn.Layer):
         if inputs_embeds is None:
             inputs_embeds = self.word_embeddings(input_ids)
         inputs_embeds = inputs_embeds.transpose([1, 0, 2])
-
-        rotary_embeds = self.rotary_embeddings(position_ids)
+        if self.config.use_long_sequence_strategies:
+            cos, sin = self.rotary_embeddings(seq_len=seq_length)
+            block_position_ids = position_ids[:, 1, :].transpose([1, 0])
+            position_ids = position_ids[:, 0, :].transpose([1, 0])
+            block_rotary_embeds = paddle.stack(
+                [cos[block_position_ids].unsqueeze(2), sin[block_position_ids].unsqueeze(2)]
+            )
+            position_rotary_embeds = paddle.stack([cos[position_ids].unsqueeze(2), sin[position_ids].unsqueeze(2)])
+            rotary_embeds = paddle.stack([position_rotary_embeds, block_rotary_embeds], axis=0)
+        else:
+            rotary_embeds = self.rotary_embeddings(position_ids)
 
         if cache is None:
             if self.config.pre_seq_len is not None:
@@ -756,7 +808,7 @@ class ChatGLMHead(nn.Layer):
 
 class ChatGLMForCausalLM(ChatGLMPretrainedModel):
     _keys_to_ignore_on_save = [r"lm_head.decoder_weight"]
-    _tied_weights_keys = ["lm_head.weight"]
+    _tied_weights_keys = ["lm_head.decoder_weight"]
 
     def __init__(self, config: ChatGLMConfig):
         super(ChatGLMForCausalLM, self).__init__(config)

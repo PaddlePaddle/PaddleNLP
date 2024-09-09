@@ -48,7 +48,6 @@ class TestQuantedLoraLayer(unittest.TestCase):
             out_features=8,
             r=4,
             lora_alpha=8,
-            merge_weights=True,
         )
         quant_lora_layer = QuantedLoRALinear(
             layer=lora_layer, q_config=SingleLayerConfig(weight=None, activation=None)
@@ -82,17 +81,17 @@ class TestQuantedLoraLayer(unittest.TestCase):
             self.assertTrue(paddle.allclose(new_quant_lora_layer(x), quant_lora_layer(x)))
 
     def test_merge_weights(self):
-        lora_layer = LoRALinear(in_features=16, out_features=8, r=4, lora_alpha=8, merge_weights=True)
+        lora_layer = LoRALinear(in_features=16, out_features=8, r=4, lora_alpha=8)
         quant_lora_layer = QuantedLoRALinear(
             layer=lora_layer, q_config=SingleLayerConfig(weight=None, activation=None)
         )
         x = paddle.randn([2, 4, 16], "float32")
 
-        quant_lora_layer.train()
-        train_output = lora_layer(x)
-        quant_lora_layer.eval()
-        eval_output = lora_layer(x)
-        self.assertTrue(paddle.allclose(train_output, eval_output))
+        quant_lora_layer.merge()
+        merge_output = lora_layer(x)
+        quant_lora_layer.unmerge()
+        unmerge_output = lora_layer(x)
+        self.assertTrue(paddle.allclose(merge_output, unmerge_output))
 
 
 class TestQuantedLoRAModel(unittest.TestCase):
@@ -102,7 +101,6 @@ class TestQuantedLoRAModel(unittest.TestCase):
             target_modules=[".*q_proj.*", ".*v_proj.*"],
             r=4,
             lora_alpha=8,
-            merge_weights=True,
         )
         cls.model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
         cls.lora_model = LoRAModel(cls.model, lora_config)
@@ -140,8 +138,11 @@ class TestQuantedLoRAModel(unittest.TestCase):
         qat = QAT(q_config)
         self.lora_model.train()
         quant_lora_model = qat.quantize(self.lora_model, inplace=False)
+        quant_lora_model.merge()
+        self.lora_model.merge()
         quant_lora_model.eval()
         self.lora_model.eval()
+
         input_ids = paddle.to_tensor(np.random.randint(100, 200, [1, 5]))
         original_model_outputs = self.lora_model(input_ids)[0]
         quant_model_outputs = quant_lora_model(input_ids)[0]

@@ -26,6 +26,26 @@ local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 #         return None
 
 
+def check_data_split(splits_string, do_train, do_eval, do_predict):
+    splits = []
+    if splits_string.find(",") != -1:
+        splits = [float(s) for s in splits_string.split(",")]
+    elif splits_string.find("/") != -1:
+        splits = [float(s) for s in splits_string.split("/")]
+    else:
+        splits = [float(splits_string)]
+    while len(splits) < 3:
+        splits.append(0.0)
+    splits = splits[:3]
+    splits_sum = sum(splits)
+    data_flag = True
+    assert splits_sum > 0.0, "sum of splits should larger than 0.0!"
+    if (do_train and splits[0] == 0) or (do_eval and splits[1] == 0) or (do_predict and splits[2] == 0):
+        data_flag = False
+    if not data_flag:
+        raise ValueError("If do_train/do_eval/do_predict is True, the corresponding dataset split should not be 0!")
+
+
 def get_train_valid_test_split_(splits_string, size):
     """Get dataset splits from comma or '/' separated string list."""
 
@@ -74,10 +94,11 @@ def get_datasets_weights_and_num_samples(data_prefix, train_val_test_num_samples
     # Add 0.5% (the 1.005 factor) so in case the bleding dataset does
     # not uniformly distribute the number of samples, we still have
     # samples left to feed to the network.
+    # (NOTE, yujun06): This is a workaround to avoid issues with indexing in the blending dataset. Therefore, we need to add 20 samples to each dataset.
     datasets_train_valid_test_num_samples = []
     for weight in weights:
         datasets_train_valid_test_num_samples.append(
-            [int(math.ceil(val * weight * 1.005)) for val in train_val_test_num_samples]
+            [int(math.ceil(val * weight * 1.005)) + 20 for val in train_val_test_num_samples]
         )
 
     return prefixes, weights, datasets_train_valid_test_num_samples
@@ -126,7 +147,9 @@ def build_train_valid_test_datasets(
     # Parse the values.
     output = get_datasets_weights_and_num_samples(data_prefix, train_val_test_num_samples)
     prefixes, weights, datasets_train_valid_test_num_samples = output
-    train_num_samples, valid_num_samples, test_num_samples = map(sum, zip(*datasets_train_valid_test_num_samples))
+    # NOTE: megatron/gpt_dataset.py has been updated. When creating BlendableDataset, we will use the raw train_val_test_num_samples instead of the expanded ones.
+    # Please refer to https://github.com/NVIDIA/NeMo/blob/72f630d087d45655b1a069dc72debf01dfdbdb2d/nemo/collections/nlp/data/language_modeling/megatron/gpt_dataset.py#L74-L80 for more information
+    train_num_samples, valid_num_samples, test_num_samples = train_val_test_num_samples
 
     # Build individual datasets.
     train_datasets = []
@@ -279,8 +302,7 @@ class GPTDataset(paddle.io.Dataset):
         self.return_doc_ids = return_doc_ids
 
         # Build index mappings.
-        if need_data:
-            # Checks
+        if need_data and len(documents) > 0:
             assert np.min(documents) >= 0
             assert np.max(documents) < indexed_dataset.sizes.shape[0]
 
@@ -308,7 +330,7 @@ class GPTDataset(paddle.io.Dataset):
             paddle.distributed.barrier()
 
         # Load mappings.
-        if need_data:
+        if need_data and len(documents) > 0:
             start_time = time.time()
             print_rank_0(f" > loading doc-idx mapping from {doc_idx_filename}")
             self.doc_idx = np.load(doc_idx_filename, allow_pickle=True, mmap_mode="r")
@@ -344,26 +366,52 @@ class GPTDataset(paddle.io.Dataset):
         if doc_index_f == doc_index_l:
             doc_ids.append(self.doc_idx[doc_index_f])
 
-            sample = self.indexed_dataset.get(
+            sample, mask = self.indexed_dataset.get(
                 self.doc_idx[doc_index_f], offset=offset_f, length=offset_l - offset_f + 1
             )
         else:
             # Otherwise, get the rest of the initial document.
             doc_ids.append(self.doc_idx[doc_index_f])
-            sample_list = [self.indexed_dataset.get(self.doc_idx[doc_index_f], offset=offset_f)]
+            sample, mask = self.indexed_dataset.get(self.doc_idx[doc_index_f], offset=offset_f)
+            append_mask = True
+            if mask is None:
+                append_mask = False
+
+            sample_list = [sample]
+            mask_list = []
+            mask_list = [mask]
             # Loop over all in between documents and add the entire document.
             for i in range(doc_index_f + 1, doc_index_l):
                 doc_ids.append(self.doc_idx[i])
-                sample_list.append(self.indexed_dataset.get(self.doc_idx[i]))
+                sample, mask = self.indexed_dataset.get(self.doc_idx[i])
+                sample_list.append(sample)
+                if append_mask:
+                    mask_list.append(mask)
+
             # And finally add the relevant portion of last document.
             doc_ids.append(self.doc_idx[doc_index_l])
-            sample_list.append(self.indexed_dataset.get(self.doc_idx[doc_index_l], length=offset_l + 1))
+            sample, mask = self.indexed_dataset.get(self.doc_idx[doc_index_l], length=offset_l + 1)
+            sample_list.append(sample)
+            if append_mask:
+                mask_list.append(mask)
             sample = np.concatenate(sample_list)
+            if append_mask:
+                mask = np.concatenate(mask_list)
         # print(sample)
         if self.return_doc_ids:  # for retro preprocessing
-            return {"text": np.array(sample, dtype=np.int64), "doc_ids": np.array(doc_ids, dtype=np.int64)}
+            if mask is None:
+                return {"text": np.array(sample, dtype=np.int64), "doc_ids": np.array(doc_ids, dtype=np.int64)}
+            else:
+                return {
+                    "text": np.array(sample, dtype=np.int64),
+                    "doc_ids": np.array(doc_ids, dtype=np.int64),
+                    "mask": np.array(mask, dtype=np.int64),
+                }
         else:
-            return {"text": np.array(sample, dtype=np.int64)}
+            if mask is None:
+                return {"text": np.array(sample, dtype=np.int64)}
+            else:
+                return {"text": np.array(sample, dtype=np.int64), "mask": np.array(mask, dtype=np.int64)}
 
 
 def _build_index_mappings(

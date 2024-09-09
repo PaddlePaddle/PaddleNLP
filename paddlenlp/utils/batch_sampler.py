@@ -14,8 +14,6 @@
 
 from __future__ import division, print_function
 
-import math
-
 import paddle
 
 __all__ = ["DistributedBatchSampler"]
@@ -106,7 +104,11 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
         self.epoch = 0
 
         self.consumed_samples = consumed_samples
-        self.num_samples = int(math.ceil(len(self.dataset) * 1.0 / self.nranks))
+        if self.dataset is None:
+            # In pre-training mode when using distributed dataloader, the input dataset can be None. We should handle this situation.
+            self.num_samples = 0
+        else:
+            self.num_samples = int(len(self.dataset) * 1.0 / self.nranks)
         self.total_size = self.num_samples * self.nranks
 
     def get_start_end_idx(self):
@@ -121,7 +123,7 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
             self.consumed_samples,
             self.nranks,
         )
-        self.remain_num_samples = int(math.ceil((len(self.dataset) - self.consumed_samples) * 1.0 / self.nranks))
+        self.remain_num_samples = int((len(self.dataset) - self.consumed_samples) * 1.0 / self.nranks)
         self.remain_total_size = self.remain_num_samples * self.nranks
         self.batch_size_times_rank_size = self.batch_size * self.nranks
 

@@ -519,7 +519,7 @@ class FunnelRelMultiheadAttention(nn.Layer):
             positional_attn = _relative_shift_gather(positional_attn, context_len, shift)
 
         if cls_mask is not None:
-            positional_attn *= cls_mask
+            positional_attn *= cls_mask.astype(positional_attn.dtype)
         return positional_attn
 
     def relative_token_type_attention(self, token_type_mat, q_head, cls_mask=None):
@@ -547,7 +547,7 @@ class FunnelRelMultiheadAttention(nn.Layer):
         )
 
         if cls_mask is not None:
-            token_type_attn *= cls_mask
+            token_type_attn *= cls_mask.astype(token_type_attn.dtype)
         return token_type_attn
 
     def forward(self, query, key, value, attention_inputs, output_attentions=False):

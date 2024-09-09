@@ -66,7 +66,7 @@ function _train(){
     mkdir $OUTPUT_PATH
 
     # if [ ${model_item} = "gpt3_moe" ];then
-    #     static_scripts="../examples/language_model/gpt-moe/dygraph/"
+    #     static_scripts="../legacy/model_zoo/gpt-moe/dygraph/"
     # else
     #     echo "not supported model item: ${model_item}"; exit 1;
     # fi
@@ -92,8 +92,7 @@ function _train(){
     model_config="gpt2-medium-en"
     [ ${mp_degree} -lt 8 ] && model_config="gpt2-small-en"
     if [ "fp16" = ${fp_item} ]; then use_pure_fp16=True; fi
-    train_cmd="--model_type gpt \
-                --model_name_or_path ${model_config} \
+    train_cmd="--model_name_or_path ${model_config} \
                 --input_dir ./data\
                 --output_dir output\
                 --weight_decay 0.01\
@@ -150,7 +149,7 @@ function _train(){
         *) echo "choose run_mode "; exit 1;
         esac
     fi
-    cd ../examples/language_model/gpt-3/dygraph/
+    cd ../legacy/model_zoo/gpt-3/dygraph/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间

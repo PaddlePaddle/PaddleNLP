@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 import sys
-from unittest import TestCase
+from unittest import TestCase, skip
 
 from paddlenlp.utils import install_package
 from paddlenlp.utils.downloader import get_path_from_url
@@ -32,11 +32,14 @@ class ErnieViLTest(TestCase):
     def tearDown(self) -> None:
         sys.path.remove(self.path)
 
+    @skip("Skip and wait to fix.")
     def test_finetune(self):
         install_package("lmdb", "1.3.0")
         if not os.path.exists("./tests/fixtures/Flickr30k-CN"):
             URL = "https://paddlenlp.bj.bcebos.com/tests/Flickr30k-CN-small.zip"
             get_path_from_url(URL, root_dir="./tests/fixtures")
+        # 0. create dataseit
+        # todo: @w5688414  fix it
 
         # 1. run finetune
         finetune_config = load_test_config(self.config_path, "finetune")

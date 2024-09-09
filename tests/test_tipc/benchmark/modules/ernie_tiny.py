@@ -16,6 +16,7 @@ import os
 import sys
 from functools import partial
 
+import paddle
 import paddle.nn as nn
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 
@@ -29,7 +30,9 @@ from .model_base import BenchmarkBase
 sys.path.insert(
     0,
     os.path.abspath(
-        os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir, os.pardir, "model_zoo", "ernie-3.0")
+        os.path.join(
+            os.path.dirname(__file__), os.pardir, os.pardir, os.pardir, os.pardir, "legacy", "model_zoo", "ernie-3.0"
+        )
     ),
 )
 
@@ -115,7 +118,23 @@ class ErnieTinyBenchmark(BenchmarkBase):
         ips=None,
         **kwargs
     ):
+        max_mem_reserved_msg = ""
+        max_mem_allocated_msg = ""
+        if paddle.device.is_compiled_with_cuda():
+            max_mem_reserved_msg = f"max_mem_reserved: {paddle.device.cuda.max_memory_reserved() // (1024 ** 2)} MB,"
+            max_mem_allocated_msg = f"max_mem_allocated: {paddle.device.cuda.max_memory_allocated() // (1024 ** 2)} MB"
         logger.info(
-            "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
-            % (step_id, args.epoch * self.num_batch, loss, reader_cost, batch_cost, num_samples, ips)
+            "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, "
+            "avg_samples: %.5f, ips: %.5f sequences/sec, %s %s"
+            % (
+                step_id,
+                args.epoch * self.num_batch,
+                loss,
+                reader_cost,
+                batch_cost,
+                num_samples,
+                ips,
+                max_mem_reserved_msg,
+                max_mem_allocated_msg,
+            )
         )

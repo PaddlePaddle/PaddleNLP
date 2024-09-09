@@ -60,9 +60,6 @@ class LLMTest:
         if config_params is None:
             config_params = {}
 
-        config_params["init_fleet_worker"] = False
-        config_params["enable_memory_optim"] = False
-
         # to avoid the same parameter
         self.disable_static()
         predict_config = load_test_config(self.config_path, "inference-predict")
@@ -71,7 +68,7 @@ class LLMTest:
         predict_config.update(config_params)
 
         with argv_context_guard(predict_config):
-            from predictor import predict
+            from predict.predictor import predict
 
             predict()
 
@@ -86,7 +83,7 @@ class LLMTest:
         config["model_name_or_path"] = self.output_dir
         config.update(config_params)
         with argv_context_guard(config):
-            from export_model import main
+            from predict.export_model import main
 
             main()
 
@@ -99,7 +96,7 @@ class LLMTest:
         config_params.pop("model_name_or_path", None)
         config.update(config_params)
         with argv_context_guard(config):
-            from predictor import predict
+            from predict.predictor import predict
 
             predict()
 
@@ -108,5 +105,6 @@ class LLMTest:
         predict_result = self._read_result(predict_config["output_file"])
         infer_result = self._read_result(config["output_file"])
         assert len(predict_result) == len(infer_result)
+
         for predict_item, infer_item in zip(predict_result, infer_result):
             self.assertEqual(predict_item, infer_item)

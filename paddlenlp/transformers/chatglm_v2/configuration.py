@@ -55,7 +55,10 @@ class ChatGLMv2Config(PretrainedConfig):
         fp32_residual_connection=False,
         eos_token_id=2,
         pad_token_id=0,
-        use_flash_attention=False,
+        long_sequence_strategy_type=None,
+        long_sequence_strategy_name=None,
+        long_sequence_init_args=None,
+        use_long_sequence_strategies=False,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, eos_token_id=eos_token_id, **kwargs)
@@ -80,4 +83,8 @@ class ChatGLMv2Config(PretrainedConfig):
         self.apply_query_key_layer_scaling = apply_query_key_layer_scaling
         self.attention_softmax_in_fp32 = attention_softmax_in_fp32
         self.fp32_residual_connection = fp32_residual_connection
-        self.use_flash_attention = use_flash_attention
+
+        self.long_sequence_strategy_type = long_sequence_strategy_type
+        self.long_sequence_strategy_name = long_sequence_strategy_name
+        self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
+        self.use_long_sequence_strategies = use_long_sequence_strategies

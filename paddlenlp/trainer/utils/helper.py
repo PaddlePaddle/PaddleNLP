@@ -16,11 +16,22 @@
 # This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers
 
+import os
 from typing import Any, Optional
 
 import numpy as np
 import paddle
 import paddle.distributed as dist
+from paddle.distributed import fleet
+from paddle.distributed.parallel import sync_params_buffers
+
+from paddlenlp.utils.log import logger
+from paddlenlp.utils.nested import nested_broadcast_tensor_with_empty  # noqa: F401
+from paddlenlp.utils.nested import (
+    nested_broadcast_tensor,
+    nested_empty_tensor,
+    nested_reduce_tensor,
+)
 
 __all__ = [
     "distributed_concat",
@@ -124,3 +135,204 @@ def nested_truncate(tensors, limit):
     if isinstance(tensors, (list, tuple)):
         return type(tensors)(nested_truncate(t, limit) for t in tensors)
     return tensors[:limit]
+
+
+def distributed_isfile(filename):
+    """Check all machine nodes. return False if no machine have such file."""
+    trainers_num = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
+    if trainers_num <= 1:
+        return os.path.isfile(filename)
+    else:
+        local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+        file_count = paddle.zeros([1], dtype="int64")
+        if local_rank == 0 and os.path.isfile(filename):
+            file_count += 1
+
+        paddle.distributed.all_reduce(file_count)
+        return file_count >= 1
+
+
+def distributed_file(filename):
+    trainers_num = int(os.getenv("PADDLE_TRAINERS_NUM", "1"))
+    if trainers_num <= 1:
+        return filename
+    else:
+        local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+        found_file = paddle.to_tensor([2**20], dtype="int64")
+        if local_rank == 0 and os.path.isfile(filename):
+            found_file = paddle.to_tensor([paddle.distributed.get_rank()], dtype="int64")
+
+        tensor_list = []
+        paddle.distributed.all_gather(tensor_list, found_file)
+        src = paddle.min(paddle.concat(tensor_list)).item()
+
+        file_object_list = [None]
+        if paddle.distributed.get_rank() == src:
+            file_object_list = [open(filename, "rb").read()]
+
+        paddle.distributed.broadcast_object_list(file_object_list, src=src)
+        file_object = file_object_list[0]
+
+        if local_rank == 0 and not os.path.isfile(filename):
+            if not os.path.exists(os.path.dirname(filename)):
+                os.makedirs(os.path.dirname(filename))
+
+            with open(filename, "wb") as f:
+                f.write(file_object)
+
+        paddle.distributed.barrier()
+
+        return filename
+
+
+def broadcast_dp_optimizer(state_dict):
+    if paddle.distributed.get_world_size() <= 1:
+        return state_dict
+
+    logger.info("Start broadcast optimizer in data parallel group.")
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        dp_group = hcg.get_data_parallel_group()
+        src_rank = hcg.get_data_parallel_group_src_rank()
+        process_rank = paddle.distributed.get_rank()
+        # Don't broadcast optimizer for dp rank is 1.
+        if dp_group.nranks <= 1:
+            return state_dict
+    except:
+        dp_group = None
+        src_rank = 0
+        process_rank = paddle.distributed.get_rank()
+
+    if process_rank == src_rank:
+        if state_dict is None:
+            logger.warning(
+                f"Your local rank {paddle.distributed.get_rank()} must have a state_dict. dp_rank:{process_rank}, src_rank:{src_rank}"
+            )
+        fake_state_dict = [nested_reduce_tensor(state_dict)]
+    else:
+        if state_dict is not None:
+            logger.warning(
+                f"Your local rank {paddle.distributed.get_rank()}  are forbidden to have a state_dict. dp_rank:{process_rank}, src_rank:{src_rank}"
+            )
+        fake_state_dict = [None]
+
+    paddle.distributed.broadcast_object_list(
+        fake_state_dict,
+        src=src_rank,
+        group=dp_group,
+    )
+    fake_state_dict = fake_state_dict[0]
+    if process_rank != src_rank:
+        state_dict = nested_empty_tensor(fake_state_dict)
+
+    state_dict = nested_broadcast_tensor(state_dict, src=src_rank, group=dp_group)
+
+    return state_dict
+
+
+def broadcast_moe_optimizer(state_dict, model_state_dict=None, broadcast_dp=True):
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        dp_group = hcg.get_data_parallel_group()
+        src_rank = hcg.get_data_parallel_group_src_rank()
+        data_parallel_rank = hcg.get_data_parallel_rank()
+        # Don't broadcast optimizer for dp rank is 1.
+        if dp_group.nranks <= 1:
+            return state_dict
+    except:
+        dp_group = None
+        src_rank = 0
+        data_parallel_rank = dist.get_rank()
+
+    def _filter_sync_optimizer_state(model_state_dict, opt_state_dict):
+        # get sync name
+        sync_vname = []
+        for k, v in model_state_dict.items():
+            if not getattr(v, "no_sync", False):
+                sync_vname.append(v.name)
+
+        filter_opt_state_dict = {"master_weights": {}}
+        filter_opt_state_dict["LR_Scheduler"] = opt_state_dict.get("LR_Scheduler", {})
+        for op_k, op_v in opt_state_dict.items():
+            if op_k not in ["master_weights", "LR_Scheduler"]:
+                for sync_v in sync_vname:
+                    if op_k.startswith(sync_v):
+                        filter_opt_state_dict[op_k] = op_v
+                        break
+            elif op_k == "master_weights":
+                for k, v in op_v.items():
+                    for sync_v in sync_vname:
+                        if k.startswith(sync_v):
+                            filter_opt_state_dict["master_weights"][k] = v
+        return filter_opt_state_dict
+
+    def _broadcast_moe_optimizer_state(state_dict):
+        # boardcast_keys
+        base_state_dict = {"master_weights": {}}
+        buf = [
+            {i: j.shape for i, j in state_dict.items() if i not in ["master_weights", "LR_Scheduler"]},
+            {i: j.shape for i, j in state_dict["master_weights"].items()},
+            {"LR_Scheduler": state_dict.get("LR_Scheduler", {})},
+        ]
+
+        dist.broadcast_object_list(buf, src=src_rank, group=dp_group)
+        # logger.info(f"moe-optimizer-gather-keys{buf}")
+        for k, s in buf[0].items():
+            v = state_dict.get(k, paddle.zeros(s, "float32")).cuda()
+            v.name = k
+            # k = k.replace("_fp32_master_0", "")
+            dist.broadcast(v, src=src_rank, group=dp_group)
+            logger.info(f"broadcast moe optimizer {k} from {src_rank}")
+            base_state_dict[k] = v.cpu()
+        for k, s in buf[1].items():
+            v = state_dict["master_weights"].get(k, paddle.zeros(s, "float32")).cuda()
+            v.name = k
+            dist.broadcast(v, src=src_rank, group=dp_group)
+            logger.info(f"broadcast moe optimizer-master_weights {k} from {src_rank}")
+            base_state_dict["master_weights"][k] = v.cpu()
+        base_state_dict.update(buf[2])
+        return base_state_dict
+
+    if broadcast_dp:
+        filter_opt_state_dict = _filter_sync_optimizer_state(model_state_dict, state_dict)
+        base_state_dict = broadcast_dp_optimizer(filter_opt_state_dict)
+    else:
+        base_state_dict = _broadcast_moe_optimizer_state(state_dict)
+
+    if data_parallel_rank > 0:
+        master_weight = state_dict.pop("master_weights", {})
+        base_state_dict.update(state_dict)
+        if master_weight:
+            if "master_weights" in base_state_dict:
+                base_state_dict["master_weights"].update(master_weight)
+            else:
+                base_state_dict["master_weights"] = master_weight
+        state_dict = base_state_dict
+        del base_state_dict
+    return state_dict
+
+
+def broadcast_dataset_rank0_model(model):
+    if paddle.distributed.get_world_size() <= 1:
+        return
+
+    logger.info("Start broadcast model in sharding group or data parallel group.")
+    hcg = fleet.get_hybrid_communicate_group()
+    sharding_group = hcg.get_sharding_parallel_group()
+    dp_group = hcg.get_data_parallel_group()
+    if sharding_group.nranks > 1:
+        sync_params_buffers(
+            model,
+            sharding_group,
+            hcg.get_sharding_parallel_group_src_rank(),
+            is_model_parallel=False,
+            fuse_params=False,
+        )
+    if dp_group.nranks > 1:
+        sync_params_buffers(
+            model,
+            dp_group,
+            hcg.get_data_parallel_group_src_rank(),
+            is_model_parallel=False,
+            fuse_params=False,
+        )

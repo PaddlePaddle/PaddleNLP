@@ -269,6 +269,24 @@ class LlamaModelTester:
         else:
             self.parent.assertTrue((result_position_id[0] == result_no_position_id[0]).all())
 
+    def create_and_check_gqa_model(self, config, input_ids, input_mask, *args):
+        model = LlamaForCausalLM(config)
+        config.num_key_value_heads = 8 # gqa
+        config.use_fused_rope = True
+        model.eval()
+
+        result = model(
+            input_ids,
+            use_cache=True,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
+        )
+        if self.parent.use_labels:
+            self.parent.assertIsInstance(result[0].item(), float)
+            self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        else:
+            self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
+
 
 class LlamaModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = LlamaModel
@@ -317,6 +335,10 @@ class LlamaModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase)
     def test_llama_lm_head_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_lm_head_model(*config_and_inputs)
+
+    def test_llama_gqa_model(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_gqa_model(*config_and_inputs)
 
 
 class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):

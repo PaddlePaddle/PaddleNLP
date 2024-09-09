@@ -29,29 +29,29 @@ PaddleNLP 模型压缩 API 功能支持对 ERNIE 类下游任务上微调后的�
 如下表所示，ERNIE 3.0-Medium (6-layer, 384-hidden, 12-heads) 模型在三类任务（文本分类、序列标注、抽取式阅读理解）经过裁剪 + 量化后加速比均达到 3 倍左右，所有任务上平均精度损失可控制在 0.5 以内（0.46）。
 
 |                            | TNEWS 性能    | TNEWS 精度   | MSRA_NER 性能 | MSRA_NER 精度 | CMRC2018 性能 | CMRC2018 精度 |
-| -------------------------- | ------------- | ------------ | ------------- | ------------- | ------------- | ------------- |
+|----------------------------|---------------|--------------|---------------|---------------|---------------|---------------|
 | ERNIE 3.0-Medium+FP32      | 1123.85(1.0x) | 57.45        | 366.75(1.0x)  | 93.04         | 146.84(1.0x)  | 66.95         |
-| ERNIE 3.0-Medium+INT8      | 3226.26(2.9x) | 56.99(-0.46) | 889.33(2.4x)  | 92.70(-0.34)  | 348.84(2.4x)  | 66.32(-0.63   |
+| ERNIE 3.0-Medium+INT8      | 3226.26(2.9x) | 56.99(-0.46) | 889.33(2.4x)  | 92.70(-0.34)  | 348.84(2.4x)  | 66.32(-0.63)  |
 | ERNIE 3.0-Medium+裁剪+FP32 | 1424.01(1.3x) | 57.31(-0.14) | 454.27(1.2x)  | 93.27(+0.23)  | 183.77(1.3x)  | 65.92(-1.03)  |
 | ERNIE 3.0-Medium+裁剪+INT8 | 3635.48(3.2x) | 57.26(-0.19) | 1105.26(3.0x) | 93.20(+0.16)  | 444.27(3.0x)  | 66.17(-0.78)  |
 
-(以上数据来自 [ERNIE 3.0 性能测试文档](../model_zoo/ernie-3.0/#性能测试)，文档包含测试环境介绍)
+(以上数据来自 [ERNIE 3.0 性能测试文档](../legacy/model_zoo/ernie-3.0/README.md#性能测试)，文档包含测试环境介绍)
 
 ##### UIE 压缩效果
 
 以报销工单信息抽取任务为例，使用 `uie-base` 进行微调，先得到原始 FP32 模型，然后使用 QAT 策略进一步量化。量化后的模型比原始 FP32 模型的 F1 值高 2.19。
 
-| Models         | F1           |
-| -------------  |:------------:|
-| uie-base+微调+FP32   | 91.93        |
-| uie-base+微调+量化+INT8 | 94.12        |
+| Models                  |  F1   |
+|-------------------------|:-----:|
+| uie-base+微调+FP32      | 91.93 |
+| uie-base+微调+量化+INT8 | 94.12 |
 
 
 <a name="三大场景快速启动模型压缩示例"></a>
 
 ### 三大场景快速启动模型压缩示例
 
-本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、抽取式阅读理解三大场景下的使用样例，可以分别参考 [ERNIE 3.0](../model_zoo/ernie-3.0/) 目录下的 [compress_seq_cls.py](../model_zoo/ernie-3.0/compress_seq_cls.py) 、[compress_token_cls.py](../model_zoo/ernie-3.0/compress_token_cls.py)、[compress_qa.py](../model_zoo/ernie-3.0/compress_qa.py) 脚本，启动方式如下：
+本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、抽取式阅读理解三大场景下的使用样例，可以分别参考 [ERNIE 3.0](../legacy/model_zoo/ernie-3.0) 目录下的 [compress_seq_cls.py](../legacy/model_zoo/ernie-3.0/compress_seq_cls.py) 、[compress_token_cls.py](../legacy/model_zoo/ernie-3.0/compress_token_cls.py)、[compress_qa.py](../legacy/model_zoo/ernie-3.0/compress_qa.py) 脚本，启动方式如下：
 
 ```shell
 # 分类任务
@@ -172,7 +172,7 @@ compression_args = parser.parse_args_into_dataclasses()
 #### Trainer 实例化参数介绍
 
 - **--model** 待压缩的模型，目前支持 ERNIE、BERT、RoBERTa、ERNIE-M、ELECTRA、ERNIE-Gram、PP-MiniLM、TinyBERT 等结构相似的模型，是在下游任务中微调后的模型，当预训练模型选择 ERNIE 时，需要继承 `ErniePretrainedModel`。以分类任务为例，可通过`AutoModelForSequenceClassification.from_pretrained(model_name_or_path)` 等方式来获取，这种情况下，`model_name_or_path`目录下需要有 model_config.json, model_state.pdparams 文件；
-- **--data_collator** 三类任务均可使用 PaddleNLP 预定义好的 [DataCollator 类](../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作。使用方法参考 [示例代码](../model_zoo/ernie-3.0/compress_seq_cls.py) 即可；
+- **--data_collator** 三类任务均可使用 PaddleNLP 预定义好的 [DataCollator 类](../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作。使用方法参考 [示例代码](../legacy/model_zoo/ernie-3.0/compress_seq_cls.py) 即可；
 - **--train_dataset** 裁剪训练需要使用的训练集，是任务相关的数据。自定义数据集的加载可参考 [文档](https://huggingface.co/docs/datasets/loading)。不启动裁剪时，可以为 None；
 - **--eval_dataset** 裁剪训练使用的评估集，也是量化使用的校准数据，是任务相关的数据。自定义数据集的加载可参考 [文档](https://huggingface.co/docs/datasets/loading)。是 Trainer 的必选参数；
 - **--tokenizer** 模型 `model` 对应的 `tokenizer`，可使用 `AutoTokenizer.from_pretrained(model_name_or_path)` 来获取。
@@ -243,9 +243,9 @@ trainer.compress()
 
 目前 DynaBERT 裁剪功能只支持 SequenceClassification 等三类 PaddleNLP 内置 class，并且内置评估器对应为 Accuracy、F1、Squad。
 
-| Model class name |  SequenceClassification   | TokenClassification   | QuestionAnswering |
-| ---------------- | ------------------------- | --------------------- | ----------------- |
-|      Metrics     |          Accuracy         |           F1          |        Squad      |
+| Model class name | SequenceClassification | TokenClassification | QuestionAnswering |
+|------------------|------------------------|---------------------|-------------------|
+| Metrics          | Accuracy               | F1                  | Squad             |
 
 需要注意以下三个条件：
 
@@ -415,19 +415,19 @@ python compress.py \
 
 裁剪、量化后的模型不能再通过 `from_pretrained` 导入进行预测，而是需要使用 Paddle 部署工具才能完成预测。
 
-压缩后的模型部署可以参考 [部署文档](../model_zoo/ernie-3.0/deploy) 完成。
+压缩后的模型部署可以参考 [部署文档](../legacy/model_zoo/ernie-3.0/deploy) 完成。
 
 ### Python 部署
 
-服务端部署可以从这里开始。可以参考 [seq_cls_infer.py](../model_zoo/ernie-3.0/deploy/python/seq_cls_infer.py) 或者 [token_cls_infer.py](../model_zoo/ernie-3.0/deploy/python/token_cls_infer.py) 来编写自己的预测脚本。并根据 [Python 部署指南](../model_zoo/ernie-3.0/deploy/python/README.md) 的介绍安装预测环境，对压缩后的模型进行精度评估、性能测试以及部署。
+服务端部署可以从这里开始。可以参考 [seq_cls_infer.py](../legacy/model_zoo/ernie-3.0/deploy/python/seq_cls_infer.py) 或者 [token_cls_infer.py](../legacy/model_zoo/ernie-3.0/deploy/python/token_cls_infer.py) 来编写自己的预测脚本。并根据 [Python 部署指南](../legacy/model_zoo/ernie-3.0/deploy/python/README.md) 的介绍安装预测环境，对压缩后的模型进行精度评估、性能测试以及部署。
 
 
 <a name="服务化部署"></a>
 
 ### 服务化部署
 
-- [FastDeploy ERNIE 3.0 模型 Serving 部署示例](../model_zoo/ernie-3.0/deploy/serving/README.md)
-- [基于PaddleNLP SimpleServing 的服务化部署](../model_zoo/ernie-3.0/deploy/simple_serving/README.md)
+- [FastDeploy ERNIE 3.0 模型 Serving 部署示例](../legacy/model_zoo/ernie-3.0/deploy/serving/README.md)
+- [基于PaddleNLP SimpleServing 的服务化部署](../legacy/model_zoo/ernie-3.0/deploy/simple_serving/README.md)
 
 ### 移动端部署
 

@@ -198,9 +198,7 @@ def masked_lm_forward_with_past_key_values(
     masked_lm_loss = None
     if labels is not None:
         loss_fct = paddle.nn.CrossEntropyLoss()
-        masked_lm_loss = loss_fct(
-            prediction_scores.reshape((-1, paddle.shape(prediction_scores)[-1])), labels.reshape((-1,))
-        )
+        masked_lm_loss = loss_fct(prediction_scores.reshape((-1, prediction_scores.shape[-1])), labels.reshape((-1,)))
 
     return MaskedLMOutput(
         loss=masked_lm_loss,

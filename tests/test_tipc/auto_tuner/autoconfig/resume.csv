@@ -1,0 +1,5 @@
+job_id,mp_degree,sharding_degree,pp_degree,dp_degree,sharding_stage,micro_batch_size,vpp_degree,use_recompute,recompute_granularity,acc_steps,global_batch_size,exec_time,interval_samples_per_second,max_mem_usage,error_info
+4,4,2,1,1,2,4,1,True,full,1,8,72.38,4.74138,26130,
+2,4,1,2,1,2,4,1,True,full,2,8,40.17,3.3612,24590,
+1,8,1,1,1,2,1,1,True,full,8,8,55.32,2.3064,19050,
+3,4,1,2,1,2,4,1,True,full_attn,2,8,39.38,,OOM,['Out of memory']

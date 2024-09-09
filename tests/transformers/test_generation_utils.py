@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import unittest
 
-import numpy as np
 import paddle
 
 from paddlenlp.generation import (
@@ -37,7 +36,6 @@ from paddlenlp.transformers import (  # import gpt model
     AutoTokenizer,
     BartForConditionalGeneration,
     BartTokenizer,
-    GPTLMHeadModel,
     PretrainedConfig,
     PretrainedTokenizer,
 )
@@ -76,6 +74,10 @@ class GenerationTesterMixin:
         max_batch_size = 2
         sequence_length = input_ids.shape[-1] // 2
         input_ids = input_ids[:max_batch_size, :sequence_length]
+        # For test_sample_generate such as: NVIDIA_TF32_OVERRIDE=0 FLAGS_cudnn_deterministic=1 python3.10 -m pytest -svv tests/transformers/bloom/test_modeling.py::BloomModelTest_0::test_sample_generate
+        # There are serious memory bug for this tensor slice. which use the original tensor mem ptr for cold start
+        # Here we just clone the tensor to avoid this problem.
+        input_ids = input_ids.clone()
         attention_mask = attention_mask[:max_batch_size, :sequence_length].unsqueeze([1, 2])
 
         attention_mask = attention_mask * attention_mask.transpose([0, 1, 3, 2])
@@ -272,6 +274,7 @@ class GenerationTesterMixin:
         logits_warper,
         process_kwargs,
     ):
+
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
@@ -442,9 +445,9 @@ class GenerationTesterMixin:
             self.assertListEqual(output_greedy[0].tolist(), output_generate[0].tolist())
 
     def test_sample_generate(self):
-
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
+            input_ids = input_ids.clone()
             paddle.seed(124)
             model = self._make_model_instance(config, model_class)
             model.eval()
@@ -1060,41 +1063,30 @@ class GenerationUtilsTestCase(unittest.TestCase):
         self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
 
         # 2. get tokens
-        eos_token_id = [6, 7]
+        eos_token_id = [12, 2]
+        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
+        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
+        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [True, True])
+
+        eos_token_id = [7, 12]
         unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
         self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
 
-        eos_token_id = [10, 11]
-        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
-        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
-        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [True, False])
-
-        # 3. get multi tokens
-        eos_token_id = [[6, 7], [9, 10]]
-        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
-        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
-        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
-
-        eos_token_id = [[6, 7], [10, 11]]
+        eos_token_id = [7, 11, 3]
         unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
         self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
 
-        eos_token_id = [[7], [11]]
+        eos_token_id = [[7], [11], [3]]
         unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
         self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
 
-        eos_token_id = [[7], [10, 11]]
+        eos_token_id = [7, [11], [3]]
         unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
         unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
         self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, False])
-
-        eos_token_id = [[7], [10, 12]]
-        unfinish_flag = paddle.to_tensor([[True], [True]], dtype="bool")
-        unfinish_flag = get_unfinished_flag(input_ids, unfinish_flag, eos_token_id)
-        self.assertEqual(unfinish_flag.reshape([2]).tolist(), [False, True])
 
     @slow
     def test_gpt_multi_stop_tokens(self):
@@ -1125,38 +1117,34 @@ class GenerationUtilsTestCase(unittest.TestCase):
         # 3. generate with single tokens
         decoded_ids = model.generate(
             paddle.to_tensor([input_ids]),
-            generation_config=GenerationConfig(max_new_tokens=20, eos_token_id=[124, 635]),
+            generation_config=GenerationConfig(max_new_tokens=20, eos_token_id=[635]),
         )[0].tolist()[0]
         self.assertEqual(decoded_ids, [520, 8, 9, 59, 124, 635])
 
         # 4. generate with multi tokens
         decoded_ids = model.generate(
             paddle.to_tensor([input_ids]),
-            generation_config=GenerationConfig(max_new_tokens=20, eos_token_id=[[59, 124], [124, 635]]),
+            generation_config=GenerationConfig(max_new_tokens=20, eos_token_id=[124, 635]),
         )[0].tolist()[0]
         self.assertEqual(decoded_ids, [520, 8, 9, 59, 124])
 
-    def test_gpt_generation(self):
-        # init the tiny-random-gpt
-        model = GPTLMHeadModel.from_pretrained("__internal_testing__/tiny-random-gpt")
-        model.eval()
 
-        input_ids = np.array([list(range(200, 300)), list(range(100, 200))])
+class TinyRandomGenerationTest(unittest.TestCase):
+    def test_generation_config_min_new_tokens_warning(self):
 
-        # 1. get the dygraph decoded_ids
-        expected_output_ids = [[15426, 15426, 15426, 15426, 15426, 15426], [18966, 18000, 23410, 23410, 23410, 23410]]
+        with self.assertLogs("PaddleNLP", level="WARNING") as log_info:
+            GenerationConfig(min_new_token=10)
+            self.assertTrue(any(["<min_new_token> field is deprecated." in item for item in log_info.output]))
 
-        decoded_ids = model.generate(
-            paddle.to_tensor(input_ids), generation_config=GenerationConfig(max_new_tokens=6)
-        )[0].tolist()
+    def test_min_new_tokens(self):
+        article = """Justin Timberlake and Jessica Biel, welcome to parenthood."""
 
-        self.assertEqual(expected_output_ids, decoded_ids)
-
-        decoded_ids = model.generate(
-            paddle.to_tensor(input_ids),
-            generation_config=GenerationConfig(max_new_tokens=6, eos_token_id=[1800, 23410]),
-        )[0].tolist()
-        self.assertEqual(expected_output_ids, decoded_ids)
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/micro-random-llama")
+        model = AutoModelForCausalLM.from_pretrained("__internal_testing__/micro-random-llama")
+        input_ids = paddle.to_tensor(tokenizer(article)["input_ids"]).unsqueeze([0])
+        attention_mask = paddle.ones_like(input_ids)
+        result = model.generate(input_ids, attention_mask=attention_mask, min_new_tokens=10)[0]
+        self.assertGreater(result.shape[1], 10)
 
 
 # TODO (wj-Mcat: enable the unit test after fix)

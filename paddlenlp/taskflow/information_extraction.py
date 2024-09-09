@@ -592,9 +592,7 @@ class UIETask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            self._task_path, use_fast=self._use_fast, from_hf_hub=self.from_hf_hub
-        )
+        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
 
     def _preprocess(self, inputs):
         """

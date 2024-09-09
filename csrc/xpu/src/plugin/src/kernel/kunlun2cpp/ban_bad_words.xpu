@@ -1,0 +1,58 @@
+#include "xpu/kernel/cluster.h"
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/cluster_primitive.h"
+
+namespace xpu2 {
+namespace plugin {
+
+template <typename T>
+inline __device__ void update_bad_words_logit(_global_ptr_ T* logits) {
+  __local__ T min_value = -1e10;
+  mfence_lm();
+  LM2GM((void*)&(min_value), logits, sizeof(T));
+}
+
+template <>
+inline __device__ void update_bad_words_logit<float16>(
+    _global_ptr_ float16* logits) {
+  __local__ short min_value = 0xFBFF;
+  mfence_lm();
+  LM2GM((void*)&(min_value), logits, sizeof(float16));
+}
+
+template <typename T>
+__global__ void ban_bad_words(T* logits,
+                              const int64_t* bad_words_list,
+                              const int64_t bs,
+                              const int64_t length,
+                              const int64_t bad_words_length) {
+  int tid = core_id() * cluster_num() + cluster_id();
+  int nthreads = cluster_num() * core_num();
+  int start = -1;
+  int end = -1;
+  partition(
+      tid, nthreads, static_cast<int>(bs * bad_words_length), 1, &start, &end);
+  for (int i = start; i < end; i++) {
+    int batch_idx = i / bad_words_length;
+    int bad_words_idx = i - batch_idx * bad_words_length;
+    int64_t bad_words_token_id = -1;
+    mfence_lm();
+    GM2LM(bad_words_list + bad_words_idx,
+          (void*)&(bad_words_token_id),
+          sizeof(int64_t));
+    if (bad_words_token_id >= length || bad_words_token_id < 0) continue;
+    update_bad_words_logit(logits + batch_idx * length + bad_words_token_id);
+  }
+}
+
+#define _XPU_DEF__BAN_BAD_WORDS_(DATA_TYPE)                             \
+  template __global__ void ban_bad_words(DATA_TYPE* logits,             \
+                                         const int64_t* bad_words_list, \
+                                         const int64_t bs,              \
+                                         const int64_t length,          \
+                                         const int64_t bad_words_length);
+_XPU_DEF__BAN_BAD_WORDS_(float);
+_XPU_DEF__BAN_BAD_WORDS_(float16);
+
+}  // namespace plugin
+}  // namespace xpu2

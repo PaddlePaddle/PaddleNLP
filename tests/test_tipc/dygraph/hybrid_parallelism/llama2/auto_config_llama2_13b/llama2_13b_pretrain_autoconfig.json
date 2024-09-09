@@ -1,0 +1,88 @@
+{
+    "dp_degree": [1],
+    "mp_degree": "auto",
+    "pp_degree": "auto",
+    "micro_batch_size": "auto",
+    "sharding_degree": "auto",
+    "sharding_stage": [1],
+    "use_recompute": "auto",
+    "recompute_granularity": ["full", "full_attn"],
+    "use_sequence_paralel": true,
+    "vpp_degree": "auto",
+    "enable_pp_prune": false,
+    "search_algo":{
+        "name": "grid",
+        "sharding_overlap": {
+            "sharding_mp": ["./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json", "sharding_parallel_config",  "split_param  enable_stage1_overlap", "pipeline_parallel_config", ""],
+            "sharding_pp": ["./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json", "pipeline_parallel_config", "enable_delay_scale_loss enable_sharding_comm_overlap enable_release_grads", "sharding_parallel_config", "split_param  enable_stage1_overlap"],
+            "sharding_mp_pp": ["./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json", "pipeline_parallel_config", "enable_delay_scale_loss enable_sharding_comm_overlap enable_release_grads disable_partial_send_recv", "sharding_parallel_config", "split_param  enable_stage1_overlap"],
+            "no_overlap": ["./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json", "pipeline_parallel_config", "enable_delay_scale_loss enable_release_grads disable_partial_send_recv", "sharding_parallel_config", "split_param "]
+        }
+    },
+
+    "task_limit": 2000,
+    "max_time_per_task": 150,
+    "schedule_mode": "performance",
+
+    "model_cfg": {
+        "hidden_size": 5120,
+        "global_batch_size": 32, 
+        "num_layers": 40, 
+        "num_attention_heads": 40, 
+        "max_sequence_length": 4096,
+        "vocab_size": 32000,
+        "intermediate_size": 13824
+    },
+
+    "run_cmd": {
+        "gradient_accumulation_steps": [
+            "./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json",
+            "gradient_accumulation_steps"
+        ],
+        "micro_batch_size": [
+            "./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json",
+            "per_device_train_batch_size"
+        ],
+        "mp_degree": [
+            "./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json",
+            "tensor_parallel_degree"
+        ],
+        "pp_degree": [
+            "./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json",
+            "pipeline_parallel_degree"
+        ],
+        "vpp_degree": [
+            "./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json",
+            "virtual_pp_degree"
+        ],
+        "sharding_degree": [
+            "./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json",
+            "sharding_degree"
+        ],
+        "sharding_stage": [
+            "./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json",
+            "sharding", "stage"
+        ],
+        "global_batch_size": [
+            "./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json",
+            "global_batch_size"
+        ],
+        "sequence_parallel": [
+            "./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json",
+            "sequence_parallel"
+        ],
+        "use_recompute": [
+            "./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json",
+            "recompute"
+        ],
+        "recompute_granularity": [
+            "./auto_config_llama2_13b/pretrain-llama2_13b-auto_tuner.json",
+            "recompute_granularity"
+        ]
+    },
+
+    "metric_cfg": {
+        "name": "interval_samples_per_second",
+        "OptimizationDirection": "Maximize"
+    }   
+}

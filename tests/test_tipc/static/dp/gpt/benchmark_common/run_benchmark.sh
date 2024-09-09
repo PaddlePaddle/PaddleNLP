@@ -54,9 +54,9 @@ function _train(){
     fi
 
     if [ ${model_item} = "gpt2" ];then
-        static_scripts="../examples/language_model/gpt/"
+        static_scripts="../legacy/model_zoo/gpt/"
     else
-        static_scripts="../examples/language_model/gpt-3/static/"
+        static_scripts="../legacy/model_zoo/gpt-3/static/"
     fi
 
     echo "current CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}, model_name=${model_name}, device_num=${device_num}, is profiling=${profiling}"

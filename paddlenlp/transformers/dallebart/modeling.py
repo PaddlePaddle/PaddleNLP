@@ -400,7 +400,7 @@ class DalleBartDecoder(DalleBartPretrainedModel):
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
         """
         if decoder_attention_mask is None:
-            decoder_length = paddle.shape(decoder_input_ids)[-1]
+            decoder_length = decoder_input_ids.shape[-1]
             decoder_attention_mask = paddle.triu(
                 (
                     paddle.full(
@@ -412,8 +412,8 @@ class DalleBartDecoder(DalleBartPretrainedModel):
                 1,
             )
         decoder_inputs_embeds = self.embed_tokens(decoder_input_ids)
-        past_key_values_length = paddle.shape(cache[0][0].k)[2] if cache is not None else 0
-        decoder_inputs_embed_pos = self.embed_positions(paddle.shape(decoder_input_ids), past_key_values_length)
+        past_key_values_length = cache[0][0].k.shape[2] if cache is not None else 0
+        decoder_inputs_embed_pos = self.embed_positions(decoder_input_ids.shape, past_key_values_length)
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         hidden_states = self.layernorm_embedding(hidden_states)
         hidden_states = self.dropout(hidden_states)

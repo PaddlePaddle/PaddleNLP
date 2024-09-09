@@ -122,8 +122,10 @@ class BloomConfig(PretrainedConfig):
         attention_softmax_in_fp32=True,
         pretraining_tp=1,  # TP rank used when training with megatron
         slow_but_exact=False,
-        use_recompute=False,
-        use_pure_fp16=False,
+        long_sequence_strategy_type=None,
+        long_sequence_strategy_name=None,
+        long_sequence_init_args=None,
+        use_long_sequence_strategies=False,
         **kwargs,
     ):
 
@@ -146,5 +148,8 @@ class BloomConfig(PretrainedConfig):
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
         self.slow_but_exact = slow_but_exact
-        self.use_recompute = use_recompute
-        self.use_pure_fp16 = use_pure_fp16
+
+        self.long_sequence_strategy_type = long_sequence_strategy_type
+        self.long_sequence_strategy_name = long_sequence_strategy_name
+        self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
+        self.use_long_sequence_strategies = use_long_sequence_strategies

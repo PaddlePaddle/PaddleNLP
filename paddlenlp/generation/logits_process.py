@@ -291,7 +291,10 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
 
 
 def TopKProcess(probs: paddle.Tensor, top_k: int, min_tokens_to_keep: int):
-    top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
+    top_k = paddle.minimum(
+        paddle.maximum(paddle.to_tensor(top_k), paddle.to_tensor(min_tokens_to_keep)),
+        paddle.to_tensor(probs.shape[-1]),
+    )
     # Remove all tokens with a probability less than the last token of the top-k
     # cast to float16 to support generation & d2s
     if probs.dtype == paddle.bfloat16:
@@ -306,10 +309,16 @@ def TopKProcess(probs: paddle.Tensor, top_k: int, min_tokens_to_keep: int):
 
 
 def TopPProcess(probs: paddle.Tensor, top_p: float, min_tokens_to_keep: int):
-    sorted_indices = paddle.argsort(probs, descending=True)
-    if isinstance(sorted_indices, tuple):
-        sorted_probs, sorted_indices = sorted_indices
+    if probs.dtype == paddle.bfloat16:
+        probs = paddle.cast(probs, paddle.float32)
+
+        sorted_indices = paddle.argsort(probs, descending=True)
+        sorted_probs = paddle.sort(probs, descending=True)
+
+        sorted_probs = paddle.cast(sorted_probs, paddle.bfloat16)
+
     else:
+        sorted_indices = paddle.argsort(probs, descending=True)
         sorted_probs = paddle.sort(probs, descending=True)
 
     cumulative_probs = paddle.cumsum(sorted_probs, axis=-1)

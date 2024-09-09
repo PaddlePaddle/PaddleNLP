@@ -162,7 +162,7 @@ class Verbalizer(nn.Layer):
         Aggregate multiple tokens/words for each word/label.
         """
         if atype == "mean":
-            outputs = outputs * mask
+            outputs = outputs * mask.astype(outputs.dtype)
             outputs = outputs.sum(axis=-1) / (mask.sum(axis=-1) + 1e-15)
         elif atype == "max":
             outputs = (outputs - 1e4 * (1 - mask)).max(axis=-1)

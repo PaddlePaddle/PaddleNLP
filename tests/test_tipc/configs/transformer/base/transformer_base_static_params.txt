@@ -13,7 +13,7 @@ null:null
 null:null
 ##
 trainer:norm_train
-norm_train:../examples/machine_translation/transformer/static/train.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --distributed --train_file ../examples/machine_translation/transformer/train.en ../examples/machine_translation/transformer/train.de --dev_file ../examples/machine_translation/transformer/dev.en ../examples/machine_translation/transformer/dev.de  --vocab_file ../examples/machine_translation/transformer/vocab_all.bpe.33708 --unk_token "<unk>" --bos_token "<s>" --eos_token "<e>"
+norm_train:../legacy/examples/machine_translation/transformer/static/train.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --distributed --train_file ../examples/machine_translation/transformer/train.en ../examples/machine_translation/transformer/train.de --dev_file ../examples/machine_translation/transformer/dev.en ../examples/machine_translation/transformer/dev.de  --vocab_file ../examples/machine_translation/transformer/vocab_all.bpe.33708 --unk_token "<unk>" --bos_token "<s>" --eos_token "<e>"
 pact_train:null
 fpgm_train:null
 distill_train:null

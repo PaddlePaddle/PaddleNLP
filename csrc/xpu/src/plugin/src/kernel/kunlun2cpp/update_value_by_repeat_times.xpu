@@ -1,0 +1,213 @@
+#include "xpu/kernel/cluster.h"
+#include "xpu/kernel/cluster_debug.h"
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/cluster_primitive.h"
+
+namespace xpu2 {
+namespace plugin {
+
+__device__ void do_cast(const int* xlm, float* ylm, int64_t len) {
+    for (int64_t i = 0; i < len; i += 8) {
+        ylm[i] = static_cast<float>(xlm[i]);
+        ylm[i + 1] = static_cast<float>(xlm[i + 1]);
+        ylm[i + 2] = static_cast<float>(xlm[i + 2]);
+        ylm[i + 3] = static_cast<float>(xlm[i + 3]);
+        ylm[i + 4] = static_cast<float>(xlm[i + 4]);
+        ylm[i + 5] = static_cast<float>(xlm[i + 5]);
+        ylm[i + 6] = static_cast<float>(xlm[i + 6]);
+        ylm[i + 7] = static_cast<float>(xlm[i + 7]);
+    }
+    mfence_lm();
+}
+
+template <typename T>
+__global__ void update_value_by_repeat_times(const int *repeat_times,
+                                             const T *penalty_scores,
+                                             const T *frequency_score,
+                                             const T *presence_score,
+                                             const float *temperatures,
+                                             T *logits,
+                                             const int64_t bs,
+                                             const int64_t length) {
+  int ncores = core_num();
+  int cid = core_id();
+  int thread_id = cid * cluster_num() + cluster_id();
+  int nthreads = cluster_num() * ncores;
+  int start = -1;
+  int end = -1;
+  partition(
+      thread_id, nthreads, static_cast<int>(bs * length), 1, &start, &end);
+
+  int bs_start = start / length;
+  int bs_end = end / length;
+  const int param_len = 256;
+  // ncores = 64 for xpu2
+  __shared__ __simd__ float alpha_buf[param_len * 64];
+  __shared__ __simd__ float beta_buf[param_len * 64];
+  __shared__ __simd__ float gamma_buf[param_len * 64];
+  __shared__ __simd__ float temperatures_buf[param_len * 64];
+  _shared_ptr_ float *alpha_sm = alpha_buf + cid * param_len;
+  _shared_ptr_ float *beta_sm = beta_buf + cid * param_len;
+  _shared_ptr_ float *gamma_sm = gamma_buf + cid * param_len;
+  _shared_ptr_ float *temperatures_sm = temperatures_buf + cid * param_len;
+  int read_param_len = bs_end - bs_start + 1;
+  GM2SM_ASYNC(penalty_scores + bs_start, alpha_sm, read_param_len * sizeof(T));
+  GM2SM_ASYNC(frequency_score + bs_start, beta_sm, read_param_len * sizeof(T));
+  GM2SM_ASYNC(presence_score + bs_start, gamma_sm, read_param_len * sizeof(T));
+  GM2SM(temperatures + bs_start, temperatures_sm, read_param_len * sizeof(T));
+  primitive_cast_sm<T, float>(
+      (const _shared_ptr_ T *)(alpha_sm), alpha_sm, read_param_len);
+  primitive_cast_sm<T, float>(
+      (const _shared_ptr_ T *)(beta_sm), beta_sm, read_param_len);
+  primitive_cast_sm<T, float>(
+      (const _shared_ptr_ T *)(gamma_sm), gamma_sm, read_param_len);
+
+  float logit_now;
+  float alpha;
+  float beta;
+  float gamma;
+  float temperature;
+  int time;
+  const int buffer_len = 768;
+  __simd__ float logits_lm[buffer_len];
+  int times_lm[buffer_len];
+
+  for (int i = start; i < end; i += buffer_len) {
+    int read_len = min(end - i, buffer_len);
+    GM2LM_ASYNC(logits + i, logits_lm, read_len * sizeof(T));
+    GM2LM(repeat_times + i, times_lm, read_len * sizeof(int));
+    primitive_cast<T, float>((const T *)(logits_lm), logits_lm, read_len);
+    for (int j = 0; j < read_len; j++) {
+      time = times_lm[j];
+      logit_now = logits_lm[j];
+      int param_idx = (i + j) / length - bs_start;
+      temperature = temperatures_sm[param_idx];
+      if (time != 0) {
+        alpha = alpha_sm[param_idx];
+        beta = beta_sm[param_idx];
+        gamma = gamma_sm[param_idx];
+        logit_now = logit_now < 0.0f ? logit_now * alpha : logit_now / alpha;
+        logit_now = logit_now - time * beta - gamma;
+      }
+      logits_lm[j] = logit_now / temperature;
+    }
+    primitive_cast<float, T>(logits_lm, (T *)logits_lm, read_len);
+    LM2GM(logits_lm, logits + i, read_len * sizeof(T));
+  }
+}
+
+#define _XPU_DEF__UPDATE_VALUE_BY_REPEAT_TIMES_(DATA_TYPE) \
+  template __global__ void update_value_by_repeat_times(   \
+      const int *repeat_times,                             \
+      const DATA_TYPE *penalty_scores,                     \
+      const DATA_TYPE *frequency_score,                    \
+      const DATA_TYPE *presence_score,                     \
+      const float *temperatures,                           \
+      DATA_TYPE *logits,                                   \
+      const int64_t bs,                                    \
+      const int64_t length);
+_XPU_DEF__UPDATE_VALUE_BY_REPEAT_TIMES_(float);
+_XPU_DEF__UPDATE_VALUE_BY_REPEAT_TIMES_(float16);
+
+template <typename T>
+__global__ void update_value_by_repeat_times_simd(
+    const int *repeat_times,    // [bs * length]
+    const T *penalty_scores,    // [bs]
+    const T *frequency_score,   // [bs]
+    const T *presence_score,    // [bs]
+    const float *temperatures,  // [bs]
+    T *logits,                  // [bs * length]
+    const int64_t bs,
+    const int64_t length) {
+  int ncores = core_num();
+  int cid = core_id();
+  int thread_id = cid * cluster_num() + cluster_id();
+  int nthreads = cluster_num() * ncores;
+  int start = -1;
+  int end = -1;
+  partition(thread_id, nthreads, static_cast<int>(bs * length), 16, &start, &end);
+
+  const int param_len = 256;
+  // ncores = 64 for xpu3
+  __shared__ __simd__ float alpha_buf[param_len * 64];
+  __shared__ __simd__ float beta_buf[param_len * 64];
+  __shared__ __simd__ float gamma_buf[param_len * 64];
+  __shared__ __simd__ float temperatures_buf[param_len * 64];
+  if (cid == 0) {
+    GM2SM_ASYNC(penalty_scores, alpha_buf, bs * sizeof(T));
+    GM2SM_ASYNC(frequency_score, beta_buf, bs * sizeof(T));
+    GM2SM_ASYNC(presence_score, gamma_buf, bs * sizeof(T));
+    GM2SM(temperatures, temperatures_buf, bs * sizeof(float));
+    primitive_cast_sm<T, float>(
+        (const _shared_ptr_ T *)(alpha_buf), alpha_buf, bs);
+    primitive_cast_sm<T, float>(
+        (const _shared_ptr_ T *)(beta_buf), beta_buf, bs);
+    primitive_cast_sm<T, float>(
+        (const _shared_ptr_ T *)(gamma_buf), gamma_buf, bs);
+  }
+  mfence();
+  sync_all();
+
+  float logit_now;
+  float alpha;
+  float beta;
+  float gamma;
+  float temperature;
+  int time;
+  const int buffer_len = 768;
+  __simd__ float logits_lm[buffer_len];
+  __simd__ float times_lm[buffer_len];
+
+  float32x16_t logits_;
+  float32x16_t logits_tmp_0;
+  float32x16_t logits_tmp_1;
+  float32x16_t time_;
+
+  for (int i = start; i < end; i += buffer_len) {
+    int read_len = min(end - i, buffer_len);
+    GM2LM_ASYNC(logits + i, logits_lm, read_len * sizeof(T));
+    GM2LM(repeat_times + i, times_lm, read_len * sizeof(int));
+    primitive_cast<T, float>((const T *)(logits_lm), logits_lm, read_len);
+    // no impl for primitive_cast<int, float>, so we do it by ourself
+    do_cast((const int *)(times_lm), times_lm, read_len);
+    int time_mask = 0;
+    int logit_mask = 0;
+    for (int j = 0; j < read_len; j += 16) {
+      time_ = vload_lm_float32x16(times_lm + j);
+      logits_ = vload_lm_float32x16(logits_lm + j);
+      int param_idx = (i + j) / length;
+      temperature = temperatures_buf[param_idx];
+      alpha = alpha_buf[param_idx];
+      beta = beta_buf[param_idx];
+      gamma = gamma_buf[param_idx];
+      time_mask = svneq_float32x16(0.f, time_); // time != 0 mask
+      logit_mask = svle_float32x16(0.f, logits_); // logit >= 0 mask
+      time_ = svmul_float32x16(beta, time_); // time * beta
+      time_ = svadd_float32x16(gamma, time_); // time * beta + gamma
+      logits_ = svmul_float32x16_mh(alpha, logits_, logits_, (time_mask & ~logit_mask)); // when time != 0 && logit < 0, do alpha * logit
+      logits_ = svmul_float32x16_mh(1.0f / alpha, logits_, logits_, (time_mask & logit_mask)); // when time != 0 && >=0, do logit / alpha
+      logits_ = vvsub_float32x16_mh(logits_, time_, logits_, time_mask); // when time != 0, do logit = logit - time * beta - gamma;
+      logits_ = svmul_float32x16(1.0f / temperature, logits_); // logit / temperature
+      vstore_lm_float32x16(logits_lm + j, logits_);
+    }
+    mfence_lm();
+    primitive_cast<float, T>(logits_lm, (T *)logits_lm, read_len);
+    LM2GM(logits_lm, logits + i, read_len * sizeof(T));
+  }
+}
+
+#define _XPU_DEF__UPDATE_VALUE_BY_REPEAT_TIMES_SIMD(DATA_TYPE) \
+  template __global__ void update_value_by_repeat_times_simd(   \
+      const int *repeat_times,                             \
+      const DATA_TYPE *penalty_scores,                     \
+      const DATA_TYPE *frequency_score,                    \
+      const DATA_TYPE *presence_score,                     \
+      const float *temperatures,                           \
+      DATA_TYPE *logits,                                   \
+      const int64_t bs,                                    \
+      const int64_t length);
+_XPU_DEF__UPDATE_VALUE_BY_REPEAT_TIMES_SIMD(float);
+_XPU_DEF__UPDATE_VALUE_BY_REPEAT_TIMES_SIMD(float16);
+
+}  // namespace plugin
+}  // namespace xpu2

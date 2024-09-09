@@ -68,6 +68,7 @@ class ClapFeatureExtractionTester(unittest.TestCase):
         self.feature_size = feature_size
         self.chunk_length = chunk_length
         self.hop_length = hop_length
+        super().__init__()
 
     def prepare_feat_extract_dict(self):
         return {

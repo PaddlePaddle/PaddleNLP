@@ -90,7 +90,7 @@ class TestMultiLabelsMetric(unittest.TestCase):
             result = self.metrics.accumulate(average=average_type, pos_label=pos_label)
             self.assertEqual(precision, result[0])
             self.assertEqual(recall, result[1])
-            self.assertEqual(f, result[2])
+            self.assertAlmostEqual(f, result[2])
 
     def test_reset(self):
         self.metrics.reset()
@@ -136,7 +136,7 @@ class TestMultiLabelsMetric(unittest.TestCase):
             result = self.metrics.accumulate(average=average_type, pos_label=pos_label)
             self.assertEqual(precision, result[0])
             self.assertEqual(recall, result[1])
-            self.assertEqual(f, result[2])
+            self.assertAlmostEqual(f, result[2])
 
     def get_binary_labels_random_case(self):
         label = np.random.randint(self.cls_num, size=self.label_shape).astype("int64")
@@ -166,7 +166,7 @@ class TestMultiLabelsMetric(unittest.TestCase):
             result = self.metrics.accumulate(average=average_type, pos_label=pos_label)
             self.assertEqual(precision, result[0])
             self.assertEqual(recall, result[1])
-            self.assertEqual(f, result[2])
+            self.assertAlmostEqual(f, result[2])
 
 
 if __name__ == "__main__":

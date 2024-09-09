@@ -854,7 +854,7 @@ class AutoTemplate(object):
         template_config_file = os.path.join(data_path, TEMPLATE_CONFIG_FILE)
         if not os.path.isfile(template_config_file):
             raise ValueError("{} not found under {}".format(TEMPLATE_CONFIG_FILE, data_path))
-        with open(template_config_file, "r") as fp:
+        with open(template_config_file, "r", encoding="utf-8") as fp:
             config = [x.strip() for x in fp]
             prompt = json.loads(config[0])
             if len(config) > 1:

@@ -1,0 +1,91 @@
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/xtdk.h"
+#include "xpu/kernel/xtdk_math.h"
+#include "xpu/kernel/xtdk_simd.h"
+
+namespace xpu2 {
+namespace plugin {
+
+template <typename T>
+static inline __device__ bool is_in_end(const T id,
+                                        const T* end_ids,
+                                        const int length) {
+  for (int i = 0; i < length; i++) {
+    if (id == end_ids[i]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+template <typename T>
+__global__ void set_stop_value_multi_ends(bool* stop_flags,
+                                          T* topk_ids,
+                                          T* next_tokens,
+                                          const T* end_ids,
+                                          const int* seq_lens,
+                                          const int bs,
+                                          const int end_length,
+                                          const bool beam_search) {
+  int ncores = core_num();
+  int cid = core_id();
+  int tid = cluster_num() * cid + cluster_id();
+  int nthreads = cluster_num() * ncores;
+
+  int startidx = -1;
+  int endidx = -1;
+  partition(tid, nthreads, bs, 1, &startidx, &endidx);
+  if (startidx >= endidx) return;
+
+  constexpr int buf_len = 64;
+  __simd__ __local__ bool stop_flags_lm[buf_len];
+  __simd__ __local__ T topk_ids_lm[buf_len];
+  __simd__ __local__ T next_tokens_lm[buf_len];
+  __simd__ __local__ T end_ids_lm[256];
+  __simd__ __local__ int seq_lens_lm[buf_len];
+  GM2LM_ASYNC(end_ids, end_ids_lm, sizeof(T) * end_length);
+
+  for (int64_t i = startidx; i < endidx; i += buf_len) {
+    int readlen = min(static_cast<int64_t>(buf_len), endidx - i);
+    GM2LM_ASYNC(stop_flags + i, stop_flags_lm, sizeof(bool) * readlen);
+    GM2LM_ASYNC(topk_ids + i, topk_ids_lm, sizeof(T) * readlen);
+    GM2LM_ASYNC(next_tokens + i, next_tokens_lm, sizeof(T) * readlen);
+    GM2LM_ASYNC(seq_lens + i, seq_lens_lm, sizeof(int) * readlen);
+    mfence();
+    for (int j = 0; j < readlen; j++) {
+      if (stop_flags_lm[j]) {
+        if (seq_lens_lm[j] == 0) {
+          topk_ids_lm[j] = -1;
+        } else {
+          topk_ids_lm[j] = end_ids_lm[0];
+          next_tokens_lm[j] = end_ids_lm[0];
+        }
+      } else {
+        next_tokens_lm[j] = topk_ids_lm[j];
+      }
+      if (!beam_search && is_in_end(topk_ids_lm[j], end_ids_lm, end_length)) {
+        stop_flags_lm[j] = true;
+      }
+    }
+    mfence_lm();
+    LM2GM_ASYNC(topk_ids_lm, topk_ids + i, sizeof(T) * readlen);
+    LM2GM_ASYNC(next_tokens_lm, next_tokens + i, sizeof(T) * readlen);
+    LM2GM_ASYNC(stop_flags_lm, stop_flags + i, sizeof(bool) * readlen);
+    mfence();
+  }
+}
+
+#define _XPU_DEF__SET_VALUE_BY_FLAGS_BOTH_(DATA_TYPE)            \
+  template __global__ void set_stop_value_multi_ends<DATA_TYPE>( \
+      bool* stop_flags,                                          \
+      DATA_TYPE* topk_ids,                                       \
+      DATA_TYPE* next_tokens,                                    \
+      const DATA_TYPE* end_ids,                                  \
+      const int* seq_lens,                                       \
+      const int bs,                                              \
+      const int end_length,                                      \
+      const bool beam_search);
+_XPU_DEF__SET_VALUE_BY_FLAGS_BOTH_(int64_t);
+
+}  // namespace plugin
+}  // namespace xpu2

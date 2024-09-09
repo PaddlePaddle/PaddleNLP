@@ -1,0 +1,23 @@
+{
+    "model_name_or_path": "meta-llama/Meta-Llama-3-8B",
+    "per_device_train_batch_size": 8,
+    "per_device_eval_batch_size": 8,
+    "eval_accumulation_steps":16,
+    "src_length": 1024,
+    "max_length": 2048,
+    "bf16": true,
+    "fp16_opt_level": "O2",
+    "dataset_name_or_path": "./data",
+    "output_dir": "./checkpoints/ptq_ckpts",
+    "do_eval": true,
+    "eval_with_do_generation": false,
+    "do_ptq": true,
+    "quant_type": "weight_only_int4",
+    "weight_quant_method": "groupwise",
+    "ptq_step": 16,
+    "smooth": true,
+    "auto_clip": true,
+    "autoclip_step": 1,
+    "unified_checkpoint": true,
+    "do_awq": true
+  }

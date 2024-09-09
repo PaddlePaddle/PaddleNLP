@@ -24,6 +24,7 @@ function _set_params(){
     model_item=${model_item:-"llama-7b"}
     base_batch_size=${batch_size}
     dtype=${dtype:-"fp16"}
+    benchmark=${benchmark:-0}
 
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递
     model_repo="PaddleNLP"          # (必选) 模型套件的名字
@@ -101,7 +102,7 @@ function _train(){
     fi
 }
 
-export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
+export PYTHONPATH=$(dirname "$PWD"):$(dirname "$PWD")/llm:$PYTHONPATH
 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@

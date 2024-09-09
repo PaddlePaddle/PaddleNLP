@@ -9,8 +9,6 @@
 
 从本地文件创建数据集时，我们 **推荐** 根据本地数据集的格式给出读取function并传入 :func:`load_dataset` 中创建数据集。
 
-以 `waybill_ie <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/waybill_ie>`__ 快递单信息抽取任务中的数据为例：
-
 .. code-block::
 
     from paddlenlp.datasets import load_dataset
@@ -44,7 +42,7 @@
 从 :class:`paddle.io.Dataset/IterableDataset` 创建数据集 
 -------------------
 
-虽然PaddlePddle内置的 :class:`Dataset` 和 :class:`IterableDataset` 是可以直接接入 :class:`DataLoader` 用于模型训练的，但有时我们希望更方便的使用一些数据处理（例如convert to feature, 数据清洗，数据增强等）。而PaddleNLP内置的 :class:`MapDataset` 和 :class:`IterDataset` 正好提供了能实现以上功能的API。
+虽然PaddlePaddle内置的 :class:`Dataset` 和 :class:`IterableDataset` 是可以直接接入 :class:`DataLoader` 用于模型训练的，但有时我们希望更方便的使用一些数据处理（例如convert to feature, 数据清洗，数据增强等）。而PaddleNLP内置的 :class:`MapDataset` 和 :class:`IterDataset` 正好提供了能实现以上功能的API。
 
 所以如果您习惯使用 :class:`paddle.io.Dataset/IterableDataset` 创建数据集的话。只需要在原来的数据集上套上一层 :class:`MapDataset` 或 :class:`IterDataset` 就可以把原来的数据集对象转换成PaddleNLP的数据集。
 

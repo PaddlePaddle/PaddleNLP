@@ -561,11 +561,11 @@ if training_args.do_train:
 ### 文本分类示例
 
 
-- [多分类文本分类示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_class/few-shot)
+- [多分类文本分类示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/applications/text_classification/multi_class/few-shot)
 
-- [多标签文本分类示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/multi_label/few-shot)
+- [多标签文本分类示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/applications/text_classification/multi_label/few-shot)
 
-- [多层次文本分类示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_classification/hierarchical/few-shot)
+- [多层次文本分类示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/applications/text_classification/hierarchical/few-shot)
 
 
 ## Reference

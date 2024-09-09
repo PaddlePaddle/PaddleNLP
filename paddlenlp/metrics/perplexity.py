@@ -92,7 +92,7 @@ class Perplexity(paddle.metric.Metric):
         ce = F.cross_entropy(input=pred, label=label, reduction="none", soft_label=False)
         ce = paddle.squeeze(ce, axis=[2])
         if seq_mask is not None:
-            ce = ce * seq_mask
+            ce = ce * seq_mask.astype(ce.dtype)
             word_num = paddle.sum(seq_mask)
             return ce, word_num
         return ce

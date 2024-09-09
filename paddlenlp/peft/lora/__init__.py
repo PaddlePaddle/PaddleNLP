@@ -13,10 +13,5 @@
 # limitations under the License.
 
 from .lora_config import LoRAConfig
-from .lora_layers import (
-    ColumnParallelLoRALinear,
-    ColumnParallelLoRAMergedLinear,
-    LoRALinear,
-    LoRAMergedLinear,
-)
+from .lora_layers import ColumnParallelLoRALinear, LoRALinear, RowParallelLoRALinear
 from .lora_model import LoRAModel

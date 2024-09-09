@@ -19,10 +19,9 @@ import json
 import os
 from collections import OrderedDict
 
-from ...utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
+from ...utils.download import resolve_file_path
 from ...utils.import_utils import import_module
 from ...utils.log import logger
-from ..utils import resolve_cache_dir
 
 __all__ = [
     "AutoProcessor",
@@ -79,14 +78,28 @@ class AutoProcessor:
         init_class = init_kwargs.pop("init_class", None)
         if init_class is None:
             init_class = init_kwargs.pop("processor_class", None)
+            if init_class is None:
+                init_class = init_kwargs.pop("image_processor_type", None)
+                # replace old name to new name
+                if init_class is not None and init_class.endswith("ImageProcessor"):
+                    init_class = init_class.replace("ImageProcessor", "Processor")
+            if init_class is None:
+                init_class = init_kwargs.pop("feature_extractor_type", None)
+                # replace old name to new name
+                if init_class is not None and init_class.endswith("FeatureExtractor"):
+                    init_class = init_class.replace("FeatureExtractor", "Processor")
 
         if init_class:
-            class_name = cls._name_mapping[init_class]
-            import_class = import_module(f"paddlenlp.transformers.{class_name}.processing")
-            processor_class = getattr(import_class, init_class)
-            return processor_class
+            try:
+                class_name = cls._name_mapping[init_class]
+                import_class = import_module(f"paddlenlp.transformers.{class_name}.processing")
+                processor_class = getattr(import_class, init_class)
+                return processor_class
+            except Exception:
+                init_class = None
+
         # If no `init_class`, we use pattern recognition to recognize the processor class.
-        else:
+        if init_class is None:
             logger.info("We use pattern recognition to recognize the processor class.")
             for key, pattern in cls._name_mapping.items():
                 if pattern in pretrained_model_name_or_path.lower():
@@ -128,15 +141,20 @@ class AutoProcessor:
             processor = AutoProcessor.from_pretrained("openai/clip-vit-base-patch32")
             processor.save_pretrained('clip_processor')
         """
-        cache_dir = resolve_cache_dir(
-            pretrained_model_name_or_path=pretrained_model_name_or_path,
-            from_hf_hub=False,  # TODO: from_hf_hub not supported yet
-            cache_dir=kwargs.pop("cache_dir", None),
-        )
+        cache_dir = kwargs.get("cache_dir", None)
+        subfolder = kwargs.get("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
+        from_aistudio = kwargs.get("from_aistudio", False)
+        from_hf_hub = kwargs.get("from_hf_hub", False)
+        kwargs["subfolder"] = subfolder
+        kwargs["cache_dir"] = cache_dir
+
         all_processor_names = []
         for names, processor_class in cls._processor_mapping.items():
             for name in names:
                 all_processor_names.append(name)
+
         # From built-in pretrained models
         if pretrained_model_name_or_path in all_processor_names:
             for names, processor_classes in cls._processor_mapping.items():
@@ -149,33 +167,27 @@ class AutoProcessor:
                         return actual_processor_class.from_pretrained(
                             pretrained_model_name_or_path, *model_args, **kwargs
                         )
-        # From local dir path
-        elif os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path, cls.processor_config_file)
-            if os.path.exists(config_file):
-                processor_class = cls._get_processor_class_from_config(pretrained_model_name_or_path, config_file)
-                logger.info("We are using %s to load '%s'." % (processor_class, pretrained_model_name_or_path))
-                return processor_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-        # Assuming from community-contributed pretrained models
-        else:
-            community_config_path = "/".join(
-                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.processor_config_file]
-            )
-            try:
-                resolved_vocab_file = get_path_from_url_with_filelock(community_config_path, cache_dir)
-            except RuntimeError as err:
-                logger.error(err)
-                raise RuntimeError(
-                    f"Can't load processor for '{pretrained_model_name_or_path}'.\n"
-                    f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                    "- a correct model-identifier of built-in pretrained models,\n"
-                    "- or a correct model-identifier of community-contributed pretrained models,\n"
-                    "- or the correct path to a directory containing relevant processor files.\n"
-                )
 
-            if os.path.exists(resolved_vocab_file):
-                processor_class = cls._get_processor_class_from_config(
-                    pretrained_model_name_or_path, resolved_vocab_file
-                )
-                logger.info("We are using %s to load '%s'." % (processor_class, pretrained_model_name_or_path))
-                return processor_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+        config_file = resolve_file_path(
+            pretrained_model_name_or_path,
+            [cls.processor_config_file],
+            subfolder,
+            cache_dir=cache_dir,
+            from_hf_hub=from_hf_hub,
+            from_aistudio=from_aistudio,
+        )
+        if config_file is not None and os.path.exists(config_file):
+            processor_class = cls._get_processor_class_from_config(
+                pretrained_model_name_or_path,
+                config_file,
+            )
+            logger.info(f"We are using {processor_class} to load '{pretrained_model_name_or_path}'.")
+            return processor_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+        else:
+            raise RuntimeError(
+                f"Can't load processor for '{pretrained_model_name_or_path}'.\n"
+                f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                "- a correct model-identifier of built-in pretrained processor,\n"
+                "- or a correct model-identifier of community-contributed pretrained models,\n"
+                "- or the correct path to a directory containing relevant processor files.\n"
+            )

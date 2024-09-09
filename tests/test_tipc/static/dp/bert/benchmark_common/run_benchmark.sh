@@ -45,7 +45,7 @@ function _set_params(){
 
 function _train(){
     batch_size=${base_batch_size}  # 如果模型跑多卡单进程时,请在_train函数中计算出多卡需要的bs
-    static_scripts="../examples/language_model/bert/static/"
+    static_scripts="../legacy/model_zoo/bert/static/"
 
     gradient_merge_steps=$(expr 67584 \/ $batch_size \/ 8)
 

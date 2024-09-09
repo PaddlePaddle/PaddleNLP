@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import paddle
 from paddle.distributed import fleet
 
-from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
-
-_MAX_DATA_DIM = 64
+from paddlenlp.utils.nested import (
+    nested_broadcast_tensor,
+    nested_copy_place,
+    nested_empty_tensor,
+    nested_reduce_tensor,
+)
 
 
 class DummyDataset(paddle.io.Dataset):
@@ -29,6 +31,11 @@ class DummyDataset(paddle.io.Dataset):
 
     def __len__(self):
         return 0
+
+
+class IterableDummyDataset(paddle.io.IterableDataset):
+    def __iter__(self):
+        return None
 
 
 class DistDataLoader(paddle.io.DataLoader):
@@ -54,24 +61,29 @@ class DistDataLoader(paddle.io.DataLoader):
         timeout=0,
         worker_init_fn=None,
         persistent_workers=False,
+        **kwargs,
     ):
 
+        eval = kwargs.pop("eval", False)
+        is_iterable_dataset = kwargs.pop("is_iterable_dataset", False)
+
         if dataset is None:
-            dataset = DummyDataset()
-            batch_sampler = DistributedBatchSampler(dataset, 1)
+            dataset = DummyDataset() if not is_iterable_dataset else IterableDummyDataset()
             logger.info("rank has no data, use Dummpy dataset")
 
         super().__init__(dataset=dataset, batch_sampler=batch_sampler, collate_fn=collate_fn, num_workers=num_workers)
 
         self._hcg = fleet.get_hybrid_communicate_group()
+        self.eval = eval
 
-        # init pp data comm group
+        # Init pp data comm group.
         if self._hcg.get_pipe_parallel_world_size() > 1:
             self._pp_data_group = self._init_dataloader_comm_group()
+            self._pp_group = self._hcg.get_pipe_parallel_group()
         else:
             self._pp_data_group = None
+            self._pp_group = None
 
-        # tensor parallel message
         self.mp_group = self._hcg.get_model_parallel_group()
         self.mp_rank = self._hcg.get_model_parallel_rank()
         self.mp_src_rank = self._hcg.get_model_parallel_group_src_rank()
@@ -80,8 +92,6 @@ class DistDataLoader(paddle.io.DataLoader):
         self.dp_rank = self._hcg.get_data_parallel_rank()
         sharding_rank = self._hcg.get_sharding_parallel_rank()
         self._need_data = (self.mp_rank == 0) and (self.pp_rank == 0)
-        self._data_int64_keys, self._data_int64_keys_size = None, None
-        self._data_fp32_keys, self._data_fp32_keys_size = None, None
 
         if self._need_data:
             self._dataloader = paddle.io.DataLoader(
@@ -128,7 +138,6 @@ class DistDataLoader(paddle.io.DataLoader):
         parallel_groups = topo.get_comm_list("pipe")
 
         for group in parallel_groups:
-            # only first rank and last rank
             ranks = [group[0], group[-1]]
             comm_group = paddle.distributed.new_group(ranks=ranks)
             if paddle.distributed.get_rank() in ranks:
@@ -138,140 +147,68 @@ class DistDataLoader(paddle.io.DataLoader):
     def __iter__(self):
         return self
 
-    def __next__(self):
-        data_int64_keys_size, data_fp32_keys_size = 0, 0
-        if self._need_data:
-            # {'input_ids': int64, 'labels': int64}
-            data = next(self._dataloader_iter)
-            data_keys = list(data.keys())
-
-            # TODO(daisiming): Better methods are needed to support new data types.
-            type_check = [paddle.int64, paddle.float32]
-            for key in data_keys:
-                if data[key].dtype not in type_check:
-                    raise ValueError(
-                        f"Dist dataloader requires dtype == `int64` or dtype == 'float32', but got: {data[key].dtype}"
+    def _broadcast_data(self, data):
+        process_rank = paddle.distributed.get_rank()
+        if self.mp_group.nranks > 1:
+            if process_rank == self.mp_src_rank:
+                fake_data = [nested_reduce_tensor(data)]
+            else:
+                if data is not None:
+                    logger.warning(
+                        f"Your local rank {paddle.distributed.get_rank()} are forbidden to have a state_dict."
                     )
-
-            data_int64_list = [data[key] for key in data_keys if data[key].dtype == paddle.int64]
-            data_int64_keys = [key for key in data_keys if data[key].dtype == paddle.int64]
-            data_fp32_list = [data[key] for key in data_keys if data[key].dtype == paddle.float32]
-            data_fp32_keys = [key for key in data_keys if data[key].dtype == paddle.float32]
-            data_int64_keys_size, data_fp32_keys_size = len(data_int64_keys), len(data_fp32_keys)
-
-        # broadcast data keys size
-        data_int64_keys_size = paddle.to_tensor(data_int64_keys_size)
-        data_fp32_keys_size = paddle.to_tensor(data_fp32_keys_size)
-        if self._data_int64_keys_size is None:
-            if self.mp_group is not None and self.pp_rank == 0:
-                paddle.distributed.broadcast(data_int64_keys_size, src=self.mp_src_rank, group=self.mp_group)
-                paddle.distributed.broadcast(data_fp32_keys_size, src=self.mp_src_rank, group=self.mp_group)
-            if self._pp_data_group is not None:
-                paddle.distributed.broadcast(
-                    data_int64_keys_size, src=self._pp_data_group.ranks[0], group=self._pp_data_group
-                )
-                paddle.distributed.broadcast(
-                    data_fp32_keys_size, src=self._pp_data_group.ranks[0], group=self._pp_data_group
-                )
-            self._data_int64_keys_size = int(data_int64_keys_size.item())
-            self._data_fp32_keys_size = int(data_fp32_keys_size.item())
-
-        if not self._need_data:
-            data_int64_keys = [None for i in range(self._data_int64_keys_size)]
-            data_fp32_keys = [None for i in range(self._data_fp32_keys_size)]
-
-        # broadcast data keys name
-        if self._data_int64_keys is None:
-            if self.mp_group is not None and self.pp_rank == 0:
-                paddle.distributed.broadcast_object_list(data_int64_keys, src=self.mp_src_rank, group=self.mp_group)
-                paddle.distributed.broadcast_object_list(data_fp32_keys, src=self.mp_src_rank, group=self.mp_group)
-            if self._pp_data_group is not None:
-                paddle.distributed.broadcast_object_list(
-                    data_int64_keys, src=self._pp_data_group.ranks[0], group=self._pp_data_group
-                )
-                paddle.distributed.broadcast_object_list(
-                    data_fp32_keys, src=self._pp_data_group.ranks[0], group=self._pp_data_group
-                )
-            self._data_int64_keys = data_int64_keys
-            self._data_fp32_keys = data_fp32_keys
-
-        # broadcast data
-        if not self._need_data:
-            data_int64_list = [None for i in range(self._data_int64_keys_size)]
-            data_fp32_list = [None for i in range(self._data_fp32_keys_size)]
-        if self.mp_group is not None and self.pp_rank == 0:
-            data_int64_list = broadcast_data_list(
-                data_int64_list, paddle.int64, self.mp_rank, self.mp_group, self.mp_src_rank
+                fake_data = [None]
+        if self._pp_group is not None:
+            if process_rank == self._pp_group.ranks[0]:
+                fake_data = [nested_reduce_tensor(data)]
+            else:
+                if data is not None:
+                    logger.warning(
+                        f"Your local rank {paddle.distributed.get_rank()} are forbidden to have a state_dict."
+                    )
+                fake_data = [None]
+        if self.mp_group.nranks > 1 and self.pp_rank == 0:
+            paddle.distributed.broadcast_object_list(
+                fake_data,
+                src=self.mp_src_rank,
+                group=self.mp_group,
             )
-            data_fp32_list = broadcast_data_list(
-                data_fp32_list, paddle.float32, self.mp_rank, self.mp_group, self.mp_src_rank
+        if self._pp_group is not None:
+            paddle.distributed.broadcast_object_list(
+                fake_data,
+                src=self._pp_group.ranks[0],
+                group=self._pp_group,
             )
 
-        if self._pp_data_group is not None:
-            # Note(daisimng): In last stage of pp, we don't need input_ids.
-            # It will be removed in future.
-            data_int64_list = broadcast_data_list(
-                data_int64_list,
-                paddle.int64,
-                self.pp_rank,
-                self._pp_data_group,
-                self._pp_data_group.ranks[0],
-            )
-            data_fp32_list = broadcast_data_list(
-                data_fp32_list,
-                paddle.float32,
-                self.pp_rank,
-                self._pp_data_group,
-                self._pp_data_group.ranks[0],
-            )
+        fake_data = fake_data[0]
+        if fake_data is None:
+            raise StopIteration
 
-        out = dict([(key, data) for key, data in zip(self._data_int64_keys, data_int64_list)])
-        out.update([(key, data) for key, data in zip(self._data_fp32_keys, data_fp32_list)])
-        return out
+        dst_pp_group = self._pp_group if self.eval else self._pp_data_group
+        if self.mp_group.nranks > 1:
+            if process_rank != self.mp_src_rank:
+                data = nested_empty_tensor(fake_data)
+        if dst_pp_group is not None:
+            if process_rank != dst_pp_group.ranks[0]:
+                data = nested_empty_tensor(fake_data)
 
+        if self.mp_group.nranks > 1 and self.pp_rank == 0:
+            data = nested_broadcast_tensor(data, src=self.mp_src_rank, group=self.mp_group)
+        if dst_pp_group is not None:
+            data = nested_broadcast_tensor(data, src=dst_pp_group.ranks[0], group=dst_pp_group)
+        # for pp1 - pp_{n-1}, Paddle need to recevie empty dict for pipeline parallel.
+        if data is None:
+            data = {}
 
-def broadcast_data_list(data_list, datatype, comm_rank=0, comm_group=None, src_rank=0):
-    """
-    Broadcast data from src_rank to all ranks in comm_group.
-    """
-    # Move to GPU and broadcast.
-    size_cpu = []
-    if comm_rank == 0:
-        for data in data_list:
-            size_cpu.append(len(data.shape))
-            size_cpu += data.shape
-    size_cpu = size_cpu + [0] * (_MAX_DATA_DIM - len(size_cpu))
-    size_cuda = paddle.to_tensor(size_cpu)
-    paddle.distributed.broadcast(size_cuda, src_rank, group=comm_group).wait()
+        return data
 
-    size_cpu = size_cuda.tolist()
-    i = 0
-    numel = 0
-    sizes = []
-    while size_cpu[i] > 0:
-        rank = size_cpu[i]
-        this_size = size_cpu[i + 1 : i + 1 + rank]
-        numel += int(np.prod(this_size))
-        sizes.append(this_size)
-        i += rank + 1
-
-    if comm_rank == 0:
-        assert data.dtype == datatype, "input has data type {} which " "is different than {}".format(
-            data.dtype, datatype
-        )
-        data_b = paddle.concat([d.cuda().reshape([-1]) for d in data_list], 0)
-        assert numel == sum([d.numel().item() for d in data_list]), (numel, [d.numel().item() for d in data_list])
-    else:
-        data_b = paddle.empty([numel], dtype=datatype).cuda()
-
-    # Broadcast
-    paddle.distributed.broadcast(data_b, src_rank, group=comm_group).wait()
-
-    ret = []
-    offset = 0
-    for size in sizes:
-        numel = int(np.prod(size))
-        ret.append(data_b[offset : offset + numel].reshape(size))
-        offset += numel
-
-    return ret
+    def __next__(self):
+        data = None
+        if self._need_data:
+            try:
+                data = next(self._dataloader_iter)
+                data = nested_copy_place(data, place=paddle.framework._current_expected_place())
+            except Exception as e:
+                logger.debug(e)
+        data = self._broadcast_data(data)
+        return data

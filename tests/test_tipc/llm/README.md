@@ -4,8 +4,12 @@
 ## 执行方式
 
 ```shell
-MODEL_NAME=llama pytest -v -s tests/test_tipc/llm/test_predictor.py
+cd ./tests
+export PYTHONPATH=../:$PYTHONPATH
+MODEL_NAME=llama pytest -v -s ./test_tipc/llm/test_predictor.py
 ```
+
+> 脚本为了和 CE 测试脚本路径一致，故此处需要以./tests 为执行目录。
 
 `MODEL_NAME` 的取值来源于 ./tests/test_tipc/llm/fixtures/predictor.yaml 文件中的一级 key name。
 

@@ -60,7 +60,7 @@ function _train(){
     mkdir $OUTPUT_PATH
 
     # if [ ${model_item} = "gpt3_moe" ];then
-    #     static_scripts="../examples/language_model/gpt-moe/dygraph/"
+    #     static_scripts="../legacy/model_zoo/gpt-moe/dygraph/"
     # else
     #     echo "not supported model item: ${model_item}"; exit 1;
     # fi
@@ -147,7 +147,7 @@ function _train(){
         ;;
     *) echo "choose run_mode "; exit 1;
     esac
-    cd ../examples/language_model/moe/dygraph/
+    cd ../legacy/model_zoo/moe/dygraph/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
     if [[ ${model_item} =~ "CE" ]];then # CE精度-不限制执行时间
@@ -162,8 +162,10 @@ function _train(){
     fi
     #kill -9 `ps -ef|grep 'python'|awk '{print $2}'`
     if [ ${device_num} != "N1C1" -a -d mylog ]; then
+        case_path=$PWD && cd - && mkdir -p mylog      # PaddleNLP/tests/mylog
+        cp -r ${case_path}/mylog/workerlog.* ./mylog/
         rm ${log_file}
-        cp mylog/workerlog.${workerlog_id} ${log_file}
+        cp ${case_path}/mylog/workerlog.${workerlog_id} ${log_file}
     fi
 }
 

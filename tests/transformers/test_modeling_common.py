@@ -695,6 +695,8 @@ class ModelTesterMixin:
 
             loaded_config = config.__class__.from_pretrained(tempdir)
             for key in config.__dict__.keys():
+                if key == "paddlenlp_version" and config.paddlenlp_version is None:
+                    continue
                 self.assertEqual(getattr(config, key), getattr(loaded_config, key))
 
     def random_choice_pretrained_config_field(self) -> Optional[str]:
@@ -800,7 +802,7 @@ class ModelTesterPretrainedMixin:
         if self.paddlehub_remote_test_model_path is None or self.base_model_class is None:
             return
         config = self.base_model_class.config_class.from_pretrained(self.paddlehub_remote_test_model_path)
-        model = self.base_model_class._from_config(config)
+        model = self.base_model_class.from_config(config)
         self.assertIsNotNone(model)
 
     @slow
@@ -965,8 +967,10 @@ class GenerationD2STestMixin:
                         use_top_p=False,
                     ),
                 )
-
-                model_path = os.path.join(tempdir, "model.pdmodel")
+                if paddle.framework.use_pir_api():
+                    model_path = os.path.join(tempdir, "model.json")
+                else:
+                    model_path = os.path.join(tempdir, "model.pdmodel")
                 params_path = os.path.join(tempdir, "model.pdiparams")
                 config = paddle.inference.Config(model_path, params_path)
 
@@ -1034,7 +1038,10 @@ class GenerationD2STestMixin:
                     ),
                 )
 
-                model_path = os.path.join(tempdir, "model.pdmodel")
+                if paddle.framework.use_pir_api():
+                    model_path = os.path.join(tempdir, "model.json")
+                else:
+                    model_path = os.path.join(tempdir, "model.pdmodel")
                 params_path = os.path.join(tempdir, "model.pdiparams")
                 config = paddle.inference.Config(model_path, params_path)
 

@@ -71,7 +71,7 @@ RE_SHEBANG = re.compile(r"^[ \t\v]*#[ \t]?\!")
 def _check_copyright(path):
     head=[]
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             head = [next(f) for x in range(4)]
     except StopIteration:
         pass

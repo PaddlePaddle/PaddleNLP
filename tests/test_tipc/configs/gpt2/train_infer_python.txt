@@ -13,7 +13,7 @@ null:null
 null:null
 ##
 trainer:norm_train
-norm_train:../examples/language_model/gpt/run_pretrain.py --model_type="gpt" --model_name_or_path="gpt2-en" --save_steps 100000 --decay_steps 320000 --weight_decay 0.01 --warmup_rate 0.01 --grad_clip 1.0 --logging_freq 1 --eval_freq 1000 --device "gpu" --min_lr 0.00001 --max_lr 0.00015 --max_seq_len 1024 --output_dir=./output/ --input_dir=./data/
+norm_train:../legacy/model_zoo/gpt/run_pretrain.py --model_type="gpt" --model_name_or_path="gpt2-en" --save_steps 100000 --decay_steps 320000 --weight_decay 0.01 --warmup_rate 0.01 --grad_clip 1.0 --logging_freq 1 --eval_freq 1000 --device "gpu" --min_lr 0.00001 --max_lr 0.00015 --max_seq_len 1024 --output_dir=./output/ --input_dir=./data/
 pact_train:null
 fpgm_train:null
 distill_train:null

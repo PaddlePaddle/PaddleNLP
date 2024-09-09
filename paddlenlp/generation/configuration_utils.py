@@ -24,17 +24,11 @@ from paddle.common_ops_import import convert_dtype
 
 from paddlenlp import __version__
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.transformers.utils import resolve_cache_dir
+from paddlenlp.utils.download import resolve_file_path
 from paddlenlp.utils.log import logger
 
 from ..utils import GENERATION_CONFIG_NAME
-from ..utils.downloader import (
-    COMMUNITY_MODEL_PREFIX,
-    get_path_from_url_with_filelock,
-    hf_file_exists,
-    is_url,
-    url_file_exists,
-)
+from ..utils.downloader import hf_file_exists
 
 DEFAULT_MAX_NEW_TOKENS = 20
 
@@ -128,6 +122,8 @@ class GenerationConfig:
                 for FastGeneration. Default to False.
             use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding.
                 Only works when fast entry is avalible. Default to False.
+            trunc_input: (bool, optional): Whether to truncate the inputs from
+                output sequences . Default to True.
             model_kwargs (dict): It can be used to specify additional kwargs
                 passed to the model.
     """
@@ -146,10 +142,16 @@ class GenerationConfig:
     def __init__(self, **kwargs):
         # Parameters that control the length of the output
         self.max_new_tokens = kwargs.get("max_new_tokens", DEFAULT_MAX_NEW_TOKENS)
-        self.min_new_token = kwargs.pop("min_new_token", 0)
+
+        if "min_new_token" in kwargs:
+            logger.warning("<min_new_token> field is deprecated. Please use <min_new_tokens> instead.")
+            kwargs["min_new_tokens"] = kwargs.pop("min_new_token")
+
+        self.min_new_tokens = kwargs.pop("min_new_tokens", 0)
         self.max_length = kwargs.pop("max_length", 0)
         self.min_length = kwargs.pop("min_length", 0)
         self.early_stopping = kwargs.pop("early_stopping", False)
+        self.trunc_input = kwargs.pop("trunc_input", True)
 
         # Parameters for manipulation of the model output logits
         self.diversity_rate = kwargs.pop("diversity_rate", 0.0)
@@ -176,6 +178,7 @@ class GenerationConfig:
         # Generation parameters exclusive to encoder-decoder models
         self.use_fast = kwargs.pop("use_fast", False)
         self.use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
+        self.fast_ptq_sampling = kwargs.pop("fast_ptq_sampling", False)
         self.decoder_start_token_id = kwargs.pop("decoder_start_token_id", None)
         self._from_model_config = kwargs.pop("_from_model_config", False)
         self.paddlenlp_version = kwargs.pop("paddlenlp_version", __version__)
@@ -335,6 +338,7 @@ class GenerationConfig:
         cls,
         pretrained_model_name_or_path: Union[str, os.PathLike],
         from_hf_hub: bool = False,
+        from_aistudio: bool = False,
         config_file_name: Optional[Union[str, os.PathLike]] = None,
         cache_dir: Optional[Union[str, os.PathLike]] = None,
         force_download: bool = False,
@@ -403,45 +407,22 @@ class GenerationConfig:
         ```"""
         config_file_name = config_file_name if config_file_name is not None else GENERATION_CONFIG_NAME
 
-        subfolder = kwargs.pop("subfolder", None)
+        subfolder = kwargs.pop("subfolder", "")
+        if subfolder is None:
+            subfolder = ""
 
-        config_path = os.path.join(pretrained_model_name_or_path, config_file_name)
-        config_path = str(config_path)
-
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
-
-        # 1. get the configuration file from local file, eg: /cache/path/model_config.json
-        if os.path.isfile(pretrained_model_name_or_path):
-            resolved_config_file = pretrained_model_name_or_path
-
-        # 2. get the configuration file from url, eg: https://ip/path/to/model_config.json
-        elif is_url(pretrained_model_name_or_path):
-            resolved_config_file = get_path_from_url_with_filelock(
-                pretrained_model_name_or_path, cache_dir, check_exist=not force_download
-            )
-        # 3. get the configuration file from local dir with default name, eg: /local/path
-        elif os.path.isdir(pretrained_model_name_or_path):
-            configuration_file = os.path.join(pretrained_model_name_or_path, GENERATION_CONFIG_NAME)
-            if os.path.exists(configuration_file):
-                resolved_config_file = configuration_file
-            else:
-                # try to detect old-school config file
-                raise FileNotFoundError("please make sure there is `generation_config.json` under the dir")
-
-        # 4. get the configuration file from HF hub
-        elif from_hf_hub:
-            resolved_config_file = resolve_hf_generation_config_path(
-                repo_id=pretrained_model_name_or_path, cache_dir=cache_dir, subfolder=subfolder
-            )
-        else:
-            community_url = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, GENERATION_CONFIG_NAME])
-            if url_file_exists(community_url):
-                resolved_config_file = get_path_from_url_with_filelock(
-                    community_url, cache_dir, check_exist=not force_download
-                )
-            else:
-                raise FileNotFoundError(f"configuration file<{GENERATION_CONFIG_NAME}> not found")
-
+        resolved_config_file = resolve_file_path(
+            pretrained_model_name_or_path,
+            [config_file_name],
+            subfolder,
+            cache_dir=cache_dir,
+            force_download=force_download,
+            from_aistudio=from_aistudio,
+            from_hf_hub=from_hf_hub,
+        )
+        assert (
+            resolved_config_file is not None
+        ), f"please make sure {config_file_name} under {pretrained_model_name_or_path}"
         try:
             logger.info(f"Loading configuration file {resolved_config_file}")
             # Load config dict

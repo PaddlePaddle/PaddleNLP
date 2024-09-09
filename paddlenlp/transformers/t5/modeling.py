@@ -337,15 +337,15 @@ class T5Attention(nn.Layer):
         # Input is (batch_size, seq_length, dim)
         # Mask is (batch_size, key_length) (non-causal) or (batch_size, key_length, key_length)
         # cache[0] is (batch_size, n_heads, q_len - 1, dim_per_head)
-        batch_size, seq_length = paddle.shape(hidden_states)[:2]
+        batch_size, seq_length = hidden_states.shape[:2]
 
         real_seq_length = seq_length
 
         if cache is not None:
             assert len(cache) == 2, f"cache should have 2 past states: keys and values. Got { len(cache)} past states"
-            real_seq_length += paddle.shape(cache[0])[2] if query_length is None else query_length
+            real_seq_length += cache[0].shape[2] if query_length is None else query_length
 
-        key_length = real_seq_length if key_value_states is None else paddle.shape(key_value_states)[1]
+        key_length = real_seq_length if key_value_states is None else key_value_states.shape[1]
 
         def shape(states):
             """projection"""
@@ -412,7 +412,7 @@ class T5Attention(nn.Layer):
             # if key and values are already calculated
             # we want only the last query position bias
             if cache is not None:
-                position_bias = position_bias[:, :, -paddle.shape(hidden_states)[1] :, :]
+                position_bias = position_bias[:, :, -hidden_states.shape[1] :, :]
 
             if mask is not None:
                 position_bias = position_bias + mask  # (batch_size, n_heads, seq_length, key_length)
@@ -566,7 +566,7 @@ class T5Block(nn.Layer):
             # the actual query length is unknown for cross attention
             # if using past key value states. Need to inject it here
             if present_key_value_state is not None:
-                query_length = paddle.shape(present_key_value_state[0])[2]
+                query_length = present_key_value_state[0].shape[2]
             else:
                 query_length = None
 
@@ -990,10 +990,10 @@ class T5Stack(T5PretrainedModel):
                 f"You cannot specify both {err_msg_prefix}input_ids and {err_msg_prefix}inputs_embeds at the same time"
             )
         elif input_ids is not None:
-            input_shape = paddle.shape(input_ids)
+            input_shape = input_ids.shape
             # input_ids = input_ids.reshape(shape=[-1, input_shape[-1]])
         elif inputs_embeds is not None:
-            input_shape = paddle.shape(inputs_embeds)[:-1]
+            input_shape = inputs_embeds.shape[:-1]
         else:
             err_msg_prefix = "decoder_" if self.is_decoder else ""
             raise ValueError(f"You have to specify either {err_msg_prefix}input_ids or {err_msg_prefix}inputs_embeds")
@@ -1005,7 +1005,7 @@ class T5Stack(T5PretrainedModel):
         batch_size, seq_length = input_shape
 
         # required mask seq length can be calculated via length of past
-        mask_seq_length = paddle.shape(cache[0][0])[2] + seq_length if cache is not None else seq_length
+        mask_seq_length = cache[0][0].shape[2] + seq_length if cache is not None else seq_length
 
         if use_cache is True:
             assert self.is_decoder, f"`use_cache` can only be set to `True` if {self.__class__} is used as a decoder"
@@ -1013,7 +1013,7 @@ class T5Stack(T5PretrainedModel):
         if attention_mask is None:
             attention_mask = paddle.ones(shape=[batch_size, mask_seq_length])
         if self.is_decoder and encoder_attention_mask is None and encoder_hidden_states is not None:
-            encoder_seq_length = paddle.shape(encoder_hidden_states)[1]
+            encoder_seq_length = encoder_hidden_states.shape[1]
             encoder_attention_mask = paddle.ones([batch_size, encoder_seq_length], dtype=paddle.int64)
 
         # initialize caches with `None` if past does not exist
@@ -1027,7 +1027,7 @@ class T5Stack(T5PretrainedModel):
         # If a 2D or 3D attention mask is provided for the cross-attention
         # we need to make broadcastable to [batch_size, num_heads, seq_length, seq_length]
         if self.is_decoder and encoder_hidden_states is not None:
-            encoder_batch_size, encoder_sequence_length, _ = paddle.shape(encoder_hidden_states)
+            encoder_batch_size, encoder_sequence_length, _ = encoder_hidden_states.shape
             encoder_hidden_shape = (encoder_batch_size, encoder_sequence_length)
             if encoder_attention_mask is None:
                 encoder_attention_mask = paddle.ones(shape=encoder_hidden_shape)

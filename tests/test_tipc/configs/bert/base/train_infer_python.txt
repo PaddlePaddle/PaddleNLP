@@ -13,7 +13,7 @@ null:null
 null:null
 ##
 trainer:norm_train
-norm_train:../examples/language_model/bert/run_pretrain.py --max_predictions_per_seq 20 --learning_rate 1e-4 --weight_decay 1e-2 --adam_epsilon 1e-6 --warmup_steps 10000 --output_dir ./tmp2/ --logging_steps 10 --save_steps 20000 --model_type bert --model_name_or_path bert-base-uncased --input_dir ./data/wikicorpus_en_seqlen128 --fuse_transformer true --amp_level O2
+norm_train:../legacy/model_zoo/bert/run_pretrain.py --max_predictions_per_seq 20 --learning_rate 1e-4 --weight_decay 1e-2 --adam_epsilon 1e-6 --warmup_steps 10000 --output_dir ./tmp2/ --logging_steps 10 --save_steps 20000 --model_type bert --model_name_or_path bert-base-uncased --input_dir ./data/wikicorpus_en_seqlen128 --fuse_transformer true --amp_level O2
 pact_train:null
 fpgm_train:null
 distill_train:null

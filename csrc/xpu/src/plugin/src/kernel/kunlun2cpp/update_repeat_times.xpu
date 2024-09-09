@@ -1,0 +1,75 @@
+#include "xpu/kernel/cluster.h"
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/cluster_primitive.h"
+
+namespace xpu2 {
+namespace plugin {
+
+static __device__ void atomic_add(_shared_ptr_ int *ptr, int v) {
+  bool fail = true;
+  while (fail) {
+    int a;
+    __asm__ __volatile__("loada.w %0,%1" : "=&r"(a) : "r"(ptr));
+    a += v;
+    __asm__ __volatile__("storea.w %0,%1,%2" : "=&r"(fail) : "r"(a), "r"(ptr));
+  }
+}
+
+__global__ void update_repeat_times(const int64_t *pre_ids,
+                                    const int64_t *cur_len,
+                                    int *repeat_times,
+                                    const int64_t bs,
+                                    const int64_t length,
+                                    const int64_t length_id) {
+  int cid = core_id();
+  int ncores = core_num();
+  int clusterid = cluster_id();
+  int nclusters = cluster_num();
+  int tid = clusterid * ncores + cid;
+
+  const int max_sm_len = 256 * 1024 / sizeof(int);
+  __shared__ int repeated_times_sm[max_sm_len];
+  int64_t pre_id_lm;
+  int n_length = (length + max_sm_len - 1) / max_sm_len;
+
+  // assert bs <= 640
+  const int max_bs = 640;
+  int64_t cur_len_lm[max_bs];
+  GM2LM(cur_len, cur_len_lm, bs * sizeof(int64_t));
+
+  for (int nli = 0; nli < n_length; nli++) {
+    int step = nli * max_sm_len;
+    int cur_length = min(max_sm_len, length - step);
+    for (int64_t bi = clusterid; bi < bs; bi += nclusters) {
+      if (cur_len_lm[bi] < 0) {
+        continue;
+      }
+      if (cid == 0) {
+        GM2SM(repeat_times + bi * length + step,
+              repeated_times_sm,
+              sizeof(int) * cur_length);
+      }
+      sync_cluster();
+      for (int i = cid; i < length_id; i += ncores) {
+        GM2LM(pre_ids + bi * length_id + i, &pre_id_lm, sizeof(int64_t));
+        if (pre_id_lm < 0) {
+          break;
+        }
+        if (pre_id_lm >= step && pre_id_lm < step + cur_length) {
+          atomic_add(repeated_times_sm + pre_id_lm - step, 1);
+          mfence();
+        }
+      }
+      sync_cluster();
+      if (cid == 0) {
+        SM2GM(repeated_times_sm,
+              repeat_times + bi * length + step,
+              sizeof(int) * cur_length);
+      }
+      sync_cluster();
+    }
+  }
+}
+
+}  // namespace plugin
+}  // namespace xpu2

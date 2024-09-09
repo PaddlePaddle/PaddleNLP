@@ -58,6 +58,7 @@ class ErnieViLImageProcessingTester(unittest.TestCase):
         self.image_mean = image_mean
         self.image_std = image_std
         self.do_convert_rgb = do_convert_rgb
+        super().__init__()
 
     def prepare_image_processor_dict(self):
         return {

@@ -3,6 +3,7 @@ inference-predict:
     mode: dynamic 
     max_length: 40
     batch_size: 2
+    use_flash_attention: false
     decode_strategy: greedy_search
     dtype: float16
     data_file: tests/fixtures/llm/data/train.json
@@ -10,6 +11,7 @@ inference-predict:
 inference-to-static:
   default:
     dtype: float16
+    max_length: 40
 
 inference-infer:
   default:

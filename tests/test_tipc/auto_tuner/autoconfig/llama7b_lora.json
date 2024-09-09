@@ -1,0 +1,85 @@
+{
+  "dp_degree": "auto",
+  "invalid_strategy": [
+    "stage3_mp*"
+  ],
+  "max_search_time": 900,
+  "max_time_per_task": 300,
+  "metric_cfg": {
+    "OptimizationDirection": "Maximize",
+    "name": "interval_samples_per_second"
+  },
+  "micro_batch_size": "auto",
+  "mode": "LoRA",
+  "model_cfg": {
+    "global_batch_size": 8,
+    "hidden_size": 4096,
+    "num_attention_heads": 32,
+    "num_layers": 28,
+    "vocab_size": 65024
+  },
+  "mp_degree": [
+    1
+  ],
+  "need_baseline": true,
+  "pp_degree": [
+    1
+  ],
+  "run_cmd": {
+    "gradient_accumulation_steps": [
+      "./autoconfig/llama7b_lora_params.json",
+      "gradient_accumulation_steps"
+    ],
+    "micro_batch_size": [
+      "./autoconfig/llama7b_lora_params.json",
+      "per_device_train_batch_size"
+    ],
+    "mp_degree": [
+      "./autoconfig/llama7b_lora_params.json",
+      "tensor_parallel_degree"
+    ],
+    "pp_degree": [
+      "./autoconfig/llama7b_lora_params.json",
+      "pipeline_parallel_degree"
+    ],
+    "run_best_stage": {
+      "autotuner_benchmark": [
+        "./autoconfig/llama7b_lora_params.json",
+        "autotuner_benchmark",
+        0
+      ]
+    },
+    "search_stage": {
+      "autotuner_benchmark": [
+        "./autoconfig/llama7b_lora_params.json",
+        "autotuner_benchmark",
+        1
+      ]
+    },
+    "sharding_degree": [
+      "./autoconfig/llama7b_lora_params.json",
+      "sharding_parallel_degree"
+    ],
+    "sharding_stage": [
+      "./autoconfig/llama7b_lora_params.json",
+      "sharding",
+      "stage"
+    ],
+    "use_recompute": [
+      "./autoconfig/llama7b_lora_params.json",
+      "recompute"
+    ],
+    "recompute_granularity": [
+      "./autoconfig/llama7b_lora_params.json",
+      "recompute_granularity"
+    ]
+  },
+  "schedule_prior": [
+    "mp4"
+  ],
+  "sharding_degree": "auto",
+  "sharding_stage": "auto",
+  "task_limit": 2000,
+  "use_recompute": "auto",
+  "recompute_granularity":"auto"
+}

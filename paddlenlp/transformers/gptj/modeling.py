@@ -158,7 +158,7 @@ class GPTJAttention(Layer):
 
         if attention_mask is not None:
             # Apply the attention mask
-            attn_weights = attn_weights + attention_mask
+            attn_weights = attn_weights + attention_mask.astype(attn_weights.dtype)
 
         attn_weights = paddle.nn.functional.softmax(attn_weights, axis=-1)
         attn_weights = attn_weights.astype(value.dtype)

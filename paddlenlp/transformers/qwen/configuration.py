@@ -14,6 +14,8 @@
 
 from paddlenlp.transformers import PretrainedConfig
 
+__all__ = ["QWenConfig"]
+
 
 class QWenConfig(PretrainedConfig):
     model_type = "qwen"
@@ -37,10 +39,16 @@ class QWenConfig(PretrainedConfig):
         rotary_emb_base=10000,
         use_dynamic_ntk=True,
         use_logn_attn=True,
-        use_flash_attn="auto",
         intermediate_size=22016,
         no_bias=True,
         tie_word_embeddings=False,
+        pad_token_id=0,
+        bos_token_id=1,
+        eos_token_id=2,
+        long_sequence_strategy_type=None,
+        long_sequence_strategy_name=None,
+        long_sequence_init_args=None,
+        use_long_sequence_strategies=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -56,11 +64,21 @@ class QWenConfig(PretrainedConfig):
         self.use_cache = use_cache
         self.max_position_embeddings = max_position_embeddings
         self.kv_channels = kv_channels
+
         self.rotary_pct = rotary_pct
         self.rotary_emb_base = rotary_emb_base
         self.use_dynamic_ntk = use_dynamic_ntk
         self.use_logn_attn = use_logn_attn
-        self.use_flash_attn = use_flash_attn
         self.no_bias = no_bias
+        self.long_sequence_strategy_type = long_sequence_strategy_type
+        self.long_sequence_strategy_name = long_sequence_strategy_name
+        self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
+        self.use_long_sequence_strategies = use_long_sequence_strategies
 
-        super().__init__(tie_word_embeddings=tie_word_embeddings, **kwargs)
+        super().__init__(
+            pad_token_id=pad_token_id,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            tie_word_embeddings=tie_word_embeddings,
+            **kwargs,
+        )

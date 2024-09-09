@@ -1,4 +1,4 @@
-exclude: 'model_zoo/gpt-3'
+exclude: 'legacy/model_zoo/gpt-3'
 repos:
 # For Python files
 -   repo: https://github.com/psf/black.git
@@ -44,3 +44,12 @@ repos:
         entry: python .copyright.hook
         language: system
         files: \.(c|cc|cxx|cpp|cu|h|hpp|hxx|proto|xpu|kps|py|sh)$
+# For Markdown files
+-   repo: local
+    hooks:
+    -   id: add-spaces-between-chinese-and-english
+        name: Add spaces between Chinese and English characters
+        entry: python scripts/codestyle/check_spaces.py
+        language: python
+        files: \.(md|markdown)$
+        pass_filenames: true

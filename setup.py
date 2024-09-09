@@ -14,7 +14,9 @@
 import errno
 import io
 import os
+import re
 import subprocess
+from datetime import datetime
 
 import setuptools
 
@@ -109,10 +111,29 @@ def show():
         f.write(content)
 
 
-__version__ = "2.6.1.post"
+# only use this file to contral the version
+__version__ = "3.0.0b1.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
+else:
+    formatted_date = datetime.now().date().strftime("%Y%m%d")
+    __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
 
+
+# write the version information for the develop version
+def append_version_py(filename="paddlenlp/__init__.py"):
+    assert os.path.exists(filename), f"{filename} does not exist!"
+
+    with open(filename, "r") as file:
+        file_content = file.read()
+
+    pattern = r"^# \[VERSION_INFO\].*$"
+    modified_content = re.sub(pattern, f'\n__version__ = "{__version__}"\n\n', file_content, flags=re.MULTILINE)
+    with open(filename, "w") as file:
+        file.write(modified_content)
+
+
+append_version_py(filename="paddlenlp/__init__.py")
 
 extras = {}
 REQUIRED_PACKAGES = read_requirements_file("requirements.txt")
@@ -165,7 +186,7 @@ try:
         license_files=("LICENSE",),
         packages=setuptools.find_packages(
             where=".",
-            exclude=("examples*", "tests*", "applications*", "fast_tokenizer*", "fast_generation*", "model_zoo*"),
+            exclude=("examples*", "tests*", "applications*", "fast_generation*", "model_zoo*"),
         ),
         package_data={
             "paddlenlp.ops": get_package_data_files(
@@ -174,18 +195,18 @@ try:
             "paddlenlp.transformers.layoutxlm": get_package_data_files(
                 "paddlenlp.transformers.layoutxlm", ["visual_backbone.yaml"]
             ),
+            "paddlenlp.experimental": get_package_data_files("paddlenlp.experimental", ["transformers"]),
         },
         setup_requires=["cython", "numpy"],
         install_requires=REQUIRED_PACKAGES,
         entry_points={"console_scripts": ["paddlenlp = paddlenlp.cli:main"]},
         extras_require=extras,
-        python_requires=">=3.6",
+        python_requires=">=3.8",
         classifiers=[
             "Programming Language :: Python :: 3",
-            "Programming Language :: Python :: 3.6",
-            "Programming Language :: Python :: 3.7",
             "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
+            "Programming Language :: Python :: 3.10",
             "License :: OSI Approved :: Apache Software License",
             "Operating System :: OS Independent",
         ],
@@ -193,6 +214,8 @@ try:
     )
 except Exception as e:
     git_checkout(paddlenlp_dir, "paddlenlp/version/__init__.py") if commit != "unknown" else None
+    git_checkout(paddlenlp_dir, "paddlenlp/__init__.py") if commit != "unknown" else None
     raise e
 
 git_checkout(paddlenlp_dir, "paddlenlp/version/__init__.py") if commit != "unknown" else None
+git_checkout(paddlenlp_dir, "paddlenlp/__init__.py") if commit != "unknown" else None

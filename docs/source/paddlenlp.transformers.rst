@@ -24,6 +24,8 @@ paddlenlp.transformers
    paddlenlp.transformers.convbert
    paddlenlp.transformers.ctrl
    paddlenlp.transformers.dallebart
+   paddlenlp.transformers.deberta
+   paddlenlp.transformers.deberta_v2
    paddlenlp.transformers.distilbert
    paddlenlp.transformers.electra
    paddlenlp.transformers.ernie

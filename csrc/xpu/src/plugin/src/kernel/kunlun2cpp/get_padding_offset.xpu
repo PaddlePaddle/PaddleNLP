@@ -1,0 +1,51 @@
+#include "xpu/kernel/cluster.h"
+#include "xpu/kernel/cluster_partition.h"
+#include "xpu/kernel/cluster_primitive.h"
+
+namespace xpu2 {
+namespace plugin {
+
+__global__ void get_padding_offset(int *padding_offset,
+                                   int *cum_offsets_out,
+                                   int *cu_seqlens_q,
+                                   int *cu_seqlens_k,
+                                   const int *cum_offsets,
+                                   const int *seq_lens,
+                                   const int max_seq_len,
+                                   const int bs) {
+  int cid = core_id();
+  int ncores = core_num();
+  int clusterid = cluster_id();
+  int nclusters = cluster_num();
+  int tid = clusterid * ncores + cid;
+
+  int buf_len = 32;
+  __simd__ int padding_offset_lm[buf_len];
+  __simd__ int cum_offsets_lm[16];
+  int seq_len_lm;
+  for (int i = clusterid; i < bs; i += nclusters) {
+    GM2LM_ASYNC(seq_lens + i, &seq_len_lm, sizeof(int));
+    GM2LM(cum_offsets + i - 1, cum_offsets_lm, 2 * sizeof(int));
+    if (i == 0) {
+      cum_offsets_lm[0] = 0;
+    }
+    for (int j = cid * buf_len; j < seq_len_lm; j += ncores * buf_len) {
+      int cur_len = min(seq_len_lm - j, buf_len);
+      for (int k = 0; k < cur_len; k++) {
+        padding_offset_lm[k] = cum_offsets_lm[0];
+      }
+      LM2GM(padding_offset_lm,
+                  padding_offset + i * max_seq_len - cum_offsets_lm[0] + j,
+                  cur_len * sizeof(int));
+    }
+    if (cid == 0) {
+      LM2GM_ASYNC(cum_offsets_lm, cum_offsets_out + i, sizeof(int));
+      int cum_seq_len = (i + 1) * max_seq_len - cum_offsets_lm[1];
+      LM2GM_ASYNC(&cum_seq_len, cu_seqlens_q + i + 1, sizeof(int));
+      LM2GM(&cum_seq_len, cu_seqlens_k + i + 1, sizeof(int));
+    }
+  }
+}
+
+}  // namespace plugin
+}  // namespace xpu2
