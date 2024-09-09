@@ -123,6 +123,8 @@ class AutoTrainer(Trainer):
             self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage2())
         elif ShardingOption.FULL_SHARD in self.args.sharding:
             self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage3())
+        else:
+            self.optimizer = dist.shard_optimizer(self.optimizer)
 
         if self.args.to_static:
             unified_strategy = dist.Strategy()
