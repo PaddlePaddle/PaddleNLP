@@ -55,6 +55,7 @@ setup(
     name="paddlenlp_ops",
     ext_modules=CUDAExtension(
         sources=[
+            "./generation/vtensor.cu",
             "./generation/pass/remove_assign_out_pass.cc",
             "./generation/save_with_output.cc",
             "./generation/set_value_by_flags.cu",
@@ -95,7 +96,7 @@ setup(
             ]
             + gencode_flags,
         },
-        libraries=['cublasLt'],
+        libraries=['cublasLt', 'cuda'],
         library_dirs=[library_path],
     ),
 )
