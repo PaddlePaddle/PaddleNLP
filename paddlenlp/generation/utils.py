@@ -1361,10 +1361,8 @@ class GenerationMixin(object):
                 "you should not specify InputSpec for top_k and top_p parameters, one of InputSpec is expected"
             )
 
-        # This tricky line has two functions:
-        # 1. avoid D2H sync of topk attribute
-        # 2. avoid constant_folding_pass incorrectly convert constant "1" into parameter
-        top_k = paddle.empty([top_k, 1]).shape[0]
+        # avoid D2H sync of topk attribute
+        top_k = paddle.empty([top_k]).shape[0]
 
         batch_size, cur_len = input_ids.shape
         # used for compute on gpu, avoid memcpy D2H
@@ -1412,9 +1410,7 @@ class GenerationMixin(object):
             # compute next_tokens
             if use_top_p:
                 logits = logits / temperature
-                # top_ps_tensor = paddle.full(shape=[probs.shape[0], 1], fill_value=top_p, dtype=probs.dtype) # will introduce cuda sync D2D copy
-                top_ps_tensor = paddle.empty(shape=[probs.shape[0], 1], dtype=probs.dtype)
-                top_ps_tensor[:] = top_p
+                top_ps_tensor = paddle.full(shape=[probs.shape[0], 1], fill_value=top_p, dtype=probs.dtype)
                 _, next_tokens = paddle.tensor.top_p_sampling(probs, top_ps_tensor)
             else:
                 probs = TopKProcess(probs, top_k, min_tokens_to_keep)
