@@ -524,6 +524,15 @@ class GenerationBlockInferenceModel(GenerationMixin):
             cache_v_dequant_scales,
             tgt_mask_spec,
         ]
+        if config.get("export_precache", None) is not None:
+            speculate_spec = [
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="draft_tokens"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="accept_tokens"),
+                paddle.static.InputSpec(shape=[None], dtype="int32", name="accept_num"),
+                paddle.static.InputSpec(shape=[None], dtype="int32", name="actual_draft_token_num"),
+            ]
+            input_spec.extend(speculate_spec)
+
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
         paddle.jit.save(
             model, output_path, skip_prune_program=True
