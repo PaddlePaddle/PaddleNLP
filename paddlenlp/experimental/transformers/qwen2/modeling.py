@@ -757,7 +757,9 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                             if self.config.tensor_parallel_degree > 1 and self.config.single_card_ptq:
                                 tmp = (
                                     tmp.reshape([3, self.num_attention_heads, head_size])
-                                    .split(self.config.tensor_parallel_degree, axis=1)[self.config.tensor_parallel_rank]
+                                    .split(self.config.tensor_parallel_degree, axis=1)[
+                                        self.config.tensor_parallel_rank
+                                    ]
                                     .reshape([-1])
                                 )
                             self.transformer_block.qkv_out_scales[i_layer].set_value(tmp)
