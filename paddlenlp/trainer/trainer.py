@@ -290,10 +290,10 @@ class Trainer:
         # Seed must be set before instantiating the model when using model
         set_seed(seed=self.args.seed)
 
-        if model is None and not args.debug_data:
-            raise RuntimeError("`Trainer` requires either a `model` or `model_init` argument")
+        if model is None:
+            logger.warning("Model is None.")
 
-        if self.args.to_static:
+        if self.args.to_static and model is not None:
             model = paddle.jit.to_static(model)
             logger.info("Successfully to apply @to_static to the whole model.")
 
@@ -341,8 +341,6 @@ class Trainer:
         self._signature_columns = None
         self.optimizer_grouped_parameters = None
         self.sharding_io = None
-        if self.args.should_save_sharding_stage1_model or self.args.should_load_sharding_stage1_model:
-            self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
         if self.args.unified_checkpoint:
             self.unified_checkpoint_handler = UnifiedCheckpointHandler(self.args)
 
@@ -352,19 +350,12 @@ class Trainer:
                 "You should subclass `Trainer` and override the `create_optimizer_and_scheduler` method."
             )
 
-        if self.args.pipeline_parallel_degree > 1 and self.args.use_hybrid_parallel and not args.debug_data:
+        if self.args.pipeline_parallel_degree > 1 and self.args.use_hybrid_parallel and model is not None:
             from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
             assert (isinstance(model, LoRAModel) and isinstance(model.model, PipelineLayer)) or isinstance(
                 model, PipelineLayer
             ), "Only support pipeline parallel mode when model is PipelineLayer!!!"
-
-        default_callbacks = DEFAULT_CALLBACKS + get_reporting_integration_callbacks(self.args.report_to)
-        callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
-        self.callback_handler = CallbackHandler(
-            callbacks, self.model, self.tokenizer, self.optimizer, self.lr_scheduler
-        )
-        self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
 
         def _save_ckpt_func(state_dict, path, signal_path=None):
             if self.args.enable_auto_parallel:
@@ -404,7 +395,17 @@ class Trainer:
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False
 
-        if not args.debug_data:
+        if model is not None:
+            if self.args.should_save_sharding_stage1_model or self.args.should_load_sharding_stage1_model:
+                self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
+
+            default_callbacks = DEFAULT_CALLBACKS + get_reporting_integration_callbacks(self.args.report_to)
+            callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
+            self.callback_handler = CallbackHandler(
+                callbacks, self.model, self.tokenizer, self.optimizer, self.lr_scheduler
+            )
+            self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
+
             if args.fp16 or args.bf16:
                 # set do_grad_scaling, enable_autocast_context_manager
                 self._wrap_amp_model(args, model)
