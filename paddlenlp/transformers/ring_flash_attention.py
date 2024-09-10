@@ -225,7 +225,6 @@ def balanced_ring_flash_attention_bwd_func(
     try:
         from paddlenlp_ops import flash_attn_bwd
     except (ImportError, ModuleNotFoundError):
-        pass
         from paddlenlp.utils.log import logger
 
         logger.warning(
