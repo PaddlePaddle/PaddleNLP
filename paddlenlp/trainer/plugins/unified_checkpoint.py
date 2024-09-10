@@ -29,7 +29,7 @@ from tqdm.auto import tqdm
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.trainer.argparser import strtobool
-from paddlenlp.trainer.trainer_utils import ExplicitEnum
+from paddlenlp.trainer.trainer_utils import ExplicitEnum, ShardingOption
 from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
@@ -489,15 +489,37 @@ class UnifiedCheckpointHandler:
             output_dir (str): Save directory.
 
         """
+        if paddle.distributed.get_world_size() <= 1:
+            self.save_single_card_optimizer(model, optimizer, output_dir)
+            return
+
+        if (
+            self.args.sharding_parallel_degree > 1
+            and ShardingOption.SHARD_OP in self.args.sharding
+            and "split_param" in self.args.sharding_parallel_config
+        ):
+            pass
 
         if "ignore_merge_optimizer" in self.args.unified_checkpoint_config:
             self.save_non_merge_optimizer(model, optimizer, output_dir)
             return
 
-        if paddle.distributed.get_world_size() <= 1:
-            self.save_single_card_optimizer(model, optimizer, output_dir)
-            return
+        print(type(optimizer), type(optimizer._inner_opt))
+        # print([p.name for p in optimizer._inner_opt._parameter_list])
+        print(optimizer._inner_opt._comm_buffer_list[0])
 
+        # comm_buffer
+        for buffer in optimizer._inner_opt._comm_buffer_list:
+            print(buffer.buffer_size)
+            # print([p.name for p in buffer._params])
+            for key in buffer._sharding_param_grad_view.keys():
+                print(
+                    key,
+                    buffer._sharding_param_grad_view[key]._param_begin,
+                    buffer._sharding_param_grad_view[key]._param_end,
+                )
+        paddle.distributed.barrier()
+        raise ValueError
         # Split into naive optimizer params and master weights.
         results = unified_optimizer_into_shards(self.args, model, optimizer, safe_serialization=True)
         master_weight_state_dict = None
