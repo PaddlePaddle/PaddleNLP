@@ -426,8 +426,8 @@ class Trainer:
                 else ["labels"]
             )
             self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
+            self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
 
-        self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
         self.print_config()
 
         # very last
