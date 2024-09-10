@@ -231,20 +231,12 @@ def prepare_qconfig(args):
         if "a" not in use_fp8
         else FP8_OBSERVER.get(args.act_quant_method, None)
     )
-    cachekv_observer = (
-        CACHEKV_OBSERVER.get(args.cachekv_quant_method, None)
-        if "c" not in use_fp8
-        else FP8_OBSERVER.get(args.cachekv_quant_method, None)
-    )
+    cachekv_observer = CACHEKV_OBSERVER.get(args.cachekv_quant_method, None)
 
     if "c8" in args.quant_type:
         quant_type = args.quant_type.replace("c8", "")
         cachekv_quant = True
-
-        if "c" in use_fp8:
-            cachekv_quant_bits = "fp8"
-        else:
-            cachekv_quant_bits = "int8"
+        cachekv_quant_bits = "int8"
     else:
         quant_type = args.quant_type.replace("c16", "")
         cachekv_quant = False
@@ -297,23 +289,8 @@ def prepare_qconfig(args):
                     cachekv_observer(quant_bits=cachekv_quant_bit),
                 ]
             q_config.add_qat_layer_mapping(FuncWrapper, QuantizedCustomAttentionLayer)
-
-        elif cachekv_quant_bits == "fp8":
-            cachekv_quant_bit = (4, 3) if args.fp8_type[use_fp8.index("c")] == "e4m3" else (5, 2)
-
-            if "headwise" in args.cachekv_quant_method:
-                cachekv = [
-                    cachekv_observer(quant_bits=cachekv_quant_bit, quant_axis=1),
-                    cachekv_observer(quant_bits=cachekv_quant_bit, quant_axis=1),
-                ]
-            else:
-                cachekv = [
-                    cachekv_observer(quant_bits=cachekv_quant_bit),
-                    cachekv_observer(quant_bits=cachekv_quant_bit),
-                ]
-            q_config.add_qat_layer_mapping(FuncWrapper, QuantizedCustomAttentionLayer)
         else:
-            raise ValueError("cachekv_quant_bits should be 8")
+            raise ValueError("cachekv_quant_bits should be int8")
 
     return activation, weight, cachekv, q_config
 
