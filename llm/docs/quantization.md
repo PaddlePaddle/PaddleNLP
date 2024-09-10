@@ -95,7 +95,6 @@ python  run_finetune.py ./config/llama/fp8_ptq_argument.json
 ```
 
 
-
 ### 2.9 量化参数介绍
 
 <summary>&emsp; 量化参数（QuantArgument）</summary>
