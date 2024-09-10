@@ -8,7 +8,7 @@ run_mode=DP2-MP1-PP4-SD2-stage2
 device_num=N1C8
 sharding_degree=2 # sharding_degree = dp_degree
 sharding_stage=2
-level=o3
+level=o2
 local_batch_size=8
 
 model=gpt

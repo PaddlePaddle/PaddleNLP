@@ -34,7 +34,7 @@ function _set_params(){
     convergence_key="loss:"        # (可选)解析日志，筛选出收敛数据所在行的关键字 如：convergence_key="loss:"
     sharding_degree=${10:-"1"}      # (可选)
     sharding_stage=${11:-"1"}       # (可选)sharding case
-    level=${12:-"o1"}               # o1|o2|o3
+    level=${12:-"o1"}               # o0|o1|o2
     local_batch_size=${13:-"8"}    # （可选）本地batch size
     schedule_mode=${14:-"1F1B"}    # （可选）schedule mode
     base_batch_size=$global_batch_size

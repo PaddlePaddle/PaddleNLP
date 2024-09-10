@@ -8,7 +8,7 @@ run_mode=DP1-MP1-PP8-SD1-stage1
 device_num=N1C8
 sharding_degree=1
 sharding_stage=1
-level=o3
+level=o2
 local_batch_size=8
 
 model=gpt
