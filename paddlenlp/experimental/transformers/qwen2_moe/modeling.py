@@ -257,6 +257,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        self.transformer_block.init_weight()
         head_size = self.hidden_size // self.num_attention_heads
         dtype = paddle.get_default_dtype()
         embed_tokens_weight = paddle.to_tensor(state_dict["qwen2_moe.embed_tokens.weight"]).cast(
