@@ -50,7 +50,6 @@ def strtobool(v):
             f"Truthy value expected: got {v} but expected one of yes/no, true/false, t/f, y/n, 1/0 (case insensitive)."
         )
 
-
 def get_gencode_flags():
     if not strtobool(os.getenv("FLAG_LLM_PDC", "False")):
         prop = paddle.device.cuda.get_device_properties()
@@ -118,10 +117,20 @@ nvcc_compile_args += [
     "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
     "-Igpu/cutlass_kernels",
     "-Igpu/cutlass_kernels/cutlass/include",
+    "-Igpu/fp8_gemm_with_cutlass",
+    "-Igpu",
 ]
 cc = get_sm_version()
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
+
+if cc >= 89:
+    sources += [
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
+        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.cu",
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
+        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_dual_gemm_scale_bias_act.cu",
+    ]
 
 setup(
     name="paddlenlp_ops",
