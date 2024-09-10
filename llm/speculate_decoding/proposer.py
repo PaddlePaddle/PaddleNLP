@@ -37,7 +37,8 @@ class Proposer(ABC):
 
 class InferenceWithReferenceProposer(Proposer):
     """
-    Proposer for Inference with reference speculate method. Match tokens in the input and output as draft tokens.
+    InferenceWithReference(https://arxiv.org/pdf/2304.04487) is one of the speculative decoding method.
+    It match tokens in the input and output as draft tokens.
     """
 
     def __init__(self, max_draft_tokens, max_ngram_size, max_batch_size, **kwargs):
@@ -45,8 +46,10 @@ class InferenceWithReferenceProposer(Proposer):
         Args:
         max_draft_tokens (int):
             Maximum number of tokens a proposer can generate at one time.
+            The hyperparameter of k in the paper.
         max_ngram_size (int):
             The maximum size of the window used to match inputs and outputs.
+            The hyperparameter of n in the paper.
         max_batch_size (int):
             The maximum batch size.
         """
