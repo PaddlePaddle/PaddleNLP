@@ -48,7 +48,6 @@ from . import (
     seq2vec,
     trainer,
     transformers,
-    trl,
     utils,
     version,
 )
