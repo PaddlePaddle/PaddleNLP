@@ -59,9 +59,6 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
             }
         } else if (seq_lens_decoder[tid] != 0 && block_table_now[seq_lens_decoder[tid] / block_size] == -1) {
             // 统计需要分配block的位置和总数
-#ifdef DEBUG_STEP
-            printf("step seq_id:%d, ##### pin 1 #####\n", tid);
-#endif
             const int ori_need_block_len = atomicAdd(need_block_len, 1);
             need_block_list[ori_need_block_len] = tid;
 #ifdef DEBUG_STEP
@@ -69,9 +66,6 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
 #endif
         }
     }
-#ifdef DEBUG_STEP
-    printf("step seq_id:%d, ##### pin 2 #####\n", tid);
-#endif
     __syncthreads();
     if (tid == 0) {
         printf("need_block_len: %d, free_list_len: %d\n", need_block_len[0], free_list_len[0]);
@@ -108,9 +102,6 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
         }
         __syncthreads();
     }
-#ifdef DEBUG_STEP
-    printf("step seq_id:%d, ##### pin 3 #####\n", tid);
-#endif
     // 为需要block的位置分配block，每个位置分配一个block
     if (tid < need_block_len[0]) {
         const int need_block_id = need_block_list[tid];
@@ -124,16 +115,10 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
         need_block_list[tid] = -1;
     }
     __syncthreads();
-#ifdef DEBUG_STEP
-    printf("step seq_id:%d, ##### pin 4 #####\n", tid);
-#endif
     // 计算可以复原的query id
     if (tid == 0) {
         int ori_free_list_len = free_list_len[0];
         int ori_step_len = step_len[0];
-#ifdef DEBUG_STEP
-        printf("ori_step_len %d\n", ori_step_len);
-#endif
         if (ori_step_len > 0) {
             int ori_step_block_id = step_block_list[ori_step_len - 1];
             int tmp_used_len = used_list_len[ori_step_block_id];
@@ -161,9 +146,6 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
         }
         need_block_len[0] = 0;
     }
-#ifdef DEBUG_STEP
-    printf("step seq_id:%d, ##### pin 5 #####\n", tid);
-#endif
 }
 
 // 根据上一步计算出的可以复原的query_id进行状态恢复
