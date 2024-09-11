@@ -851,7 +851,7 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
         logger.info("Qwen2Moe inference model _get_tensor_parallel_mappings")
 
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
-        
+
         fn = split_or_merge_func(
             is_split=is_split,
             tensor_parallel_degree=config.tensor_parallel_degree,
@@ -889,15 +889,9 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
                 )
             else:
                 for expert_idx in range(config.num_experts):
-                    base_actions[f"layers.0.mlp.experts.{expert_idx}.up_proj.weight"] = partial(
-                        fn, is_column=True
-                    )
-                    base_actions[f"layers.0.mlp.experts.{expert_idx}.gate_proj.weight"] = partial(
-                        fn, is_column=True
-                    )
-                    base_actions[f"layers.0.mlp.experts.{expert_idx}.down_proj.weight"] = partial(
-                        fn, is_column=False
-                    )
+                    base_actions[f"layers.0.mlp.experts.{expert_idx}.up_proj.weight"] = partial(fn, is_column=True)
+                    base_actions[f"layers.0.mlp.experts.{expert_idx}.gate_proj.weight"] = partial(fn, is_column=True)
+                    base_actions[f"layers.0.mlp.experts.{expert_idx}.down_proj.weight"] = partial(fn, is_column=False)
             base_actions["layers.0.mlp.shared_expert.up_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.shared_expert.gate_proj.weight"] = partial(fn, is_column=True)
             base_actions["layers.0.mlp.shared_expert.down_proj.weight"] = partial(fn, is_column=False)

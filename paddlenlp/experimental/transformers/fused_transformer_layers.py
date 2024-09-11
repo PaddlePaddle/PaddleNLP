@@ -647,7 +647,6 @@ class FusedMultiTransformerBase(Layer):
                 if self.config.moe_config.use_shared_expert(i):
                     _set_var_distributed(shared_expert_ffn1_weight)
                     _set_var_distributed(shared_expert_ffn2_weight)
-                
 
             self.ln_scales.append(ln_scale)
             self.ln_biases.append(ln_bias)
@@ -2456,9 +2455,6 @@ class FusedBlockMultiTransformerFP8(Layer):
                 # row parallel
                 _set_var_distributed(linear_weight)
                 _set_var_distributed(ffn2_weight)
-                if self.config.moe_config.use_shared_expert(i):
-                    _set_var_distributed(shared_expert_ffn1_weight)
-                    _set_var_distributed(shared_expert_ffn2_weight)
 
             self.ln_scales.append(ln_scale)
             self.ln_biases.append(ln_bias)
