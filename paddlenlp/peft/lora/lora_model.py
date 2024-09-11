@@ -70,7 +70,7 @@ from .lora_layers import (
     RowSequenceParallelLoRALinear,
 )
 
-AVAILABLE_LAYERS = [
+AVALIABLE_LAYERS = [
     ColumnParallelLoRALinear,
     ColumnSequenceParallelLoRALinear,
     LoRAConv2D,
@@ -90,7 +90,7 @@ try:
         RowParallelQuantizationLoRALinear,
     )
 
-    AVAILABLE_LAYERS += [
+    AVALIABLE_LAYERS += [
         ColumnParallelQuantizationLoRALinear,
         QuantizationLoRALinear,
         RowParallelQuantizationLoRALinear,
@@ -815,20 +815,20 @@ class LoRAModel(nn.Layer):
 
     def disable_lora(self):
         for _, layer in self.model.named_sublayers():
-            if any(isinstance(layer, lora_layer) for lora_layer in AVAILABLE_LAYERS):
+            if any(isinstance(layer, lora_layer) for lora_layer in AVALIABLE_LAYERS):
                 layer.disable_lora = True
 
     def enable_lora(self):
         for _, layer in self.model.named_sublayers():
-            if any(isinstance(layer, lora_layer) for lora_layer in AVAILABLE_LAYERS):
+            if any(isinstance(layer, lora_layer) for lora_layer in AVALIABLE_LAYERS):
                 layer.disable_lora = False
 
     def merge(self):
         for _, layer in self.model.named_sublayers():
-            if any(isinstance(layer, lora_layer) for lora_layer in AVAILABLE_LAYERS):
+            if any(isinstance(layer, lora_layer) for lora_layer in AVALIABLE_LAYERS):
                 layer.merge()
 
     def unmerge(self):
         for _, layer in self.model.named_sublayers():
-            if any(isinstance(layer, lora_layer) for lora_layer in AVAILABLE_LAYERS):
+            if any(isinstance(layer, lora_layer) for lora_layer in AVALIABLE_LAYERS):
                 layer.unmerge()
