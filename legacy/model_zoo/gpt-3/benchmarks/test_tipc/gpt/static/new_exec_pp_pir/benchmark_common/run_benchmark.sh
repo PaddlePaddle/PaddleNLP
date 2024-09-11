@@ -38,7 +38,7 @@ function _set_params(){
 
     if [ $FLAGS_enable_pir_api == 1 ]; then
         if [ ${level} == "o3" ]; then
-            ${level}="o2"
+            level="o2"
             echo "amp level changed to o2 in pir mode"
         else
             echo "amp level is o3"
