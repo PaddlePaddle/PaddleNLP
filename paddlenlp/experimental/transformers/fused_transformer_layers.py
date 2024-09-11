@@ -50,16 +50,19 @@ if core.is_compiled_with_cuda():
         from paddlenlp_ops import cutlass_fp8_fp8_half_gemm_fused as fp8_gemm_fused
     else:
         from paddle.linalg import fp8_fp8_half_gemm_fused as fp8_gemm_fused
-    from paddlenlp_ops import (
-        dequant_int8,
-        encode_rotary_qk,
-        gemm_dequant,
-        qkv_transpose_split,
-        quant_int8,
-        rebuild_padding,
-        transpose_remove_padding,
-        write_cache_kv,
-    )
+    try:
+        from paddlenlp_ops import (
+            dequant_int8,
+            encode_rotary_qk,
+            gemm_dequant,
+            qkv_transpose_split,
+            quant_int8,
+            rebuild_padding,
+            transpose_remove_padding,
+            write_cache_kv,
+        )
+    except:
+        pass
 
 __all__ = [
     "MoeConfig",
