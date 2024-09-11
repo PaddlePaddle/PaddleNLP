@@ -356,7 +356,6 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             unfused_state_dict["qwen2_moe.self_attn.v_proj.bias"] = state_dict[
                 "qwen2_moe.layers.{}.self_attn.v_proj.bias".format(idx)
             ]
-            print(unfused_state_dict["qwen2_moe.self_attn.v_proj.bias"].shape)
 
             concated_qkv_biases = np.concatenate(
                 [
