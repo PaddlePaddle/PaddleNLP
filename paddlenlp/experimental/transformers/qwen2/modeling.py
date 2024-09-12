@@ -117,6 +117,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         elif "a8w8" in config.quant_type:
             self.quant_model_path = config.model_name_or_path
             self.shift = config.quantization_config.shift
+            self.smooth = config.quantization_config.smooth
             self.shift_smooth_all_linears = config.quantization_config.shift_smooth_all_linears
             if self.use_fake_parameter:
                 self.shift_smooth_all_linears = True
