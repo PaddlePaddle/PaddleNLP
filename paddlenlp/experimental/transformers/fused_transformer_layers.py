@@ -2319,7 +2319,7 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
             v_quant_scales[i] if v_quant_scales is not None else None,
             k_dequant_scales[i] if k_dequant_scales is not None else None,
             v_dequant_scales[i] if v_dequant_scales is not None else None,
-            self.qkv_out_scales[i] if self.skip_quant("qkv_weight_scale", i) else None,
+            self.qkv_out_scales[i] if not self.skip_quant("qkv_weight_scale", i) else None,
             self.qkv_biases[i] if len(self.qkv_biases) > 0 else None,
             self.linear_shifts[i] if len(self.linear_shifts) > 0 else None,
             self.linear_smooths[i] if len(self.linear_smooths) > 0 else None,
