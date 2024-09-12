@@ -867,6 +867,22 @@ class TrainingArguments:
     release_grads: Optional[bool] = field(
         default=False, metadata={"help": "Whether to release gradients during training. Default is `False`."}
     )
+    fused_linear_param_grad_add: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
+        },
+    )
+    fuse_allreduce_split_to_reducescatter: bool = field(
+        default=False,
+        metadata={"help": "Enable fuse_allreduce_split_to_reducescatter pass."},
+    )
+    eliminate_transpose: bool = field(
+        default=False,
+        metadata={
+            "help": "Enable eliminate_transpose pass, which should replace transpose with reshape when sequence parallel is enabled."
+        },
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -1413,6 +1429,22 @@ class TrainingArguments:
                 warnings.warn("`offload` is not supported NOW!")
 
             strategy = fleet.auto.Strategy()
+
+            if self.fused_linear_param_grad_add:
+                fused_passes = strategy.fused_passes
+                fused_passes.enable = True
+                fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
+
+            if self.fuse_allreduce_split_to_reducescatter:
+                fused_passes = strategy.fused_passes
+                fused_passes.enable = True
+                fused_passes.fused_passes_list.append("fuse_allreduce_split_to_reducescatter_pass")
+
+            if self.eliminate_transpose:
+                fused_passes = strategy.fused_passes
+                fused_passes.enable = True
+                fused_passes.fused_passes_list.append("eliminate_transpose")
+
             if self.dataset_world_size > 1:
                 data_parallel_config = set(self.data_parallel_config.split(" "))
                 for x in data_parallel_config:
