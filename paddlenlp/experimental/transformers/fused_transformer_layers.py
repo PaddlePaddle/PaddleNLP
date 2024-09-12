@@ -1302,7 +1302,7 @@ class FusedMultiTransformerWeightOnly(FusedMultiTransformerBase):
                 if config.moe_config.has_shared_expert():
                     self.moe_ffn1_weight_shape[2] //= 2
                     self.moe_ffn2_weight_shape[1] //= 2
-                else :
+                else:
                     self.moe_ffn1_weight_shape[2] //= 2
                     self.moe_ffn2_weight_shape[2] //= 2
 
