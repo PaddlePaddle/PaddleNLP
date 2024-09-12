@@ -78,29 +78,33 @@ def setup_fused_ln():
         name="fused_ln",
         ext_modules=CUDAExtension(
             sources=[
-                "fused_ln/layer_norm_cuda.cu",
+                "fused_ln/layer_norm_cuda.mu",
             ],
             extra_compile_args={
                 "cxx": ["-O3"],
-                "nvcc": [
+                # "nvcc": [
+                #     "-O3",
+                #     "-U__CUDA_NO_HALF_OPERATORS__",
+                #     "-U__CUDA_NO_HALF_CONVERSIONS__",
+                #     "-U__CUDA_NO_BFLOAT16_OPERATORS__",
+                #     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+                #     "-U__CUDA_NO_BFLOAT162_OPERATORS__",
+                #     "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+                #     "-I./apex/contrib/csrc/layer_norm/",
+                #     "--expt-relaxed-constexpr",
+                #     "--expt-extended-lambda",
+                #     "--use_fast_math",
+                #     "-maxrregcount=50",
+                # ]
+                # + gencode_flags,
+                "mcc":[
                     "-O3",
-                    "-U__CUDA_NO_HALF_OPERATORS__",
-                    "-U__CUDA_NO_HALF_CONVERSIONS__",
-                    "-U__CUDA_NO_BFLOAT16_OPERATORS__",
-                    "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                    "-U__CUDA_NO_BFLOAT162_OPERATORS__",
-                    "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-                    "-I./apex/contrib/csrc/layer_norm/",
-                    "--expt-relaxed-constexpr",
-                    "--expt-extended-lambda",
-                    "--use_fast_math",
-                    "-maxrregcount=50",
+                    "-D__MUSA_NO_HALF_CONVERSIONS__"
                 ]
-                + gencode_flags,
             },
         ),
     )
 
-
-run(setup_fast_ln)
-run(setup_fused_ln)
+setup_fused_ln()
+# run(setup_fast_ln)
+# run(setup_fused_ln)

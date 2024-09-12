@@ -20,8 +20,8 @@
 
 #pragma once  // NOLINT
 
-#include <cuda.h>          // NOLINT
-#include <cuda_runtime.h>  // NOLINT
+#include <musa.h>          // NOLINT
+#include <musa_runtime.h>  // NOLINT
 
 #include "paddle/extension.h"
 
@@ -914,15 +914,15 @@ __global__ void cuComputeGradInput(const V* __restrict__ dout,
   }
 }
 
-static cudaDeviceProp GetDevicePropImpl() {
+static musaDeviceProp GetDevicePropImpl() {
   int device = -1;
-  PD_CHECK(cudaGetDevice(&device) == cudaSuccess);
-  cudaDeviceProp prop;
-  PD_CHECK(cudaGetDeviceProperties(&prop, device) == cudaSuccess);
+  PD_CHECK(musaGetDevice(&device) == musaSuccess);
+  musaDeviceProp prop;
+  PD_CHECK(musaGetDeviceProperties(&prop, device) == musaSuccess);
   return prop;
 }
 
-static cudaDeviceProp* GetDeviceProp() {
+static musaDeviceProp* GetDeviceProp() {
   static auto prop = GetDevicePropImpl();
   return &prop;
 }
@@ -937,7 +937,7 @@ void HostApplyLayerNorm(V* output,
                         double epsilon,
                         const V* gamma,
                         const V* beta,
-                        cudaStream_t stream) {
+                        musaStream_t stream) {
   const dim3 threads(32, 4, 1);
   const uint64_t maxGridY = GetDeviceProp()->maxGridSize[1];
   const dim3 blocks(1, std::min((uint64_t)n1, maxGridY), 1);
@@ -955,11 +955,11 @@ void HostApplyRMSNorm(V* output,
                       int n2,
                       double epsilon,
                       const V* gamma,
-                      cudaStream_t stream) {
-  // auto stream = at::cuda::getCurrentCUDAStream().stream();
+                      musaStream_t stream) {
+  // auto stream = at::musa::getCurrentmusaStream().stream();
   const dim3 threads(32, 4, 1);
   // const uint64_t maxGridY =
-  // at::cuda::getCurrentDeviceProperties()->maxGridSize[1];
+  // at::musa::getCurrentDeviceProperties()->maxGridSize[1];
   const uint64_t maxGridY = GetDeviceProp()->maxGridSize[1];
   const dim3 blocks(1, std::min((uint64_t)n1, maxGridY), 1);
   int nshared =
@@ -1027,7 +1027,7 @@ void HostLayerNormGradient(const V* dout,
                            T* grad_input,
                            V* grad_gamma,
                            V* grad_beta,
-                           cudaStream_t stream) {
+                           musaStream_t stream) {
   if (gamma != NULL && beta != NULL) {
     // compute grad_gamma(j) and grad_beta(j)
     const int part_size = 16;
@@ -1094,7 +1094,7 @@ void HostRMSNormGradient(const V* dout,
                          double epsilon,
                          T* grad_input,
                          V* grad_gamma,
-                         cudaStream_t stream) {
+                         musaStream_t stream) {
   if (gamma != NULL) {
     const int part_size = 16;
     const dim3 threads2(32, 4, 1);
