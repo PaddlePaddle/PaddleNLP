@@ -127,7 +127,7 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 |       Yuan2        |    ✅     |  ✅  |  ✅   |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
 ------------------------------------------------------------------------------------------
 
-* [大模型推理](./llm/docs/predict/inference.md)已支持 LLaMA 系列、Qwen 系列、Mistral 系列、ChatGLM 系列、Bloom 系列和Baichuan 系列，支持Weight Only INT8及INT4推理，支持WAC（权重、激活、Cache KV）进行INT8、FP8量化的推理，【LLM】模型推理支持列表如下：
+* [大模型推理](./llm/docs/predict/inference.md)已支持 LLaMA 系列、Qwen 系列、Mistral 系列、ChatGLM 系列、Bloom 系列和 Baichuan 系列，支持 Weight Only INT8及 INT4推理，支持 WAC（权重、激活、Cache KV）进行 INT8、FP8量化的推理，【LLM】模型推理支持列表如下：
 
 |                模型名称/量化类型支持            | FP16/BF16 | WINT8 | WINT4 | INT8-A8W8 | FP8-A8W8 | INT8-A8W8C8 |
 |:--------------------------------------------:|:---------:|:-----:|:-----:|:---------:|:--------:|:-----------:|
@@ -149,7 +149,7 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 ### pip 安装
 
 ```shell
-pip install --upgrade paddlenlp==3.0.0b0
+pip install --upgrade paddlenlp==3.0.0b1
 ```
 
 或者可通过以下命令安装最新 develop 分支代码：

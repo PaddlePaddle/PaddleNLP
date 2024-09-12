@@ -1,4 +1,4 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ ACT_OBSERVER = dict(
 
 WEIGHT_OBSERVER = dict(
     abs_max_channel_wise=AbsMaxChannelWiseWeightObserver,
-    group_wise=GroupWiseWeightObserver,
+    groupwise=GroupWiseWeightObserver,
 )
 
 CACHEKV_OBSERVER = dict(
@@ -213,21 +213,25 @@ def prepare_qconfig(args):
     """
     Prepare qconfig
     """
-
-    weight_observer = WEIGHT_OBSERVER.get(args.weight_quant_method, None)
-    if weight_observer is None:
-        weight_observer = FP8_OBSERVER.get(args.weight_quant_method, None)
-
-    act_observer = ACT_OBSERVER.get(args.act_quant_method, None)
-    if act_observer is None:
-        act_observer = FP8_OBSERVER.get(args.act_quant_method, None)
-
-    cachekv_observer = CACHEKV_OBSERVER.get(args.cachekv_quant_method, None)
-    if cachekv_observer is None:
-        cachekv_observer = FP8_OBSERVER.get(args.cachekv_quant_method, None)
-
     args.quant_type = args.quant_type.lower()
     args.use_fp8 = args.use_fp8.lower()
+
+    weight_observer = (
+        WEIGHT_OBSERVER.get(args.weight_quant_method, None)
+        if "w" not in args.use_fp8
+        else FP8_OBSERVER.get(args.weight_quant_method, None)
+    )
+    act_observer = (
+        ACT_OBSERVER.get(args.act_quant_method, None)
+        if "a" not in args.use_fp8
+        else FP8_OBSERVER.get(args.act_quant_method, None)
+    )
+    cachekv_observer = (
+        CACHEKV_OBSERVER.get(args.cachekv_quant_method, None)
+        if "c" not in args.use_fp8
+        else FP8_OBSERVER.get(args.cachekv_quant_method, None)
+    )
+
     if "c8" in args.quant_type:
         quant_type = args.quant_type.replace("c8", "")
         cachekv_quant = True
@@ -252,15 +256,15 @@ def prepare_qconfig(args):
             a_quant_bit = (4, 3) if args.fp8_type[args.use_fp8.index("a")] == "e4m3" else (5, 2)
         else:
             a_quant_bit = 8
-        activation = act_observer(quant_bits=w_quant_bit)
-        weight = weight_observer(quant_bits=a_quant_bit)
+        activation = act_observer(quant_bits=a_quant_bit)
+        weight = weight_observer(quant_bits=w_quant_bit)
 
-    elif quant_type in ["wint4", "w4a16", "weight_only_int8"]:
+    elif quant_type in ["wint4", "w4a16", "weight_only_int4"]:
         activation = None
-        weight = GroupWiseWeightObserver(quant_bits=4, group_size=args.group_size)  # TODO
+        weight = weight_observer(quant_bits=4)
+
     elif quant_type in ["wint8", "w8a16", "weight_only_int8"]:
         activation = None
-
         if "w" in args.use_fp8:
             weight = weight_observer(quant_bits=(4, 3))
         else:
@@ -290,7 +294,7 @@ def prepare_qconfig(args):
             q_config.add_qat_layer_mapping(FuncWrapper, QuantizedCustomAttentionLayer)
 
         elif cachekv_quant_bits == "fp8":
-            cachekv_quant_bit = (4, 3) if args.fp8_type[args.use_fp8.index("C")] == "e4m3" else (5, 2)
+            cachekv_quant_bit = (4, 3) if args.fp8_type[args.use_fp8.index("c")] == "e4m3" else (5, 2)
 
             if "headwise" in args.cachekv_quant_method:
                 cachekv = [

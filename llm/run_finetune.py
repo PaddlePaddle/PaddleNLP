@@ -18,7 +18,6 @@ from functools import partial
 
 import paddle
 from utils.argument import (
-    CEvalArgument,
     DataArgument,
     GenerateArgument,
     ModelArgument,
@@ -53,6 +52,7 @@ from paddlenlp.transformers import (
     LlamaForCausalLM,
     LlamaForCausalLMPipe,
     LlamaTokenizer,
+    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.utils.llm_utils import (
@@ -72,13 +72,11 @@ flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
 
 
 def main():
-    parser = PdArgumentParser(
-        (GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments, CEvalArgument)
-    )
+    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        gen_args, quant_args, model_args, data_args, training_args, ceval_args = parser.parse_json_file_and_cmd_lines()
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
-        gen_args, quant_args, model_args, data_args, training_args, ceval_args = parser.parse_args_into_dataclasses()
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -193,7 +191,10 @@ def main():
             neft_post_hook_handle = model.get_input_embeddings().register_forward_post_hook(neft_post_hook)
         else:
             raise NotImplementedError("Only support neftune for model with get_input_embeddings")
-
+    if training_args.sequence_parallel:
+        register_sequence_parallel_allreduce_hooks(
+            model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
+        )
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
     # init chat_template for tokenizer
@@ -518,6 +519,8 @@ def main():
         training_args.pipeline_parallel_degree > 1
         or training_args.sequence_parallel
         or training_args.autotuner_benchmark
+        or data_args.zero_padding
+        or data_args.pad_to_max_length
     ):
         # NOTE(gongenlei): new add autotuner_benchmark
         max_length = data_args.max_length
@@ -554,10 +557,6 @@ def main():
         gen_args=gen_args,
         data_args=data_args,
     )
-
-    # Evaluation dev set
-    if training_args.do_eval:
-        before_eval_result = trainer.evaluate(dev_ds)
 
     # Train
     if training_args.do_train:
@@ -720,19 +719,9 @@ def main():
     # Evaluation dev set
     if training_args.do_eval:
 
-        logger.info("*** Evaluate result before train/ptq/qat/ etc.***")
-        trainer.log_metrics("eval", before_eval_result)
-
         logger.info("*** Evaluate result after train/ptq/qat/ etc.***")
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
-
-    if training_args.do_ceval:
-        logger.info("*** Evaluate on C-Eval ***")
-        ceval_args.output_dir = training_args.output_dir
-        from experimental.ceval.default.eval import run_eval
-
-        run_eval(tokenizer, trainer.model, ceval_args)
 
 
 if __name__ == "__main__":

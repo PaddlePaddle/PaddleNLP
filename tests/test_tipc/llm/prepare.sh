@@ -20,4 +20,7 @@ make install
 
 cd ./csrc
 pip install -r requirements.txt
+wget https://paddle-qa.bj.bcebos.com/benchmark/PaddleNLP/cutlass.tar
+tar -xvf cutlass.tar
+mv cutlass ./gpu/cutlass_kernels
 python setup_cuda.py install
