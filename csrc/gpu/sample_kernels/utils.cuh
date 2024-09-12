@@ -1,7 +1,8 @@
 #pragma once
 
-#include <cuda_runtime.h>
 #include <cuda_device_runtime_api.h>
+#include <cuda_runtime.h>
+
 #include <cstdint>
 #include <iostream>
 #include <sstream>
@@ -13,22 +14,23 @@
 #define STR(x) STR_HELPER(x)
 
 #ifndef NDEBUG
-#define CUDA_CALL(func, ...)                                                     \
-  {                                                                                         \
-    cudaError_t e = (func);                                                                 \
-    if (e != cudaSuccess) {                                                                 \
-      std::cerr << "CUDA Error: " << cudaGetErrorString(e) << " (" << e << ") " << __FILE__ \
-                << ": line " << __LINE__ << " at function " << STR(func) << std::endl;      \
-      return e;                                                                             \
-    }                                                                                       \
+#define CUDA_CALL(func, ...)                                            \
+  {                                                                     \
+    cudaError_t e = (func);                                             \
+    if (e != cudaSuccess) {                                             \
+      std::cerr << "CUDA Error: " << cudaGetErrorString(e) << " (" << e \
+                << ") " << __FILE__ << ": line " << __LINE__            \
+                << " at function " << STR(func) << std::endl;           \
+      return e;                                                         \
+    }                                                                   \
   }
 #else
 #define CUDA_CALL(func, ...) \
-  {                                     \
-    cudaError_t e = (func);             \
-    if (e != cudaSuccess) {             \
-      return e;                         \
-    }                                   \
+  {                          \
+    cudaError_t e = (func);  \
+    if (e != cudaSuccess) {  \
+      return e;              \
+    }                        \
   }
 #endif
 
@@ -101,7 +103,9 @@ struct vec_t<float, 1> {
   float data;
 
   SAMPLING_INLINE float& operator[](size_t i) { return ((float*)(&data))[i]; }
-  SAMPLING_INLINE const float& operator[](size_t i) const { return ((const float*)(&data))[i]; }
+  SAMPLING_INLINE const float& operator[](size_t i) const {
+    return ((const float*)(&data))[i];
+  }
   SAMPLING_INLINE float* ptr() { return reinterpret_cast<float*>(&data); }
   SAMPLING_INLINE void fill(float val);
   SAMPLING_INLINE void load(const float* ptr);
@@ -127,7 +131,9 @@ SAMPLING_INLINE void vec_t<float, 1>::load(const float* ptr) { data = *ptr; }
 
 SAMPLING_INLINE void vec_t<float, 1>::store(float* ptr) const { *ptr = data; }
 
-SAMPLING_INLINE void vec_t<float, 1>::memcpy(float* dst, const float* src) { *dst = *src; }
+SAMPLING_INLINE void vec_t<float, 1>::memcpy(float* dst, const float* src) {
+  *dst = *src;
+}
 
 // float x 2
 template <>
@@ -135,7 +141,9 @@ struct vec_t<float, 2> {
   float2 data;
 
   SAMPLING_INLINE float& operator[](size_t i) { return ((float*)(&data))[i]; }
-  SAMPLING_INLINE const float& operator[](size_t i) const { return ((const float*)(&data))[i]; }
+  SAMPLING_INLINE const float& operator[](size_t i) const {
+    return ((const float*)(&data))[i];
+  }
   SAMPLING_INLINE float* ptr() { return reinterpret_cast<float*>(&data); }
   SAMPLING_INLINE void fill(float val);
   SAMPLING_INLINE void load(const float* ptr);
@@ -155,11 +163,17 @@ struct vec_t<float, 2> {
   SAMPLING_INLINE static void memcpy(float* dst, const float* src);
 };
 
-SAMPLING_INLINE void vec_t<float, 2>::fill(float val) { data = make_float2(val, val); }
+SAMPLING_INLINE void vec_t<float, 2>::fill(float val) {
+  data = make_float2(val, val);
+}
 
-SAMPLING_INLINE void vec_t<float, 2>::load(const float* ptr) { data = *((float2*)ptr); }
+SAMPLING_INLINE void vec_t<float, 2>::load(const float* ptr) {
+  data = *((float2*)ptr);
+}
 
-SAMPLING_INLINE void vec_t<float, 2>::store(float* ptr) const { *((float2*)ptr) = data; }
+SAMPLING_INLINE void vec_t<float, 2>::store(float* ptr) const {
+  *((float2*)ptr) = data;
+}
 
 SAMPLING_INLINE void vec_t<float, 2>::memcpy(float* dst, const float* src) {
   *((float2*)dst) = *((float2*)src);
@@ -171,7 +185,9 @@ struct vec_t<float, vec_size> {
   float4 data[vec_size / 4];
 
   SAMPLING_INLINE float& operator[](size_t i) { return ((float*)(data))[i]; }
-  SAMPLING_INLINE const float& operator[](size_t i) const { return ((const float*)(data))[i]; }
+  SAMPLING_INLINE const float& operator[](size_t i) const {
+    return ((const float*)(data))[i];
+  }
   SAMPLING_INLINE float* ptr() { return reinterpret_cast<float*>(&data); }
   SAMPLING_INLINE void fill(float val) {
 #pragma unroll
