@@ -78,12 +78,6 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
         },
     )
-    fused_linear_param_grad_add: bool = field(
-        default=False,
-        metadata={
-            "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
-        },
-    )
     job_schedule_profiler_start: int = field(
         default=-1,
         metadata={"help": "The step to start job_schedule_profiler."},
@@ -132,11 +126,6 @@ class PreTrainingArguments(TrainingArguments):
             self.report_to = []
             self.save_strategy = IntervalStrategy.NO
             self.evaluation_strategy = IntervalStrategy.NO
-
-        if self.fused_linear_param_grad_add:
-            fused_passes = self.strategy.fused_passes
-            fused_passes.enable = True
-            fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
 
         logger.info(self.strategy)
 
