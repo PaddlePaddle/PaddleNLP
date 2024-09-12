@@ -797,6 +797,16 @@ class TrainingArguments:
     release_grads: Optional[bool] = field(
         default=False, metadata={"help": "Whether to release gradients during training. Default is `False`."}
     )
+    skip_data_intervals: Optional[List[List[int]]] = field(
+        default=None,
+        metadata={"help": "The intervals to skip, pass start global step and end global step at each interval"},
+    )
+    debug_data: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": "whether to debug data.If set to True, will print the skip intervals data and skip training process."
+        },
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))

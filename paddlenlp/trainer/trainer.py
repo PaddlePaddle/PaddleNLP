@@ -137,6 +137,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     get_scheduler,
     has_length,
     set_seed,
+    should_skip_data,
     speed_metrics,
 )
 from .training_args import TrainingArguments
@@ -275,7 +276,7 @@ class Trainer:
         # Seed must be set before instantiating the model when using model
         set_seed(seed=self.args.seed)
 
-        if model is None:
+        if model is None and not args.debug_data:
             raise RuntimeError("`Trainer` requires either a `model` or `model_init` argument")
 
         if self.args.to_static:
@@ -337,7 +338,7 @@ class Trainer:
                 "You should subclass `Trainer` and override the `create_optimizer_and_scheduler` method."
             )
 
-        if self.args.pipeline_parallel_degree > 1 and self.args.use_hybrid_parallel:
+        if self.args.pipeline_parallel_degree > 1 and self.args.use_hybrid_parallel and not args.debug_data:
             from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
             assert (isinstance(model, LoRAModel) and isinstance(model.model, PipelineLayer)) or isinstance(
@@ -353,6 +354,7 @@ class Trainer:
 
         self._save_ckpt_func = dist.save_state_dict if self.args.enable_auto_parallel else paddle.save
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
+        self.skip_global_steps = 0
 
         if args.max_steps > 0:
             logger.info("max_steps is given, it will override any value given in num_train_epochs")
@@ -369,26 +371,28 @@ class Trainer:
 
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False
-        if args.fp16 or args.bf16:
-            # set do_grad_scaling, enable_autocast_context_manager
-            self._wrap_amp_model(args, model)
 
-        if args.recompute:
+        if not args.debug_data:
+            if args.fp16 or args.bf16:
+                # set do_grad_scaling, enable_autocast_context_manager
+                self._wrap_amp_model(args, model)
 
-            def fn(layer):
-                if hasattr(layer, "enable_recompute") and (
-                    layer.enable_recompute is False or layer.enable_recompute == 0
-                ):
-                    layer.enable_recompute = True
+            if args.recompute:
 
-            model.apply(fn)
+                def fn(layer):
+                    if hasattr(layer, "enable_recompute") and (
+                        layer.enable_recompute is False or layer.enable_recompute == 0
+                    ):
+                        layer.enable_recompute = True
 
-        default_label_names = (
-            ["start_positions", "end_positions"]
-            if "QusetionAnswering" in type(self.model).__name__ or "UIE" in type(self.model).__name__
-            else ["labels"]
-        )
-        self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
+                model.apply(fn)
+
+            default_label_names = (
+                ["start_positions", "end_positions"]
+                if "QusetionAnswering" in type(self.model).__name__ or "UIE" in type(self.model).__name__
+                else ["labels"]
+            )
+            self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
 
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
         self.print_config()
@@ -897,6 +901,7 @@ class Trainer:
             step_control = 0  # used in loop control, reset to 0 after every step
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
+            step = -1
             for step, inputs in enumerate(epoch_iterator):
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
@@ -928,6 +933,31 @@ class Trainer:
                 elif steps_trained_progress_bar is not None:
                     steps_trained_progress_bar.close()
                     steps_trained_progress_bar = None
+
+                # Skip data
+                if should_skip_data(self.state.global_step, self.args.skip_data_intervals):
+                    logger.warning(f"Skip data at global step {self.state.global_step+1}, sub step {step_control}")
+                    logger.warning(f"{self.tokenizer.batch_decode(inputs['input_ids'], skip_special_tokens=True)}")
+
+                    if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
+                        # last step in epoch but step is always smaller than gradient_accumulation_steps
+                        steps_in_epoch <= args.gradient_accumulation_steps
+                        and (step + 1) == steps_in_epoch
+                    ):
+                        self.skip_global_steps += 1
+                        self.state.global_step += 1
+                        self.state.epoch = epoch + (step + 1) / steps_in_epoch
+                        self.control = self.callback_handler.on_step_end(args, self.state, self.control)
+                        self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                        self._print_timer()
+                        step_control = 0
+                    else:
+                        self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
+                        step_control += 1
+                    if self.control.should_epoch_stop or self.control.should_training_stop:
+                        break
+                    self.timers and self.timers("read-data").start()
+                    continue
 
                 if step_control % args.gradient_accumulation_steps == 0:
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
@@ -1146,7 +1176,10 @@ class Trainer:
                         )
 
         self._total_loss_scalar += tr_loss.item()
-        train_loss = self._total_loss_scalar / self.state.global_step
+        if self.state.global_step == self.skip_global_steps:
+            train_loss = 0.0
+        else:
+            train_loss = self._total_loss_scalar / (self.state.global_step - self.skip_global_steps)
 
         metrics = speed_metrics("train", start_time, num_samples=num_train_samples, num_steps=self.state.max_steps)
 
