@@ -338,7 +338,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
             use_neox_rotary_style=self.use_neox,
             cachekv_int8_type=config.cachekv_int8_type,
             rank_id=config.tensor_parallel_rank,
-            trans_qkvw=(False if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8" else True),
+            trans_qkvw=(False if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type else True),
             moe_config=moe_config,
         )
 
@@ -527,7 +527,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                 unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
                     "mixtral.layers.{}.self_attn.v_proj.weight".format(idx)
                 ]
-                if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8":
+                if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type:
                     concated_qkv_weight = np.concatenate(
                         [
                             unfused_state_dict["self_attn.q_proj.weight"],
@@ -642,7 +642,11 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                         ffn1_weight_tensor[i], algo=self.quant_algo
                     )
                     ffn1_quanted_weight_list.append(
-                        ffn1_quanted_weight_list_i.reshape([self.transformer_block.config.embed_dim, -1])
+                        ffn1_quanted_weight_list_i.reshape(
+                            [self.transformer_block.embed_dim, self.transformer_block.dim_feedforward * 2]
+                            if self.quant_type == "weight_only_int8"
+                            else [self.transformer_block.embed_dim, self.transformer_block.dim_feedforward]
+                        )
                     )
                     ffn1_quanted_weight_scale.append(ffn1_quanted_weight_scale_i)
                 ffn1_quanted_weight_tensor = paddle.to_tensor(ffn1_quanted_weight_list)
@@ -677,7 +681,11 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                         ffn2_weight_tensor[i], algo=self.quant_algo
                     )
                     ffn2_quanted_weight_list.append(
-                        ffn2_quanted_weight_list_i.reshape([-1, self.transformer_block.config.embed_dim])
+                        ffn2_quanted_weight_list_i.reshape(
+                            [self.transformer_block.dim_feedforward, self.transformer_block.embed_dim]
+                            if self.quant_type == "weight_only_int8"
+                            else [self.transformer_block.dim_feedforward, self.transformer_block.embed_dim // 2]
+                        )
                     )
                     ffn2_quanted_weight_scale.append(ffn2_quanted_weight_scale_i)
                 ffn2_quanted_weight_tensor = paddle.to_tensor(ffn2_quanted_weight_list)
