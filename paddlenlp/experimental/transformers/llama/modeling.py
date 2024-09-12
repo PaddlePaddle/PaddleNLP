@@ -467,7 +467,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         ffn_ln_scale_attrs = [
             paddle.ParamAttr(name="fusellama.{}.ffn_ln_scale".format(i)) for i in range(self.num_layers)
         ]
-
         if "fp8" in self.quant_type:
             ffn1_0_weight_attrs = [
                 paddle.ParamAttr(
