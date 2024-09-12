@@ -49,7 +49,12 @@ from paddlenlp.experimental.transformers.generation_utils import (
     GenerationBlockInferenceModel,
     GenerationInferenceModel,
 )
-from paddlenlp.experimental.transformers.utils import infererence_model_from_pretrained
+from paddlenlp.experimental.transformers.utils import (
+    EmptyActScale,
+    EmptyCacheScale,
+    EmptyWeightScale,
+    infererence_model_from_pretrained,
+)
 from paddlenlp.transformers import Qwen2Config, Qwen2PretrainedModel
 from paddlenlp.transformers.conversion_utils import split_param_func
 from paddlenlp.transformers.model_outputs import (  # CausalLMOutputWithCrossAttentions,
@@ -95,10 +100,12 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         self.intermediate_size = config.intermediate_size
         self.num_layers = config.num_hidden_layers
         self.rms_norm_eps = config.rms_norm_eps
-        self.quant_type = config.quant_type
-        self.rope_theta = config.rope_theta
+        self.quant_type = config.get("quant_type", "")
 
+        self.rope_theta = config.rope_theta
         self.use_neox = True
+
+        self.use_fake_parameter = config.get("use_fake_parameter", False)
 
         self.use_weight_only = False
         if config.quant_type == "weight_only_int8":
@@ -112,6 +119,9 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             self.shift = config.quantization_config.shift
             self.smooth = config.quantization_config.smooth
             self.shift_smooth_all_linears = config.quantization_config.shift_smooth_all_linears
+            if self.use_fake_parameter:
+                self.shift_smooth_all_linears = True
+                config.quantization_config.shift_smooth_all_linears = True
 
         if self.use_weight_only:
             assert (
@@ -372,7 +382,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 use_neox_rotary_style=self.use_neox,
                 cachekv_int8_type=config.cachekv_int8_type,
                 rank_id=config.tensor_parallel_rank,
-                trans_qkvw=(False if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8" else True),
+                trans_qkvw=(False if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type else True),
             )
 
         self.set_transformer_block(transformer_config)
@@ -433,7 +443,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 unfused_state_dict["qwen2.self_attn.v_proj.weight"] = state_dict[
                     "qwen2.layers.{}.self_attn.v_proj.weight".format(idx)
                 ]
-                if paddle.is_compiled_with_rocm() and (self.quant_type == "a8w8" or self.quant_type == "a8w8c8"):
+                if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type:
                     concated_qkv_weight = np.concatenate(
                         [
                             unfused_state_dict["self_attn.q_proj.weight"],
@@ -603,6 +613,30 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
 
             if "a8w8" in self.quant_type:
                 if self.shift_smooth_all_linears:
+                    if self.use_fake_parameter:
+                        if "qwen2.layers.{}.self_attn.o_proj.shift_bias".format(idx) not in state_dict:
+                            state_dict["qwen2.layers.{}.self_attn.o_proj.shift_bias".format(idx)] = paddle.zeros(
+                                shape=[
+                                    (self.num_attention_heads // self.config.tensor_parallel_degree)
+                                    * (self.hidden_size // self.num_attention_heads)
+                                ],
+                                dtype=paddle.get_default_dtype(),
+                            )
+                            state_dict["qwen2.layers.{}.self_attn.o_proj.smooth_weight".format(idx)] = paddle.ones(
+                                shape=[
+                                    (self.num_attention_heads // self.config.tensor_parallel_degree)
+                                    * (self.hidden_size // self.num_attention_heads)
+                                ],
+                                dtype=paddle.get_default_dtype(),
+                            )
+                            state_dict["qwen2.layers.{}.mlp.down_proj.shift_bias".format(idx)] = paddle.zeros(
+                                shape=[self.intermediate_size // self.config.tensor_parallel_degree],
+                                dtype=paddle.get_default_dtype(),
+                            )
+                            state_dict["qwen2.layers.{}.mlp.down_proj.smooth_weight".format(idx)] = paddle.ones(
+                                shape=[self.intermediate_size // self.config.tensor_parallel_degree],
+                                dtype=paddle.get_default_dtype(),
+                            )
                     self.transformer_block.linear_shifts[idx].set_value(
                         paddle.to_tensor(state_dict["qwen2.layers.{}.self_attn.o_proj.shift_bias".format(idx)])
                     )
@@ -617,23 +651,55 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                     )
 
                 if self.shift:
+                    if self.use_fake_parameter:
+                        if "qwen2.layers.{}.input_layernorm.bias".format(idx) not in state_dict:
+                            state_dict["qwen2.layers.{}.input_layernorm.bias".format(idx)] = paddle.zeros(
+                                shape=[self.hidden_size], dtype=paddle.get_default_dtype()
+                            )
+                            state_dict["qwen2.layers.{}.post_attention_layernorm.bias".format(idx)] = paddle.zeros(
+                                [self.hidden_size], dtype=paddle.get_default_dtype()
+                            )
+                            unfused_state_dict["self_attn.q_proj.bias"] = paddle.zeros(
+                                shape=[self.num_attention_heads * (self.hidden_size // self.num_attention_heads)],
+                                dtype=paddle.get_default_dtype(),
+                            )
+                            unfused_state_dict["self_attn.k_proj.bias"] = paddle.zeros(
+                                shape=[self.num_key_value_heads * (self.hidden_size // self.num_attention_heads)],
+                                dtype=paddle.get_default_dtype(),
+                            )
+                            unfused_state_dict["self_attn.v_proj.bias"] = paddle.zeros(
+                                shape=[self.num_key_value_heads * (self.hidden_size // self.num_attention_heads)],
+                                dtype=paddle.get_default_dtype(),
+                            )
+                            unfused_state_dict["mlp.gate_proj.bias"] = paddle.zeros(
+                                shape=[self.intermediate_size], dtype=paddle.get_default_dtype()
+                            )
+                            unfused_state_dict["mlp.up_proj.bias"] = paddle.zeros(
+                                shape=[self.intermediate_size], dtype=paddle.get_default_dtype()
+                            )
+                    else:
+                        unfused_state_dict["self_attn.q_proj.bias"] = state_dict[
+                            "qwen2.layers.{}.self_attn.q_proj.bias".format(idx)
+                        ]
+                        unfused_state_dict["self_attn.k_proj.bias"] = state_dict[
+                            "qwen2.layers.{}.self_attn.k_proj.bias".format(idx)
+                        ]
+                        unfused_state_dict["self_attn.v_proj.bias"] = state_dict[
+                            "qwen2.layers.{}.self_attn.v_proj.bias".format(idx)
+                        ]
+                        unfused_state_dict["mlp.gate_proj.bias"] = state_dict[
+                            "qwen2.layers.{}.mlp.gate_proj.bias".format(idx)
+                        ]
+                        unfused_state_dict["mlp.up_proj.bias"] = state_dict[
+                            "qwen2.layers.{}.mlp.up_proj.bias".format(idx)
+                        ]
+
                     self.transformer_block.ln_biases[idx].set_value(
                         paddle.to_tensor(state_dict["qwen2.layers.{}.input_layernorm.bias".format(idx)])
                     )
                     self.transformer_block.ffn_ln_biases[idx].set_value(
                         paddle.to_tensor(state_dict["qwen2.layers.{}.post_attention_layernorm.bias".format(idx)])
                     )
-
-                    unfused_state_dict["self_attn.q_proj.bias"] = state_dict[
-                        "qwen2.layers.{}.self_attn.q_proj.bias".format(idx)
-                    ]
-                    unfused_state_dict["self_attn.k_proj.bias"] = state_dict[
-                        "qwen2.layers.{}.self_attn.k_proj.bias".format(idx)
-                    ]
-                    unfused_state_dict["self_attn.v_proj.bias"] = state_dict[
-                        "qwen2.layers.{}.self_attn.v_proj.bias".format(idx)
-                    ]
-
                     concated_qkv_biases = np.concatenate(
                         [
                             unfused_state_dict["self_attn.q_proj.bias"],
@@ -644,19 +710,20 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                     )
 
                     self.transformer_block.qkv_biases[idx].set_value(paddle.to_tensor(concated_qkv_biases))
-
-                    unfused_state_dict["mlp.gate_proj.bias"] = state_dict[
-                        "qwen2.layers.{}.mlp.gate_proj.bias".format(idx)
-                    ]
-                    unfused_state_dict["mlp.up_proj.bias"] = state_dict["qwen2.layers.{}.mlp.up_proj.bias".format(idx)]
-
                     concated_ffn1_bias = np.concatenate(
                         [unfused_state_dict["mlp.gate_proj.bias"], unfused_state_dict["mlp.up_proj.bias"]], axis=-1
                     )
-
                     self.transformer_block.ffn1_biases[idx].set_value(paddle.to_tensor(concated_ffn1_bias))
 
                     if self.shift_smooth_all_linears:
+                        if self.use_fake_parameter:
+                            if "qwen2.layers.{}.self_attn.o_proj.bias".format(idx) not in state_dict:
+                                state_dict["qwen2.layers.{}.self_attn.o_proj.bias".format(idx)] = paddle.zeros(
+                                    [self.hidden_size], dtype=paddle.get_default_dtype()
+                                )
+                                state_dict["qwen2.layers.{}.mlp.down_proj.layer.bias".format(idx)] = paddle.zeros(
+                                    [self.hidden_size], dtype=paddle.get_default_dtype()
+                                )
                         self.transformer_block.linear_biases[idx].set_value(
                             paddle.to_tensor(state_dict["qwen2.layers.{}.self_attn.o_proj.bias".format(idx)])
                         )
@@ -678,40 +745,63 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 cache_scale_map_dict = scale_map_dict["cachekv_scale"]
                 # TODO(RichardWooSJTU): support multi-cards
 
-                act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
-                weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
-                if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                    act_scale_json_path = os.path.join(
-                        self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
+                if not self.use_fake_parameter:
+                    act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
+                    weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
+                    if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
+                        act_scale_json_path = os.path.join(
+                            self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
+                        )
+                        weight_scale_json_path = os.path.join(
+                            self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
+                        )
+                    act_scale_loader = ActScalesLoader(
+                        act_scale_json_path, act_scale_map_dict, num_of_layers=self.config.num_hidden_layers
                     )
-                    weight_scale_json_path = os.path.join(
-                        self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
+                    weight_scales_loader = WeightScalesLoader(
+                        weight_scale_json_path,
+                        weight_scale_map_dict,
+                        num_of_layers=self.config.num_hidden_layers,
+                        concat_qkv=True,
+                        concat_ffn1=True,
                     )
-                act_scale_loader = ActScalesLoader(
-                    act_scale_json_path, act_scale_map_dict, num_of_layers=self.config.num_hidden_layers
-                )
+                else:
+                    act_scale_loader = EmptyActScale(act_scale_map_dict, num_of_layers=self.config.num_hidden_layers)
+                    weight_scales_loader = EmptyWeightScale(
+                        weight_scale_map_dict,
+                        num_of_layers=self.config.num_hidden_layers,
+                        num_head=self.num_attention_heads,
+                        dim_head=self.hidden_size // self.num_attention_heads,
+                        ffn_hidden_size=self.intermediate_size,
+                        num_key_value_heads=self.num_key_value_heads,
+                        mp_size=self.config.tensor_parallel_degree,
+                    )
                 self.transformer_block.act_scales = act_scale_loader.scale
-                weight_scales_loader = WeightScalesLoader(
-                    weight_scale_json_path,
-                    weight_scale_map_dict,
-                    num_of_layers=self.config.num_hidden_layers,
-                    concat_qkv=True,
-                    concat_ffn1=True,
-                )
 
                 if self.config.cachekv_int8_type == "static":
-                    cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_scales.json")
-                    if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                        cache_scale_json_path = os.path.join(
-                            self.quant_model_path, f"cachekv_scales_{self.config.tensor_parallel_rank}.json"
+                    if not self.use_fake_parameter:
+                        cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_scales.json")
+                        if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
+                            cache_scale_json_path = os.path.join(
+                                self.quant_model_path, f"cachekv_scales_{self.config.tensor_parallel_rank}.json"
+                            )
+                        cache_scales_loader = CacheScaleLoader(
+                            cache_scale_json_path,
+                            cache_scale_map_dict,
+                            num_of_layers=self.config.num_hidden_layers,
+                            num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
+                            num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
                         )
-                    cache_scales_loader = CacheScaleLoader(
-                        cache_scale_json_path,
-                        cache_scale_map_dict,
-                        num_of_layers=self.config.num_hidden_layers,
-                        num_heads=self.num_attention_heads // self.config.tensor_parallel_degree,
-                        num_key_value_heads=self.num_key_value_heads // self.config.tensor_parallel_degree,
-                    )
+                    else:
+                        cache_scales_loader = EmptyCacheScale(
+                            cache_scale_map_dict,
+                            num_of_layers=self.config.num_hidden_layers,
+                            num_heads=self.num_attention_heads,
+                            dim_heads=self.hidden_size // self.num_attention_heads,
+                            is_channel_wise=False,
+                            num_key_value_heads=self.num_key_value_heads,
+                            mp_size=self.config.tensor_parallel_degree,
+                        )
 
                     for k, v in cache_scales_loader.scale.items():
                         for i_layer, weight_scale in enumerate(v):
@@ -1493,10 +1583,13 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
                 base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
             else:
                 base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.q_proj.bias"] = partial(fn, is_column=True)
                 # if we have enough num_key_value_heads to split, then split it.
                 if config.num_key_value_heads % config.tensor_parallel_degree == 0:
                     base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
                     base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+                    base_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
+                    base_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
 
             if config.fuse_attention_ffn:
                 base_actions["layers.0.mlp.gate_up_fused_proj.weight"] = partial(

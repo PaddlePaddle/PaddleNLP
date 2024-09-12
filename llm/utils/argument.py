@@ -299,11 +299,6 @@ class QuantArgument:
     do_ptq: bool = field(default=False, metadata={"help": "Whether to use PTQ"})
     ptq_step: int = field(default=32, metadata={"help": "Step for PTQ"})
 
-    weight_quant_method: str = field(
-        default="abs_max_channel_wise",
-        metadata={"help": "Weight quantization method, choosen from ['abs_max_channel_wise', 'groupwise']"},
-    )
-
     # Pre-quant method Shift related parameters
     shift: bool = field(default=False, metadata={"help": "Whether to use Shift"})
     shift_all_linears: bool = field(default=False, metadata={"help": "Whether to shift all linears"})
@@ -353,21 +348,3 @@ class GenerateArgument:
     top_p: float = field(
         default=1.0, metadata={"help": "The cumulative probability for top-p-filtering in the sampling strategy."}
     )
-
-
-@dataclass
-class CEvalArgument:
-    do_ceval: bool = field(
-        default=False,
-        metadata={"help": "Whether to run C-Eval"},
-    )
-    cot: bool = field(default=False, metadata={"help": "Whether to use chain of thought"})
-    few_shot: bool = field(default=False, metadata={"help": "Whether to use few shot"})
-    ntrain: int = field(default=5, metadata={"help": "Number of few shot"})
-    with_prompt: bool = field(default=False, metadata={"help": "Whether to use prompt"})
-    constrained_decoding: bool = field(default=True, metadata={"help": "Whether to use constrained decoding"})
-    temperature: float = field(default=0.2, metadata={"help": "Temperature for decoding"})
-    n_times: int = field(default=1, metadata={"help": "Number of times to run"})
-    do_save_csv: bool = field(default=False, metadata={"help": "Whether to save csv"})
-    do_test: bool = field(default=False, metadata={"help": "Whether to run test"})
-    ceval_data_path: str = field(default="../dataset/ceval", metadata={"help": "Path to the data for ceval"})

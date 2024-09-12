@@ -405,6 +405,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
         self.rope_theta = config.rope_theta
         self.use_neox = True
 
+        self.use_fake_parameter = config.get("use_fake_parameter", False)
+
         self.use_weight_only = False
         if config.quant_type == "weight_only_int8":
             self.use_weight_only = True
@@ -417,8 +419,9 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             self.shift = config.quantization_config.shift
             self.smooth = config.quantization_config.smooth
             self.shift_smooth_all_linears = config.quantization_config.shift_smooth_all_linears
-
-        self.use_fake_parameter = config.get("use_fake_parameter", False)
+            if self.use_fake_parameter:
+                self.shift_smooth_all_linears = True
+                config.quantization_config.shift_smooth_all_linears = True
 
         if self.use_weight_only:
             assert (
@@ -675,7 +678,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 use_neox_rotary_style=self.use_neox,
                 cachekv_int8_type=config.cachekv_int8_type,
                 rank_id=config.tensor_parallel_rank,
-                trans_qkvw=(False if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8" else True),
+                trans_qkvw=(False if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type else True),
             )
 
         self.set_transformer_block(transformer_config)
@@ -862,7 +865,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
                     "llama.layers.{}.self_attn.v_proj.weight".format(idx)
                 ]
-                if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8":
+                if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type:
                     concated_qkv_weight = np.concatenate(
                         [
                             unfused_state_dict["self_attn.q_proj.weight"],
@@ -1067,6 +1070,22 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                             unfused_state_dict["mlp.up_proj.bias"] = paddle.zeros(
                                 shape=[self.intermediate_size], dtype=paddle.get_default_dtype()
                             )
+                    else:
+                        unfused_state_dict["self_attn.q_proj.bias"] = state_dict[
+                            "llama.layers.{}.self_attn.q_proj.bias".format(idx)
+                        ]
+                        unfused_state_dict["self_attn.k_proj.bias"] = state_dict[
+                            "llama.layers.{}.self_attn.k_proj.bias".format(idx)
+                        ]
+                        unfused_state_dict["self_attn.v_proj.bias"] = state_dict[
+                            "llama.layers.{}.self_attn.v_proj.bias".format(idx)
+                        ]
+                        unfused_state_dict["mlp.gate_proj.bias"] = state_dict[
+                            "llama.layers.{}.mlp.gate_proj.bias".format(idx)
+                        ]
+                        unfused_state_dict["mlp.up_proj.bias"] = state_dict[
+                            "llama.layers.{}.mlp.up_proj.bias".format(idx)
+                        ]
 
                     self.transformer_block.ln_biases[idx].set_value(
                         paddle.to_tensor(state_dict["llama.layers.{}.input_layernorm.bias".format(idx)])
@@ -1074,16 +1093,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     self.transformer_block.ffn_ln_biases[idx].set_value(
                         paddle.to_tensor(state_dict["llama.layers.{}.post_attention_layernorm.bias".format(idx)])
                     )
-
-                    unfused_state_dict["self_attn.q_proj.bias"] = state_dict[
-                        "llama.layers.{}.self_attn.q_proj.bias".format(idx)
-                    ]
-                    unfused_state_dict["self_attn.k_proj.bias"] = state_dict[
-                        "llama.layers.{}.self_attn.k_proj.bias".format(idx)
-                    ]
-                    unfused_state_dict["self_attn.v_proj.bias"] = state_dict[
-                        "llama.layers.{}.self_attn.v_proj.bias".format(idx)
-                    ]
 
                     concated_qkv_biases = np.concatenate(
                         [
@@ -1095,11 +1104,6 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     )
 
                     self.transformer_block.qkv_biases[idx].set_value(paddle.to_tensor(concated_qkv_biases))
-
-                    unfused_state_dict["mlp.gate_proj.bias"] = state_dict[
-                        "llama.layers.{}.mlp.gate_proj.bias".format(idx)
-                    ]
-                    unfused_state_dict["mlp.up_proj.bias"] = state_dict["llama.layers.{}.mlp.up_proj.bias".format(idx)]
 
                     concated_ffn1_bias = np.concatenate(
                         [unfused_state_dict["mlp.gate_proj.bias"], unfused_state_dict["mlp.up_proj.bias"]], axis=-1

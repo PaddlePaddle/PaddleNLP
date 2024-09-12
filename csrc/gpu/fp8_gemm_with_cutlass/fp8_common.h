@@ -80,4 +80,3 @@ typedef struct {
 } DualGemmEpilogueAllParams;
 
 typedef bool (*func1)(DualGemmEpilogueAllParams);
-

@@ -2241,6 +2241,7 @@ class Trainer:
                 self.args.unified_checkpoint_config = unified_checkpoint_config_backup
         else:
             if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
+                os.makedirs(output_dir, exist_ok=True)
                 if self.is_in_train:
                     global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
                     paddle.save(global_rank, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
@@ -2259,6 +2260,7 @@ class Trainer:
             and "async_save" in self.args.unified_checkpoint_config
             and not self.is_in_train
         ):
+            os.makedirs(output_dir, exist_ok=True)
             global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
             paddle.save(self.state.global_step, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
 
@@ -2336,6 +2338,7 @@ class Trainer:
                 else:
                     if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                        os.makedirs(output_dir, exist_ok=True)
                         paddle.save(global_rank, os.path.join(output_dir, f".optimizer_weight.done.{global_rank}"))
                         if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
                             paddle.save(global_rank, os.path.join(output_dir, f".master_weight.done.{global_rank}"))
@@ -2367,6 +2370,14 @@ class Trainer:
 
                 if self.do_grad_scaling:
                     paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
+            else:
+                if self.args.unified_checkpoint and not self.args.use_hybrid_parallel:
+                    if "async_save" in self.args.unified_checkpoint_config:
+                        global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                        os.makedirs(output_dir, exist_ok=True)
+                        paddle.save(global_rank, os.path.join(output_dir, f".optimizer_weight.done.{global_rank}"))
+                        if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
+                            paddle.save(global_rank, os.path.join(output_dir, f".master_weight.done.{global_rank}"))
 
         self.runtime_timer.stop()
         # Determine the new best metric / best model checkpoint
@@ -3289,7 +3300,7 @@ class Trainer:
 
     def _is_iterable_dataset_distributed(self, dataset):
         # For distributed dataloaer.
-        is_iterable_dataset_tensor = paddle.to_tensor(self._is_iterable_dataset(dataset)).reshape([1])
+        is_iterable_dataset_tensor = paddle.to_tensor(self._is_iterable_dataset(dataset)).astype("int32").reshape([1])
         if dist.get_world_size() > 1:
             dist.all_reduce(is_iterable_dataset_tensor, op=dist.ReduceOp.MAX)
         if is_iterable_dataset_tensor.item() == 1:

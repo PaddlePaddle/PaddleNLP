@@ -203,4 +203,3 @@ PD_BUILD_OP(cutlass_fp8_fp8_half_gemm_fused)
     .SetKernelFn(PD_KERNEL(cutlass_fp8_fp8_half_gemm))
     .SetInferShapeFn(PD_INFER_SHAPE(CutlassFp8Fp8HalfGemmFusedInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(CutlassFp8Fp8HalfGemmFusedInferDtype));
-

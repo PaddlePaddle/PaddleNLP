@@ -32,6 +32,15 @@ def clone_git_repo(version, repo_url, destination_path):
         return False
 
 
+def find_end_files(directory, end_str):
+    gen_files = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(end_str):
+                gen_files.append(os.path.join(root, file))
+    return gen_files
+
+
 def get_sm_version():
     prop = paddle.device.cuda.get_device_properties()
     cc = prop.major * 10 + prop.minor
@@ -49,15 +58,6 @@ def strtobool(v):
         raise ValueError(
             f"Truthy value expected: got {v} but expected one of yes/no, true/false, t/f, y/n, 1/0 (case insensitive)."
         )
-
-
-def find_end_files(directory, end_str):
-    gen_files = []
-    for root, dirs, files in os.walk(directory):
-        for file in files:
-            if file.endswith(end_str):
-                gen_files.append(os.path.join(root, file))
-    return gen_files
 
 
 def get_gencode_flags():
@@ -109,13 +109,19 @@ sources = [
     "./gpu/tune_cublaslt_gemm.cu",
 ]
 
-cutlass_dir = "gpu/cutlass_kernels/cutlass"
+cutlass_dir = "third_party/cutlass"
 nvcc_compile_args = gencode_flags
 
 if not os.path.exists(cutlass_dir) or not os.listdir(cutlass_dir):
     if not os.path.exists(cutlass_dir):
         os.makedirs(cutlass_dir)
     clone_git_repo("v3.5.0", "https://github.com/NVIDIA/cutlass.git", cutlass_dir)
+
+json_dir = "third_party/nlohmann_json"
+if not os.path.exists(json_dir) or not os.listdir(json_dir):
+    if not os.path.exists(json_dir):
+        os.makedirs(json_dir)
+    clone_git_repo("v3.11.3", "https://github.com/nlohmann/json.git", json_dir)
 
 nvcc_compile_args += [
     "-O3",
@@ -126,7 +132,8 @@ nvcc_compile_args += [
     "-U__CUDA_NO_BFLOAT162_OPERATORS__",
     "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
     "-Igpu/cutlass_kernels",
-    "-Igpu/cutlass_kernels/cutlass/include",
+    "-Ithird_party/cutlass/include",
+    "-Ithird_party/nlohmann_json/single_include",
     "-Igpu/fp8_gemm_with_cutlass",
     "-Igpu",
 ]

@@ -69,7 +69,7 @@ ACT_OBSERVER = dict(
 
 WEIGHT_OBSERVER = dict(
     abs_max_channel_wise=AbsMaxChannelWiseWeightObserver,
-    group_wise=GroupWiseWeightObserver,
+    groupwise=GroupWiseWeightObserver,
 )
 
 CACHEKV_OBSERVER = dict(
@@ -259,12 +259,12 @@ def prepare_qconfig(args):
         activation = act_observer(quant_bits=a_quant_bit)
         weight = weight_observer(quant_bits=w_quant_bit)
 
-    elif quant_type in ["wint4", "w4a16", "weight_only_int8"]:
+    elif quant_type in ["wint4", "w4a16", "weight_only_int4"]:
         activation = None
-        weight = GroupWiseWeightObserver(quant_bits=4, group_size=args.group_size)  # TODO
+        weight = weight_observer(quant_bits=4)
+
     elif quant_type in ["wint8", "w8a16", "weight_only_int8"]:
         activation = None
-
         if "w" in args.use_fp8:
             weight = weight_observer(quant_bits=(4, 3))
         else:

@@ -126,6 +126,6 @@ FETCH_HEAD
 ./ppdiffusers/ppdiffusers/version.py
 
 # third party
-csrc/gpu/cutlass_kernels/cutlass
+csrc/third_party/
 dataset/
 output/
