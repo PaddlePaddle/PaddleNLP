@@ -1961,7 +1961,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         attn_mask,
         i,
     ):
-        if self.skip_quant("qkv_weight_scale", i):
+        if not self.skip_quant("qkv_weight_scale", i):
             qkv_out = dequant_int8(qkv_out, self.qkv_out_scales[i], self._dtype)
         if self.qkv_biases[i] is not None:
             qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
