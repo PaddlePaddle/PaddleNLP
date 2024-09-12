@@ -372,7 +372,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 use_neox_rotary_style=self.use_neox,
                 cachekv_int8_type=config.cachekv_int8_type,
                 rank_id=config.tensor_parallel_rank,
-                trans_qkvw=(False if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8" else True),
+                trans_qkvw=(False if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type else True),
             )
 
         self.set_transformer_block(transformer_config)
@@ -470,7 +470,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 unfused_state_dict["qwen2.self_attn.v_proj.weight"] = state_dict[
                     "qwen2.layers.{}.self_attn.v_proj.weight".format(idx)
                 ]
-                if paddle.is_compiled_with_rocm() and (self.quant_type == "a8w8" or self.quant_type == "a8w8c8"):
+                if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type:
                     concated_qkv_weight = np.concatenate(
                         [
                             unfused_state_dict["self_attn.q_proj.weight"],
