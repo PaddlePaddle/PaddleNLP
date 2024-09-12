@@ -30,10 +30,12 @@
     "flash_mask":true,
     "recompute": false,
     "recompute_granularity": "full",
-    "dpo_beta": 0.1,
+    "beta": 0.1,
     "benchmark": false,
-    "dpo_loss_type": "sigmoid",
-    "dpo_label_smoothing": 0.0,
+    "loss_type": "sigmoid",
+    "label_smoothing": 0.0,
     "unified_checkpoint": true,
-    "autotuner_benchmark":false
+    "autotuner_benchmark":false,
+    "lazy": false,
+    "seed":42
   }

@@ -55,6 +55,7 @@ class DPOTrainer(Trainer):
         disable_dropout: bool = True,
         padding_value: int = 0,
         model_with_dpo_criterion: bool = False,
+        ignore_eos_token: bool = False,
         **kwargs
     ):
         super().__init__(model, data_collator=data_collator, **kwargs)
@@ -64,7 +65,9 @@ class DPOTrainer(Trainer):
             self.dpo_config = dpo_config
         if not model_with_dpo_criterion:
             if dpo_criterion is None:
-                self.dpo_criterion = DPOCriterion(self.model.config)
+                self.dpo_criterion = DPOCriterion(
+                    self.model.config, dpo_config=dpo_config, ignore_eos_token=ignore_eos_token
+                )
             elif isinstance(dpo_criterion, DPOCriterion):
                 self.dpo_criterion = dpo_criterion
             else:
@@ -120,8 +123,11 @@ class DPOTrainer(Trainer):
         }
         if "attention_mask" in batch:
             dpo_inputs["attention_mask"] = batch["attention_mask"]
-        if "attn_mask_start_row_indices" in batch:
+        elif "attn_mask_start_row_indices" in batch:
             dpo_inputs["attn_mask_start_row_indices"] = batch["attn_mask_start_row_indices"]
+        elif "attn_mask_startend_row_indices" in batch:
+            dpo_inputs["attn_mask_startend_row_indices"] = batch["attn_mask_startend_row_indices"]
+
         if self.model_with_dpo_criterion:
             dpo_inputs["chosen_labels"] = batch["chosen_labels"]
             dpo_inputs["rejected_labels"] = batch["rejected_labels"]
@@ -232,7 +238,8 @@ class DPOTrainer(Trainer):
                 ignore_keys = []
 
         with paddle.no_grad():
-            loss = self.get_batch_metrics(self.ref_model_wrapped, model, inputs, train_eval="eval")
+            with self.autocast_smart_context_manager():
+                loss = self.get_batch_metrics(self.ref_model_wrapped, model, inputs, train_eval="eval")
 
         if prediction_loss_only:
             return (loss.detach(), None, None)

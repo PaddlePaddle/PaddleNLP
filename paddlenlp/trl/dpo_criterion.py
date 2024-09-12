@@ -26,6 +26,7 @@ from paddlenlp.transformers import (
     parallel_matmul,
     sequence_parallel_sparse_mask_labels,
 )
+from paddlenlp.transformers.model_outputs import CausalLMOutputWithPast
 from paddlenlp.utils import infohub
 from paddlenlp.utils.tools import get_env_device
 
@@ -33,12 +34,15 @@ from paddlenlp.utils.tools import get_env_device
 class DPOCriterion(nn.Layer):
     """DPO Criterion"""
 
-    def __init__(self, config, use_infohub=False):
+    def __init__(self, config, dpo_config=None, use_infohub=False, ignore_eos_token=False):
         super(DPOCriterion, self).__init__()
         self.config = config
-        if getattr(self.config, "dpo_config", None) is None:
-            raise ValueError("DPO Criterion requires model_config.dpo_config.")
-        self.dpo_config = copy.deepcopy(config.dpo_config)
+        if dpo_config is None:
+            if getattr(self.config, "dpo_config", None) is None:
+                raise ValueError("DPO Criterion requires model_config.dpo_config.")
+            self.dpo_config = copy.deepcopy(config.dpo_config)
+        else:
+            self.dpo_config = dpo_config
         if (
             getattr(self.config, "tensor_parallel_output", False)
             and getattr(self.config, "tensor_parallel_degree", 1) > 1
@@ -47,6 +51,7 @@ class DPOCriterion(nn.Layer):
         else:
             self.logprobs = nn.CrossEntropyLoss(reduction="none")
         self.use_infohub = use_infohub
+        self.ignore_eos_token = ignore_eos_token
 
     def dpo_loss(self, policy_chosen_logps, policy_rejected_logps, reference_chosen_logps, reference_rejected_logps):
         """DPO Loss"""
@@ -183,6 +188,10 @@ class DPOCriterion(nn.Layer):
             logits = logits.astype("float32")
             per_token_logps = -self.logprobs(logits, labels)
         else:
+            if isinstance(logits, tuple):
+                logits = logits[0]
+            elif isinstance(logits, CausalLMOutputWithPast):
+                logits = logits.logits
             logits = logits.astype("float32")
             if logits.shape[:-1] != labels.shape:
                 raise ValueError("Logits (batch and sequence length dim) and labels must have the same shape.")
@@ -214,6 +223,8 @@ class DPOCriterion(nn.Layer):
                 rejected_list = []
                 for response_index in response_indexs:
                     begin = response_index[2]
+                    if self.ignore_eos_token:
+                        begin += 1
                     end = response_index[3]
                     one_data = paddle.ones_like(per_token_logps[0])
                     mask_data = paddle.zeros_like(per_token_logps[0])
@@ -228,13 +239,22 @@ class DPOCriterion(nn.Layer):
                     ],
                     axis=0,
                 )
-                rejected_logps = paddle.stack(
-                    [
-                        (per_token_logps[response_index[0]][response_index[2] : response_index[3]]).sum()
-                        for response_index in response_indexs
-                    ],
-                    axis=0,
-                )
+                if self.ignore_eos_token:
+                    rejected_logps = paddle.stack(
+                        [
+                            (per_token_logps[response_index[0]][response_index[2] + 1 : response_index[3]]).sum()
+                            for response_index in response_indexs
+                        ],
+                        axis=0,
+                    )
+                else:
+                    rejected_logps = paddle.stack(
+                        [
+                            (per_token_logps[response_index[0]][response_index[2] : response_index[3]]).sum()
+                            for response_index in response_indexs
+                        ],
+                        axis=0,
+                    )
         sft_loss = -chosen_logps.sum() / (chosen_labels != 0).sum()
         if average_log_prob:
             chosen_response_length = response_indexs[:, 2] - response_indexs[:, 1]
