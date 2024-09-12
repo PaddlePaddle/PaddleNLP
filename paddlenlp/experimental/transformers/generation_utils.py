@@ -329,8 +329,16 @@ class GenerationInferenceModel(GenerationMixin):
             # sample
             probs = F.softmax(logits)
 
-            # compute next_tokens, use paddle.tensor.top_p_sampling
-            _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
+            # compute next_tokens
+            try:
+                from paddlenlp_ops import top_p_sampling_from_probs
+
+                # max_rounds default is  32
+                bs = probs.shape[0]
+                uniform_samples = paddle.randn([bs, 32])
+                next_tokens = top_p_sampling_from_probs(probs, uniform_samples, top_p)
+            except:
+                _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
@@ -667,7 +675,17 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
             # sample
             probs = F.softmax(logits)
-            _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
+
+            # compute next_tokens
+            try:
+                from paddlenlp_ops import top_p_sampling_from_probs
+
+                bs = probs.shape[0]
+                # max_rounds default is  32
+                uniform_samples = paddle.randn([bs, 32])
+                next_tokens = top_p_sampling_from_probs(probs, uniform_samples, top_p)
+            except:
+                _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)

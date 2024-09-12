@@ -107,6 +107,7 @@ sources = [
     "./gpu/dequant_int8.cu",
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
+    "./gpu/sample_kernels/top_p_sampling_from_probs.cu",
 ]
 
 cutlass_dir = "third_party/cutlass"
@@ -135,6 +136,7 @@ nvcc_compile_args += [
     "-Ithird_party/cutlass/include",
     "-Ithird_party/nlohmann_json/single_include",
     "-Igpu/fp8_gemm_with_cutlass",
+    "-Igpu/sample_kernels",
     "-Igpu",
 ]
 cc = get_sm_version()
