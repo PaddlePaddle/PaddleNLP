@@ -36,7 +36,7 @@ function _set_params(){
     sharding_stage=${11:-"1"}       # (可选)sharding case
     level=${12:-"o1"}               # o1|o2|o3
     
-    if [ $FLAGS_enable_pir_api == 1 ]; then
+    if [[ $FLAGS_enable_pir_api == "1" || $FLAGS_enable_pir_api == "True" ]]; then
         if [ ${level} == "o3" ]; then
             level="o2"
             echo "amp level changed to o2 in pir mode"
