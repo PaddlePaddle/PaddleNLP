@@ -454,6 +454,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                         mp_size=self.config.tensor_parallel_degree,
                     )
                 self.transformer_block.weight_scales = weight_scales_loader.scale
+                self.transformer_block.act_scales = act_scale_loader.scale
 
         self.transformer_block.init_weight()
         head_size = self.hidden_size // self.num_attention_heads
