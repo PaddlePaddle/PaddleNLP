@@ -774,6 +774,9 @@ class FusedMultiTransformerBase(Layer):
                 1,
             ]
 
+    def skip_quant(self, layer_name, layer_idx):
+        return False
+
     def get_weight_create_dype(self):
         return self._dtype
 
@@ -1887,9 +1890,12 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             self._add_parameter(ffn1_weight)
             self._add_parameter(ffn2_weight)
 
+    def skip_quant(self, layer_name, layer_idx):
+        return hasattr(self, "weight_scales") and np.all(self.weight_scales[layer_name][layer_idx] == -1)
+
     def get_weight_create_dype(self, layer_name=None, layer_idx=None):
         if layer_name is not None and layer_idx is not None:
-            if hasattr(self, "weight_scales") and np.all(self.weight_scales[layer_name][layer_idx] == -1):
+            if self.skip_quant(layer_name, layer_idx):
                 return self._dtype
         return "int8"
 
@@ -1945,7 +1951,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         attn_mask,
         i,
     ):
-        if hasattr(self, "weight_scales") and not np.all(self.weight_scales["qkv_weight_scale"][i] == -1):
+        if self.skip_quant("qkv_weight_scale", i):
             qkv_out = dequant_int8(qkv_out, self.qkv_out_scales[i], self._dtype)
         if self.qkv_biases[i] is not None:
             qkv_out = paddle.add(qkv_out, self.qkv_biases[i])
@@ -2022,7 +2028,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         )[0]
 
     def compute_out_linear(self, fmha_out, i):
-        if hasattr(self, "weight_scales") and np.all(self.weight_scales["out_linear_weight_scale"][i] == -1):
+        if self.skip_quant("out_linear_weight_scale", i):
             if paddle.is_compiled_with_rocm():
                 out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
             else:
@@ -2081,7 +2087,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             return paddle.matmul(tmp_out, self.ffn1_weights[i], False, True)
 
     def compute_ffn2(self, ffn1_out, i):
-        if hasattr(self, "weight_scales") and np.all(self.weight_scales["ffn2_weight_scale"][i] == -1):
+        if self.skip_quant("ffn2_weight_scale", i):
             if paddle.device.is_compiled_with_rocm():
                 ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i])
             else:
@@ -2303,9 +2309,7 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
             v_quant_scales[i] if v_quant_scales is not None else None,
             k_dequant_scales[i] if k_dequant_scales is not None else None,
             v_dequant_scales[i] if v_dequant_scales is not None else None,
-            self.qkv_out_scales[i]
-            if hasattr(self, "weight_scales") and not np.all(self.weight_scales["qkv_weight_scale"][i] == -1)
-            else None,
+            self.qkv_out_scales[i] if self.skip_quant("qkv_weight_scale", i) else None,
             self.qkv_biases[i] if len(self.qkv_biases) > 0 else None,
             self.linear_shifts[i] if len(self.linear_shifts) > 0 else None,
             self.linear_smooths[i] if len(self.linear_smooths) > 0 else None,

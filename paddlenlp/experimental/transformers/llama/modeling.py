@@ -968,7 +968,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 )
                 self.transformer_block.qkv_weights[idx].set_value(qkv_quanted_weight_tensor)
                 self.transformer_block.qkv_weights_scale[idx].set_value(qkv_weight_scale_tensor)
-            elif "a8w8" in self.quant_type and not np.all(weight_scales_loader.scale["qkv_weight_scale"][idx] == -1):
+            elif "a8w8" in self.quant_type and not self.transformer_block.skip_quant("qkv_weight_scale", idx):
                 self.transformer_block.qkv_weights[idx].set_value(
                     paddle.cast(paddle.to_tensor(concated_qkv_weight), "int8")
                 )
@@ -987,7 +987,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             elif "a8w8" in self.quant_type:
                 w_dtype = (
                     paddle.get_default_dtype()
-                    if np.all(weight_scales_loader.scale["out_linear_weight_scale"][idx] == -1)
+                    if self.transformer_block.skip_quant("out_linear_weight_scale", idx)
                     else "int8"
                 )
                 if paddle.is_compiled_with_rocm():
@@ -1019,7 +1019,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             elif "a8w8" in self.quant_type:
                 w_dtype = (
                     paddle.get_default_dtype()
-                    if np.all(weight_scales_loader.scale["ffn1_weight_scale"][idx] == -1)
+                    if self.transformer_block.skip_quant("ffn1_weight_scale", idx)
                     else "int8"
                 )
                 if paddle.is_compiled_with_rocm():
@@ -1045,7 +1045,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             elif "a8w8" in self.quant_type:
                 w_dtype = (
                     paddle.get_default_dtype()
-                    if np.all(weight_scales_loader.scale["ffn2_weight_scale"][idx] == -1)
+                    if self.transformer_block.skip_quant("ffn2_weight_scale", idx)
                     else "int8"
                 )
                 if paddle.is_compiled_with_rocm():
