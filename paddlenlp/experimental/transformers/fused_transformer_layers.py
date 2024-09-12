@@ -50,16 +50,19 @@ if core.is_compiled_with_cuda():
         from paddlenlp_ops import cutlass_fp8_fp8_half_gemm_fused as fp8_gemm_fused
     else:
         from paddle.linalg import fp8_fp8_half_gemm_fused as fp8_gemm_fused
-    from paddlenlp_ops import (
-        dequant_int8,
-        encode_rotary_qk,
-        gemm_dequant,
-        qkv_transpose_split,
-        quant_int8,
-        rebuild_padding,
-        transpose_remove_padding,
-        write_cache_kv,
-    )
+    try:
+        from paddlenlp_ops import (
+            dequant_int8,
+            encode_rotary_qk,
+            gemm_dequant,
+            qkv_transpose_split,
+            quant_int8,
+            rebuild_padding,
+            transpose_remove_padding,
+            write_cache_kv,
+        )
+    except:
+        pass
 
 __all__ = [
     "MoeConfig",
@@ -381,10 +384,13 @@ class FusedMultiTransformerBase(Layer):
             assert config.ring_id != -1
         assert config.num_heads % config.nranks == 0
         assert config.dim_feedforward % config.nranks == 0
+        assert config.moe_config.shared_expert_intermediate_size % config.nranks == 0
         self.num_heads = config.num_heads // config.nranks
         self.kv_num_heads = config.kv_num_heads // config.nranks
         dim_feedforward = config.dim_feedforward // config.nranks
         self.dim_feedforward = dim_feedforward
+        shared_expert_intermediate_size = config.moe_config.shared_expert_intermediate_size // config.nranks
+        self.config.moe_config.shared_expert_intermediate_size = shared_expert_intermediate_size
 
         self.num_layers = config.num_layers
         assert self.num_layers > 0
@@ -641,6 +647,9 @@ class FusedMultiTransformerBase(Layer):
                 # row parallel
                 _set_var_distributed(linear_weight)
                 _set_var_distributed(ffn2_weight)
+                if self.config.moe_config.use_shared_expert(i):
+                    _set_var_distributed(shared_expert_ffn1_weight)
+                    _set_var_distributed(shared_expert_ffn2_weight)
 
             self.ln_scales.append(ln_scale)
             self.ln_biases.append(ln_bias)
@@ -2240,9 +2249,12 @@ class FusedBlockMultiTransformerFP8(Layer):
             assert config.ring_id != -1
         assert config.num_heads % config.nranks == 0
         assert config.dim_feedforward % config.nranks == 0
+        assert config.moe_config.shared_expert_intermediate_size % config.nranks == 0
         self.num_heads = config.num_heads // config.nranks
         self.kv_num_heads = config.kv_num_heads // config.nranks
         self.dim_feedforward = config.dim_feedforward // config.nranks
+        shared_expert_intermediate_size = config.moe_config.shared_expert_intermediate_size // config.nranks
+        self.config.moe_config.shared_expert_intermediate_size = shared_expert_intermediate_size
 
         self.num_layers = config.num_layers
         assert self.num_layers > 0

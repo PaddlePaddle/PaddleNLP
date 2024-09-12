@@ -15,6 +15,14 @@
 #pragma once
 
 #include "paddle/extension.h"
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <stdio.h>
 #ifdef PADDLE_WITH_HIP
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
@@ -27,6 +35,11 @@ namespace cub = hipcub;
 #include <cub/cub.cuh>
 #include <curand_kernel.h>
 #endif
+#include <iostream>
+#include <fstream>
+#include "nlohmann/json.hpp"
+
+using json = nlohmann::json;
 
 constexpr int kBlockSize = 256; 
 constexpr int kNumWaves = 16; 
@@ -147,3 +160,14 @@ HOSTDEVICE inline void Store(const AlignedVector<T, Size>& vec, T* addr) {
 }
 
 constexpr int VEC_16B = 16;
+
+inline json readJsonFromFile(const std::string& filePath) {
+    std::ifstream file(filePath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Unable to open file: " + filePath);
+    }
+
+    json j;
+    file >> j;
+    return j;
+}
