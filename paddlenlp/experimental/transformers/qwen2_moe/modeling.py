@@ -866,7 +866,6 @@ class Qwen2MoeForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
-                # "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
 
             # Column Linear
