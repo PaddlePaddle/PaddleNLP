@@ -100,10 +100,12 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         self.intermediate_size = config.intermediate_size
         self.num_layers = config.num_hidden_layers
         self.rms_norm_eps = config.rms_norm_eps
-        self.quant_type = config.quant_type
-        self.rope_theta = config.rope_theta
+        self.quant_type = config.get("quant_type", "")
 
+        self.rope_theta = config.rope_theta
         self.use_neox = True
+
+        self.use_fake_parameter = config.get("use_fake_parameter", False)
 
         self.use_weight_only = False
         if config.quant_type == "weight_only_int8":
@@ -115,10 +117,10 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         elif "a8w8" in config.quant_type:
             self.quant_model_path = config.model_name_or_path
             self.shift = config.quantization_config.shift
-            self.smooth = config.quantization_config.smooth
             self.shift_smooth_all_linears = config.quantization_config.shift_smooth_all_linears
-
-        self.use_fake_parameter = config.get("use_fake_parameter", False)
+            if self.use_fake_parameter:
+                self.shift_smooth_all_linears = True
+                config.quantization_config.shift_smooth_all_linears = True
 
         if self.use_weight_only:
             assert (
@@ -674,23 +676,29 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                             unfused_state_dict["mlp.up_proj.bias"] = paddle.zeros(
                                 shape=[self.intermediate_size], dtype=paddle.get_default_dtype()
                             )
+                    else:
+                        unfused_state_dict["self_attn.q_proj.bias"] = state_dict[
+                            "qwen2.layers.{}.self_attn.q_proj.bias".format(idx)
+                        ]
+                        unfused_state_dict["self_attn.k_proj.bias"] = state_dict[
+                            "qwen2.layers.{}.self_attn.k_proj.bias".format(idx)
+                        ]
+                        unfused_state_dict["self_attn.v_proj.bias"] = state_dict[
+                            "qwen2.layers.{}.self_attn.v_proj.bias".format(idx)
+                        ]
+                        unfused_state_dict["mlp.gate_proj.bias"] = state_dict[
+                            "qwen2.layers.{}.mlp.gate_proj.bias".format(idx)
+                        ]
+                        unfused_state_dict["mlp.up_proj.bias"] = state_dict[
+                            "qwen2.layers.{}.mlp.up_proj.bias".format(idx)
+                        ]
+
                     self.transformer_block.ln_biases[idx].set_value(
                         paddle.to_tensor(state_dict["qwen2.layers.{}.input_layernorm.bias".format(idx)])
                     )
                     self.transformer_block.ffn_ln_biases[idx].set_value(
                         paddle.to_tensor(state_dict["qwen2.layers.{}.post_attention_layernorm.bias".format(idx)])
                     )
-
-                    unfused_state_dict["self_attn.q_proj.bias"] = state_dict[
-                        "qwen2.layers.{}.self_attn.q_proj.bias".format(idx)
-                    ]
-                    unfused_state_dict["self_attn.k_proj.bias"] = state_dict[
-                        "qwen2.layers.{}.self_attn.k_proj.bias".format(idx)
-                    ]
-                    unfused_state_dict["self_attn.v_proj.bias"] = state_dict[
-                        "qwen2.layers.{}.self_attn.v_proj.bias".format(idx)
-                    ]
-
                     concated_qkv_biases = np.concatenate(
                         [
                             unfused_state_dict["self_attn.q_proj.bias"],
@@ -701,16 +709,9 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                     )
 
                     self.transformer_block.qkv_biases[idx].set_value(paddle.to_tensor(concated_qkv_biases))
-
-                    unfused_state_dict["mlp.gate_proj.bias"] = state_dict[
-                        "qwen2.layers.{}.mlp.gate_proj.bias".format(idx)
-                    ]
-                    unfused_state_dict["mlp.up_proj.bias"] = state_dict["qwen2.layers.{}.mlp.up_proj.bias".format(idx)]
-
                     concated_ffn1_bias = np.concatenate(
                         [unfused_state_dict["mlp.gate_proj.bias"], unfused_state_dict["mlp.up_proj.bias"]], axis=-1
                     )
-
                     self.transformer_block.ffn1_biases[idx].set_value(paddle.to_tensor(concated_ffn1_bias))
 
                     if self.shift_smooth_all_linears:
@@ -1581,10 +1582,13 @@ class Qwen2ForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, Qwen2Pr
                 base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
             else:
                 base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.q_proj.bias"] = partial(fn, is_column=True)
                 # if we have enough num_key_value_heads to split, then split it.
                 if config.num_key_value_heads % config.tensor_parallel_degree == 0:
                     base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
                     base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+                    base_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
+                    base_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
 
             if config.fuse_attention_ffn:
                 base_actions["layers.0.mlp.gate_up_fused_proj.weight"] = partial(
