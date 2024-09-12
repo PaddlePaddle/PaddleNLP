@@ -1891,6 +1891,16 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             self._add_parameter(ffn2_weight)
 
     def skip_quant(self, layer_name, layer_idx):
+        """
+        Determine whether to skip quantization for a given layer based on weight scales.
+
+        Parameters:
+        - layer_name (str): The name of the layer to check.
+        - layer_idx (int): The index of the specific layer to check.
+
+        Returns:
+        - bool: True if quantization should be skipped, False otherwise.
+        """
         return hasattr(self, "weight_scales") and np.all(self.weight_scales[layer_name][layer_idx] == -1)
 
     def get_weight_create_dype(self, layer_name=None, layer_idx=None):
