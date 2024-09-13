@@ -64,7 +64,7 @@ def build_blending_indices_python(dataset_index, dataset_sample_index, weights, 
             print(f"   dataset {dataset_idx}, input: {weights[dataset_idx]}, achieved: {ratio}")
 
 
-def skip_if_version_not_equal(version="0.1.1", package_name="tool_helpers"):
+def skip_if_version_not_equal(version="0.1.1", package_name="fast_dataindex"):
     try:
         importlib.import_module(package_name)
     except ImportError:
@@ -96,7 +96,7 @@ class TestToolHelpers(unittest.TestCase):
             python_dataset_index, python_dataset_sample_index, weights, num_datasets, size, verbose
         )
 
-        from tool_helpers import helpers
+        from fast_dataindex import helpers
 
         c_dataset_index = np.zeros(size, dtype=dataset_index_dtype)
         c_dataset_sample_index = np.zeros(size, dtype=np.int64)
@@ -116,7 +116,7 @@ class TestToolHelpers(unittest.TestCase):
             (1024, 8192, "int16", False, 42, False),
         ]
     )
-    @unittest.skipIf(*skip_if_version_not_equal(version="0.1.1", package_name="tool_helpers"))
+    @unittest.skipIf(*skip_if_version_not_equal(version="0.1.1", package_name="fast_dataindex"))
     def test_build_blending_indices_version_0_1_1(
         self, num_datasets=128, size=8192, dataset_index_dtype="uint8", verbose=False, seed=42, assert_true=True
     ):
@@ -130,7 +130,7 @@ class TestToolHelpers(unittest.TestCase):
             (1024, 8192, "int16", False, 42, True),
         ]
     )
-    @unittest.skipIf(*skip_if_version_not_equal(version="0.1.2", package_name="tool_helpers"))
+    @unittest.skipIf(*skip_if_version_not_equal(version="0.1.2", package_name="fast_dataindex"))
     def test_build_blending_indices_version_0_1_2(
         self, num_datasets=128, size=8192, dataset_index_dtype="uint8", verbose=False, seed=42, assert_true=True
     ):

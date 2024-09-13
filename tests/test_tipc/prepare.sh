@@ -324,7 +324,7 @@ elif [ ${MODE} = "benchmark_train" ];then
     fi
 
     if [[ ${model_name} == "gpt2" ]]; then
-        python -m pip install tool_helpers -i https://pip.baidu-int.com/simple
+        python -m pip install fast_dataindex -i https://pip.baidu-int.com/simple
         mkdir -p data && cd data
         wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy -o .tmp
         wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz -o .tmp
@@ -332,7 +332,7 @@ elif [ ${MODE} = "benchmark_train" ];then
     fi
 
     if [[ ${model_name} == "gpt3" ]]; then
-        python -m pip install tool_helpers -i https://pip.baidu-int.com/simple
+        python -m pip install fast_dataindex -i https://pip.baidu-int.com/simple
         mkdir -p data && cd data
         wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy -o .tmp
         wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz -o .tmp
