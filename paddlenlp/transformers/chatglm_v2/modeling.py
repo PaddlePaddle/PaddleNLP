@@ -1125,7 +1125,10 @@ class Chatglmv2LMHead(nn.Layer):
         if self.config.sequence_parallel:
             hidden_states = GatherOp.apply(hidden_states)
             hidden_states = paddle.reshape_(hidden_states, [self.config.seq_length, -1, self.config.hidden_size])
-        logits = parallel_matmul(hidden_states, self.weight, self.config.tensor_parallel_output)
+        if self.config.tensor_parallel_degree > 1:
+            logits = parallel_matmul(hidden_states, self.weight, self.config.tensor_parallel_output)
+        else:
+            logits = paddle.matmul(hidden_states, self.weight, transpose_y=False)
         return logits.transpose([1, 0, 2])
 
 
