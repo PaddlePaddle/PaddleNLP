@@ -1128,7 +1128,7 @@ class Chatglmv2LMHead(nn.Layer):
         if self.config.tensor_parallel_degree > 1:
             logits = parallel_matmul(hidden_states, self.weight, self.config.tensor_parallel_output)
         else:
-            logits = paddle.matmul(hidden_states, self.weight, transpose_y=False)
+            logits = paddle.matmul(hidden_states, self.weight)
         return logits.transpose([1, 0, 2])
 
 
@@ -1240,9 +1240,9 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
             lm_logits = parallel_matmul(
                 hidden_states, self.chatglm_v2.output_layer.weight, self.config.tensor_parallel_output
             )
+            lm_logits = lm_logits.transpose([1, 0, 2])
         else:
             lm_logits = self.chatglm_v2.output_layer(hidden_states)
-        lm_logits = lm_logits.transpose([1, 0, 2])
         # shape = [batch_size, seq_length, vocab_size]
         loss = None
         if labels is not None:
