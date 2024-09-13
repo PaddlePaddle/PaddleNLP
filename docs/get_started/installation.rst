@@ -30,6 +30,7 @@ Anaconda和Miniconda是流行的Python发行版本，它们能够简化包管理
 2. **安装**：运行下载的安装包，按照屏幕上的指示完成安装。
 
 3. **配置环境**：
+
    - 打开“Anaconda Prompt”或“Miniconda Prompt”。
    - 创建一个新的环境并安装PaddleNLP：
 
@@ -59,6 +60,7 @@ Anaconda和Miniconda是流行的Python发行版本，它们能够简化包管理
 2. **安装**：打开终端，导航到下载文件的目录，并执行安装脚本。
 
 3. **配置环境**：
+
    - 创建一个新的环境并安装PaddleNLP，步骤与Windows相同。
 
 代码安装
@@ -85,7 +87,7 @@ Anaconda和Miniconda是流行的Python发行版本，它们能够简化包管理
 
   # 假设您已经拉取了PaddlePaddle的Docker镜像
   # 进入Docker容器后
-  pip install --upgrade paddlenlp
+  pip install --upgrade --pre paddlenlp
 
 或者，如果您想安装开发版本：
 
