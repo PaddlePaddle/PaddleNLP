@@ -181,6 +181,7 @@ PaddleNLP 提供了方便易用的 Auto API，能够快速的加载模型和 Tok
 ### 大模型预训练
 
 ```shell
+git clone https://github.com/PaddlePaddle/PaddleNLP.git && cd PaddleNLP # 如已clone或下载PaddleNLP可跳过
 mkdir -p llm/data && cd llm/data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx
@@ -191,6 +192,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py 
 ### 大模型 SFT 精调
 
 ```shell
+git clone https://github.com/PaddlePaddle/PaddleNLP.git && cd PaddleNLP # 如已clone或下载PaddleNLP可跳过
 mkdir -p llm/data && cd llm/data
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz && tar -zxvf AdvertiseGen.tar.gz
 cd .. # change folder to PaddleNLP/llm
