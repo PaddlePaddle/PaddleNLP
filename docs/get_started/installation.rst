@@ -1,7 +1,9 @@
 安装PaddleNLP
-============
+~~~~~~~~~~~~~~~
 
-以下指南将引导您完成安装过程，确保您能够轻松上手。请注意，本安装过程假设您已安装好`paddlepaddle-gpu`或`paddlepaddle`（版本大于或等于3.0）。如果您尚未安装PaddlePaddle，请参考[飞桨官网](https://www.paddlepaddle.org.cn/)进行安装。
+以下指南将引导您完成安装过程，确保您能够轻松上手。请注意，本安装过程假设您已安装好`paddlepaddle-gpu`或`paddlepaddle`（版本大于或等于3.0）。如果您尚未安装PaddlePaddle，请参考 `飞桨官网`_ 进行安装。
+
+.. _飞桨官网: https://www.paddlepaddle.org.cn/
 
 pip安装
 
@@ -25,7 +27,10 @@ Anaconda和Miniconda是流行的Python发行版本，它们能够简化包管理
 **Windows安装步骤**：
 
 
-1. **下载**：访问[Anaconda官网](https://www.anaconda.com/download/success)或[Miniconda官网](https://docs.anaconda.com/miniconda/)，下载适用于Windows 64-Bit的安装包。
+1. **下载**：访问 `Anaconda官网`_ 或 `Miniconda官网`_，下载适用于Windows 64-Bit的安装包。
+
+.. _`Anaconda官网`: https://www.anaconda.com/download/success
+.. _`Miniconda官网`: https://docs.anaconda.com/miniconda/
 
 2. **安装**：运行下载的安装包，按照屏幕上的指示完成安装。
 
@@ -46,6 +51,7 @@ Anaconda和Miniconda是流行的Python发行版本，它们能够简化包管理
     或者，如果您想安装nightly版本：
 
     .. code-block:: bash
+      
       pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 
    现在，您可以在这个环境中使用PaddleNLP了。
