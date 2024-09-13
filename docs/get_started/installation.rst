@@ -58,7 +58,10 @@ Anaconda和Miniconda是流行的Python发行版本，它们能够简化包管理
 **Linux/Mac安装步骤**：
 ^^^^^^^^^^^^^^^^^^^^^
 
-1. **下载**：访问 `Anaconda官网`_ 或 `Miniconda官网`_，下载适用于您操作系统的安装包。
+1. **下载**：访问 `Anaconda官网`_ 或 `Miniconda官网`_，下载适用于Linux/Mac操作系统的安装包。
+
+.. _`Anaconda官网`: https://www.anaconda.com/download/success
+.. _`Miniconda官网`: https://docs.anaconda.com/miniconda/
 
 2. **安装**：打开终端，导航到下载文件的目录，并执行安装脚本。
 
