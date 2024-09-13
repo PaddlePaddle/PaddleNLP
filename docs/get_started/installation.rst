@@ -34,20 +34,19 @@ Anaconda和Miniconda是流行的Python发行版本，它们能够简化包管理
    - 打开“Anaconda Prompt”或“Miniconda Prompt”。
    - 创建一个新的环境并安装PaddleNLP：
 
-     .. code-block:: bash
+    .. code-block:: bash
 
-       # 创建名为my_paddlenlp的环境，指定Python版本为3.9或3.10
-       conda create -n my_paddlenlp python=3.9
-       # 激活环境
-       conda activate my_paddlenlp
-       # 安装PaddleNLP
-       pip install --upgrade --pre paddlenlp
+      # 创建名为my_paddlenlp的环境，指定Python版本为3.9或3.10
+      conda create -n my_paddlenlp python=3.9
+      # 激活环境
+      conda activate my_paddlenlp
+      # 安装PaddleNLP
+      pip install --upgrade --pre paddlenlp
 
     或者，如果您想安装nightly版本：
 
-     .. code-block:: bash
-
-         pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+    .. code-block:: bash
+      pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 
    现在，您可以在这个环境中使用PaddleNLP了。
 
