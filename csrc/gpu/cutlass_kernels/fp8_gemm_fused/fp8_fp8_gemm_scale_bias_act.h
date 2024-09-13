@@ -15,6 +15,9 @@
 #pragma once
 
 #include "fp8_common.h"
+#include "fuse_gemm_noact_template.h"
+#include "fuse_gemm_relu_template.h"
+#include "fuse_gemm_gelu_template.h"
 
 bool fp8_fp8_gemm_scale_bias_act(GemmEpilogueAllParams params);
 

@@ -1133,7 +1133,7 @@ class TrainingArguments:
                         "dp_comm_overlap": enable_dp_comm_overlap,
                         "sharding_comm_overlap": enable_sharding_comm_overlap,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
-                        "release_gradients": "enable_release_grads" in pipeline_parallel_config,
+                        "release_gradients": "enable_release_grads" in pipeline_parallel_config or self.release_grads,
                         "overlap_p2p_comm": "enable_overlap_p2p_comm" in pipeline_parallel_config,
                         "clear_every_step_cache": "enable_clear_every_step_cache" in pipeline_parallel_config,
                         "use_batch_p2p_comm": "disable_batch_p2p_comm" not in pipeline_parallel_config,
