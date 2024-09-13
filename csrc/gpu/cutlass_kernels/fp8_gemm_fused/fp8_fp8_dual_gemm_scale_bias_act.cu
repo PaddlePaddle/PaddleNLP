@@ -30,7 +30,7 @@ std::map<std::string, int> config_map1{
 };
 
 bool fp8_fp8_dual_gemm_scale_bias_act(DualGemmEpilogueAllParams params) {
-  switch (config_map1[params.gemm_config]) {
+  switch (config_map1[params.fuse_gemm_config]) {
     case 0:
       dispatch_dual_gemm_scale_swiglu<phi::dtype::float8_e4m3fn,
                                       phi::dtype::float8_e4m3fn>(params);

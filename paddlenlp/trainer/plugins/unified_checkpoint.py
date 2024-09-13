@@ -349,7 +349,10 @@ class UnifiedCheckpointHandler:
         # save the config
         config_to_save = save_config(model_to_save)
         # Attach architecture to the config
-        config_to_save.architectures = [model_to_save.__class__.__name__]
+        if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
+            config_to_save.architectures = [model_to_save.model.__class__.__name__]
+        else:
+            config_to_save.architectures = [model_to_save.__class__.__name__]
         if self.args.should_save:
             config_to_save.save_pretrained(save_directory)
         paddle.device.cuda.empty_cache()
@@ -560,7 +563,11 @@ class UnifiedCheckpointHandler:
             optim_state_dict = load_single_card_optimizer(self.args, model, optimizer, resume_from_checkpoint)
             return optim_state_dict
 
-        if "ignore_merge_optimizer" in self.args.unified_checkpoint_config:
+        has_merge_optimizer_safetensors = distributed_isfile(
+            os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME)
+        )
+        # If not having merge optimizer, then load non-merge optimizer.
+        if not has_merge_optimizer_safetensors:
             if self.args.data_parallel_rank == 0:
                 returned_optim_state_dict = self.load_non_merge_optimizer(
                     model,
