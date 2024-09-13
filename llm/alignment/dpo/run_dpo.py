@@ -109,7 +109,7 @@ def main():
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         recompute_granularity=model_args.recompute_granularity,
         use_flash_attention=model_args.use_flash_attention,
-        tensor_parallel_output=True,
+        tensor_parallel_output=model_args.tensor_parallel_output,
     )
     if training_args.pipeline_parallel_degree > 1:
         raise ValueError("DPO does not support pipeline parallelism yet.")

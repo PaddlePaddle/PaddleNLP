@@ -1,5 +1,5 @@
 {
-  "model_name_or_path": "IEITYuan/Yuan2-2B",
+  "model_name_or_path": "mistralai/Mixtral-8x7B-Instruct-v0.1",
   "train_dataset_path": "./data/train.jsonl",
   "dev_dataset_path": "./data/dev.jsonl",
   "output_dir": "./checkpoints/dpo_ckpts",
@@ -23,9 +23,8 @@
   "do_eval": true,
   "disable_tqdm": true,
   "load_best_model_at_end": true,
-  "tensor_parallel_degree": 2,
-  "tensor_parallel_output":false,
-  "sharding": "stage1",
+  "tensor_parallel_degree": 8,
+  "sharding": "stage2",
   "use_flash_attention": true,
   "recompute": false,
   "recompute_granularity": "full",

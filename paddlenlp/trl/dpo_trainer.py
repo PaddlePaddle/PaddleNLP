@@ -114,6 +114,7 @@ class DPOTrainer(Trainer):
         self.train_step_count = 0
         if self.compute_metrics is not None:
             raise NotImplementedError("compute_metrics is not supported for DPOTrainer")
+        self.reset_dpo_infohub()
 
     def get_batch_metrics(self, ref_model, model, batch, train_eval="train"):
         """Compute the DPO loss and other metrics for the given batch of inputs for train or test."""
@@ -308,7 +309,6 @@ class DPOTrainer(Trainer):
 
         self._pp_data_buffer = []
         inputs, labels = model._prepare_pipeline_inputs_func(concatenated_inputs)
-        self.reset_dpo_infohub()
         if not self.dpo_config.reference_free:
             if self.dpo_config.lora:
                 self.disable_lora(model)
@@ -348,7 +348,7 @@ class DPOTrainer(Trainer):
             train_eval="eval",
         )
         self.log_metric(**metric_inputs)
-
+        self.reset_dpo_infohub()
         return (loss, None, None)
 
     def log_metric(
@@ -411,7 +411,6 @@ class DPOTrainer(Trainer):
         model_config_backup = model.micro_batch_size, model.accumulate_steps
         model.micro_batch_size = self.args.per_device_train_batch_size
         model.accumulate_steps = self.args.gradient_accumulation_steps
-        self.reset_dpo_infohub()
 
         if not self.dpo_config.reference_free:
             if self.dpo_config.lora:
@@ -461,7 +460,7 @@ class DPOTrainer(Trainer):
             train_eval="train",
         )
         self.log_metric(**metric_inputs)
-
+        self.reset_dpo_infohub()
         return loss.detach()
 
     def disable_lora(self, model):

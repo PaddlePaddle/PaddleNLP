@@ -43,10 +43,7 @@ class DPOCriterion(nn.Layer):
             self.dpo_config = copy.deepcopy(config.dpo_config)
         else:
             self.dpo_config = dpo_config
-        if (
-            getattr(self.config, "tensor_parallel_output", False)
-            and getattr(self.config, "tensor_parallel_degree", 1) > 1
-        ):
+        if self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1:
             self.logprobs = ParallelCrossEntropy()
         else:
             self.logprobs = nn.CrossEntropyLoss(reduction="none")
@@ -140,9 +137,6 @@ class DPOCriterion(nn.Layer):
         """DPO logprobs"""
         use_fused_head_and_loss_fn = getattr(self.config, "use_fused_head_and_loss_fn", False)
         use_sparse_head_and_loss_fn = getattr(self.config, "use_sparse_head_and_loss_fn", False)
-        tensor_parallel_degree = getattr(self.config, "tensor_parallel_degree", 1)
-        tensor_parallel_output = getattr(self.config, "tensor_parallel_output", False)
-        sequence_parallel = getattr(self.config, "sequence_parallel", False)
         chunk_size = getattr(self.config, "chunk_size", 1024)
         labels = chosen_labels + rejected_labels
         if use_fused_head_and_loss_fn:
@@ -151,7 +145,7 @@ class DPOCriterion(nn.Layer):
             hidden_states, weight, bias = logits
 
         if use_sparse_head_and_loss_fn:
-            if tensor_parallel_degree > 1 and sequence_parallel:
+            if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
                 labels, sparse_tgt_idx = sequence_parallel_sparse_mask_labels(labels, 0)
 
                 hidden_states = paddle.take_along_axis(hidden_states, sparse_tgt_idx, axis=0)
@@ -173,8 +167,8 @@ class DPOCriterion(nn.Layer):
                 None,
                 transpose_y,
                 self.config.vocab_size,
-                tensor_parallel_degree,
-                tensor_parallel_output,
+                self.config.tensor_parallel_degree,
+                self.config.tensor_parallel_output,
                 False,  # fused_linear
                 chunk_size,
                 return_token_loss=True,
@@ -182,9 +176,9 @@ class DPOCriterion(nn.Layer):
             )
         elif use_sparse_head_and_loss_fn:
             if bias is None:
-                logits = parallel_matmul(hidden_states, weight, tensor_parallel_output)
+                logits = parallel_matmul(hidden_states, weight, self.config.tensor_parallel_output)
             else:
-                logits = parallel_linear(hidden_states, weight, bias, tensor_parallel_output)
+                logits = parallel_linear(hidden_states, weight, bias, self.config.tensor_parallel_output)
             logits = logits.astype("float32")
             per_token_logps = -self.logprobs(logits, labels)
         else:

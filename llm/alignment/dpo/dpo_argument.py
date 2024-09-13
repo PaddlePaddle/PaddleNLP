@@ -151,6 +151,10 @@ class DPOModelArgument:
         default=False,
         metadata={"help": "whether to use sequence parallel"},
     )
+    tensor_parallel_output: bool = field(
+        default=True,
+        metadata={"help": "whether to use tensor_parallel_output"},
+    )
     weight_quantize_algo: str = field(
         default=None,
         metadata={"help": "Model weight quantization algorithm including 'nf4'(qlora), 'weight_only_int8'."},
