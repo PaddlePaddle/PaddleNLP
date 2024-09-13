@@ -289,11 +289,18 @@ class Trainer:
 
         # Seed must be set before instantiating the model when using model
         set_seed(seed=self.args.seed)
-
+        self._skip_global_steps = 0  # total skip global steps
+        self._skip_steps_since_last_logged = 0  # skip steps since last logged
         if model is None:
             logger.warning("Model is None.")
+            self.model = None
+            self.train_dataset = train_dataset
+            self.tokenizer = tokenizer
+            default_collator = default_data_collator if tokenizer is None else DataCollatorWithPadding(tokenizer)
+            self.data_collator = data_collator if data_collator is not None else default_collator
+            return
 
-        if self.args.to_static and model is not None:
+        if self.args.to_static:
             model = paddle.jit.to_static(model)
             logger.info("Successfully to apply @to_static to the whole model.")
 
@@ -341,6 +348,8 @@ class Trainer:
         self._signature_columns = None
         self.optimizer_grouped_parameters = None
         self.sharding_io = None
+        if self.args.should_save_sharding_stage1_model or self.args.should_load_sharding_stage1_model:
+            self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
         if self.args.unified_checkpoint:
             self.unified_checkpoint_handler = UnifiedCheckpointHandler(self.args)
 
@@ -350,12 +359,19 @@ class Trainer:
                 "You should subclass `Trainer` and override the `create_optimizer_and_scheduler` method."
             )
 
-        if self.args.pipeline_parallel_degree > 1 and self.args.use_hybrid_parallel and model is not None:
+        if self.args.pipeline_parallel_degree > 1 and self.args.use_hybrid_parallel:
             from paddle.distributed.fleet.meta_parallel import PipelineLayer
 
             assert (isinstance(model, LoRAModel) and isinstance(model.model, PipelineLayer)) or isinstance(
                 model, PipelineLayer
             ), "Only support pipeline parallel mode when model is PipelineLayer!!!"
+
+        default_callbacks = DEFAULT_CALLBACKS + get_reporting_integration_callbacks(self.args.report_to)
+        callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
+        self.callback_handler = CallbackHandler(
+            callbacks, self.model, self.tokenizer, self.optimizer, self.lr_scheduler
+        )
+        self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
 
         def _save_ckpt_func(state_dict, path, signal_path=None):
             if self.args.enable_auto_parallel:
@@ -371,9 +387,6 @@ class Trainer:
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
         if self.args.use_async_save:
             self._async_optimizer_saver = AsyncSaver()
-
-        self._skip_global_steps = 0  # total skip global steps
-        self._skip_steps_since_last_logged = 0  # skip steps since last logged
 
         if args.max_steps > 0:
             logger.info("max_steps is given, it will override any value given in num_train_epochs")
@@ -394,40 +407,28 @@ class Trainer:
 
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False
+        if args.fp16 or args.bf16:
+            # set do_grad_scaling, enable_autocast_context_manager
+            self._wrap_amp_model(args, model)
 
-        if model is not None:
-            if self.args.should_save_sharding_stage1_model or self.args.should_load_sharding_stage1_model:
-                self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
+        if args.recompute:
 
-            default_callbacks = DEFAULT_CALLBACKS + get_reporting_integration_callbacks(self.args.report_to)
-            callbacks = default_callbacks if callbacks is None else default_callbacks + callbacks
-            self.callback_handler = CallbackHandler(
-                callbacks, self.model, self.tokenizer, self.optimizer, self.lr_scheduler
-            )
-            self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
+            def fn(layer):
+                if hasattr(layer, "enable_recompute") and (
+                    layer.enable_recompute is False or layer.enable_recompute == 0
+                ):
+                    layer.enable_recompute = True
 
-            if args.fp16 or args.bf16:
-                # set do_grad_scaling, enable_autocast_context_manager
-                self._wrap_amp_model(args, model)
+            model.apply(fn)
 
-            if args.recompute:
+        default_label_names = (
+            ["start_positions", "end_positions"]
+            if "QusetionAnswering" in type(self.model).__name__ or "UIE" in type(self.model).__name__
+            else ["labels"]
+        )
+        self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
 
-                def fn(layer):
-                    if hasattr(layer, "enable_recompute") and (
-                        layer.enable_recompute is False or layer.enable_recompute == 0
-                    ):
-                        layer.enable_recompute = True
-
-                model.apply(fn)
-
-            default_label_names = (
-                ["start_positions", "end_positions"]
-                if "QusetionAnswering" in type(self.model).__name__ or "UIE" in type(self.model).__name__
-                else ["labels"]
-            )
-            self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
-            self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
-
+        self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
         self.print_config()
 
         # very last
@@ -3308,7 +3309,7 @@ class Trainer:
             self._signature_columns += list(set(["label", "label_ids"] + self.label_names))
 
     def _remove_unused_columns(self, dataset: "datasets.Dataset", description: Optional[str] = None):
-        if not self.args.remove_unused_columns:
+        if not self.args.remove_unused_columns or self.model is None:
             return dataset
         if self._signature_columns is None:
             # Inspect model forward signature to keep only the arguments it accepts.
