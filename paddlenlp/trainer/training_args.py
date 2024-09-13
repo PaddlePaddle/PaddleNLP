@@ -1239,8 +1239,14 @@ class TrainingArguments:
                         "order": order,
                     }
 
-                if self.enable_optimizer_timer:
-                    hybrid_configs["enable_optimizer_timer"] = True
+                try:
+                    if self.enable_optimizer_timer:
+                        hybrid_configs["enable_optimizer_timer"] = True
+                except (KeyError, AttributeError):
+                    warnings.warn(
+                        "The enable_optimizer_timer is not supported "
+                        "by current version of Paddle. Please try latest develop Paddle."
+                    )
 
                 if self.pipeline_parallel_degree > 1:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs
