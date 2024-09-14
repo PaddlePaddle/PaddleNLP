@@ -107,6 +107,14 @@ sources = [
     "./gpu/dequant_int8.cu",
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
+    "./gpu/append_attention.cu",
+    "./gpu/encoder_write_cache_with_rope.cu",
+    "./gpu/decoder_write_cache_with_rope.cu",
+    "./gpu/get_block_shape.cu",
+    "./gpu/split_kv_block.cu",
+    "./gpu/append_attn/append_attention_kernel.cu",
+    "./gpu/append_attn/encoder_write_cache_with_rope_kernel.cu",
+    "./gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
 ]
 
 cutlass_dir = "third_party/cutlass"

@@ -121,6 +121,8 @@ class PredictorArgument:
         },
     )
 
+    append_attn: bool = field(default=False, metadata={"help": "whether use append attention"})
+
     chat_template: str = field(
         default=None,
         metadata={
@@ -138,6 +140,10 @@ class PredictorArgument:
             return self.src_length + self.max_length
         else:
             return 8192  # Maximum sequence length.
+
+    def __post_init__(self):
+        if self.append_attn:
+            self.block_attn = True
 
 
 @dataclass
@@ -886,12 +892,8 @@ class BlockInferencePredictorMixin(BasePredictor):
                 ]
             )
             # self.model_inputs["src_mask/tgt_mask"] is read only, will not be updated!
-            src_mask = (
-                alibi_encoder + (1 - src_mask) * paddle.finfo(self.dtype).min
-            ).cast(self.dtype)
-            tgt_mask = (
-                alibi_decoder + (1 - tgt_mask) * paddle.finfo(self.dtype).min
-            ).cast(self.dtype)
+            src_mask = (alibi_encoder + (1 - src_mask) * paddle.finfo(self.dtype).min).cast(self.dtype)
+            tgt_mask = (alibi_decoder + (1 - tgt_mask) * paddle.finfo(self.dtype).min).cast(self.dtype)
             self.model_inputs["rope_emb"] = paddle.concat([src_mask.reshape([-1]), tgt_mask.reshape([-1])])
 
     def _preprocess(self, input_text: list[str]):
@@ -1265,6 +1267,7 @@ def create_predictor(
                 elif predictor_args.block_attn:
                     config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
+                    config.append_attn = predictor_args.append_attn
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
                     )
@@ -1304,6 +1307,7 @@ def create_predictor(
                 if predictor_args.block_attn:
                     config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
+                    config.append_attn = predictor_args.append_attn
                     from paddlenlp.experimental.transformers import (
                         MixtralForCausalLMBlockInferenceModel as MixtralInferenceModel,
                     )
@@ -1373,6 +1377,7 @@ def create_predictor(
 
                     config.block_size = predictor_args.block_size
                     config.max_seq_len = predictor_args.total_max_length
+                    config.append_attn = predictor_args.append_attn
                 else:
                     from paddlenlp.experimental.transformers import (
                         BloomForCausalLMInferenceModel as BloomInferenceModel,
@@ -1401,6 +1406,7 @@ def create_predictor(
                 if predictor_args.block_attn:
                     config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
+                    config.append_attn = predictor_args.append_attn
                     from paddlenlp.experimental.transformers import (
                         Qwen2MoeForCausalLMBlockInferenceModel as Qwen2MoeInferenceModel,
                     )
@@ -1427,6 +1433,7 @@ def create_predictor(
                 if predictor_args.block_attn:
                     config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
+                    config.append_attn = predictor_args.append_attn
                     from paddlenlp.experimental.transformers import (
                         Qwen2ForCausalLMBlockInferenceModel as Qwen2InferenceModel,
                     )

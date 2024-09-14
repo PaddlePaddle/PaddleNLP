@@ -64,6 +64,12 @@ if core.is_compiled_with_cuda():
     except:
         pass
 
+from paddlenlp.experimental.transformers.append_attention import (
+    compute_append_attn,
+    get_block_shape,
+    split_kv_block,
+)
+
 __all__ = [
     "MoeConfig",
     "FusedMultiTransformerConfig",
@@ -71,6 +77,8 @@ __all__ = [
     "FusedMultiTransformerPostLayernorm",
     "FusedMultiTransformerWeightOnly",
     "FusedMultiTransformerWeightOnlyPostLayernorm",
+    "FusedAppendMultiTransformer",
+    "FusedAppendMultiTransformerA8W8",
     "FusedBlockMultiTransformer",
     "FusedBlockMultiTransformerWeightOnly",
     "FusedBlockMultiTransformerA8W8",
@@ -264,6 +272,7 @@ class FusedMultiTransformerConfig:
         rank_id=-1,
         moe_config=MoeConfig(),
         avx_config=AvxConfig(),
+        append_attn=False,
     ):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -340,6 +349,8 @@ class FusedMultiTransformerConfig:
 
         self.moe_config = moe_config
         self.avx_config = avx_config
+
+        self.append_attn = append_attn
 
 
 class FusedMultiTransformerBase(Layer):
@@ -601,12 +612,16 @@ class FusedMultiTransformerBase(Layer):
                     dtype=self._helper.get_default_dtype(),
                 )
 
+            cache_scale_dtype = "float32"
+            if self.config.append_attn:
+                cache_scale_dtype = paddle.get_default_dtype()
+
             cache_k_scale = None
             if cache_k_scale_attr:
                 cache_k_scale = self.create_parameter(
                     shape=[self.kv_num_heads],
                     attr=cache_k_scale_attr,
-                    dtype="float32",
+                    dtype=cache_scale_dtype,
                     is_bias=False,
                 )
 
@@ -615,7 +630,7 @@ class FusedMultiTransformerBase(Layer):
                 cache_v_scale = self.create_parameter(
                     shape=[self.kv_num_heads],
                     attr=cache_v_scale_attr,
-                    dtype="float32",
+                    dtype=cache_scale_dtype,
                     is_bias=False,
                 )
 
@@ -624,7 +639,7 @@ class FusedMultiTransformerBase(Layer):
                 cache_k_out_scale = self.create_parameter(
                     shape=[self.kv_num_heads],
                     attr=cache_k_out_scale_attr,
-                    dtype="float32",
+                    dtype=cache_scale_dtype,
                     is_bias=False,
                 )
 
@@ -633,7 +648,7 @@ class FusedMultiTransformerBase(Layer):
                 cache_v_out_scale = self.create_parameter(
                     shape=[self.kv_num_heads],
                     attr=cache_v_out_scale_attr,
-                    dtype="float32",
+                    dtype=cache_scale_dtype,
                     is_bias=False,
                 )
 
@@ -2126,6 +2141,264 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         return out
 
 
+class FusedAppendMultiTransformer(FusedMultiTransformerBase):
+    def __init__(self, config: FusedMultiTransformerConfig):
+        super().__init__(config)
+
+    def compute_attn(
+        self,
+        time_step,
+        qkv,
+        padding_offset,
+        seq_lens,
+        input_ids,
+        rotary_embs,
+        rotary_emb_dims,
+        caches,
+        pre_caches,
+        pre_caches_length,
+        attn_mask,
+        i,
+        encoder_batch_ids,
+        encoder_tile_ids_per_batch,
+        encoder_num_blocks,
+        kv_batch_ids,
+        kv_tile_ids_per_batch,
+        kv_num_blocks,
+        decoder_batch_ids,
+        decoder_tile_ids_per_batch,
+        decoder_num_blocks,
+        num_heads,
+        kv_num_heads,
+        head_dim,
+        encoder_block_shape_q,
+        decoder_block_shape_q,
+        max_partition_size,
+        encoder_max_partition_size,
+        **kwargs,
+    ):
+        fmha_out = compute_append_attn(
+            qkv,
+            caches[2 * i],
+            caches[2 * i + 1],
+            rotary_embs,
+            kwargs.get("seq_lens_this_time", None),
+            kwargs.get("seq_lens_encoder", None),
+            kwargs.get("seq_lens_decoder", None),
+            kwargs.get("padding_offsets", None),
+            kwargs.get("cum_offsets", None),
+            kwargs.get("block_tables", None),
+            encoder_batch_ids,
+            encoder_tile_ids_per_batch,
+            encoder_num_blocks,
+            kv_batch_ids,
+            kv_tile_ids_per_batch,
+            kv_num_blocks,
+            decoder_batch_ids,
+            decoder_tile_ids_per_batch,
+            decoder_num_blocks,
+            kwargs.get("max_enc_len_this_time", None),
+            kwargs.get("max_dec_len_this_time", None),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "none",  # cache_quant_type_str
+            kwargs.get("max_input_length", -1),
+            num_heads,
+            kv_num_heads,
+            head_dim,
+            0.0,  # out_linear_in_scale
+        )
+        out_linear_out = self.compute_out_linear(fmha_out, i)
+
+        return out_linear_out
+
+    def forward(
+        self,
+        input_ids,
+        src,
+        cum_offsets=None,
+        padding_offset=None,
+        attn_mask=None,
+        caches=None,
+        pre_caches=None,
+        pre_caches_length=0,
+        rotary_embs=None,
+        rotary_emb_dims=0,
+        seq_lens=None,
+        time_step=None,
+        **kwargs,
+    ):
+        r"""
+        Applies multi transformer layers on the input.
+
+        Parameters:
+            src (Tensor): The input of Transformer layers. It is
+                a tensor with shape `[batch_size, sequence_length, d_model]`.
+                The data type should be float16 or float32.
+            attn_mask (Tensor, optional): A tensor used in multi-head attention
+                to prevents attention to some unwanted positions, usually the
+                paddings or the subsequent positions. It is a tensor with shape
+                `[batch_size, 1, sequence_length, sequence_length]`. It can be
+                None when nothing wanted or needed to be prevented attention to.
+                Default None.
+            caches (list(Tensor)|tuple(Tensor), optional): The cache structure
+                tensors for the inference generation model. It is only used for
+                inference and should be None for training. The shape is
+                `[2, batch_size, num_head, max_seq_len, head_dim]`. Default None.
+            pre_caches (list(Tensor)|tuple(Tensor), optional): The prefix caches
+                for the generation model. The shape is `[2, bsz, num\_head, cache\_len, head\_dim]`. Default None.
+            rotary_embs (Tensor optional): The RoPE embs for the rotary computation. The shape is `[2, bsz, 1, seq\_len, head\_dim]`. Default None.
+            rotary_emb_dims (int, optional): The rotary_emb_dims of rotary computation, and it is 0 when rotary_embs is None,
+                1 when rotary_embs is not None and pos_extra_ids is None, 2 when rotary_embs and pos_extra_ids are both not None. Default 0.
+            seq_lens (Tensor optional): The sequence lengths of this batch. The shape is `[bsz]`. Default None.
+            time_step (Tensor, optional): The time step tensor for the generation
+                model. Which used in decode stage, to represent the time step,
+                that is, the real seq_len of CacheKV. The shape is `[1]`, must be
+                in CPUPlace. Default None.
+
+        Returns:
+            Tensor|tuple: If `caches` is None, return a tensor that has
+            the same shape and data type with `src`, representing the output
+            of Transformer layers. If `caches` is not None, return the
+            tuple (output, caches), which output is the output of
+            Transformer layers, caches is inplace with input `caches`.
+        """
+        self.pre_process(**kwargs)
+        kwargs["cum_offsets"] = cum_offsets
+
+        if caches is not None:
+            assert len(caches) == len(self.qkv_weights) or len(caches) == 2 * len(self.qkv_weights)
+
+        assert self.num_layers == len(self.qkv_weights)
+
+        max_enc_len_this_time, max_dec_len_this_time = self.compute_max_len(
+            kwargs.get("seq_lens_encoder", None), kwargs.get("seq_lens_decoder", None), cum_offsets
+        )
+        kwargs["max_enc_len_this_time"] = max_enc_len_this_time
+        kwargs["max_dec_len_this_time"] = max_dec_len_this_time
+
+        encoder_block_shape_q = 128
+        decoder_block_shape_q = 128
+        max_partition_size = 1024
+        encoder_max_partition_size = kwargs.get("max_input_length", None)
+        group_size = self.num_heads // self.kv_num_heads
+
+        encoder_batch_ids, encoder_tile_ids_per_batch, encoder_num_blocks_x_cpu = get_block_shape(
+            kwargs.get("seq_lens_encoder", None),
+            None,
+            max_enc_len_this_time,
+            kwargs.get("cum_offsets", None),
+            encoder_block_shape_q,
+            group_size,
+        )
+        # encoder_num_blocks = encoder_num_blocks_x_cpu.item()
+        kv_batch_ids, kv_tile_ids_per_batch, kv_num_blocks_x_cpu = split_kv_block(
+            kwargs.get("seq_lens_decoder", None),
+            kwargs.get("seq_lens_encoder", None),
+            max_enc_len_this_time,
+            kwargs.get("cum_offsets", None),
+            kwargs.get("block_size", 64),
+            kwargs.get("block_size", 64),
+        )
+        # kv_num_blocks = kv_num_blocks_x_cpu.item()
+
+        # decoder重映射
+        decoder_batch_ids, decoder_tile_ids_per_batch, decoder_num_blocks_x_cpu = get_block_shape(
+            kwargs.get("seq_lens_decoder", None),
+            kwargs.get("seq_lens_encoder", None),
+            paddle.ones(shape=[1], dtype="int32"),
+            kwargs.get("cum_offsets", None),
+            decoder_block_shape_q,
+            group_size,
+        )
+
+        residual_input = src
+        for i in range(self.num_layers):
+            qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
+
+            out_linear_out = self.compute_attn(
+                time_step,
+                qkv_out,
+                padding_offset,
+                seq_lens,
+                input_ids,
+                rotary_embs,
+                rotary_emb_dims,
+                caches,
+                pre_caches,
+                pre_caches_length,
+                attn_mask,
+                i,
+                encoder_batch_ids,
+                encoder_tile_ids_per_batch,
+                encoder_num_blocks_x_cpu,
+                kv_batch_ids,
+                kv_tile_ids_per_batch,
+                kv_num_blocks_x_cpu,
+                decoder_batch_ids,
+                decoder_tile_ids_per_batch,
+                decoder_num_blocks_x_cpu,
+                self.num_heads,
+                self.kv_num_heads,
+                self.head_dim,
+                encoder_block_shape_q,
+                decoder_block_shape_q,
+                max_partition_size,
+                encoder_max_partition_size,
+                **kwargs,
+            )
+            # all_reduce
+            if self.nranks > 1:
+                dist.all_reduce(out_linear_out)
+
+            # ffn layernorm
+            tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
+
+            # ffn1 matmul
+            ffn1_out = self.compute_ffn1(tmp_out, i)
+            ffn1_out = self.compute_activation(ffn1_out, i)
+
+            # ffn2 matmul
+            ffn2_out = self.compute_ffn2(ffn1_out, i)
+
+            # all_reduce
+            if self.nranks > 1:
+                dist.all_reduce(ffn2_out)
+
+            # norm + residual_add_bias
+            tmp_out, residual_input = self.compute_bias_residual_layernorm(
+                ffn2_out, residual_input, i, self.num_layers
+            )
+            src = tmp_out
+
+        kwargs["time_step"] = time_step
+        kwargs["multi_block_output"] = tmp_out
+        kwargs["seq_lens"] = seq_lens
+        kwargs["input_ids"] = input_ids
+
+        out = self.post_process(**kwargs)
+        return out, caches
+
+    def post_process(self, **kwargs):
+        multi_block_output = kwargs.get("multi_block_output", None)
+        cum_offsets = kwargs.get("cum_offsets", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        max_input_length = kwargs.get("max_input_length", -1)
+
+        out = rebuild_padding_v2(multi_block_output, cum_offsets, seq_lens_decoder, seq_lens_encoder, max_input_length)
+
+        return out
+
+
 class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMultiTransformerWeightOnly):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__(config)
@@ -2200,6 +2473,108 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
             compute_dtype=self._fuse_kernel_compute_dtype,
         )[0]
 
+        out_linear_out = self.compute_out_linear(fmha_out, i)
+
+        return out_linear_out
+
+
+class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTransformerA8W8):
+    def __init__(self, config: FusedMultiTransformerConfig):
+        super().__init__(config)
+
+    def compute_attn(
+        self,
+        time_step,
+        qkv,
+        padding_offset,
+        seq_lens,
+        input_ids,
+        rotary_embs,
+        rotary_emb_dims,
+        caches,
+        pre_caches,
+        pre_caches_length,
+        attn_mask,
+        i,
+        encoder_batch_ids,
+        encoder_tile_ids_per_batch,
+        encoder_num_blocks,
+        kv_batch_ids,
+        kv_tile_ids_per_batch,
+        kv_num_blocks,
+        decoder_batch_ids,
+        decoder_tile_ids_per_batch,
+        decoder_num_blocks,
+        num_heads,
+        kv_num_heads,
+        head_dim,
+        encoder_block_shape_q,
+        decoder_block_shape_q,
+        max_partition_size,
+        encoder_max_partition_size,
+        **kwargs,
+    ):
+        k_quant_scales = kwargs.get("k_quant_scales", None)
+        v_quant_scales = kwargs.get("v_quant_scales", None)
+        k_dequant_scales = kwargs.get("k_dequant_scales", None)
+        v_dequant_scales = kwargs.get("v_dequant_scales", None)
+        cache_k_zps = kwargs.get("cache_k_zp", None)
+        cache_v_zps = kwargs.get("cache_v_zp", None)
+
+        cache_quant_type_str = "none"
+        if self.config.cachekv_int8_type == "static":
+            k_quant_scales = self.cache_k_scales
+            v_quant_scales = self.cache_v_scales
+            k_dequant_scales = self.cache_k_out_scales
+            v_dequant_scales = self.cache_v_out_scales
+            cache_quant_type_str = "cache_int8"
+
+        k_quant_scale = k_quant_scales[i] if k_quant_scales is not None else None
+        v_quant_scale = v_quant_scales[i] if v_quant_scales is not None else None
+        k_dequant_scale = k_dequant_scales[i] if k_dequant_scales is not None else None
+        v_dequant_scale = v_dequant_scales[i] if v_dequant_scales is not None else None
+        cache_k_zp = cache_k_zps[i] if cache_k_zps is not None else None
+        cache_v_zp = cache_v_zps[i] if cache_v_zps is not None else None
+
+        fmha_out = compute_append_attn(
+            qkv,
+            caches[2 * i],
+            caches[2 * i + 1],
+            rotary_embs,
+            kwargs.get("seq_lens_this_time", None),
+            kwargs.get("seq_lens_encoder", None),
+            kwargs.get("seq_lens_decoder", None),
+            kwargs.get("padding_offsets", None),
+            kwargs.get("cum_offsets", None),
+            kwargs.get("block_tables", None),
+            encoder_batch_ids,
+            encoder_tile_ids_per_batch,
+            encoder_num_blocks,
+            kv_batch_ids,
+            kv_tile_ids_per_batch,
+            kv_num_blocks,
+            decoder_batch_ids,
+            decoder_tile_ids_per_batch,
+            decoder_num_blocks,
+            kwargs.get("max_enc_len_this_time", None),
+            kwargs.get("max_dec_len_this_time", None),
+            self.qkv_out_scales[i],
+            self.qkv_biases[i] if len(self.qkv_biases) > 0 else None,
+            k_quant_scale,
+            v_quant_scale,
+            k_dequant_scale,
+            v_dequant_scale,
+            cache_k_zps,
+            cache_v_zps,
+            self.linear_shifts[i] if len(self.linear_shifts) > 0 else None,
+            self.linear_smooths[i] if len(self.linear_smooths) > 0 else None,
+            cache_quant_type_str,
+            kwargs.get("max_input_length", -1),
+            num_heads,
+            kv_num_heads,
+            head_dim,
+            0.0 if self.linear_shifts[i] is None else self.act_scales["out_linear_in_scale"][i],
+        )
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
         return out_linear_out
@@ -2410,12 +2785,16 @@ class FusedBlockMultiTransformerFP8(Layer):
                     is_bias=True,
                 )
 
+            cache_scale_dtype = "float32"
+            if self.config.append_attn:
+                cache_scale_dtype = paddle.get_default_dtype()
+
             cache_k_scale = None
             if cache_k_scale_attr:
                 cache_k_scale = self.create_parameter(
                     shape=[self.kv_num_heads],
                     attr=cache_k_scale_attr,
-                    dtype="float32",
+                    dtype=cache_scale_dtype,
                     is_bias=False,
                 )
 
@@ -2424,7 +2803,7 @@ class FusedBlockMultiTransformerFP8(Layer):
                 cache_v_scale = self.create_parameter(
                     shape=[self.kv_num_heads],
                     attr=cache_v_scale_attr,
-                    dtype="float32",
+                    dtype=cache_scale_dtype,
                     is_bias=False,
                 )
 
@@ -2433,7 +2812,7 @@ class FusedBlockMultiTransformerFP8(Layer):
                 cache_k_out_scale = self.create_parameter(
                     shape=[self.kv_num_heads],
                     attr=cache_k_out_scale_attr,
-                    dtype="float32",
+                    dtype=cache_scale_dtype,
                     is_bias=False,
                 )
 
@@ -2442,7 +2821,7 @@ class FusedBlockMultiTransformerFP8(Layer):
                 cache_v_out_scale = self.create_parameter(
                     shape=[self.kv_num_heads],
                     attr=cache_v_out_scale_attr,
-                    dtype="float32",
+                    dtype=cache_scale_dtype,
                     is_bias=False,
                 )
 

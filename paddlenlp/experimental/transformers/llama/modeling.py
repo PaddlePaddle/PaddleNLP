@@ -37,6 +37,8 @@ from paddlenlp.experimental.model_utils import (
 )
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     AvxConfig,
+    FusedAppendMultiTransformer,
+    FusedAppendMultiTransformerA8W8,
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerA8W8,
     FusedBlockMultiTransformerFP8,
@@ -631,6 +633,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 norm_type="rmsnorm",
                 use_neox_rotary_style=self.use_neox,
                 rank_id=config.tensor_parallel_rank,
+                append_attn=config.append_attn,
             )
 
         else:
@@ -678,6 +681,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 cachekv_int8_type=config.cachekv_int8_type,
                 rank_id=config.tensor_parallel_rank,
                 trans_qkvw=(False if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type else True),
+                append_attn=config.append_attn,
             )
 
         self.set_transformer_block(transformer_config)
@@ -1212,7 +1216,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
                     for k, v in cache_scales_loader.scale.items():
                         for i_layer, weight_scale in enumerate(v):
-                            weight_scale = weight_scale.astype("float32")
+                            if self.config.append_attn:
+                                weight_scale = paddle.to_tensor(weight_scale).cast(paddle.get_default_dtype())
+                            else:
+                                weight_scale = weight_scale.astype("float32")
                             if k == "cache_k_scale":
                                 self.transformer_block.cache_k_scales[i_layer].set_value(weight_scale)
                             elif k == "cache_v_scale":
@@ -1327,7 +1334,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             )
             for k, v in cache_scales_loader.scale.items():
                 for i_layer, weight_scale in enumerate(v):
-                    weight_scale = weight_scale.astype("float32")
+                    if self.config.append_attn:
+                        weight_scale = paddle.to_tensor(weight_scale).cast(paddle.get_default_dtype())
+                    else:
+                        weight_scale = weight_scale.astype("float32")
                     if k == "cache_k_scale":
                         self.transformer_block.cache_k_scales[i_layer].set_value(weight_scale)
                     elif k == "cache_v_scale":
@@ -1551,19 +1561,33 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 @register_base_model
 class LlamaBlockInferenceModel(LlamaInferenceModel):
     def __init__(self, config: LlamaConfig):
+        self.append_attn = config.append_attn
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size
 
     def set_transformer_block(self, transformer_config):
-        if self.use_weight_only:
-            self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
-        elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
-            self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
-        elif "fp8" in self.quant_type:
-            self.transformer_block = FusedBlockMultiTransformerFP8(transformer_config)
+        if not self.append_attn:
+            if self.use_weight_only:
+                self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
+            elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
+                self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
+            elif "fp8" in self.quant_type:
+                self.transformer_block = FusedBlockMultiTransformerFP8(transformer_config)
+            else:
+                self.transformer_block = FusedBlockMultiTransformer(transformer_config)
         else:
-            self.transformer_block = FusedBlockMultiTransformer(transformer_config)
+            # if self.use_weight_only:
+            #     self.transformer_block = FusedAppendMultiTransformerWeightOnly(transformer_config)
+            # elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
+            #     self.transformer_block = FusedAppendMultiTransformerA8W8(transformer_config)
+            # elif "fp8" in self.quant_type:
+            #     self.transformer_block = FusedAppendMultiTransformerFP8(transformer_config)
+            # else:
+            if self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
+                self.transformer_block = FusedAppendMultiTransformerA8W8(transformer_config)
+            else:
+                self.transformer_block = FusedAppendMultiTransformer(transformer_config)
 
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
