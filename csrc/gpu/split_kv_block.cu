@@ -67,7 +67,6 @@ std::vector<paddle::Tensor> SplitKVBlock(const paddle::Tensor& sequence_lengths_
   auto batch_ids = paddle::empty({bsz * max_tile_size_per_bs}, paddle::DataType::INT32, paddle::GPUPlace());
 	auto tile_ids_per_batch = paddle::empty({bsz * max_tile_size_per_bs}, paddle::DataType::INT32, paddle::GPUPlace());
 	auto num_blocks = paddle::empty({1}, paddle::DataType::INT32, paddle::GPUPlace());
-	auto num_blocks_cpu = paddle::empty({1}, paddle::DataType::INT32, paddle::CPUPlace());
   
   split_kv_block<<<1, 32, 0, stream>>>(
           sequence_lengths_stage.data<int>(),
@@ -80,10 +79,7 @@ std::vector<paddle::Tensor> SplitKVBlock(const paddle::Tensor& sequence_lengths_
           num_row_per_block
         );
 
-	cudaMemcpy(num_blocks_cpu.data<int>(),
-						 num_blocks.data<int>(),
-						 sizeof(int),
-						 cudaMemcpyDeviceToHost);
+  auto num_blocks_cpu = num_blocks.copy_to(paddle::CPUPlace(), false);
 	return {batch_ids, tile_ids_per_batch, num_blocks_cpu};
 }
 

@@ -14,6 +14,7 @@
 
 #pragma once
 #include "paddle/extension.h"
+#include "paddle/phi/core/allocator.h"
 
 
 template <paddle::DataType D>

@@ -79,8 +79,6 @@ std::vector<paddle::Tensor> GetBlockShape(
                                           paddle::GPUPlace());
   auto num_blocks_x =
       paddle::empty({1}, paddle::DataType::INT32, paddle::GPUPlace());
-  auto num_blocks_x_cpu =
-      paddle::empty({1}, paddle::DataType::INT32, paddle::CPUPlace());
 
   const int* seq_lens_remove = nullptr;
   if (sequence_lengths_remove) {
@@ -95,10 +93,7 @@ std::vector<paddle::Tensor> GetBlockShape(
                                       num_qrow_per_block,
                                       group_size);
 
-  cudaMemcpy(num_blocks_x_cpu.data<int>(),
-             num_blocks_x.data<int>(),
-             sizeof(int),
-             cudaMemcpyDeviceToHost);
+  auto num_blocks_x_cpu = num_blocks_x.copy_to(paddle::CPUPlace(), false);
   return {batch_ids, tile_ids_per_batch, num_blocks_x_cpu};
 }
 
