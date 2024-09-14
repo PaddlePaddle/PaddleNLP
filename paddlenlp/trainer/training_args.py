@@ -844,6 +844,10 @@ class TrainingArguments:
             )
         },
     )
+    enable_optimizer_timer: Optional[bool] = field(
+        default=False,
+        metadata={"help": "是否开启Optimzier的timer"},
+    )
     ignore_load_lr_and_optim: Optional[bool] = field(
         default=False,
         metadata={"help": "whether to ignore load optimizer and scheduler."},
@@ -1266,6 +1270,15 @@ class TrainingArguments:
                         "sharding_degree": self.sharding_parallel_degree,
                         "order": order,
                     }
+
+                try:
+                    if self.enable_optimizer_timer:
+                        hybrid_configs["enable_optimizer_timer"] = True
+                except (KeyError, AttributeError):
+                    warnings.warn(
+                        "The enable_optimizer_timer is not supported "
+                        "by current version of Paddle. Please try latest develop Paddle."
+                    )
 
                 if self.pipeline_parallel_degree > 1:
                     hybrid_configs["pp_configs"] = dygraph_pp_configs
