@@ -16,7 +16,9 @@ import os
 
 import paddle
 from experimental.layers.custom_attention import QuantizedCustomAttentionLayer
+from experimental.observer.abs_max import AbsmaxObserver
 from experimental.observer.abs_max_headwise import AbsMaxHeadwiseObserver
+from experimental.observer.avg import AVGObserver
 from experimental.observer.avg_headwise import AvgHeadwiseObserver
 from experimental.observer.channel_wise import ChannelWiseObserver
 from paddle import nn
@@ -44,10 +46,8 @@ from paddleslim.quant.layers import (
 )
 from paddleslim.quant.observers import (
     AbsMaxChannelWiseWeightObserver,
-    AVGObserver,
     GroupWiseWeightObserver,
 )
-from paddleslim.quant.observers.abs_max import AbsmaxObserver
 
 from paddlenlp.peft import PrefixModelForCausalLM
 from paddlenlp.peft.lora import (
@@ -214,32 +214,29 @@ def prepare_qconfig(args):
     Prepare qconfig
     """
     args.quant_type = args.quant_type.lower()
-    args.use_fp8 = args.use_fp8.lower()
+
+    if args.quant_type in ["a8w8_fp8"]:
+        use_fp8 = "aw"
+        args.quant_type = args.quant_type.replace("_fp8", "")
+    else:
+        use_fp8 = ""
 
     weight_observer = (
         WEIGHT_OBSERVER.get(args.weight_quant_method, None)
-        if "w" not in args.use_fp8
+        if "w" not in use_fp8
         else FP8_OBSERVER.get(args.weight_quant_method, None)
     )
     act_observer = (
         ACT_OBSERVER.get(args.act_quant_method, None)
-        if "a" not in args.use_fp8
+        if "a" not in use_fp8
         else FP8_OBSERVER.get(args.act_quant_method, None)
     )
-    cachekv_observer = (
-        CACHEKV_OBSERVER.get(args.cachekv_quant_method, None)
-        if "c" not in args.use_fp8
-        else FP8_OBSERVER.get(args.cachekv_quant_method, None)
-    )
+    cachekv_observer = CACHEKV_OBSERVER.get(args.cachekv_quant_method, None)
 
     if "c8" in args.quant_type:
         quant_type = args.quant_type.replace("c8", "")
         cachekv_quant = True
-
-        if "c" in args.use_fp8:
-            cachekv_quant_bits = "fp8"
-        else:
-            cachekv_quant_bits = "int8"
+        cachekv_quant_bits = "int8"
     else:
         quant_type = args.quant_type.replace("c16", "")
         cachekv_quant = False
@@ -247,13 +244,13 @@ def prepare_qconfig(args):
     q_config = QuantConfig(activation=None, weight=None)
     if quant_type in ["a8w8", "w8a8"]:
 
-        if "w" in args.use_fp8:
-            w_quant_bit = (4, 3) if args.fp8_type[args.use_fp8.index("w")] == "e4m3" else (5, 2)
+        if "w" in use_fp8:
+            w_quant_bit = (4, 3) if args.fp8_type[use_fp8.index("w")] == "e4m3" else (5, 2)
         else:
             w_quant_bit = 8
 
-        if "a" in args.use_fp8:
-            a_quant_bit = (4, 3) if args.fp8_type[args.use_fp8.index("a")] == "e4m3" else (5, 2)
+        if "a" in use_fp8:
+            a_quant_bit = (4, 3) if args.fp8_type[use_fp8.index("a")] == "e4m3" else (5, 2)
         else:
             a_quant_bit = 8
         activation = act_observer(quant_bits=a_quant_bit)
@@ -265,13 +262,13 @@ def prepare_qconfig(args):
 
     elif quant_type in ["wint8", "w8a16", "weight_only_int8"]:
         activation = None
-        if "w" in args.use_fp8:
+        if "w" in use_fp8:
             weight = weight_observer(quant_bits=(4, 3))
         else:
             weight = weight_observer(quant_bits=8)
     else:
         raise ValueError(
-            "quant_type should be in ['weight_only_int8/wint8', 'weight_only_int4/wint4', 'a8w8', 'a8w8c8']"
+            "quant_type should be in ['weight_only_int8/wint8', 'weight_only_int4/wint4', 'a8w8', 'a8w8c8', 'a8w8_fp8']"
         )
 
     q_config.add_qat_layer_mapping(ColumnParallelLinear, QuantizedColumnParallelLinear)
@@ -292,23 +289,8 @@ def prepare_qconfig(args):
                     cachekv_observer(quant_bits=cachekv_quant_bit),
                 ]
             q_config.add_qat_layer_mapping(FuncWrapper, QuantizedCustomAttentionLayer)
-
-        elif cachekv_quant_bits == "fp8":
-            cachekv_quant_bit = (4, 3) if args.fp8_type[args.use_fp8.index("c")] == "e4m3" else (5, 2)
-
-            if "headwise" in args.cachekv_quant_method:
-                cachekv = [
-                    cachekv_observer(quant_bits=cachekv_quant_bit, quant_axis=1),
-                    cachekv_observer(quant_bits=cachekv_quant_bit, quant_axis=1),
-                ]
-            else:
-                cachekv = [
-                    cachekv_observer(quant_bits=cachekv_quant_bit),
-                    cachekv_observer(quant_bits=cachekv_quant_bit),
-                ]
-            q_config.add_qat_layer_mapping(FuncWrapper, QuantizedCustomAttentionLayer)
         else:
-            raise ValueError("cachekv_quant_bits should be 8")
+            raise ValueError("cachekv_quant_bits should be int8")
 
     return activation, weight, cachekv, q_config
 
