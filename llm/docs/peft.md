@@ -1,6 +1,6 @@
 # PaddleNLP PEFT API
 
-PaddleNLP PEFT API提供单卡/分布式LoRA和Prefix-Tuning，用户定义好模型，数据集, 以及相应的配置，就可以快速使用PEFT适配模型进行低参数模型微调。
+PaddleNLP PEFT API 提供单卡/分布式 LoRA 和 Prefix-Tuning，用户定义好模型，数据集, 以及相应的配置，就可以快速使用 PEFT 适配模型进行低参数模型微调。
 
 ## 预备知识
 ### LoRA
@@ -8,14 +8,14 @@ PaddleNLP PEFT API提供单卡/分布式LoRA和Prefix-Tuning，用户定义好�
 <img src=https://github.com/PaddlePaddle/PaddleNLP/assets/37530985/63d56558-247a-4a8d-a6ca-121c820f7534 width=30% height=30% />
 </div>
 
-大模型网络中有很多的线性层，里面需要进行密集的矩阵乘法计算，而这些通常具有全秩(full rank)，较难优化计算。LoRA论文的研究中表明, 将输入表达随机投影到较小的子空间不仅任然可以有效地学习还可以节约大量的计算显存需求。具体做法：对于预训练的权重矩阵, 通过引入两个低 rank 矩阵 $AB$(图中橙色的两个矩阵) 来近似权重的更新过程 $W_0+\Delta W=W_0+B A$ , 其中 $B \in \mathbb{R}^{d \times r}, A \in \mathbb{R}^{r \times k}$, $r$ 远小于原权重矩阵的 rank 。训练期间, $W_0$ 参数冻结, 只对 $\mathrm{A}$ 和 $\mathrm{B}$ 两个矩阵进行梯度更新，前向传播公式如下:
+大模型网络中有很多的线性层，里面需要进行密集的矩阵乘法计算，而这些通常具有全秩(full rank)，较难优化计算。LoRA 论文的研究中表明, 将输入表达随机投影到较小的子空间不仅任然可以有效地学习还可以节约大量的计算显存需求。具体做法：对于预训练的权重矩阵, 通过引入两个低 rank 矩阵 $AB$(图中橙色的两个矩阵) 来近似权重的更新过程 $W_0+\Delta W=W_0+B A$ , 其中 $B \in \mathbb{R}^{d \times r}, A \in \mathbb{R}^{r \times k}$, $r$ 远小于原权重矩阵的 rank 。训练期间, $W_0$ 参数冻结, 只对 $\mathrm{A}$ 和 $\mathrm{B}$ 两个矩阵进行梯度更新，前向传播公式如下:
 
 $$
 h=W_{0}x+BAx
 $$
 
 由于训练参数的减少，训练过程会减少很多中间变量的存储，由此节约大量的训练显存消耗。
-更多算法细节参考LoRA[论文](https://arxiv.org/abs/2106.09685)
+更多算法细节参考 LoRA[论文](https://arxiv.org/abs/2106.09685)
 
 ### Prefix-tuning
 
@@ -24,13 +24,13 @@ $$
 </div>
 
 
-Prefix-tuning是一个针对NLG类型下游任务的轻量级微调方案，受提示学习（Prompt learning）的影响，加入的一部分 prefix embedding 作为连续型提示进行训练。prefix embedding是由专门的 prefix encoder 网络生成的数个张量，会以 past_key_value的方式被插入到语言模型每一层的 hidden_state之前。和 LoRA 类似，它也会冻结整个预训练模型的所有参数权重，只对prefix embedding进行梯度更新，因此训练参数量只有常规 SFT 的 0.1%。Prefix-tuning可以在全样本下获得与 SFT 比肩的训练效果，在小样本环境下甚至可以超越 SFT。更多算法细节参考
+Prefix-tuning 是一个针对 NLG 类型下游任务的轻量级微调方案，受提示学习（Prompt learning）的影响，加入的一部分 prefix embedding 作为连续型提示进行训练。prefix embedding 是由专门的 prefix encoder 网络生成的数个张量，会以 past_key_value 的方式被插入到语言模型每一层的 hidden_state 之前。和 LoRA 类似，它也会冻结整个预训练模型的所有参数权重，只对 prefix embedding 进行梯度更新，因此训练参数量只有常规 SFT 的 0.1%。Prefix-tuning 可以在全样本下获得与 SFT 比肩的训练效果，在小样本环境下甚至可以超越 SFT。更多算法细节参考
 Prefix-tuning[论文](https://arxiv.org/abs/2101.00190)
 
 ## 快速开始
 ### LoRA
 
-1. 要对 model 进行 LoRA 微调，首先需要定义LoRAConfig， 再通过 LoRAConfig 对 LoRAModel 进行构建，再通过 mark_only_lora_as_trainable函数冻结主干参数：
+1. 要对 model 进行 LoRA 微调，首先需要定义 LoRAConfig， 再通过 LoRAConfig 对 LoRAModel 进行构建，再通过 mark_only_lora_as_trainable 函数冻结主干参数：
 ```python
     from paddlenlp.peft import LoRAConfig, LoRAModel
     from paddlenlp.transformers import AutoModelForCausalLM
@@ -50,13 +50,13 @@ Prefix-tuning[论文](https://arxiv.org/abs/2101.00190)
 
 2. 模型的保存和载入
 
-LoRAModel的保存和载入和普通的 model 没有太大区别，都是通过 save_pretrained/from_pretrained调用
+LoRAModel 的保存和载入和普通的 model 没有太大区别，都是通过 save_pretrained/from_pretrained 调用
 ```python
     # 保存
     model.save_pretrained('lora_path')
 ```
-Paddle会将 LoRAModel 的矩阵 AB 权重保存为lora_mode_state.pdparams文件，LoRAConfig 配置保存为 lora_config.json 文件在 lora_path 目录下。
-之后当需要载入模型权重进行推理时，则直接进行 from_pretrained即可。
+Paddle 会将 LoRAModel 的矩阵 AB 权重保存为 lora_mode_state.pdparams 文件，LoRAConfig 配置保存为 lora_config.json 文件在 lora_path 目录下。
+之后当需要载入模型权重进行推理时，则直接进行 from_pretrained 即可。
 ```python
       from paddlenlp.transformers import AutoModelForCausalLM
     + from paddlenlp.peft import LoRAModel, LoRAConfig
@@ -153,7 +153,7 @@ key function:
 
 
 ### Prefix-tuning
-1. 设置Prefix-tuning参数
+1. 设置 Prefix-tuning 参数
 ```python
     from paddlenlp.transformers import AutoModelForCausalLM
 
@@ -174,13 +174,13 @@ key function:
 
 2. 模型的保存和载入
 
-和 LoRAModel 一致，通过 save_pretrained/from_pretrained调用
+和 LoRAModel 一致，通过 save_pretrained/from_pretrained 调用
 ```python
     # 保存
     model.save_pretrained('prefix_path')
 ```
-Paddle会将 PrefixModel 中用到的 prefix_encoder(里面包含 Embedding layer 和 Linear layers)网络模型权重，PrefixConfig 配置保存为 prefix_config.json 文件在 prefix_path 路径下。
-之后当需要载入模型权重进行推理时，则直接进行 from_pretrained即可。
+Paddle 会将 PrefixModel 中用到的 prefix_encoder(里面包含 Embedding layer 和 Linear layers)网络模型权重，PrefixConfig 配置保存为 prefix_config.json 文件在 prefix_path 路径下。
+之后当需要载入模型权重进行推理时，则直接进行 from_pretrained 即可。
 ```python
       from paddlenlp.transformers import AutoModelForCausalLM
     + from paddlenlp.peft import PrefixModel, PrefixConfig
