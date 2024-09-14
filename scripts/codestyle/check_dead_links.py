@@ -17,33 +17,54 @@ import re
 import sys
 
 
-def find_dead_links(file_path):
+def get_repo_root(file_path):
+    """通过给定文件路径找到仓库根目录"""
+    current_dir = os.path.dirname(file_path)
+    while not os.path.exists(os.path.join(current_dir, ".git")):
+        parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
+        if parent_dir == current_dir:
+            raise FileNotFoundError("Could not find .git directory")
+        current_dir = parent_dir
+    return current_dir
+
+
+def find_dead_links(directory):
     # 正则表达式，用于匹配Markdown和reStructuredText中的链接
     markdown_link_pattern = r"\[([^\[\]]+)\]\(([^)]+)\)"  # 修改正则表达式以捕获链接文本
     rst_link_pattern = r"``([^`]+) <([^>]+)>`_"  # reStructuredText链接
     dead_links = []
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-            print(f"Processing {file_path}")
-            # 查找Markdown链接
-            markdown_matches = re.findall(markdown_link_pattern, content)
-            for link_text, match in markdown_matches:
-                if not match.startswith(("http:", "https:")):
-                    abs_path = os.path.abspath(os.path.join(os.path.dirname(file_path), match))
-                    if not os.path.exists(abs_path):
-                        dead_links.append((file_path, link_text, "Markdown Link: " + abs_path))
 
-            # 查找reStructuredText链接
-            rst_matches = re.findall(rst_link_pattern, content)
-            for text, url in rst_matches:
-                if not url.startswith(("http:", "https:")):
-                    abs_path = os.path.abspath(os.path.join(os.path.dirname(file_path), url))
-                    if not os.path.exists(abs_path):
-                        dead_links.append((file_path, text, "reStructuredText Link: " + abs_path))
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith((".md", ".rst")):
+                file_path = os.path.join(root, file)
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content = f.read()
 
-    except Exception as e:
-        print(f"Error reading {file_path}: {e}")
+                        # 查找Markdown链接
+                        markdown_matches = re.findall(markdown_link_pattern, content)
+                        for link_text, match in markdown_matches:
+                            if match.startswith(("http:", "https:")):
+                                # 忽略外部链接
+                                continue
+                            elif "#" in match:
+                                # 这是一个锚点链接，忽略文件系统检查
+                                continue
+                            abs_path = os.path.abspath(os.path.join(os.path.dirname(file_path), match))
+                            if not os.path.exists(abs_path):
+                                dead_links.append((file_path, link_text, "Markdown Link: " + abs_path))
+
+                        # 查找reStructuredText链接
+                        rst_matches = re.findall(rst_link_pattern, content)
+                        for text, url in rst_matches:
+                            if not url.startswith(("http:", "https:")):
+                                abs_path = os.path.abspath(os.path.join(os.path.dirname(file_path), url))
+                                if not os.path.exists(abs_path):
+                                    dead_links.append((file_path, text, "reStructuredText Link: " + abs_path))
+
+                except Exception as e:
+                    print(f"Error reading {file_path}: {e}")
 
     return dead_links
 
@@ -53,11 +74,12 @@ def process_file(file_path):
     if len(dead_links) > 0:
         print("Dead links found in", file_path)
         for link in dead_links:
-            print("\t", *link)
-        return -1
-    return 0
+            print("file path:", link[0], "- link text:", link[1], "- deal link:", link[2])
+        print("Please check the above dead links and fix them.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    for file_path in sys.argv[1:]:
-        state = process_file(file_path)
+    if len(sys.argv) > 1:
+        repo_root = get_repo_root(os.path.realpath(sys.argv[1]))
+        process_file(repo_root)
