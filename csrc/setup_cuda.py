@@ -107,7 +107,7 @@ sources = [
     "./gpu/dequant_int8.cu",
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
-    "./gpu/sample_kernels/top_p_sampling_from_probs.cu",
+    "./gpu/sample_kernels/top_p_sampling_reject",
 ]
 
 cutlass_dir = "third_party/cutlass"
