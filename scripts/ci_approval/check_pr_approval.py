@@ -15,6 +15,7 @@
 import json
 import sys
 
+print("new pr here")
 
 def check_approval(count, required_reviewers):
     json_buff = ""
