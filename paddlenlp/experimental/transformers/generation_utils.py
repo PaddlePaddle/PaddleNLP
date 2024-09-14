@@ -331,12 +331,9 @@ class GenerationInferenceModel(GenerationMixin):
 
             # compute next_tokens
             try:
-                from paddlenlp_ops import top_p_sampling_from_probs
+                from paddlenlp_ops import top_p_sampling_reject
 
-                # max_rounds default is  32
-                bs = probs.shape[0]
-                uniform_samples = paddle.randn([bs, 32])
-                next_tokens = top_p_sampling_from_probs(probs, uniform_samples, top_p)
+                next_tokens = top_p_sampling_reject(probs, top_p)
             except:
                 _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
@@ -678,12 +675,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
             # compute next_tokens
             try:
-                from paddlenlp_ops import top_p_sampling_from_probs
+                from paddlenlp_ops import top_p_sampling_reject
 
-                bs = probs.shape[0]
-                # max_rounds default is  32
-                uniform_samples = paddle.randn([bs, 32])
-                next_tokens = top_p_sampling_from_probs(probs, uniform_samples, top_p)
+                next_tokens = top_p_sampling_reject(probs, top_p)
             except:
                 _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
