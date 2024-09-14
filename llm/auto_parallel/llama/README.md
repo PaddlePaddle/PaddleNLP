@@ -7,11 +7,11 @@
 
 ## 2. 动静统一组网的训练方式
 - 动态图训练
-参考训练脚本[run_pretrain_auto.sh](./run_pretrain_auto.sh)，运行8卡dp2mp2pp2的并行策略。
+参考训练脚本[run_pretrain_auto.sh](./run_pretrain_auto.sh)，运行8卡 dp2mp2pp2的并行策略。
 - 动转静训练
-参考训练脚本[run_pretrain_auto.sh](./run_pretrain_auto.sh)，并开启 `to_static=1`，运行8卡dp2mp2pp2的并行策略。
+参考训练脚本[run_pretrain_auto.sh](./run_pretrain_auto.sh)，并开启 `to_static=1`，运行8卡 dp2mp2pp2的并行策略。
 
 ## 3. 静态图组网的训练方式
 
-参考训练脚本[run_pretrain_auto_static.sh](./run_pretrain_auto_static.sh)，运行8卡dp2sharding2mp2pp2vpp2的并行策略。
-参考训练脚本[run_pretrain_auto_static_sp.sh](./run_pretrain_auto_static_sp.sh)，运行8卡dp2sharding2mp2pp2vpp2sp的并行策略。
+参考训练脚本[run_pretrain_auto_static.sh](./run_pretrain_auto_static.sh)，运行8卡 dp2sharding2mp2pp2vpp2的并行策略。
+参考训练脚本[run_pretrain_auto_static_sp.sh](./run_pretrain_auto_static_sp.sh)，运行8卡 dp2sharding2mp2pp2vpp2sp 的并行策略。
