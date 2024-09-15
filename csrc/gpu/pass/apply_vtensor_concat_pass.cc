@@ -34,11 +34,11 @@ public:
         auto out = match_ctx.Tensor("concat_out");
         for (auto op = out.use_begin(); op != out.use_end(); ++op) {
           auto name = op->owner()->name();
-          std::cout << name << " ";
+          // std::cout << name << " ";
           has_yield |= name == "cf.yield";
           has_attn |= name == "pd_op.flash_attn";
         }
-        std::cout << std::endl;
+        // std::cout << std::endl;
         matched &= has_yield;
         // matched &= has_attn;
       }
