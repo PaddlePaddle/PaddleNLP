@@ -19,6 +19,7 @@ setup(
     ext_modules=CUDAExtension(
         sources=[
             "./gpu/pass/remove_assign_out_pass.cc",
+            "./gpu/pass/apply_vtensor_concat_pass.cc",
             "./gpu/vtensor.cu", # TODO: this haven't tested with hip
             "./gpu/save_with_output.cc",
             "./gpu/set_value_by_flags.cu",
