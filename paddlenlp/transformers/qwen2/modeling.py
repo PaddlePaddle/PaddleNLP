@@ -44,6 +44,7 @@ from ..model_outputs import (
     TokenClassifierOutput,
 )
 from ..model_utils import PretrainedModel, register_base_model
+from ..utils import caculate_llm_flops
 from .configuration import Qwen2Config
 
 try:
@@ -499,6 +500,8 @@ class Qwen2Attention(nn.Layer):
             base=self.rope_theta,
         )
 
+        self.attn_func = scaled_dot_product_attention
+
     def forward(
         self,
         hidden_states,
@@ -564,27 +567,27 @@ class Qwen2Attention(nn.Layer):
             and self.recompute_granularity == "core_attn"
         ):
             outputs = recompute(
-                scaled_dot_product_attention,
+                self.attn_func,
                 query_states,
                 self.config,
                 key_states,
                 value_states,
                 attention_mask,
                 output_attentions,
-                self.training,
-                self.sequence_parallel,
+                training=self.training,
+                sequence_parallel=self.sequence_parallel,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
-            outputs = scaled_dot_product_attention(
+            outputs = self.attn_func(
                 query_states,
                 self.config,
                 key_states,
                 value_states,
                 attention_mask,
                 output_attentions,
-                self.training,
-                self.sequence_parallel,
+                training=self.training,
+                sequence_parallel=self.sequence_parallel,
             )
         if output_attentions:
             attn_output, attn_weights = outputs
@@ -911,6 +914,39 @@ class Qwen2Model(Qwen2PretrainedModel):
             ]
         )
         self.norm = Qwen2RMSNorm(config)
+
+    def get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return caculate_llm_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=False,
+        )
+
+    def get_hardware_flops(self, batch_size=1, seq_length=None, recompute=False, **kwargs):
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return caculate_llm_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=recompute,
+            recompute_granularity=self.config.recompute_granularity,
+        )
 
     def get_input_embeddings(self):
         return self.embed_tokens
