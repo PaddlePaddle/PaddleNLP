@@ -49,6 +49,7 @@ from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import linear_utils
 from ..linear_utils import Linear
 from ..model_outputs import ModelOutput
+from ..utils import caculate_llm_flops
 from .configuration import QWenConfig
 
 try:
@@ -690,6 +691,39 @@ class QWenModel(QWenPretrainedModel):
         )
         self.ln_f = QWenRMSNorm(config)
 
+    def get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return caculate_llm_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=False,
+        )
+
+    def get_hardware_flops(self, batch_size=1, seq_length=None, recompute=False, **kwargs):
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return caculate_llm_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=recompute,
+            recompute_granularity=self.config.recompute_granularity,
+        )
+
     def get_input_embeddings(self):
         return self.wte
 
@@ -811,7 +845,7 @@ class QWenModel(QWenPretrainedModel):
         hidden_states = inputs_embeds
         use_casual_mask = get_use_casual_mask()
         # bool 4D mask
-        if use_casual_mask is None:
+        if use_casual_mask is True:
             attention_mask = None
         else:
             attention_mask = self.get_masks(input_shape[0], input_shape[1], past_length, padding_mask=attention_mask)

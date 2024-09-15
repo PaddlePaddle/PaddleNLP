@@ -64,9 +64,16 @@ class QuantizationConfig:
             raise ValueError(
                 f"weight_quantize_algo:{weight_quantize_algo} not in supported list ['weight_only_int8', 'weight_only_int4', 'llm.int8', 'a8w8', 'nf4', 'fp4']"
             )
-        if quant_type is not None and quant_type not in ["weight_only_int8", "weight_only_int4", "a8w8", "a8w8c8"]:
+        if quant_type is not None and quant_type not in [
+            "weight_only_int8",
+            "weight_only_int4",
+            "a8w8",
+            "a8w8c8",
+            "a8w8_fp8",
+            "a8w8c8_fp8",
+        ]:
             raise ValueError(
-                f"quant_type:{quant_type} not in supported list ['weight_only_int8', 'weight_only_int4', 'a8w8', 'a8w8c8']"
+                f"quant_type:{quant_type} not in supported list ['weight_only_int8', 'weight_only_int4', 'a8w8', 'a8w8c8', 'a8w8_fp8', 'a8w8c8_fp8']"
             )
         self.weight_quantize_algo = weight_quantize_algo
         self.quant_type = quant_type

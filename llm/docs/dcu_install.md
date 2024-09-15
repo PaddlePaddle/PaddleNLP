@@ -64,4 +64,4 @@ cd -
 ```
 
 ### 高性能推理：
-海光的推理命令与GPU推理命令一致，请参考[大模型推理教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/inference.md).
+海光的推理命令与GPU推理命令一致，请参考[大模型推理教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/inference.md).

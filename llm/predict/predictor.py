@@ -43,7 +43,7 @@ from paddlenlp.transformers import (
     PretrainedTokenizer,
 )
 from paddlenlp.utils import llm_utils
-from paddlenlp.utils.import_utils import import_module, is_paddlenlp_ops_available
+from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
 # Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
@@ -85,14 +85,24 @@ class PredictorArgument:
     inference_model: bool = field(default=False, metadata={"help": "whether use InferenceModel to do generation"})
     quant_type: str = field(
         default="",
-        metadata={"help": "Quantization type. Supported values: a8w8, a8w8c8, weight_only_int4, weight_only_int8"},
+        metadata={
+            "help": "Quantization type. Supported values: a8w8, a8w8c8, a8w8_fp8, a8w8c8_fp8, weight_only_int4, weight_only_int8"
+        },
     )
     avx_model: bool = field(
         default=False, metadata={"help": "whether use AvxModel to do generation when using cpu inference"}
     )
     avx_type: str = field(
         default=None,
-        metadata={"help": "avx compute type. Supported values: fp16, bf16"},
+        metadata={
+            "help": "avx compute type. Supported values: fp16, bf16,fp16_int8\
+        fp16: first_token and next_token run in fp16\
+        fp16_int8 : first_token run in fp16, next token run in int8"
+        },
+    )
+    avx_cachekv_type: str = field(
+        default="fp16",
+        metadata={"help": "avx cachekv type. Supported values: fp16,int8"},
     )
     batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
@@ -124,7 +134,10 @@ class PredictorArgument:
 
     @property
     def total_max_length(self):
-        return 8192  # Maximum sequence length.
+        if self.device == "npu":
+            return self.src_length + self.max_length
+        else:
+            return 8192  # Maximum sequence length.
 
 
 @dataclass
@@ -179,6 +192,7 @@ class BasePredictor:
             source,
             max_length=self.config.src_length,
             truncation=True,
+            return_position_ids=True if not isinstance(self.tokenizer, ChatGLMTokenizer) else False,
             truncation_side="left",
             return_tensors=self.return_tensors,
             padding=True,
@@ -305,6 +319,9 @@ class StaticGraphPredictor(BasePredictor):
             inference_config.disable_gpu()
         inference_config.disable_glog_info()
         inference_config.enable_new_executor()
+        # remove `gpu_cpu_map_matmul_v2_to_matmul_pass` to avoid mapping matmul_v2 -> matmul op
+        if config.dtype == "bfloat16":
+            inference_config.delete_pass("gpu_cpu_map_matmul_v2_to_matmul_pass")
         if in_pir_executor_mode():
             inference_config.enable_new_ir()
             if in_cinn_mode():
@@ -610,17 +627,6 @@ class StaticInferencePredictor(InferencePredictorMixin):
                 "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
             )
 
-        # register the custome ops
-        if predictor_args.device == "cpu" and predictor_args.avx_model:
-            import_module("paddlenlp_ops.xft_llama_layer")
-        else:
-            import_module("paddlenlp_ops.encode_rotary_qk")
-            import_module("paddlenlp_ops.get_padding_offset")
-            import_module("paddlenlp_ops.qkv_transpose_split")
-            import_module("paddlenlp_ops.rebuild_padding")
-            import_module("paddlenlp_ops.transpose_remove_padding")
-            import_module("paddlenlp_ops.write_cache_kv")
-
         infer_model_path = llm_utils.get_infer_model_path(
             predictor_args.model_name_or_path, predictor_args.model_prefix
         )
@@ -642,7 +648,9 @@ class StaticInferencePredictor(InferencePredictorMixin):
             )
         elif predictor_args.device == "cpu" and predictor_args.avx_model:
             config.disable_gpu()
-            config.switch_ir_optim(False)
+            config.enable_new_ir()
+            config.disable_mkldnn()
+            config.disable_glog_info()
         else:
             device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
             config.enable_use_gpu(100, device_id)
@@ -862,6 +870,35 @@ class BlockInferencePredictorMixin(BasePredictor):
             self.model_inputs["tgt_mask"] = (
                 alibi_decoder + (1 - self.model_inputs["tgt_mask"]) * paddle.finfo(self.dtype).min
             ).cast(self.dtype)
+        elif config.device == "npu" and self.model_config.get("alibi", False):
+            lower_one_tril = paddle.tril(
+                paddle.ones(shape=(config.total_max_length, config.total_max_length), dtype=self.dtype)
+            )
+            lower_one_tril = lower_one_tril[None, None, :, :]
+            src_mask = lower_one_tril.tile([config.batch_size, 1, 1, 1])
+            tgt_mask = paddle.full(
+                shape=[config.batch_size, 1, 1, config.total_max_length], fill_value=1, dtype=self.dtype
+            )
+            arange_tensor_encoder = paddle.arange(config.total_max_length).astype(self.dtype)
+            alibi_slopes = llm_utils.get_alibi_slopes(self.num_attention_heads)
+            alibi = alibi_slopes[None, :, None, None] * arange_tensor_encoder
+            alibi_encoder = alibi.tile([config.batch_size, 1, config.total_max_length, 1])
+            alibi_decoder = alibi.tile(
+                [
+                    config.batch_size,
+                    1,
+                    1,
+                    1,
+                ]
+            )
+            # self.model_inputs["src_mask/tgt_mask"] is read only, will not be updated!
+            src_mask = (
+                alibi_encoder + (1 - src_mask) * paddle.finfo(self.dtype).min
+            ).cast(self.dtype)
+            tgt_mask = (
+                alibi_decoder + (1 - tgt_mask) * paddle.finfo(self.dtype).min
+            ).cast(self.dtype)
+            self.model_inputs["rope_emb"] = paddle.concat([src_mask.reshape([-1]), tgt_mask.reshape([-1])])
 
     def _preprocess(self, input_text: list[str]):
         if self.tokenizer.chat_template is not None:
@@ -953,16 +990,17 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
-
-        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
-        tensor_queue.put(output_tensor)
-
+        done_event = mp.Event()
         read_res_process = mp.Process(
-            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue]
+            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
         )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
 
+        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
+        tensor_queue.put(output_tensor)
+        if self.tensor_parallel_rank == 0:
+            done_event.wait()
         s_time = time.time()
         while self.model_inputs["not_need_stop"]:
             self._infer(self.model_inputs)
@@ -1078,17 +1116,18 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
 
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
-
-        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
-        tensor_queue.put(output_tensor)
+        done_event = mp.Event()
 
         read_res_process = mp.Process(
-            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue]
+            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
         )
 
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
-
+        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
+        tensor_queue.put(output_tensor)
+        if self.tensor_parallel_rank == 0:
+            done_event.wait()
         s_time = time.time()
         while self.model_inputs["not_need_stop"]:
             self.predictor.run(list(self.model_inputs.values()))
@@ -1211,9 +1250,6 @@ def create_predictor(
             config.cachekv_int8_type = predictor_args.cachekv_int8_type
             config.use_fake_parameter = predictor_args.use_fake_parameter
             config.single_card_ptq = True
-            if predictor_args.avx_model:
-                config.avx_type = predictor_args.avx_type
-
             if config.quantization_config.quant_type is not None:
                 predictor_args.quant_type = config.quantization_config.quant_type
                 config.quant_type = config.quantization_config.quant_type
@@ -1253,6 +1289,8 @@ def create_predictor(
                             "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/inference.md"
                         )
                     elif predictor_args.device == "cpu" and predictor_args.avx_model:
+                        config.avx_type = predictor_args.avx_type
+                        config.avx_cachekv_type = predictor_args.avx_cachekv_type
                         from paddlenlp.experimental.transformers import (
                             LlamaForCausalLMAvxInferenceModel as LlamaInferenceModel,
                         )
@@ -1265,6 +1303,35 @@ def create_predictor(
                         predictor_args.model_name_or_path,
                         config=config,
                         dtype=predictor_args.dtype,
+                    )
+                model.eval()
+
+            elif "mixtral" in config.architectures[0].lower():
+                if predictor_args.block_attn:
+                    config.max_seq_len = predictor_args.total_max_length
+                    config.block_size = predictor_args.block_size
+                    from paddlenlp.experimental.transformers import (
+                        MixtralForCausalLMBlockInferenceModel as MixtralInferenceModel,
+                    )
+
+                    model = MixtralInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        MixtralForCausalLMInferenceModel as MixtralInferenceModel,
+                    )
+
+                    model = MixtralInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
                     )
                 model.eval()
 
@@ -1335,6 +1402,32 @@ def create_predictor(
                     config=config,
                     dtype=predictor_args.dtype,
                 )
+                model.eval()
+            elif "qwen2moe" in config.architectures[0].lower():
+                if predictor_args.block_attn:
+                    config.max_seq_len = predictor_args.total_max_length
+                    config.block_size = predictor_args.block_size
+                    from paddlenlp.experimental.transformers import (
+                        Qwen2MoeForCausalLMBlockInferenceModel as Qwen2MoeInferenceModel,
+                    )
+
+                    model = Qwen2MoeInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        Qwen2MoeForCausalLMInferenceModel as Qwen2MoeInferenceModel,
+                    )
+
+                    model = Qwen2MoeInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                    )
                 model.eval()
             elif "qwen2" in config.architectures[0].lower():
                 if predictor_args.block_attn:
@@ -1411,6 +1504,20 @@ def create_predictor(
                 cache_kvs_shape = LlamaInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
+            elif "mixtral" in config.architectures[0].lower():
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                    from paddlenlp.experimental.transformers import (
+                        MixtralForCausalLMBlockInferenceModel as MixtralInferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        MixtralForCausalLMInferenceModel as MixtralInferenceModel,
+                    )
+                cache_kvs_shape = MixtralInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
             elif "chatglmv2forcausallm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMv2ForCausalLMInferenceModel,
@@ -1456,6 +1563,20 @@ def create_predictor(
                 )
 
                 cache_kvs_shape = GPTForCausalLMInferenceModel.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
+            elif "qwen2moe" in config.architectures[0].lower():
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                    from paddlenlp.experimental.transformers import (
+                        Qwen2MoeForCausalLMBlockInferenceModel as Qwen2MoeInferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        Qwen2MoeForCausalLMInferenceModel as Qwen2MoeInferenceModel,
+                    )
+                cache_kvs_shape = Qwen2MoeInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "qwen2" in config.architectures[0].lower():
