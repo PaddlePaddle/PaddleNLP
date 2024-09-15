@@ -1033,44 +1033,6 @@ class LlamaAttention(nn.Layer):
 
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
-        from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
-        if is_paddlenlp_ops_available():
-            from paddlenlp_ops import vtensor_reserve_one_token
-            if (
-                past_key_value is not None and
-                use_cache and
-                not output_attentions and
-                not self.enable_recompute and
-                self.kv_indices is None and
-                not self.config.immediate_clear_past_key_value and
-                not self.training and
-                # False
-                True
-            ):
-                assert query_states.shape[1] == 1
-
-                key_cache, value_cache = past_key_value
-
-                if paddle.in_dynamic_mode():
-                    # tensors passed to custom operator must be contiguous in dynamic mode, or it will be copy
-                    key_cache = key_cache.transpose([1, 0, 2, 3]).contiguous()
-                    value_cache = value_cache.transpose([1, 0, 2, 3]).contiguous()
-                    # print(key_cache.data_ptr(), value_cache.data_ptr())
-                key_cache = vtensor_reserve_one_token(key_cache, key_states, transposed_input=paddle.in_dynamic_mode())
-                value_cache = vtensor_reserve_one_token(value_cache, value_states, transposed_input=paddle.in_dynamic_mode())
-
-                attn_output = F.scaled_dot_product_attention(
-                    query_states,
-                    key_cache,
-                    value_cache,
-                    attn_mask=attention_mask,
-                    training=False,
-                )
-                attn_output = attn_output.flatten(2, 3)
-                attn_output = self.o_proj(attn_output)
-                
-                return attn_output, (key_cache, value_cache)
-
         # [bs, seq_len, num_head, head_dim]
         if past_key_value is not None:
             # reuse k, v, self_attention

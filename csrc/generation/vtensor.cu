@@ -208,6 +208,9 @@ std::vector<paddle::Tensor> VTensorReserveOneToken(
 ) {
     // std::cout << "vtensor_reserve_one_token 1 " << (uintptr_t)cache_transposed.data() << std::endl;
 
+    PD_CHECK(cache_transposed.place().GetType() == phi::AllocationType::GPU);
+    PD_CHECK(append_state.place().GetType() == phi::AllocationType::GPU);
+
     PD_CHECK(cache_transposed.shape().size() == 4);
     PD_CHECK(append_state.shape().size() == 4);
     PD_CHECK(append_state.is_dense_tensor());
@@ -290,37 +293,3 @@ PD_BUILD_OP(vtensor_reserve_one_token)
     .SetKernelFn(PD_KERNEL(VTensorReserveOneToken))
     .SetInferShapeFn(PD_INFER_SHAPE(VTensorReserveOneTokenInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(VTensorReserveOneTokenInferDtype));
-
-
-
-
-// std::vector<paddle::Tensor> MakeContiguous(
-//     const paddle::Tensor& x
-// ) {
-//     PD_CHECK(check_contiguous(x));
-
-//     std::cout << "make contiguous " << (uintptr_t)x.data() << std::endl;
-
-//     return {x};
-// }
-
-
-// PD_BUILD_OP(make_contiguous)
-//     .Inputs({"x"})
-//     .Outputs({"out"})
-//     .SetKernelFn(PD_KERNEL(MakeContiguous));
-
-
-// std::vector<paddle::Tensor> PrintDataPtr(
-//     const paddle::Tensor& x
-// ) {
-//     std::cout << "print_data_ptr " << (uintptr_t)x.data() << std::endl;
-
-//     return {x};
-// }
-
-
-// PD_BUILD_OP(print_data_ptr)
-//     .Inputs({"x"})
-//     .Outputs({"out"})
-//     .SetKernelFn(PD_KERNEL(PrintDataPtr));
