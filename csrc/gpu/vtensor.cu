@@ -47,6 +47,13 @@ static void dealloc_virtual_allocation(phi::Allocation* ptr) {
     // std::cout << "releasing virtual allocation with " 
     //     << metadata.physics_block_handle.size() << " blocks" << std::endl;
     
+    // cuMemUnmap does not synchronize with the in-flight kernels, so we need to sync here
+    int current_device = -1;
+    PD_CHECK(cudaGetDevice(&current_device) == CUDA_SUCCESS, "cudaGetDevice before unmap failed");
+    PD_CHECK(cudaSetDevice(ptr->place().GetDeviceId()) == CUDA_SUCCESS,
+        "cudaSetDevice before unmap failed");
+    PD_CHECK(cudaDeviceSynchronize() == CUDA_SUCCESS, "sync before unmap failed");
+
     CUresult result = CUDA_SUCCESS;
     result = cuMemUnmap((CUdeviceptr)ptr->ptr(), ptr->size());
     PD_CHECK(result == CUDA_SUCCESS, "cuMemUnmap failed");
@@ -56,6 +63,8 @@ static void dealloc_virtual_allocation(phi::Allocation* ptr) {
     }
     result = cuMemAddressFree((CUdeviceptr)ptr->ptr(), metadata.reserved_size);
     PD_CHECK(result == CUDA_SUCCESS, "cuMemAddressFree failed");
+
+    PD_CHECK(cudaSetDevice(current_device) == CUDA_SUCCESS, "cudaSetDevice after unmap failed");
 
     virtual_allocation_metadata.erase((CUdeviceptr)ptr->ptr());
 }
