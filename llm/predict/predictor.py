@@ -331,6 +331,7 @@ class StaticGraphPredictor(BasePredictor):
             import paddlenlp_ops
             inference_config.enable_custom_passes([
                 "remove_assign_out_pass", # remove the assign_out_ op at the end of while loop
+                "apply_vtensor_concat_pass", # replace concat op with vtensor implementation
             ])
 
         with static_mode_guard():
