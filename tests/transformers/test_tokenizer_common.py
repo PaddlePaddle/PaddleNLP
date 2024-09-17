@@ -1155,6 +1155,7 @@ class TokenizerTesterMixin:
     #             encoded_masked[mask_loc] = encoded_1[mask_loc]
 
     #             self.assertEqual(encoded_masked, encoded_1)
+
     def test_special_token_addition(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
@@ -1179,7 +1180,6 @@ class TokenizerTesterMixin:
                         replace_additional_special_tokens=False,
                     )
                     self.assertEqual(tokenizer_2.additional_special_tokens, ["<other>", "<another>", "<tok>"])
-
 
     def test_special_tokens_mask(self):
         tokenizers = self.get_tokenizers(do_lower_case=False)

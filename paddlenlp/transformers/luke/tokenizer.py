@@ -608,7 +608,7 @@ class LukeTokenizer(RobertaBPETokenizer):
 
         return self._convert_token_to_id(token)
 
-    def add_special_tokens(self, token_list: Union[List[int], Dict]):
+    def add_special_tokens(self, token_list: Union[List[int], Dict], replace_additional_special_tokens: bool = True):
         """
         Adding special tokens if you need.
 
@@ -616,14 +616,36 @@ class LukeTokenizer(RobertaBPETokenizer):
             token_list (List[int], Dict[List[int]]):
                 The special token list you provided. If you provide a Dict, the key of the Dict must
                 be "additional_special_tokens" and the value must be token list.
+            replace_additional_special_tokens (bool, optional, defaults to True):
+                If True, the existing list of additional special tokens will be replaced by the list provided in
+                `token_list`. Otherwise, `self._additional_special_tokens` is just extended. In the former
+                case, the tokens will NOT be removed from the tokenizer's full vocabulary - they are only being flagged
+                as non-special tokens. Remember, this only affects which tokens are skipped during decoding, not the
+                `added_tokens_encoder` and `added_tokens_decoder`. This means that the previous
+                `additional_special_tokens` are still added tokens, and will not be split by the model.
         """
         if isinstance(token_list, dict):
             token_list = token_list["additional_special_tokens"]
+
+        if not hasattr(self, "_additional_special_tokens"):
+            self._additional_special_tokens = []
+
+        if replace_additional_special_tokens:
+            self._additional_special_tokens = list(token_list)
+        else:
+            self._additional_special_tokens.extend(
+                [token for token in token_list if token not in self._additional_special_tokens]
+            )
         encoder_dict = dict()
         decoder_dict = dict()
-        for token in token_list:
-            encoder_dict[token] = len(self.encoder.keys())
-            decoder_dict[len(self.decoder.keys())] = token
+        current_encoder_length = len(self.encoder) + len(self.added_tokens_encoder)
+        current_decoder_length = len(self.decoder) + len(self.added_tokens_decoder)
+
+        for idx, token in enumerate(token_list):
+            if token not in self.added_tokens_encoder:
+                encoder_dict[token] = current_encoder_length + idx
+                decoder_dict[current_decoder_length + idx] = token
+
         self.added_tokens_encoder.update(encoder_dict)
         self.added_tokens_decoder.update(decoder_dict)
 
