@@ -1420,6 +1420,7 @@ class Trainer:
                     model_flops = self.model.get_hardware_flops(seq_length=seq_length, recompute=self.args.recompute)
                 except NotImplementedError:
                     model_flops = None
+
             # Do not log speed metrics if all steps are skipped since last log.
             if num_steps > 0:
                 logs.update(

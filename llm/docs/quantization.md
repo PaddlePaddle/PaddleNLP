@@ -94,15 +94,19 @@ python  run_finetune.py ./config/llama/ptq_c8_argument.json
 python  run_finetune.py ./config/llama/fp8_ptq_argument.json
 ```
 
-### 2.9 量化参数介绍
+### 2.8 量化参数介绍
 
 <summary>&emsp; 量化参数（QuantArgument）</summary>
 
 <div>
 
-- `quant_type`: PTQ，QAT 量化类型，默认为 a8w8(不区分大小写)。支持 a8w8，a8w8c8，wint4/weight_only_int4，wint8/weight_only_int8：a8w8指对激活（输入）进行 8位量化，对模型权重进行 8位量化，具体量化类型通过`use_fp8`字段给出；a8w8c8指对激活、权重、kvcache 进行8位量化，具体量化类型通过`use_fp8`字段给出；wint4/weight_only_int4指仅对模型权重进行 INT4量化，后续使用 WeightOnly 进行推理；wint8/weight_only_int8指仅对模型权重进行 INT8量化，后续使用 WeightOnly 进行推理。
-- `use_fp8`: 是否使用 FP8 量化，默认为空字符串。输入`"WA"`(不区分大小写)则将权重和激活的8位量化转换为 FP8量化。
-- `fp8_type`: FP8量化类型，长度应与`use_fp8`相同。默认为`["e4m3","e4m3"]`。
+- `quant_type`: PTQ，QAT 量化类型，默认为 a8w8(不区分大小写)。支持 a8w8，a8w8c8，a8w8_fp8，wint4/weight_only_int4，wint8/weight_only_int8:
+    - a8w8指对激活（输入）进行 8位量化，对模型权重进行 INT8量化
+    - a8w8c8指对激活、权重、kvcache 进行 INT8量化
+    - a8w8_fp8指对激活、权重进行 FP8量化
+    - wint4/weight_only_int4指仅对模型权重进行 INT4量化，后续使用 WeightOnly 进行推理
+    - wint8/weight_only_int8指仅对模型权重进行 INT8量化，后续使用 WeightOnly 进行推理
+- `fp8_type`: FP8量化类型，指定 activatin，weight 的 fp8类型，默认为`["e4m3","e4m3"]`。
 - `do_ptq`: 是否进行 PTQ 量化，默认为 False。
 - `weight_quant_method`: 权重量化方式，INT8量化可选 groupwise 或者 abs_max_channel_wise，FP8量化可选 abs_max 或 avg。
 - `act_quant_method`: 激活量化方式，INT8可选 avg 或者 abs_max，FP8量化可选 abs_max 或 avg。

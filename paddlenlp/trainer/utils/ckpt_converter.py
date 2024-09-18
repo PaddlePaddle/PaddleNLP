@@ -148,11 +148,8 @@ class CheckpointConverter:
 
             # In this scenario, the data type of the model state is bfloat16.
             for param_name, param_value in model_params.items():
-                if param_value.is_dist():
-                    master_weight = self.auto_parallel_state_dict[param_name + ".master_weight"]
-                    cast_master_weight = paddle.cast(master_weight._local_value(), param_value.dtype)
-                    paddle.assign(cast_master_weight, param_value._local_value())
-                else:
+                if param_value._is_initialized():
+                    # These codes are compatible for both dense tensor and dist tensor
                     master_weight = self.auto_parallel_state_dict[param_name + ".master_weight"]
                     cast_master_weight = paddle.cast(master_weight, param_value.dtype)
                     paddle.assign(cast_master_weight, param_value)
