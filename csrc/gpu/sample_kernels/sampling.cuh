@@ -1,8 +1,4 @@
-// Copyright © 2024 PaddlePaddle Name. All Rights Reserved.
-//
-// This code is partially inspired by and references the implementation found in FlashInfer.
-// Specifically, the implementation of Top-p Sampling functionality in this code is inspired by the logic of FlashInfer’s flashinfer.sampling.top_p_sampling_from_probs function.
-// For more details on FlashInfer’s documentation, please refer to: https://docs.flashinfer.ai/generated/flashinfer.sampling.top_p_sampling_from_probs.html#flashinfer-sampling-top-p-sampling-from_probs
+// Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// This code is partially inspired by and references the implementation found
+// in FlashInfer.Specifically, the implementation of Top-p Sampling functionality
+// in this code is inspired by the logic of
+// FlashInfer’s flashinfer.sampling.top_p_sampling_from_probs .
+// For more details on FlashInfer’s documentation, please refer to:
+// https://docs.flashinfer.ai/generated/flashinfer.sampling.top_p_sampling_from_probs.html
+
 #pragma once
 
 #include <cub/block/block_adjacent_difference.cuh>
