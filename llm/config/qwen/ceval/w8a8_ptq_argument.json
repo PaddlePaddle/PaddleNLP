@@ -22,6 +22,5 @@
   "smooth_k_piece": 3,
   "smooth_search_piece": true,
   "act_quant_method": "abs_max",
-  "cachekv_quant_method": "abs_max_headwise",
   "skip_list_names": ["down_proj"]
 }
