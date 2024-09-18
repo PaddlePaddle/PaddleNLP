@@ -95,3 +95,7 @@ class DPOModelArgument:
         default=False,
         metadata={"help": "whether to use sequence parallel"},
     )
+    tensor_parallel_output: Optional[bool] = field(
+        default=True,
+        metadata={"help": "whether to output logits in distributed status"},
+    )
