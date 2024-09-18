@@ -846,7 +846,7 @@ class TrainingArguments:
     )
     enable_optimizer_timer: Optional[bool] = field(
         default=False,
-        metadata={"help": "是否开启Optimzier的timer"},
+        metadata={"help": "是否开启Optimzier的timer统计"},
     )
     ignore_load_lr_and_optim: Optional[bool] = field(
         default=False,
