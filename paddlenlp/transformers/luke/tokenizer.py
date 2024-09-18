@@ -482,6 +482,12 @@ class LukeTokenizer(RobertaBPETokenizer):
 
         return encode_output
 
+    def __len__(self):
+        """
+        Size of the full vocabulary with the added tokens.
+        """
+        return len(self.encoder) + len(self.added_tokens_encoder)
+
     def tokenize(self, text, add_prefix_space=False):
         """
         Tokenize a string.
@@ -627,9 +633,6 @@ class LukeTokenizer(RobertaBPETokenizer):
         if isinstance(token_list, dict):
             token_list = token_list["additional_special_tokens"]
 
-        if not hasattr(self, "_additional_special_tokens"):
-            self._additional_special_tokens = []
-
         if replace_additional_special_tokens:
             self._additional_special_tokens = list(token_list)
         else:
@@ -638,13 +641,13 @@ class LukeTokenizer(RobertaBPETokenizer):
             )
         encoder_dict = dict()
         decoder_dict = dict()
-        current_encoder_length = len(self.encoder) + len(self.added_tokens_encoder)
-        current_decoder_length = len(self.decoder) + len(self.added_tokens_decoder)
 
-        for idx, token in enumerate(token_list):
+        token_id_counter = len(self)
+        for token in token_list:
             if token not in self.added_tokens_encoder:
-                encoder_dict[token] = current_encoder_length + idx
-                decoder_dict[current_decoder_length + idx] = token
+                encoder_dict[token] = token_id_counter
+                decoder_dict[token_id_counter] = token
+                token_id_counter += 1
 
         self.added_tokens_encoder.update(encoder_dict)
         self.added_tokens_decoder.update(decoder_dict)
