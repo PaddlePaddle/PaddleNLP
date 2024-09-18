@@ -1,5 +1,6 @@
 #include "paddle/extension.h"
 #include <iostream>
+#include <algorithm>
 
 namespace {
 
@@ -15,7 +16,17 @@ public:
 
     pat.AddConstraint([](const paddle::drr::MatchContext &match_ctx) {
       auto &out = match_ctx.Tensor("out");
-      if (out.use_count() == 1 && out.use_begin()->owner()->name() == "cf.yield") {
+      auto parent_block = out.defining_op()->GetParent();
+      auto parent_op = out.defining_op()->GetParentOp();
+
+      auto &assign_out = match_ctx.Tensor("assign_out");
+      
+      if (
+        parent_block && parent_op &&
+        parent_op->name() == "pd_op.while" &&
+        out.use_count() == 1 && out.use_begin()->owner()->name() == "cf.yield" &&
+        std::find(parent_block->args_begin(), parent_block->args_end(), assign_out) != parent_block->args_end()
+      ) {
         return true;
       }
       return false;
