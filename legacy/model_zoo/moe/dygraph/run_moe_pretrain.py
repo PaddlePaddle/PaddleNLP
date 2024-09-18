@@ -158,6 +158,12 @@ def initialize_mp_dp_parameters(model, hcg):
 def unscale_method(self, optimizer):
     if not self._enable:
         return
+    if paddle.framework.use_pir_api():
+        type_float16 = core.DataType.FLOAT16
+        type_float32 = core.DataType.FLOAT32
+    else:
+        type_float16 = core.VarDesc.VarType.FP16
+        type_float32 = core.VarDesc.VarType.FP32
 
     if getattr(optimizer, "_param_groups", None) and isinstance(optimizer._param_groups[0], dict):
         param_grads_fp16 = []
@@ -165,7 +171,7 @@ def unscale_method(self, optimizer):
         for group in optimizer._param_groups:
             for param in group["params"]:
                 if param._grad_ivar() is not None:
-                    if param._grad_ivar().dtype == core.VarDesc.VarType.FP16:
+                    if param._grad_ivar().dtype == type_float16:
                         param_grads_fp16.append(param._grad_ivar())
                     else:
                         param_grads_fp32.append(param._grad_ivar())
@@ -173,12 +179,12 @@ def unscale_method(self, optimizer):
         param_grads_fp16 = [
             param._grad_ivar()
             for param in optimizer._parameter_list
-            if (param._grad_ivar() is not None) and (param._grad_ivar().dtype == core.VarDesc.VarType.FP16)
+            if (param._grad_ivar() is not None) and (param._grad_ivar().dtype == type_float16)
         ]
         param_grads_fp32 = [
             param._grad_ivar()
             for param in optimizer._parameter_list
-            if (param._grad_ivar() is not None) and (param._grad_ivar().dtype == core.VarDesc.VarType.FP32)
+            if (param._grad_ivar() is not None) and (param._grad_ivar().dtype == type_float32)
         ]
     temp_found_inf_fp16 = paddle.to_tensor(np.array([0]).astype(np.bool_))
     temp_found_inf_fp32 = paddle.to_tensor(np.array([0]).astype(np.bool_))

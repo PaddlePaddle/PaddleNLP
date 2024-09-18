@@ -18,7 +18,6 @@ from functools import partial
 
 import paddle
 from utils.argument import (
-    CEvalArgument,
     DataArgument,
     GenerateArgument,
     ModelArgument,
@@ -73,13 +72,11 @@ flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
 
 
 def main():
-    parser = PdArgumentParser(
-        (GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments, CEvalArgument)
-    )
+    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        gen_args, quant_args, model_args, data_args, training_args, ceval_args = parser.parse_json_file_and_cmd_lines()
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
-        gen_args, quant_args, model_args, data_args, training_args, ceval_args = parser.parse_args_into_dataclasses()
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -561,10 +558,6 @@ def main():
         data_args=data_args,
     )
 
-    # Evaluation dev set
-    if training_args.do_eval:
-        before_eval_result = trainer.evaluate(dev_ds)
-
     # Train
     if training_args.do_train:
         checkpoint = None
@@ -726,20 +719,9 @@ def main():
     # Evaluation dev set
     if training_args.do_eval:
 
-        logger.info("*** Evaluate result before train/ptq/qat/ etc.***")
-        trainer.log_metrics("eval", before_eval_result)
-
         logger.info("*** Evaluate result after train/ptq/qat/ etc.***")
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
-
-    # C-Eval after qat/ptq/train
-    if ceval_args.do_ceval:
-        logger.info("*** Evaluate on C-Eval ***")
-        ceval_args.output_dir = training_args.output_dir
-        from experimental.ceval.default.eval import run_eval
-
-        run_eval(tokenizer, trainer.model, ceval_args)
 
 
 if __name__ == "__main__":
