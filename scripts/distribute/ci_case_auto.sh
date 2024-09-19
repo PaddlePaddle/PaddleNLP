@@ -1173,6 +1173,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
     task_name="llama_align_dygraph_dy2st_auto_bs2_bf16_dp2"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
+    
 
     for to_static in "0" "1"; do
         rm -rf $case_out_dir
