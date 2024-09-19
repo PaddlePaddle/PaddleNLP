@@ -92,7 +92,7 @@ __all__ = [
     "LlamaForCausalLMInferenceModel",
     "LlamaForCausalLMAvxInferenceModel",
     "LlamaForCausalLMBlockInferenceModel",
-    "LlamaForCausalLMSpeculateInferenceModel"
+    "LlamaForCausalLMSpeculateInferenceModel",
     "LlamaForMiniGPT4InferenceModel",
 ]
 
@@ -1699,7 +1699,7 @@ class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
         remove_padding的重载，使用speculate_get_padding_offset算子，与基类的区别在于decoder为append场景
         投机采样解码阶段每个 batch 的实际 draft tokens 数目可能不同，所以需要一个适配投机采样的decoder阶段的 remove_padding
         """
-        cum_offsets_now = paddle.cumsum(self.max_len - seq_lens_this_time)
+        cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
         ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = speculate_get_padding_offset(
             input_ids, draft_tokens, cum_offsets_now, token_num, seq_lens_this_time, seq_lens_encoder
@@ -2010,7 +2010,12 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
 
     def __init__(self, config):
         super().__init__(config)
-        self.llama = LlamaBlockInferenceModel(config)
+        # Since LlamaForCausalLMSpeculateInferenceModel inherit from LlamaForCausalLMBlockInferenceModel, when call LlamaBlockInferenceModel's
+        # __init__ function will init self.llama twice, it will cause paramater name repeate error.
+        if config.speculate_method is not None:
+            self.llama = LlamaSpeculateInferenceModel(config)
+        else:
+            self.llama = LlamaBlockInferenceModel(config)
         self.lm_head = LlamaLMHead(config)
 
     @classmethod
@@ -2218,12 +2223,11 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
     def __init__(self, config):
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
-        self.llama = LlamaSpeculateInferenceModel(config)
         self.max_candidate_len = config.speculate_max_candidate_len
         self.verify_window = config.speculate_verify_window
 
     def prepare_inputs_for_generation(self, **kwargs):
-        model_inputs = super(LlamaForCausalLMBlockInferenceModel, self).prepare_inputs_for_generation(**kwargs)
+        model_inputs = super().prepare_inputs_for_generation(**kwargs)
         draft_tokens = kwargs["draft_tokens"]
         model_inputs["draft_tokens"] = draft_tokens
         output_padding_offset = kwargs["output_padding_offset"]
@@ -2243,6 +2247,51 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
             output_cum_offsets_tmp, out_token_num, seq_lens_output, self.max_seq_len
         )
         return output_padding_offset, output_cum_offsets
+
+
+    def forward(
+        self,
+        input_ids,
+        src_mask=None,
+        pre_caches=None,
+        caches=None,
+        seq_lens_this_time=None,
+        seq_lens_encoder=None,
+        seq_lens_decoder=None,
+        rope_emb=None,
+        block_tables=None,
+        k_quant_scales=None,
+        v_quant_scales=None,
+        k_dequant_scales=None,
+        v_dequant_scales=None,
+        draft_tokens=None,
+        output_padding_offset=None,
+    ):
+        outputs = self.llama(
+            input_ids,
+            src_mask=src_mask,
+            caches=caches,
+            rope_emb=rope_emb,
+            block_tables=block_tables,
+            pre_caches=pre_caches,
+            seq_lens_this_time=seq_lens_this_time,
+            seq_lens_encoder=seq_lens_encoder,
+            seq_lens_decoder=seq_lens_decoder,
+            k_quant_scales=k_quant_scales,
+            v_quant_scales=v_quant_scales,
+            k_dequant_scales=k_dequant_scales,
+            v_dequant_scales=v_dequant_scales,
+            draft_tokens=draft_tokens,
+            output_padding_offset=output_padding_offset,
+        )
+
+        hidden_states = outputs[0]
+        logits = self.lm_head(
+            hidden_states,
+            tensor_parallel_output=False,
+        )
+
+        return logits
 
     def sample(
         self,
@@ -2301,16 +2350,8 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
 
             # sample
             probs = F.softmax(logits)
-            output_padding_offset, output_cum_offsets = self.get_output_padding_offset(
-                model_kwargs["seq_lens_this_time"], 
-                model_kwargs["seq_lens_encoder"], 
-                model_kwargs["seq_lens_decoder"]
-            )
-            model_kwargs["output_padding_offset"] = output_padding_offset
-            model_kwargs["output_cum_offsets"] = output_cum_offsets
-
             verify_scores, verify_tokens, actual_candidate_len = top_p_candidates(
-                probs, top_p, output_padding_offset, self.max_candidate_len, self.max_seq_len
+                probs, top_p, model_kwargs["output_padding_offset"], self.max_candidate_len, self.max_seq_len
             )  # [token_num, max_candidate_len]
 
             ###################################
@@ -2331,7 +2372,7 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
                 model_kwargs["max_dec_len"],
                 eos_token_id,
                 model_kwargs["is_block_step"],
-                output_cum_offsets,
+                model_kwargs["output_cum_offsets"],
                 actual_candidate_len,
                 model_kwargs["actual_draft_token_num"],
                 top_p,
@@ -2360,11 +2401,11 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
             )
 
         # # Prepare output padding offset
-        # output_padding_offset, output_cum_offsets = self.get_output_padding_offset(
-        #     model_kwargs["seq_lens_this_time"], model_kwargs["seq_lens_encoder"], model_kwargs["seq_lens_decoder"]
-        # )
-        # model_kwargs["output_padding_offset"] = output_padding_offset
-        # model_kwargs["output_cum_offsets"] = output_cum_offsets
+        output_padding_offset, output_cum_offsets = self.get_output_padding_offset(
+            model_kwargs["seq_lens_this_time"], model_kwargs["seq_lens_encoder"], model_kwargs["seq_lens_decoder"]
+        )
+        model_kwargs["output_padding_offset"] = output_padding_offset
+        model_kwargs["output_cum_offsets"] = output_cum_offsets
 
         # LLM
         outputs = _forward_(**model_kwargs)

@@ -45,7 +45,7 @@ from paddlenlp.transformers import (
 from paddlenlp.utils import llm_utils
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
-from speculate_decoding.proposer import AutogressiveProposer, InferenceWithReferenceProposer
+from llm.speculate_decoding.proposer import InferenceWithReferenceProposer
 
 # Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
 MAX_BSZ = 512
@@ -1176,15 +1176,12 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
         tokenizer: PretrainedTokenizer = None,
     ):
         DygraphBlockInferencePredictor.__init__(self, config, model, tokenizer)
-        self.init_proposer_args()
 
         # init speculate components
         if config.speculate_method == "inference_with_reference":
             self.proposer = InferenceWithReferenceProposer(
                 config.speculate_max_draft_tokens, config.speculate_max_ngram_size, config.batch_size
             )
-        elif config.speculate_method == "autoregressive":
-            self.proposer = AutogressiveProposer()
         else:
             self.proposer = None
     
@@ -1192,9 +1189,10 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
     def predict(self, input_texts: list[str], return_tokens=False):
         self._preprocess(input_texts)
 
+        self.init_proposer_args()
+
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
-        # TODO(Wanglongzhi2001): 消息队列接收消息大小需要更改
         output_tensor = paddle.full(shape=[MAX_BSZ + MAX_DRAFT_TOKENS + 2, 1], fill_value=2, dtype="int64").cpu()
         tensor_queue.put(output_tensor)
 
@@ -1240,23 +1238,22 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
     #     #     inputs["pre_ids"][bid, 0] = input_ids[bid][-1]
 
     def init_proposer_args(self):
-        self.model_inputs["accept_tokens"] = np.full(
+        self.model_inputs["accept_tokens"] = paddle.full(
                 shape=[self.config.batch_size, self.config.speculate_max_draft_tokens + 1], fill_value=0, dtype="int64"
             )
-        self.model_inputs["accept_num"] = np.full(shape=[self.config.batch_size], fill_value=0, dtype="int32")
-        self.model_inputs["draft_tokens"] = np.full(
+        self.model_inputs["accept_num"] = paddle.full(shape=[self.config.batch_size], fill_value=0, dtype="int32")
+        self.model_inputs["draft_tokens"] = paddle.full(
             shape=[self.config.batch_size, self.config.speculate_max_draft_tokens + 1], fill_value=0, dtype="int64"
         )
-        self.model_inputs["actual_draft_token_num"] = np.full(
+        self.model_inputs["actual_draft_token_num"] = paddle.full(
             shape=[self.config.batch_size], fill_value=self.config.speculate_max_draft_tokens, dtype="int32"
         )
 
-        if self.args.speculate_method == "inference_with_reference":
+        if self.config.speculate_method == "inference_with_reference":
             # ngram_match in inference_with_reference run on cpu, so we need to put input_ids on cpu
             self.model_inputs["input_ids_cpu"] = paddle.full(
-                shape=[self.config.batch_size, self.config.max_seq_len], fill_value=1, dtype="int64"
+                shape=[self.config.batch_size, self.config.max_length], fill_value=1, dtype="int64"
             ).cpu()
-            self.proposer.input_ids_len = self.model_inputs["seq_lens_this_time"].cpu()
 
 
 class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):

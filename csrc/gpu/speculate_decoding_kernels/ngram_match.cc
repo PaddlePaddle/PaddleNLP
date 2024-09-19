@@ -22,7 +22,6 @@
 
 int sum(const int *value, int num) {
     int sum_value = 0;
-    // printf("num %d\n", num);
     for (int i = 0; i <= num; i++) {
         sum_value += value[i];
     }
@@ -44,8 +43,6 @@ void find_candidate_pred_tokens(const int64_t *input_ids,
         const int real_batch_size,
         int max_ngram_size = 3,
         int max_draft_tokens = 10) {
-    // printf("max_ngram_size %d, max_draft_tokens %d\n", max_ngram_size, max_draft_tokens);
-    // printf("real_batch_size %d\n", real_batch_size);
     int threshold = 128;
     char *env_var = getenv("INFER_WITH_REFERENCE_TOKENUM_THRESHOLD");
     if (env_var) {

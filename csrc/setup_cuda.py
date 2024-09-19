@@ -117,7 +117,6 @@ sources = [
     "./gpu/speculate_decoding_kernels/ngram_mask.cu",
     "./gpu/speculate_decoding_kernels/ngram_match.cc",
     "./gpu/speculate_decoding_kernels/rebuild_append_padding.cu",
-    "./gpu/speculate_decoding_kernels/rebuild_padding.cu",
     "./gpu/speculate_decoding_kernels/speculate_calcu_accept_ratio.cu",
     "./gpu/speculate_decoding_kernels/speculate_clear_accept_nums.cu",
     "./gpu/speculate_decoding_kernels/speculate_get_output_padding_offset.cu",
@@ -130,7 +129,7 @@ sources = [
     "./gpu/speculate_decoding_kernels/speculate_update_input_ids_cpu.cc",
     "./gpu/speculate_decoding_kernels/speculate_update_seq_lens_this_time.cu",
     "./gpu/speculate_decoding_kernels/speculate_verify_and_update.cu",
-    "./gpu/speculate_decoding_kernels/topp_candidates.cu",
+    "./gpu/speculate_decoding_kernels/top_p_candidates.cu",
 ]
 sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
 
