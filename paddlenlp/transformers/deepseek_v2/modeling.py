@@ -157,29 +157,17 @@ def scaled_dot_product_attention(
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
 
-        version = paddle.version.full_version
-        if version != "0.0.0" and version <= "2.5.2":
-            attn_output, attn_weights = flash_attention(
-                query_states,
-                key_states,
-                value_states,
-                causal=True,
-                return_softmax=output_attentions,
-            )
-            attn_output *= (head_dim ** (0.5)) * softmax_scale
-            attn_weights *= (head_dim ** (0.5)) * softmax_scale
-        else:
-            attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                is_causal=attention_mask is None,
-                dropout_p=config.attention_dropout if training else 0.0,
-                training=training,
-            )
-            attn_output *= (head_dim ** (0.5)) * softmax_scale
-            attn_weights = None
+        attn_output = F.scaled_dot_product_attention(
+            query_states,
+            key_states,
+            value_states,
+            attn_mask=attention_mask,
+            is_causal=attention_mask is None,
+            dropout_p=config.attention_dropout if training else 0.0,
+            training=training,
+        )
+        attn_output *= (head_dim ** (0.5)) * softmax_scale
+        attn_weights = None
 
         if sequence_parallel:
             attn_output = attn_output.reshape([bsz * q_len, v_head_dim * num_heads])
