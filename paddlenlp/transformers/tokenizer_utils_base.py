@@ -801,14 +801,16 @@ class SpecialTokensMixin:
         """
         return self.add_tokens(self.all_special_tokens_extended, special_tokens=True)
 
-    def add_special_tokens(self, special_tokens_dict: Dict[str, Union[str, AddedToken]]) -> int:
+    def add_special_tokens(
+        self, special_tokens_dict: Dict[str, Union[str, AddedToken]], replace_additional_special_tokens=True
+    ) -> int:
         """
         Add a dictionary of special tokens (eos, pad, cls, etc.) to the encoder and link them to class attributes. If
         special tokens are NOT in the vocabulary, they are added to it (indexed starting from the last index of the
         current vocabulary).
 
-        Note,None When adding new tokens to the vocabulary, you should make sure to also resize the token embedding
-        matrix of the model so that its embedding matrix matches the tokenizer.
+        When adding new tokens to the vocabulary, you should make sure to also resize the token embedding matrix of the
+        model so that its embedding matrix matches the tokenizer.
 
         In order to do that, please use the [`~PreTrainedModel.resize_token_embeddings`] method.
 
@@ -829,6 +831,13 @@ class SpecialTokensMixin:
 
                 Tokens are only added if they are not already in the vocabulary (tested by checking if the tokenizer
                 assign the index of the `unk_token` to them).
+            replace_additional_special_tokens (`bool`, *optional*,, defaults to `True`):
+                If `True`, the existing list of additional special tokens will be replaced by the list provided in
+                `special_tokens_dict`. Otherwise, `self._additional_special_tokens` is just extended. In the former
+                case, the tokens will NOT be removed from the tokenizer's full vocabulary - they are only being flagged
+                as non-special tokens. Remember, this only affects which tokens are skipped during decoding, not the
+                `added_tokens_encoder` and `added_tokens_decoder`. This means that the previous
+                `additional_special_tokens` are still added tokens, and will not be split by the model.
 
         Returns:
             `int`: Number of tokens added to the vocabulary.
@@ -852,25 +861,38 @@ class SpecialTokensMixin:
         if not special_tokens_dict:
             return 0
 
-        added_tokens = 0
+        added_tokens = []
         for key, value in special_tokens_dict.items():
             assert key in self.SPECIAL_TOKENS_ATTRIBUTES, f"Key {key} is not a special token"
 
             if self.verbose:
                 logger.info(f"Assigning {value} to the {key} key of the tokenizer")
-            setattr(self, key, value)
 
             if key == "additional_special_tokens":
                 assert isinstance(value, (list, tuple)) and all(
                     isinstance(t, (str, AddedToken)) for t in value
                 ), f"Tokens {value} for key {key} should all be str or AddedToken instances"
-                added_tokens += self.add_tokens(value, special_tokens=True)
-            else:
-                assert isinstance(
-                    value, (str, AddedToken)
-                ), f"Token {value} for key {key} should be a str or an AddedToken instance"
-                added_tokens += self.add_tokens([value], special_tokens=True)
 
+                to_add = []
+                for token in value:
+                    if not replace_additional_special_tokens and str(token) in self.additional_special_tokens:
+                        continue
+                    to_add.append(token)
+                if replace_additional_special_tokens and len(to_add) > 0:
+                    setattr(self, key, list(to_add))
+                else:
+                    self._additional_special_tokens.extend(to_add)
+                added_tokens += to_add
+
+            else:
+                if not isinstance(value, (str, AddedToken)):
+                    raise ValueError(f"Token {value} for key {key} should be a str or an AddedToken instance")
+                setattr(self, key, value)
+                if value not in added_tokens:
+                    added_tokens.append(value)
+
+        # if we are adding tokens that were not part of the vocab, we ought to add them
+        added_tokens = self.add_tokens(added_tokens, special_tokens=True)
         return added_tokens
 
     def add_tokens(
@@ -1543,6 +1565,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         else:
             init_kwargs = init_configuration
 
+        pass_added_tokens_file = False
         # Handle tokenizer serialization of added and special tokens
         added_tokens_decoder: Dict[int, AddedToken] = {}
         # if we have info on the slow added tokens
@@ -1557,6 +1580,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                         f"Found a {token.__class__} in the saved `added_tokens_decoder`, should be a dictionary or an AddedToken instance"
                     )
             init_kwargs["added_tokens_decoder"] = added_tokens_decoder
+
+            pass_added_tokens_file = True
 
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())
@@ -1585,7 +1610,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             if model_max_length is not None and isinstance(model_max_length, (int, float)):
                 init_kwargs["model_max_length"] = min(init_kwargs.get("model_max_length", int(1e30)), model_max_length)
 
-        added_tokens_file = resolved_vocab_files.pop("added_tokens_file", None)
         # Merge resolved_vocab_files arguments in init_kwargs if not including.
         # Maybe need more ways to load resources.
         for args_name, file_path in resolved_vocab_files.items():
@@ -1612,6 +1636,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         chat_template = init_kwargs.pop("chat_template", None)
         if chat_template is not None:
             tokenizer.init_chat_template(chat_template)
+
         special_tokens_map_file = resolved_vocab_files.pop("special_tokens_map_file", None)
         if special_tokens_map_file is not None:
             with open(special_tokens_map_file, encoding="utf-8") as special_tokens_map_handle:
@@ -1620,16 +1645,17 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 if key in kwargs and kwargs[key]:
                     # This value has already been redefined by the kwargs
                     # We keep this new value and ignore the one stored in the special_tokens_map_file
-
                     continue
-
                 if isinstance(value, dict):
                     value = AddedToken(**value)
                 elif isinstance(value, list):
                     value = [AddedToken(**token) if isinstance(token, dict) else token for token in value]
                 setattr(tokenizer, key, value)
+
         # Add supplementary tokens.
         special_tokens = tokenizer.all_special_tokens
+        added_tokens_file = resolved_vocab_files.pop("added_tokens_file", None)
+        added_tokens_file = None if pass_added_tokens_file else added_tokens_file
         if added_tokens_file is not None:
             with open(added_tokens_file, encoding="utf-8") as added_tokens_handle:
                 added_tok_encoder = json.load(added_tokens_handle)
@@ -1726,6 +1752,15 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         # add_type_field=True to allow dicts in the kwargs / differentiate from AddedToken serialization
         tokenizer_config = convert_added_tokens(tokenizer_config, add_type_field=True)
+
+        # Process added tokens seperatly: allows previous versions to ignore it!
+        added_tokens = {}
+        for key, value in self.added_tokens_decoder.items():
+            if isinstance(value, AddedToken):
+                added_tokens[key] = value.__getstate__()
+            else:
+                added_tokens[key] = AddedToken(value).__getstate__()
+        tokenizer_config["added_tokens_decoder"] = added_tokens
 
         # Add tokenizer class to the tokenizer config to be able to reload it with from_pretrained
         tokenizer_class = self.__class__.__name__

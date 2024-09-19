@@ -1,0 +1,21 @@
+{
+    "act_scale":{
+        "qkv_in_scale": "qwen2.layers.#.self_attn.q_proj.activation_quanter", 
+        "out_linear_in_scale": "qwen2.layers.#.self_attn.o_proj.activation_quanter", 
+        "ffn1_in_scale": "qwen2.layers.#.mlp.gate_proj.activation_quanter", 
+        "ffn2_in_scale": "qwen2.layers.#.mlp.down_proj.activation_quanter"
+    },
+    "weight_scale":{
+        "q_weight_scale":"qwen2.layers.#.self_attn.q_proj.weight_quanter",
+        "k_weight_scale":"qwen2.layers.#.self_attn.k_proj.weight_quanter",
+        "v_weight_scale":"qwen2.layers.#.self_attn.v_proj.weight_quanter",
+        "out_linear_weight_scale":"qwen2.layers.#.self_attn.o_proj.weight_quanter",
+        "ffn1_0_weight_scale":"qwen2.layers.#.mlp.gate_proj.weight_quanter",
+        "ffn1_1_weight_scale":"qwen2.layers.#.mlp.up_proj.weight_quanter",
+        "ffn2_weight_scale":"qwen2.layers.#.mlp.down_proj.weight_quanter"
+    },
+    "cachekv_scale":{
+        "cache_k_scale": "qwen2.layers.#.self_attn.cachek_matmul.activation_quanter",
+        "cache_v_scale": "qwen2.layers.#.self_attn.cachev_matmul.activation_quanter"
+    }
+}
