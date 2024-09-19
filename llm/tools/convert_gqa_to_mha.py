@@ -13,10 +13,12 @@
 # limitations under the License.
 
 import argparse
-import json
 import os
 
 import paddle
+
+from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM
+from paddlenlp.transformers.model_utils import load_tp_checkpoint
 
 
 def parse_arguments():
@@ -41,25 +43,25 @@ def convert(gqa_model_path, mha_model_path, config_path):
         mha_model_path (str): the saved path of mha_model weight
         config_path (str): the path of model's config
     """
-    config_file = open(config_path, "r")
-    config_json = json.load(config_file)
+    config = AutoConfig.from_pretrained(gqa_model_path)
 
-    model = paddle.load(gqa_model_path)
+    model = AutoModelForCausalLM.from_pretrained(gqa_model_path)
+    model_state = load_tp_checkpoint(gqa_model_path, model, config)
 
-    model_type = config_json["model_type"]
-    hidden_size = config_json["hidden_size"]
-    num_head = config_json["num_attention_heads"]
-    num_key_value_heads = config_json["num_key_value_heads"]
+    model_type = config["model_type"]
+    hidden_size = config["hidden_size"]
+    num_head = config["num_attention_heads"]
+    num_key_value_heads = config["num_key_value_heads"]
     dim_head = hidden_size // num_head
-    num_layers = config_json["num_hidden_layers"]
+    num_layers = config["num_hidden_layers"]
     num_gqa_partitions = num_head // num_key_value_heads
 
     for i in range(num_layers):
         print(f"num_layers: {i}")
         # qkv weight [hidden_size, (num_head + 2 * num_key_value_heads) * dim_head]
-        q_weight = model[f"{model_type}.layers.{i}.self_attn.q_proj.weight"]
-        k_weight = model[f"{model_type}.layers.{i}.self_attn.k_proj.weight"]
-        v_weight = model[f"{model_type}.layers.{i}.self_attn.v_proj.weight"]
+        q_weight = model_state[f"{model_type}.layers.{i}.self_attn.q_proj.weight"]
+        k_weight = model_state[f"{model_type}.layers.{i}.self_attn.k_proj.weight"]
+        v_weight = model_state[f"{model_type}.layers.{i}.self_attn.v_proj.weight"]
         print(f"q_weight.shape: {q_weight.shape}")
         print(f"k_weight.shape: {k_weight.shape}")
         print(f"k_weight.shape: {v_weight.shape}")
@@ -83,19 +85,19 @@ def convert(gqa_model_path, mha_model_path, config_path):
         print(f"new_k_weight.shape: {new_k_weight.shape}")
         print(f"new_v_weight.shape: {new_v_weight.shape}")
 
-        model[f"{model_type}.layers.{i}.self_attn.k_proj.weight"] = new_k_weight
-        model[f"{model_type}.layers.{i}.self_attn.v_proj.weight"] = new_v_weight
+        model_state[f"{model_type}.layers.{i}.self_attn.k_proj.weight"] = new_k_weight
+        model_state[f"{model_type}.layers.{i}.self_attn.v_proj.weight"] = new_v_weight
 
         if (
-            f"{model_type}.layers.{i}.self_attn.q_proj.bias" in model
-            and f"{model_type}.layers.{i}.self_attn.k_proj.bias" in model
-            and f"{model_type}.layers.{i}.self_attn.v_proj.bias" in model
+            f"{model_type}.layers.{i}.self_attn.q_proj.bias" in model_state
+            and f"{model_type}.layers.{i}.self_attn.k_proj.bias" in model_state
+            and f"{model_type}.layers.{i}.self_attn.v_proj.bias" in model_state
         ):
             print("bias")
 
-            q_bias = model[f"{model_type}.layers.{i}.self_attn.q_proj.bias"]
-            k_bias = model[f"{model_type}.layers.{i}.self_attn.k_proj.bias"]
-            v_bias = model[f"{model_type}.layers.{i}.self_attn.v_proj.bias"]
+            q_bias = model_state[f"{model_type}.layers.{i}.self_attn.q_proj.bias"]
+            k_bias = model_state[f"{model_type}.layers.{i}.self_attn.k_proj.bias"]
+            v_bias = model_state[f"{model_type}.layers.{i}.self_attn.v_proj.bias"]
             print(f"q_bias.shape: {q_bias.shape}")
             print(f"k_bias.shape: {k_bias.shape}")
             print(f"v_bias.shape: {v_bias.shape}")
@@ -115,10 +117,10 @@ def convert(gqa_model_path, mha_model_path, config_path):
             print(f"new_k_bias.shape: {new_k_bias.shape}")
             print(f"new_v_bias.shape: {new_v_bias.shape}")
 
-            model[f"{model_type}.layers.{i}.self_attn.k_proj.bias"] = new_k_bias
-            model[f"{model_type}.layers.{i}.self_attn.v_proj.bias"] = new_v_bias
+            model_state[f"{model_type}.layers.{i}.self_attn.k_proj.bias"] = new_k_bias
+            model_state[f"{model_type}.layers.{i}.self_attn.v_proj.bias"] = new_v_bias
 
-    paddle.save(model, mha_model_path)
+    paddle.save(model_state, mha_model_path)
 
 
 if __name__ == "__main__":
@@ -127,9 +129,8 @@ if __name__ == "__main__":
     """
     args = parse_arguments()
     config_path = os.path.join(args.gqa_model_path, "config.json")
-    gqa_model_path = os.path.join(args.gqa_model_path, f"{args.model_prefix_name}.pdparams")
     mha_model_path = os.path.join(args.mha_model_path, f"{args.model_prefix_name}.pdparams")
 
     assert os.path.exists(config_path), "config.json is not found in {}".format(args.gqa_model_path)
-    assert os.path.exists(gqa_model_path), "{} is not found".format(gqa_model_path)
-    convert(gqa_model_path, mha_model_path, config_path)
+    assert os.path.exists(args.gqa_model_path), "{} is not found".format(args.gqa_model_path)
+    convert(args.gqa_model_path, mha_model_path, config_path)
