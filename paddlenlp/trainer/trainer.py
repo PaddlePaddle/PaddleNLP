@@ -1354,8 +1354,14 @@ class Trainer:
             )
             num_steps = self.state.global_step - self._globalstep_last_logged
             seq_length = None
+            model_flops = None
             if getattr(self, "is_pretraining", False) and hasattr(self.model, "config"):
                 seq_length = getattr(self.model.config, "seq_length", None)
+                try:
+                    model_flops = self.model.get_hardware_flops(seq_length=seq_length, recompute=self.args.recompute)
+                except NotImplementedError:
+                    model_flops = None
+
             logs.update(
                 speed_metrics(
                     "interval",
@@ -1363,6 +1369,7 @@ class Trainer:
                     num_samples=total_train_batch_size * num_steps,
                     num_steps=num_steps,
                     seq_length=seq_length,
+                    model_flops=model_flops,
                 )
             )
 

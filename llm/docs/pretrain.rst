@@ -26,11 +26,11 @@ git clone 代码到本地，即可开始。
 .. toctree::
    :maxdepth: 1
 
-   内置预练数据集及自定义数据制作 <dataset.md>
-   CLUECorpus2020 语料制作 <data/CLUECorpus2020.md>
-   CLUECorpusSmall  语料制作 <data/CLUECorpusSmall.md>
-   OpenWebText2 语料制作 <data/OpenWebText2.md>
-   WuDaoCorpus2.0 Base 语料 <data/WuDaoCorpusBase.md>
+   内置预练数据集及自定义数据制作 <../dataset.md>
+   CLUECorpus2020 语料制作 <../tools/preprocess/docs/CLUECorpus2020.md>
+   CLUECorpusSmall  语料制作 <../tools/preprocess/docs/CLUECorpusSmall.md>
+   OpenWebText2 语料制作 <../tools/preprocess/docs/OpenWebText2.md>
+   WuDaoCorpus2.0 Base 语料 <../tools/preprocess/docs/WuDaoCorpusBase.md>
 
 
 

@@ -780,5 +780,8 @@ class AutoTrainer(Trainer):
                     raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
                 self._load_ckpt_func(state_dict, ckpt_path)
 
+            if self.args.to_static:
+                self.model_wrapped.set_state_dict(model_state_dict)
+                self.model_wrapped.set_state_dict(optim_state_dict)
             # release memory
             del state_dict
