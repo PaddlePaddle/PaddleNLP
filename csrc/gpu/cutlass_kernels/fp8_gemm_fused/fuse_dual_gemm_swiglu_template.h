@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #pragma once
+
 #include "fp8_common.h"
 #include "cutlass/cutlass.h"
 #include "cutlass/float8.h"
@@ -20,8 +21,10 @@
 #include "fp8_gemm_fused/dual_gemm/device/dual_gemm.h"
 #include "fp8_gemm_fused/dual_gemm/thread/left_silu_and_mul.h"
 
-template <typename InputType, typename BiasType, typename OutType>
-bool dual_gemm_scale_bias_swiglu_64_64_64_stages4(DualGemmEpilogueAllParams params) {
+template <typename InputType, typename OutType, typename BiasType,
+            typename ThreadBlockShape, typename WarpShape, 
+            typename MMAShape, int Stages, bool hasbias, typename SM>
+bool dispatch_dual_gemm_swiglu(DualGemmEpilogueAllParams params) {
   using ElementInputA = typename std::conditional_t<
       std::is_same_v<InputType, phi::dtype::float8_e4m3fn>,
       cutlass::float_e4m3_t,
@@ -54,23 +57,24 @@ bool dual_gemm_scale_bias_swiglu_64_64_64_stages4(DualGemmEpilogueAllParams para
   using MMAOp = cutlass::arch::OpClassTensorOp;
 
   // This code section describes CUDA SM architecture number
-  using SmArch = cutlass::arch::Sm89;
+  using SmArch = SM;
 
   // This code section describes the tile size a thread block will compute
-  using ShapeMMAThreadBlock =
-      cutlass::gemm::GemmShape<64, 64, 64>;  
+  using ShapeMMAThreadBlock = ThreadBlockShape;
       
   // This code section describes tile size a warp will compute
-  using ShapeMMAWarp =
-      cutlass::gemm::GemmShape<32, 32, 64>;  
+  using ShapeMMAWarp = WarpShape;  
       
   // This code section describes the size of MMA op
-  using ShapeMMAOp = cutlass::gemm::GemmShape<16, 8, 32>;  // <- MMA Op tile M =
-                                                           // 16, N = 8, K = 32
+  using ShapeMMAOp = MMAShape;
 
   // This code section describes how threadblocks are scheduled on GPU
   using SwizzleThreadBlock =
       cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>;  // <- ??
+
+  static constexpr auto ScaleType =
+              hasbias? cutlass::epilogue::thread::ScaleType::NoBetaScaling
+                       : cutlass::epilogue::thread::ScaleType::OnlyAlphaScaling;
 
   using EpilogueOp0 = cutlass::epilogue::thread::LinearCombination<
       ElementInputC,  // <- data type of output matrix
@@ -81,9 +85,8 @@ bool dual_gemm_scale_bias_swiglu_64_64_64_stages4(DualGemmEpilogueAllParams para
                            // math instructions in the epilogue too
       ElementAccumulator,  // <- data type of accumulator
       ElementComputeEpilogue,
-      cutlass::epilogue::thread::ScaleType::
-          NoBetaScaling>;  // <- data type for alpha/beta in linear
-                           // combination function
+      ScaleType>;  // <- data type for alpha/beta in linear
+                              // combination function
 
   using EpilogueOp1 = cutlass::epilogue::thread::LeftSiLUAndMul<
       ElementOutput,
@@ -92,7 +95,7 @@ bool dual_gemm_scale_bias_swiglu_64_64_64_stages4(DualGemmEpilogueAllParams para
       ElementCompute>;
 
   // Number of pipelines you want to use
-  constexpr int NumStages = 3;
+  constexpr int NumStages = Stages;
   constexpr bool StoreD0 = false;
   constexpr bool StoreD1 = false;
   constexpr bool SplitKSerial = false;
@@ -126,7 +129,9 @@ bool dual_gemm_scale_bias_swiglu_64_64_64_stages4(DualGemmEpilogueAllParams para
   cutlass::gemm::GemmCoord problem_size =
       cutlass::gemm::GemmCoord{params.M, params.N, params.K};
 
-  cutlass::gemm::DualGemmMode mode = cutlass::gemm::DualGemmMode::kBatched;
+  cutlass::gemm::DualGemmMode mode = params.batch_count > 1 ?
+        cutlass::gemm::DualGemmMode::kBatched :
+        cutlass::gemm::DualGemmMode::kGemm;
 
   typename cutlass::TensorRef<typename Gemm::ElementC, typename Gemm::LayoutC>
       nullptr_ref{};
@@ -139,11 +144,11 @@ bool dual_gemm_scale_bias_swiglu_64_64_64_stages4(DualGemmEpilogueAllParams para
        params.lda},
       {reinterpret_cast<ElementInputB*>(const_cast<void*>(params.B0)),
        params.ldb},
-      {reinterpret_cast<ElementInputC*>(const_cast<void*>(params.bias0)), 0},
+      hasbias ? typename cutlass::TensorRef<typename Gemm::ElementC, typename Gemm::LayoutC>{reinterpret_cast<ElementInputC*>(const_cast<void*>(params.bias0)), 0} : nullptr_ref,
       nullptr_ref,
       {reinterpret_cast<ElementInputB*>(const_cast<void*>(params.B1)),
        params.ldb},
-      {reinterpret_cast<ElementInputC*>(const_cast<void*>(params.bias1)), 0},
+      hasbias ? typename cutlass::TensorRef<typename Gemm::ElementC, typename Gemm::LayoutC>{reinterpret_cast<ElementInputC*>(const_cast<void*>(params.bias1)), 0} : nullptr_ref,
       nullptr_ref,
       {reinterpret_cast<ElementOutput*>(const_cast<void*>(params.D)),
        params.ldd},
@@ -182,4 +187,3 @@ bool dual_gemm_scale_bias_swiglu_64_64_64_stages4(DualGemmEpilogueAllParams para
   }
   return true;
 }
-
