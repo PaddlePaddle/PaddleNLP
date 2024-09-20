@@ -1,5 +1,5 @@
 {
-    "model_name_or_path": "baichuan-inc/Baichuan2-7B-Base",
+    "model_name_or_path": "meta-llama/Meta-Llama-3-8B",
     "train_dataset_path": "./data/train.jsonl",
     "dev_dataset_path": "./data/dev.jsonl",
     "output_dir": "./checkpoints/dpo_ckpts",
@@ -8,7 +8,7 @@
     "per_device_eval_batch_size": 1,
     "num_train_epochs": 1,
     "max_steps": 100,
-    "learning_rate": 1e-06,
+    "learning_rate": 6e-07,
     "warmup_steps": 10,
     "logging_steps": 1,
     "evaluation_strategy": "steps",
@@ -26,12 +26,16 @@
     "tensor_parallel_degree": 8,
     "sharding": "stage1",
     "use_flash_attention": true,
+    "flash_mask":true,
     "recompute": false,
     "recompute_granularity": "full",
-    "dpo_beta": 0.1,
+    "beta": 2.0,
+    "simpo_gamma":1.0,
     "benchmark": false,
-    "dpo_loss_type": "sigmoid",
-    "dpo_label_smoothing": 0.0,
+    "loss_type": "simpo",
+    "label_smoothing": 0.0,
     "unified_checkpoint": true,
-    "autotuner_benchmark":false
+    "autotuner_benchmark":false,
+    "lazy": false,
+    "seed":42
   }
