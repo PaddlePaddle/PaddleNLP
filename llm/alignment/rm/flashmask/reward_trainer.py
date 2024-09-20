@@ -12,25 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 
-import numpy as np
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-from paddle.io import Dataset
 
-import paddlenlp.trainer.trainer as trainer
-from paddlenlp.data import DataCollator
-from paddlenlp.trainer import (
-    EvalPrediction,
-    Trainer,
-    TrainerCallback,
-    TrainingArguments,
-)
-from paddlenlp.trainer.utils import nested_detach
-from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
+from paddlenlp.trainer import Trainer
 
 
 class RewardTrainer(Trainer):
@@ -38,25 +24,20 @@ class RewardTrainer(Trainer):
     Initialize RewardTrainer.
     """
 
-    def __init__(
-        self,
-        model,
-        data_collator,
-        **kwargs
-    ):
+    def __init__(self, model, data_collator, **kwargs):
         super().__init__(model, data_collator=data_collator, **kwargs)
         self._stored_metrics = defaultdict(lambda: defaultdict(list))
         if self.compute_metrics is not None:
             raise NotImplementedError("compute_metrics is not supported for RewardTrainer")
-
 
     def get_batch_metrics(self, model, batch, train_eval="train"):
         """Compute the RM loss and other metrics for the given batch of inputs for train or test."""
         rm_inputs = {
             "input_ids": batch["input_ids"],
             "position_ids": batch["position_ids"],
-            "response_indexs": batch["response_indexs"]
+            "response_indexs": batch["response_indexs"],
         }
+
         if "attention_mask" in batch:
             rm_inputs["attention_mask"] = batch["attention_mask"]
         elif "attn_mask_start_row_indices" in batch:
@@ -73,7 +54,6 @@ class RewardTrainer(Trainer):
         if self.args.should_save:
             self.store_metrics(metrics, train_eval=train_eval)
         return loss
-
 
     def compute_loss(self, model, inputs):
         """Compute the loss for the given batch of inputs."""
@@ -96,7 +76,7 @@ class RewardTrainer(Trainer):
             return (loss.detach(), None, None)
         else:
             raise NotImplementedError("RewardTrainer only supports prediction_loss_only=True for now.")
-    
+
     def store_metrics(self, metrics, train_eval="train"):
         """store_metrics"""
         for key, value in metrics.items():
@@ -119,4 +99,3 @@ class RewardTrainer(Trainer):
         if self.state.epoch is not None and train_eval == "train":
             self.state.epoch *= self.args.num_train_epochs
         return super().log(logs, **kwargs)
-        

@@ -17,8 +17,9 @@ from __future__ import annotations
 from typing import Any
 
 import paddle
-from paddle import nn
 import paddle.nn.functional as F
+from paddle import nn
+
 import paddlenlp
 from paddlenlp.transformers import (
     LlamaConfig,
@@ -31,6 +32,7 @@ from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
 )
+
 
 class LlamaModelForScore(LlamaPretrainedModel):
     _keys_to_ignore_on_load_missing = ["lm_head.weight"]
@@ -82,11 +84,15 @@ class LlamaModelForScore(LlamaPretrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
-            attn_mask_startend_row_indices=attn_mask_startend_row_indices
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
         )
         hidden_states = outputs[0]  # size = (B, L, E)
-        chosen_indexes = paddle.to_tensor([[response_index[0], response_index[1]] for response_index in response_indexs])
-        rejected_indexes = paddle.to_tensor([[response_index[0], response_index[2]] for response_index in response_indexs])    
+        chosen_indexes = paddle.to_tensor(
+            [[response_index[0], response_index[1]] for response_index in response_indexs]
+        )
+        rejected_indexes = paddle.to_tensor(
+            [[response_index[0], response_index[2]] for response_index in response_indexs]
+        )
         chosen_hidden_states = hidden_states.gather_nd(chosen_indexes)
         rejected_hidden_states = hidden_states.gather_nd(rejected_indexes)
 

@@ -16,6 +16,7 @@ import numpy as np
 
 
 def check_preference_data(data):
+
     if isinstance(data["src"], str):
         data["src"] = [data["src"]]
     if isinstance(data["tgt"], str):
@@ -57,28 +58,35 @@ def preprocess_preference_data(data, tokenizer, data_args, model_args):
     prompt_tokens_ids = tokenizer(data["src"][-1], add_special_tokens=True)["input_ids"]
 
     for idx in range(len(data["tgt"])):
-        src_token_ids = tokenizer(data["src"][-idx-1], add_special_tokens=True)["input_ids"]
+        src_token_ids = tokenizer(data["src"][-idx - 1], add_special_tokens=True)["input_ids"]
         tgt_token_ids = tokenizer(data["tgt"][-idx])["input_ids"] + [tokenizer.eos_token_id]
         prompt_tokens_ids = src_token_ids + tgt_token_ids + prompt_tokens_ids
-    
+
     if len(prompt_tokens_ids) + len(rejected_token_ids) + len(chosen_token_ids) > data_args.max_seq_len:
         prompt_tokens_ids = prompt_tokens_ids[-data_args.max_prompt_len :]
         if len(prompt_tokens_ids) + len(rejected_token_ids) + len(chosen_token_ids) > data_args.max_seq_len:
             max_response_len = data_args.max_seq_len - len(prompt_tokens_ids)
             # 按比例截断
-            max_chosen_len = int(len(chosen_token_ids)  / (len(chosen_token_ids) + len(rejected_token_ids)) * max_response_len)
+            max_chosen_len = int(
+                len(chosen_token_ids) / (len(chosen_token_ids) + len(rejected_token_ids)) * max_response_len
+            )
             max_rejected_len = max_response_len - max_chosen_len
             chosen_token_ids = chosen_token_ids[:max_chosen_len]
             rejected_token_ids = rejected_token_ids[:max_rejected_len]
     input_ids = prompt_tokens_ids + chosen_token_ids + rejected_token_ids
-    prompt_len, chosen_len, rejected_len, seq_len = len(prompt_tokens_ids), len(chosen_token_ids), len(rejected_token_ids), len(input_ids)
+    prompt_len, chosen_len, rejected_len, seq_len = (
+        len(prompt_tokens_ids),
+        len(chosen_token_ids),
+        len(rejected_token_ids),
+        len(input_ids),
+    )
     position_ids = (
         list(range(prompt_len))  # prompt
         + list(range(prompt_len, prompt_len + chosen_len))  # chosen
         + list(range(prompt_len, prompt_len + rejected_len))  # rejected
     )
     # response index
-    response_indexs = [prompt_len + chosen_len-1, seq_len -1]
+    response_indexs = [prompt_len + chosen_len - 1, seq_len - 1]
     output_dict = {
         "input_ids": input_ids,
         "position_ids": position_ids,

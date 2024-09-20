@@ -38,6 +38,7 @@ class TrainingArguments(TrainingArguments):
         default=True,
         metadata={"help": "Enable fused linear grad add strategy."},
     )
+
     unified_checkpoint_config: Optional[str] = field(
         default="",
         metadata={"help": "Configs to unify hybrid parallel checkpoint.\n"},

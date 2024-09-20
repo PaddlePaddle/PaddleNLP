@@ -16,10 +16,13 @@
 
 import os
 import sys
-import time
 from functools import partial
 
 import paddle
+from data import preference_collate_fn, preprocess_preference_data
+from reward_argument import DataArgument, ModelArgument, TrainingArguments
+from reward_model import LlamaModelForScore
+from reward_trainer import RewardTrainer
 
 from paddlenlp.datasets import ZeroPaddingMapDataset, load_dataset
 from paddlenlp.trainer import (
@@ -31,15 +34,9 @@ from paddlenlp.trainer import (
 from paddlenlp.transformers import (
     AutoConfig,
     AutoTokenizer,
-    LlamaForCausalLM,
-    LlamaForCausalLMPipe,
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.utils.log import logger
-from reward_model import LlamaModelForScore
-from data import preprocess_preference_data, preference_collate_fn
-from reward_argument import DataArgument, ModelArgument, TrainingArguments
-from reward_trainer import RewardTrainer
 
 
 def main():
