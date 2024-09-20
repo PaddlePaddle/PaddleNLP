@@ -1,8 +1,8 @@
-# 一、Pretrain数据集
+# 一、Pretrain 数据集
 
 ## 1. 内置数据集
 
-名称|文本类型|纯文本的大小|适配模型|制作时间|出处|下载链接bin|下载链接idx|
+名称|文本类型|纯文本的大小|适配模型|制作时间|出处|下载链接 bin|下载链接 idx|
 |-|-|-|-|-|-|-|-|
 OpenWebText2|英文|70GB|`meta-llama/Llama-2-7b`<br> `meta-llama/Llama-2-7b-chat`<br> `meta-llama/Llama-2-13b`<br> `meta-llama/Llama-2-13b-chat` <br>`facebook/llama-7b`<br> `facebook/llama-13b`<br>| 42min |  [链接](https://skylion007.github.io/OpenWebTextCorpus/) |[*bin](https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/llama/mmap/llama_mmap.bin) | [*idx](https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/llama/mmap/llama_mmap.idx) |
 |OpenWebText2|英文|70GB|`gpt2-en`|37min|[链接](https://skylion007.github.io/OpenWebTextCorpus/)|[*bin](https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/gpt/mmap/gpt2-en-mmap.bin)|[*idx](https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/openwebtext2/gpt/mmap/gpt2-en-mmap.idx)|
@@ -15,7 +15,7 @@ CLUECorpusSmall|中文|14GB|`idea-ccnl/ziya-llama-13b-v1`|15min|[链接](https:/
 WuDaoCorpus2.0 Base|中文|200GB|`idea-ccnl/ziya-llama-13b-v1`|3h 35min| [链接](https://data.baai.ac.cn/details/WuDaoCorporaText)|[*bin](https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/wudao/ziya/mmap/ziya_mmap.bin)|[*idx](https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/wudao/ziya/mmap/ziya_mmap.idx)|
 WuDaoCorpus2.0 Base|中文|200GB|`baichuan-inc/Baichuan-7B`|2h 52min||[*bin](https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/wudao/baichuan/mmap/baichuan_mmap.bin)|[*idx](https://paddlenlp.bj.bcebos.com/datasets/PDC_DATASETS/PRETRAIN/wudao/baichuan/mmap/baichuan_mmap.idx)|
 
-下载 bin 和 idx 放在同一个目录下，预训练脚本指定 input_dir即可.
+下载 bin 和 idx 放在同一个目录下，预训练脚本指定 input_dir 即可.
 
 若需要自行制作数据集，整体制作流程如2.1所示，详细步骤如以下2.2所示。
 
@@ -25,12 +25,12 @@ WuDaoCorpus2.0 Base|中文|200GB|`baichuan-inc/Baichuan-7B`|2h 52min||[*bin](htt
 
 |步骤|阶段&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|数据格式| 样例|
 |-|-|-|-|
-| 0️⃣初始状态 | -|原始数据： <br/> **每个doc之间用空行间隔开** <br/> - 中文，默认每句换行符，作为句子结束。<br/> - 英文，默认使用nltk判断句子结束  | ```飞桨是功能完备、开源开放的产业级深度学习平台。``` <br/> ```飞桨拥有核心训练和推理框架、基础模型库。``` <br/><br/> ```PaddleNLP是自然语言处理领域的优秀工具。```  |
-|1️⃣原始数据转换<br/>`trans_to_json.py`|预处理 <br>输入：0️⃣初始状态 <br>输出：jsonl|jsonl格式：每个doc对应一行json字符串| ```{"text": "飞桨是功能完备、开源开放的产业级深度学习平台。飞桨拥有..."}```<br/>```{"text": "PaddleNLP是自然语言..."}```
-|2️⃣数据ID化<br/>`create_pretrain_data.py`|预处理| bin格式：数据id化后的token id <br/>idx格式：数据句子、文章位置索引 | -
+| 0️⃣初始状态 | -|原始数据： <br/> **每个 doc 之间用空行间隔开** <br/> - 中文，默认每句换行符，作为句子结束。<br/> - 英文，默认使用 nltk 判断句子结束  | ```飞桨是功能完备、开源开放的产业级深度学习平台。``` <br/> ```飞桨拥有核心训练和推理框架、基础模型库。``` <br/><br/> ```PaddleNLP是自然语言处理领域的优秀工具。```  |
+|1️⃣原始数据转换<br/>`trans_to_json.py`|预处理 <br>输入：0️⃣初始状态 <br>输出：jsonl|jsonl 格式：每个 doc 对应一行 json 字符串| ```{"text": "飞桨是功能完备、开源开放的产业级深度学习平台。飞桨拥有..."}```<br/>```{"text": "PaddleNLP是自然语言..."}```
+|2️⃣数据 ID 化<br/>`create_pretrain_data.py`|预处理| bin 格式：数据 id 化后的 token id <br/>idx 格式：数据句子、文章位置索引 | -
 
 ### 2.2 详细准备
-下面以ziya-llama-13b-v1模型为例，简要介绍数据制备的全流程。
+下面以 ziya-llama-13b-v1模型为例，简要介绍数据制备的全流程。
 
 **2.2.1 原始数据**
 
@@ -43,7 +43,7 @@ cd ..
 
 **2.2.2 原始数据转换 jsonl 格式**
 
-使用trans_to_json.py转化为json串格式，下面是脚本的使用说明
+使用 trans_to_json.py 转化为 json 串格式，下面是脚本的使用说明
 ```bash
 optional arguments:
   -h, --help
@@ -67,7 +67,7 @@ optional arguments:
   --no-shuffle
                         "可选。默认不开启这个选项，默认对处理完进行shuffle。"
 ```
-根据说明，我们使用下面简单命令，可以得到baike_sample.jsonl文件。此处，我们对文章所有doc进行了shuffle。
+根据说明，我们使用下面简单命令，可以得到 baike_sample.jsonl 文件。此处，我们对文章所有 doc 进行了 shuffle。
 ```
 python trans_to_json.py  --input_path ./data --output_path baike_sample
 ```
@@ -80,9 +80,9 @@ head -1 baike_sample.jsonl
 大的制约。中华人民共和国省份中，广东为GDP最高的第一强省，浙江为人均收入最高的第一富省。中国大陆、香港、澳门、台湾之间的经济联系在全球化的过程中日益紧密。\n"}
 ```
 
-**2.2.3 数据ID化**
+**2.2.3 数据 ID 化**
 
-在这一部分，我们使用 `create_pretraining_data.py` 脚本将前面得到的 `baike_sample.jsonl` 进行tokenize id化处理。模型可以参考已有的列表。
+在这一部分，我们使用 `create_pretraining_data.py` 脚本将前面得到的 `baike_sample.jsonl` 进行 tokenize id 化处理。模型可以参考已有的列表。
 ```bash
 optional arguments:
   --model_name MODEL_NAME.
@@ -142,14 +142,14 @@ python -u  create_pretraining_data.py \
     --data_impl "mmap"
 ```
 1. 如果您使用已经分好词的语料，可以设置 `--cn_splitd` 为 True，同时指定`--cn_split_dimer`如空格。
-2. 使用自定义词表的话，请指定model_name为词表所在的文件夹地址。
+2. 使用自定义词表的话，请指定 model_name 为词表所在的文件夹地址。
 
-经过以上处理，在 “/home/data/” 文件夹下可以得到预处理后的训练数据baike_sample.bin, 与文章索引信息：`baike_sample.idx`.
+经过以上处理，在 “/home/data/” 文件夹下可以得到预处理后的训练数据 baike_sample.bin, 与文章索引信息：`baike_sample.idx`.
 
 **2.2.4（可选） 合并数据集**
 
-若需要预处理的文件过大，该脚本所耗费的时间可能会很长。此时可以考虑将jsonl文件拆分为多个小文件，并行使用create_pretraining_data.py进行处理，得到多个.bin & .idx文件，之后使用如下merge脚本合并多个小的.bin & .idx文件。
-使用merge脚本将两份500g文件合并为1T的时间约1h。
+若需要预处理的文件过大，该脚本所耗费的时间可能会很长。此时可以考虑将 jsonl 文件拆分为多个小文件，并行使用 create_pretraining_data.py 进行处理，得到多个.bin & .idx 文件，之后使用如下 merge 脚本合并多个小的.bin & .idx 文件。
+使用 merge 脚本将两份500g 文件合并为1T 的时间约1h。
 ```bash
 python merge.py \
     --input "/home/data/" \
@@ -167,19 +167,19 @@ arguments:
   --data_impl {mmap,lazy}
                         "merge前后的数据格式，可选“mmap”或“lazy”，各个待merge的文件需格式一致。"
 ```
-经过以上merge脚本处理，“/home/data”目录下可以得到由“/home/data/”下的小文件合并而成的merged.bin和merged.idx文件。
+经过以上 merge 脚本处理，“/home/data”目录下可以得到由“/home/data/”下的小文件合并而成的 merged.bin 和 merged.idx 文件。
 
-**注意：单个数据集不宜过大，容易出现int32越界，建议单个文件docs数目不超过5亿。**
+**注意：单个数据集不宜过大，容易出现 int32越界，建议单个文件 docs 数目不超过5亿。**
 
 
 
 
 ## 常用数据集制作
 
-[CLUECorpus2020 语料制作](./data/CLUECorpus2020.md)
+[CLUECorpus2020 语料制作](./tools/preprocess/docs/CLUECorpus2020.md)
 
-[CLUECorpusSmall 语料制作](./data/CLUECorpusSmall.md)
+[CLUECorpusSmall 语料制作](./tools/preprocess/docs/CLUECorpusSmall.md)
 
-[OpenWebText2 语料制作](./data/OpenWebText2.md)
+[OpenWebText2 语料制作](./tools/preprocess/docs/OpenWebText2.md)
 
-[WuDaoCorpus2.0 Base 语料](./data/WuDaoCorpusBase.md)
+[WuDaoCorpus2.0 Base 语料](./tools/preprocess/docs/WuDaoCorpusBase.md)
