@@ -41,7 +41,7 @@ def split(args):
     """
     Split model weight
     """
-    nranks, rank = llm_utils.init_dist_env()
+    rank, nranks = llm_utils.init_dist_env()
 
     if args.output_path is None:
         args.output_path = os.path.join(args.model_path, f"{nranks}_ranks")
@@ -55,8 +55,8 @@ def split(args):
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
 
     if args.model_rank_id is not None:
-        model_path = os.path.join(args.model_path, f"model_state.tp0{args.model_rank_id}.pdparams")
-        assert os.path.isfile(model_path), f"{model_path}/model_state.tp0{args.model_rank_id}.pdparams not exist"
+        model_path = os.path.join(args.model_path, f"model_state.tp0{args.model_rank_id - 1}.pdparams")
+        assert os.path.isfile(model_path), f"{model_path} not exist"
         model_state_dict = paddle.load(model_path)
         model_rank = args.model_rank_id
         save_base_rank = model_rank * nranks
