@@ -256,7 +256,7 @@ class ChatGLMv2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             )
 
         self.add_sequential_layer(
-            LayerDesc(RMSNormPipe, hidden_size=config.hidden_size, config=config, epsilon=config.layernorm_epsilon),
+            LayerDesc(RMSNormPipe, config=config),
             "encoder.final_layernorm",
         )
         self.add_sequential_layer(
