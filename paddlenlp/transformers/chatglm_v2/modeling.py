@@ -802,7 +802,6 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
 
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
-
         def split_or_merge_qkv_weights(tensor_parallel_degree, tensor_parallel_rank, hidden_size, is_split, tensor):
             if is_split:
                 return split_qkv_weights(tensor_parallel_degree, tensor_parallel_rank, hidden_size, tensor)
