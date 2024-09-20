@@ -239,16 +239,9 @@ class QuantArgument:
         metadata={"help": "Quantization type. Supported values: weight_only_int8, weight_only_int4, a8w8, a8w8c8"},
     )
 
-    use_fp8: str = field(
-        default="",
-        metadata={
-            "help": "Whether to use FP8 on (activation, weight, cachekv), e.g. WAC means weight , activation, cachekv use fp8"
-        },
-    )
-
     fp8_type: List[str] = field(
         default_factory=lambda: ["e4m3", "e4m3"],
-        metadata={"help": "Quantization type for (weight, activation, cachekv)", "nargs": "+"},
+        metadata={"help": "Quantization type for (activation, weight)", "nargs": "+"},
     )
 
     skip_list_names: List[str] = field(

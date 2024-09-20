@@ -1354,8 +1354,14 @@ class Trainer:
             )
             num_steps = self.state.global_step - self._globalstep_last_logged
             seq_length = None
+            model_flops = None
             if getattr(self, "is_pretraining", False) and hasattr(self.model, "config"):
                 seq_length = getattr(self.model.config, "seq_length", None)
+                try:
+                    model_flops = self.model.get_hardware_flops(seq_length=seq_length, recompute=self.args.recompute)
+                except NotImplementedError:
+                    model_flops = None
+
             logs.update(
                 speed_metrics(
                     "interval",
@@ -1363,6 +1369,7 @@ class Trainer:
                     num_samples=total_train_batch_size * num_steps,
                     num_steps=num_steps,
                     seq_length=seq_length,
+                    model_flops=model_flops,
                 )
             )
 
@@ -2241,6 +2248,7 @@ class Trainer:
                 self.args.unified_checkpoint_config = unified_checkpoint_config_backup
         else:
             if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
+                os.makedirs(output_dir, exist_ok=True)
                 if self.is_in_train:
                     global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
                     paddle.save(global_rank, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
@@ -2259,6 +2267,7 @@ class Trainer:
             and "async_save" in self.args.unified_checkpoint_config
             and not self.is_in_train
         ):
+            os.makedirs(output_dir, exist_ok=True)
             global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
             paddle.save(self.state.global_step, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
 
@@ -2336,6 +2345,7 @@ class Trainer:
                 else:
                     if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                        os.makedirs(output_dir, exist_ok=True)
                         paddle.save(global_rank, os.path.join(output_dir, f".optimizer_weight.done.{global_rank}"))
                         if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
                             paddle.save(global_rank, os.path.join(output_dir, f".master_weight.done.{global_rank}"))
@@ -2367,6 +2377,14 @@ class Trainer:
 
                 if self.do_grad_scaling:
                     paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
+            else:
+                if self.args.unified_checkpoint and not self.args.use_hybrid_parallel:
+                    if "async_save" in self.args.unified_checkpoint_config:
+                        global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                        os.makedirs(output_dir, exist_ok=True)
+                        paddle.save(global_rank, os.path.join(output_dir, f".optimizer_weight.done.{global_rank}"))
+                        if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
+                            paddle.save(global_rank, os.path.join(output_dir, f".master_weight.done.{global_rank}"))
 
         self.runtime_timer.stop()
         # Determine the new best metric / best model checkpoint

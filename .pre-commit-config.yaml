@@ -53,3 +53,12 @@ repos:
         language: python
         files: \.(md|markdown)$
         pass_filenames: true
+# For dead links
+-   repo: local
+    hooks:
+    -   id: check-dead-links
+        name: Check dead links
+        entry: python scripts/codestyle/check_dead_links.py
+        language: python
+        files: \.(md|markdown|rst)$
+        pass_filenames: true
