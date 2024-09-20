@@ -12,9 +12,9 @@ pip install -r requirements.txt
 
 生成 FP8的 cutlass 算子
 ```shell
-python generate_code_gemm_fused_kernels.py
+python utils/auto_gen_fp8_fp8_gemm_fused_kernels.py
 
-python generate_code_dual_gemm_fused_kernels.py
+python utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels.py
 ```
 
 编译
