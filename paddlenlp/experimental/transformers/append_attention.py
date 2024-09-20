@@ -45,7 +45,7 @@ def split_kv_block(
     padding_len: int,
     num_rows_per_block: int,
 ) -> tuple[paddle.Tensor, paddle.Tensor, paddle.Tensor]:
-    batch_ids, tile_ids_per_batch, num_blocks_cpu = custom_ops.get_block_shape(
+    batch_ids, tile_ids_per_batch, num_blocks_cpu = custom_ops.split_kv_block(
         sequence_lengths_stage, sequence_lengths_remove, max_len, cum_offsets,
         padding_len, num_rows_per_block)
     return (batch_ids, tile_ids_per_batch, num_blocks_cpu)
@@ -295,9 +295,9 @@ def compute_append_attn(
         padding_offsets,
         cum_offsets,
         block_tables,
-        encoder_batch_ids,
-        encoder_tile_ids_per_batch,
-        encoder_num_blocks,
+        kv_batch_ids,
+        kv_tile_ids_per_batch,
+        kv_num_blocks,
         max_enc_len,
         qkv_out,
         cache_k,
