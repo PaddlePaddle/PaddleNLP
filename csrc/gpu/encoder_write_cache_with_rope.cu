@@ -40,11 +40,12 @@ void encoder_write_cache_with_rope(const paddle::Tensor& qkv, // [token_num, 3, 
 														const int max_input_len,
 														const int num_heads,
 														const int kv_num_heads,
-														const int head_dim) {
+														const int head_dim,
+														const bool use_neox_style) {
 	int num_blocks_data = num_blocks_x_cpu.data<int>()[0];
 	int max_enc_len_data = max_enc_len.data<int>()[0];
 
-	if (max_enc_len_data <= 0) return;
+	if (max_enc_len_data <= 0) {return;}
 	typedef PDTraits<D> traits_;
 	typedef typename traits_::DataType DataType_;
 	typedef typename traits_::data_t data_t;
@@ -55,6 +56,34 @@ void encoder_write_cache_with_rope(const paddle::Tensor& qkv, // [token_num, 3, 
 
 	if (qkv_out_scales) {
 		EncoderWriteCacheWithRopeKernel<data_t, int>(qkv, // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 * gqa_group_size, head_dim] if GQA)
+													rotary_emb,
+													seq_lens_this_time,
+													seq_lens_encoder,
+													seq_lens_decoder,
+													padding_offsets,
+													cum_offsets,
+													block_table,
+													batch_ids,
+													tile_ids_per_batch,
+													qkv_out_scales,
+													qkv_biases,
+													cache_k_scale,
+													cache_v_scale,
+													cache_k_zp,
+													cache_v_zp,
+													cache_quant_type_str,
+													num_blocks_data,
+													max_input_len,
+													num_heads,
+													kv_num_heads,
+													head_dim,
+													use_neox_style,
+													stream,
+													&qkv_out_tmp,
+													&cache_k, 
+													&cache_v);
+	} else {
+		EncoderWriteCacheWithRopeKernel<data_t, data_t>(qkv, // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 * gqa_group_size, head_dim] if GQA)
 														rotary_emb,
 														seq_lens_this_time,
 														seq_lens_encoder,
@@ -76,66 +105,41 @@ void encoder_write_cache_with_rope(const paddle::Tensor& qkv, // [token_num, 3, 
 														num_heads,
 														kv_num_heads,
 														head_dim,
+														use_neox_style,
 														stream,
 														&qkv_out_tmp,
 														&cache_k, 
 														&cache_v);
-	} else {
-		EncoderWriteCacheWithRopeKernel<data_t, data_t>(qkv, // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 * gqa_group_size, head_dim] if GQA)
-															rotary_emb,
-															seq_lens_this_time,
-															seq_lens_encoder,
-															seq_lens_decoder,
-															padding_offsets,
-															cum_offsets,
-															block_table,
-															batch_ids,
-															tile_ids_per_batch,
-															qkv_out_scales,
-															qkv_biases,
-															cache_k_scale,
-															cache_v_scale,
-															cache_k_zp,
-															cache_v_zp,
-															cache_quant_type_str,
-															num_blocks_data,
-															max_input_len,
-															num_heads,
-															kv_num_heads,
-															head_dim,
-															stream,
-															&qkv_out_tmp,
-															&cache_k, 
-															&cache_v);
 	}
 }
 
 void EncoderWriteCacheWithRope(const paddle::Tensor& qkv, // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 * gqa_group_size, head_dim] if GQA)
-													const paddle::Tensor& rotary_emb,
-													const paddle::Tensor& seq_lens_this_time,
-													const paddle::Tensor& seq_lens_encoder,
-													const paddle::Tensor& seq_lens_decoder,
-													const paddle::Tensor& padding_offsets,
-													const paddle::Tensor& cum_offsets,
-													const paddle::Tensor& block_table,
-													const paddle::Tensor& batch_ids,
-													const paddle::Tensor& tile_ids_per_batch,
-													const paddle::Tensor& num_blocks_x_cpu,
-													const paddle::Tensor& max_enc_len,
-													paddle::Tensor& qkv_out_tmp,
-													paddle::Tensor& cache_k, 
-													paddle::Tensor& cache_v,
-													const paddle::optional<paddle::Tensor>& qkv_out_scales,
-													const paddle::optional<paddle::Tensor>& qkv_biases,
-													const paddle::optional<paddle::Tensor>& cache_k_scale,
-													const paddle::optional<paddle::Tensor>& cache_v_scale,
-													const paddle::optional<paddle::Tensor>& cache_k_zp,
-													const paddle::optional<paddle::Tensor>& cache_v_zp,
-													const std::string& cache_quant_type_str,
-													const int max_input_len,
-													const int num_heads,
-													const int kv_num_heads,
-													const int head_dim) {
+							const paddle::Tensor& rotary_emb,
+							const paddle::Tensor& seq_lens_this_time,
+							const paddle::Tensor& seq_lens_encoder,
+							const paddle::Tensor& seq_lens_decoder,
+							const paddle::Tensor& padding_offsets,
+							const paddle::Tensor& cum_offsets,
+							const paddle::Tensor& block_table,
+							const paddle::Tensor& batch_ids,
+							const paddle::Tensor& tile_ids_per_batch,
+							const paddle::Tensor& num_blocks_x_cpu,
+							const paddle::Tensor& max_enc_len,
+							paddle::Tensor& qkv_out_tmp,
+							paddle::Tensor& cache_k, 
+							paddle::Tensor& cache_v,
+							const paddle::optional<paddle::Tensor>& qkv_out_scales,
+							const paddle::optional<paddle::Tensor>& qkv_biases,
+							const paddle::optional<paddle::Tensor>& cache_k_scale,
+							const paddle::optional<paddle::Tensor>& cache_v_scale,
+							const paddle::optional<paddle::Tensor>& cache_k_zp,
+							const paddle::optional<paddle::Tensor>& cache_v_zp,
+							const std::string& cache_quant_type_str,
+							const int max_input_len,
+							const int num_heads,
+							const int kv_num_heads,
+							const int head_dim,
+							const bool use_neox_style) {
 	
 	switch (qkv_out_tmp.type()) {
 		case paddle::DataType::FLOAT16: {
@@ -165,7 +169,8 @@ void EncoderWriteCacheWithRope(const paddle::Tensor& qkv, // [token_num, 3, num_
 				max_input_len,
 				num_heads,
 				kv_num_heads,
-				head_dim);
+				head_dim,
+				use_neox_style);
 		}
 		case paddle::DataType::BFLOAT16: {
 			return encoder_write_cache_with_rope<paddle::DataType::BFLOAT16>(
@@ -194,7 +199,8 @@ void EncoderWriteCacheWithRope(const paddle::Tensor& qkv, // [token_num, 3, num_
 				max_input_len,
 				num_heads,
 				kv_num_heads,
-				head_dim);
+				head_dim,
+				use_neox_style);
 		}
 		default: {
 			PD_THROW(
@@ -267,7 +273,8 @@ PD_BUILD_OP(encoder_write_cache_with_rope)
 			"max_input_len: int",
 			"num_heads: int",
 			"kv_num_heads: int",
-			"head_dim: int"})
+			"head_dim: int",
+			"use_neox_style: bool"})
     .SetKernelFn(PD_KERNEL(EncoderWriteCacheWithRope));
 	// .SetInferShapeFn(PD_INFER_SHAPE(EncoderWriteCacheWithRopeInferShape))
 	// .SetInferDtypeFn(PD_INFER_DTYPE(EncoderWriteCacheWithRopeInferDtype));

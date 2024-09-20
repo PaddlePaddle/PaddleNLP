@@ -37,6 +37,7 @@ void EncoderWriteCacheWithRopeKernel(const paddle::Tensor& qkv, // [token_num, 3
                             const int num_heads,
                             const int kv_num_heads,
                             const int head_dim,
+                            const bool use_neox_style,
                             cudaStream_t& stream,
                             paddle::Tensor *qkv_out, 
                             paddle::Tensor *key_cache_out, 

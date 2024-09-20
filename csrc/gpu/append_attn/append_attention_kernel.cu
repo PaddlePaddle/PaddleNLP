@@ -14,6 +14,7 @@
 
 #include "append_attention_kernel.h"
 
+// #define DEBUG_ATTN
 template <typename T,
           uint32_t GROUP_SIZE,
           uint32_t HEAD_DIM,
@@ -574,6 +575,11 @@ void MultiQueryAppendC8Attention(
     const bool is_decoder,
     cudaStream_t& stream,
     paddle::Tensor* out) {
+#ifdef DEBUG_ATTN
+    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaGetLastError());
+    std::cout << "MultiQueryAppendC8Attention start NUM_WARP_Q=" << NUM_WARP_Q << std::endl;
+#endif
   using NV_TYPE = typename cascade_attn_type_traits<T>::type;
   using OUT_NV_TYPE = typename cascade_attn_type_traits<OutT>::type;
   // using NV_TYPE = T;
@@ -596,6 +602,11 @@ void MultiQueryAppendC8Attention(
   const float scale = 1.f / sqrt(HEAD_DIM);
 
   if constexpr (NUM_WARP_Q == 4) {
+#ifdef DEBUG_ATTN
+    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaGetLastError());
+    std::cout << "multi_query_append_attention_c8_kernel start NUM_WARP_Q=4" << std::endl;
+#endif
     constexpr uint32_t num_frags_z = BLOCK_SIZE / 16;  // !!!
     constexpr uint32_t smem_size =
         num_warps * num_frags_x * 16 * HEAD_DIM * sizeof(T) +
@@ -627,6 +638,12 @@ void MultiQueryAppendC8Attention(
     cudaDeviceGetAttribute(&sm_count, cudaDevAttrMultiProcessorCount, dev_id);
     cudaOccupancyMaxActiveBlocksPerMultiprocessor(
         &act_blocks_per_sm, split_kv_kernel, num_warps * 32, smem_size);
+#ifdef DEBUG_ATTN
+    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaGetLastError());
+    std::cout << "multi_query_append_attention_c8_kernel launched act_blocks_per_sm:" << act_blocks_per_sm
+        << " smem_size: " << smem_size << std::endl;
+#endif
     assert(act_blocks_per_sm > 1);
     const int num_blocks_per_wave = sm_count * act_blocks_per_sm;
     const int num_blocks_need = num_blocks_x_cpu * kv_num_heads;
@@ -641,10 +658,14 @@ void MultiQueryAppendC8Attention(
     const int num_chunks = div_up(max_dec_len, chunk_size);
     // VLOG(2) << "cache_k_scale: " << cache_k_scale.get();
     // VLOG(2) << "cache_v_scale: " << cache_v_scale.get();
-
     dim3 grids(num_blocks_x_cpu, num_chunks, kv_num_heads);
     dim3 blocks(32, num_warps);
     if (num_chunks <= 1) {
+#ifdef DEBUG_ATTN
+      cudaDeviceSynchronize();
+      CUDA_CHECK(cudaGetLastError());
+      std::cout << "multi_query_append_attention_c8_kernel num_chunks<= 1" << std::endl;
+#endif
       auto nosplit_kv_kernel =
           multi_query_append_attention_c8_kernel<NV_TYPE,
                                                  uint8_t,
@@ -696,7 +717,11 @@ void MultiQueryAppendC8Attention(
           nullptr,
           reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
           speculate_max_draft_token_num);
-
+#ifdef DEBUG_ATTN
+      cudaDeviceSynchronize();
+      CUDA_CHECK(cudaGetLastError());
+      std::cout << "multi_query_append_attention_c8_kernel num_chunks <=1 end" << std::endl;
+#endif
     } else {
       phi::Allocator::AllocationPtr tmp_workspace, tmp_m, tmp_d;
       if (ENABLE_PREFILL) {
@@ -723,6 +748,11 @@ void MultiQueryAppendC8Attention(
             static_cast<size_t>(speculate_max_draft_token_num * bsz *
                                 num_chunks * num_heads));
       }
+#ifdef DEBUG_ATTN
+      cudaDeviceSynchronize();
+      CUDA_CHECK(cudaGetLastError());
+      std::cout << "multi_query_append_attention_c8_kernel num_chunks > 1" << std::endl;
+#endif
       split_kv_kernel<<<grids, blocks, smem_size, stream>>>(
           reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
           const_cast<uint8_t*>(cache_k.data<uint8_t>()),
@@ -752,6 +782,11 @@ void MultiQueryAppendC8Attention(
           static_cast<float*>(tmp_d->ptr()),
           reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
           speculate_max_draft_token_num);
+#ifdef DEBUG_ATTN
+      cudaDeviceSynchronize();
+      CUDA_CHECK(cudaGetLastError());
+      std::cout << "multi_query_append_attention_c8_kernel num_chunks > 1 end" << std::endl;
+#endif
       // merge
       constexpr int vec_size = num_elems_per_128b<NV_TYPE>();
       if (is_decoder) {
@@ -823,8 +858,17 @@ void MultiQueryAppendC8Attention(
                 speculate_max_draft_token_num);
       }
     }
-
+#ifdef DEBUG_ATTN
+      cudaDeviceSynchronize();
+      CUDA_CHECK(cudaGetLastError());
+      std::cout << "multi_query_append_attention_c8_kernel NUM_WARP_Q=4 end" << std::endl;
+#endif
   } else {
+#ifdef DEBUG_ATTN
+    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaGetLastError());
+    std::cout << "multi_query_append_attention_c8_warp1_4_kernel start NUM_WARP_Q=1" << std::endl;
+#endif
     constexpr uint32_t num_frags_z = BLOCK_SIZE / 16 / NUM_WARP_KV * 2;  // !!!
     constexpr uint32_t smem_size =
         num_frags_x * 16 * HEAD_DIM * sizeof(T) +
@@ -855,6 +899,12 @@ void MultiQueryAppendC8Attention(
     cudaDeviceGetAttribute(&sm_count, cudaDevAttrMultiProcessorCount, dev_id);
     cudaOccupancyMaxActiveBlocksPerMultiprocessor(
         &act_blocks_per_sm, split_kv_kernel, num_warps * 32, smem_size);
+#ifdef DEBUG_ATTN
+    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaGetLastError());
+    std::cout << "multi_query_append_attention_c8_warp1_4_kernel launched act_blocks_per_sm:" << act_blocks_per_sm
+        << " smem_size: " << smem_size << std::endl;
+#endif
     assert(act_blocks_per_sm > 1);
     const int num_blocks_per_wave = sm_count * act_blocks_per_sm;
     const int num_blocks_need = num_blocks_x_cpu * kv_num_heads;
@@ -923,7 +973,11 @@ void MultiQueryAppendC8Attention(
           nullptr,
           reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
           speculate_max_draft_token_num);
-
+#ifdef DEBUG_ATTN
+      cudaDeviceSynchronize();
+      CUDA_CHECK(cudaGetLastError());
+      std::cout << "multi_query_append_attention_c8_warp1_4_kernel launched act_blocks_per_sm:" << std::endl;
+#endif
     } else {
       phi::Allocator::AllocationPtr tmp_workspace, tmp_m, tmp_d;
       if (is_decoder) {
@@ -1664,9 +1718,15 @@ void CascadeAppendAttentionKernel(
     const bool enable_prefill,
     cudaStream_t& stream,
     paddle::Tensor* out) {
-  if (max_dec_len <= 0) {
-    return;
-  }
+#ifdef DEBUG_ATTN
+    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaGetLastError());
+    std::cout << "CascadeAppendAttentionKernel start max_dec_len=" << max_dec_len << 
+       "cache_quant_type_str:" << cache_quant_type_str << std::endl;
+#endif
+//   if (max_dec_len <= 0) {
+//     return;
+//   }
 
   const auto& q_dims = qkv.dims();
   const auto& k_dims = cache_k.dims();
@@ -1677,172 +1737,125 @@ void CascadeAppendAttentionKernel(
   const uint32_t group_size = num_heads / kv_num_heads;
 
   if (cache_quant_type_str == "none") {
-    DISPATCH_CAUSAL(
-        causal,
-        CAUSAL,
-        {DISPATCH_ENABLE_PREFILL(
-            enable_prefill,
-            ENABLE_PREFILL,
-            {DISPATCH_GQA_GROUP_SIZE(
-                group_size,
-                GROUP_SIZE,
-                {DISPATCH_HEAD_DIM(
-                    head_dim,
-                    HEAD_DIM,
-                    {DISPATCH_BLOCK_SIZE(
-                        block_size,
-                        BLOCK_SIZE,
-                        {DISPATCH_BLOCKSHAPE_Q(
-                            block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, {
-                              MultiQueryAppendAttention<T,
-                                                        GROUP_SIZE,
-                                                        HEAD_DIM,
-                                                        BLOCK_SIZE,
-                                                        CAUSAL,
-                                                        BLOCK_SHAPE_Q,
-                                                        NUM_WARP_Q,
-                                                        OutT,
-                                                        ENABLE_PREFILL>(
-                                  qkv,
-                                  cache_k,
-                                  cache_v,
-                                  attn_mask,
-                                  shift_bias,
-                                  smooth_weight,
-                                  seq_lens_q,
-                                  seq_lens_kv,
-                                  seq_lens_encoder,
-                                  padding_offsets,
-                                  cum_offsets,
-                                  block_table,
-                                  batch_ids,
-                                  tile_ids_per_batch,
-                                  num_blocks,
-                                  max_seq_len,
-                                  max_dec_len,
-                                  num_heads,
-                                  kv_num_heads,
-                                  in_scale,
-                                  max_partition_size,
-                                  encoder_max_partition_size,
-                                  speculate_max_draft_token_num,
-                                  is_decoder,
-                                  stream,
-                                  out);
+#ifdef DEBUG_ATTN
+    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaGetLastError());
+    std::cout << "MultiQueryAppendAttentionC16 start" << std::endl;
+#endif
+    DISPATCH_CAUSAL(causal, CAUSAL,
+        {DISPATCH_ENABLE_PREFILL(enable_prefill, ENABLE_PREFILL,
+            {DISPATCH_GQA_GROUP_SIZE(group_size, GROUP_SIZE,
+                {DISPATCH_HEAD_DIM(head_dim, HEAD_DIM,
+                    {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE,
+                        {DISPATCH_BLOCKSHAPE_Q(block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, 
+                        {MultiQueryAppendAttention<T, GROUP_SIZE, HEAD_DIM, BLOCK_SIZE, CAUSAL, BLOCK_SHAPE_Q, NUM_WARP_Q, OutT, ENABLE_PREFILL>(
+                            qkv,
+                            cache_k,
+                            cache_v,
+                            attn_mask,
+                            shift_bias,
+                            smooth_weight,
+                            seq_lens_q,
+                            seq_lens_kv,
+                            seq_lens_encoder,
+                            padding_offsets,
+                            cum_offsets,
+                            block_table,
+                            batch_ids,
+                            tile_ids_per_batch,
+                            num_blocks,
+                            max_seq_len,
+                            max_dec_len,
+                            num_heads,
+                            kv_num_heads,
+                            in_scale,
+                            max_partition_size,
+                            encoder_max_partition_size,
+                            speculate_max_draft_token_num,
+                            is_decoder,
+                            stream,
+                            out);
                             })})})})})})
   } else if (cache_quant_type_str == "cache_int8") {
-    DISPATCH_CAUSAL(
-        causal,
-        CAUSAL,
-        {DISPATCH_ENABLE_PREFILL(
-            enable_prefill,
-            ENABLE_PREFILL,
-            {DISPATCH_GQA_GROUP_SIZE(
-                group_size,
-                GROUP_SIZE,
-                {DISPATCH_HEAD_DIM(
-                    head_dim,
-                    HEAD_DIM,
-                    {DISPATCH_BLOCK_SIZE(
-                        block_size,
-                        BLOCK_SIZE,
-                        {DISPATCH_BLOCKSHAPE_Q(
-                            block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, {
-                              MultiQueryAppendC8Attention<T,
-                                                          GROUP_SIZE,
-                                                          HEAD_DIM,
-                                                          BLOCK_SIZE,
-                                                          CAUSAL,
-                                                          BLOCK_SHAPE_Q,
-                                                          NUM_WARP_Q,
-                                                          OutT,
-                                                          ENABLE_PREFILL>(
-                                  qkv,
-                                  cache_k,
-                                  cache_v,
-                                  attn_mask,
-                                  cache_k_scale.get(),
-                                  cache_v_scale.get(),
-                                  shift_bias,
-                                  smooth_weight,
-                                  seq_lens_q,
-                                  seq_lens_kv,
-                                  seq_lens_encoder,
-                                  padding_offsets,
-                                  cum_offsets,
-                                  block_table,
-                                  batch_ids,
-                                  tile_ids_per_batch,
-                                  num_blocks,
-                                  max_seq_len,
-                                  max_dec_len,
-                                  num_heads,
-                                  kv_num_heads,
-                                  in_scale,
-                                  max_partition_size,
-                                  encoder_max_partition_size,
-                                  speculate_max_draft_token_num,
-                                  is_decoder,
-                                  stream,
-                                  out);
+#ifdef DEBUG_ATTN
+    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaGetLastError());
+    std::cout << "MultiQueryAppendAttentionC8 start" << std::endl;
+#endif
+    DISPATCH_CAUSAL(causal, CAUSAL,
+        {DISPATCH_ENABLE_PREFILL(enable_prefill, ENABLE_PREFILL,
+            {DISPATCH_GQA_GROUP_SIZE(group_size, GROUP_SIZE,
+                {DISPATCH_HEAD_DIM(head_dim, HEAD_DIM,
+                    {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE,
+                        {DISPATCH_BLOCKSHAPE_Q(block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, {
+                            MultiQueryAppendC8Attention<T, GROUP_SIZE, HEAD_DIM, BLOCK_SIZE, CAUSAL, BLOCK_SHAPE_Q, NUM_WARP_Q, OutT, ENABLE_PREFILL>(
+                                qkv,
+                                cache_k,
+                                cache_v,
+                                attn_mask,
+                                cache_k_scale.get(),
+                                cache_v_scale.get(),
+                                shift_bias,
+                                smooth_weight,
+                                seq_lens_q,
+                                seq_lens_kv,
+                                seq_lens_encoder,
+                                padding_offsets,
+                                cum_offsets,
+                                block_table,
+                                batch_ids,
+                                tile_ids_per_batch,
+                                num_blocks,
+                                max_seq_len,
+                                max_dec_len,
+                                num_heads,
+                                kv_num_heads,
+                                in_scale,
+                                max_partition_size,
+                                encoder_max_partition_size,
+                                speculate_max_draft_token_num,
+                                is_decoder,
+                                stream,
+                                out);
                             })})})})})})
   } else if (cache_quant_type_str == "cache_int4") {
-    DISPATCH_CAUSAL(
-        causal,
-        CAUSAL,
-        {DISPATCH_ENABLE_PREFILL(
-            enable_prefill,
-            ENABLE_PREFILL,
-            {DISPATCH_GQA_GROUP_SIZE(
-                group_size,
-                GROUP_SIZE,
-                {DISPATCH_HEAD_DIM(
-                    head_dim,
-                    HEAD_DIM,
-                    {DISPATCH_BLOCK_SIZE(
-                        block_size,
-                        BLOCK_SIZE,
-                        {DISPATCH_BLOCKSHAPE_Q(
-                            block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, {
-                              MultiQueryAppendC4Attention<T,
-                                                          GROUP_SIZE,
-                                                          HEAD_DIM,
-                                                          BLOCK_SIZE,
-                                                          CAUSAL,
-                                                          BLOCK_SHAPE_Q,
-                                                          NUM_WARP_Q,
-                                                          OutT,
-                                                          ENABLE_PREFILL>(
-                                  qkv,
-                                  cache_k,
-                                  cache_v,
-                                  attn_mask,
-                                  cache_k_scale.get(),
-                                  cache_v_scale.get(),
-                                  cache_k_zp,
-                                  cache_v_zp,
-                                  shift_bias,
-                                  smooth_weight,
-                                  seq_lens_q,
-                                  seq_lens_kv,
-                                  seq_lens_encoder,
-                                  padding_offsets,
-                                  cum_offsets,
-                                  block_table,
-                                  batch_ids,
-                                  tile_ids_per_batch,
-                                  num_blocks,
-                                  max_seq_len,
-                                  max_dec_len,
-                                  num_heads,
-                                  kv_num_heads,
-                                  in_scale,
-                                  max_partition_size,
-                                  encoder_max_partition_size,
-                                  speculate_max_draft_token_num,
-                                  is_decoder,
-                                  stream,
-                                  out);
+    DISPATCH_CAUSAL(causal, CAUSAL,
+        {DISPATCH_ENABLE_PREFILL(enable_prefill, ENABLE_PREFILL,
+            {DISPATCH_GQA_GROUP_SIZE(group_size, GROUP_SIZE,
+                {DISPATCH_HEAD_DIM(head_dim, HEAD_DIM,
+                    {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE,
+                        {DISPATCH_BLOCKSHAPE_Q(block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q,
+                            {MultiQueryAppendC4Attention<T, GROUP_SIZE, HEAD_DIM, BLOCK_SIZE, CAUSAL, BLOCK_SHAPE_Q, NUM_WARP_Q, OutT, ENABLE_PREFILL>(
+                                qkv,
+                                cache_k,
+                                cache_v,
+                                attn_mask,
+                                cache_k_scale.get(),
+                                cache_v_scale.get(),
+                                cache_k_zp,
+                                cache_v_zp,
+                                shift_bias,
+                                smooth_weight,
+                                seq_lens_q,
+                                seq_lens_kv,
+                                seq_lens_encoder,
+                                padding_offsets,
+                                cum_offsets,
+                                block_table,
+                                batch_ids,
+                                tile_ids_per_batch,
+                                num_blocks,
+                                max_seq_len,
+                                max_dec_len,
+                                num_heads,
+                                kv_num_heads,
+                                in_scale,
+                                max_partition_size,
+                                encoder_max_partition_size,
+                                speculate_max_draft_token_num,
+                                is_decoder,
+                                stream,
+                                out);
                             })})})})})})
   } else {
     PD_THROW("append attention just support C16/C8/C4_zp now!");

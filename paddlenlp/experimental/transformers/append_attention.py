@@ -21,6 +21,7 @@ import paddle
 if paddle.is_compiled_with_cuda():
     import paddlenlp_ops as custom_ops
 
+paddle.set_printoptions(4, 20480)
 
 def get_block_shape(
     sequence_lengths_stage: paddle.Tensor,
@@ -31,8 +32,8 @@ def get_block_shape(
     group_size: int,
 ) -> tuple[paddle.Tensor, paddle.Tensor, paddle.Tensor]:
     batch_ids, tile_ids_per_batch, num_blocks_x_cpu = custom_ops.get_block_shape(
-        sequence_lengths_stage, sequence_lengths_remove, max_len, cum_offsets, block_shape_q, group_size
-    )
+        sequence_lengths_stage, sequence_lengths_remove, max_len, cum_offsets,
+        block_shape_q, group_size)
     return (batch_ids, tile_ids_per_batch, num_blocks_x_cpu)
 
 
@@ -45,8 +46,8 @@ def split_kv_block(
     num_rows_per_block: int,
 ) -> tuple[paddle.Tensor, paddle.Tensor, paddle.Tensor]:
     batch_ids, tile_ids_per_batch, num_blocks_cpu = custom_ops.get_block_shape(
-        sequence_lengths_stage, sequence_lengths_remove, max_len, cum_offsets, padding_len, num_rows_per_block
-    )
+        sequence_lengths_stage, sequence_lengths_remove, max_len, cum_offsets,
+        padding_len, num_rows_per_block)
     return (batch_ids, tile_ids_per_batch, num_blocks_cpu)
 
 
@@ -77,36 +78,35 @@ def encoder_write_cache_with_rope(
     num_heads: int,
     kv_num_heads: int,
     head_dim: int,
+    use_neox_style: bool,
 ) -> paddle.Tensor:
-    return custom_ops.encoder_write_cache_with_rope(
-        qkv,
-        rotary_emb,
-        seq_lens_this_time,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        padding_offsets,
-        cum_offsets,
-        block_table,
-        batch_ids,
-        tile_ids_per_batch,
-        num_blocks_cpu,
-        max_enc_len,
-        qkv_out,
-        cache_k,
-        cache_v,
-        qkv_out_scales,
-        qkv_biases,
-        cache_k_scale,
-        cache_v_scale,
-        cache_k_zp,
-        cache_v_zp,
-        cache_quant_type_str,
-        max_input_len,
-        num_heads,
-        kv_num_heads,
-        head_dim,
-    )
-
+    return custom_ops.encoder_write_cache_with_rope(qkv,
+                                                    rotary_emb,
+                                                    seq_lens_this_time,
+                                                    seq_lens_encoder,
+                                                    seq_lens_decoder,
+                                                    padding_offsets,
+                                                    cum_offsets,
+                                                    block_table,
+                                                    batch_ids,
+                                                    tile_ids_per_batch,
+                                                    num_blocks_cpu,
+                                                    max_enc_len,
+                                                    qkv_out,
+                                                    cache_k,
+                                                    cache_v,
+                                                    qkv_out_scales,
+                                                    qkv_biases,
+                                                    cache_k_scale,
+                                                    cache_v_scale,
+                                                    cache_k_zp,
+                                                    cache_v_zp,
+                                                    cache_quant_type_str,
+                                                    max_input_len,
+                                                    num_heads,
+                                                    kv_num_heads,
+                                                    head_dim,
+                                                    use_neox_style)
 
 def decoder_write_cache_with_rope(
     qkv: paddle.Tensor,
@@ -132,35 +132,32 @@ def decoder_write_cache_with_rope(
     kv_num_heads: int,
     head_dim: int,
 ) -> paddle.Tensor:
-    return custom_ops.decoder_write_cache_with_rope(
-        qkv,
-        rotary_emb,
-        seq_lens_encoder,
-        seq_lens_decoder,
-        padding_offsets,
-        cum_offsets,
-        block_table,
-        max_dec_len,
-        qkv_out,
-        cache_k,
-        cache_v,
-        qkv_out_scales,
-        qkv_biases,
-        cache_k_scale,
-        cache_v_scale,
-        cache_k_zp,
-        cache_v_zp,
-        cache_quant_type_str,
-        max_input_len,
-        num_heads,
-        kv_num_heads,
-        head_dim,
-    )
-
+    return custom_ops.decoder_write_cache_with_rope(qkv,
+                                                    rotary_emb,
+                                                    seq_lens_encoder,
+                                                    seq_lens_decoder,
+                                                    padding_offsets,
+                                                    cum_offsets,
+                                                    block_table,
+                                                    max_dec_len,
+                                                    qkv_out,
+                                                    cache_k,
+                                                    cache_v,
+                                                    qkv_out_scales,
+                                                    qkv_biases,
+                                                    cache_k_scale,
+                                                    cache_v_scale,
+                                                    cache_k_zp,
+                                                    cache_v_zp,
+                                                    cache_quant_type_str,
+                                                    max_input_len,
+                                                    num_heads,
+                                                    kv_num_heads,
+                                                    head_dim)
 
 def append_attention(
     qkv: paddle.Tensor,
-    cache_k: paddle.Tensor,
+    cache_k: paddle.Tensor, 
     cache_v: paddle.Tensor,
     seq_lens_q: paddle.Tensor,
     seq_lens_kv: paddle.Tensor,
@@ -196,44 +193,42 @@ def append_attention(
     is_decoder: bool = False,
     enable_prefill: bool = True,
 ) -> paddle.Tensor:
-    return custom_ops.append_attention(
-        qkv,
-        cache_k,
-        cache_v,
-        seq_lens_q,
-        seq_lens_kv,
-        seq_lens_encoder,
-        padding_offsets,
-        cum_offsets,
-        block_table,
-        batch_ids,
-        tile_ids_per_batch,
-        num_blocks_x_cpu,
-        max_enc_len,
-        max_dec_len,
-        out_tmp,
-        attn_mask,
-        cache_k_scale,
-        cache_v_scale,
-        cache_k_zps,
-        cache_v_zps,
-        shift_bias,
-        smooth_weight,
-        cache_quant_type_str,
-        max_input_len,
-        block_shape_q,
-        num_heads,
-        kv_num_heads,
-        head_dim,
-        in_scale,
-        mode,
-        max_partition_size,
-        encoder_max_partition_size,
-        speculate_max_draft_token_num,
-        causal,
-        is_decoder,
-        enable_prefill,
-    )
+    return custom_ops.append_attention(qkv,
+                                      cache_k, 
+                                      cache_v,
+                                      seq_lens_q,
+                                      seq_lens_kv,
+                                      seq_lens_encoder,
+                                      padding_offsets,
+                                      cum_offsets,
+                                      block_table,
+                                      batch_ids,
+                                      tile_ids_per_batch,
+                                      num_blocks_x_cpu,
+                                      max_enc_len,
+                                      max_dec_len,
+                                      out_tmp,
+                                      attn_mask,
+                                      cache_k_scale,
+                                      cache_v_scale,
+                                      cache_k_zps,
+                                      cache_v_zps,
+                                      shift_bias,
+                                      smooth_weight,
+                                      cache_quant_type_str,
+                                      max_input_len,
+                                      block_shape_q,
+                                      num_heads,
+                                      kv_num_heads,
+                                      head_dim,
+                                      in_scale,
+                                      mode,
+                                      max_partition_size,
+                                      encoder_max_partition_size,
+                                      speculate_max_draft_token_num,
+                                      causal,
+                                      is_decoder,
+                                      enable_prefill)
 
 
 # # append w8a8c8 attention demo
@@ -274,24 +269,23 @@ def compute_append_attn(
     num_heads,
     kv_num_heads,
     head_dim,
+    use_neox_style,
     out_linear_in_scale,
-    encoder_block_shape_q=128,
-    decoder_block_shape_q=128,
-    block_size=64,
-    max_partition_size=1024,
-    encoder_max_partition_size=8192,
-    speculate_max_draft_token_num=5,
-    causal=True,
-    is_decoder=False,
-    enable_prefill=True,
-):
+    encoder_block_shape_q = 64,
+    decoder_block_shape_q = 16,
+    block_size = 64,
+    max_partition_size = 32768,
+    encoder_max_partition_size = 32768,
+    speculate_max_draft_token_num = 5,
+    causal = True,
+    is_decoder = False,
+    enable_prefill = True,
+): 
+    qkv_out = paddle.zeros_like(qkv, dtype=paddle.get_default_dtype())
+    # qkv_out1 = paddle.empty_like(qkv, dtype=paddle.get_default_dtype())
+    fmha_out = paddle.empty([qkv.shape[0], num_heads * head_dim],
+        dtype= "int8" if out_linear_in_scale > 0.0 else qkv_out.dtype)
 
-    qkv_out = paddle.empty_like(qkv, dtype=paddle.get_default_dtype())
-    fmha_out = paddle.empty(
-        [qkv.shape[0], num_heads * head_dim], dtype="int8" if out_linear_in_scale > 0.0 else qkv_out.dtype
-    )
-
-    # paddle.device.synchronize()
     _ = encoder_write_cache_with_rope(
         qkv,
         rotary_embs,
@@ -319,8 +313,9 @@ def compute_append_attn(
         num_heads,
         kv_num_heads,
         head_dim,
+        use_neox_style,
     )
-    # paddle.device.synchronize()
+
     _ = append_attention(
         qkv_out,
         cache_k,
@@ -359,8 +354,7 @@ def compute_append_attn(
         is_decoder,
         enable_prefill,
     )
-    # paddle.device.synchronize()
-
+    
     _ = decoder_write_cache_with_rope(
         qkv,
         rotary_embs,
@@ -385,7 +379,7 @@ def compute_append_attn(
         head_dim,
         kv_num_heads,
     )
-    # paddle.device.synchronize()
+
     _ = append_attention(
         qkv_out,
         cache_k,
@@ -411,18 +405,18 @@ def compute_append_attn(
         linear_smooths,
         cache_quant_type_str,  # one of "none "cache_int8", "cache_int4"
         max_input_len,
-        decoder_block_shape_q,  # decoder_block_shape_q
+        decoder_block_shape_q,  # decoder_block_shape_q       
         num_heads,
         kv_num_heads,
         head_dim,
         out_linear_in_scale,
         "decoder",
-        max_partition_size,  # max_partition_size
-        encoder_max_partition_size,  # encoder_max_partition_size
+        max_partition_size, #max_partition_size
+        encoder_max_partition_size, # encoder_max_partition_size
         speculate_max_draft_token_num,
         causal,
         is_decoder,
         enable_prefill,
     )
-    # paddle.device.synchronize()
+
     return fmha_out

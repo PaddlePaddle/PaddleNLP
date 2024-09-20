@@ -14,6 +14,8 @@
 
 #include "encoder_write_cache_with_rope_kernel.h"
 
+// #define DEBUG_APPEND
+
 template <typename T>
 void CascadeAppendWriteCacheKVQKV(const paddle::Tensor& qkv, // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 * gqa_group_size, head_dim] if GQA)
                                   const paddle::Tensor& block_table,
@@ -102,7 +104,7 @@ void CascadeAppendWriteCacheKVC8QKV(const paddle::Tensor &cache_k, // [max_block
   //                      dev_ctx.GetPlace(),
   //                      num_blocks_x.data<int>(),
   //                      sizeof(int),
-  //                      dev_ctx.stream());
+  //                      stream);
   // VLOG(1) << "num_blocks_x_cpu: " << num_blocks_x_cpu;
 
   dim3 grids(num_blocks_x_cpu, 1, num_heads);
@@ -176,37 +178,6 @@ void CascadeAppendWriteCacheKVC4QKV(const paddle::Tensor &cache_k, // [max_block
   constexpr uint32_t num_row_per_block = num_warps * num_frags_z * 16;
   // VLOG(1) << "num_warps: " << num_warps << ", num_frags_z: " << num_frags_z << ", num_frags_y: " << num_frags_y << ", num_row_per_block: " << num_row_per_block;
 
-  // const uint32_t max_tile_size_per_bs = div_up(max_seq_len, num_row_per_block);
-  // paddle::Tensor batch_ids, tile_ids_per_batch, num_blocks_x;
-  // batch_ids.Resize({bsz * max_tile_size_per_bs});
-  // tile_ids_per_batch.Resize({bsz * max_tile_size_per_bs});
-  // num_blocks_x.Resize({1});
-  // dev_ctx.template Alloc<int>(&batch_ids);
-  // dev_ctx.template Alloc<int>(&tile_ids_per_batch);
-  // dev_ctx.template Alloc<int>(&num_blocks_x);
-
-  // split_kv_block<<<1, 32, 0, dev_ctx.stream()>>>(
-  //   seq_lens_decoder.data<int>(),
-  //   seq_lens_this_time.data<int>(),
-  //   batch_ids.data<int>(),
-  //   tile_ids_per_batch.data<int>(),
-  //   num_blocks_x.data<int>(),
-  //   bsz,
-  //   pad_len,
-  //   num_row_per_block
-  // );
-  // VLOG(1) << "batch_ids: " << batch_ids;
-  // VLOG(1) << "tile_ids_per_batch: " << tile_ids_per_batch;
-
-  // int num_blocks_x_cpu;
-  // paddle::memory::Copy(paddle::platform::CPUPlace(),
-  //                      &num_blocks_x_cpu,
-  //                      dev_ctx.GetPlace(),
-  //                      num_blocks_x.data<int>(),
-  //                      sizeof(int),
-  //                      dev_ctx.stream());
-  // VLOG(1) << "num_blocks_x_cpu: " << num_blocks_x_cpu;
-
   dim3 grids(num_blocks_x_cpu, 1, num_heads);
   dim3 blocks(32, num_warps);
 
@@ -251,30 +222,55 @@ void rotary_qk_variable(T *qkv_out, // [token_num, 3, num_head, dim_head]
                         const int seq_len,
                         const int input_output_len,
                         const int dim_head,
-                        const cudaStream_t& stream) {
-  const int elem_nums = token_num * 3 * head_num * dim_head; // just q and k
+                        const cudaStream_t& stream,
+                        bool use_neox_style = false) {
+  int elem_nums = token_num * 3 * head_num * dim_head; // for all q k v
+  if (use_neox_style) {
+    elem_nums = token_num * 3 * head_num * dim_head / 2;
+  }
+
   constexpr int PackSize = 16 / sizeof(T);
   const int pack_num = elem_nums / PackSize;
   const int blocksize = 128;
   int grid_size = 1;
   GetNumBlocks(pack_num, &grid_size);
+  if (!use_neox_style) {
   const float *cos_emb = rotary_emb;
   const float *sin_emb = rotary_emb + input_output_len * dim_head / 2;
-  VariableLengthRotaryKernel<T, PackSize><<<grid_size, blocksize, 0, stream>>>(
-    qkv_input,
-    cos_emb,
-    sin_emb,
-    padding_offsets,
-    seq_lens,
-    seq_lens_decoder,
-    qkv_out_scales,
-    qkv_bias,
-    qkv_out,
-    elem_nums,
-    head_num,
-    seq_len,
-    dim_head
-  );
+    VariableLengthRotaryKernel<T, PackSize>
+      <<<grid_size, blocksize, 0, stream>>>(
+        qkv_input,
+        cos_emb,
+        sin_emb,
+        padding_offsets,
+        seq_lens,
+        seq_lens_decoder,
+        qkv_out_scales,
+        qkv_bias,
+        qkv_out,
+        elem_nums,
+        head_num,
+        seq_len,
+        dim_head);
+  } else {
+    const float *cos_emb = rotary_emb;
+    const float *sin_emb = rotary_emb + input_output_len * dim_head;
+    NeoxVariableLengthRotaryKernel<T, PackSize>
+      <<<grid_size, blocksize, 0, stream>>>(
+        qkv_input,
+        cos_emb,
+        sin_emb,
+        padding_offsets,
+        seq_lens,
+        seq_lens_decoder,
+        qkv_out_scales,
+        qkv_bias,
+        qkv_out,
+        elem_nums,
+        head_num,
+        seq_len,
+        dim_head);
+  }
 }
 
 template <typename T, typename QKV_TYPE>
@@ -287,36 +283,61 @@ void gqa_rotary_qk_variable(T *qkv_out, // [token_num, 3, num_head, dim_head]
                             const int *seq_lens,
                             const int *seq_lens_decoder,
                             const int token_num,
-                            const int head_num,
+                            const int num_heads,
+                            const int kv_num_heads,
                             const int seq_len,
                             const int input_output_len,
                             const int dim_head,
-                            const int kv_num_heads,
-                            const cudaStream_t& stream) {
-  const int elem_nums = token_num * (head_num + 2 * kv_num_heads) * dim_head; // for all q k v
+                            const cudaStream_t& stream,
+                            bool use_neox_style = false) {
+  int elem_nums = token_num * (num_heads + 2 * kv_num_heads) * dim_head; // for all q k v
+  if (use_neox_style) {
+    elem_nums /= 2;
+  }
   constexpr int PackSize = 16 / sizeof(T);
   const int pack_num = elem_nums / PackSize;
   const int blocksize = 128;
   int grid_size = 1;
   GetNumBlocks(pack_num, &grid_size);
-  const float *cos_emb = rotary_emb;
-  const float *sin_emb = rotary_emb + input_output_len * dim_head / 2;
-  GQAVariableLengthRotaryKernel<T, PackSize><<<grid_size, blocksize, 0, stream>>>(
-    qkv_input,
-    cos_emb,
-    sin_emb,
-    padding_offsets,
-    seq_lens,
-    seq_lens_decoder,
-    qkv_out_scales,
-    qkv_bias,
-    qkv_out,
-    elem_nums,
-    head_num,
-    seq_len,
-    dim_head,
-    kv_num_heads
-  );
+  if (!use_neox_style) {
+    const float *cos_emb = rotary_emb;
+    const float *sin_emb = rotary_emb + input_output_len * dim_head / 2;
+    GQAVariableLengthRotaryKernel<T, PackSize>
+      <<<grid_size, blocksize, 0, stream>>>(
+        qkv_input,
+        cos_emb,
+        sin_emb,
+        padding_offsets,
+        seq_lens,
+        seq_lens_decoder,
+        qkv_out_scales,
+        qkv_bias,
+        qkv_out,
+        elem_nums,
+        num_heads,
+        seq_len,
+        dim_head,
+        kv_num_heads);
+  } else {
+    const float *cos_emb = rotary_emb;
+    const float *sin_emb = rotary_emb + input_output_len * dim_head;
+    GQANeoxVariableLengthRotaryKernel<T, PackSize>
+      <<<grid_size, blocksize, 0, stream>>>(
+        qkv_input,
+        cos_emb,
+        sin_emb,
+        padding_offsets,
+        seq_lens,
+        seq_lens_decoder,
+        qkv_out_scales,
+        qkv_bias,
+        qkv_out,
+        elem_nums,
+        num_heads,
+        kv_num_heads,
+        seq_len,
+        dim_head);
+  }
 }
 
 template <typename T, typename QKV_TYPE>
@@ -342,14 +363,18 @@ void EncoderWriteCacheWithRopeKernel(const paddle::Tensor& qkv, // [token_num, 3
                                     const int num_heads,
                                     const int kv_num_heads,
                                     const int head_dim,
+                                    const bool use_neox_style,
                                     cudaStream_t& stream,
                                     paddle::Tensor *qkv_out, 
                                     paddle::Tensor *key_cache_out, 
                                     paddle::Tensor *value_cache_out) {
   auto qkv_dims = qkv.dims();
-  
   const uint32_t token_num = qkv_dims[0];
-
+#ifdef DEBUG_APPEND
+  cudaDeviceSynchronize();
+  CUDA_CHECK(cudaGetLastError());
+  std::cout << "gqa_rotary_qk_variable start" << std::endl;
+#endif
   if (num_heads == kv_num_heads) {
     // std::cout << "rotary_qk_variable" << std::endl;
     rotary_qk_variable(
@@ -367,7 +392,8 @@ void EncoderWriteCacheWithRopeKernel(const paddle::Tensor& qkv, // [token_num, 3
       max_seq_len,
       rotary_emb.dims()[2],
       head_dim,
-      stream
+      stream,
+      use_neox_style
     );
   } else {
     // std::cout << "gqa_rotary_qk_variable" << std::endl;
@@ -383,16 +409,19 @@ void EncoderWriteCacheWithRopeKernel(const paddle::Tensor& qkv, // [token_num, 3
       seq_lens_decoder.data<int>(),
       token_num,
       num_heads,
+      kv_num_heads,
       max_seq_len,
       rotary_emb.dims()[2],
       head_dim,
-      kv_num_heads,
-      stream
+      stream,
+      use_neox_style
     );
   }
-  // cudaDeviceSynchronize();
-  // cudaGetLastError();
-  // std::cout << "gqa_rotary_qk_variable end" << std::endl;
+#ifdef DEBUG_APPEND
+  cudaDeviceSynchronize();
+  CUDA_CHECK(cudaGetLastError());
+  std::cout << "gqa_rotary_qk_variable end" << std::endl;
+#endif
   const auto &cache_k_dims = key_cache_out->dims();
   const uint32_t block_size = cache_k_dims[2];
   if (cache_quant_type_str == "none") {
@@ -417,9 +446,11 @@ void EncoderWriteCacheWithRopeKernel(const paddle::Tensor& qkv, // [token_num, 3
         "NOT supported cache_quant_type. "
         "Only none, cache_int8 and cache_int4 are supported. ");
   }
-  // cudaDeviceSynchronize();
-  // cudaGetLastError();
-  // std::cout << "CascadeAppendWriteCacheKVQKV end" << std::endl;
+#ifdef DEBUG_APPEND
+  cudaDeviceSynchronize();
+  CUDA_CHECK(cudaGetLastError());
+  std::cout << "CascadeAppendWriteCacheKVQKV end" << std::endl;
+#endif
 }
 
 template void EncoderWriteCacheWithRopeKernel<paddle::bfloat16, int>(const paddle::Tensor& qkv, // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 * gqa_group_size, head_dim] if GQA)
@@ -444,6 +475,7 @@ template void EncoderWriteCacheWithRopeKernel<paddle::bfloat16, int>(const paddl
                                     const int num_heads,
                                     const int kv_num_heads,
                                     const int head_dim,
+                                    const bool use_neox_style,
                                     cudaStream_t& stream,
                                     paddle::Tensor *qkv_out, 
                                     paddle::Tensor *key_cache_out, 
@@ -471,6 +503,7 @@ template void EncoderWriteCacheWithRopeKernel<paddle::bfloat16, paddle::bfloat16
                                     const int num_heads,
                                     const int kv_num_heads,
                                     const int head_dim,
+                                    const bool use_neox_style,
                                     cudaStream_t& stream,
                                     paddle::Tensor *qkv_out, 
                                     paddle::Tensor *key_cache_out, 

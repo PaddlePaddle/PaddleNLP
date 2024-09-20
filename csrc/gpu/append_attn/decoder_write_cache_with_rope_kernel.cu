@@ -14,7 +14,7 @@
 
 #include "decoder_write_cache_with_rope_kernel.h"
 
-#define DEBUG
+// #define DEBUG
 template <typename T, int VecSize = 1>
 __global__ void append_decode_cache_T_rope_kernel(
     const T* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size,

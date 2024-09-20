@@ -5,86 +5,6 @@
 
 template <typename T, int VecSize = 1>
 __global__ void VariableLengthRotaryKernel(
-    const T *qkv,
-    const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
-    const float *sin_emb,
-    const int *padding_offsets,
-    const int *seq_lens,
-    const int *seq_lens_decoder,
-    const float *qkv_out_scales,
-    const T *qkv_biases,
-    T *qkv_out,
-    const int64_t elem_cnt,
-    const int num_head,
-    const int seq_len,
-    const int last_dim) {
-  using LoadT = AlignedVector<T, VecSize>;
-  constexpr int HalfVecSize = VecSize / 2;
-  using LoadEmbT = AlignedVector<float, HalfVecSize>;
-  LoadT src_vec;
-  LoadT bias_vec;
-  LoadEmbT cos_emb_vec;
-  LoadEmbT sin_emb_vec;
-  int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
-  const int half_lastdim = last_dim / 2;
-  const int hidden_size = num_head * last_dim;
-  const int offset = 3 * hidden_size;
-  for (int64_t linear_index = global_thread_idx * VecSize,
-               step = gridDim.x * blockDim.x * VecSize;
-       linear_index < elem_cnt;
-       linear_index += step) {
-    const int token_idx = linear_index / offset;
-    const int ori_token_idx = token_idx + padding_offsets[token_idx];
-    const int ori_bi = ori_token_idx / seq_len;
-    if (seq_lens[ori_bi] == 0) continue;
-    const int bias = linear_index % offset;
-    const int qkv_id = bias / hidden_size;
-    const int qkv_bias = bias % hidden_size;
-    const int hi = qkv_bias / last_dim;
-    const int h_bias = qkv_bias % last_dim;
-
-    int ori_seq_id;
-    ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
-
-    const int64_t emb_idx = ori_seq_id * half_lastdim + h_bias / 2;
-    const int64_t bias_idx = qkv_id * hidden_size + hi * last_dim + h_bias;
-    const int64_t base_idx = token_idx * 3 * hidden_size + bias_idx;
-    Load<T, VecSize>(&qkv[base_idx], &src_vec);
-    if (qkv_biases) {
-      Load<T, VecSize>(&qkv_biases[bias_idx], &bias_vec);
-    }
-    Load<float, HalfVecSize>(&cos_emb[emb_idx], &cos_emb_vec);
-    Load<float, HalfVecSize>(&sin_emb[emb_idx], &sin_emb_vec);
-#pragma unroll
-    for (int i = 0; i < HalfVecSize; i++) {
-      const float input_left = qkv_biases ?
-          static_cast<float>(src_vec[2 * i] + bias_vec[2 * i]) : static_cast<float>(src_vec[2 * i]);
-      const float input_right = qkv_biases ?
-          static_cast<float>(src_vec[2 * i + 1] + bias_vec[2 * i + 1]) : static_cast<float>(src_vec[2 * i + 1]);
-      // const float cos_tmp = cos_emb_vec[i];
-      // const float sin_tmp = sin_emb_vec[i];
-      // src_vec[2 * i] = static_cast<T>(input_left * cos_tmp - input_right *
-      // sin_tmp); src_vec[2 * i + 1] = static_cast<T>(input_right * cos_tmp +
-      // input_left * sin_tmp);
-
-      if (qkv_id < 2) {  // qk rope
-        const float cos_tmp = cos_emb_vec[i];
-        const float sin_tmp = sin_emb_vec[i];
-        src_vec[2 * i] =
-            static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
-        src_vec[2 * i + 1] =
-            static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
-      } else {
-        src_vec[2 * i] = static_cast<T>(input_left);
-        src_vec[2 * i + 1] = static_cast<T>(input_right);
-      }
-    }
-    Store<T, VecSize>(src_vec, &qkv_out[base_idx]);
-  }
-}
-
-template <typename T, int VecSize = 1>
-__global__ void VariableLengthRotaryKernel(
     const int *qkv,
     const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
     const float *sin_emb,
@@ -119,23 +39,17 @@ __global__ void VariableLengthRotaryKernel(
     const int token_idx = linear_index / offset;
     const int ori_token_idx = token_idx + padding_offsets[token_idx];
     const int ori_bi = ori_token_idx / seq_len;
-    if (seq_lens[ori_bi] == 0) continue;
+    if (seq_lens && seq_lens[ori_bi] == 0) continue;
     const int bias = linear_index % offset;
     const int qkv_id = bias / hidden_size;
     const int qkv_bias = bias % hidden_size;
     const int hi = qkv_bias / last_dim;
     const int h_bias = qkv_bias % last_dim;
 
-    int ori_seq_id;  // = seq_lens_decoder[ori_bi];
-    // if (seq_lens_decoder[ori_bi] == 0) {
-    //   ori_seq_id = ori_token_idx % seq_len;
-    // } else {
-    //   ori_seq_id = seq_lens_decoder[ori_bi];
-    // }
-    ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
+    const int ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
 
-    const int64_t emb_idx = ori_seq_id * half_lastdim + h_bias / 2;
-    const int64_t bias_idx = qkv_id * hidden_size + hi * last_dim + h_bias;
+    const int emb_idx = ori_seq_id * half_lastdim + h_bias / 2;
+    const int bias_idx = qkv_id * hidden_size + hi * last_dim + h_bias;
     const int64_t base_idx = token_idx * 3 * hidden_size + bias_idx;
     Load<int, VecSize>(&qkv[base_idx], &src_vec);
     if (qkv_biases) {
@@ -172,94 +86,7 @@ __global__ void VariableLengthRotaryKernel(
 }
 
 template <typename T, int VecSize = 1>
-__global__ void GQAVariableLengthRotaryKernel(
-    const T *qkv,
-    const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
-    const float *sin_emb,
-    const int *padding_offsets,
-    const int *seq_lens,
-    const int *seq_lens_decoder,
-    const float *qkv_out_scales,
-    const T *qkv_biases,
-    T *qkv_out,
-    const int64_t elem_cnt,
-    const int num_head,
-    const int seq_len,
-    const int last_dim,
-    const int gqa_group_size) {
-  using LoadT = AlignedVector<T, VecSize>;
-  constexpr int HalfVecSize = VecSize / 2;
-  using LoadEmbT = AlignedVector<float, HalfVecSize>;
-  LoadT src_vec;
-  LoadT bias_vec;
-  LoadEmbT cos_emb_vec;
-  LoadEmbT sin_emb_vec;
-  int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
-  const int half_lastdim = last_dim / 2;
-  // const int hidden_size = num_head * last_dim;
-  const int offset = (num_head + 2 * gqa_group_size) * last_dim;
-  for (int64_t linear_index = global_thread_idx * VecSize,
-               step = gridDim.x * blockDim.x * VecSize;
-       linear_index < elem_cnt;
-       linear_index += step) {
-    const int token_idx = linear_index / offset;
-    const int ori_token_idx = token_idx + padding_offsets[token_idx];
-    const int ori_bi = ori_token_idx / seq_len;
-    if (seq_lens[ori_bi] == 0) continue;
-    const int bias = linear_index % offset;
-    const int hi = bias / last_dim;
-    const int h_bias = bias % last_dim;
-
-    int ori_seq_id;
-    ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
-
-    const int64_t emb_idx = ori_seq_id * half_lastdim + h_bias / 2;
-    const int64_t bias_idx = hi * last_dim + h_bias;
-    const int64_t base_idx = token_idx * offset + bias_idx;
-    Load<T, VecSize>(&qkv[base_idx], &src_vec);
-    if (qkv_biases) {
-      Load<T, VecSize>(&qkv_biases[bias_idx], &bias_vec);
-    }
-    Load<float, HalfVecSize>(&cos_emb[emb_idx], &cos_emb_vec);
-    Load<float, HalfVecSize>(&sin_emb[emb_idx], &sin_emb_vec);
-#ifdef DEBUG_SENGMENTED_LORA_GEMM
-    __syncthreads();
-
-    printf("block.x:%d, thread.x:%d --212\n", blockIdx.x, threadIdx.x);
-#endif
-#pragma unroll
-    for (int i = 0; i < HalfVecSize; i++) {
-      const float input_left =
-          qkv_biases ? static_cast<float>(src_vec[2 * i] + bias_vec[2 * i])
-                     : static_cast<float>(src_vec[2 * i]);
-      const float input_right =
-          qkv_biases
-              ? static_cast<float>(src_vec[2 * i + 1] + bias_vec[2 * i + 1])
-              : static_cast<float>(src_vec[2 * i + 1]);
-
-      if (hi < num_head + gqa_group_size) {  // qk rope
-        const float cos_tmp = cos_emb_vec[i];
-        const float sin_tmp = sin_emb_vec[i];
-        src_vec[2 * i] =
-            static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
-        src_vec[2 * i + 1] =
-            static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
-      } else {
-        src_vec[2 * i] = static_cast<T>(input_left);
-        src_vec[2 * i + 1] = static_cast<T>(input_right);
-      }
-    }
-    Store<T, VecSize>(src_vec, &qkv_out[base_idx]);
-  }
-#ifdef DEBUG_SENGMENTED_LORA_GEMM
-  __syncthreads();
-
-  printf("block.x:%d, thread.x:%d --212\n", blockIdx.x, threadIdx.x);
-#endif
-}
-
-template <typename T, int VecSize = 1>
-__global__ void GQAVariableLengthRotaryKernel(
+__global__ void NeoxVariableLengthRotaryKernel(
     const int *qkv,
     const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
     const float *sin_emb,
@@ -272,8 +99,102 @@ __global__ void GQAVariableLengthRotaryKernel(
     const int64_t elem_cnt,
     const int num_head,
     const int seq_len,
-    const int last_dim,
-    const int gqa_group_size) {
+    const int last_dim) {
+  using LoadT = AlignedVector<int, VecSize>;
+  using LoadBiasT = AlignedVector<T, VecSize>;
+  using LoadScaleT = AlignedVector<float, VecSize>;
+  using LoadEmbT = AlignedVector<float, VecSize>;
+  LoadT left_vec;
+  LoadT right_vec;
+  LoadBiasT left_bias_vec;
+  LoadBiasT right_bias_vec;
+  LoadScaleT left_out_scale_vec;
+  LoadScaleT right_out_scale_vec;
+  LoadEmbT cos_emb_vec;
+  LoadEmbT sin_emb_vec;
+  int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
+  const int half_lastdim = last_dim / 2;
+  const int hidden_size = num_head * half_lastdim;
+  const int full_hidden_size = num_head * last_dim;
+  const int offset = 3 * hidden_size;
+  for (int64_t linear_index = global_thread_idx * VecSize,
+               step = gridDim.x * blockDim.x * VecSize;
+       linear_index < elem_cnt;
+       linear_index += step) {
+    const int token_idx = linear_index / offset;
+    const int ori_token_idx = token_idx + padding_offsets[token_idx];
+    const int ori_bi = ori_token_idx / seq_len;
+    if (seq_lens && seq_lens[ori_bi] == 0) continue;
+    const int bias = linear_index % offset;
+    const int qkv_id = bias / hidden_size;
+    const int qkv_bias = bias % hidden_size;
+    const int hi = qkv_bias / half_lastdim;
+    const int h_bias = qkv_bias % half_lastdim;
+
+    const int ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
+
+    const int emb_idx = ori_seq_id * last_dim + h_bias;
+    const int bias_idx_left =
+        qkv_id * full_hidden_size + hi * last_dim + h_bias;
+    const int bias_idx_right = bias_idx_left + half_lastdim;
+    const int base_idx_left = token_idx * 3 * full_hidden_size + bias_idx_left;
+    const int base_idx_right = base_idx_left + half_lastdim;
+    Load<int, VecSize>(&qkv[base_idx_left], &left_vec);
+    Load<int, VecSize>(&qkv[base_idx_right], &right_vec);
+    if (qkv_biases) {
+      Load<T, VecSize>(&qkv_biases[bias_idx_left], &left_bias_vec);
+      Load<T, VecSize>(&qkv_biases[bias_idx_right], &right_bias_vec);
+    }
+    Load<float, VecSize>(&qkv_out_scales[bias_idx_left],
+                              &left_out_scale_vec);
+    Load<float, VecSize>(&qkv_out_scales[bias_idx_right],
+                              &right_out_scale_vec);
+    if (qkv_id < 2) {
+      Load<float, VecSize>(&cos_emb[emb_idx], &cos_emb_vec);
+      Load<float, VecSize>(&sin_emb[emb_idx], &sin_emb_vec);
+    }
+#pragma unroll
+    for (int i = 0; i < VecSize; i++) {
+      float input_left = static_cast<float>(left_vec[i]);
+      float input_right = static_cast<float>(right_vec[i]);
+      // dequant + bias_add
+      input_left = qkv_biases ? input_left * left_out_scale_vec[i] +
+                   static_cast<float>(left_bias_vec[i]) : input_left * left_out_scale_vec[i];
+      input_right = qkv_biases ? input_right * right_out_scale_vec[i] +
+                    static_cast<float>(right_bias_vec[i]) : input_right * right_out_scale_vec[i];
+      if (qkv_id < 2) {  // qk rope
+        const float cos_tmp = cos_emb_vec[i];
+        const float sin_tmp = sin_emb_vec[i];
+        left_bias_vec[i] =
+            static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+        right_bias_vec[i] =
+            static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+      } else {
+        left_bias_vec[i] = static_cast<T>(input_left);
+        right_bias_vec[i] = static_cast<T>(input_right);
+      }
+    }
+    Store<T, VecSize>(left_bias_vec, &qkv_out[base_idx_left]);
+    Store<T, VecSize>(right_bias_vec, &qkv_out[base_idx_right]);
+  }
+}
+
+template <typename T, int VecSize = 1>
+__global__ void GQAVariableLengthRotaryKernel(
+    const int *qkv,
+    const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
+    const float *sin_emb,
+    const int *padding_offsets,
+    const int *seq_lens,
+    const int *seq_lens_decoder,
+    const float *qkv_out_scales,  // [3, q_num_head, dim_head]
+    const T *qkv_biases,          // [3, q_num_head, dim_head]
+    T *qkv_out,
+    const int64_t elem_cnt,
+    const int q_num_head,
+    const int kv_num_head,
+    const int seq_len,
+    const int last_dim) {
   using LoadT = AlignedVector<int, VecSize>;
   using LoadBiasT = AlignedVector<T, VecSize>;
   using LoadScaleT = AlignedVector<float, VecSize>;
@@ -286,7 +207,7 @@ __global__ void GQAVariableLengthRotaryKernel(
   LoadEmbT sin_emb_vec;
   int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
   const int half_lastdim = last_dim / 2;
-  const int offset = (num_head + 2 * gqa_group_size) * last_dim;
+  const int offset = (q_num_head + 2 * kv_num_head) * last_dim;
   for (int64_t linear_index = global_thread_idx * VecSize,
                step = gridDim.x * blockDim.x * VecSize;
        linear_index < elem_cnt;
@@ -299,14 +220,7 @@ __global__ void GQAVariableLengthRotaryKernel(
     const int hi = bias / last_dim;
     const int h_bias = bias % last_dim;
 
-    int ori_seq_id;  // = seq_lens_decoder[ori_bi];
-    // if (seq_lens_decoder[ori_bi] == 0) {
-    //   ori_seq_id = ori_token_idx % seq_len;
-    // } else {
-    //   ori_seq_id = seq_lens_decoder[ori_bi];
-    // }
-    ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
-    // const int ori_seq_id = ori_token_idx % seq_len;
+    const int ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
 
     const int64_t emb_idx = ori_seq_id * half_lastdim + h_bias / 2;
     const int64_t bias_idx = hi * last_dim + h_bias;
@@ -316,7 +230,7 @@ __global__ void GQAVariableLengthRotaryKernel(
       Load<T, VecSize>(&qkv_biases[bias_idx], &bias_vec);
     }
     Load<float, VecSize>(&qkv_out_scales[bias_idx], &out_scale_vec);
-    if (hi < num_head + gqa_group_size) {
+    if (hi < q_num_head + kv_num_head) {
       Load<float, HalfVecSize>(&cos_emb[emb_idx], &cos_emb_vec);
       Load<float, HalfVecSize>(&sin_emb[emb_idx], &sin_emb_vec);
     }
@@ -326,12 +240,10 @@ __global__ void GQAVariableLengthRotaryKernel(
       float input_right = static_cast<float>(src_vec[2 * i + 1]);
       // dequant + bias_add
       input_left = qkv_biases ? input_left * out_scale_vec[2 * i] +
-                                    static_cast<float>(bias_vec[2 * i])
-                              : input_left * out_scale_vec[2 * i];
+                   static_cast<float>(bias_vec[2 * i]) : input_left * out_scale_vec[2 * i];
       input_right = qkv_biases ? input_right * out_scale_vec[2 * i + 1] +
-                                     static_cast<float>(bias_vec[2 * i + 1])
-                               : input_right * out_scale_vec[2 * i + 1];
-      if (hi < num_head + gqa_group_size) {  // qk rope
+                    static_cast<float>(bias_vec[2 * i + 1]) : input_right * out_scale_vec[2 * i + 1];
+      if (hi < q_num_head + kv_num_head) {  // qk rope
         const float cos_tmp = cos_emb_vec[i];
         const float sin_tmp = sin_emb_vec[i];
         bias_vec[2 * i] =
@@ -346,6 +258,743 @@ __global__ void GQAVariableLengthRotaryKernel(
     Store<T, VecSize>(bias_vec, &qkv_out[base_idx]);
   }
 }
+
+template <typename T, int VecSize = 1>
+__global__ void GQANeoxVariableLengthRotaryKernel(
+    const int *qkv,
+    const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
+    const float *sin_emb,
+    const int *padding_offsets,
+    const int *seq_lens,
+    const int *seq_lens_decoder,
+    const float *qkv_out_scales,  // [3, q_num_head, dim_head]
+    const T *qkv_biases,          // [3, q_num_head, dim_head]
+    T *qkv_out,
+    const int64_t elem_cnt,
+    const int q_num_head,
+    const int kv_num_head,
+    const int seq_len,
+    const int last_dim) {
+  using LoadT = AlignedVector<int, VecSize>;
+  using LoadBiasT = AlignedVector<T, VecSize>;
+  using LoadScaleT = AlignedVector<float, VecSize>;
+  using LoadEmbT = AlignedVector<float, VecSize>;
+  LoadT left_vec;
+  LoadT right_vec;
+  LoadBiasT left_bias_vec;
+  LoadBiasT right_bias_vec;
+  LoadScaleT left_out_scale_vec;
+  LoadScaleT right_out_scale_vec;
+  LoadEmbT cos_emb_vec;
+  LoadEmbT sin_emb_vec;
+  int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
+  const int half_lastdim = last_dim / 2;
+  const int offset = (q_num_head + 2 * kv_num_head) * half_lastdim;
+  for (int64_t linear_index = global_thread_idx * VecSize,
+               step = gridDim.x * blockDim.x * VecSize;
+       linear_index < elem_cnt;
+       linear_index += step) {
+    const int token_idx = linear_index / offset;
+    const int ori_token_idx = token_idx + padding_offsets[token_idx];
+    const int ori_bi = ori_token_idx / seq_len;
+    if (seq_lens && seq_lens[ori_bi] == 0) continue;
+    const int bias = linear_index % offset;
+    const int hi = bias / half_lastdim;
+    const int h_bias = bias % half_lastdim;
+
+    const int ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
+
+    const int emb_idx = ori_seq_id * last_dim + h_bias;
+    const int bias_idx_left = hi * last_dim + h_bias;
+    const int bias_idx_right = bias_idx_left + half_lastdim;
+    const int base_idx_left = token_idx * offset + bias_idx_left;
+    const int base_idx_right = base_idx_left + half_lastdim;
+    Load<int, VecSize>(&qkv[base_idx_left], &left_vec);
+    Load<int, VecSize>(&qkv[base_idx_right], &right_vec);
+    if (qkv_biases) {
+      Load<T, VecSize>(&qkv_biases[bias_idx_left], &left_bias_vec);
+      Load<T, VecSize>(&qkv_biases[bias_idx_right], &right_bias_vec);
+    }
+    Load<float, VecSize>(&qkv_out_scales[bias_idx_left],
+                              &left_out_scale_vec);
+    Load<float, VecSize>(&qkv_out_scales[bias_idx_right],
+                              &right_out_scale_vec);
+    if (hi < (q_num_head + kv_num_head)) {
+      Load<float, VecSize>(&cos_emb[emb_idx], &cos_emb_vec);
+      Load<float, VecSize>(&sin_emb[emb_idx], &sin_emb_vec);
+    }
+#pragma unroll
+    for (int i = 0; i < VecSize; i++) {
+      float input_left = static_cast<float>(left_vec[i]);
+      float input_right = static_cast<float>(right_vec[i]);
+      // dequant + bias_add
+      input_left = qkv_biases ? input_left * left_out_scale_vec[i] +
+                   static_cast<float>(left_bias_vec[i]) : input_left * left_out_scale_vec[i];
+      input_right = qkv_biases ? input_right * right_out_scale_vec[i] +
+                    static_cast<float>(right_bias_vec[i]) : input_right * right_out_scale_vec[i];
+      if (hi < (q_num_head + kv_num_head)) {  // qk rope
+        const float cos_tmp = cos_emb_vec[i];
+        const float sin_tmp = sin_emb_vec[i];
+        left_bias_vec[i] =
+            static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+        right_bias_vec[i] =
+            static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+      } else {
+        left_bias_vec[i] = static_cast<T>(input_left);
+        right_bias_vec[i] = static_cast<T>(input_right);
+      }
+    }
+    Store<T, VecSize>(left_bias_vec, &qkv_out[base_idx_left]);
+    Store<T, VecSize>(right_bias_vec, &qkv_out[base_idx_right]);
+  }
+}
+
+template <typename T, int VecSize = 1>
+__global__ void VariableLengthRotaryKernel(
+    const T *qkv,
+    const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
+    const float *sin_emb,
+    const int *padding_offsets,
+    const int *seq_lens,
+    const int *seq_lens_decoder,
+    const float *qkv_out_scales,
+    const T *qkv_biases,
+    T *qkv_out,
+    const int64_t elem_cnt,
+    const int num_head,
+    const int seq_len,
+    const int last_dim) {
+  using LoadT = AlignedVector<T, VecSize>;
+  constexpr int HalfVecSize = VecSize / 2;
+  using LoadEmbT = AlignedVector<float, HalfVecSize>;
+  LoadT src_vec;
+  LoadT bias_vec;
+  LoadEmbT cos_emb_vec;
+  LoadEmbT sin_emb_vec;
+  int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
+  const int half_lastdim = last_dim / 2;
+  const int hidden_size = num_head * last_dim;
+  const int offset = 3 * hidden_size;
+  for (int64_t linear_index = global_thread_idx * VecSize,
+               step = gridDim.x * blockDim.x * VecSize;
+       linear_index < elem_cnt;
+       linear_index += step) {
+    const int token_idx = linear_index / offset;
+    const int ori_token_idx = token_idx + padding_offsets[token_idx];
+    const int ori_bi = ori_token_idx / seq_len;
+    if (seq_lens && seq_lens[ori_bi] == 0) continue;
+    const int bias = linear_index % offset;
+    const int qkv_id = bias / hidden_size;
+    const int qkv_bias = bias % hidden_size;
+    const int hi = qkv_bias / last_dim;
+    const int h_bias = qkv_bias % last_dim;
+
+    const int ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
+
+    const int emb_idx = ori_seq_id * half_lastdim + h_bias / 2;
+    const int bias_idx = qkv_id * hidden_size + hi * last_dim + h_bias;
+    const int64_t base_idx = token_idx * 3 * hidden_size + bias_idx;
+    Load<T, VecSize>(&qkv[base_idx], &src_vec);
+    if (qkv_biases) {
+      Load<T, VecSize>(&qkv_biases[bias_idx], &bias_vec);
+    }
+    Load<float, HalfVecSize>(&cos_emb[emb_idx], &cos_emb_vec);
+    Load<float, HalfVecSize>(&sin_emb[emb_idx], &sin_emb_vec);
+#pragma unroll
+    for (int i = 0; i < HalfVecSize; i++) {
+      const float input_left = qkv_biases ?
+          static_cast<float>(src_vec[2 * i] + bias_vec[2 * i]) : static_cast<float>(src_vec[2 * i]);
+      const float input_right = qkv_biases ?
+          static_cast<float>(src_vec[2 * i + 1] + bias_vec[2 * i + 1]) : static_cast<float>(src_vec[2 * i + 1]);
+
+      if (qkv_id < 2) {  // qk rope
+        const float cos_tmp = cos_emb_vec[i];
+        const float sin_tmp = sin_emb_vec[i];
+        src_vec[2 * i] =
+            static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+        src_vec[2 * i + 1] =
+            static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+      } else {
+        src_vec[2 * i] = static_cast<T>(input_left);
+        src_vec[2 * i + 1] = static_cast<T>(input_right);
+      }
+    }
+    Store<T, VecSize>(src_vec, &qkv_out[base_idx]);
+  }
+}
+
+template <typename T, int VecSize = 1>
+__global__ void NeoxVariableLengthRotaryKernel(
+    const T *qkv,
+    const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
+    const float *sin_emb,
+    const int *padding_offsets,
+    const int *seq_lens,
+    const int *seq_lens_decoder,
+    const float *qkv_out_scales,
+    const T *qkv_biases,
+    T *qkv_out,
+    const int64_t elem_cnt,
+    const int num_head,
+    const int seq_len,
+    const int last_dim) {
+  using LoadT = AlignedVector<T, VecSize>;
+  using LoadEmbT = AlignedVector<float, VecSize>;
+  LoadT left_vec;
+  LoadT right_vec;
+  LoadT left_bias_vec;
+  LoadT right_bias_vec;
+  LoadEmbT cos_emb_vec;
+  LoadEmbT sin_emb_vec;
+  int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
+  const int half_lastdim = last_dim / 2;
+  const int hidden_size = num_head * half_lastdim;
+  const int full_hidden_size = num_head * last_dim;
+  const int offset = 3 * hidden_size;
+  for (int64_t linear_index = global_thread_idx * VecSize,
+               step = gridDim.x * blockDim.x * VecSize;
+       linear_index < elem_cnt;
+       linear_index += step) {
+    const int token_idx = linear_index / offset;
+    const int ori_token_idx = token_idx + padding_offsets[token_idx];
+    const int ori_bi = ori_token_idx / seq_len;
+    if (seq_lens && seq_lens[ori_bi] == 0) continue;
+    const int bias = linear_index % offset;
+    const int qkv_id = bias / hidden_size;
+    const int qkv_bias = bias % hidden_size;
+    const int hi = qkv_bias / half_lastdim;
+    const int h_bias = qkv_bias % half_lastdim;
+
+    const int ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
+
+    const int emb_idx = ori_seq_id * last_dim + h_bias;
+    const int bias_idx_left =
+        qkv_id * full_hidden_size + hi * last_dim + h_bias;
+    const int bias_idx_right = bias_idx_left + half_lastdim;
+    const int base_idx_left = token_idx * 3 * full_hidden_size + bias_idx_left;
+    const int base_idx_right = base_idx_left + half_lastdim;
+    Load<T, VecSize>(&qkv[base_idx_left], &left_vec);
+    Load<T, VecSize>(&qkv[base_idx_right], &right_vec);
+    if (qkv_biases) {
+      Load<T, VecSize>(&qkv_biases[bias_idx_left], &left_bias_vec);
+      Load<T, VecSize>(&qkv_biases[bias_idx_right], &right_bias_vec);
+    }
+    Load<float, VecSize>(&cos_emb[emb_idx], &cos_emb_vec);
+    Load<float, VecSize>(&sin_emb[emb_idx], &sin_emb_vec);
+#pragma unroll
+    for (int i = 0; i < VecSize; i++) {
+      const float input_left = qkv_biases ?
+          static_cast<float>(left_vec[i] + left_bias_vec[i]) : static_cast<float>(left_vec[i]);
+      const float input_right = qkv_biases ?
+          static_cast<float>(right_vec[i] + right_bias_vec[i]) : static_cast<float>(right_vec[i]);
+
+      if (qkv_id < 2) {  // qk rope
+        const float cos_tmp = cos_emb_vec[i];
+        const float sin_tmp = sin_emb_vec[i];
+        left_vec[i] =
+            static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+        right_vec[i] =
+            static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+      } else {
+        left_vec[i] = static_cast<T>(input_left);
+        right_vec[i] = static_cast<T>(input_right);
+      }
+    }
+    Store<T, VecSize>(left_vec, &qkv_out[base_idx_left]);
+    Store<T, VecSize>(right_vec, &qkv_out[base_idx_right]);
+  }
+}
+
+template <typename T, int VecSize = 1>
+__global__ void GQAVariableLengthRotaryKernel(
+    const T *qkv,
+    const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
+    const float *sin_emb,
+    const int *padding_offsets,
+    const int *seq_lens,
+    const int *seq_lens_decoder,
+    const float *qkv_out_scales,
+    const T *qkv_biases,
+    T *qkv_out,
+    const int64_t elem_cnt,
+    const int q_num_head,
+    const int kv_num_head,
+    const int seq_len,
+    const int last_dim) {
+  using LoadT = AlignedVector<T, VecSize>;
+  constexpr int HalfVecSize = VecSize / 2;
+  using LoadEmbT = AlignedVector<float, HalfVecSize>;
+  LoadT src_vec;
+  LoadT bias_vec;
+  LoadEmbT cos_emb_vec;
+  LoadEmbT sin_emb_vec;
+  int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
+  const int half_lastdim = last_dim / 2;
+  const int offset = (q_num_head + 2 * kv_num_head) * last_dim;
+  for (int64_t linear_index = global_thread_idx * VecSize,
+               step = gridDim.x * blockDim.x * VecSize;
+       linear_index < elem_cnt;
+       linear_index += step) {
+    const int token_idx = linear_index / offset;
+    const int ori_token_idx = token_idx + padding_offsets[token_idx];
+    const int ori_bi = ori_token_idx / seq_len;
+    if (seq_lens[ori_bi] == 0) continue;
+    const int bias = linear_index % offset;
+    const int hi = bias / last_dim;
+    const int h_bias = bias % last_dim;
+
+    const int ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
+
+    const int64_t emb_idx = ori_seq_id * half_lastdim + h_bias / 2;
+    const int64_t bias_idx = hi * last_dim + h_bias;
+    const int64_t base_idx = token_idx * offset + bias_idx;
+    Load<T, VecSize>(&qkv[base_idx], &src_vec);
+    if (qkv_biases) {
+      Load<T, VecSize>(&qkv_biases[bias_idx], &bias_vec);
+    }
+    Load<float, HalfVecSize>(&cos_emb[emb_idx], &cos_emb_vec);
+    Load<float, HalfVecSize>(&sin_emb[emb_idx], &sin_emb_vec);
+#pragma unroll
+    for (int i = 0; i < HalfVecSize; i++) {
+      const float input_left = qkv_biases ?
+          static_cast<float>(src_vec[2 * i] + bias_vec[2 * i]) : static_cast<float>(src_vec[2 * i]);
+      const float input_right = qkv_biases ?
+          static_cast<float>(src_vec[2 * i + 1] + bias_vec[2 * i + 1]) : static_cast<float>(src_vec[2 * i + 1]);
+
+      if (hi < q_num_head + kv_num_head) {  // qk rope
+        const float cos_tmp = cos_emb_vec[i];
+        const float sin_tmp = sin_emb_vec[i];
+        src_vec[2 * i] =
+            static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+        src_vec[2 * i + 1] =
+            static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+      } else {
+        src_vec[2 * i] = static_cast<T>(input_left);
+        src_vec[2 * i + 1] = static_cast<T>(input_right);
+      }
+    }
+    Store<T, VecSize>(src_vec, &qkv_out[base_idx]);
+  }
+}
+
+template <typename T, int VecSize = 1>
+__global__ void GQANeoxVariableLengthRotaryKernel(
+    const T *qkv,
+    const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
+    const float *sin_emb,
+    const int *padding_offsets,
+    const int *seq_lens,
+    const int *seq_lens_decoder,
+    const float *qkv_out_scales,
+    const T *qkv_biases,
+    T *qkv_out,
+    const int64_t elem_cnt,
+    const int q_num_head,
+    const int kv_num_head,
+    const int seq_len,
+    const int last_dim) {
+  using LoadT = AlignedVector<T, VecSize>;
+  using LoadEmbT = AlignedVector<float, VecSize>;
+  LoadT left_vec;
+  LoadT right_vec;
+  LoadT left_bias_vec;
+  LoadT right_bias_vec;
+  LoadEmbT cos_emb_vec;
+  LoadEmbT sin_emb_vec;
+  int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
+  const int half_lastdim = last_dim / 2;
+  const int offset = (q_num_head + 2 * kv_num_head) * half_lastdim;
+  for (int64_t linear_index = global_thread_idx * VecSize,
+               step = gridDim.x * blockDim.x * VecSize;
+       linear_index < elem_cnt;
+       linear_index += step) {
+    const int token_idx = linear_index / offset;
+    const int ori_token_idx = token_idx + padding_offsets[token_idx];
+    const int ori_bi = ori_token_idx / seq_len;
+    if (seq_lens && seq_lens[ori_bi] == 0) continue;
+    const int bias = linear_index % offset;
+    const int hi = bias / half_lastdim;
+    const int h_bias = bias % half_lastdim;
+
+    const int ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
+
+    const int emb_idx = ori_seq_id * last_dim + h_bias;
+    const int bias_idx_left = hi * last_dim + h_bias;
+    const int bias_idx_right = bias_idx_left + half_lastdim;
+    const int base_idx_left = token_idx * offset + bias_idx_left;
+    const int base_idx_right = base_idx_left + half_lastdim;
+    Load<T, VecSize>(&qkv[base_idx_left], &left_vec);
+    Load<T, VecSize>(&qkv[base_idx_right], &right_vec);
+    if (qkv_biases) {
+      Load<T, VecSize>(&qkv_biases[bias_idx_left], &left_bias_vec);
+      Load<T, VecSize>(&qkv_biases[bias_idx_right], &right_bias_vec);
+    }
+    Load<float, VecSize>(&cos_emb[emb_idx], &cos_emb_vec);
+    Load<float, VecSize>(&sin_emb[emb_idx], &sin_emb_vec);
+#pragma unroll
+    for (int i = 0; i < VecSize; i++) {
+      const float input_left = qkv_biases ?
+          static_cast<float>(left_vec[i] + left_bias_vec[i]) : static_cast<float>(left_vec[i]);
+      const float input_right = qkv_biases ?
+          static_cast<float>(right_vec[i] + right_bias_vec[i]) : static_cast<float>(right_vec[i]);
+
+      if (hi < (q_num_head + kv_num_head)) {  // qk rope
+        const float cos_tmp = cos_emb_vec[i];
+        const float sin_tmp = sin_emb_vec[i];
+        left_vec[i] =
+            static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+        right_vec[i] =
+            static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+      } else {
+        left_vec[i] = static_cast<T>(input_left);
+        right_vec[i] = static_cast<T>(input_right);
+      }
+    }
+    Store<T, VecSize>(left_vec, &qkv_out[base_idx_left]);
+    Store<T, VecSize>(right_vec, &qkv_out[base_idx_right]);
+  }
+}
+
+
+//================
+// template <typename T, int VecSize = 1>
+// __global__ void VariableLengthRotaryKernel(
+//     const T *qkv,
+//     const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
+//     const float *sin_emb,
+//     const int *padding_offsets,
+//     const int *seq_lens,
+//     const int *seq_lens_decoder,
+//     const float *qkv_out_scales,
+//     const T *qkv_biases,
+//     T *qkv_out,
+//     const int64_t elem_cnt,
+//     const int num_head,
+//     const int seq_len,
+//     const int last_dim) {
+//   using LoadT = AlignedVector<T, VecSize>;
+//   constexpr int HalfVecSize = VecSize / 2;
+//   using LoadEmbT = AlignedVector<float, HalfVecSize>;
+//   LoadT src_vec;
+//   LoadT bias_vec;
+//   LoadEmbT cos_emb_vec;
+//   LoadEmbT sin_emb_vec;
+//   int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
+//   const int half_lastdim = last_dim / 2;
+//   const int hidden_size = num_head * last_dim;
+//   const int offset = 3 * hidden_size;
+//   for (int64_t linear_index = global_thread_idx * VecSize,
+//                step = gridDim.x * blockDim.x * VecSize;
+//        linear_index < elem_cnt;
+//        linear_index += step) {
+//     const int token_idx = linear_index / offset;
+//     const int ori_token_idx = token_idx + padding_offsets[token_idx];
+//     const int ori_bi = ori_token_idx / seq_len;
+//     if (seq_lens[ori_bi] == 0) continue;
+//     const int bias = linear_index % offset;
+//     const int qkv_id = bias / hidden_size;
+//     const int qkv_bias = bias % hidden_size;
+//     const int hi = qkv_bias / last_dim;
+//     const int h_bias = qkv_bias % last_dim;
+
+//     int ori_seq_id;
+//     ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
+
+//     const int64_t emb_idx = ori_seq_id * half_lastdim + h_bias / 2;
+//     const int64_t bias_idx = qkv_id * hidden_size + hi * last_dim + h_bias;
+//     const int64_t base_idx = token_idx * 3 * hidden_size + bias_idx;
+//     Load<T, VecSize>(&qkv[base_idx], &src_vec);
+//     if (qkv_biases) {
+//       Load<T, VecSize>(&qkv_biases[bias_idx], &bias_vec);
+//     }
+//     Load<float, HalfVecSize>(&cos_emb[emb_idx], &cos_emb_vec);
+//     Load<float, HalfVecSize>(&sin_emb[emb_idx], &sin_emb_vec);
+// #pragma unroll
+//     for (int i = 0; i < HalfVecSize; i++) {
+//       const float input_left = qkv_biases ?
+//           static_cast<float>(src_vec[2 * i] + bias_vec[2 * i]) : static_cast<float>(src_vec[2 * i]);
+//       const float input_right = qkv_biases ?
+//           static_cast<float>(src_vec[2 * i + 1] + bias_vec[2 * i + 1]) : static_cast<float>(src_vec[2 * i + 1]);
+//       // const float cos_tmp = cos_emb_vec[i];
+//       // const float sin_tmp = sin_emb_vec[i];
+//       // src_vec[2 * i] = static_cast<T>(input_left * cos_tmp - input_right *
+//       // sin_tmp); src_vec[2 * i + 1] = static_cast<T>(input_right * cos_tmp +
+//       // input_left * sin_tmp);
+
+//       if (qkv_id < 2) {  // qk rope
+//         const float cos_tmp = cos_emb_vec[i];
+//         const float sin_tmp = sin_emb_vec[i];
+//         src_vec[2 * i] =
+//             static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+//         src_vec[2 * i + 1] =
+//             static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+//       } else {
+//         src_vec[2 * i] = static_cast<T>(input_left);
+//         src_vec[2 * i + 1] = static_cast<T>(input_right);
+//       }
+//     }
+//     Store<T, VecSize>(src_vec, &qkv_out[base_idx]);
+//   }
+// }
+
+// template <typename T, int VecSize = 1>
+// __global__ void VariableLengthRotaryKernel(
+//     const int *qkv,
+//     const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
+//     const float *sin_emb,
+//     const int *padding_offsets,
+//     const int *seq_lens,
+//     const int *seq_lens_decoder,
+//     const float *qkv_out_scales,  // [3, num_head, dim_head]
+//     const T *qkv_biases,          // [3, num_head, dim_head]
+//     T *qkv_out,
+//     const int64_t elem_cnt,
+//     const int num_head,
+//     const int seq_len,
+//     const int last_dim) {
+//   using LoadT = AlignedVector<int, VecSize>;
+//   using LoadBiasT = AlignedVector<T, VecSize>;
+//   using LoadScaleT = AlignedVector<float, VecSize>;
+//   constexpr int HalfVecSize = VecSize / 2;
+//   using LoadEmbT = AlignedVector<float, HalfVecSize>;
+//   LoadT src_vec;
+//   LoadBiasT bias_vec;
+//   LoadScaleT out_scale_vec;
+//   LoadEmbT cos_emb_vec;
+//   LoadEmbT sin_emb_vec;
+//   int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
+//   const int half_lastdim = last_dim / 2;
+//   const int hidden_size = num_head * last_dim;
+//   const int offset = 3 * hidden_size;
+//   for (int64_t linear_index = global_thread_idx * VecSize,
+//                step = gridDim.x * blockDim.x * VecSize;
+//        linear_index < elem_cnt;
+//        linear_index += step) {
+//     const int token_idx = linear_index / offset;
+//     const int ori_token_idx = token_idx + padding_offsets[token_idx];
+//     const int ori_bi = ori_token_idx / seq_len;
+//     if (seq_lens[ori_bi] == 0) continue;
+//     const int bias = linear_index % offset;
+//     const int qkv_id = bias / hidden_size;
+//     const int qkv_bias = bias % hidden_size;
+//     const int hi = qkv_bias / last_dim;
+//     const int h_bias = qkv_bias % last_dim;
+
+//     int ori_seq_id;  // = seq_lens_decoder[ori_bi];
+//     // if (seq_lens_decoder[ori_bi] == 0) {
+//     //   ori_seq_id = ori_token_idx % seq_len;
+//     // } else {
+//     //   ori_seq_id = seq_lens_decoder[ori_bi];
+//     // }
+//     ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
+
+//     const int64_t emb_idx = ori_seq_id * half_lastdim + h_bias / 2;
+//     const int64_t bias_idx = qkv_id * hidden_size + hi * last_dim + h_bias;
+//     const int64_t base_idx = token_idx * 3 * hidden_size + bias_idx;
+//     Load<int, VecSize>(&qkv[base_idx], &src_vec);
+//     if (qkv_biases) {
+//       Load<T, VecSize>(&qkv_biases[bias_idx], &bias_vec);
+//     }
+//     Load<float, VecSize>(&qkv_out_scales[bias_idx], &out_scale_vec);
+//     if (qkv_id < 2) {
+//       Load<float, HalfVecSize>(&cos_emb[emb_idx], &cos_emb_vec);
+//       Load<float, HalfVecSize>(&sin_emb[emb_idx], &sin_emb_vec);
+//     }
+// #pragma unroll
+//     for (int i = 0; i < HalfVecSize; i++) {
+//       float input_left = static_cast<float>(src_vec[2 * i]);
+//       float input_right = static_cast<float>(src_vec[2 * i + 1]);
+//       // dequant + bias_add
+//       input_left = qkv_biases ? input_left * out_scale_vec[2 * i] +
+//                    static_cast<float>(bias_vec[2 * i]) : input_left * out_scale_vec[2 * i];
+//       input_right = qkv_biases ? input_right * out_scale_vec[2 * i + 1] +
+//                     static_cast<float>(bias_vec[2 * i + 1]) : input_right * out_scale_vec[2 * i + 1];
+//       if (qkv_id < 2) {  // qk rope
+//         const float cos_tmp = cos_emb_vec[i];
+//         const float sin_tmp = sin_emb_vec[i];
+//         bias_vec[2 * i] =
+//             static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+//         bias_vec[2 * i + 1] =
+//             static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+//       } else {
+//         bias_vec[2 * i] = static_cast<T>(input_left);
+//         bias_vec[2 * i + 1] = static_cast<T>(input_right);
+//       }
+//     }
+//     Store<T, VecSize>(bias_vec, &qkv_out[base_idx]);
+//   }
+// }
+
+// template <typename T, int VecSize = 1>
+// __global__ void GQAVariableLengthRotaryKernel(
+//     const T *qkv,
+//     const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
+//     const float *sin_emb,
+//     const int *padding_offsets,
+//     const int *seq_lens,
+//     const int *seq_lens_decoder,
+//     const float *qkv_out_scales,
+//     const T *qkv_biases,
+//     T *qkv_out,
+//     const int64_t elem_cnt,
+//     const int num_head,
+//     const int seq_len,
+//     const int last_dim,
+//     const int gqa_group_size) {
+//   using LoadT = AlignedVector<T, VecSize>;
+//   constexpr int HalfVecSize = VecSize / 2;
+//   using LoadEmbT = AlignedVector<float, HalfVecSize>;
+//   LoadT src_vec;
+//   LoadT bias_vec;
+//   LoadEmbT cos_emb_vec;
+//   LoadEmbT sin_emb_vec;
+//   int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
+//   const int half_lastdim = last_dim / 2;
+//   // const int hidden_size = num_head * last_dim;
+//   const int offset = (num_head + 2 * gqa_group_size) * last_dim;
+//   for (int64_t linear_index = global_thread_idx * VecSize,
+//                step = gridDim.x * blockDim.x * VecSize;
+//        linear_index < elem_cnt;
+//        linear_index += step) {
+//     const int token_idx = linear_index / offset;
+//     const int ori_token_idx = token_idx + padding_offsets[token_idx];
+//     const int ori_bi = ori_token_idx / seq_len;
+//     if (seq_lens[ori_bi] == 0) continue;
+//     const int bias = linear_index % offset;
+//     const int hi = bias / last_dim;
+//     const int h_bias = bias % last_dim;
+
+//     int ori_seq_id;
+//     ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
+
+//     const int64_t emb_idx = ori_seq_id * half_lastdim + h_bias / 2;
+//     const int64_t bias_idx = hi * last_dim + h_bias;
+//     const int64_t base_idx = token_idx * offset + bias_idx;
+//     Load<T, VecSize>(&qkv[base_idx], &src_vec);
+//     if (qkv_biases) {
+//       Load<T, VecSize>(&qkv_biases[bias_idx], &bias_vec);
+//     }
+//     Load<float, HalfVecSize>(&cos_emb[emb_idx], &cos_emb_vec);
+//     Load<float, HalfVecSize>(&sin_emb[emb_idx], &sin_emb_vec);
+// #ifdef DEBUG_SENGMENTED_LORA_GEMM
+//     __syncthreads();
+
+//     printf("block.x:%d, thread.x:%d --212\n", blockIdx.x, threadIdx.x);
+// #endif
+// #pragma unroll
+//     for (int i = 0; i < HalfVecSize; i++) {
+//       const float input_left =
+//           qkv_biases ? static_cast<float>(src_vec[2 * i] + bias_vec[2 * i])
+//                      : static_cast<float>(src_vec[2 * i]);
+//       const float input_right =
+//           qkv_biases
+//               ? static_cast<float>(src_vec[2 * i + 1] + bias_vec[2 * i + 1])
+//               : static_cast<float>(src_vec[2 * i + 1]);
+
+//       if (hi < num_head + gqa_group_size) {  // qk rope
+//         const float cos_tmp = cos_emb_vec[i];
+//         const float sin_tmp = sin_emb_vec[i];
+//         src_vec[2 * i] =
+//             static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+//         src_vec[2 * i + 1] =
+//             static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+//       } else {
+//         src_vec[2 * i] = static_cast<T>(input_left);
+//         src_vec[2 * i + 1] = static_cast<T>(input_right);
+//       }
+//     }
+//     Store<T, VecSize>(src_vec, &qkv_out[base_idx]);
+//   }
+// #ifdef DEBUG_SENGMENTED_LORA_GEMM
+//   __syncthreads();
+
+//   printf("block.x:%d, thread.x:%d --212\n", blockIdx.x, threadIdx.x);
+// #endif
+// }
+
+// template <typename T, int VecSize = 1>
+// __global__ void GQAVariableLengthRotaryKernel(
+//     const int *qkv,
+//     const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
+//     const float *sin_emb,
+//     const int *padding_offsets,
+//     const int *seq_lens,
+//     const int *seq_lens_decoder,
+//     const float *qkv_out_scales,  // [3, num_head, dim_head]
+//     const T *qkv_biases,          // [3, num_head, dim_head]
+//     T *qkv_out,
+//     const int64_t elem_cnt,
+//     const int num_head,
+//     const int seq_len,
+//     const int last_dim,
+//     const int gqa_group_size) {
+//   using LoadT = AlignedVector<int, VecSize>;
+//   using LoadBiasT = AlignedVector<T, VecSize>;
+//   using LoadScaleT = AlignedVector<float, VecSize>;
+//   constexpr int HalfVecSize = VecSize / 2;
+//   using LoadEmbT = AlignedVector<float, HalfVecSize>;
+//   LoadT src_vec;
+//   LoadBiasT bias_vec;
+//   LoadScaleT out_scale_vec;
+//   LoadEmbT cos_emb_vec;
+//   LoadEmbT sin_emb_vec;
+//   int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
+//   const int half_lastdim = last_dim / 2;
+//   const int offset = (num_head + 2 * gqa_group_size) * last_dim;
+//   for (int64_t linear_index = global_thread_idx * VecSize,
+//                step = gridDim.x * blockDim.x * VecSize;
+//        linear_index < elem_cnt;
+//        linear_index += step) {
+//     const int token_idx = linear_index / offset;
+//     const int ori_token_idx = token_idx + padding_offsets[token_idx];
+//     const int ori_bi = ori_token_idx / seq_len;
+//     if (seq_lens[ori_bi] == 0) continue;
+//     const int bias = linear_index % offset;
+//     const int hi = bias / last_dim;
+//     const int h_bias = bias % last_dim;
+
+//     int ori_seq_id;  
+//     ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
+//     // const int ori_seq_id = ori_token_idx % seq_len;
+
+//     const int64_t emb_idx = ori_seq_id * half_lastdim + h_bias / 2;
+//     const int64_t bias_idx = hi * last_dim + h_bias;
+//     const int64_t base_idx = token_idx * offset + bias_idx;
+//     Load<int, VecSize>(&qkv[base_idx], &src_vec);
+//     if (qkv_biases) {
+//       Load<T, VecSize>(&qkv_biases[bias_idx], &bias_vec);
+//     }
+//     Load<float, VecSize>(&qkv_out_scales[bias_idx], &out_scale_vec);
+//     if (hi < num_head + gqa_group_size) {
+//       Load<float, HalfVecSize>(&cos_emb[emb_idx], &cos_emb_vec);
+//       Load<float, HalfVecSize>(&sin_emb[emb_idx], &sin_emb_vec);
+//     }
+// #pragma unroll
+//     for (int i = 0; i < HalfVecSize; i++) {
+//       float input_left = static_cast<float>(src_vec[2 * i]);
+//       float input_right = static_cast<float>(src_vec[2 * i + 1]);
+//       // dequant + bias_add
+//       input_left = qkv_biases ? input_left * out_scale_vec[2 * i] +
+//                                     static_cast<float>(bias_vec[2 * i])
+//                               : input_left * out_scale_vec[2 * i];
+//       input_right = qkv_biases ? input_right * out_scale_vec[2 * i + 1] +
+//                                      static_cast<float>(bias_vec[2 * i + 1])
+//                                : input_right * out_scale_vec[2 * i + 1];
+//       if (hi < num_head + gqa_group_size) {  // qk rope
+//         const float cos_tmp = cos_emb_vec[i];
+//         const float sin_tmp = sin_emb_vec[i];
+//         bias_vec[2 * i] =
+//             static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+//         bias_vec[2 * i + 1] =
+//             static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+//       } else {
+//         bias_vec[2 * i] = static_cast<T>(input_left);
+//         bias_vec[2 * i + 1] = static_cast<T>(input_right);
+//       }
+//     }
+//     Store<T, VecSize>(bias_vec, &qkv_out[base_idx]);
+//   }
+// }
 
 template <typename T, int VecSize = 1>
 __global__ void cache_kernel(

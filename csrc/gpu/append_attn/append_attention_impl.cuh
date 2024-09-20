@@ -17,8 +17,7 @@ template <typename T,
           bool ENABLE_PREFILL = true>
 __global__ void multi_query_append_attention_kernel(
     T *__restrict__ q,        // [token_num. num_heads, head_dim]
-    T *__restrict__ cache_k,  // [max_block_num, num_heads, block_size,
-                              // head_dim]
+    T *__restrict__ cache_k,  // [max_block_num, num_heads, block_size, head_dim]
     T *__restrict__ cache_v,
     const T *__restrict__ shift_bias,     // [q_num_heads * HEAD_DIM]
     const T *__restrict__ smooth_weight,  // [q_num_heads * HEAD_DIM]
@@ -34,8 +33,7 @@ __global__ void multi_query_append_attention_kernel(
     const float scale,
     const float in_scale,
     const uint32_t chunk_size,
-    T *__restrict__ tmp_workspace,  // split kv [token_num, num_chunks,
-                                    // num_heads, head_dim]
+    T *__restrict__ tmp_workspace,  // split kv [token_num, num_chunks, num_heads, head_dim]
     float *__restrict__ tmp_m,      // [token_num, num_chunks, num_heads]
     float *__restrict__ tmp_d,      // [token_num, num_chunks, num_heads]
     OutT *__restrict__ out,
@@ -1104,8 +1102,7 @@ template <typename T,
           bool ENABLE_PREFILL = true>
 __global__ void multi_query_append_attention_c8_kernel(
     T *__restrict__ q,             // [token_num. num_heads, head_dim]
-    CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size,
-                                   // head_dim]
+    CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size, head_dim]
     CacheT *__restrict__ cache_v,
     const T *__restrict__ cache_k_scale,  // [num_kv_heads]
     const T *__restrict__ cache_v_scale,  // [num_kv_heads]
@@ -1129,6 +1126,11 @@ __global__ void multi_query_append_attention_c8_kernel(
     float *__restrict__ tmp_d,      // [token_num, num_chunks, num_heads]
     OutT *__restrict__ out,
     const int speculate_max_draft_token_num = 5) {
+#ifdef DEBUG_ATTN_C8
+  __syncthreads();
+  printf("launched multi_query_append_attention_c8_kernel");
+  __syncthreads();
+#endif
   constexpr uint32_t num_vecs_per_head =
       HEAD_DIM / num_elems_per_128b<T>();  // 128 / 8 = 16
   constexpr uint32_t num_vecs_per_head_k =
@@ -1145,7 +1147,8 @@ __global__ void multi_query_append_attention_c8_kernel(
   const uint32_t num_chunks = gridDim.y;
   const uint32_t chunk_idx = blockIdx.y;
 #ifdef DEBUG_ATTN_C8
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
+  __syncthreads();
+  if (tid == PRINT_TID && wid == 0) {
     printf(
         "num_vecs_per_head: %d, num_vecs_per_head_k: %d, "
         "num_vecs_per_blocksize: %d, inv_k_stride: %d, inv_v_stride: %d\n",
@@ -1220,7 +1223,7 @@ __global__ void multi_query_append_attention_c8_kernel(
                             tid % 8 * num_elems_per_128b<T>();
   T *q_base_ptr = q + q_offset;
 #ifdef DEBUG_ATTN_C8
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
+  if (tid == PRINT_TID && wid == 0) {
     printf(
         "q_base_seq_id_this_block: %d, q_start_seq_id: %d, q_offset: %d, "
         "q_ori_n_stride: %d, q_base: %f\n",
@@ -1295,6 +1298,7 @@ __global__ void multi_query_append_attention_c8_kernel(
               : chunk_len) /
       (num_frags_z * 16);
 #ifdef DEBUG_ATTN_C8
+  __syncthreads();  
   if (tid == 0 && wid == 0) {
     printf(
         "batch_id: %d, tile_id: %d, chunk_size: %d, q_len: %d, kv_len: %d, "
@@ -1716,8 +1720,7 @@ template <typename T,
           bool ENABLE_PREFILL = true>
 __global__ void multi_query_append_attention_c8_warp1_4_kernel(
     T *__restrict__ q,             // [token_num. num_heads, head_dim]
-    CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size,
-                                   // head_dim]
+    CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size, head_dim]
     CacheT *__restrict__ cache_v,
     const T *__restrict__ cache_k_scale,  // [num_kv_heads, head_dim]
     const T *__restrict__ cache_v_scale,  // [num_kv_heads, head_dim]
@@ -1758,8 +1761,12 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
   const uint32_t num_chunks = gridDim.y;
   const uint32_t chunk_idx = blockIdx.y;
 #ifdef DEBUG_ATTN_C8
-  if (layer_id == 0 && tid == PRINT_TID && wid == 0 && blockIdx.z == 0 &&
+  __syncthreads(); 
+  printf("---1771---");
+  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0 &&
       blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
+    __syncthreads();
+    
     printf(
         "num_vecs_per_head: %d, num_vecs_per_head_k: %d, "
         "num_vecs_per_blocksize: %d, inv_k_stride: %d, inv_v_stride: %d\n",
@@ -1831,7 +1838,8 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
                             tid % 8 * num_elems_per_128b<T>();
   T *q_base_ptr = q + q_offset;
 #ifdef DEBUG_ATTN_C8
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
+  __syncthreads();
+  if (tid == PRINT_TID && wid == 0) {
     printf("q_start_seq_id: %d, q_offset: %d, q_ori_n_stride: %d, q_base: %f\n",
            (int)q_start_seq_id,
            (int)q_offset,
@@ -2280,10 +2288,6 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
   }
   __syncthreads();
 #endif
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-      blockIdx.x == 0 && blockIdx.y == 0) {
-    printf("partition_kv:%d", int(partition_kv));
-  }
 
   if constexpr (!partition_kv) {
     normalize_d<num_frags_x, num_frags_y>(o_frag, d_frag);

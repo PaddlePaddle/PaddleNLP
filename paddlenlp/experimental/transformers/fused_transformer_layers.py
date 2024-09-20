@@ -2221,6 +2221,7 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
             num_heads,
             kv_num_heads,
             head_dim,
+            self.use_neox_rotary_style,
             0.0,  # out_linear_in_scale
         )
         out_linear_out = self.compute_out_linear(fmha_out, i)
@@ -2580,6 +2581,7 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
             num_heads,
             kv_num_heads,
             head_dim,
+            self.use_neox_rotary_style,
             0.0 if self.linear_shifts[i] is None else self.act_scales["out_linear_in_scale"][i],
         )
         out_linear_out = self.compute_out_linear(fmha_out, i)

@@ -236,10 +236,8 @@ void append_attention(
 
 void AppendAttention(
     const paddle::Tensor& qkv,  // [token_num, num_heads, head_dim]
-    const paddle::Tensor&
-        cache_k,  // [max_block_num, num_heads, block_size, head_dim]
-    const paddle::Tensor&
-        cache_v,  // [max_block_num, num_heads, head_dim, block_size]
+    const paddle::Tensor& cache_k,  // [max_block_num, num_heads, block_size, head_dim]
+    const paddle::Tensor& cache_v,  // [max_block_num, num_heads, head_dim, block_size]
     const paddle::Tensor& seq_lens_q,
     const paddle::Tensor& seq_lens_kv,
     const paddle::Tensor& seq_lens_encoder,
@@ -253,14 +251,10 @@ void AppendAttention(
     const paddle::Tensor& max_dec_len,
     paddle::Tensor& out_tmp,
     const paddle::optional<paddle::Tensor>& attn_mask,
-    const paddle::optional<paddle::Tensor>&
-        cache_k_scale,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>&
-        cache_v_scale,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>&
-        cache_k_zp,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>&
-        cache_v_zp,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>& cache_k_scale,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>& cache_v_scale,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>& cache_k_zp,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>& cache_v_zp,  // [num_kv_heads, head_dim]
     const paddle::optional<paddle::Tensor>& shift_bias,
     const paddle::optional<paddle::Tensor>& smooth_weight,
     const std::string& cache_quant_type_str,

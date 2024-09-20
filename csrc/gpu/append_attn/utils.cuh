@@ -334,8 +334,23 @@ __forceinline__ __host__ __device__  void vec_cast<nv_bfloat16, float>(nv_bfloat
   if (group_size == 1) {                                     \
     constexpr size_t GROUP_SIZE = 1;                         \
     __VA_ARGS__                                              \
+  } else if (group_size == 2) {                              \
+    constexpr size_t GROUP_SIZE = 2;                         \
+    __VA_ARGS__                                              \
+  } else if (group_size == 3) {                              \
+    constexpr size_t GROUP_SIZE = 3;                         \
+    __VA_ARGS__                                              \
   } else if (group_size == 4) {                              \
     constexpr size_t GROUP_SIZE = 4;                         \
+    __VA_ARGS__                                              \
+  } else if (group_size == 5) {                              \
+    constexpr size_t GROUP_SIZE = 5;                         \
+    __VA_ARGS__                                              \
+  } else if (group_size == 6) {                              \
+    constexpr size_t GROUP_SIZE = 6;                         \
+    __VA_ARGS__                                              \
+  } else if (group_size == 7) {                              \
+    constexpr size_t GROUP_SIZE = 7;                         \
     __VA_ARGS__                                              \
   } else if (group_size == 8) {                              \
     constexpr size_t GROUP_SIZE = 8;                         \
