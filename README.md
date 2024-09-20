@@ -42,7 +42,8 @@
 
 ### <a href=#多硬件训推一体> 🔧 多硬件训推一体 </a>
 
-支持英伟达 GPU、昆仑 XPU、昇腾 NPU、燧原 GCU 和海光 DCU 等多个硬件的大模型训练和推理，套件接口支持硬件快速切换，大幅降低硬件切换研发成本。
+支持英伟达 GPU、昆仑 XPU、昇腾 NPU、燧原 GCU 和海光 DCU 等多个硬件的大模型和自然语言理解模型训练和推理，套件接口支持硬件快速切换，大幅降低硬件切换研发成本。
+当前支持的自然语言理解模型：[多硬件自然语言理解模型列表](./docs/model_zoo/model_list_multy_device.md)
 
 ### <a href=#高效易用的预训练> 🚀 高效易用的预训练 </a>
 
@@ -127,7 +128,7 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 |       Yuan2        |    ✅     |  ✅  |  ✅   |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
 ------------------------------------------------------------------------------------------
 
-* [大模型推理](./llm/docs/predict/inference.md)已支持 LLaMA 系列、Qwen 系列、Mistral 系列、ChatGLM 系列、Bloom 系列和Baichuan 系列，支持Weight Only INT8及INT4推理，支持WAC（权重、激活、Cache KV）进行INT8、FP8量化的推理，【LLM】模型推理支持列表如下：
+* [大模型推理](./llm/docs/predict/inference.md)已支持 LLaMA 系列、Qwen 系列、Mistral 系列、ChatGLM 系列、Bloom 系列和 Baichuan 系列，支持 Weight Only INT8及 INT4推理，支持 WAC（权重、激活、Cache KV）进行 INT8、FP8量化的推理，【LLM】模型推理支持列表如下：
 
 |                模型名称/量化类型支持            | FP16/BF16 | WINT8 | WINT4 | INT8-A8W8 | FP8-A8W8 | INT8-A8W8C8 |
 |:--------------------------------------------:|:---------:|:-----:|:-----:|:---------:|:--------:|:-----------:|
@@ -149,7 +150,7 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 ### pip 安装
 
 ```shell
-pip install --upgrade paddlenlp==3.0.0b0
+pip install --upgrade paddlenlp==3.0.0b1
 ```
 
 或者可通过以下命令安装最新 develop 分支代码：
@@ -174,13 +175,14 @@ PaddleNLP 提供了方便易用的 Auto API，能够快速的加载模型和 Tok
 >>> model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2-0.5B", dtype="float16")
 >>> input_features = tokenizer("你好！请自我介绍一下。", return_tensors="pd")
 >>> outputs = model.generate(**input_features, max_length=128)
->>> print(tokenizer.batch_decode(outputs[0]))
+>>> print(tokenizer.batch_decode(outputs[0], skip_special_tokens=True))
 ['我是一个AI语言模型，我可以回答各种问题，包括但不限于：天气、新闻、历史、文化、科学、教育、娱乐等。请问您有什么需要了解的吗？']
 ```
 
 ### 大模型预训练
 
 ```shell
+git clone https://github.com/PaddlePaddle/PaddleNLP.git && cd PaddleNLP # 如已clone或下载PaddleNLP可跳过
 mkdir -p llm/data && cd llm/data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx
@@ -191,6 +193,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py 
 ### 大模型 SFT 精调
 
 ```shell
+git clone https://github.com/PaddlePaddle/PaddleNLP.git && cd PaddleNLP # 如已clone或下载PaddleNLP可跳过
 mkdir -p llm/data && cd llm/data
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz && tar -zxvf AdvertiseGen.tar.gz
 cd .. # change folder to PaddleNLP/llm

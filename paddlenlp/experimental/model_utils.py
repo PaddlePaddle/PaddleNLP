@@ -29,7 +29,7 @@ from paddlenlp.utils.download import resolve_file_path
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddlenlp.utils.log import logger
 
-__all__ = ["FasterPretrainedModel", "ActScalesLoader", "WeightScalesLoader"]
+__all__ = ["FasterPretrainedModel", "ActScalesLoader", "WeightScalesLoader", "PerTensorWeightScalesLoader"]
 
 
 def load_vocabulary(filepath):
@@ -332,7 +332,7 @@ class ActScalesLoader:
         self.key_map = key_map_dict
         self.scale = {}
         for scale_type, key_template in self.key_map.items():
-            self.scale[scale_type] = np.full([num_of_layers], fill_value=-1.0)
+            self.scale[scale_type] = np.full([num_of_layers], fill_value=-1.0, dtype="float32")
             for i in range(num_of_layers):
                 if key_template.replace("#", str(i)) in self.scale_dict.keys():
                     self.scale[scale_type][i] = 1 / self.scale_dict[key_template.replace("#", str(i))]
@@ -387,6 +387,47 @@ class WeightScalesLoader:
                 self.scale["ffn1_weight_scale"].append(
                     np.concatenate([self.scale["ffn1_1_weight_scale"][i, :], self.scale["ffn1_2_weight_scale"][i, :]])
                 )
+
+
+class PerTensorWeightScalesLoader:
+    """
+    Load Per Tensor Weight Scale from json file
+    """
+
+    def __init__(
+        self,
+        scale_json_file_path="weight_scales.json",
+        key_map_dict=None,
+        num_of_layers=None,
+    ):
+        """load weight scales from json file."""
+        with open(scale_json_file_path) as json_file:
+            self.scale_dict = json.load(json_file)
+        self.key_map = key_map_dict
+        self.scale = {}
+        for scale_type, key_template in self.key_map.items():
+            no_skip_layer_list = []
+            scale_shape = [1]
+            for i in range(num_of_layers):
+                if key_template.replace("#", str(i)) in self.scale_dict.keys():
+                    no_skip_layer_list.append(key_template.replace("#", str(i)))
+            if len(no_skip_layer_list) > 0:
+                scale_shape = np.array(self.scale_dict[no_skip_layer_list[0]]).shape
+
+            self.scale[scale_type] = np.full(((num_of_layers,) + tuple(scale_shape)), fill_value=-1.0)
+            for i in range(num_of_layers):
+                if key_template.replace("#", str(i)) in self.scale_dict.keys():
+                    self.scale[scale_type][i] = self.scale_dict[key_template.replace("#", str(i))]
+
+        if "qkv_weight_scale" not in self.scale.keys():
+            self.scale["qkv_weight_scale"] = np.full((num_of_layers), fill_value=-1.0).astype(np.float32)
+            for i in range(num_of_layers):
+                qkv_weight_scale = max(
+                    self.scale["q_weight_scale"][i],
+                    self.scale["k_weight_scale"][i],
+                    self.scale["v_weight_scale"][i],
+                )
+                self.scale["qkv_weight_scale"][i] = qkv_weight_scale
 
 
 class CacheScaleLoader:

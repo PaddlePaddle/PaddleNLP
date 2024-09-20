@@ -184,6 +184,16 @@ try:
 except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
+try:
+    from paddle.distributed import in_auto_parallel_align_mode
+except:
+
+    def in_auto_parallel_align_mode():
+        """
+        hack for paddlenlp develop branch.
+        """
+        return False
+
 
 __all__ = ["Trainer"]
 
@@ -354,7 +364,17 @@ class Trainer:
         )
         self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
 
-        self._save_ckpt_func = dist.save_state_dict if self.args.enable_auto_parallel else paddle.save
+        def _save_ckpt_func(state_dict, path, signal_path=None):
+            if self.args.enable_auto_parallel:
+                dist.save_state_dict(state_dict, path)
+            else:
+                paddle.save(state_dict, path)
+
+            if signal_path is not None:
+                with open(signal_path, mode="w+") as f:
+                    f.write("1")
+
+        self._save_ckpt_func = _save_ckpt_func
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
         if self.args.use_async_save:
             self._async_optimizer_saver = AsyncSaver()
@@ -1303,7 +1323,8 @@ class Trainer:
             logs: Dict[str, float] = {}
 
             # all_gather + mean() to get average loss over all processes
-            tr_loss_scalar = self._get_item_from_loss(self._nested_gather(tr_loss).mean())
+            avg_loss = self._nested_gather(tr_loss).mean()
+            tr_loss_scalar = self._get_item_from_loss(avg_loss)
 
             # reset tr_loss to zero
             tr_loss.subtract_(tr_loss)
@@ -1311,6 +1332,8 @@ class Trainer:
             logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
+            if in_auto_parallel_align_mode():
+                logs["loss_md5"] = avg_loss._md5sum()
 
             divisor = 2**30
             # TODO(@gexiao): replace these codes with unified APIs in Paddle
@@ -1331,8 +1354,14 @@ class Trainer:
             )
             num_steps = self.state.global_step - self._globalstep_last_logged
             seq_length = None
+            model_flops = None
             if getattr(self, "is_pretraining", False) and hasattr(self.model, "config"):
                 seq_length = getattr(self.model.config, "seq_length", None)
+                try:
+                    model_flops = self.model.get_hardware_flops(seq_length=seq_length, recompute=self.args.recompute)
+                except NotImplementedError:
+                    model_flops = None
+
             logs.update(
                 speed_metrics(
                     "interval",
@@ -1340,6 +1369,7 @@ class Trainer:
                     num_samples=total_train_batch_size * num_steps,
                     num_steps=num_steps,
                     seq_length=seq_length,
+                    model_flops=model_flops,
                 )
             )
 
@@ -2218,6 +2248,7 @@ class Trainer:
                 self.args.unified_checkpoint_config = unified_checkpoint_config_backup
         else:
             if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
+                os.makedirs(output_dir, exist_ok=True)
                 if self.is_in_train:
                     global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
                     paddle.save(global_rank, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
@@ -2236,6 +2267,7 @@ class Trainer:
             and "async_save" in self.args.unified_checkpoint_config
             and not self.is_in_train
         ):
+            os.makedirs(output_dir, exist_ok=True)
             global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
             paddle.save(self.state.global_step, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
 
@@ -2297,7 +2329,9 @@ class Trainer:
                             self._save_ckpt_func(
                                 self._filter_moe_no_sync_optimizer_params(),
                                 os.path.join(output_dir, optimizer_name),
+                                saved_signal_path,
                             )
+
                         else:
                             state_dict = self.optimizer.state_dict()
                             save_path = os.path.join(output_dir, optimizer_name)
@@ -2307,12 +2341,11 @@ class Trainer:
                                     state_dict, save_path, saved_signal_path=saved_signal_path
                                 )
                             else:
-                                self._save_ckpt_func(state_dict, save_path)
-                                with open(saved_signal_path, mode="w+") as f:
-                                    f.write("1")
+                                self._save_ckpt_func(state_dict, save_path, saved_signal_path)
                 else:
                     if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                        os.makedirs(output_dir, exist_ok=True)
                         paddle.save(global_rank, os.path.join(output_dir, f".optimizer_weight.done.{global_rank}"))
                         if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
                             paddle.save(global_rank, os.path.join(output_dir, f".master_weight.done.{global_rank}"))
@@ -2328,16 +2361,30 @@ class Trainer:
                     else:
                         if self.args.data_parallel_rank > 0 and self.args.use_expert_parallel:
                             self._save_ckpt_func(
-                                self._filter_moe_no_sync_optimizer_params(), os.path.join(output_dir, OPTIMIZER_NAME)
+                                self._filter_moe_no_sync_optimizer_params(),
+                                os.path.join(output_dir, optimizer_name),
+                                saved_signal_path,
                             )
                         else:
-                            self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                            self._save_ckpt_func(
+                                self.optimizer.state_dict(),
+                                os.path.join(output_dir, optimizer_name),
+                                saved_signal_path,
+                            )
 
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
                 if self.do_grad_scaling:
                     paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
+            else:
+                if self.args.unified_checkpoint and not self.args.use_hybrid_parallel:
+                    if "async_save" in self.args.unified_checkpoint_config:
+                        global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                        os.makedirs(output_dir, exist_ok=True)
+                        paddle.save(global_rank, os.path.join(output_dir, f".optimizer_weight.done.{global_rank}"))
+                        if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
+                            paddle.save(global_rank, os.path.join(output_dir, f".master_weight.done.{global_rank}"))
 
         self.runtime_timer.stop()
         # Determine the new best metric / best model checkpoint
@@ -3260,7 +3307,7 @@ class Trainer:
 
     def _is_iterable_dataset_distributed(self, dataset):
         # For distributed dataloaer.
-        is_iterable_dataset_tensor = paddle.to_tensor(self._is_iterable_dataset(dataset)).reshape([1])
+        is_iterable_dataset_tensor = paddle.to_tensor(self._is_iterable_dataset(dataset)).astype("int32").reshape([1])
         if dist.get_world_size() > 1:
             dist.all_reduce(is_iterable_dataset_tensor, op=dist.ReduceOp.MAX)
         if is_iterable_dataset_tensor.item() == 1:

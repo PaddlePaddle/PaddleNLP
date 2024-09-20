@@ -83,6 +83,9 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
         for (k, v) in state_dict.items():
             if v.name in filtered_parameters:
                 filtered_state_dict[k] = v
+            elif v.name not in [p.name for p in parameters]:
+                if sharding_rank == 0:
+                    filtered_state_dict[k] = v
     return filtered_state_dict
 
 

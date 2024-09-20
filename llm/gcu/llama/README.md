@@ -23,7 +23,7 @@ lspci | grep S60
 ### 1. 环境准备：(这将花费您10～20min时间)
 
 1. 初始化环境，安装驱动<br/>
-  **注：您可以联系燧原生态团队(Email: eco-enflame@enflame-tech.com)以获取软件驱动包和其他帮助**
+  **注：您可以联系燧原(Email: developer-enflame@enflame-tech.com)以获取软件驱动包和其他帮助**
 ```bash
 # 假设安装包位于：/home/paddle_user/deps/， 名称为：TopsPlatform.tar.gz
 cd /home/paddle_user/deps/ && tar -zxf TopsPlatform.tar.gz
