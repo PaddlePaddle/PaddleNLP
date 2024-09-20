@@ -18,7 +18,7 @@ from typing import Any
 
 import paddle
 from paddle import nn
-
+import paddle.nn.functional as F
 import paddlenlp
 from paddlenlp.transformers import (
     LlamaConfig,
@@ -31,7 +31,6 @@ from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
 )
-
 
 class LlamaModelForScore(LlamaPretrainedModel):
     _keys_to_ignore_on_load_missing = ["lm_head.weight"]
@@ -67,7 +66,6 @@ class LlamaModelForScore(LlamaPretrainedModel):
         attn_mask_startend_row_indices: paddle.Tensor | None = None,
         response_indexs: paddle.Tensor | None = None,
     ):
-        assert attention_mask is not None
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -88,14 +86,14 @@ class LlamaModelForScore(LlamaPretrainedModel):
         )
         hidden_states = outputs[0]  # size = (B, L, E)
         chosen_indexes = paddle.to_tensor([[response_index[0], response_index[1]] for response_index in response_indexs])
-        rejected_index = paddle.to_tensor([[response_index[0], response_index[2]] for response_index in response_indexs])    
+        rejected_indexes = paddle.to_tensor([[response_index[0], response_index[2]] for response_index in response_indexs])    
         chosen_hidden_states = hidden_states.gather_nd(chosen_indexes)
         rejected_hidden_states = hidden_states.gather_nd(rejected_indexes)
 
         chosen_scores = self.score_head(chosen_hidden_states)
         rejected_scores = self.score_head(rejected_hidden_states)
         loss = -F.log_sigmoid(chosen_scores - rejected_scores).mean()
-        return loss
+        return loss, chosen_scores, rejected_scores
 
     @classmethod
     def _get_name_mappings(cls, config: LlamaConfig) -> list[StateDictNameMapping]:

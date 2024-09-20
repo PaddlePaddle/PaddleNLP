@@ -1,11 +1,11 @@
 # FlashMask Reward model training
 
 
-#### 3.1 DPO
+#### 3.1 RM 模型训练
 
 ##### 数据准备
 
-我们支持的精调数据格式是每行包含一个字典的 json 文件，每个字典包含以下字段：
+我们支持的数据格式是每行包含一个字典的 json 文件，每个字典包含以下字段：
 
 - `src` : `str, List(str)`, 用户对话内容。
 - `tgt` : `str, List(str)`, 系统回复内容。
@@ -35,8 +35,8 @@ wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.t
 tar -zxvf ultrafeedback_binarized.tar.gz
 ```
 
-##### 全参 DPO
+##### FlashMask RM
 
 ```bash
-# DPO 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
+# RM 启动命令参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/rm/flashmask/run_reward.py ./config/llama/rm_flashmask_argument.json

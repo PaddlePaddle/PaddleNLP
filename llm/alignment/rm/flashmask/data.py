@@ -52,13 +52,13 @@ def preprocess_preference_data(data, tokenizer, data_args, model_args):
         chosen = data["response"][1]
         rejected = data["response"][0]
 
-    chosen_token_ids = tokenizer(chosen) + [tokenizer.eos_token_id]
-    rejected_token_ids = tokenizer(rejected) + [tokenizer.eos_token_id]
-    prompt_tokens_ids = tokenizer.tokenize(data["src"], add_special_tokens=True)
+    chosen_token_ids = tokenizer(chosen)["input_ids"] + [tokenizer.eos_token_id]
+    rejected_token_ids = tokenizer(rejected)["input_ids"] + [tokenizer.eos_token_id]
+    prompt_tokens_ids = tokenizer(data["src"][-1], add_special_tokens=True)["input_ids"]
 
     for idx in range(len(data["tgt"])):
-        src_token_ids = tokenizer(data["src"][-idx-1], add_special_tokens=True)
-        tgt_token_ids = tokenizer(data["tgt"][-idx]) + [tokenizer.eos_token_id]
+        src_token_ids = tokenizer(data["src"][-idx-1], add_special_tokens=True)["input_ids"]
+        tgt_token_ids = tokenizer(data["tgt"][-idx])["input_ids"] + [tokenizer.eos_token_id]
         prompt_tokens_ids = src_token_ids + tgt_token_ids + prompt_tokens_ids
     
     if len(prompt_tokens_ids) + len(rejected_token_ids) + len(chosen_token_ids) > data_args.max_seq_len:
