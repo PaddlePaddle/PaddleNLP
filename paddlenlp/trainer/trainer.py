@@ -198,6 +198,13 @@ except:
 __all__ = ["Trainer"]
 
 
+def _get_align_mode_scale():
+    hcg = fleet.get_hybrid_communicate_group()
+    data_parallel_world_size = hcg.get_data_parallel_world_size()
+    sharding_parallel_world_size = hcg.get_sharding_parallel_world_size()
+    return max(data_parallel_world_size, 1) * max(sharding_parallel_world_size, 1)
+
+
 class Trainer:
     """
     Trainer is a simple but feature-complete training and eval loop for PaddlePaddle, optimized for PaddleNLP.
@@ -2149,7 +2156,10 @@ class Trainer:
             `paddle.Tensor`: The tensor with training loss on this batch.
         """
         if self.args.pipeline_parallel_degree > 1:
-            return self.training_pipeline_step(model, inputs)
+            loss = self.training_pipeline_step(model, inputs)
+            if in_auto_parallel_align_mode():
+                loss = loss / _get_align_mode_scale()
+            return loss
 
         model.train()
         inputs = self._prepare_inputs(inputs)
@@ -2159,11 +2169,18 @@ class Trainer:
         if self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
 
+        if in_auto_parallel_align_mode():
+            loss = loss / _get_align_mode_scale()
+
         if self.do_grad_scaling:
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
-        return loss.detach()
+
+        detached_loss = loss.detach()
+        if in_auto_parallel_align_mode():
+            detached_loss *= _get_align_mode_scale()
+        return detached_loss
 
     def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         """
@@ -2220,7 +2237,10 @@ class Trainer:
 
         model.micro_batch_size, model.accumulate_steps = config_backup
 
-        return loss.detach()
+        detached_loss = loss.detach()
+        if in_auto_parallel_align_mode():
+            detached_loss *= _get_align_mode_scale()
+        return detached_loss
 
     def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
         """
