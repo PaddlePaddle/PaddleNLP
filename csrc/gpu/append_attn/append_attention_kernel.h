@@ -41,7 +41,7 @@ void CascadeAppendAttentionKernel(
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
-    const paddle::Tensor& block_table,
+    const paddle::Tensor& block_tables,
     const paddle::Tensor& batch_ids,
     const paddle::Tensor& tile_ids_per_batch,
     const std::string& cache_quant_type_str,

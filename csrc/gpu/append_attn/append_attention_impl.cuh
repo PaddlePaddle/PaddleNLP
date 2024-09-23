@@ -26,7 +26,7 @@ __global__ void multi_query_append_attention_kernel(
     const int *__restrict__ batch_ids,
     const int *__restrict__ tile_ids_per_batch,
     const int *__restrict__ cum_offsets,
-    const int *__restrict__ block_table,  // [bsz, block_num_per_seq]
+    const int *__restrict__ block_tables,  // [bsz, block_num_per_seq]
     const int max_seq_len,
     const int max_dec_len,
     const int max_block_num_per_seq,
@@ -52,7 +52,7 @@ __global__ void multi_query_append_attention_kernel(
   const uint32_t num_rows_per_block = NUM_WARPS * num_frags_x * 16;
   const int *block_table_now = nullptr;
 
-  block_table_now = block_table + batch_id * max_block_num_per_seq;
+  block_table_now = block_tables + batch_id * max_block_num_per_seq;
 
   const uint32_t q_len = seq_lens[batch_id];
   if (q_len <= 0) {
@@ -491,7 +491,7 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
     const int *__restrict__ batch_ids,
     const int *__restrict__ tile_ids_per_batch,
     const int *__restrict__ cum_offsets,
-    const int *__restrict__ block_table,  // [bsz, block_num_per_seq]
+    const int *__restrict__ block_tables,  // [bsz, block_num_per_seq]
     const int max_seq_len,
     const int max_dec_len,
     const int max_block_num_per_seq,
@@ -520,7 +520,7 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
   const uint32_t batch_id = batch_ids[btid];
   const uint32_t tile_id = tile_ids_per_batch[btid];
   const uint32_t num_rows_per_block = num_frags_x * 16;
-  const int *block_table_now = block_table + batch_id * max_block_num_per_seq;
+  const int *block_table_now = block_tables + batch_id * max_block_num_per_seq;
 
   const uint32_t q_len = seq_lens[batch_id];
   if (q_len <= 0) {
@@ -1113,7 +1113,7 @@ __global__ void multi_query_append_attention_c8_kernel(
     const int *__restrict__ batch_ids,
     const int *__restrict__ tile_ids_per_batch,
     const int *__restrict__ cum_offsets,
-    const int *__restrict__ block_table,  // [bsz, block_num_per_seq]
+    const int *__restrict__ block_tables,  // [bsz, block_num_per_seq]
     const int max_seq_len,
     const int max_dec_len,
     const int max_block_num_per_seq,
@@ -1166,7 +1166,7 @@ __global__ void multi_query_append_attention_c8_kernel(
   const uint32_t num_rows_per_block = NUM_WARPS * num_frags_x * 16;
   const int *block_table_now = nullptr;
 
-  block_table_now = block_table + batch_id * max_block_num_per_seq;
+  block_table_now = block_tables + batch_id * max_block_num_per_seq;
 
   const uint32_t q_len = seq_lens[batch_id];
   if (q_len <= 0) {
@@ -1731,7 +1731,7 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
     const int *__restrict__ batch_ids,
     const int *__restrict__ tile_ids_per_batch,
     const int *__restrict__ cum_offsets,
-    const int *__restrict__ block_table,  // [bsz, block_num_per_seq]
+    const int *__restrict__ block_tables,  // [bsz, block_num_per_seq]
     const int max_seq_len,
     const int max_dec_len,
     const int max_block_num_per_seq,
@@ -1782,7 +1782,7 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
   const uint32_t batch_id = batch_ids[btid];
   const uint32_t tile_id = tile_ids_per_batch[btid];
   const uint32_t num_rows_per_block = num_frags_x * 16;
-  const int *block_table_now = block_table + batch_id * max_block_num_per_seq;
+  const int *block_table_now = block_tables + batch_id * max_block_num_per_seq;
 
   const uint32_t q_len = seq_lens[batch_id];
   if (q_len <= 0) {
@@ -2457,7 +2457,7 @@ __global__ void multi_query_append_attention_c4_kernel(
     const int *__restrict__ batch_ids,
     const int *__restrict__ tile_ids_per_batch,
     const int *__restrict__ cum_offsets,
-    const int *__restrict__ block_table,  // [bsz, block_num_per_seq]
+    const int *__restrict__ block_tables,  // [bsz, block_num_per_seq]
     const int max_seq_len,
     const int max_dec_len,
     const int max_block_num_per_seq,
@@ -2503,7 +2503,7 @@ __global__ void multi_query_append_attention_c4_kernel(
   const uint32_t num_rows_per_block = NUM_WARPS * num_frags_x * 16;
   const int *block_table_now = nullptr;
 
-  block_table_now = block_table + batch_id * max_block_num_per_seq;
+  block_table_now = block_tables + batch_id * max_block_num_per_seq;
 
   const uint32_t q_len = seq_lens[batch_id];
   if (q_len <= 0) {
@@ -3129,7 +3129,7 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
     const int *__restrict__ batch_ids,
     const int *__restrict__ tile_ids_per_batch,
     const int *__restrict__ cum_offsets,
-    const int *__restrict__ block_table,  // [bsz, block_num_per_seq]
+    const int *__restrict__ block_tables,  // [bsz, block_num_per_seq]
     const int max_seq_len,
     const int max_dec_len,
     const int max_block_num_per_seq,
@@ -3177,7 +3177,7 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
   const uint32_t batch_id = batch_ids[btid];
   const uint32_t tile_id = tile_ids_per_batch[btid];
   const uint32_t num_rows_per_block = num_frags_x * 16;
-  const int *block_table_now = block_table + batch_id * max_block_num_per_seq;
+  const int *block_table_now = block_tables + batch_id * max_block_num_per_seq;
 
   const uint32_t q_len = seq_lens[batch_id];
   if (q_len <= 0) {

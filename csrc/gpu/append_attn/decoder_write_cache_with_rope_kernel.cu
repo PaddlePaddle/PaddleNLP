@@ -1595,12 +1595,12 @@ void DecoderWriteCacheWithRoPEKernel(
     const paddle::Tensor&
         qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
               // gqa_group_size, head_dim] if GQA)
-    const paddle::Tensor& rotary_emb,
     const paddle::Tensor& seq_lens,
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
     const paddle::Tensor& block_tables,
+    const paddle::optional<paddle::Tensor>& rotary_embs,
     const paddle::optional<paddle::Tensor>& qkv_out_scales,
     const paddle::optional<paddle::Tensor>& qkv_biases,
     const paddle::optional<paddle::Tensor>& cache_k_scale,
@@ -1628,8 +1628,8 @@ void DecoderWriteCacheWithRoPEKernel(
   // VLOG(1) << "gqa_group_size: " << gqa_group_size;
   const int32_t block_size = key_cache_out->dims()[2];
 
-  const float* cos_emb = rotary_emb.data<float>();
-  const float* sin_emb = rotary_emb.data<float>() + max_seq_len * head_size / 2;
+  const float* cos_emb = rotary_embs.get().data<float>();
+  const float* sin_emb = rotary_embs.get().data<float>() + max_seq_len * head_size / 2;
 
   if (cache_quant_type_str == "none") {
     // VLOG(1) << "cache_quant_type_str: none";
@@ -1759,12 +1759,12 @@ template void DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, int>(
     const paddle::Tensor&
         qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
               // gqa_group_size, head_dim] if GQA)
-    const paddle::Tensor& rotary_emb,
     const paddle::Tensor& seq_lens,
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
     const paddle::Tensor& block_tables,
+    const paddle::optional<paddle::Tensor>& rotary_embs,
     const paddle::optional<paddle::Tensor>& qkv_out_scales,
     const paddle::optional<paddle::Tensor>& qkv_biases,
     const paddle::optional<paddle::Tensor>& cache_k_scale,
@@ -1786,12 +1786,12 @@ DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, paddle::bfloat16>(
     const paddle::Tensor&
         qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
               // gqa_group_size, head_dim] if GQA)
-    const paddle::Tensor& rotary_emb,
     const paddle::Tensor& seq_lens,
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
     const paddle::Tensor& block_tables,
+    const paddle::optional<paddle::Tensor>& rotary_embs,
     const paddle::optional<paddle::Tensor>& qkv_out_scales,
     const paddle::optional<paddle::Tensor>& qkv_biases,
     const paddle::optional<paddle::Tensor>& cache_k_scale,

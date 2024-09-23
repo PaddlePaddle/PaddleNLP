@@ -64,12 +64,6 @@ if core.is_compiled_with_cuda():
     except:
         pass
 
-from paddlenlp.experimental.transformers.append_attention import (
-    compute_append_attn,
-    get_block_shape,
-    split_kv_block,
-)
-
 __all__ = [
     "MoeConfig",
     "FusedMultiTransformerConfig",
@@ -2175,23 +2169,20 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
         decoder_batch_ids,
         decoder_tile_ids_per_batch,
         decoder_num_blocks,
-        num_heads,
-        kv_num_heads,
-        head_dim,
         encoder_block_shape_q,
         decoder_block_shape_q,
         max_partition_size,
         encoder_max_partition_size,
         **kwargs,
     ):
-        fmha_out = compute_append_attn(
+        from paddlenlp_ops import append_attention
+        fmha_out = append_attention(
             qkv,
             caches[2 * i],
             caches[2 * i + 1],
-            rotary_embs,
-            kwargs.get("seq_lens_this_time", None),
             kwargs.get("seq_lens_encoder", None),
             kwargs.get("seq_lens_decoder", None),
+            kwargs.get("seq_lens_this_time", None),
             kwargs.get("padding_offsets", None),
             kwargs.get("cum_offsets", None),
             kwargs.get("block_tables", None),
@@ -2206,24 +2197,31 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
             decoder_num_blocks,
             kwargs.get("max_enc_len_this_time", None),
             kwargs.get("max_dec_len_this_time", None),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            "none",  # cache_quant_type_str
-            kwargs.get("max_input_length", -1),
-            num_heads,
-            kv_num_heads,
-            head_dim,
+            rotary_embs,
+            None, # attn_mask
+            None, # qkv_bias
+            None, # qkv_out_scales
+            None, # cache_k_quant_scales
+            None, # cache_v_quant_scales
+            None, # cache_k_dequant_scales
+            None, # cache_v_dequant_scales
+            None, # cache_k_zp
+            None, # cache_v_zp
+            None, # out_shifts
+            None, # out_smooths
+            "none",  # cache_quant_type
             self.use_neox_rotary_style,
-            0.0,  # out_linear_in_scale
-        )
+            kwargs.get("max_input_length", -1),
+            0.0,  # out_linear_in_scale,
+            encoder_block_shape_q,
+            decoder_block_shape_q,
+            max_partition_size,
+            encoder_max_partition_size,
+            5, # speculate_max_draft_token_num
+            True, # causal
+            False, # is_decoder
+            True, # enable_prefill
+        )[0]
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
         return out_linear_out
@@ -2297,18 +2295,18 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
         decoder_block_shape_q = 128
         max_partition_size = 1024
         encoder_max_partition_size = kwargs.get("max_input_length", None)
-        group_size = self.num_heads // self.kv_num_heads
 
-        encoder_batch_ids, encoder_tile_ids_per_batch, encoder_num_blocks_x_cpu = get_block_shape(
+        from paddlenlp_ops import get_block_shape, split_kv_block
+
+        encoder_batch_ids, encoder_tile_ids_per_batch, encoder_num_blocks = get_block_shape(
             kwargs.get("seq_lens_encoder", None),
             None,
             max_enc_len_this_time,
             kwargs.get("cum_offsets", None),
             encoder_block_shape_q,
-            group_size,
+            self.num_heads // self.kv_num_heads,
         )
-        # encoder_num_blocks = encoder_num_blocks_x_cpu.item()
-        kv_batch_ids, kv_tile_ids_per_batch, kv_num_blocks_x_cpu = split_kv_block(
+        kv_batch_ids, kv_tile_ids_per_batch, kv_num_blocks = split_kv_block(
             kwargs.get("seq_lens_decoder", None),
             kwargs.get("seq_lens_encoder", None),
             max_enc_len_this_time,
@@ -2316,16 +2314,13 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
             kwargs.get("block_size", 64),
             kwargs.get("block_size", 64),
         )
-        # kv_num_blocks = kv_num_blocks_x_cpu.item()
-
-        # decoder重映射
-        decoder_batch_ids, decoder_tile_ids_per_batch, decoder_num_blocks_x_cpu = get_block_shape(
+        decoder_batch_ids, decoder_tile_ids_per_batch, decoder_num_blocks = get_block_shape(
             kwargs.get("seq_lens_decoder", None),
             kwargs.get("seq_lens_encoder", None),
             paddle.ones(shape=[1], dtype="int32"),
             kwargs.get("cum_offsets", None),
             decoder_block_shape_q,
-            group_size,
+            self.num_heads // self.kv_num_heads,
         )
 
         residual_input = src
@@ -2347,16 +2342,13 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
                 i,
                 encoder_batch_ids,
                 encoder_tile_ids_per_batch,
-                encoder_num_blocks_x_cpu,
+                encoder_num_blocks,
                 kv_batch_ids,
                 kv_tile_ids_per_batch,
-                kv_num_blocks_x_cpu,
+                kv_num_blocks,
                 decoder_batch_ids,
                 decoder_tile_ids_per_batch,
-                decoder_num_blocks_x_cpu,
-                self.num_heads,
-                self.kv_num_heads,
-                self.head_dim,
+                decoder_num_blocks,
                 encoder_block_shape_q,
                 decoder_block_shape_q,
                 max_partition_size,
@@ -2513,9 +2505,6 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
         decoder_batch_ids,
         decoder_tile_ids_per_batch,
         decoder_num_blocks,
-        num_heads,
-        kv_num_heads,
-        head_dim,
         encoder_block_shape_q,
         decoder_block_shape_q,
         max_partition_size,
@@ -2544,14 +2533,14 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
         cache_k_zp = cache_k_zps[i] if cache_k_zps is not None else None
         cache_v_zp = cache_v_zps[i] if cache_v_zps is not None else None
 
-        fmha_out = compute_append_attn(
+        from paddlenlp_ops import append_attention
+        fmha_out = append_attention(
             qkv,
             caches[2 * i],
             caches[2 * i + 1],
-            rotary_embs,
-            kwargs.get("seq_lens_this_time", None),
             kwargs.get("seq_lens_encoder", None),
             kwargs.get("seq_lens_decoder", None),
+            kwargs.get("seq_lens_this_time", None),
             kwargs.get("padding_offsets", None),
             kwargs.get("cum_offsets", None),
             kwargs.get("block_tables", None),
@@ -2566,8 +2555,10 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
             decoder_num_blocks,
             kwargs.get("max_enc_len_this_time", None),
             kwargs.get("max_dec_len_this_time", None),
+            rotary_embs,
+            None, # attn_mask
+            None, # qkv_bias
             self.qkv_out_scales[i],
-            self.qkv_biases[i] if len(self.qkv_biases) > 0 else None,
             k_quant_scale,
             v_quant_scale,
             k_dequant_scale,
@@ -2577,13 +2568,18 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
             self.linear_shifts[i] if len(self.linear_shifts) > 0 else None,
             self.linear_smooths[i] if len(self.linear_smooths) > 0 else None,
             cache_quant_type_str,
-            kwargs.get("max_input_length", -1),
-            num_heads,
-            kv_num_heads,
-            head_dim,
             self.use_neox_rotary_style,
+            kwargs.get("max_input_length", -1),
             0.0 if self.linear_shifts[i] is None else self.act_scales["out_linear_in_scale"][i],
-        )
+            encoder_block_shape_q,
+            decoder_block_shape_q,
+            max_partition_size,
+            encoder_max_partition_size,
+            5, # speculate_max_draft_token_num
+            True, # causal
+            False, # is_decoder
+            True, # enable_prefill
+        )[0]
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
         return out_linear_out

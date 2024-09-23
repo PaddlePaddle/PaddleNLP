@@ -658,7 +658,7 @@ __device__ __forceinline__ void block_produce_kv(
     smem_t smem,
     uint32_t* smem_offset,
     T* gptr_base,  // [max_block_num, num_heads, block_size, head_dim]
-    const int* block_table,
+    const int* block_tables,
     const uint32_t kv_head_idx,
     const uint32_t kv_n_stride,
     const uint32_t kv_h_stride,
@@ -676,7 +676,7 @@ __device__ __forceinline__ void block_produce_kv(
           kv_idx_base + (i * 4 * num_warps + ty * 4 + tx / 8);
       const uint32_t kv_n_idx = row_now / block_size;
       const uint32_t kv_bid = row_now % block_size;
-      T* gptr = gptr_base + __ldg(&block_table[kv_n_idx]) * kv_n_stride +
+      T* gptr = gptr_base + __ldg(&block_tables[kv_n_idx]) * kv_n_stride +
                 kv_head_idx * kv_h_stride + kv_bid * kv_b_stride +
                 tx % 8 * num_elems_per_128b<T>();
 #pragma unroll
@@ -703,7 +703,7 @@ __device__ __forceinline__ void block_produce_kv(
         const uint32_t row_now = kv_idx_base + (i * 16 + j * 4 + row_id_per_tx);
         const uint32_t kv_n_idx = row_now / block_size;
         const uint32_t kv_bid = row_now % block_size;
-        T* gptr = gptr_base + __ldg(&block_table[kv_n_idx]) * kv_n_stride +
+        T* gptr = gptr_base + __ldg(&block_tables[kv_n_idx]) * kv_n_stride +
                   kv_head_idx * kv_h_stride + kv_bid * kv_b_stride +
                   col_id_per_tx * num_elems_per_128b<T>();
 #pragma unroll

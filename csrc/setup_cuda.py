@@ -108,8 +108,6 @@ sources = [
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
     "./gpu/append_attention.cu",
-    "./gpu/encoder_write_cache_with_rope.cu",
-    "./gpu/decoder_write_cache_with_rope.cu",
     "./gpu/get_block_shape.cu",
     "./gpu/split_kv_block.cu",
     "./gpu/append_attn/append_attention_kernel.cu",
