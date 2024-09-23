@@ -2063,11 +2063,13 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
           }
           __syncthreads();
 #endif
-          if (shift_bias) {
-            Load<T, VEC_SIZE>(shift_bias + shift_smooth_offset,
-                              &shift_bias_vec);
-            Load<T, VEC_SIZE>(smooth_weight + shift_smooth_offset,
-                              &smooth_weight_vec);
+          if (in_scale > 0.0) {
+            if (shift_bias) {
+              Load<T, VEC_SIZE>(shift_bias + shift_smooth_offset,
+                                &shift_bias_vec);
+              Load<T, VEC_SIZE>(smooth_weight + shift_smooth_offset,
+                                &smooth_weight_vec);
+            }
             Load<T, VEC_SIZE>(
                 reinterpret_cast<T*>(o_smem->base + o_smem_offset_w),
                 &ori_out_vec);

@@ -18,7 +18,7 @@
 
 
 template <paddle::DataType D>
-std::vector<paddle::Tensor> append_attention(
+std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
     const paddle::Tensor& qkv,
     const paddle::Tensor& key_cache,
     const paddle::Tensor& value_cache,
@@ -366,7 +366,7 @@ std::vector<paddle::Tensor> append_attention(
   return {fmha_out};
 }
 
-std::vector<paddle::Tensor> AppendAttention(
+std::vector<paddle::Tensor> AppendMultiheadAttention(
     const paddle::Tensor& qkv,
     const paddle::Tensor& key_cache,
     const paddle::Tensor& value_cache,
@@ -414,7 +414,7 @@ std::vector<paddle::Tensor> AppendAttention(
     const bool enable_prefill) {
   switch (qkv.dtype()) {
     case paddle::DataType::FLOAT16: {
-      return append_attention<paddle::DataType::FLOAT16>(
+      return AppendMultiheadAttentionKernel<paddle::DataType::FLOAT16>(
           qkv,
           key_cache,
           value_cache,
@@ -461,7 +461,7 @@ std::vector<paddle::Tensor> AppendAttention(
           enable_prefill);
     }
     case paddle::DataType::BFLOAT16: {
-      return append_attention<paddle::DataType::BFLOAT16>(
+      return AppendMultiheadAttentionKernel<paddle::DataType::BFLOAT16>(
           qkv,
           key_cache,
           value_cache,
@@ -509,7 +509,7 @@ std::vector<paddle::Tensor> AppendAttention(
     }
     case paddle::DataType::INT32: {
       if (compute_dtype == "bf16") {
-        return append_attention<paddle::DataType::BFLOAT16>(
+        return AppendMultiheadAttentionKernel<paddle::DataType::BFLOAT16>(
             qkv,
             key_cache,
             value_cache,
@@ -555,7 +555,7 @@ std::vector<paddle::Tensor> AppendAttention(
             is_decoder,
             enable_prefill);
       } else if (compute_dtype == "fp16") {
-        return append_attention<paddle::DataType::FLOAT16>(
+        return AppendMultiheadAttentionKernel<paddle::DataType::FLOAT16>(
             qkv,
             key_cache,
             value_cache,
@@ -615,7 +615,7 @@ std::vector<paddle::Tensor> AppendAttention(
   return {paddle::Tensor{}};
 }
 
-std::vector<std::vector<int64_t>> AppendAttentionInferShape(
+std::vector<std::vector<int64_t>> AppendMultiheadAttentionInferShape(
     const std::vector<int64_t>& qkv_shape,
     const std::vector<int64_t>& key_cache_shape,
     const std::vector<int64_t>& value_cache_shape,
@@ -656,7 +656,7 @@ std::vector<std::vector<int64_t>> AppendAttentionInferShape(
   return {{token_num, num_heads * head_dim}};
 }
 
-std::vector<paddle::DataType> AppendAttentionInferDtype(
+std::vector<paddle::DataType> AppendMultiheadAttentionInferDtype(
     const paddle::DataType& qkv_dtype,
     const paddle::DataType& key_cache_dtype,
     const paddle::DataType& value_cache_dtype,
@@ -708,7 +708,7 @@ std::vector<paddle::DataType> AppendAttentionInferDtype(
   return {qkv_dtype};
 }
 
-PD_BUILD_OP(append_attention)
+PD_BUILD_OP(append_multihead_attention)
     .Inputs({"qkv",
              "key_cache",
              "value_cache",
@@ -757,6 +757,6 @@ PD_BUILD_OP(append_attention)
             "causal: bool",
             "is_decoder: bool",
             "enable_prefill: bool"})
-    .SetKernelFn(PD_KERNEL(AppendAttention))
-    .SetInferShapeFn(PD_INFER_SHAPE(AppendAttentionInferShape))
-    .SetInferDtypeFn(PD_INFER_DTYPE(AppendAttentionInferDtype));
+    .SetKernelFn(PD_KERNEL(AppendMultiheadAttention))
+    .SetInferShapeFn(PD_INFER_SHAPE(AppendMultiheadAttentionInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(AppendMultiheadAttentionInferDtype));

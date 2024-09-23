@@ -107,7 +107,7 @@ sources = [
     "./gpu/dequant_int8.cu",
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
-    "./gpu/append_attention.cu",
+    "./gpu/append_multihead_attention.cu",
     "./gpu/get_block_shape.cu",
     "./gpu/split_kv_block.cu",
     "./gpu/append_attn/append_attention_kernel.cu",

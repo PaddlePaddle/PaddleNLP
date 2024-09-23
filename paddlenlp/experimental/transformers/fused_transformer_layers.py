@@ -54,7 +54,6 @@ if core.is_compiled_with_cuda():
         from paddlenlp_ops import (
             dequant_int8,
             encode_rotary_qk,
-            gemm_dequant,
             qkv_transpose_split,
             quant_int8,
             rebuild_padding,
@@ -1931,6 +1930,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             out_linear_out = dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
         else:
             try:
+                from paddlenlp_ops import gemm_dequant
                 out_linear_out = gemm_dequant(fmha_out, self.linear_weights[i], self.linear_out_scales[i], self._dtype)
             except:
                 out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
@@ -1982,6 +1982,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
             ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
         else:
             try:
+                from paddlenlp_ops import gemm_dequant
                 ffn2_out = gemm_dequant(ffn1_out, self.ffn2_weights[i], self.ffn2_out_scales[i], self._dtype)
             except:
                 ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i], False, True)
@@ -2172,8 +2173,8 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
         encoder_max_partition_size,
         **kwargs,
     ):
-        from paddlenlp_ops import append_attention
-        fmha_out = append_attention(
+        from paddlenlp_ops import append_multihead_attention
+        fmha_out = append_multihead_attention(
             qkv,
             caches[2 * i],
             caches[2 * i + 1],
@@ -2531,8 +2532,8 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
         cache_k_zp = cache_k_zps[i] if cache_k_zps is not None else None
         cache_v_zp = cache_v_zps[i] if cache_v_zps is not None else None
 
-        from paddlenlp_ops import append_attention
-        fmha_out = append_attention(
+        from paddlenlp_ops import append_multihead_attention
+        fmha_out = append_multihead_attention(
             qkv,
             caches[2 * i],
             caches[2 * i + 1],
@@ -2555,7 +2556,7 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
             kwargs.get("max_dec_len_this_time", None),
             rotary_embs,
             None, # attn_mask
-            None, # qkv_bias
+            self.qkv_biases[i] if len(self.qkv_biases) > 0 else None,
             self.qkv_out_scales[i],
             k_quant_scale,
             v_quant_scale,
@@ -2569,7 +2570,7 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
             cache_quant_type_str,
             self.use_neox_rotary_style,
             kwargs.get("max_input_length", -1),
-            0.0 if self.linear_shifts[i] is None else self.act_scales["out_linear_in_scale"][i],
+            self.act_scales["out_linear_in_scale"][i],
             encoder_block_shape_q,
             decoder_block_shape_q,
             max_partition_size,
