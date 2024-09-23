@@ -148,6 +148,8 @@ def distributed_isfile(filename):
             file_count += 1
 
         paddle.distributed.all_reduce(file_count)
+        print(file_count)
+        print(file_count >= 1)
         return file_count >= 1
 
 

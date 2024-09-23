@@ -38,9 +38,11 @@ def main(
         #inputs["attention_mask"] = paddle.tril(paddle.ones([seq_length, seq_length], dtype=bool))
         inputs["attention_mask"] = paddle.ones([1, seq_length], dtype=paddle.int64)
 
-        tokenizer.eos_token = '<|eot_id|>'
+        #tokenizer.eos_token = '<|eot_id|>'
         with paddle.no_grad():
-            generation_output = model.generate(**inputs, max_new_tokens=max_new_tokens, decode_strategy="greedy_search", eos_token_id=[tokenizer.eos_token_id, tokenizer.start_header_id, tokenizer.end_header_id], skip_special_tokens=True)
+            #generation_output = model.generate(**inputs, max_new_tokens=max_new_tokens, decode_strategy="greedy_search", eos_token_id=[tokenizer.eos_token_id, tokenizer.start_header_id, tokenizer.end_header_id], skip_special_tokens=True)
+            generation_output = model.generate(**inputs, max_new_tokens=max_new_tokens, decode_strategy="greedy_search", eos_token_id=[tokenizer.eos_token_id], skip_special_tokens=True)
+        #import pdb; pdb.set_trace()
         s = generation_output[0][0]
         output = tokenizer.decode(s[:-1])
         #return output.split("### Response:")[1].strip()

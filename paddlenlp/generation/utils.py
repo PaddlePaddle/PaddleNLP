@@ -1090,6 +1090,9 @@ class GenerationMixin(object):
             else:
                 logits = outputs
 
+            #if isinstance(logits, tuple):
+            #    logits = logits[0]
+
             # [batch_size, vocab_size]
             next_token_logits = logits[:, -1, :]
 

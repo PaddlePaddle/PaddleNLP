@@ -80,6 +80,8 @@ setup(
             "./generation/dequant_int8.cu",
             "./generation/flash_attn_bwd.cc",
             "./generation/tune_cublaslt_gemm.cu",
+            "./NF4/quant_ops.cu",
+            "./NF4/dequant_ops.cu",
         ],
         extra_compile_args={
             "cxx": ["-O3"],

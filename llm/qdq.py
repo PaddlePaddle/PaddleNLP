@@ -73,13 +73,20 @@ def asymmetry_qdq_weight(x, quant_bit=8, quant_axis=-1, mins=None, maxs=None, de
                 qdq_x = (quant_x / bnt * scales[rank * scales.shape[0] // world_size: (rank + 1) * scales.shape[0] // world_size].unsqueeze(0).expand(quant_x.shape)) + mins[rank * mins.shape[0] // world_size: (rank + 1) * mins.shape[0] // world_size]
             return qdq_x.astype(paddle.float32), scales
 
-def group_wise_quant_dequant(inputs, mins=None, maxs=None, quant_bits=4, group_size=128, quant=True, use_pd=False):
+def group_wise_quant_dequant(inputs, mins=None, maxs=None, quant_bits=4, group_size=128, quant=True, use_pd=False, symetry=False):
     qmax = (1 << (quant_bits)) - 1
     qmin = 0
     shape = inputs.shape
 
     if quant:
         inputs_processed = inputs.reshape([shape[0] // group_size, group_size, shape[1]])
+        if symetry:
+            bnt = (1 << (quant_bits - 1)) - 1
+            scales = np.max(np.abs(inputs_processed), axis=1)
+            new_scales = np.repeat(scales, repeats=group_size, axis=0)
+            quant_tensor = np.clip(np.round(inputs / new_scales * bnt), -bnt-1, bnt)
+            return quant_tensor.astype('int8'), scales
+
         # scales: [shape[0] // group_size, shape[1]]
         maxs = np.max(inputs_processed, axis=1)
         mins = np.min(inputs_processed, axis=1)
@@ -90,6 +97,20 @@ def group_wise_quant_dequant(inputs, mins=None, maxs=None, quant_bits=4, group_s
         quant_tensor = np.clip(np.round((inputs - new_mins) / new_scales * qmax), qmin, qmax)
         return quant_tensor.astype('uint8'), mins, maxs
     else:
+        if symetry:
+            scales = mins
+            bnt = (1 << (quant_bits - 1)) - 1
+            if use_pd:
+                new_scales = paddle.repeat_interleave(scales, group_size, 0)
+            else:
+                new_scales = np.repeat(scales, repeats=group_size, axis=0)
+
+            if len(new_scales.shape) == 0 or inputs.shape[-1] == new_scales.shape[-1]:
+                dequant_tensor = inputs * new_scales / bnt 
+            else:
+                dequant_tensor = (inputs * new_scales[rank * new_scales.shape[0] // world_size: (rank + 1) * new_scales.shape[0] // world_size] / bnt)
+            return dequant_tensor
+
         scales = maxs - mins
         if use_pd:
             new_scales = paddle.repeat_interleave(scales, group_size, 0)
@@ -105,14 +126,37 @@ def group_wise_quant_dequant(inputs, mins=None, maxs=None, quant_bits=4, group_s
         return dequant_tensor
 
 def merge_int4(x, y):
-    offset = 2 ** 4
-    res = x * offset + y
-    return res
+    #offset = 2 ** 4
+    #res = x * offset + y
+    #return res
+    int4_high = (x << 4)
+    int4_low = y & 0x0F
+    final = int4_high | int4_low
+    return final
 
-def split_int8(z):
-    offset = 2 ** 4
-    x, y = z // offset, z % offset
-    return x, y
+def split_int8(final):
+    #offset = 2 ** 4
+    #x, y = z // offset, z % offset
+    #return x, y
+
+    # 获取 int4_high 和 int4_low
+    int4_high = final >> 4
+    int4_low = final & 0x0F
+
+    # 还原 high 和 low
+    # 对 int4_high 进行符号扩展还原 high
+    print("int4_low:", int4_high)
+    int4_high = np.where(int4_high > 8, int4_high - 16, int4_high)
+
+    # 对 int4_low 进行符号扩展还原 low
+    #print("int4_low:", int4_low)
+    #low = np.where(int4_low > 8, int4_low - 16, int4_low)
+
+    # 转换为 Paddle tensor
+    #high_tensor = paddle.to_tensor(high, dtype="int8")
+    #low_tensor = paddle.to_tensor(low, dtype="int8")
+
+    return int4_high, int4_low
 
 
 #aa = safe_open('PaddleNLP/llm/checkpoints/ckpt_quant/model-00001-of-00008.safetensors', framework='np')
@@ -123,13 +167,13 @@ ccc, _ = asymmetry_qdq_weight(bbb, mins=mins, maxs=maxs, dequant=True, peek=True
 print(aaa - ccc)
 aaa = np.random.randn(1024, 1024)
 aaa, bbb = np.random.randn(1024, 1024), np.random.randn(1024, 1024)
-ccc, cmins, cmaxs = group_wise_quant_dequant(aaa)
+ccc, cmins = group_wise_quant_dequant(aaa, symetry=True)
 ddd, dmins, dmaxs = group_wise_quant_dequant(bbb)
 
 eee = merge_int4(ccc, ddd)
 fff, ggg = split_int8(eee)
 
-hhh = group_wise_quant_dequant(fff, mins=cmins, maxs=cmaxs, quant=False)
+hhh = group_wise_quant_dequant(fff, mins=cmins, maxs=None, quant=False, symetry=True)
 iii = group_wise_quant_dequant(ggg, mins=dmins, maxs=dmaxs, quant=False)
 print(aaa - hhh)
 print(bbb - iii)

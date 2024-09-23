@@ -236,11 +236,11 @@ class UnifiedCheckpointHandler:
                             # m1: m1_quant_weight, m2: ratio
                             m1_key = k.split('/')[0] + '/moment1_0'
                             ratio = cal_ratio(state_dict[m1_key], state_dict[k])
-                            m1_quant, m1_mins, m1_maxs = group_wise_quant_dequant(state_dict[m1_key], quant_bits=4)
+                            m1_quant, m1_mins = group_wise_quant_dequant(state_dict[m1_key], quant_bits=4, symetry=True)
                             quant_weight, r_mins, r_maxs = group_wise_quant_dequant(ratio, quant_bits=4)
                             quant_weight = merge_int4(m1_quant, quant_weight)
                             codebook_dict[m1_key + '_min_codebook'] = m1_mins
-                            codebook_dict[m1_key + '_max_codebook'] = m1_maxs
+                            #codebook_dict[m1_key + '_max_codebook'] = m1_maxs
                             codebook_dict[k + '_min_codebook'] = r_mins
                             codebook_dict[k + '_max_codebook'] = r_maxs
                             del_key.append(m1_key)
@@ -1124,9 +1124,9 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight.pop(key)
             returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, FP32_MASTER])
 
-    returned_optim_state_dict = nested_copy_place(
-        returned_optim_state_dict, place=paddle.framework._current_expected_place()
-    )
+    #returned_optim_state_dict = nested_copy_place(
+    #    returned_optim_state_dict, place=paddle.framework._current_expected_place()
+    #)
     
 
     return returned_optim_state_dict
