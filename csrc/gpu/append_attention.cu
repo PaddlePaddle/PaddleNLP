@@ -399,6 +399,7 @@ std::vector<paddle::Tensor> AppendAttention(
     const paddle::optional<paddle::Tensor>& cache_v_zp,
     const paddle::optional<paddle::Tensor>& out_linear_shifts,
     const paddle::optional<paddle::Tensor>& out_linear_smooths,
+    const std::string& compute_dtype,
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_input_length,
@@ -411,7 +412,7 @@ std::vector<paddle::Tensor> AppendAttention(
     const bool causal,
     const bool is_decoder,
     const bool enable_prefill) {
-  switch (qkv.type()) {
+  switch (qkv.dtype()) {
     case paddle::DataType::FLOAT16: {
       return append_attention<paddle::DataType::FLOAT16>(
           qkv,
@@ -506,6 +507,104 @@ std::vector<paddle::Tensor> AppendAttention(
           is_decoder,
           enable_prefill);
     }
+    case paddle::DataType::INT32: {
+      if (compute_dtype == "bf16") {
+        return append_attention<paddle::DataType::BFLOAT16>(
+            qkv,
+            key_cache,
+            value_cache,
+            seq_lens_encoder,
+            seq_lens_decoder,
+            seq_lens_this_time,
+            padding_offsets,
+            cum_offsets,
+            block_tables,
+            encoder_batch_ids,
+            encoder_tile_ids_per_batch,
+            encoder_num_blocks,
+            kv_batch_ids,
+            kv_tile_ids_per_batch,
+            kv_num_blocks,
+            decoder_batch_ids,
+            decoder_tile_ids_per_batch,
+            decoder_num_blocks,
+            max_enc_len_this_time,
+            max_dec_len_this_time,
+            rotary_embs,
+            attn_mask,
+            qkv_bias,
+            qkv_out_scales,
+            cache_k_quant_scales,
+            cache_v_quant_scales,
+            cache_k_dequant_scales,
+            cache_v_dequant_scales,
+            cache_k_zp,
+            cache_v_zp,
+            out_linear_shifts,
+            out_linear_smooths,
+            cache_quant_type_str,
+            use_neox_rotary_style,
+            max_input_length,
+            out_linear_in_scale,
+            encoder_block_shape_q,
+            decoder_block_shape_q,
+            max_partition_size,
+            encoder_max_partition_size,
+            speculate_max_draft_token_num,
+            causal,
+            is_decoder,
+            enable_prefill);
+      } else if (compute_dtype == "fp16") {
+        return append_attention<paddle::DataType::FLOAT16>(
+            qkv,
+            key_cache,
+            value_cache,
+            seq_lens_encoder,
+            seq_lens_decoder,
+            seq_lens_this_time,
+            padding_offsets,
+            cum_offsets,
+            block_tables,
+            encoder_batch_ids,
+            encoder_tile_ids_per_batch,
+            encoder_num_blocks,
+            kv_batch_ids,
+            kv_tile_ids_per_batch,
+            kv_num_blocks,
+            decoder_batch_ids,
+            decoder_tile_ids_per_batch,
+            decoder_num_blocks,
+            max_enc_len_this_time,
+            max_dec_len_this_time,
+            rotary_embs,
+            attn_mask,
+            qkv_bias,
+            qkv_out_scales,
+            cache_k_quant_scales,
+            cache_v_quant_scales,
+            cache_k_dequant_scales,
+            cache_v_dequant_scales,
+            cache_k_zp,
+            cache_v_zp,
+            out_linear_shifts,
+            out_linear_smooths,
+            cache_quant_type_str,
+            use_neox_rotary_style,
+            max_input_length,
+            out_linear_in_scale,
+            encoder_block_shape_q,
+            decoder_block_shape_q,
+            max_partition_size,
+            encoder_max_partition_size,
+            speculate_max_draft_token_num,
+            causal,
+            is_decoder,
+            enable_prefill);
+      } else {
+        PD_THROW("Only supported attr of compute_dtype in ['fp16', 'bf16'].");
+        break;
+      }
+    }
     default: {
       PD_THROW(
           "NOT supported data type. "
@@ -590,6 +689,7 @@ std::vector<paddle::DataType> AppendAttentionInferDtype(
     const paddle::optional<paddle::DataType>& cache_v_zp_dtype,
     const paddle::optional<paddle::DataType>& out_linear_shifts_dtype,
     const paddle::optional<paddle::DataType>& out_linear_smooths_dtype,
+    const std::string& compute_dtype,
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_input_length,
@@ -644,7 +744,8 @@ PD_BUILD_OP(append_attention)
     .Outputs({"fmha_out", "key_cache_out", "value_cache_out"})
     .SetInplaceMap({{"key_cache", "key_cache_out"},
                     {"value_cache", "value_cache_out"}})
-    .Attrs({"cache_quant_type: std::string",
+    .Attrs({"compute_type: std::string",
+            "cache_quant_type: std::string",
             "use_neox_rotary_style: bool",
             "max_input_length: int",
             "out_linear_in_scale: float",

@@ -2209,6 +2209,7 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
             None, # cache_v_zp
             None, # out_shifts
             None, # out_smooths
+            self._fuse_kernel_compute_dtype,
             "none",  # cache_quant_type
             self.use_neox_rotary_style,
             kwargs.get("max_input_length", -1),
@@ -2567,6 +2568,7 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
             cache_v_zps,
             self.linear_shifts[i] if len(self.linear_shifts) > 0 else None,
             self.linear_smooths[i] if len(self.linear_smooths) > 0 else None,
+            self._fuse_kernel_compute_dtype,
             cache_quant_type_str,
             self.use_neox_rotary_style,
             kwargs.get("max_input_length", -1),
