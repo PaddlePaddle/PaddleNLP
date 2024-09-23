@@ -214,8 +214,8 @@ class CheckpointConverter:
             assert self.model_meta is not None
             global_model_state_shapes = []
             sharding_metas_keys = []
-            for i in range(self.pp_degree):
-                for j in range(self.tp_degree):
+            for i in range(self.tp_degree):
+                for j in range(self.pp_degree):
                     sharding_metas_keys.append("tp{:02d}_pp{:02d}".format(i, j))
             for key in sharding_metas_keys:
                 param_meta = self.model_meta["sharding_metas"][key]["param_meta"]
