@@ -37,32 +37,8 @@ class FusedUpdateInputsOperatorsTest(unittest.TestCase):
         topk_ids = paddle.arange(0, bs, dtype="int64")
         next_tokens = paddle.full([bs], 0, dtype="int64")
         stop_flags = paddle.to_tensor(np.random.randint(0, 2, [bs]), "bool")
-        seq_lens = paddle.to_tensor(np.random.randint(0, 5, [bs]), "int32")
         end_ids = paddle.to_tensor([0, 1, 2, 3, 4, 5], "int64")
 
-        # Clone tensors for later comparison
-        topk_ids_2 = topk_ids.clone()
-        next_tokens_2 = next_tokens.clone()
-        stop_flags_2 = stop_flags.clone()
-        seq_lens_2 = seq_lens.clone()
-        end_ids_2 = end_ids.clone()
-
-        # Run set_stop_value_multi_ends_v2
-        set_stop_value_multi_ends_v2(
-            topk_ids, stop_flags, seq_lens, end_ids, next_tokens
-        )
-
-        # Save results from set_stop_value_multi_ends_v2 and update_inputs
-        result1 = {
-            "topk_ids": topk_ids.numpy(),
-            "next_tokens": next_tokens.numpy(),
-            "stop_flags": stop_flags.numpy(),
-            "seq_lens": seq_lens.numpy(),
-            "end_ids": end_ids.numpy(),
-        }
-
-        # Initialize tensors for update_inputs
-        not_need_stop = paddle.to_tensor(np.array([1], "bool"))
         seq_lens_this_time = np.zeros([bs], "int32")
         seq_lens_encoder = np.zeros([max_bs], "int32")
         seq_lens_decoder = np.zeros([max_bs], "int32")
@@ -83,15 +59,35 @@ class FusedUpdateInputsOperatorsTest(unittest.TestCase):
         seq_lens_this_time = paddle.to_tensor(seq_lens_this_time)
         seq_lens_encoder = paddle.to_tensor(seq_lens_encoder)
         seq_lens_decoder = paddle.to_tensor(seq_lens_decoder)
+        seq_lens_this_time_2 = seq_lens_this_time.clone()
+        seq_lens_encoder_2 = seq_lens_encoder.clone()
+        seq_lens_decoder_2 = seq_lens_decoder.clone()
+        topk_ids_2 = topk_ids.clone()
+        next_tokens_2 = next_tokens.clone()
+        stop_flags_2 = stop_flags.clone()
+        end_ids_2 = end_ids.clone()
+
+        # Run set_stop_value_multi_ends_v2
+        set_stop_value_multi_ends_v2(
+            topk_ids, stop_flags, seq_lens_this_time, end_ids, next_tokens
+        )
+
+        # Save results from set_stop_value_multi_ends_v2 and update_inputs
+        result1 = {
+            "topk_ids": topk_ids.numpy(),
+            "next_tokens": next_tokens.numpy(),
+            "stop_flags": stop_flags.numpy(),
+            "end_ids": end_ids.numpy(),
+        }
+
+        # Initialize tensors for update_inputs
+        not_need_stop = paddle.to_tensor(np.array([1], "bool"))
         input_ids = paddle.to_tensor(input_ids_np)
         stop_nums = paddle.to_tensor(stop_nums)
         is_block_step = paddle.to_tensor(is_block_step)
 
         # Clone tensors for fused_update_inputs
         not_need_stop_2 = not_need_stop.clone()
-        seq_lens_this_time_2 = seq_lens_this_time.clone()
-        seq_lens_encoder_2 = seq_lens_encoder.clone()
-        seq_lens_decoder_2 = seq_lens_decoder.clone()
         input_ids_2 = input_ids.clone()
         stop_nums_2 = stop_nums.clone()
         is_block_step_2 = is_block_step.clone()

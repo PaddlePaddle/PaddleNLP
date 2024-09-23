@@ -13,7 +13,7 @@
 // limitations under the License.
 #include "helper.h"
 
-__device__ bool is_in_end(const int64_t id,
+__device__ bool is_in_end_v3(const int64_t id,
                           const int64_t *end_ids,
                           int length) {
   for (int i = 0; i < length; i++) {
@@ -25,7 +25,7 @@ __device__ bool is_in_end(const int64_t id,
 }
 
 template <int THREADBLOCK_SIZE>
-__global__ void fused_update_inputs_kernel(bool *not_need_stop,
+__global__ void fused_update_inputs_kernel(bool *not_need_stop,   
                                            int *seq_lens_this_time,
                                            int *seq_lens_encoder,
                                            int *seq_lens_decoder,
@@ -51,7 +51,7 @@ __global__ void fused_update_inputs_kernel(bool *not_need_stop,
     if (thread_idx < bsz) {
       // Begin merging set_value_by_flags_v2 logic
       if (stop_flags[thread_idx]) {
-        if (seq_lens_decoder[thread_idx] == 0) {
+        if (seq_lens_this_time[thread_idx] == 0) {
           topk_ids[thread_idx] = -1;
         } else {
           topk_ids[thread_idx] = end_ids[0];
@@ -61,7 +61,7 @@ __global__ void fused_update_inputs_kernel(bool *not_need_stop,
         next_tokens[thread_idx] = topk_ids[thread_idx];
       }
 
-      if (is_in_end(topk_ids[thread_idx], end_ids, end_length)) {
+      if (is_in_end_v3(topk_ids[thread_idx], end_ids, end_length)) {
         stop_flags[thread_idx] = true;
       }
 
