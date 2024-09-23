@@ -89,6 +89,7 @@ sources = [
     "./gpu/set_value_by_flags_v2.cu",
     "./gpu/stop_generation_multi_ends_v2.cu",
     "./gpu/update_inputs.cu",
+    "./gpu/fused_update_inputs.cu",
     "./gpu/get_output.cc",
     "./gpu/save_with_output_msg.cc",
     "./gpu/write_int8_cache_kv.cu",

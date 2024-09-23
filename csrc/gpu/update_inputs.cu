@@ -50,10 +50,14 @@ __global__ void update_inputs_kernel(bool *not_need_stop,
     const int seq_len_encoder = seq_lens_encoder[thread_idx];
     const int seq_len_decoder = seq_lens_decoder[thread_idx];
 
-    seq_lens_decoder[thread_idx] =
-        stop_flag_now
-            ? 0
-            : (seq_len_decoder == 0 ? seq_len_encoder : seq_len_decoder + 1);
+    // seq_lens_decoder[thread_idx] = stop_flag_now
+    //     ? 0
+    //     : (seq_len_decoder == 0 ? seq_len_encoder : seq_len_decoder + 1);
+    seq_lens_decoder[thread_idx] = 
+        stop_flag_now 
+            ? 0 
+            : (seq_len_encoder > 0 ? (seq_len_encoder + seq_len_decoder) 
+            : seq_len_decoder + 1);
 
     seq_lens_this_time[thread_idx] = stop_flag_now ? 0 : 1;
     seq_lens_encoder[thread_idx] = 0;
