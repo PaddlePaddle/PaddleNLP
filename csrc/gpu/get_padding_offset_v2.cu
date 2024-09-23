@@ -14,43 +14,36 @@
 
 #include "paddle/extension.h"
 
-__global__ void RemovePaddingV2(int64_t *output_data,
-                                const int64_t *input_data,
-                                const int *seq_lens,
-                                const int *cum_offsets,
-                                const int sequence_length) {
-  const int bi = blockIdx.x;
+__global__ void RemovePaddingAndComputeOffsets(
+    int64_t *output_data,
+    int *padding_offset,
+    int *cum_offsets_out,
+    int *cu_seqlens_q,
+    int *cu_seqlens_k,
+    const int64_t *input_data,
+    const int *seq_lens,
+    const int *cum_offsets,
+    const int sequence_length) {
+  const int bi = blockIdx.x;  // Batch index
   const int tid = threadIdx.x;
 
-  for (int i = tid; i < seq_lens[bi]; i += blockDim.x) {
-    const int tgt_seq_id = bi * sequence_length - cum_offsets[bi] + i;
-    const int src_seq_id = bi * sequence_length + i;
-    output_data[tgt_seq_id] = input_data[src_seq_id];
-  }
-}
+  int cum_offset_prev = (bi == 0) ? 0 : cum_offsets[bi - 1];
+  int cum_offset = cum_offsets[bi];
 
-__global__ void GetPaddingOffsetKernelV2(int *padding_offset,
-                                         int *cum_offsets_out,
-                                         int *cu_seqlens_q,
-                                         int *cu_seqlens_k,
-                                         const int *cum_offsets,
-                                         const int *seq_lens,
-                                         const int max_seq_len) {
-  // get padding offset of each batch
-  const int bi = blockIdx.x;
-  const int ti = threadIdx.x;
-  int cum_offset = bi == 0 ? 0 : cum_offsets[bi - 1];
-  for (int i = ti; i < seq_lens[bi]; i += blockDim.x) {
-    padding_offset[bi * max_seq_len - cum_offset + i] = cum_offset;
-  }
-  if (ti == 0) {
-    cum_offsets_out[bi] = cum_offset;
-    int cum_seq_len = (bi + 1) * max_seq_len - cum_offsets[bi];
+  if (tid == 0) {
+    cum_offsets_out[bi] = cum_offset_prev;
+    int cum_seq_len = (bi + 1) * sequence_length - cum_offset;
     cu_seqlens_q[bi + 1] = cum_seq_len;
     cu_seqlens_k[bi + 1] = cum_seq_len;
   }
-}
 
+  for (int i = tid; i < seq_lens[bi]; i += blockDim.x) {
+    int src_seq_id = bi * sequence_length + i;
+    int tgt_seq_id = bi * sequence_length - cum_offset_prev + i;
+    output_data[tgt_seq_id] = input_data[src_seq_id];
+    padding_offset[tgt_seq_id] = cum_offset_prev;
+  }
+}
 
 std::vector<paddle::Tensor> GetPaddingOffsetV2(const paddle::Tensor& input_ids,
                                                const paddle::Tensor& cum_offsets,
@@ -59,7 +52,7 @@ std::vector<paddle::Tensor> GetPaddingOffsetV2(const paddle::Tensor& input_ids,
     auto cu_stream = input_ids.stream();
     std::vector<int64_t> input_ids_shape = input_ids.shape();
     const int bsz = seq_len.shape()[0];
-    const int seq_length = input_ids_shape[1];
+    const int sequence_length = input_ids_shape[1];
     auto cum_offsets_out = cum_offsets.copy_to(cum_offsets.place(), false);
     auto cpu_token_num = token_num.copy_to(paddle::CPUPlace(), false);
 
@@ -68,22 +61,22 @@ std::vector<paddle::Tensor> GetPaddingOffsetV2(const paddle::Tensor& input_ids,
     auto padding_offset = paddle::full({token_num_data}, 0, paddle::DataType::INT32, input_ids.place());
     auto cu_seqlens_q = paddle::full({bsz + 1}, 0, paddle::DataType::INT32, input_ids.place());
     auto cu_seqlens_k = paddle::full({bsz + 1}, 0, paddle::DataType::INT32, input_ids.place());
-    int blockSize = min((token_num_data + 32 - 1) / 32 * 32, 128);
-    GetPaddingOffsetKernelV2<<<bsz, 128, 0, cu_stream>>>(
-      padding_offset.data<int>(), 
-      cum_offsets_out.data<int>(),
-      cu_seqlens_q.data<int>(),
-      cu_seqlens_k.data<int>(),
-      cum_offsets.data<int>(),
-      seq_len.data<int>(),
-      seq_length);
-    RemovePaddingV2<<<bsz, blockSize, 0, cu_stream>>>(
-      x_remove_padding.data<int64_t>(), 
-      input_ids.data<int64_t>(), 
-      seq_len.data<int>(),
-      cum_offsets_out.data<int>(), 
-      seq_length);
-    return {x_remove_padding, cum_offsets_out, padding_offset, cu_seqlens_q, cu_seqlens_k}; // , enc_token_num, dec_token_num};
+
+    int blockSize = std::min((token_num_data + 32 - 1) / 32 * 32, 128);
+    int gridSize = bsz;
+
+    RemovePaddingAndComputeOffsets<<<gridSize, blockSize, 0, cu_stream>>>(
+        x_remove_padding.data<int64_t>(),
+        padding_offset.data<int>(),
+        cum_offsets_out.data<int>(),
+        cu_seqlens_q.data<int>(),
+        cu_seqlens_k.data<int>(),
+        input_ids.data<int64_t>(),
+        seq_len.data<int>(),
+        cum_offsets.data<int>(),
+        sequence_length);
+
+    return {x_remove_padding, cum_offsets_out, padding_offset, cu_seqlens_q, cu_seqlens_k};
 }
 
 std::vector<std::vector<int64_t>> GetPaddingOffsetV2InferShape(const std::vector<int64_t>& input_ids_shape,
