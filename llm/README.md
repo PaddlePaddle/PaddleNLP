@@ -81,7 +81,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 
 注意：
 
-1. 建议使用 paddle develop 版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失 whl 包
+1. 建议使用 paddle develop 版本训练，需要安装`pip install fast_dataindex visualdl==2.5.3`等相关缺失 whl 包
 2. `use_flash_attention` 需要在 A100机器开启，建议使用 cuda11.8环境。
 3. `use_fused_rms_norm` 需要安装自定义算子。如果安装后仍然找不到算子，需要额外设置 PYTHONPATH
 4. `continue_training` 表示从现有的预训练模型加载训练。7b 模型初始 loss 大概为2.xx, 随机初始化模型 loss 从11.x 左右下降。
