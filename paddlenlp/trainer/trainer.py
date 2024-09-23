@@ -187,18 +187,6 @@ except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
 
-try:
-    from paddle.framework.recall_error import LOSS_NAN_ERROR
-except ImportError:
-    LOSS_NAN_ERROR = "CUDA error(1002)"
-
-
-try:
-    from paddle.framework.recall_error import LOSS_INF_ERROR
-except ImportError:
-    LOSS_INF_ERROR = "CUDA error(1004)"
-
-
 __all__ = ["Trainer"]
 
 
@@ -1304,8 +1292,7 @@ class Trainer:
         loss_value = loss.item()
         if not self.args.fp16:
             if not np.isfinite(loss_value).all():
-                err_msg = LOSS_NAN_ERROR if np.isnan(loss_value).any() else LOSS_INF_ERROR
-                raise ValueError(f"{err_msg}. Loss contains inf or nan values, its value is {loss_value}")
+                raise ValueError(f"Loss contains inf or nan values, its value is {loss_value}")
         return loss_value
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
