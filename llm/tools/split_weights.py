@@ -49,6 +49,8 @@ def split(args):
     paddle.set_default_dtype(args.dtype)
 
     config = AutoConfig.from_pretrained(args.model_path)
+    config.tensor_parallel_degree = nranks
+    config.tensor_parallel_rank = rank
 
     generation_config = GenerationConfig.from_pretrained(args.model_path)
     model = AutoModelForCausalLM.from_pretrained(args.model_path)
@@ -57,23 +59,14 @@ def split(args):
     if args.model_rank_id is not None:
         model_path = os.path.join(args.model_path, f"model_state.tp0{args.model_rank_id - 1}.pdparams")
         assert os.path.isfile(model_path), f"{model_path} not exist"
-        model_state_dict = paddle.load(model_path)
+        state_dict = load_tp_checkpoint(args.model_path, model, config)
         model_rank = args.model_rank_id
         save_base_rank = model_rank * nranks
     else:
-        model_state_dict = load_tp_checkpoint(args.model_path, model, config)
+        state_dict = load_tp_checkpoint(args.model_path, model, config)
         model_rank = 0
         save_base_rank = 0
 
-    config.tensor_parallel_degree = nranks
-    config.tensor_parallel_rank = rank
-
-    state_dict = model.convert_tensor_parallel(
-        weight_file=None,
-        config=config,
-        state_dict=model_state_dict,
-        ignore_error=True,
-    )
     weight_file = os.path.join(args.output_path, f"model_state.tp0{rank + save_base_rank}.pdparams")
     paddle.save(state_dict, weight_file)
 
