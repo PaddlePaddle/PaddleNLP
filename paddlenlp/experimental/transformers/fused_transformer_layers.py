@@ -363,10 +363,20 @@ class FusedMultiTransformerBase(Layer):
 
         # self.normalize_before = normalize_before
         self._dtype = self._helper.get_default_dtype()
+        if self._dtype == "bfloat16":
+            self._fuse_kernel_compute_dtype = "bf16"
+        elif self._dtype == "float16":
+            self._fuse_kernel_compute_dtype = "fp16"
+        elif self._dtype == "float32":
+            self._fuse_kernel_compute_dtype = "fp32"
+        else:
+            raise ValueError(
+                "FusedMultiTransformer just support float32, float16 and bfloat16 as default dtype, but received {}".format(
+                    self._dtype
+                )
+            )
         self._epsilon = config.epsilon
         self._residual_alpha = config.residual_alpha
-        self._trans_qkvw = config.trans_qkvw
-        self._ring_id = config.ring_id
         self.nranks = config.nranks
         self.norm_type = config.norm_type
         if self.norm_type == "layernorm":
@@ -1693,19 +1703,6 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         self.quant_min_bound = config.quant_min_bound
         # self.use_gemm_dequant = False
 
-        if self._dtype == "bfloat16":
-            self._fuse_kernel_compute_dtype = "bf16"
-        elif self._dtype == "float16":
-            self._fuse_kernel_compute_dtype = "fp16"
-        elif self._dtype == "float32":
-            self._fuse_kernel_compute_dtype = "fp32"
-        else:
-            raise ValueError(
-                "FusedMultiTransformer just support float32, float16 and bfloat16 as default dtype, but received {}".format(
-                    self._dtype
-                )
-            )
-
         self.qkv_out_scales = []
         self.linear_out_scales = []
         self.ffn1_out_scales = []
@@ -2607,8 +2604,6 @@ class FusedBlockMultiTransformerFP8(Layer):
         self._dtype = self._helper.get_default_dtype()
         self._epsilon = config.epsilon
         self._residual_alpha = config.residual_alpha
-        self._trans_qkvw = config.trans_qkvw
-        self._ring_id = config.ring_id
         self.nranks = config.nranks
         self.norm_type = config.norm_type
         if self.norm_type == "layernorm":
