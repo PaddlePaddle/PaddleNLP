@@ -24,7 +24,11 @@ from reward_argument import DataArgument, ModelArgument, TrainingArguments
 from reward_model import LlamaModelForScore
 from reward_trainer import RewardTrainer
 
-from paddlenlp.datasets import ZeroPaddingMapDataset, load_dataset
+from paddlenlp.datasets import (
+    ZeroPaddingIterableDataset,
+    ZeroPaddingMapDataset,
+    load_dataset,
+)
 from paddlenlp.trainer import (
     IntervalStrategy,
     PdArgumentParser,
@@ -135,14 +139,19 @@ def main():
 
     logger.info("Start to create dataset")
     trans_func = partial(preprocess_preference_data, tokenizer=tokenizer, data_args=data_args, model_args=model_args)
+    if data_args.lazy:
+        zero_padding_dataset = ZeroPaddingIterableDataset
+    else:
+        zero_padding_dataset = ZeroPaddingMapDataset
     if training_args.do_train and training_args.should_load_dataset:
         train_ds = load_dataset(
             "json",
             data_files=data_args.train_dataset_path,
+            lazy=data_args.lazy,
         )[0]
         logger.info("Creating train Zero Padding Data Stream. This may take a few minutes.")
         train_ds = (
-            ZeroPaddingMapDataset(
+            zero_padding_dataset(
                 train_ds.map(trans_func),
                 tokenizer=tokenizer,
                 max_length=data_args.max_seq_len,
@@ -158,10 +167,11 @@ def main():
         eval_ds = load_dataset(
             "json",
             data_files=data_args.dev_dataset_path,
+            lazy=data_args.lazy,
         )[0]
         logger.info("Creating dev Zero Padding Data Stream. This may take a few minutes.")
         eval_ds = (
-            ZeroPaddingMapDataset(
+            zero_padding_dataset(
                 eval_ds.map(trans_func),
                 tokenizer=tokenizer,
                 max_length=data_args.max_seq_len,
