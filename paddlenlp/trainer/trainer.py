@@ -2441,9 +2441,8 @@ class Trainer:
                 "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
                 "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
             }
-            if not os.path.exists(os.path.join(self.args.logging_dir, "async_save_info.json")):
-                with open(os.path.join(self.args.logging_dir, "async_save_info.json"), "w") as f:
-                    json.dump(save_info, f)
+            with open(os.path.join(self.args.logging_dir, "async_save_info.json"), "w") as f:
+                json.dump(save_info, f)
 
         if self.args.should_save:
             if self.tokenizer is not None:
