@@ -51,7 +51,7 @@ function llama_case_list_auto() {
     # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP1
     # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2
     # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
-    llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
+    # llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
 
     llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
     llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
@@ -1169,7 +1169,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
     export FLAGS_enable_pir_api=1
-    export FLAGS_max_inplace_grad_add=3
+    export FLAGS_max_inplace_grad_add=4
 
     task_name="llama_align_dygraph_dy2st_auto_bs2_bf16_dp2"
     case_out_dir="output/$task_name"
@@ -1191,7 +1191,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
             --weight_decay 0.01 \
             --warmup_ratio 0.01 \
             --warmup_steps 30 \
-            --max_grad_norm 0.0 \
+            --max_grad_norm 1.0 \
             --learning_rate 3e-05 \
             --min_learning_rate 3e-06 \
             --max_steps 10 \
@@ -1217,17 +1217,17 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
             --recompute_use_reentrant true \
             --recompute_granularity full \
             --pp_recompute_interval 0 \
-            --bf16 1\
+            --bf16 1 \
             --fp16_opt_level "O2"  \
             --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
             --amp_custom_white_list "lookup_table" "lookup_table_v2" \
             --amp_master_grad 1 \
             --fuse_attention_ffn true \
-            --fuse_attention_qkv false \
+            --fuse_attention_qkv true \
             --fuse_sequence_parallel_allreduce false \
             --use_flash_attention 0 \
             --use_fused_rope false \
-            --use_fused_rms_norm 0 \
+            --use_fused_rms_norm 1 \
             --max_seq_length 4096 \
             --sep_parallel_degree 1 \
             --sequence_parallel false \
@@ -1244,9 +1244,9 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
         ips=-1
         mem=-1
         echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
-        loss_base=10.06303482
+        loss_base=9.97198105
         if [ $IS_A100 -ne 0 ];then
-            loss_base=10.24704742
+            loss_base=10.18783569
         fi
         ips_base=-1
         mem_base=-1

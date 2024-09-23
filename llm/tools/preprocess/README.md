@@ -1,14 +1,14 @@
 # PaddleNLP 预训练数据流程
 
-本示例致力于打造基于PaddleNLP预训练模型的最佳实践。
+本示例致力于打造基于 PaddleNLP 预训练模型的最佳实践。
 
 
 我们将预训练数据过程划分为以下部分
 
-- 原始数据转换，原始文本转换为jsonl的json字符串格式。
-- 数据ID化，断句、分词、tokenize转化为token id格式。
-- 训练index文件生成，生成train、valid、test的每个样本索引。
-- token动态mask(可选)，python 层实时mask文本。
+- 原始数据转换，原始文本转换为 jsonl 的 json 字符串格式。
+- 数据 ID 化，断句、分词、tokenize 转化为 token id 格式。
+- 训练 index 文件生成，生成 train、valid、test 的每个样本索引。
+- token 动态 mask(可选)，python 层实时 mask 文本。
 
 本目录下主要包含一下文件：
 ```
@@ -24,40 +24,40 @@
  - tqdm
  - numpy
  - pybind11
- - tool_helpers
+ - fast_dataindex
  - lac (可选)
  - zstandard (可选)
 
-安装命令`pip install tqdm numpy pybind11 tool_helpers lac zstandard`。另，部分功能需要`g++>=4.8`编译支持
+安装命令`pip install tqdm numpy pybind11 fast_dataindex lac zstandard`。另，部分功能需要`g++>=4.8`编译支持
 
 
-## 训练全流程数据Pipeline
+## 训练全流程数据 Pipeline
 
 飞桨是自主研发、功能完备、开源开放的产业级深度学习平台，集深度学习核心训练和推理框架、基础模型库、端到端开发套件和丰富的工具组件于一体
 
 | 步骤                                                | 阶段&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | 数据格式                                                                                                                        | 样例                                                                                                                                                                               |
 |-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 0️⃣初始状态                                           | -                                                                                                                                  | 原始数据： <br/> **每个doc之间用空行间隔开** <br/> - 中文，默认每句换行符，作为句子结束。<br/> - 英文，默认使用nltk判断句子结束 | ```飞桨是功能完备、开源开放的产业级深度学习平台。``` <br/> ```飞桨拥有核心训练和推理框架、基础模型库。``` <br/><br/> ```PaddleNLP是自然语言处理领域的优秀工具。```                 |
-| 1️⃣原始数据转换<br/>`trans_to_json.py`                | 预处理 <br>输入：0️⃣初始状态 <br>输出：jsonl                                                                                         | jsonl格式：每个doc对应一行json字符串                                                                                            | ```{"text": "飞桨是功能完备、开源开放的产业级深度学习平台。飞桨拥有..."}```<br/>```{"text": "PaddleNLP是自然语言..."}```                                                           |
-| ❇️(**可选**)数据中文分词<br/>`words_segmentation.py` | 语料分词：中文WWM <br>输入：jsonl  <br> 输出：0️⃣初始状态                                                                            | 将jsonl格式的数据，恢复成分词后的原始格式数据 <br>                                                                              | ```飞桨 是 功能 完备、开源 开放的 产业级 深度学习 平台。``` <br/> ```飞桨 拥有 核心 训练和推理 框架、基础 模型库。``` <br/><br/> ```PaddleNLP 是 自然语言处理领域 的 优秀工具。``` |
-| 2️⃣数据ID化<br/>`create_pretrain_data.py`             | 预处理                                                                                                                             | bin格式：数据id化后的token id <br/>idx格式：数据句子、文章位置索引                                                              | -                                                                                                                                                                                  |
-| 3️⃣训练index文件生成                                  | 训练启动                                                                                                                           | npy格式：<br/> 根据训练步数max_steps生成<br/>train、valid、test的每个样本索引文件                                               | -                                                                                                                                                                                  |
-| 4️⃣token动态mask（可选）                              | Dataset取数据                                                                                                                      | 无                                                                                                                              | -                                                                                                                                                                                  |
+| 0️⃣初始状态                                           | -                                                                                                                                  | 原始数据： <br/> **每个 doc 之间用空行间隔开** <br/> - 中文，默认每句换行符，作为句子结束。<br/> - 英文，默认使用 nltk 判断句子结束 | ```飞桨是功能完备、开源开放的产业级深度学习平台。``` <br/> ```飞桨拥有核心训练和推理框架、基础模型库。``` <br/><br/> ```PaddleNLP是自然语言处理领域的优秀工具。```                 |
+| 1️⃣原始数据转换<br/>`trans_to_json.py`                | 预处理 <br>输入：0️⃣初始状态 <br>输出：jsonl                                                                                         | jsonl 格式：每个 doc 对应一行 json 字符串                                                                                            | ```{"text": "飞桨是功能完备、开源开放的产业级深度学习平台。飞桨拥有..."}```<br/>```{"text": "PaddleNLP是自然语言..."}```                                                           |
+| ❇️(**可选**)数据中文分词<br/>`words_segmentation.py` | 语料分词：中文 WWM <br>输入：jsonl  <br> 输出：0️⃣初始状态                                                                            | 将 jsonl 格式的数据，恢复成分词后的原始格式数据 <br>                                                                              | ```飞桨 是 功能 完备、开源 开放的 产业级 深度学习 平台。``` <br/> ```飞桨 拥有 核心 训练和推理 框架、基础 模型库。``` <br/><br/> ```PaddleNLP 是 自然语言处理领域 的 优秀工具。``` |
+| 2️⃣数据 ID 化<br/>`create_pretrain_data.py`             | 预处理                                                                                                                             | bin 格式：数据 id 化后的 token id <br/>idx 格式：数据句子、文章位置索引                                                              | -                                                                                                                                                                                  |
+| 3️⃣训练 index 文件生成                                  | 训练启动                                                                                                                           | npy 格式：<br/> 根据训练步数 max_steps 生成<br/>train、valid、test 的每个样本索引文件                                               | -                                                                                                                                                                                  |
+| 4️⃣token 动态 mask（可选）                              | Dataset 取数据                                                                                                                      | 无                                                                                                                              | -                                                                                                                                                                                  |
 
 
 注意：
 - **❇️(**可选**)数据中文分词** 是中文预训练做 WWM 的可选步骤
   - 当你的数据比较少时，分词耗时较少，不需要分词步骤。直接在`create_pretrain_data.py`步骤中分词即可。
-  - 目的是为了提前分词，加快后续数据ID转化步骤。
-  - 如果这里输入的是 jsonl格式文件，最好为多文件，`trans_to_json.py` 时候开启`no-merge`选项。
+  - 目的是为了提前分词，加快后续数据 ID 转化步骤。
+  - 如果这里输入的是 jsonl 格式文件，最好为多文件，`trans_to_json.py` 时候开启`no-merge`选项。
   - 当你的数据集比较大，或者需要尝试多次转换数据的时候，提前分词可以避免`create_pretrain_data.py`时每次都运行一次分词程序。
-- 转换后，需要重新进行步骤 1️⃣`原始数据转换 trans_to_json.py`，最后2️⃣`数据ID化`步骤设置`--cn_splited=True`参数。
-- 2️⃣`数据ID化`也可以在转化ID的同时，一起实现分词。不需要❇️`数据中文分词`步骤。
+- 转换后，需要重新进行步骤 1️⃣`原始数据转换 trans_to_json.py`，最后2️⃣`数据 ID 化`步骤设置`--cn_splited=True`参数。
+- 2️⃣`数据 ID 化`也可以在转化 ID 的同时，一起实现分词。不需要❇️`数据中文分词`步骤。
 
 
 ## 数据教程汇总
 
-针对目前开源的数据集，PaddleNLP提供了详细的数据教程，点击对应数据集的链接，即可开始进行数据制作：
+针对目前开源的数据集，PaddleNLP 提供了详细的数据教程，点击对应数据集的链接，即可开始进行数据制作：
 
 | 名称                                             | 文本类型 | 纯文本大小 | 适配模型 |
 |--------------------------------------------------|----------|------------|----------|
@@ -68,7 +68,7 @@
 
 ## 预训练详细准备
 
-下面以ziya-llama-13b-v1预训练为例，简要介绍一下预训练的全流程。
+下面以 ziya-llama-13b-v1预训练为例，简要介绍一下预训练的全流程。
 
 ### 原始数据
 首先下载样例数据：
@@ -79,7 +79,7 @@ cd ..
 ```
 
 ### 原始数据转换 jsonl 格式
-使用`trans_to_json.py`转化为json串格式，下面是脚本的使用说明
+使用`trans_to_json.py`转化为 json 串格式，下面是脚本的使用说明
 ```
 optional arguments:
   -h, --help            show this help message and exit
@@ -107,7 +107,7 @@ optional arguments:
   --no-shuffle          Don't shuffle the file.
                         可选。默认不开启这个选项，默认对处理完进行shuffle。
 ```
-根据说明，我们使用下面简单命令，可以得到`baike_sample.jsonl`文件。此处，我们对文章所有doc进行了shuffle。
+根据说明，我们使用下面简单命令，可以得到`baike_sample.jsonl`文件。此处，我们对文章所有 doc 进行了 shuffle。
 ```shell
 python trans_to_json.py  --input_path ./data --output_path baike_sample
 ```
@@ -121,8 +121,8 @@ head -1 baike_sample.jsonl
 大的制约。中华人民共和国省份中，广东为GDP最高的第一强省，浙江为人均收入最高的第一富省。中国大陆、香港、澳门、台湾之间的经济联系在全球化的过程中日益紧密。\n"}
 ```
 
-### 数据ID化
-本部分，我们使用 `create_pretraining_data.py` 脚本将前面得到的 `baike_sample.jsonl` 进行tokenize id化处理。
+### 数据 ID 化
+本部分，我们使用 `create_pretraining_data.py` 脚本将前面得到的 `baike_sample.jsonl` 进行 tokenize id 化处理。
 ```
 optional arguments:
   -h, --help            show this help message and exit
@@ -213,11 +213,11 @@ python -u  create_pretraining_data.py \
     --log_interval 5 \
     --workers 40
 ```
-1. 如果您使用已经分好词的语料，可以设置 --cn_splited 为 True，同时指定--cn_split_dimer如空格。
-2. 使用自定义词表的话，请指定model_name为词表所在的文件夹地址。
+1. 如果您使用已经分好词的语料，可以设置 --cn_splited 为 True，同时指定--cn_split_dimer 如空格。
+2. 使用自定义词表的话，请指定 model_name 为词表所在的文件夹地址。
 
-若需要预处理的文件过大，该脚本所耗费的时间可能会很长。此时可以考虑将jsonl文件拆分为多个小文件，并行使用create_pretraining_data.py进行处理，得到多个.bin & .idx文件。
-之后使用如下merge脚本合并多个小的.bin & .idx文件。
+若需要预处理的文件过大，该脚本所耗费的时间可能会很长。此时可以考虑将 jsonl 文件拆分为多个小文件，并行使用 create_pretraining_data.py 进行处理，得到多个.bin & .idx 文件。
+之后使用如下 merge 脚本合并多个小的.bin & .idx 文件。
 ```
 python merge.py \
     --input /root/data \
@@ -239,21 +239,21 @@ arguments:
 ```
 
 ### 预训练开始
-得到了处理好的训练数据，就可以开始模型的预训练了。简单将预处理好的数据，拷贝到data目录，即可开始预训练。
+得到了处理好的训练数据，就可以开始模型的预训练了。简单将预处理好的数据，拷贝到 data 目录，即可开始预训练。
 ```shell
 mkdir data
 mv ./preprocess/baike_sample* ./data
 ```
 
-* llama预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm)。
-* ernie预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/model_zoo/ernie-1.0/pretraining_introduction.md)。
+* llama 预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm)。
+* ernie 预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/model_zoo/ernie-1.0/pretraining_introduction.md)。
 
 
 代码说明：
-- 动态mask相关代码实现在`./data_tools/dataset_utils.py`
-  用户可以根据自己的需求，灵活修改mask方式。具体可以参考`dataset_utils.py`中`create_masked_lm_predictions`函数。
-  可以自定义的选项有do_whole_word_mask, favor_longer_ngram, do_permutation, geometric_dist等，
-  可以参考[Megatron](https://github.com/NVIDIA/Megatron-LM)使用这些lm_mask策略。
+- 动态 mask 相关代码实现在`./data_tools/dataset_utils.py`
+  用户可以根据自己的需求，灵活修改 mask 方式。具体可以参考`dataset_utils.py`中`create_masked_lm_predictions`函数。
+  可以自定义的选项有 do_whole_word_mask, favor_longer_ngram, do_permutation, geometric_dist 等，
+  可以参考[Megatron](https://github.com/NVIDIA/Megatron-LM)使用这些 lm_mask 策略。
 
 ## 参考内容
 

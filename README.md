@@ -151,6 +151,8 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 * python >= 3.8
 * paddlepaddle >= 3.0.0b0
 
+如果您尚未安装PaddlePaddle，请参考 [飞桨官网](https://www.paddlepaddle.org.cn/) 进行安装。
+
 ### pip 安装
 
 ```shell
