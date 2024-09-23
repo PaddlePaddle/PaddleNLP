@@ -18,7 +18,9 @@ import functools
 import json
 import logging
 import multiprocessing
+import os
 import signal
+import sys
 import threading
 import time
 
@@ -184,3 +186,18 @@ class MetricsDumper(object):
 
 
 logger = Logger()
+
+
+@contextlib.contextmanager
+def redirect_error_msg_when_exit():
+    log_dir = os.getenv("PADDLE_LOG_DIR", "./log")
+    local_rank = os.getenv("PADDLE_LOCAL_RANK", "0")
+    try:
+        yield
+    except Exception as e:
+        error_msg = f"Caught an exception in training process: {e}\n"
+        logger.error(error_msg)
+        error_log = os.path.join(log_dir, f"workerlog.{local_rank}.err")
+        with open(error_log, "a+") as f:
+            f.write(error_msg)
+        sys.exit(1)
