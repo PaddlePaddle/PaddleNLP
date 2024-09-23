@@ -2063,7 +2063,7 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
           }
           __syncthreads();
 #endif
-          if (in_scale > 0.0) {
+          if (shift_bias) {
             Load<T, VEC_SIZE>(shift_bias + shift_smooth_offset,
                               &shift_bias_vec);
             Load<T, VEC_SIZE>(smooth_weight + shift_smooth_offset,
@@ -2082,12 +2082,6 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
 #endif
 #pragma unroll
           for (int i = 0; i < VEC_SIZE; ++i) {
-            // float quant_value = 127.0f * static_cast<float>((ori_out_vec[i] +
-            // shift_bias_vec[i]) * smooth_weight_vec[i]) * in_scale;
-            // quant_value = rintf(quant_value);
-            // quant_value = quant_value > 127.0f ? 127.0f : quant_value;
-            // quant_value = quant_value < -127.0f ? -127.0f : quant_value;
-            // out_vec[i] = static_cast<int8_t>(quant_value);
             StoreFunc<T, VEC_SIZE, OutT>()(ori_out_vec,
                                            shift_bias_vec,
                                            smooth_weight_vec,

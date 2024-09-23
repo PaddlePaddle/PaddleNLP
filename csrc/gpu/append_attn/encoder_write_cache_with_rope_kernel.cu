@@ -290,7 +290,7 @@ void gqa_rotary_qk_variable(T *qkv_out, // [token_num, 3, num_head, dim_head]
                             const int dim_head,
                             const cudaStream_t& stream,
                             bool use_neox_style = false) {
-  int elem_nums = token_num * (num_heads + 2 * kv_num_heads) * dim_head; // for all q k v
+  int elem_nums = token_num * (num_heads + kv_num_heads) * dim_head; // for all q k v
   if (use_neox_style) {
     elem_nums /= 2;
   }

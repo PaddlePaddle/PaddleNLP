@@ -17,7 +17,8 @@ template <typename T,
           bool ENABLE_PREFILL = true>
 __global__ void multi_query_append_attention_kernel(
     T *__restrict__ q,        // [token_num. num_heads, head_dim]
-    T *__restrict__ cache_k,  // [max_block_num, num_heads, block_size, head_dim]
+    T *__restrict__ cache_k,  // [max_block_num, num_heads, block_size,
+                              // head_dim]
     T *__restrict__ cache_v,
     const T *__restrict__ shift_bias,     // [q_num_heads * HEAD_DIM]
     const T *__restrict__ smooth_weight,  // [q_num_heads * HEAD_DIM]
@@ -33,7 +34,8 @@ __global__ void multi_query_append_attention_kernel(
     const float scale,
     const float in_scale,
     const uint32_t chunk_size,
-    T *__restrict__ tmp_workspace,  // split kv [token_num, num_chunks, num_heads, head_dim]
+    T *__restrict__ tmp_workspace,  // split kv [token_num, num_chunks,
+                                    // num_heads, head_dim]
     float *__restrict__ tmp_m,      // [token_num, num_chunks, num_heads]
     float *__restrict__ tmp_d,      // [token_num, num_chunks, num_heads]
     OutT *__restrict__ out,
@@ -1102,7 +1104,8 @@ template <typename T,
           bool ENABLE_PREFILL = true>
 __global__ void multi_query_append_attention_c8_kernel(
     T *__restrict__ q,             // [token_num. num_heads, head_dim]
-    CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size, head_dim]
+    CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size,
+                                   // head_dim]
     CacheT *__restrict__ cache_v,
     const T *__restrict__ cache_k_scale,  // [num_kv_heads]
     const T *__restrict__ cache_v_scale,  // [num_kv_heads]
@@ -1147,8 +1150,7 @@ __global__ void multi_query_append_attention_c8_kernel(
   const uint32_t num_chunks = gridDim.y;
   const uint32_t chunk_idx = blockIdx.y;
 #ifdef DEBUG_ATTN_C8
-  __syncthreads();
-  if (tid == PRINT_TID && wid == 0) {
+  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
     printf(
         "num_vecs_per_head: %d, num_vecs_per_head_k: %d, "
         "num_vecs_per_blocksize: %d, inv_k_stride: %d, inv_v_stride: %d\n",
@@ -1223,7 +1225,7 @@ __global__ void multi_query_append_attention_c8_kernel(
                             tid % 8 * num_elems_per_128b<T>();
   T *q_base_ptr = q + q_offset;
 #ifdef DEBUG_ATTN_C8
-  if (tid == PRINT_TID && wid == 0) {
+  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
     printf(
         "q_base_seq_id_this_block: %d, q_start_seq_id: %d, q_offset: %d, "
         "q_ori_n_stride: %d, q_base: %f\n",
@@ -1298,7 +1300,7 @@ __global__ void multi_query_append_attention_c8_kernel(
               : chunk_len) /
       (num_frags_z * 16);
 #ifdef DEBUG_ATTN_C8
-  __syncthreads();  
+  __syncthreads();
   if (tid == 0 && wid == 0) {
     printf(
         "batch_id: %d, tile_id: %d, chunk_size: %d, q_len: %d, kv_len: %d, "
@@ -1366,18 +1368,6 @@ __global__ void multi_query_append_attention_c8_kernel(
   __syncthreads();
 #endif
 
-  // produce_k_blockwise_c8<SharedMemFillMode::kNoFill, NUM_WARPS, BLOCK_SIZE,
-  // num_frags_y, num_frags_z, NUM_WARP_Q>(
-  //   k_smem,
-  //   &k_smem_offset_w,
-  //   &cache_k_now,
-  //   kv_head_idx,
-  //   kv_n_stride,
-  //   kv_h_stride,
-  //   kv_b_stride,
-  //   kv_idx_base,
-  //   chunk_end
-  // );
   produce_k_blockwise_c8<SharedMemFillMode::kNoFill,
                          NUM_WARPS,
                          BLOCK_SIZE,
@@ -1511,23 +1501,7 @@ __global__ void multi_query_append_attention_c8_kernel(
     __syncthreads();
 
     kv_idx_base += num_frags_z * 16;
-    // block_id = __ldg(&block_table_now[kv_idx_base / BLOCK_SIZE]);
-    // if (block_id < 0) {
-    //   block_id = 0; // 搬但不算
-    // }
-    // cache_k_now = cache_k + block_id * kv_n_stride + const_k_offset;
-    // produce_k_blockwise_c8<SharedMemFillMode::kNoFill, NUM_WARPS, BLOCK_SIZE,
-    // num_frags_y, num_frags_z, NUM_WARP_Q>(
-    //   k_smem,
-    //   &k_smem_offset_w,
-    //   &cache_k_now,
-    //   kv_head_idx,
-    //   kv_n_stride,
-    //   kv_h_stride,
-    //   kv_b_stride,
-    //   kv_idx_base,
-    //   chunk_end
-    // );
+
     produce_k_blockwise_c8<SharedMemFillMode::kNoFill,
                            NUM_WARPS,
                            BLOCK_SIZE,
@@ -1585,19 +1559,7 @@ __global__ void multi_query_append_attention_c8_kernel(
     }
     __syncthreads();
 #endif
-    // cache_v_now = cache_v + block_id * kv_n_stride + const_v_offset;
-    // produce_v_blockwise_c8<SharedMemFillMode::kNoFill, NUM_WARPS, BLOCK_SIZE,
-    // num_frags_y, num_frags_z, NUM_WARP_Q>(
-    //   v_smem,
-    //   &v_smem_offset_w,
-    //   &cache_v_now,
-    //   kv_head_idx,
-    //   kv_n_stride,
-    //   kv_h_stride,
-    //   kv_d_stride,
-    //   kv_idx_base,
-    //   chunk_end
-    // );
+
     produce_v_blockwise_c8<SharedMemFillMode::kNoFill,
                            NUM_WARPS,
                            BLOCK_SIZE,
@@ -1720,7 +1682,8 @@ template <typename T,
           bool ENABLE_PREFILL = true>
 __global__ void multi_query_append_attention_c8_warp1_4_kernel(
     T *__restrict__ q,             // [token_num. num_heads, head_dim]
-    CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size, head_dim]
+    CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size,
+                                   // head_dim]
     CacheT *__restrict__ cache_v,
     const T *__restrict__ cache_k_scale,  // [num_kv_heads, head_dim]
     const T *__restrict__ cache_v_scale,  // [num_kv_heads, head_dim]
@@ -1761,12 +1724,12 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
   const uint32_t num_chunks = gridDim.y;
   const uint32_t chunk_idx = blockIdx.y;
 #ifdef DEBUG_ATTN_C8
-  __syncthreads(); 
+  __syncthreads();
   printf("---1771---");
   if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0 &&
       blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
     __syncthreads();
-    
+
     printf(
         "num_vecs_per_head: %d, num_vecs_per_head_k: %d, "
         "num_vecs_per_blocksize: %d, inv_k_stride: %d, inv_v_stride: %d\n",
@@ -3948,7 +3911,7 @@ __global__ void merge_multi_chunks_decoder_kernel(
     AlignedVector<T, vec_size> shift_bias_vec;
     AlignedVector<T, vec_size> smooth_weight_vec;
     AlignedVector<OutT, vec_size> out_vec;
-    if (in_scale > 0.0) {
+    if (shift_bias) {
       Load<T, vec_size>(shift_bias + shift_smooth_offset, &shift_bias_vec);
       Load<T, vec_size>(smooth_weight + shift_smooth_offset,
                         &smooth_weight_vec);
@@ -4105,7 +4068,7 @@ __global__ void merge_multi_chunks_v2_kernel(
       AlignedVector<T, vec_size> shift_bias_vec;
       AlignedVector<T, vec_size> smooth_weight_vec;
       AlignedVector<OutT, vec_size> out_vec;
-      if (in_scale > 0.0) {
+      if (shift_bias) {
         Load<T, vec_size>(shift_bias + shift_smooth_offset, &shift_bias_vec);
         Load<T, vec_size>(smooth_weight + shift_smooth_offset,
                           &smooth_weight_vec);
