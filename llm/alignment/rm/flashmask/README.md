@@ -1,9 +1,9 @@
 # FlashMask Reward model training
 
 
-#### 3.1 RM 模型训练
+## 3.1 RM 模型训练
 
-##### 数据准备
+### 数据准备
 
 我们支持的数据格式是每行包含一个字典的 json 文件，每个字典包含以下字段：
 
@@ -35,7 +35,7 @@ wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.t
 tar -zxvf ultrafeedback_binarized.tar.gz
 ```
 
-##### FlashMask RM
+### FlashMask RM
 
 ```bash
 # RM 启动命令参考
