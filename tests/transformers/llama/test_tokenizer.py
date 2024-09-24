@@ -13,10 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import shutil
+import tempfile
 import unittest
 
-from paddlenlp.transformers.llama.tokenizer import LlamaTokenizer
+from paddlenlp.transformers.auto.tokenizer import AutoTokenizer
+from paddlenlp.transformers.llama.tokenizer import Llama3Tokenizer, LlamaTokenizer
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
+from paddlenlp.transformers.tokenizer_utils_fast import PretrainedTokenizerFast
 
 from ...transformers.test_tokenizer_common import TokenizerTesterMixin
 
@@ -34,6 +38,7 @@ class LlamaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
         tokenizer = LlamaTokenizer.from_pretrained("__internal_testing__/tiny-random-llama", **kwargs)
+        print(f"tokenizer = {tokenizer}")
         tokenizer.pad_token = tokenizer.unk_token
         return tokenizer
 
@@ -186,7 +191,6 @@ class LlamaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     def test_add_bos_token_slow(self):
         bos_token = "<s>"
         tokenizer = self.get_tokenizer()
-
         s = "This is a simple input"
         s2 = ["This is a simple input 1", "This is a simple input 2"]
 
@@ -208,3 +212,70 @@ class LlamaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # No max_model_input_sizes
         self.assertGreaterEqual(len(self.tokenizer_class.pretrained_resource_files_map), 1)
         self.assertGreaterEqual(len(list(self.tokenizer_class.pretrained_resource_files_map.values())[0]), 1)
+
+class TikTokenIntegrationTests(unittest.TestCase):
+    """
+    A class that regroups important test to make sure that we properly handle the special tokens.
+    """
+    def test_tiktoken_llama(self):
+        model_path = "hf-internal-testing/Llama3-Instruct-Internal"
+        test_text = "This is a test sentence."
+        test_tokens = [128000, 2028, 374, 264, 1296, 11914, 13, 128001]
+        num_reserved_special_tokens = 256
+        special_tokens = [
+            "<|begin_of_text|>",
+            "<|end_of_text|>",
+            "<|reserved_special_token_0|>",
+            "<|reserved_special_token_1|>",
+            "<|reserved_special_token_2|>",
+            "<|reserved_special_token_3|>",
+            "<|start_header_id|>",
+            "<|end_header_id|>",
+            "<|reserved_special_token_4|>",
+            "<|eot_id|>",
+            "<|python_tag|>",  # end of turn
+        ] + [f"<|reserved_special_token_{i}|>" for i in range(5, num_reserved_special_tokens - 5)]
+
+        tiktoken_tokenizer = PretrainedTokenizerFast.from_pretrained(
+            model_path,
+            additional_special_tokens=special_tokens,
+            bos_token="<|begin_of_text|>",
+            eos_token="<|end_of_text|>",
+            from_hf_hub=True,
+        )
+        tokens = tiktoken_tokenizer.tokenize("<|begin_of_text|> " + test_text)
+        self.assertEqual(tokens[0], "<|begin_of_text|>")
+
+        tiktoken_tokenizer = AutoTokenizer.from_pretrained(
+            model_path,
+            additional_special_tokens=special_tokens,
+            bos_token="<|begin_of_text|>",
+            eos_token="<|end_of_text|>",
+            add_bos_token=True,
+            add_eos_token=True,
+            from_hf_hub=True
+        )
+        self.assertTrue(isinstance(tiktoken_tokenizer, PretrainedTokenizerFast))
+        tokens = tiktoken_tokenizer.encode(test_text, add_special_tokens=True)['input_ids']
+        self.assertEqual(tokens, test_tokens)
+        tmpdirname = tempfile.mkdtemp()
+        tiktoken_tokenizer.save_pretrained(tmpdirname)
+        print(f"RELOADING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+        tokenizer_reload = AutoTokenizer.from_pretrained(tmpdirname)
+        
+        self.assertTrue(isinstance(tokenizer_reload, PretrainedTokenizerFast))
+        tokens = tokenizer_reload.encode(test_text, add_special_tokens=True)['input_ids']
+        self.assertEqual(tokens, test_tokens)
+        shutil.rmtree(tmpdirname)
+        # tiktoken_tokenizer = AutoTokenizer.from_pretrained(
+        #     model_path,
+        #     additional_special_tokens=special_tokens,
+        #     bos_token="<|begin_of_text|>",
+        #     eos_token="<|end_of_text|>",
+        #     from_slow=True,
+        #     add_bos_token=True,
+        #     add_eos_token=True,
+        #     from_hf_hub=True,
+        # )
+        # tokens = tiktoken_tokenizer.encode(test_text, add_special_tokens=True)['input_ids']
+        # self.assertEqual(tokens, test_tokens)

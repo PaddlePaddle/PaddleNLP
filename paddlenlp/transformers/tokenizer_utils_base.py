@@ -41,8 +41,21 @@ from huggingface_hub.utils import EntryNotFoundError
 
 from ..utils.download import resolve_file_path
 from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME, TOKENIZER_CONFIG_NAME
-from ..utils.import_utils import is_tokenizers_available
+from ..utils.import_utils import is_protobuf_available, is_tokenizers_available
 from ..utils.log import logger
+
+
+def import_protobuf_decode_error(error_message=""):
+    if is_protobuf_available():
+        from google.protobuf.message import DecodeError
+
+        return DecodeError
+    else:
+        raise ImportError(f"""
+{error_message} requires the protobuf library but it was not found in your environment. Checkout the instructions on the
+installation page of its repo: https://github.com/protocolbuffers/protobuf/tree/master/python#installation and follow the ones
+that match your environment. Please note that you may need to restart your runtime after installation.
+""")
 
 if is_tokenizers_available():
     from tokenizers import AddedToken
@@ -132,7 +145,7 @@ EncodedInputPair = Tuple[List[int], List[int]]
 SPECIAL_TOKENS_MAP_FILE = "special_tokens_map.json"
 ADDED_TOKENS_FILE = "added_tokens.json"
 TOKENIZER_CONFIG_FILE = "tokenizer_config.json"
-
+FULL_TOKENIZER_FILE = "tokenizer.json"
 
 def to_py_obj(obj):
     """
@@ -1361,6 +1374,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         self.model_input_names = kwargs.pop("model_input_names", self.model_input_names)
 
+        # By default, cleaning tokenization spaces for both fast and slow tokenizers
+        self.clean_up_tokenization_spaces = kwargs.pop("clean_up_tokenization_spaces", True)
+
+
         # By default, do not split special tokens for both fast and slow tokenizers
         self.split_special_tokens = kwargs.pop("split_special_tokens", False)
 
@@ -1423,10 +1440,13 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         self._processor_class = processor_class
 
     def __repr__(self) -> str:
+        added_tokens_decoder_rep = "\n\t".join([f"{k}: {v.__repr__()}," for k, v in self.added_tokens_decoder.items()])
         return (
-            f"{'PretrainedTokenizer'}(name_or_path='{self.name_or_path}', "
-            f"vocab_size={self.vocab_size}, model_max_len={self.model_max_length}, "
-            f"padding_side='{self.padding_side}', truncation_side='{self.truncation_side}', special_tokens={self.special_tokens_map_extended})"
+            f"{self.__class__.__name__}(name_or_path='{self.name_or_path}',"
+            f" vocab_size={self.vocab_size}, model_max_length={self.model_max_length}, is_fast={self.is_fast},"
+            f" padding_side='{self.padding_side}', truncation_side='{self.truncation_side}',"
+            f" special_tokens={self.special_tokens_map}, clean_up_tokenization_spaces={self.clean_up_tokenization_spaces}), "
+            " added_tokens_decoder={\n\t" + added_tokens_decoder_rep + "\n}"
         )
 
     def get_vocab(self) -> Dict[str, int]:
@@ -1483,28 +1503,30 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 tokenizer = BertTokenizer.from_pretrained('./my_bert/')
         """
 
-        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
         from_aistudio = kwargs.pop("from_aistudio", False)
         subfolder = kwargs.pop("subfolder", "")
         return_tokenizer_file_dir = kwargs.pop("return_tokenizer_file_dir", False)
 
-        if subfolder is None:
-            subfolder = ""
-
+        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         vocab_files = {}
         init_configuration = {}
+
+        is_local = os.path.isdir(pretrained_model_name_or_path)
+        
 
         additional_files_names = {
             "added_tokens_file": ADDED_TOKENS_FILE,
             "special_tokens_map_file": SPECIAL_TOKENS_MAP_FILE,
             "tokenizer_config_file": TOKENIZER_CONFIG_FILE,
-            "chat_template_file": CHAT_TEMPLATE_CONFIG_NAME,
+            "chat_template_file": CHAT_TEMPLATE_CONFIG_NAME, # what's this
+            # "tokenizer_file": FULL_TOKENIZER_FILE,
         }
+        print(f"cls = {cls}")
+        print(f"cls.resource_files_name1s = {cls.resource_files_names}")
 
         vocab_files_target = {**cls.resource_files_names, **additional_files_names}
-
         # From HF Hub or AI Studio
         if from_hf_hub or from_aistudio:
             # Only include the necessary resource files specified by the tokenizer cls
@@ -1528,12 +1550,15 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             # Assuming from community-contributed pretrained models
             for file_id, file_name in vocab_files_target.items():
                 vocab_files[file_id] = file_name
-
+        print("vocab_files: ", vocab_files)
         resolved_vocab_files = {}
+        
         for file_id, file_path in vocab_files.items():
+            print(f"file_id: {file_id}, file_path: {file_path}")
             if file_path is None or os.path.isfile(file_path):
                 resolved_vocab_files[file_id] = file_path
                 continue
+            print(f"Try resolving {file_id} from {pretrained_model_name_or_path}, {file_path}")
             resolved_vocab_files[file_id] = resolve_file_path(
                 pretrained_model_name_or_path,
                 [file_path],
@@ -1542,11 +1567,72 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 from_aistudio=from_aistudio,
                 from_hf_hub=from_hf_hub,
             )
-
         for file_id, file_path in resolved_vocab_files.items():
             if resolved_vocab_files[file_id] is not None:
                 cache_dir = os.path.dirname(resolved_vocab_files[file_id])
                 break
+        return cls._from_pretrained(
+            resolved_vocab_files,
+            pretrained_model_name_or_path,
+            init_configuration,
+            *args,
+            cache_dir=cache_dir,
+            return_tokenizer_file_dir=return_tokenizer_file_dir,
+            from_hf_hub=from_hf_hub,
+            **kwargs,
+        )
+    @classmethod
+    def _from_pretrained(
+        cls,
+        resolved_vocab_files,
+        pretrained_model_name_or_path,
+        init_configuration,
+        *init_inputs,
+        cache_dir=None,
+        return_tokenizer_file_dir=False,
+        from_hf_hub=False,
+        **kwargs,
+    ):
+        """
+        Instantiate a `PretrainedTokenizer` from a predefined tokenizer class.
+
+        Args:
+            pretrained_model_name_or_path (str):
+                The model name or path to instantiate the tokenizer from.
+            *init_inputs (tuple):
+                Positional arguments to be passed to the tokenizer class `__init__` method.
+            cache_dir (str, optional):
+                Directory to cache the downloaded vocabulary files.
+            return_tokenizer_file_dir (bool, optional):
+                Whether to return the directory path of the tokenizer files.
+            from_hf_hub (bool, optional):
+                Whether to load from Huggingface Hub.
+            from_aistudio (bool, optional):
+                Whether to load from AI Studio.
+            **kwargs (dict):
+                Additional keyword arguments to be passed to the tokenizer class `__init__` method.
+
+        Returns:
+            PretrainedTokenizer: An instance of `PretrainedTokenizer`.
+            str: The directory path of the tokenizer files if `return_tokenizer_file_dir` is `True`.
+
+        """
+        print("sdvcsdvsdvsvd",cls,resolved_vocab_files,pretrained_model_name_or_path,init_configuration,init_inputs,cache_dir,return_tokenizer_file_dir,from_hf_hub,kwargs)
+        from_slow = kwargs.get("from_slow", False)
+        has_tokenizer_file = resolved_vocab_files.get("tokenizer_file", None) is not None
+        print(f"from_slow: {from_slow}, has_tokenizer_file: {has_tokenizer_file}")
+        if (from_slow or not has_tokenizer_file) and cls.slow_tokenizer_class is not None:
+            slow_tokenizer = (cls.slow_tokenizer_class)._from_pretrained(
+                copy.deepcopy(resolved_vocab_files),
+                pretrained_model_name_or_path,
+                copy.deepcopy(init_configuration),
+                *init_inputs,
+                cache_dir=cache_dir,
+                **(copy.deepcopy(kwargs)),
+            )
+        else:
+            slow_tokenizer = None
+        print(f"slow_tokenizer: {slow_tokenizer}")
 
         tokenizer_config_file_dir_list = set()
         for k, v in resolved_vocab_files.items():
@@ -1555,6 +1641,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         tokenizer_config_file_dir_list = list(tokenizer_config_file_dir_list)
         # TODO: check this
         assert len(tokenizer_config_file_dir_list) > 0, "All tokenizer files should be in the same directory."
+
         # Prepare tokenizer initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
         has_tokenizer_file = resolved_vocab_files.get("tokenizer_file", None) is not None
@@ -1564,6 +1651,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 init_kwargs = json.load(f)
         else:
             init_kwargs = init_configuration
+
+        if slow_tokenizer is not None:
+            init_kwargs["__slow_tokenizer"] = slow_tokenizer
+        init_kwargs["name_or_path"] = pretrained_model_name_or_path
 
         pass_added_tokens_file = False
         # Handle tokenizer serialization of added and special tokens
@@ -1584,11 +1675,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             pass_added_tokens_file = True
 
         # position args are stored in kwargs, maybe better not include
-        init_args = init_kwargs.pop("init_args", ())
+        # init_args = init_kwargs.pop("init_args", ())
         init_kwargs.pop("init_class", None)
 
         # Update with newly provided args and kwargs
-        init_args = init_args if not args else args
+        # init_args = init_args if not args else args
         init_kwargs.update(kwargs)
 
         def convert_added_tokens(obj):
@@ -1632,7 +1723,15 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             init_kwargs.pop("tokenizer_file")
 
         # TODO(guosheng): avoid reduplication of position args and key word args
-        tokenizer = cls(*init_args, **init_kwargs)
+        try:
+            tokenizer = cls(*init_inputs, **init_kwargs)
+        except import_protobuf_decode_error():
+            logger.info(
+                "Unable to load tokenizer model from SPM, loading from TikToken will be attempted instead."
+                "(Google protobuf error: Tried to load SPM model with non-SPM vocab file).",
+            )
+            return False
+        
         chat_template = init_kwargs.pop("chat_template", None)
         if chat_template is not None:
             tokenizer.init_chat_template(chat_template)

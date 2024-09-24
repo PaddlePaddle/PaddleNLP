@@ -928,9 +928,8 @@ class GenerationD2STestMixin:
 
     def test_to_static_use_top_k(self):
         tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
-        if tokenizer.__class__.__name__ == "LlamaTokenizer":
+        if "LlamaTokenizer" in tokenizer.__class__.__name__:
             tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
-
         model = self.CausalLMClass.from_pretrained(self.internal_testing_model)
         model_kwargs = tokenizer(
             self.article,
@@ -1008,7 +1007,7 @@ class GenerationD2STestMixin:
 
     def test_to_static_use_top_p(self):
         tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
-        if tokenizer.__class__.__name__ == "LlamaTokenizer":
+        if "LlamaTokenizer" in tokenizer.__class__.__name__:
             tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
         model = self.CausalLMClass.from_pretrained(self.internal_testing_model)
 

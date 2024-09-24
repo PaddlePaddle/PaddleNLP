@@ -142,7 +142,9 @@ def resolve_file_path(
             elif index < len(filenames) - 1:
                 continue
             else:
-                raise FileNotFoundError(f"please make sure one of the {filenames} under the dir {repo_id}")
+                pass 
+                # 临时解决方案
+                # raise FileNotFoundError(f"please make sure one of the {filenames} under the dir {repo_id}")
 
     # check cache
     for filename in filenames:
