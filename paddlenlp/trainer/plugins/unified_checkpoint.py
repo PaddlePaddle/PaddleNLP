@@ -389,15 +389,8 @@ class UnifiedCheckpointHandler:
         if self.args.dataset_rank == 0:
             load_unified_checkpoint_locally(self.args, model, resume_from_checkpoint, safe_serialization=True)
 
-    def save_non_merge_optimizer(self, model, optimizer, output_dir):
+    def save_non_merge_optimizer(self, model, optim_state_dict, master_weights, output_dir):
         paddle.device.cuda.empty_cache()
-        optim_state_dict = nested_copy(optimizer.state_dict())
-        master_weights = None
-        if "master_weights" in optim_state_dict.keys():
-            master_weights = optim_state_dict["master_weights"]
-            optim_state_dict.pop("master_weights")
-        if "LR_Scheduler" in optim_state_dict.keys():
-            optim_state_dict.pop("LR_Scheduler")
 
         # gather global master_weights status.
         global_master_weights = reduce_master_weights_status(master_weights is not None)
@@ -498,30 +491,24 @@ class UnifiedCheckpointHandler:
             and ShardingOption.SHARD_OP in self.args.sharding
             and "split_param" in self.args.sharding_parallel_config
         ):
-            pass
+            optim_state_dict, master_weights = self.gather_split_param_for_optimizer(optimizer)
+        else:
+            optim_state_dict = nested_copy(optimizer.state_dict())
+            master_weights = None
+            if "master_weights" in optim_state_dict.keys():
+                master_weights = optim_state_dict["master_weights"]
+                optim_state_dict.pop("master_weights")
+            if "LR_Scheduler" in optim_state_dict.keys():
+                optim_state_dict.pop("LR_Scheduler")
 
         if "ignore_merge_optimizer" in self.args.unified_checkpoint_config:
-            self.save_non_merge_optimizer(model, optimizer, output_dir)
+            self.save_non_merge_optimizer(model, optim_state_dict, master_weights, output_dir)
             return
 
-        print(type(optimizer), type(optimizer._inner_opt))
-        # print([p.name for p in optimizer._inner_opt._parameter_list])
-        print(optimizer._inner_opt._comm_buffer_list[0])
-
-        # comm_buffer
-        for buffer in optimizer._inner_opt._comm_buffer_list:
-            print(buffer.buffer_size)
-            # print([p.name for p in buffer._params])
-            for key in buffer._sharding_param_grad_view.keys():
-                print(
-                    key,
-                    buffer._sharding_param_grad_view[key]._param_begin,
-                    buffer._sharding_param_grad_view[key]._param_end,
-                )
-        paddle.distributed.barrier()
-        raise ValueError
         # Split into naive optimizer params and master weights.
-        results = unified_optimizer_into_shards(self.args, model, optimizer, safe_serialization=True)
+        results = unified_optimizer_into_shards(
+            self.args, model, optim_state_dict, master_weights, safe_serialization=True
+        )
         master_weight_state_dict = None
         if len(results) == 1:
             optim_state_dict, shard_optim_file, sharded_optim_index = results[0]
@@ -530,7 +517,6 @@ class UnifiedCheckpointHandler:
             master_weight_state_dict, shard_master_weight_file, sharded_master_weight_index = results[1]
 
         paddle.device.cuda.empty_cache()
-
         save_directory = output_dir
         os.makedirs(save_directory, exist_ok=True)
 
@@ -567,7 +553,7 @@ class UnifiedCheckpointHandler:
                     with open(master_path, "w") as f:
                         json.dump(sharded_master_weight_index, f, indent=4)
 
-    def load_unified_optimizer(self, args, model, optimizer, resume_from_checkpoint):
+    def load_unified_optimizer(self, model, optimizer, resume_from_checkpoint):
         """Load potential model checkpoint
 
         Args:
@@ -723,6 +709,70 @@ class UnifiedCheckpointHandler:
                 is_sync=True,
                 state_dict_type="master_weight",
             )
+
+    def gather_split_param_for_optimizer(self, optimizer):
+        hcg = fleet.get_hybrid_communicate_group()
+        sharding_group = hcg.get_sharding_parallel_group()
+        global_rank = dist.get_rank()
+        param_slice_info = {}
+        param_shape_info = {}
+        for buffer in optimizer._inner_opt._comm_buffer_list:
+            for key in buffer._sharding_param_grad_view.keys():
+                param_slice_info[key] = (
+                    buffer._sharding_param_grad_view[key]._param_begin,
+                    buffer._sharding_param_grad_view[key]._param_end,
+                )
+                param_shape_info[key] = (
+                    buffer._sharding_param_grad_view[key]._param.shape,
+                    buffer._sharding_param_grad_view[key]._param.numel().item(),
+                )
+        param_slice_info["global_rank"] = global_rank
+        param_slice_info_list = []
+        dist.all_gather_object(param_slice_info_list, param_slice_info, group=sharding_group)
+
+        optim_state_dict = nested_copy(optimizer.state_dict())
+        master_weights = None
+        if "master_weights" in optim_state_dict.keys():
+            master_weights = optim_state_dict.pop("master_weights")
+        if "LR_Scheduler" in optim_state_dict.keys():
+            optim_state_dict.pop("LR_Scheduler")
+
+        # deal with optimizer param
+        partial_tensor_list = []
+        for key in list(optim_state_dict.keys()):
+            static_name, _ = generate_base_static_name(key)
+            if static_name in param_slice_info.keys():
+                if optim_state_dict[key].numel().item() == 1:  # for example: beta1, beta2
+                    continue
+                begin, end = param_slice_info[static_name]
+                shape, numel = param_shape_info[static_name]
+                if end - begin == numel:  # full tensor
+                    optim_state_dict[key] = optim_state_dict[key].reshape(shape)
+                elif end <= begin:  # empty tensor
+                    continue
+                else:  # partial tensor, end > begin but end - begin < numel
+                    partial_tensor_list.append(static_name)
+
+        send_table = {}
+        recv_table = {}
+        for key in partial_tensor_list:
+            sharding_ranklist = []
+            for slice_info in param_slice_info_list:
+                begin, end = slice_info[key]
+                if end > begin:
+                    sharding_ranklist.append((slice_info["global_rank"], begin, end))
+            recv_table[key] = sharding_ranklist[0][0]  # which sharding_rank to recv the splited tensor
+            send_table[key] = [(rank, begin, end) for rank, begin, end in sharding_ranklist]
+
+        distributed_send_recv_splited_param(
+            optim_state_dict, partial_tensor_list, param_shape_info, send_table, recv_table, False
+        )
+        if master_weights is not None:
+            distributed_send_recv_splited_param(
+                master_weights, partial_tensor_list, param_shape_info, send_table, recv_table, True
+            )
+
+        return optim_state_dict, master_weights
 
     def unlink_shared_memory(self):
         if not ("async_save" in self.args.unified_checkpoint_config):
@@ -1038,7 +1088,8 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
 def unified_optimizer_into_shards(
     args,
     model,
-    optimizer,
+    optim_state_dict,
+    master_weights,
     safe_serialization=False,
 ):
     """Get optimizer state dict and master weight state dict.
@@ -1048,13 +1099,6 @@ def unified_optimizer_into_shards(
         safe_serialization (bool, optional): safe serialization using safetensors. Defaults to False.
     """
     paddle.device.cuda.empty_cache()
-    optim_state_dict = nested_copy(optimizer.state_dict())
-    master_weights = None
-    if "master_weights" in optim_state_dict.keys():
-        master_weights = optim_state_dict["master_weights"]
-        optim_state_dict.pop("master_weights")
-    if "LR_Scheduler" in optim_state_dict.keys():
-        optim_state_dict.pop("LR_Scheduler")
 
     # gather global master_weights status.
     global_master_weights = reduce_master_weights_status(master_weights is not None)
@@ -1882,6 +1926,39 @@ def distributed_send_recv(
         if is_src:
             f.__exit__(None, None, None)
 
+    return state_dict
+
+
+def distributed_send_recv_splited_param(
+    state_dict, partial_tensor_list, param_shape_info, send_table, recv_table, is_master_weights=False
+):
+    global_rank = dist.get_rank()
+    for key in list(state_dict.keys()):
+        if state_dict[key].numel().item() == 1:  # for example: beta1, beta2
+            continue
+
+        static_name = key if is_master_weights else generate_base_static_name(key)[0]
+        if static_name not in partial_tensor_list:
+            continue
+
+        recv_rank = recv_table[static_name]
+        send_info = send_table[static_name]
+
+        if global_rank == recv_rank:
+            tmp_tensor_list = []
+            for send_rank, begin, end in send_info:
+                if send_rank == recv_rank:
+                    tmp_tensor_list.append(state_dict[key])
+                else:
+                    tmp_tensor = paddle.empty(shape=[end - begin], dtype=state_dict[key].dtype)
+                    dist.stream.recv(tmp_tensor, src=send_rank)
+                    tmp_tensor_list.append(tmp_tensor)
+            state_dict[key] = paddle.concat(tmp_tensor_list, axis=0).reshape(param_shape_info[static_name][0])
+        else:
+            for send_rank, _, _ in send_info:
+                if global_rank == send_rank:
+                    dist.stream.send(state_dict[key], dst=recv_rank)
+                    state_dict.pop(key)
     return state_dict
 
 
