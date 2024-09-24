@@ -2493,6 +2493,8 @@ class Trainer:
                 "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
                 "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
             }
+            if os.path.exists(os.path.join(self.args.logging_dir, "async_save_info.json")):  # afs cannot overwrite
+                os.remove(os.path.join(self.args.logging_dir, "async_save_info.json"))
             with open(os.path.join(self.args.logging_dir, "async_save_info.json"), "w") as f:
                 json.dump(save_info, f)
 
