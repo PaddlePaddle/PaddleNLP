@@ -61,15 +61,57 @@ from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
 from ...utils.log import logger
 from ...utils.tools import get_env_device
 from .lora_config import LoRAConfig
-from .lora_layers import (
-    ColumnParallelLoRALinear,
-    ColumnSequenceParallelLoRALinear,
-    LoRAConv2D,
-    LoRALinear,
-    RowParallelLoRALinear,
-    RowSequenceParallelLoRALinear,
-)
 
+
+def get_lora_layers():
+    try:
+        if get_env_device() == "xpu":
+            # If paddle_xpu is not installed, just use PaddleNLP's native lora layers
+            from paddle_xpu.layers.nn.lora_layers import (
+                XPUColumnParallelLoRALinear as ColumnParallelLoRALinear,
+            )
+            from paddle_xpu.layers.nn.lora_layers import (
+                XPUColumnSequenceParallelLoRALinear as ColumnSequenceParallelLoRALinear,
+            )
+            from paddle_xpu.layers.nn.lora_layers import XPULoRALinear as LoRALinear
+            from paddle_xpu.layers.nn.lora_layers import (
+                XPURowParallelLoRALinear as RowParallelLoRALinear,
+            )
+            from paddle_xpu.layers.nn.lora_layers import (
+                XPURowSequenceParallelLoRALinear as RowSequenceParallelLoRALinear,
+            )
+
+            from .lora_layers import LoRAConv2D
+
+        else:
+            raise ImportError  # Force to use the fallback if not XPU
+    except ImportError:
+        from .lora_layers import (
+            ColumnParallelLoRALinear,
+            ColumnSequenceParallelLoRALinear,
+            LoRAConv2D,
+            LoRALinear,
+            RowParallelLoRALinear,
+            RowSequenceParallelLoRALinear,
+        )
+
+    return {
+        "ColumnParallelLoRALinear": ColumnParallelLoRALinear,
+        "ColumnSequenceParallelLoRALinear": ColumnSequenceParallelLoRALinear,
+        "LoRAConv2D": LoRAConv2D,
+        "LoRALinear": LoRALinear,
+        "RowParallelLoRALinear": RowParallelLoRALinear,
+        "RowSequenceParallelLoRALinear": RowSequenceParallelLoRALinear,
+    }
+
+
+lora_layers = get_lora_layers()
+ColumnParallelLoRALinear = lora_layers["ColumnParallelLoRALinear"]
+ColumnSequenceParallelLoRALinear = lora_layers["ColumnSequenceParallelLoRALinear"]
+LoRAConv2D = lora_layers["LoRAConv2D"]
+LoRALinear = lora_layers["LoRALinear"]
+RowParallelLoRALinear = lora_layers["RowParallelLoRALinear"]
+RowSequenceParallelLoRALinear = lora_layers["RowSequenceParallelLoRALinear"]
 AVALIABLE_LAYERS = [
     ColumnParallelLoRALinear,
     ColumnSequenceParallelLoRALinear,
