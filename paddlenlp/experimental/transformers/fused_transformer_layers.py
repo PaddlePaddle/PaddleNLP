@@ -2290,10 +2290,10 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
         kwargs["max_enc_len_this_time"] = max_enc_len_this_time
         kwargs["max_dec_len_this_time"] = max_dec_len_this_time
 
-        encoder_block_shape_q = 128
-        decoder_block_shape_q = 128
-        max_partition_size = 1024
-        encoder_max_partition_size = kwargs.get("max_input_length", None)
+        encoder_block_shape_q = 64
+        decoder_block_shape_q = 16
+        max_partition_size = 32768
+        encoder_max_partition_size = 32768
 
         from paddlenlp_ops import get_block_shape, split_kv_block
 
