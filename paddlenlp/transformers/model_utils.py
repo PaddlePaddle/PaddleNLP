@@ -488,21 +488,13 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 
 
 def load_state_dict(
-    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None, device="cpu"
+    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None, device="cpu", ckpt_quant_stage="O0"
 ):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
     """
-    # 假设你想要获取的环境变量名为 'MY_ENV_VAR'
-    env_var_name = 'QUANT'
-
-    # 使用 os.getenv() 方法获取环境变量的值
-    # 如果环境变量不存在，可以设置一个默认值
-    env_var_value = os.getenv(env_var_name, '0')
-
-    print(f"环境变量 {env_var_name} 的值为: {env_var_value}")
     quant = False
-    if env_var_value != '0':
+    if ckpt_quant_stage != 'O0':
         quant = "optimizer" in checkpoint_file
 
     if tensor_parallel_split_mapping is None:
@@ -559,7 +551,7 @@ def load_state_dict(
                     tp_group = hcg.get_model_parallel_group()
                     rank, world_size = tp_group.rank, tp_group.nranks
 
-                if env_var_value == '2':
+                if ckpt_quant_stage == 'O2':
                     #print("xxx ", scale_dict.keys())
                     for quant_key in state_dict.keys():
                         if not quant_key.endswith("moment1_0") and not quant_key.endswith("moment2_0"):
@@ -580,7 +572,7 @@ def load_state_dict(
                             weight = paddle.square(weight)
                             #print(f"squaring {quant_key}, dtype: {weight.shape}")
                         state_dict[quant_key] = weight
-                elif env_var_value == '1':
+                elif ckpt_quant_stage == 'O1':
                     # set eps
                     eps = 1e-8
                     for quant_key in state_dict.keys():
@@ -608,7 +600,7 @@ def load_state_dict(
                             weight = paddle.square(1.0 / weight - eps)
                             #print(weight)
                             state_dict[quant_key] = weight
-                elif env_var_value == '3':
+                elif ckpt_quant_stage == 'O3':
                     # set eps
                     eps = 1e-8
                     m1_state_dict = {}
@@ -2244,7 +2236,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     filter_dict_keys = None
 
                 state_dict = load_state_dict(
-                    shard_file, tp_actions if pre_tensor_parallel_split else None, filter_dict_keys
+                    shard_file, tp_actions if pre_tensor_parallel_split else None, filter_dict_keys, ckpt_quant_stage=config.ckpt_quant_stage
                 )
 
                 # convert for fusing or splitting weights
@@ -2567,9 +2559,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 with safe_open(resolved_archive_file, framework="np", device="cpu") as f:
                     loaded_keys = f.keys()
                 tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
-                state_dict = load_state_dict(resolved_archive_file, tp_actions)
+                state_dict = load_state_dict(resolved_archive_file, tp_actions, ckpt_quant_stage=config.ckpt_quant_stage)
             else:
-                state_dict = load_state_dict(resolved_archive_file)
+                state_dict = load_state_dict(resolved_archive_file, ckpt_quant_stage=config.ckpt_quant_stage)
 
             logger.info("Loaded weights file from disk, setting weights to model.")
 
@@ -3071,7 +3063,7 @@ def load_tp_checkpoint(folder, cls, config, return_numpy=False):
             with safe_open(safe_model_path, framework="np", device="cpu") as f:
                 loaded_keys = f.keys()
             tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
-            state_dict = load_state_dict(safe_model_path, tp_actions)
+            state_dict = load_state_dict(safe_model_path, tp_actions, ckpt_quant_stage=config.ckpt_quant_stage)
         else:  # shard files safetensors
             resolved_archive_file, resolved_sharded_files, sharded_metadata, is_sharded = cls._resolve_model_file_path(
                 pretrained_model_name_or_path=folder,
@@ -3087,6 +3079,7 @@ def load_tp_checkpoint(folder, cls, config, return_numpy=False):
                     shard_file,
                     tp_actions,
                     loaded_state_dict_keys,
+                    ckpt_quant_stage=config.ckpt_quant_stage,
                 )
                 state_dict.update(shard_state_dict)
         if return_numpy:

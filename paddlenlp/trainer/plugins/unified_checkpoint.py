@@ -28,6 +28,7 @@ from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.trainer.trainer_utils import ExplicitEnum
 from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
@@ -156,18 +157,10 @@ class UnifiedCheckpointHandler:
             self._shared_save_optimizer_flag = multiprocessing.Array("i", 1)
 
     def _file_save_async_or_sync(
-        self, state_dict, path, is_sync=True, state_dict_type="model_weight"
+        self, state_dict, path, is_sync=True, state_dict_type="model_weight", ckpt_quant_stage="O0"
     ):
-        # 假设你想要获取的环境变量名为 'MY_ENV_VAR'
-        env_var_name = 'QUANT'
-
-        # 使用 os.getenv() 方法获取环境变量的值
-        # 如果环境变量不存在，可以设置一个默认值
-        env_var_value = os.getenv(env_var_name, '0')
-
-        print(f"环境变量 {env_var_name} 的值为: {env_var_value}")
         quant = False
-        if env_var_value != '0':
+        if ckpt_quant_stage != 'O0':
             quant = True
         if is_sync:
             for k in list(state_dict.keys()):
@@ -188,7 +181,7 @@ class UnifiedCheckpointHandler:
 
                     quant_weight = None
 
-                    if env_var_value == '2':
+                    if ckpt_quant_stage == 'O2':
                         # m1: wint8, m2: wint8, fusion
                         if momentum2:
                             # moment2
@@ -213,7 +206,7 @@ class UnifiedCheckpointHandler:
                             quant_bits += k_size
                         else:
                             quant_weight = state_dict[k]
-                    elif env_var_value == '1':
+                    elif ckpt_quant_stage == 'O1':
                         # m1: wint8, 1/(sqrt(m2)+eps): wint8
                         if momentum2:
                             # m1: m1_quant_weight, m2: ratio
@@ -227,7 +220,7 @@ class UnifiedCheckpointHandler:
                             codebook_dict[k + '_max_codebook'] = maxs
                         elif not momentum1:
                             quant_weight = state_dict[k]
-                    elif env_var_value == '3':
+                    elif ckpt_quant_stage == 'O3':
                         # m1: bw-wint4, 1/(sqrt(m2)+eps): bw-wint4
                         if momentum2:
                             if len(state_dict[k].shape) < 2:
@@ -439,6 +432,7 @@ class UnifiedCheckpointHandler:
                 path=os.path.join(save_directory, shard_file),
                 is_sync=is_sync_save,
                 state_dict_type="model_weight",
+                ckpt_quant_stage=model_to_save.config.ckpt_quant_stage,
             )
             if sharded_index is not None:
                 if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
@@ -545,12 +539,14 @@ class UnifiedCheckpointHandler:
             path=os.path.join(output_dir, optimizer_name),
             is_sync=is_sync_save,
             state_dict_type="optimizer_weight",
+            ckpt_quant_stage=model.config.ckpt_quant_stage,
         )
         self._file_save_async_or_sync(
             master_weights,
             path=os.path.join(output_dir, master_weights_name),
             is_sync=is_sync_save,
             state_dict_type="master_weight",
+            ckpt_quant_stage=model.config.ckpt_quant_stage,
         )
 
     def load_non_merge_optimizer(self, model, optimizer, resume_from_checkpoint):
@@ -635,6 +631,7 @@ class UnifiedCheckpointHandler:
             path=os.path.join(save_directory, shard_optim_file),
             is_sync=is_sync_save,
             state_dict_type="optimizer_weight",
+            ckpt_quant_stage=model.config.ckpt_quant_stage,
         )
         if master_weight_state_dict is not None:
             self._file_save_async_or_sync(
@@ -642,6 +639,7 @@ class UnifiedCheckpointHandler:
                 path=os.path.join(save_directory, shard_master_weight_file),
                 is_sync=is_sync_save,
                 state_dict_type="master_weight",
+                ckpt_quant_stage=model.config.ckpt_quant_stage,
             )
 
         if sharded_optim_index is not None:
@@ -738,7 +736,7 @@ class UnifiedCheckpointHandler:
 
         # save checkpoint
         self._file_save_async_or_sync(
-            state_dict, path=os.path.join(output_dir, weight_filename), is_sync=True, state_dict_type="model_weight"
+            state_dict, path=os.path.join(output_dir, weight_filename), is_sync=True, state_dict_type="model_weight", ckpt_quant_stage=model_to_save.config.ckpt_quant_stage,
         )
 
         if isinstance(model_to_save, PrefixModelForCausalLM):
@@ -812,6 +810,7 @@ class UnifiedCheckpointHandler:
             path=os.path.join(output_dir, "optimizer-00001-of-00001.safetensors"),
             is_sync=True,
             state_dict_type="optimizer_weight",
+            ckpt_quant_stage=model.config.ckpt_quant_stage,
         )
         if master_weights is not None:
             self._file_save_async_or_sync(
@@ -819,6 +818,7 @@ class UnifiedCheckpointHandler:
                 path=os.path.join(output_dir, "master_weights-00001-of-00001.safetensors"),
                 is_sync=True,
                 state_dict_type="master_weight",
+                ckpt_quant_stage=model.config.ckpt_quant_stage,
             )
 
     def unlink_shared_memory(self):
@@ -911,7 +911,7 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
                 tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
         # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
         state_dict = load_state_dict(
-            shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys, device="expected"
+            shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys, device="expected", ckpt_quant_stage=model.config.ckpt_quant_stage
         )
 
         if not pre_tensor_parallel_split:
@@ -1095,10 +1095,10 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
                         tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)
 
                     # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-                    state_dict = load_state_dict(shard_file, tp_actions, expected_keys, device="expected")
+                    state_dict = load_state_dict(shard_file, tp_actions, expected_keys, device="expected", ckpt_quant_stage=model.config.ckpt_quant_stage)
                 else:
                     # for pipeline model, we don't need to use tp_actions
-                    state_dict = load_state_dict(shard_file, None, expected_keys, device="expected")
+                    state_dict = load_state_dict(shard_file, None, expected_keys, device="expected", ckpt_quant_stage=model.config.ckpt_quant_stage)
 
             returned_state_dict.update(state_dict)
             # force memory release
@@ -1179,12 +1179,7 @@ def unified_optimizer_into_shards(
         new_name = static2struct_name_mappings[static_name] + "/" + type_name
         optim_state_dict[new_name] = optim_state_dict.pop(key)
 
-    env_var_name = 'REMOVE_MW'
-    env_var_value = os.getenv(env_var_name, '0')
-
-    print(f"环境变量 {env_var_name} 的值为: {env_var_value}")
-    remove_mw = env_var_value == '1'
-    if remove_mw:
+    if model.config.remove_mw:
         master_weights = None
 
     if master_weights is not None:
@@ -1837,7 +1832,7 @@ def load_single_card_checkpoint(args, model, resume_from_checkpoint: str):
     if len(missing_keys) > 0:
         raise ValueError(f"Missing keys: {missing_keys}")
 
-    state_dict = load_state_dict(resolved_archive_file[0], None, expected_keys)
+    state_dict = load_state_dict(resolved_archive_file[0], None, expected_keys, ckpt_quant_stage=model.config.ckpt_quant_stage)
     error_msgs = _load_state_dict_into_model(model, state_dict, "")
     del state_dict
     gc.collect()
@@ -1867,9 +1862,9 @@ def load_single_card_optimizer(args, model, optimizer, resume_from_checkpoint: s
         )
         expected_keys_mw = sharded_metadata_mw["all_optimizer_keys"]
 
-    state_dict_optim = load_state_dict(resolved_archive_file[0], None, expected_keys)
+    state_dict_optim = load_state_dict(resolved_archive_file[0], None, expected_keys, ckpt_quant_stage=model.config.ckpt_quant_stage)
     if has_master_weights:
-        state_dict_optim_mw = load_state_dict(resolved_archive_file_mw[0], None, expected_keys_mw)
+        state_dict_optim_mw = load_state_dict(resolved_archive_file_mw[0], None, expected_keys_mw, ckpt_quant_stage=model.config.ckpt_quant_stage)
 
     for key in list(state_dict_optim.keys()):
         key_name = key.split("/")
@@ -2138,16 +2133,8 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
     filter_tensor_list = [[] for i in range(tp_size)]
 
     if tp_rank == 0:
-        # 假设你想要获取的环境变量名为 'MY_ENV_VAR'
-        env_var_name = 'QUANT'
-
-        # 使用 os.getenv() 方法获取环境变量的值
-        # 如果环境变量不存在，可以设置一个默认值
-        env_var_value = os.getenv(env_var_name, '0')
-
-        print(f"环境变量 {env_var_name} 的值为: {env_var_value}")
         quant = False
-        if env_var_value != '0':
+        if model_to_save.config.ckpt_quant_stage != '0':
             quant = True
         if not quant or not is_optimizer:    
             tensor_bytes_dict = {}
