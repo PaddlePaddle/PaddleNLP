@@ -319,7 +319,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
     batch_size, target_length = input_ids_shape  # target_length: seq_len
 
-    if get_env_device() == "npu" or get_env_device() == "mlu":
+    if get_env_device() in ["npu", "mlu", "intel_hpu"]:
         mask = paddle.tril(paddle.ones((target_length, target_length))).astype("int32")
     else:
         mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
@@ -1519,7 +1519,7 @@ class LlamaModel(LlamaPretrainedModel):
                     combined_attention_mask = _make_causal_mask(
                         input_shape, past_key_values_length=past_key_values_length
                     )
-                    if get_env_device() == "npu" or get_env_device() == "mlu":
+                    if get_env_device() in ["npu", "mlu", "intel_hpu"]:
                         expanded_attn_mask = expanded_attn_mask.astype("bool") & combined_attention_mask.astype("bool")
                     else:
                         expanded_attn_mask = expanded_attn_mask & combined_attention_mask
