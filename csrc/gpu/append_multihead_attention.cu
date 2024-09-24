@@ -82,7 +82,12 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
   int max_dec_len_this_time_data = max_dec_len_this_time.data<int>()[0];
   auto stream = qkv.stream();
 
-  paddle::Tensor qkv_out = paddle::empty(qkv.shape(), D, qkv.place());
+  paddle::Tensor qkv_out;
+  if (qkv_out_scales) {
+    qkv_out = paddle::empty(qkv.shape(), D, qkv.place());
+  } else {
+    qkv_out = qkv;
+  }
   paddle::Tensor fmha_out;
   if (out_linear_in_scale > 0.0) {
     fmha_out = paddle::empty(
@@ -123,7 +128,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           const_cast<paddle::Tensor*>(&value_cache));
     } else {
       EncoderWriteCacheWithRopeKernel<data_t, data_t>(
-          qkv,
+          qkv_out,
           seq_lens_this_time,
           seq_lens_encoder,
           seq_lens_decoder,
@@ -255,7 +260,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           const_cast<paddle::Tensor*>(&value_cache));
     } else {
       DecoderWriteCacheWithRoPEKernel<data_t, data_t>(
-          qkv,  // [token_num, num_heads, head_dim]
+          qkv_out,  // [token_num, num_heads, head_dim]
           seq_lens_decoder,
           seq_lens_encoder,
           padding_offsets,

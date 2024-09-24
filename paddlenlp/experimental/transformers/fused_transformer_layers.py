@@ -2211,7 +2211,7 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
             "none",  # cache_quant_type
             self.use_neox_rotary_style,
             kwargs.get("max_input_length", -1),
-            0.0,  # out_linear_in_scale,
+            0.0,  # out_linear_in_scale
             encoder_block_shape_q,
             decoder_block_shape_q,
             max_partition_size,
