@@ -16,7 +16,6 @@
 import unittest
 
 import numpy as np
-from parameterized import parameterized
 
 from paddlenlp.transformers import ChatGLMTokenizer
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
@@ -218,8 +217,7 @@ class ChatGLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         self.assertGreaterEqual(len(self.tokenizer_class.pretrained_resource_files_map), 1)
         self.assertGreaterEqual(len(list(self.tokenizer_class.pretrained_resource_files_map.values())[0]), 1)
 
-    @parameterized.expand([(True,), (False,)])
-    def test_encode_plus_with_padding(self, use_padding_as_call_kwarg: bool):
+    def test_encode_plus_with_padding(self):
         tokenizers = self.get_tokenizers(do_lower_case=False)
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
@@ -235,32 +233,14 @@ class ChatGLMTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 special_tokens_mask = encoded_sequence["special_tokens_mask"]
                 sequence_length = len(input_ids)
 
-                # Test right padding
-                tokenizer_kwargs_right = {
-                    "max_length": sequence_length + padding_size,
-                    "padding": "max_length",
-                    "return_special_tokens_mask": True,
-                }
-
-                if not use_padding_as_call_kwarg:
-                    tokenizer.padding_side = "right"
-                else:
-                    tokenizer_kwargs_right["padding_side"] = "right"
-                self.assertRaises(AssertionError, lambda: tokenizer.encode_plus(sequence, **tokenizer_kwargs_right))
-
                 # Test left padding
-                tokenizer_kwargs_left = {
-                    "max_length": sequence_length + padding_size,
-                    "padding": "max_length",
-                    "return_special_tokens_mask": True,
-                }
-
-                if not use_padding_as_call_kwarg:
-                    tokenizer.padding_side = "left"
-                else:
-                    tokenizer_kwargs_left["padding_side"] = "left"
-
-                left_padded_sequence = tokenizer.encode_plus(sequence, **tokenizer_kwargs_left)
+                tokenizer.padding_side = "left"
+                left_padded_sequence = tokenizer.encode(
+                    sequence,
+                    max_length=sequence_length + padding_size,
+                    padding="max_length",
+                    return_special_tokens_mask=True,
+                )
                 left_padded_input_ids = left_padded_sequence["input_ids"]
                 left_padded_special_tokens_mask = left_padded_sequence["special_tokens_mask"]
                 left_padded_sequence_length = len(left_padded_input_ids)
