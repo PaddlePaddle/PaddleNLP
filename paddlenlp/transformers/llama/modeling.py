@@ -319,7 +319,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
     batch_size, target_length = input_ids_shape  # target_length: seq_len
 
-    if get_env_device() == "npu" or get_env_device() == "mlu":
+    if get_env_device() in ["npu", "mlu", "intel_hpu"]:
         mask = paddle.tril(paddle.ones((target_length, target_length))).astype("int32")
     else:
         mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
@@ -414,7 +414,11 @@ class LlamaRotaryEmbedding(nn.Layer):
         # [seq_len]
         t = paddle.arange(seq_len, dtype="float32")
         # [seq_len, dim/2]
-        freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+        if get_env_device() == "intel_hpu":
+            # fallback einsum to intel Gaudi TPC since MME doesn't support FP32
+            freqs = t.unsqueeze(1) * self.inv_freq.unsqueeze(0)
+        else:
+            freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         # [seq_len, dim]
         emb = paddle.concat([freqs, freqs], axis=-1)
@@ -705,7 +709,7 @@ class LlamaAttention(nn.Layer):
                 )
 
         self.use_fused_rope = config.use_fused_rope
-        if self.use_fused_rope and get_env_device() not in ["npu", "mlu", "xpu", "gcu"]:
+        if self.use_fused_rope and get_env_device() not in ["npu", "mlu", "xpu", "gcu", "intel_hpu"]:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
@@ -1519,7 +1523,7 @@ class LlamaModel(LlamaPretrainedModel):
                     combined_attention_mask = _make_causal_mask(
                         input_shape, past_key_values_length=past_key_values_length
                     )
-                    if get_env_device() == "npu" or get_env_device() == "mlu":
+                    if get_env_device() in ["npu", "mlu", "intel_hpu"]:
                         expanded_attn_mask = expanded_attn_mask.astype("bool") & combined_attention_mask.astype("bool")
                     else:
                         expanded_attn_mask = expanded_attn_mask & combined_attention_mask
@@ -1532,7 +1536,7 @@ class LlamaModel(LlamaPretrainedModel):
         else:
             expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
-        if get_env_device() == "npu" or get_env_device() == "mlu":
+        if get_env_device() in ["npu", "mlu", "intel_hpu"]:
             x = paddle.to_tensor(0.0, dtype="float32")
             y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float32")
             expanded_attn_mask = expanded_attn_mask.astype("float32")
