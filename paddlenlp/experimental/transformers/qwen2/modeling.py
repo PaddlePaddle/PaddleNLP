@@ -67,6 +67,7 @@ from paddlenlp.transformers.model_utils import (
     register_base_model,
 )
 from paddlenlp.transformers.qwen2.modeling import Qwen2LMHead, Qwen2PretrainingCriterion
+from paddlenlp.utils.download import resolve_file_path
 from paddlenlp.utils.log import logger
 
 __all__ = ["Qwen2ForCausalLMInferenceModel", "Qwen2ForCausalLMBlockInferenceModel"]
@@ -746,13 +747,13 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                 # TODO(RichardWooSJTU): support multi-cards
 
                 if not self.use_fake_parameter:
-                    act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
-                    weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
+                    act_scale_json_path = resolve_file_path(self.quant_model_path, "act_scales.json")
+                    weight_scale_json_path = resolve_file_path(self.quant_model_path, "weight_scales.json")
                     if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                        act_scale_json_path = os.path.join(
+                        act_scale_json_path = resolve_file_path(
                             self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
                         )
-                        weight_scale_json_path = os.path.join(
+                        weight_scale_json_path = resolve_file_path(
                             self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
                         )
                     act_scale_loader = ActScalesLoader(
@@ -780,9 +781,9 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
 
                 if self.config.cachekv_int8_type == "static":
                     if not self.use_fake_parameter:
-                        cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_scales.json")
+                        cache_scale_json_path = resolve_file_path(self.quant_model_path, "cachekv_scales.json")
                         if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                            cache_scale_json_path = os.path.join(
+                            cache_scale_json_path = resolve_file_path(
                                 self.quant_model_path, f"cachekv_scales_{self.config.tensor_parallel_rank}.json"
                             )
                         cache_scales_loader = CacheScaleLoader(
@@ -876,13 +877,13 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
             act_scale_map_dict = scale_map_dict["act_scale"]
             weight_scale_map_dict = scale_map_dict["weight_scale"]
             cache_scale_map_dict = scale_map_dict["cachekv_scale"]
-            act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
-            weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
+            act_scale_json_path = resolve_file_path(self.quant_model_path, "act_scales.json")
+            weight_scale_json_path = resolve_file_path(self.quant_model_path, "weight_scales.json")
             if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                act_scale_json_path = os.path.join(
+                act_scale_json_path = resolve_file_path(
                     self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
                 )
-                weight_scale_json_path = os.path.join(
+                weight_scale_json_path = resolve_file_path(
                     self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
                 )
 
@@ -907,9 +908,9 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
         head_size = self.hidden_size // self.num_attention_heads
         split_fn = split_param_func()
         if self.config.cachekv_int8_type == "static":
-            cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_scales.json")
+            cache_scale_json_path = resolve_file_path(self.quant_model_path, "cachekv_scales.json")
             if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                cache_scale_json_path = os.path.join(
+                cache_scale_json_path = resolve_file_path(
                     self.quant_model_path, f"cachekv_scales_{self.config.tensor_parallel_rank}.json"
                 )
             cache_scales_loader = CacheScaleLoader(
