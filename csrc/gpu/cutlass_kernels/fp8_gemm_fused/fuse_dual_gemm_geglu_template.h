@@ -12,16 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #pragma once
+
 #include "fp8_common.h"
 #include "cutlass/cutlass.h"
 #include "cutlass/float8.h"
 #include "cutlass/gemm/device/gemm_universal.h"
 
 #include "fp8_gemm_fused/dual_gemm/device/dual_gemm.h"
-#include "fp8_gemm_fused/dual_gemm/thread/left_silu_and_mul.h"
+#include "fp8_gemm_fused/dual_gemm/thread/left_gelu_and_mul.h"
 
-template <typename InputType, typename OutType>
-bool dispatch_dual_gemm_scale_swiglu(DualGemmEpilogueAllParams params) {
+template <typename InputType, typename OutType, typename BiasType,
+            typename ThreadBlockShape, typename WarpShape, 
+            typename MMAShape, int Stages, bool hasbias, typename SM>
+bool dispatch_dual_gemm_geglu(DualGemmEpilogueAllParams params) {
   using ElementInputA = typename std::conditional_t<
       std::is_same_v<InputType, phi::dtype::float8_e4m3fn>,
       cutlass::float_e4m3_t,
@@ -30,7 +33,10 @@ bool dispatch_dual_gemm_scale_swiglu(DualGemmEpilogueAllParams params) {
       std::is_same_v<InputType, phi::dtype::float8_e4m3fn>,
       cutlass::float_e4m3_t,
       cutlass::float_e5m2_t>;
-  using ElementInputC = cutlass::half_t;
+  using ElementInputC = typename std::conditional_t<
+      std::is_same_v<BiasType, phi::dtype::bfloat16>,
+      cutlass::bfloat16_t,
+      cutlass::half_t>;
   using ElementOutput = typename std::conditional_t<
       std::is_same_v<OutType, phi::dtype::float8_e4m3fn>,
       cutlass::float_e4m3_t,
@@ -51,23 +57,24 @@ bool dispatch_dual_gemm_scale_swiglu(DualGemmEpilogueAllParams params) {
   using MMAOp = cutlass::arch::OpClassTensorOp;
 
   // This code section describes CUDA SM architecture number
-  using SmArch = cutlass::arch::Sm89;
+  using SmArch = SM;
 
   // This code section describes the tile size a thread block will compute
-  using ShapeMMAThreadBlock =
-      cutlass::gemm::GemmShape<64, 64, 64>; 
+  using ShapeMMAThreadBlock = ThreadBlockShape;
       
   // This code section describes tile size a warp will compute
-  using ShapeMMAWarp =
-      cutlass::gemm::GemmShape<32, 32, 64>; 
+  using ShapeMMAWarp = WarpShape;  
       
   // This code section describes the size of MMA op
-  using ShapeMMAOp = cutlass::gemm::GemmShape<16, 8, 32>;  // <- MMA Op tile M =
-                                                           // 16, N = 8, K = 32
+  using ShapeMMAOp = MMAShape;
 
   // This code section describes how threadblocks are scheduled on GPU
   using SwizzleThreadBlock =
       cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>;  // <- ??
+
+  static constexpr auto ScaleType =
+              hasbias? cutlass::epilogue::thread::ScaleType::NoBetaScaling
+                       : cutlass::epilogue::thread::ScaleType::OnlyAlphaScaling;
 
   using EpilogueOp0 = cutlass::epilogue::thread::LinearCombination<
       ElementInputC,  // <- data type of output matrix
@@ -78,18 +85,17 @@ bool dispatch_dual_gemm_scale_swiglu(DualGemmEpilogueAllParams params) {
                            // math instructions in the epilogue too
       ElementAccumulator,  // <- data type of accumulator
       ElementComputeEpilogue,
-      cutlass::epilogue::thread::ScaleType::
-          OnlyAlphaScaling>;  // <- data type for alpha/beta in linear
+      ScaleType>;  // <- data type for alpha/beta in linear
                               // combination function
 
-  using EpilogueOp1 = cutlass::epilogue::thread::LeftSiLUAndMul<
+  using EpilogueOp1 = cutlass::epilogue::thread::LeftGELUAndMul<
       ElementOutput,
       128 / cutlass::sizeof_bits<ElementInputC>::value,
       ElementInputC,
       ElementCompute>;
 
   // Number of pipelines you want to use
-  constexpr int NumStages = 3;
+  constexpr int NumStages = Stages;
   constexpr bool StoreD0 = false;
   constexpr bool StoreD1 = false;
   constexpr bool SplitKSerial = false;
@@ -127,6 +133,7 @@ bool dispatch_dual_gemm_scale_swiglu(DualGemmEpilogueAllParams params) {
 
   typename cutlass::TensorRef<typename Gemm::ElementC, typename Gemm::LayoutC>
       nullptr_ref{};
+
   int split_k_slices = Gemm::kSplitKSerial ? 2 : 1;
 
   typename Gemm::Arguments arguments{
@@ -136,11 +143,11 @@ bool dispatch_dual_gemm_scale_swiglu(DualGemmEpilogueAllParams params) {
        params.lda},
       {reinterpret_cast<ElementInputB*>(const_cast<void*>(params.B0)),
        params.ldb},
-      nullptr_ref,
+      hasbias? typename cutlass::TensorRef<typename Gemm::ElementC, typename Gemm::LayoutC>{reinterpret_cast<ElementInputC*>(const_cast<void*>(params.bias0)), 0} : nullptr_ref,
       nullptr_ref,
       {reinterpret_cast<ElementInputB*>(const_cast<void*>(params.B1)),
        params.ldb},
-      nullptr_ref,
+      hasbias? typename cutlass::TensorRef<typename Gemm::ElementC, typename Gemm::LayoutC>{reinterpret_cast<ElementInputC*>(const_cast<void*>(params.bias1)), 0} : nullptr_ref,
       nullptr_ref,
       {reinterpret_cast<ElementOutput*>(const_cast<void*>(params.D)),
        params.ldd},
