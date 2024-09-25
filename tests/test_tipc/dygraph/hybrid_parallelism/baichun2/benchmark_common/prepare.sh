@@ -22,7 +22,7 @@ cd -
 
 python -m pip install tiktoken
 
-# install tool_helpers
+# install fast_dataindex
 cd ../llm/
 mkdir data
 cd data
