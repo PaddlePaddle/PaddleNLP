@@ -50,6 +50,7 @@ def strtobool(v):
             f"Truthy value expected: got {v} but expected one of yes/no, true/false, t/f, y/n, 1/0 (case insensitive)."
         )
 
+
 def get_gencode_flags():
     if not strtobool(os.getenv("FLAG_LLM_PDC", "False")):
         prop = paddle.device.cuda.get_device_properties()
@@ -89,7 +90,6 @@ sources = [
     "./gpu/set_value_by_flags_v2.cu",
     "./gpu/stop_generation_multi_ends_v2.cu",
     "./gpu/update_inputs.cu",
-    "./gpu/fused_update_inputs.cu",
     "./gpu/get_output.cc",
     "./gpu/save_with_output_msg.cc",
     "./gpu/write_int8_cache_kv.cu",
@@ -98,6 +98,8 @@ sources = [
     "./gpu/dequant_int8.cu",
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
+    "./gpu/update_all.cu",
+    "./gpu/set_preids_token_penalty_multi_scores.cu",
 ]
 
 cutlass_dir = "gpu/cutlass_kernels/cutlass"
