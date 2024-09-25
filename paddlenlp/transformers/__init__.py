@@ -25,10 +25,13 @@ from .tokenizer_utils import (
     tokenize_special_chars,
     convert_to_unicode,
 )
+from .tokenizer_utils_fast import PretrainedTokenizerFast
 from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .image_processing_utils import ImageProcessingMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
+from .sequence_parallel_utils import AllGatherVarlenOp, sequence_parallel_sparse_mask_labels
+from .tensor_parallel_utils import parallel_matmul, parallel_linear, fused_head_and_loss_fn
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
@@ -299,3 +302,9 @@ from .deberta_v2.configuration import *
 from .qwen2 import *
 from .qwen2_moe import *
 from .yuan import *
+from .mamba.configuration import *
+from .mamba.modeling import *
+from .mamba.tokenizer import *
+from .jamba.modeling import *
+from .jamba.configuration import *
+from .jamba.tokenizer import *

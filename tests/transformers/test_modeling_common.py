@@ -967,8 +967,10 @@ class GenerationD2STestMixin:
                         use_top_p=False,
                     ),
                 )
-
-                model_path = os.path.join(tempdir, "model.pdmodel")
+                if paddle.framework.use_pir_api():
+                    model_path = os.path.join(tempdir, "model.json")
+                else:
+                    model_path = os.path.join(tempdir, "model.pdmodel")
                 params_path = os.path.join(tempdir, "model.pdiparams")
                 config = paddle.inference.Config(model_path, params_path)
 
@@ -1036,7 +1038,10 @@ class GenerationD2STestMixin:
                     ),
                 )
 
-                model_path = os.path.join(tempdir, "model.pdmodel")
+                if paddle.framework.use_pir_api():
+                    model_path = os.path.join(tempdir, "model.json")
+                else:
+                    model_path = os.path.join(tempdir, "model.pdmodel")
                 params_path = os.path.join(tempdir, "model.pdiparams")
                 config = paddle.inference.Config(model_path, params_path)
 

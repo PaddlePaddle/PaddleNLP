@@ -15,7 +15,7 @@
 
 import os
 from shutil import copyfile
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 import sentencepiece as spm
@@ -111,6 +111,18 @@ class GemmaTokenizer(PretrainedTokenizer):
         """Returns vocab size"""
         return self.sp_model.get_piece_size()
 
+    def __len__(self):
+        """
+        Returns the vocabulary size. added_tokens_encoder has to be added in the sp_model
+        """
+        added_size = 0
+
+        for id in self.added_tokens_decoder:
+            if id >= self.sp_model.get_piece_size():
+                added_size += 1
+
+        return self.vocab_size + added_size
+
     # Copied from transformers.models.llama.tokenization_llama.LlamaTokenizer.get_vocab
     def get_vocab(self):
         """Returns vocab as a dict"""
@@ -127,11 +139,15 @@ class GemmaTokenizer(PretrainedTokenizer):
     # Copied from transformers.models.llama.tokenization_llama.LlamaTokenizer._convert_token_to_id
     def _convert_token_to_id(self, token):
         """Converts a token (str) in an id using the vocab."""
-        return self.sp_model.piece_to_id(token)
+        if token in self.added_tokens_encoder:
+            return self.added_tokens_encoder[token]
+        return self.sp_model.PieceToId(token)
 
     # Copied from transformers.models.llama.tokenization_llama.LlamaTokenizer._convert_id_to_token
     def _convert_id_to_token(self, index):
         """Converts an index (integer) in a token (str) using the vocab."""
+        if index in self.added_tokens_decoder:
+            return self.added_tokens_decoder[index]
         token = self.sp_model.IdToPiece(index)
         return token
 
@@ -307,6 +323,7 @@ class GemmaTokenizer(PretrainedTokenizer):
         max_length: Optional[int] = None,
         padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_attention_mask: Optional[bool] = None,
     ) -> dict:
         """
@@ -329,6 +346,9 @@ class GemmaTokenizer(PretrainedTokenizer):
             pad_to_multiple_of: (optional) Integer if set will pad the sequence to a multiple of the provided value.
                 This is especially useful to enable the use of Tensor Core on NVIDIA hardware with compute capability
                 >= 7.5 (Volta).
+            padding_side: (optional) The side on which the model should have padding applied.
+                Should be selected between ['right', 'left'].
+                Default value is picked from the class attribute of the same name.
             return_attention_mask:
                 (optional) Set to False to avoid returning attention mask (default: set to model specifics)
         """
@@ -343,7 +363,7 @@ class GemmaTokenizer(PretrainedTokenizer):
 
         required_input = encoded_inputs[self.model_input_names[0]]
         encoded_inputs = super()._pad(
-            encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, return_attention_mask
+            encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, padding_side, return_attention_mask
         )
         if attention_mask is not None and len(np.shape(attention_mask)) > 2:
             encoded_inputs["attention_mask"] = attention_mask

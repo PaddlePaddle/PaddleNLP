@@ -87,7 +87,10 @@ def main():
 
     dataset_config = data_args.dataset.split(" ")
     raw_datasets = load_dataset(
-        dataset_config[0], None if len(dataset_config) <= 1 else dataset_config[1], cache_dir=model_args.cache_dir
+        dataset_config[0],
+        None if len(dataset_config) <= 1 else dataset_config[1],
+        cache_dir=model_args.cache_dir,
+        trust_remote_code=True,
     )
 
     label_list = getattr(raw_datasets["train"], "label_list", None)

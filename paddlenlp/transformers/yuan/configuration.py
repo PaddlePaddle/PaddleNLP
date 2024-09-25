@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Yuan model configuration"""
+"""Configuration class for Yuan2.0 model"""
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
@@ -31,7 +31,7 @@ class YuanConfig(PretrainedConfig):
         hidden_act="silu",
         model_max_length=8192,
         initializer_range=0.02,
-        tensor_parallel_output=True,
+        tensor_parallel_output=False,
         rms_norm_eps=1e-6,
         use_cache=True,
         pad_token_id=77185,

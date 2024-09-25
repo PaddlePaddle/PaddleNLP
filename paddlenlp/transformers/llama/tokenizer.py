@@ -15,7 +15,7 @@
 
 import os
 from shutil import copyfile
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import numpy as np
 import sentencepiece as spm
@@ -80,6 +80,18 @@ class LlamaTokenizer(PretrainedTokenizer):
         """Returns vocab size"""
         return self.sp_model.get_piece_size()
 
+    def __len__(self):
+        """
+        Returns the vocabulary size. added_tokens_encoder has to be added in the sp_model
+        """
+        added_size = 0
+
+        for id in self.added_tokens_decoder:
+            if id >= self.sp_model.get_piece_size():
+                added_size += 1
+
+        return self.vocab_size + added_size
+
     @property
     def bos_token_id(self) -> Optional[int]:
         return self.sp_model.bos_id()
@@ -104,7 +116,7 @@ class LlamaTokenizer(PretrainedTokenizer):
 
     def _convert_id_to_token(self, index):
         """Converts an index (integer) in a token (str) using the vocab."""
-        token = self.sp_model.IdToPiece(index)
+        token = self.sp_model.id_to_piece(index)
         return token
 
     def convert_tokens_to_string(self, tokens):
@@ -220,6 +232,7 @@ class LlamaTokenizer(PretrainedTokenizer):
         max_length: Optional[int] = None,
         padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_attention_mask: Optional[bool] = None,
     ) -> dict:
         """
@@ -235,13 +248,16 @@ class LlamaTokenizer(PretrainedTokenizer):
                 - PaddingStrategy.LONGEST Pad to the longest sequence in the batch
                 - PaddingStrategy.MAX_LENGTH: Pad to the max length (default)
                 - PaddingStrategy.DO_NOT_PAD: Do not pad
-                The tokenizer padding sides are defined in self.padding_side:
+                The tokenizer padding sides are defined in `padding_side` argument:
 
                     - 'left': pads on the left of the sequences
                     - 'right': pads on the right of the sequences
             pad_to_multiple_of: (optional) Integer if set will pad the sequence to a multiple of the provided value.
                 This is especially useful to enable the use of Tensor Core on NVIDIA hardware with compute capability
                 >= 7.5 (Volta).
+            padding_side: (optional) The side on which the model should have padding applied.
+                Should be selected between ['right', 'left'].
+                Default value is picked from the class attribute of the same name.
             return_attention_mask:
                 (optional) Set to False to avoid returning attention mask (default: set to model specifics)
         """
@@ -256,7 +272,7 @@ class LlamaTokenizer(PretrainedTokenizer):
 
         required_input = encoded_inputs[self.model_input_names[0]]
         encoded_inputs = super()._pad(
-            encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, return_attention_mask
+            encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, padding_side, return_attention_mask
         )
         if attention_mask is not None and len(np.shape(attention_mask)) > 2:
             encoded_inputs["attention_mask"] = attention_mask
@@ -509,6 +525,7 @@ class Llama3Tokenizer(PretrainedTokenizer):
         max_length: Optional[int] = None,
         padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_attention_mask: Optional[bool] = None,
     ) -> dict:
         """
@@ -524,13 +541,16 @@ class Llama3Tokenizer(PretrainedTokenizer):
                 - PaddingStrategy.LONGEST Pad to the longest sequence in the batch
                 - PaddingStrategy.MAX_LENGTH: Pad to the max length (default)
                 - PaddingStrategy.DO_NOT_PAD: Do not pad
-                The tokenizer padding sides are defined in self.padding_side:
+                The tokenizer padding sides are defined in `padding_side` argument:
 
                     - 'left': pads on the left of the sequences
                     - 'right': pads on the right of the sequences
             pad_to_multiple_of: (optional) Integer if set will pad the sequence to a multiple of the provided value.
                 This is especially useful to enable the use of Tensor Core on NVIDIA hardware with compute capability
                 >= 7.5 (Volta).
+            padding_side: (optional) The side on which the model should have padding applied.
+                Should be selected between ['right', 'left'].
+                Default value is picked from the class attribute of the same name.
             return_attention_mask:
                 (optional) Set to False to avoid returning attention mask (default: set to model specifics)
         """
@@ -545,7 +565,7 @@ class Llama3Tokenizer(PretrainedTokenizer):
 
         required_input = encoded_inputs[self.model_input_names[0]]
         encoded_inputs = super()._pad(
-            encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, return_attention_mask
+            encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, padding_side, return_attention_mask
         )
         if attention_mask is not None and len(np.shape(attention_mask)) > 2:
             encoded_inputs["attention_mask"] = attention_mask

@@ -58,6 +58,7 @@ inference-to-static:
   default:
     dtype: float16
     export_precache: true
+    max_length: 20
 
 inference-infer:
   default:

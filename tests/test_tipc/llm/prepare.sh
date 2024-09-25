@@ -14,10 +14,13 @@
 
 cd ..
 sed -i -e "s/paddlepaddle/#paddlepaddle/g" requirements-dev.txt
-sed -i -e "s/pip install paddlepaddle/#pip install paddlepaddle/g" Makefile
+sed -i -e "s/pip install --pre paddlepaddle/#pip install --pre paddlepaddle/g" Makefile
 
 make install
 
 cd ./csrc
 pip install -r requirements.txt
+wget https://paddle-qa.bj.bcebos.com/benchmark/PaddleNLP/cutlass.tar
+tar -xvf cutlass.tar
+mv cutlass ./third_party/cutlass
 python setup_cuda.py install

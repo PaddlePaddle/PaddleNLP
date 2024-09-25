@@ -127,9 +127,15 @@ class Predictor(object):
                         break
                     else:
                         labels_can = bk_tree.search_similar_word(label)
-                        result["label"] = labels_can[0][0]
-
-            result["category"] = name_dict[result["label"]]
+                        if len(labels_can) != 0:
+                            result["label"] = labels_can[0][0]
+                        else:
+                            result["label"] = None
+            
+            if result["label"] in name_dict:
+                result["category"] = name_dict[result["label"]]
+            else:
+                result["category"] = None
             results.append(result)
         return results
 

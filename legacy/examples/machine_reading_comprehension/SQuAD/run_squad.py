@@ -230,11 +230,11 @@ def run(args):
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     if args.version_2_with_negative:
-        train_examples = load_dataset("squad_v2", split="train")
-        dev_examples = load_dataset("squad_v2", split="validation")
+        train_examples = load_dataset("squad_v2", split="train", trust_remote_code=True)
+        dev_examples = load_dataset("squad_v2", split="validation", trust_remote_code=True)
     else:
-        train_examples = load_dataset("squad", split="train")
-        dev_examples = load_dataset("squad", split="validation")
+        train_examples = load_dataset("squad", split="train", trust_remote_code=True)
+        dev_examples = load_dataset("squad", split="validation", trust_remote_code=True)
     set_seed(args)
     if rank == 0:
         if os.path.exists(args.model_name_or_path):
