@@ -83,6 +83,12 @@ class PreTrainingArguments(TrainingArguments):
             "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
     )
+    use_fused_linear:bool = field(
+        default=True,
+        metadata={
+            "help": "Enable fused linear op, which will fuse matmul and bias add together."
+        },
+    )
     job_schedule_profiler_start: int = field(
         default=-1,
         metadata={"help": "The step to start job_schedule_profiler."},
@@ -123,12 +129,17 @@ class PreTrainingArguments(TrainingArguments):
             self.report_to = []
             self.save_strategy = IntervalStrategy.NO
             self.evaluation_strategy = IntervalStrategy.NO
-
+        
+        fused_passes = self.strategy.fused_passes
         if self.fused_linear_param_grad_add:
-            fused_passes = self.strategy.fused_passes
             fused_passes.enable = True
             fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
-
+        if self.use_fused_linear:
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("fused_gemm_epilogue_pass")
+        if self.enable_linear_fused_grad_add:
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
         logger.info(self.strategy)
 
 
@@ -217,6 +228,15 @@ class ModelArguments:
     fuse_attention_ffn: bool = field(
         default=False,
         metadata={"help": "whether to fuse first up and gate proj in mlp block"},
+    )
+    #this optional can be use in run_pretrain.py
+    use_fast_layer_norm: bool = field(
+        default=False,
+        metadata={"help": "GPT3 model, use fast layernorm"},
+    )
+    use_fused_dropout_add: bool = field(
+        default=False,
+        metadata={"help": "Gpt3 model, use_fused_dropout_add"},
     )
     recompute_granularity: str = field(
         default="full",
@@ -367,7 +387,7 @@ def get_train_data_file(args):
 class PretrainingTrainer(AutoTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self.is_pretraining = True
     def _wrap_for_dist_loader(self, train_dataloader):
         dist_loader = super()._wrap_for_dist_loader(train_dataloader)
         dist_loader._input_keys = ["input_ids", "labels"]
@@ -437,10 +457,11 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
-
-        mock_layers()
+    # if training_args.enable_linear_fused_grad_add:
+    #     sys.path.append('../..')
+    #     from utils.fused_layers import mock_layers
+    #     # from utils.fused_layers import mock_layers
+    #     mock_layers()
 
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
@@ -481,7 +502,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
-
+    config.use_fast_layer_norm = model_args.use_fast_layer_norm
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
     if not model_args.continue_training:
@@ -505,7 +526,7 @@ def main():
     config.num_attention_heads = (
         model_args.num_attention_heads if model_args.num_attention_heads is not None else config.num_attention_heads
     )
-
+    config.use_fused_dropout_add = model_args.use_fused_dropout_add
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -542,14 +563,16 @@ def main():
 
     model = model_class.from_config(config, dtype=dtype)
     criterion = criterion_class(config)
+    ###todo(bug): training_args.recompute is not working , temp set all was true
+    training_args.recompute = True
     if training_args.recompute:
-
         def fn(layer):
             if hasattr(layer, "enable_recompute") and (layer.enable_recompute is False or layer.enable_recompute == 0):
                 layer.enable_recompute = True
-
+                if hasattr(layer,"layerwise_recompute"):
+                    layer.layerwise_recompute = True
         model.apply(fn)
-
+        
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps

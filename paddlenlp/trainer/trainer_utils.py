@@ -343,8 +343,18 @@ def total_processes_number(local_rank):
         return paddle.distributed.get_world_size()
     return 1
 
+avg_tokens_per_second_per_device = []
+def average_after_removing_extremes(numbers):
+    if len(numbers) < 6:
+        return -1
 
-def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_length=None, model_flops=None):
+    sorted_numbers = copy.copy(sorted(numbers))
+    trimmed_numbers = sorted_numbers[3:-2]
+    average_value = sum(trimmed_numbers) / len(trimmed_numbers)
+    
+    return average_value
+
+def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_length=None):
     """
     Measure and return speed performance metrics.
 
@@ -357,6 +367,7 @@ def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_lengt
     - start_time: operation start time
     - num_samples: number of samples processed
     """
+    global avg_tokens_per_second_per_device
     runtime = time.time() - start_time
     result = {f"{split}_runtime": round(runtime, 4)}
     if num_samples is not None:
@@ -364,11 +375,9 @@ def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_lengt
         result[f"{split}_samples_per_second"] = round(samples_per_second, 4)
         if seq_length is not None:
             tokens_per_second_per_device = samples_per_second * seq_length / paddle.distributed.get_world_size()
+            avg_tokens_per_second_per_device.append(round(tokens_per_second_per_device, 4))
             result[f"{split}_tokens_per_second_per_device"] = round(tokens_per_second_per_device, 4)
-        if model_flops is not None:
-            result[f"{split}_hardware_tflops_per_device"] = round(
-                tokens_per_second_per_device * model_flops / seq_length / 2**40, 2
-            )
+            result[f"{split}_avg_tokens"] = average_after_removing_extremes(avg_tokens_per_second_per_device)
 
     if num_steps is not None:
         steps_per_second = num_steps / runtime
