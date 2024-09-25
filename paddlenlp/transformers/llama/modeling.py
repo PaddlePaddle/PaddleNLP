@@ -414,8 +414,11 @@ class LlamaRotaryEmbedding(nn.Layer):
         # [seq_len]
         t = paddle.arange(seq_len, dtype="float32")
         # [seq_len, dim/2]
-        # freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
-        freqs = t.unsqueeze(1) * self.inv_freq.unsqueeze(0)
+        if get_env_device() == "intel_hpu":
+            # fallback einsum to intel Gaudi TPC since MME doesn't support FP32
+            freqs = t.unsqueeze(1) * self.inv_freq.unsqueeze(0)
+        else:
+            freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         # [seq_len, dim]
         emb = paddle.concat([freqs, freqs], axis=-1)
