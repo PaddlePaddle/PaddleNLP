@@ -55,13 +55,36 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo
 ```
 
 ## 3. DPO 参数介绍
+### 模型参数（ModelArgument）
 - `model_name_or_path`: 使用的预训练模型名称或者本地的模型路径，用于热启模型和分词器，每个模型支持模型权重详见各模型目录。
-- `use_flash_attention`: 模型是否使用 FlashAttention，默认为 `True`。
-- `flash_mask`: 是否使用 FlashMask，默认为 `True`，需要在 FlashAttention 打开的基础上设置。
+- `use_flash_attention`: 模型是否使用 FlashAttention，默认为 `False`。
+- `flash_mask`: 是否使用 FlashMask，需要在 FlashAttention 打开的基础上设置。
+- `lora`: 是否使用 LoRA 模型，默认为 `False`。
+- `ref_model_update_steps`: 更新参考模型状态字典的步数，默认为 -1，表示不更新。
+- `reference_free`: 是否不使用参考模型，默认为 False。
+- `recompute_granularity`: 重计算的粒度，这里为 `"full"`。
+- `tokenizer_name_or_path`: 分词器的预训练名称或路径，如果与模型不同。
+- `virtual_pp_degree`: 虚拟流水线并行度，这里为 `1`。
+- `sequence_parallel`: 是否使用序列并行，这里为 `False`。
+- `tensor_parallel_output`: 是否使用 tensor_parallel_output，这里为 `True`。
+- `weight_quantize_algo`: 模型权重量化算法，包括 `"nf4"`（qlora）、`"weight_only_int8"`。
+- `lora_rank`: LoRA 中秩的值，这里为 `8`。
+- `lora_path`: 用于初始化 LoRA 状态字典的路径。
+- `rslora`: 是否使用 RsLoRA，这里为 `False`。
+- `lora_plus_scale`: 在 LoRA+ 技术中，Lora B 的比例，这里为 `1.0`。
+- `lora_alpha`: LoRA 的 alpha 参数，这里为 `-1`。
+- `rslora_plus`: 是否增强 LoRA 的性能，这里为 `False`。
+- `use_quick_lora`: 是否使用 Quick LoRA，这里为 `True`。
+
+### 数据参数（DataArgument）
 - `train_dataset_path`: 训练集数据路径，这里为 `"./data/train.jsonl"`。
 - `dev_dataset_path`: 验证集数据路径，这里为 `"./data/dev.jsonl"`。
-- `max_seq_len`: 输入序列的最大长度，默认为 `4096`。
-- `max_prompt_len`: 输入提示的最大长度，默认为 `2048`。
+- `max_seq_len`: 输入序列的最大长度，这里为 `4096`。
+- `max_prompt_len`: 输入提示的最大长度，这里为 `2048`。
+- `greedy_zero_padding`: 是否使用 greedy zero padding，默认为 `False`。
+- `lazy`: 是否返回`MapDataset` 或者`IterDataset`。`True`代表`IterDataset`，`False`代表`MapDataset`。
+
+### 训练参数（TrainingArguments）
 - `output_dir`: 用于保存相关文件的目录，包括模型、checkpoint、分词器文件、评估结果等，这里为 `"./checkpoints/dpo_ckpts"`。
 - `per_device_train_batch_size`: 每个设备上的训练批处理大小，这里为 `1`。
 - `gradient_accumulation_steps`: 梯度累积步数，默认为 `8`，表示每 `8` 个步数进行一次参数更新。
@@ -84,10 +107,68 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo
 - `sharding_parallel_degree`: 分组参数切片的数据并行大小。
 - `sharding`: 是否使用 Sharding 数据并行功能，这里为 `"stage1"`。
 - `recompute`: 重计算，暂支持 full 策略。开启后可降低显存以达到增大 batch size 的目的。
-- `recompute_granularity`: 重计算的粒度，这里为 `"full"`。
-- `dpo_beta`: DPO 算法中的 beta 参数，这里为 `0.1`。
-- `dpo_loss_type`: DPO 损失函数类型，有 sigmoid, hinge, ipo, kto_pair, sppo_hard, nca_pair，这里为 `"sigmoid"`。
-- `dpo_label_smoothing`: DPO 标签平滑参数，这里为 `0.0`。
 - `unified_checkpoint`: 是否使用统一的 checkpoint，默认为 `True`。
 - `autotuner_benchmark`: 是否启用 autotuner 基准测试，默认为 `False`。
 - `benchmark`: 是否开启基准测试，默认为 `False`。
+### DPO 参数（DPOArguments）
+- `beta`: DPO 损失函数的 beta 参数，默认为 0.1。
+- `simpo_gamma`: SimPO 损失函数的 gamma 参数，默认为 0.5。
+- `normalize_logps`: 是否应用对数概率归一化，默认为 True。
+- `label_smoothing`: 标签平滑比率，默认为 0.0。
+- `loss_type`: DPO 损失类型，DPO 损失函数类型，有 sigmoid, hinge, ipo, kto_pair, sppo_hard, nca_pair,默认为 `sigmoid`。
+- `pref_loss_ratio`: DPO 损失比率，默认为 1.0。
+- `sft_loss_ratio`: SFT 损失比率，默认为 0.0。
+- `dpop_lambda`: dpop_lambda，默认为 50，详情可见文档[DPOP](https://arxiv.org/pdf/2402.13228)
+
+## 4. DPO 数据流介绍
+在 dpo 的数据流中，我们首先将原始的数据集进行预处理，然后构造 DPO 的数据序列。序列包括提示（问题），chosen（偏好回答）和 rejected（拒绝回答）。
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/user-attachments/assets/2713a562-ad42-4590-a152-9009250491e6">
+</div>
+<div align="center">
+    <font size ="1">
+    序列构造
+     </font>
+</div>
+
+序列构造完成后我们需要将多个序列拼接一个 batch，并进行 padding（零填充）操作，使每个 batch 长度相同。
+
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/user-attachments/assets/3342da5a-a3e2-4fe2-8f94-04867b45e3a4">
+</div>
+<div align="center">
+    <font size ="1">
+    序列拼接
+     </font>
+</div>
+
+在训练过程中，我们需要防止模型在生成序列时提前看到未来的信息，具体来说，在处理序列数据时，模型只能看到当前 token 及其之前的 token，而不能看到之后的 token，我们使用掩码来实现这一功能。针对 dpo 数据序列，每条数据包含的内容是是提示，chosen 和 rejected，我们需要让模型读到的数据是 **提示+chosen** 和 **提示+rejected**，同样使用掩码实现。
+
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/user-attachments/assets/20a3622f-c33d-48d4-af5e-777464a83dfb">
+</div>
+<div align="center">
+    <font size ="1">
+    序列掩码示意图
+     </font>
+</div>
+
+序列拼接后将各序列的掩码拼接形成 batch 掩码
+
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/user-attachments/assets/37203f1c-b213-4521-8b70-980f4814cdbc">
+</div>
+<div align="center">
+    <font size ="1">
+    batch 掩码拼接示意图
+     </font>
+</div>
+
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/user-attachments/assets/88d09f09-ebe6-4250-b8aa-e9e35db5b9d3">
+</div>
+<div align="center">
+    <font size ="1">
+    batch 掩码示意图
+     </font>
+</div>
