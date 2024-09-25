@@ -847,6 +847,9 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Offload optimizer after optimizer.step()"},
     )
+    save_sharding_stage1_model_include_freeze_params: Optional[bool] = field(
+        default=False, metadata={"help": "Save Sharding Stage1 Model Exclude Freeze Params"}
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
