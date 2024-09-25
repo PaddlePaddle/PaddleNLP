@@ -26,11 +26,11 @@ git clone 代码到本地，即可开始。
 .. toctree::
    :maxdepth: 1
 
-   内置预练数据集及自定义数据制作 <dataset.md>
-   CLUECorpus2020 语料制作 <data/CLUECorpus2020.md>
-   CLUECorpusSmall  语料制作 <data/CLUECorpusSmall.md>
-   OpenWebText2 语料制作 <data/OpenWebText2.md>
-   WuDaoCorpus2.0 Base 语料 <data/WuDaoCorpusBase.md>
+   内置预练数据集及自定义数据制作 <../dataset.md>
+   CLUECorpus2020 语料制作 <../tools/preprocess/docs/CLUECorpus2020.md>
+   CLUECorpusSmall  语料制作 <../tools/preprocess/docs/CLUECorpusSmall.md>
+   OpenWebText2 语料制作 <../tools/preprocess/docs/OpenWebText2.md>
+   WuDaoCorpus2.0 Base 语料 <../tools/preprocess/docs/WuDaoCorpusBase.md>
 
 
 
@@ -76,7 +76,7 @@ git clone 代码到本地，即可开始。
 
 注意：
 
-1. 建议使用paddle develop版本训练，需要安装 ``pip install tool_helpers visualdl==2.5.3`` 等相关缺失whl包。
+1. 建议使用paddle develop版本训练，需要安装 ``pip install fast_dataindex visualdl==2.5.3`` 等相关缺失whl包。
 2. ``use_flash_attention`` 需要在A100机器开启，建议使用cuda11.8环境。
 3. ``use_fused_rms_norm`` 需要安装 `此目录 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/gpt-3/external_ops>`_ 下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置 ``PYTHONPATH``。
 4. ``continue_training`` 表示从现有的预训练模型加载训练。7b模型初始loss大概为2.xx, 随机初始化模型loss从11.x左右下降。

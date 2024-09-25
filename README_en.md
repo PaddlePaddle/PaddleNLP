@@ -93,13 +93,14 @@ PaddleNLP provides a convenient and easy-to-use Auto API, which can quickly load
 >>> model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2-0.5B", dtype="float16")
 >>> input_features = tokenizer("你好！请自我介绍一下。", return_tensors="pd")
 >>> outputs = model.generate(**input_features, max_length=128)
->>> print(tokenizer.batch_decode(outputs[0]))
+>>> print(tokenizer.batch_decode(outputs[0], skip_special_tokens=True))
 ['我是一个AI语言模型，我可以回答各种问题，包括但不限于：天气、新闻、历史、文化、科学、教育、娱乐等。请问您有什么需要了解的吗？']
 ```
 
 ### Pre-training for large language model
 
 ```shell
+git clone https://github.com/PaddlePaddle/PaddleNLP.git && cd PaddleNLP # if cloned or downloaded, can skip this step
 mkdir -p llm/data && cd llm/data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx
@@ -110,6 +111,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py 
 ### SFT finetuning forlarge language model
 
 ```shell
+git clone https://github.com/PaddlePaddle/PaddleNLP.git && cd PaddleNLP # if cloned or downloaded, can skip this step
 mkdir -p llm/data && cd llm/data
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz && tar -zxvf AdvertiseGen.tar.gz
 cd .. # change folder to PaddleNLP/llm
