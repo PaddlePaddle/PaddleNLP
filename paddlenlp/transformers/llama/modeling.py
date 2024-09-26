@@ -173,7 +173,7 @@ def assign_kv_heads(num_kv_heads: int, num_gpus: int):
     return assignment_list
 
 
-def parallel_matmul(x: Tensor, y: Tensor, transpose_y=True, tensor_parallel_output=True):
+def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_output=True):
     is_fleet_init = True
     tensor_parallel_degree = 1
     try:
