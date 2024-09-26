@@ -248,7 +248,11 @@ def scaled_dot_product_attention(
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
         # matmul and devide by sqrt(head_dim)
-        attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+        if get_env_device() == "intel_hpu":
+            attn_weights = paddle.matmul(query_states * (1 / math.sqrt(head_dim)), key_states.transpose([0, 1, 3, 2]))
+        else:
+            attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+
         # then add alibi bias
         if alibi is not None:
             alibi = alibi.reshape([bsz, num_heads, 1, -1])
@@ -429,6 +433,9 @@ class LlamaRotaryEmbedding(nn.Layer):
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
+        if self.cos_cached.dtype != x.dtype and get_env_device() == "intel_hpu":
+            self.cos_cached = self.cos_cached.cast(x.dtype)
+            self.sin_cached = self.sin_cached.cast(x.dtype)
         cos = self.cos_cached[:, :seq_len, :, :]
         sin = self.sin_cached[:, :seq_len, :, :]
         return (

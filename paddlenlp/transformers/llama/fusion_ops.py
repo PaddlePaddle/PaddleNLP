@@ -71,7 +71,7 @@ def fusion_rope(
     if context_parallel_degree > 1:
         assert get_env_device() == "gpu", "context parallel only support cuda device for now"
         kv_seq_len *= context_parallel_degree
-    if get_env_device() != "gcu":
+    if get_env_device() not in ["gcu", "intel_hpu"]:
         cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
     if get_env_device() == "npu":
         query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
@@ -80,8 +80,8 @@ def fusion_rope(
         if past_key_value is not None:
             kv_seq_len += past_key_value[0].shape[-3]
         cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
-        cos = cos.squeeze().unsqueeze(0).unsqueeze(0).clone()
-        sin = sin.squeeze().unsqueeze(0).unsqueeze(0).clone()
+        cos = cos.squeeze().unsqueeze(0).unsqueeze(0)
+        sin = sin.squeeze().unsqueeze(0).unsqueeze(0)
         query_states, _, _ = paddle.incubate.nn.functional.fused_rotary_position_embedding(
             paddle.transpose(query_states, [0, 2, 1, 3]), None, None, sin=sin, cos=cos, position_ids=position_ids
         )
