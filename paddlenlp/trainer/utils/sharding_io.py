@@ -57,9 +57,17 @@ SHARDING_META_NAME = "shard_meta.json"
 def to_device(tensor, place=None):
     if place is None:
         place = get_env_device()
+
     if isinstance(place, str):
         place = paddle.device._convert_to_place(place)
-    return tensor._copy_to(place, True)
+
+    if not tensor.place._equals(place):
+        new_t = tensor._copy_to(place, True)
+        dst_tensor = tensor.value().get_tensor()
+        src_tensor = new_t.value().get_tensor()
+        dst_tensor._share_data_with(src_tensor)
+
+    return tensor
 
 
 def filter_sharded_params(state_dict, optimizer, sharding_group, include_freeze_params=False):
