@@ -21,8 +21,8 @@ from paddlenlp_ops import set_stop_value_multi_ends_v2, update_all, update_input
 np.random.seed(100)
 
 
-class FusedUpdateInputsOperatorsTest(unittest.TestCase):
-    def test_fused_update_inputs(self):
+class UpdateAllOperatorsTest(unittest.TestCase):
+    def test_update_all_operations(self):
         # Initialize parameters
         bs = 64
         max_bs = 64

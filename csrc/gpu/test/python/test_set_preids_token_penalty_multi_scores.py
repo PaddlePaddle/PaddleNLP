@@ -25,9 +25,8 @@ from paddlenlp_ops import (
 paddle.seed(2023)
 
 
-class CombinedTest(unittest.TestCase):
-    def test_combined_operations(self):
-        # Tensor初始化
+class SetPreidsTokenPenaltyMultiScores(unittest.TestCase):
+    def test_set_preids_token_penalty_multi_scores_operations(self):
         pre_ids = paddle.to_tensor([[1, 9, 3, 4, 5, 6, 7, -1, -1, -1], [1, 9, 7, 6, 5, 4, -1, -1, -1, -1]], "int64")
         pre_ids_2 = pre_ids.clone()
         input_ids = paddle.to_tensor(
@@ -65,7 +64,7 @@ class CombinedTest(unittest.TestCase):
         eos_token_id = paddle.to_tensor([2, 9], "int64")
         eos_token_id_2 = eos_token_id.clone()
 
-        # 第一次运行 set_value_by_flags_and_idx_v2 和 get_token_penalty_multi_scores_v2
+        # run set_value_by_flags_and_idx_v2 and get_token_penalty_multi_scores_v2
         print("Running set_value_by_flags_and_idx_v2...")
         set_value_by_flags_and_idx_v2(
             pre_ids, input_ids, seq_lens_this_time, seq_lens_encoder, seq_lens_decoder, step_idx, stop_flags
@@ -84,7 +83,6 @@ class CombinedTest(unittest.TestCase):
             eos_token_id,
         )
 
-        # 打印第一次运行的结果
         print("Results after first operation:")
         print("pre_ids\n", pre_ids.numpy())
         print("logits\n", logits.numpy())
@@ -97,11 +95,10 @@ class CombinedTest(unittest.TestCase):
         print("min_len\n", min_len.numpy())
         print("eos_token_id\n", eos_token_id.numpy())
 
-        # 存储第一次运行后的张量
         first_pre_ids = pre_ids.numpy()
         first_logits = logits.numpy()
 
-        # 第二次运行 set_preids_token_penalty_multi_scores
+        # run set_preids_token_penalty_multi_scores
         print("Running set_preids_token_penalty_multi_scores...")
         set_preids_token_penalty_multi_scores(
             pre_ids_2,
@@ -121,7 +118,6 @@ class CombinedTest(unittest.TestCase):
             eos_token_id_2,
         )
 
-        # 打印第二次运行的结果
         print("Results after second operation:")
         print("pre_ids_2\n", pre_ids_2.numpy())
         print("logits_2\n", logits_2.numpy())
@@ -134,11 +130,9 @@ class CombinedTest(unittest.TestCase):
         print("min_len_2\n", min_len_2.numpy())
         print("eos_token_id_2\n", eos_token_id_2.numpy())
 
-        # 存储第二次运行后的张量
         second_pre_ids = pre_ids_2.numpy()
         second_logits = logits_2.numpy()
 
-        # 比较两次运行的结果是否一致
         np.testing.assert_array_equal(
             first_pre_ids, second_pre_ids, err_msg="pre_ids arrays are different between runs"
         )
