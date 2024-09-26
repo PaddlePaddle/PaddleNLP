@@ -41,7 +41,7 @@ std::vector<paddle::Tensor> TopPSamplingReject(const paddle::Tensor& probs,
       paddle::full({batch_size, 1}, 0, paddle::DataType::BOOL, probs.place());
 
   auto top_p_host =
-      paddle::experimental::copy_to(top_p, paddle::CPUPlace(), true);
+      paddle::experimental::copy_to(top_p, paddle::CPUPlace(), false);
   float top_p_val = top_p_host.data<float>()[0];
   cudaError_t status;
   if (top_p_val == 0.0) {
