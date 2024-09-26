@@ -45,7 +45,7 @@ std::vector<paddle::Tensor> TopPSamplingReject(const paddle::Tensor& probs,
   float top_p_val = top_p_host.data<float>()[0];
   cudaError_t status;
   if (top_p_val == 0.0) {
-    // top_p is 0，use top_k sampling
+    // top_p is 0，use top_k sampling .
     status = sampling::TopKSamplingFromProb<float, int>(
         const_cast<float*>(probs.data<float>()),
         uniform_samples.data<float>(),
