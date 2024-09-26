@@ -108,7 +108,7 @@ class UpdateAllOperatorsTest(unittest.TestCase):
         }
         print(result2)
 
-        not_need_stop_2 = paddle.to_tensor(np.array([1], "bool"), place=paddle.CPUPlace())
+        not_need_stop_2 = paddle.to_tensor(np.array([1], "bool"))
         # Run fused_update_inputs
         update_all(
             stop_flags_2,

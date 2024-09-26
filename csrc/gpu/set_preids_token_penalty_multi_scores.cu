@@ -38,38 +38,41 @@ __global__ void update_value_all(const bool *stop_flags,
                                  const int64_t bad_words_length,
                                  const int64_t length_input_ids) {
     int bi = blockIdx.x;
+    T *logits_now = logits + bi * length;
     int tid = threadIdx.x;
 
     if (tid < bs && !stop_flags[tid]) {
-        int64_t *pre_ids_all_now = pre_ids + tid * length;
+        int64_t *pre_ids_now = pre_ids + tid * length;
         const int64_t *input_ids_now = input_ids + tid * length_input_ids;
         const int seq_len_dec = seq_lens_decoder[tid];
         const int seq_len_enc = seq_lens_encoder[tid];
         if (seq_len_dec == 0 && seq_len_enc == 0) return; // stoped
-        if (step_idx[tid] >= 0) {
-            if (seq_len_dec == 0) { // encoder, get last token accord to seq_lens_encoder
-                pre_ids_all_now[step_idx[tid]] = input_ids_now[seq_len_enc - 1];
+
+        const int step_idx_now = step_idx[bi];
+        if (tid == 0 && step_idx_now >= 0) {
+            if (seq_len_enc > 0) { // encoder, get last token accord to seq_lens_encoder
+                pre_ids_now[step_idx_now] = input_ids_now[seq_len_enc - 1];
             } else { // decoedr, get first token
-                pre_ids_all_now[step_idx[tid]] = input_ids_now[0];
+                pre_ids_now[step_idx_now] = input_ids_now[0];
             }
         }
     }
     __syncthreads();
+    // min_length process
+    if (bi < bs) {
+        if (cur_len[bi] < min_len[bi]) {
+            if (tid < end_length) {
+                logits_now[eos_token_id[tid]] = -1e10;
+            }
+        }
+    }
     // update repeat_times
-    const int64_t *pre_ids_now = pre_ids + bi * length_id;
     int *repeat_times_now = repeat_times + bi * length;
+    const int64_t *pre_ids_now = pre_ids + bi * length_id;
     for (int i = tid; i < length_id; i += blockDim.x) {
         int64_t id = pre_ids_now[i];
         if (id < 0) break;
         atomicAdd(&repeat_times_now[id], 1);
-    }
-    __syncthreads();
-    // min_length process
-    T *logits_now = logits + bi * length;
-    if (bi < bs && cur_len[bi] < min_len[bi]) {
-        for (int i = 0; i < end_length; i++) {
-            logits_now[eos_token_id[i]] = -1e10;
-        }
     }
     __syncthreads();
     // penalty_scores process
@@ -124,6 +127,7 @@ void set_preids_token_penalty_multi_scores_kernel(const paddle::Tensor& pre_ids,
     int64_t length_input_ids = input_ids.shape()[1];
 
     int64_t end_length = eos_token_id.shape()[0];
+
     update_value_all<DataType_><<<bs, 1024, 0, cu_stream>>>(
         stop_flags.data<bool>(), 
         const_cast<int64_t*>(pre_ids.data<int64_t>()),
