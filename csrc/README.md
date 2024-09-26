@@ -10,9 +10,11 @@ pip install -r requirements.txt
 
 ## 编译 Cuda 算子
 
-生成 FP8的 cutlass 算子(编译耗时较长)
+生成 FP8的 cutlass 算子
 ```shell
-python generate_code_gemm_fused_kernels.py
+python utils/auto_gen_fp8_fp8_gemm_fused_kernels.py
+
+python utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels.py
 ```
 
 编译
