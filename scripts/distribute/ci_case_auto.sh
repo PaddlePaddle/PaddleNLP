@@ -890,6 +890,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
 
     export CUDA_DEVICE_MAX_CONNECTIONS=1
     export PARALLEL_CROSS_ENTROPY=true
+    export FLAGS_enable_pir_api=False # 暂时disable pir，后期修复后打开 @卢畅
 
     task_name="llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw"
     case_out_dir="output/$task_name"
@@ -2256,6 +2257,7 @@ function before_hook_for_gpt() {
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
+    export no_proxy=bcebos.com
     if [[ $FLAGS_install_deps == 0 ]];then
         echo -e "\033[31m ---- Install requirements for GPT auto cases  \033[0m"
         cp requirements.txt requirements_nlp.txt
@@ -2297,6 +2299,7 @@ function before_hook_for_llama() {
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
+    export no_proxy=bcebos.com
     python -m pip install -r $root_path/requirements.txt
     python -m pip install -r $root_path/requirements-dev.txt
     if [[ ! $FLAGS_download_data =~ "llama" ]];then
