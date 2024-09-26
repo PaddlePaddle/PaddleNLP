@@ -1105,3 +1105,20 @@ def set_hyrbid_parallel_seed(basic_seed, dataset_rank, tp_rank, pp_rank=0):
         tracker.add("global_seed", global_seed)
     if "local_seed" not in tracker.states_ and local_seed not in tracker.seeds_:
         tracker.add("local_seed", local_seed)
+
+
+def should_skip_data(global_step, skip_data_intervals):
+    """Whether to skip current step data"""
+
+    if skip_data_intervals is None:
+        return False
+    skip_flag = False
+    for interval in skip_data_intervals:
+        if len(interval) != 2 or interval[0] > interval[1] or interval[0] <= 0:
+            raise ValueError(f"Please check your skip interval {interval}")
+        start_global_step, end_global_step = interval[0], interval[1]
+        # start_global_step and end_global_step start from 1, while global_step start from 0
+        if start_global_step <= global_step + 1 <= end_global_step:
+            skip_flag = True
+            break
+    return skip_flag
