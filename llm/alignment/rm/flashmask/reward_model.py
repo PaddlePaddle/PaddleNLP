@@ -19,7 +19,14 @@ from typing import Any
 import paddle
 import paddle.nn.functional as F
 from paddle import nn
-
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        GatherOp,
+        ScatterOp,
+        mark_as_sequence_parallel_parameter,
+    )
+except:
+    pass
 import paddlenlp
 from paddlenlp.transformers import (
     LlamaConfig,
@@ -87,6 +94,9 @@ class LlamaModelForScore(LlamaPretrainedModel):
             attn_mask_startend_row_indices=attn_mask_startend_row_indices,
         )
         hidden_states = outputs[0]  # size = (B, L, E)
+        if self.config.sequence_parallel:
+            hidden_states = GatherOp.apply(hidden_states)
+            hidden_states = paddle.reshape_(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
         chosen_indexes = paddle.to_tensor(
             [[response_index[0], response_index[1]] for response_index in response_indexs]
         )
