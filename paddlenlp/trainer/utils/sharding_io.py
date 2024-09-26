@@ -54,6 +54,14 @@ MODEL_META_NAME = "model_meta.json"
 SHARDING_META_NAME = "shard_meta.json"
 
 
+def to_device(tensor, place=None):
+    if place is None:
+        place = get_env_device()
+    if isinstance(place, str):
+        place = paddle.device._convert_to_place(place)
+    return tensor._copy_to(place, True)
+
+
 def filter_sharded_params(state_dict, optimizer, sharding_group, include_freeze_params=False):
 
     sharding_rank = sharding_group.rank
@@ -466,7 +474,7 @@ class ShardingIO:
         # cast to before
         for (k, v) in tmp.items():
             name = v.name
-            master_weights[k] = paddle.cast(v.to(get_env_device()), paddle.bfloat16).cpu()
+            master_weights[k] = paddle.cast(to_device(v), paddle.bfloat16).cpu()
             master_weights[k].name = name
 
         structure_name_map = {k: v.name for (k, v) in self.model.state_dict().items()}
@@ -498,7 +506,7 @@ class ShardingIO:
             if param.name in master_weights:
                 assert param.shape == master_weights[param.name].shape
                 paddle.assign(
-                    paddle.cast(master_weights[param.name].to(get_env_device()), paddle.bfloat16),
+                    paddle.cast(to_device(master_weights[param.name]), paddle.bfloat16),
                     model_state_dict[key],
                 )
             elif key in state_dict:
