@@ -54,6 +54,12 @@ try:
 except:
     pass
 
+from paddlenlp.transformers import (
+    AllGatherVarlenOp,
+    fused_head_and_loss_fn,
+    parallel_matmul,
+    sequence_parallel_sparse_mask_labels,
+)
 from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
@@ -171,36 +177,6 @@ def assign_kv_heads(num_kv_heads: int, num_gpus: int):
             for j in range(num_card_per_heads):
                 assignment_list[i * num_card_per_heads + j].append(i)
     return assignment_list
-
-
-def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
-    is_fleet_init = True
-    tensor_parallel_degree = 1
-    try:
-        hcg = fleet.get_hybrid_communicate_group()
-        model_parallel_group = hcg.get_model_parallel_group()
-        tensor_parallel_degree = hcg.get_model_parallel_world_size()
-    except:
-        is_fleet_init = False
-
-    if paddle.in_dynamic_mode():
-        y_is_distributed = y.is_distributed
-    else:
-        y_is_distributed = tensor_parallel_degree > 1
-
-    if is_fleet_init and tensor_parallel_degree > 1 and y_is_distributed:
-        # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
-        input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, y, transpose_y=False)
-
-        if tensor_parallel_output:
-            return logits
-
-        return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
-
-    else:
-        logits = paddle.matmul(x, y, transpose_y=False)
-        return logits
 
 
 def scaled_dot_product_attention(
@@ -1798,24 +1774,66 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
                     f"enable_parallel_cross_entropy, the vocab_size should be splited: {prediction_scores.shape[-1]}, {self.config.vocab_size}"
                 )
                 self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
+        if self.config.use_fused_head_and_loss_fn or self.config.use_sparse_head_and_loss_fn:
+            hidden_states, weight, bias, transpose_y = prediction_scores
+
+        if self.config.use_sparse_head_and_loss_fn:
+            if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
+                masked_lm_labels, sparse_tgt_idx = sequence_parallel_sparse_mask_labels(masked_lm_labels, -100)
+
+                hidden_states = paddle.take_along_axis(hidden_states, sparse_tgt_idx, axis=0)
+                hidden_states = AllGatherVarlenOp.apply(hidden_states)
+            else:
+                masked_lm_labels = masked_lm_labels.flatten()
+                sparse_tgt_idx = paddle.nonzero(masked_lm_labels != -100).flatten()
+                masked_lm_labels = paddle.take_along_axis(masked_lm_labels, sparse_tgt_idx, axis=0)
+
+                hidden_states = hidden_states.reshape([-1, hidden_states.shape[-1]])
+                hidden_states = paddle.take_along_axis(hidden_states, sparse_tgt_idx.unsqueeze(-1), axis=0)
 
         with paddle.amp.auto_cast(False):
-            masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
-
-            if self.config.sep_parallel_degree > 1 or self.config.context_parallel_degree > 1:
-                _hcg = fleet.get_hybrid_communicate_group()
-                masked_lm_loss = ConcatMaskedLoss.apply(masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group())
-            # skip ignore_index which loss == 0
-            # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
-            # loss = paddle.mean(masked_lm_loss)
-            binary_sequence = paddle.where(
-                masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
-            )
-            count = paddle.sum(binary_sequence)
-            if count == 0:
-                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            if self.config.use_fused_head_and_loss_fn and not (
+                self.config.sep_parallel_degree > 1 or self.config.context_parallel_degree > 1
+            ):
+                prediction_scores = paddle.zeros([1, 1], dtype=hidden_states.dtype)  # fake prediction_scores
+                loss = fused_head_and_loss_fn(
+                    hidden_states,
+                    weight,
+                    bias,
+                    masked_lm_labels,
+                    None,
+                    transpose_y,
+                    self.config.vocab_size,
+                    self.config.tensor_parallel_degree,
+                    self.config.tensor_parallel_output,
+                    False,
+                    self.config.chunk_size,
+                    return_token_loss=False,
+                    ignore_index=-100,
+                )
             else:
-                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+                if self.config.use_sparse_head_and_loss_fn:
+                    prediction_scores = parallel_matmul(
+                        hidden_states, weight, self.config.tensor_parallel_output, transpose_y=transpose_y
+                    )
+                masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
+
+                if self.config.sep_parallel_degree > 1 or self.config.context_parallel_degree > 1:
+                    _hcg = fleet.get_hybrid_communicate_group()
+                    masked_lm_loss = ConcatMaskedLoss.apply(
+                        masked_lm_loss, axis=1, group=_hcg.get_sep_parallel_group()
+                    )
+                # skip ignore_index which loss == 0
+                # masked_lm_loss = masked_lm_loss[masked_lm_loss > 0]
+                # loss = paddle.mean(masked_lm_loss)
+                binary_sequence = paddle.where(
+                    masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
+                )
+                count = paddle.sum(binary_sequence)
+                if count == 0:
+                    loss = paddle.sum(masked_lm_loss * binary_sequence)
+                else:
+                    loss = paddle.sum(masked_lm_loss * binary_sequence) / count
 
         return loss
 
@@ -1865,17 +1883,10 @@ class LlamaLMHead(nn.Layer):
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
         if self.weight.is_distributed:
             self.weight.split_axis = 1
-        if get_env_device() == "xpu":
-            try:
-                from paddle_xpu.layers.nn import (  # noqa: F401
-                    parallel_matmul as xpu_parallel_matmul,
-                )
-
-                self.xpu_parallel_matmul = xpu_parallel_matmul()
-            except ImportError:
-                self.xpu_parallel_matmul = None
 
     def forward(self, hidden_states, tensor_parallel_output=None):
+        if self.config.use_fused_head_and_loss_fn or self.config.use_sparse_head_and_loss_fn:
+            return hidden_states, self.weight, None, False
         if self.config.sequence_parallel:
             hidden_states = GatherOp.apply(hidden_states)
             seq_length = self.config.seq_length
@@ -1890,12 +1901,7 @@ class LlamaLMHead(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
-        if get_env_device() == "xpu" and self.xpu_parallel_matmul is not None:
-            logits = self.xpu_parallel_matmul(
-                hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output, training=self.training
-            )
-        else:
-            logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
+        logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
         return logits
 
 

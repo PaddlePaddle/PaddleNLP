@@ -158,6 +158,9 @@ class LlamaConfig(PretrainedConfig):
         use_flash_attention_for_generation=False,
         use_last_token_for_generation=False,
         immediate_clear_past_key_value=False,
+        use_sparse_head_and_loss_fn=False,
+        use_fused_head_and_loss_fn=False,
+        chunk_size=1024,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -195,7 +198,9 @@ class LlamaConfig(PretrainedConfig):
         self.use_flash_attention_for_generation = use_flash_attention_for_generation
         self.use_last_token_for_generation = use_last_token_for_generation
         self.immediate_clear_past_key_value = immediate_clear_past_key_value
-
+        self.use_sparse_head_and_loss_fn = use_sparse_head_and_loss_fn
+        self.use_fused_head_and_loss_fn = use_fused_head_and_loss_fn
+        self.chunk_size = chunk_size
         super().__init__(
             pad_token_id=pad_token_id,
             bos_token_id=bos_token_id,

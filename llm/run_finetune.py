@@ -139,7 +139,10 @@ def main():
         model_config.attention_probs_dropout_prob = model_args.attention_probs_dropout_prob
     if hasattr(model_config, "ignore_index"):
         model_config.ignore_index = -100
-
+    if hasattr(model_config, "use_sparse_head_and_loss_fn"):
+        model_config.use_sparse_head_and_loss_fn = model_args.use_sparse_head_and_loss_fn
+    if hasattr(model_config, "use_fused_head_and_loss_fn"):
+        model_config.use_fused_head_and_loss_fn = model_args.use_fused_head_and_loss_fn
     if model_args.fuse_attention_qkv is not None:
         model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
     if model_args.fuse_attention_ffn is not None:

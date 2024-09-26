@@ -195,6 +195,12 @@ class ModelArgument:
             "help": "Block size for quant_scale of weight quant_scale(Only available for nf4 or fp4 quant_scale.)"
         },
     )
+    use_sparse_head_and_loss_fn: bool = field(
+        default=False, metadata={"help": "Whether to use sparse LM Head and loss function."}
+    )
+    use_fused_head_and_loss_fn: bool = field(
+        default=True, metadata={"help": "Whether to use fused_head_and_loss_fnin flash attention."}
+    )
 
     # LoRA related parameters
     lora: bool = field(default=False, metadata={"help": "Whether to use LoRA technique"})
