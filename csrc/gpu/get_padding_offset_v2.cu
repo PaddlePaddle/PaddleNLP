@@ -11,17 +11,18 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 #include "paddle/extension.h"
 
 __global__ void GetPaddingOffsetV2Kernel(int *padding_offset,
-                                       int *cum_offsets_out,
-                                       int *cu_seqlens_q,
-                                       int *cu_seqlens_k,
-                                       int64_t *output_data,
-                                       const int64_t *input_data,
-                                       const int *cum_offsets,
-                                       const int *seq_lens,
-                                       const int max_seq_len) {
+                                         int *cum_offsets_out,
+                                         int *cu_seqlens_q,
+                                         int *cu_seqlens_k,
+                                         int64_t *output_data,
+                                         const int64_t *input_data,
+                                         const int *cum_offsets,
+                                         const int *seq_lens,
+                                         const int max_seq_len) {
   // get padding offset of each batch
   const int bi = blockIdx.x;
   const int ti = threadIdx.x;
@@ -42,9 +43,9 @@ __global__ void GetPaddingOffsetV2Kernel(int *padding_offset,
 
 
 std::vector<paddle::Tensor> GetPaddingOffsetV2(const paddle::Tensor& input_ids,
-                                             const paddle::Tensor& cum_offsets,
-                                             const paddle::Tensor& token_num,
-                                             const paddle::Tensor& seq_len) {
+                                               const paddle::Tensor& cum_offsets,
+                                               const paddle::Tensor& token_num,
+                                               const paddle::Tensor& seq_len) {
     auto cu_stream = input_ids.stream();
     std::vector<int64_t> input_ids_shape = input_ids.shape();
     const int bsz = seq_len.shape()[0];
