@@ -1129,14 +1129,14 @@ function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
         --recompute_use_reentrant true \
         --recompute_granularity full \
         --pp_recompute_interval 0 \
-        --bf16 1 \
+        --bf16 0 \
         --fp16_opt_level "O2"  \
         --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
         --amp_custom_white_list "lookup_table" "lookup_table_v2" \
-        --amp_master_grad true \
+        --amp_master_grad false \
         --fuse_attention_ffn false \
         --fuse_attention_qkv false \
-        --use_flash_attention true \
+        --use_flash_attention false \
         --use_fused_rope true \
         --use_fused_rms_norm true \
         --max_seq_length 4096 \
@@ -1201,14 +1201,14 @@ function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
         --recompute_use_reentrant true \
         --recompute_granularity full \
         --pp_recompute_interval 0 \
-        --bf16 1 \
+        --bf16 0 \
         --fp16_opt_level "O2"  \
         --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
         --amp_custom_white_list "lookup_table" "lookup_table_v2" \
-        --amp_master_grad true \
+        --amp_master_grad false \
         --fuse_attention_ffn false \
         --fuse_attention_qkv false \
-        --use_flash_attention true \
+        --use_flash_attention false \
         --use_fused_rope true \
         --use_fused_rms_norm true \
         --max_seq_length 4096 \
