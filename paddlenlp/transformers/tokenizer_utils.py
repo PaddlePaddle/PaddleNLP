@@ -25,7 +25,7 @@ import re
 import unicodedata
 from collections import OrderedDict
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy
 import numpy as np
@@ -1338,7 +1338,6 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
-        padding_side: Optional[Literal["right", "left"]] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_position_ids: Optional[bool] = None,
         return_token_type_ids: Optional[bool] = None,
@@ -1390,7 +1389,6 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             max_length=max_length,
             stride=stride,
             pad_to_multiple_of=pad_to_multiple_of,
-            padding_side=padding_side,
             return_tensors=return_tensors,
             prepend_batch_axis=True,
             return_position_ids=return_position_ids,
@@ -1421,7 +1419,6 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
-        padding_side: Optional[Literal["right", "left"]] = None,
         return_position_ids: Optional[bool] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_token_type_ids: Optional[bool] = None,
@@ -1490,7 +1487,6 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             max_length=max_length,
             stride=stride,
             pad_to_multiple_of=pad_to_multiple_of,
-            padding_side=padding_side,
             return_position_ids=return_position_ids,
             return_attention_mask=return_attention_mask,
             return_token_type_ids=return_token_type_ids,
@@ -1515,7 +1511,6 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         max_length: Optional[int] = None,
         stride: int = 0,
         pad_to_multiple_of: Optional[int] = None,
-        padding_side: Optional[Literal["right", "left"]] = None,
         return_position_ids: Optional[bool] = None,
         return_tensors: Optional[str] = None,
         return_token_type_ids: Optional[bool] = None,
@@ -1628,7 +1623,6 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                     max_length=max_length,
                     stride=stride,
                     pad_to_multiple_of=None,  # we pad in batch afterward
-                    padding_side=padding_side,  # we pad in batch afterward
                     return_position_ids=return_position_ids,  # we pad in batch afterward
                     return_attention_mask=False,  # we pad in batch afterward
                     return_token_type_ids=return_token_type_ids,
@@ -1651,7 +1645,6 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             padding=padding_strategy.value,
             max_length=max_length,
             pad_to_multiple_of=pad_to_multiple_of,
-            padding_side=padding_side,
             return_attention_mask=return_attention_mask,
         )
         if return_dict:
