@@ -279,6 +279,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        self.transformer_block.init_weight()
         head_size = self.hidden_size // self.num_attention_heads
         split_fn = split_param_func()
         dtype = paddle.get_default_dtype()
