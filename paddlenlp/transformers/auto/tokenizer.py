@@ -17,7 +17,7 @@ import io
 import json
 import os
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 
 from paddlenlp.transformers.auto.configuration import (
     CONFIG_MAPPING_NAMES,
@@ -29,11 +29,7 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.tokenizer_utils_base import TOKENIZER_CONFIG_FILE
 from paddlenlp.transformers.tokenizer_utils_fast import PretrainedTokenizerFast
 
-from ...utils import (
-    is_g2p_en_available,
-    is_sentencepiece_available,
-    is_tokenizers_available,
-)
+from ...utils import is_sentencepiece_available, is_tokenizers_available
 from ...utils.download import resolve_file_path
 from ...utils.import_utils import import_module
 from ...utils.log import logger
@@ -42,11 +38,6 @@ from .factory import _LazyAutoMapping
 __all__ = [
     "AutoTokenizer",
 ]
-
-if is_tokenizers_available():
-    from ..tokenizer_utils_fast import PretrainedTokenizerFast
-else:
-    PretrainedTokenizerFast = None
 
 if False:
     # This significantly improves completion suggestion performance when
@@ -67,7 +58,7 @@ else:
                 "bert",
                 (
                     "BertTokenizer",
-                    "BertTokenizerFast" if is_tokenizers_available() else None,
+                    None,
                 ),
             ),
             ("blenderbot", ("BlenderbotTokenizer", "BlenderbotTokenizerFast")),
@@ -96,7 +87,7 @@ else:
                 "convbert",
                 (
                     "ConvBertTokenizer",
-                    "ConvBertTokenizerFast" if is_tokenizers_available() else None,
+                    None,
                 ),
             ),
             ("ctrl", ("CTRLTokenizer", None)),
@@ -104,7 +95,7 @@ else:
                 "distilbert",
                 (
                     "DistilBertTokenizer",
-                    "DistilBertTokenizerFast" if is_tokenizers_available() else None,
+                    None,
                 ),
             ),
             (
@@ -189,15 +180,15 @@ else:
             (
                 "mbart",
                 (
+                    "MBartTokenizer" if is_sentencepiece_available() else None,
                     "MBart50Tokenizer" if is_sentencepiece_available() else None,
-                    "MBart50TokenizerFast" if is_tokenizers_available() else None,
                 ),
             ),
             (
                 "mobilebert",
                 (
                     "MobileBertTokenizer",
-                    "MobileBertTokenizerFast" if is_tokenizers_available() else None,
+                    None,
                 ),
             ),
             (
@@ -233,7 +224,7 @@ else:
                 "rembert",
                 (
                     "RemBertTokenizer" if is_sentencepiece_available() else None,
-                    "RemBertTokenizerFast" if is_tokenizers_available() else None,
+                    None,
                 ),
             ),
             (
@@ -255,7 +246,7 @@ else:
                 "squeezebert",
                 (
                     "SqueezeBertTokenizer",
-                    "SqueezeBertTokenizerFast" if is_tokenizers_available() else None,
+                    None,
                 ),
             ),
             (
@@ -273,7 +264,34 @@ else:
                     "XLNetTokenizerFast" if is_tokenizers_available() else None,
                 ),
             ),
-            ('bert_japanese', 'BertJapaneseTokenizer'), ('bigbird', 'BigBirdTokenizer'), ('blenderbot_small', 'BlenderbotSmallTokenizer'), ('chatglm', 'ChatGLMTokenizer'), ('chatglm_v2', 'ChatGLMv2Tokenizer'), ('chinesebert', 'ChineseBertTokenizer'), ('dallebart', 'DalleBartTokenizer'), ('ernie_ctm', 'ErnieCtmTokenizer'), ('ernie_doc', 'ErnieDocBPETokenizer'), ('ernie_gram', 'ErnieGramTokenizer'), ('ernie_layout', 'ErnieLayoutTokenizer'), ('ernie_code', 'ErnieCodeTokenizer'), ('megatronbert', 'MegatronBertTokenizer'), ('nystromformer', 'NystromformerTokenizer'), ('ppminilm', 'PPMiniLMTokenizer'), ('roformerv2', 'RoFormerv2Tokenizer'), ('skep', 'SkepTokenizer'), ('tinybert', 'TinyBertTokenizer'), ('unified_transformer', 'UnifiedTransformerTokenizer'), ('unimo', 'UNIMOTokenizer'), ('gpt', 'GPTChineseTokenizer'), ('gau_alpha', 'GAUAlphaTokenizer'), ('artist', 'ArtistTokenizer'), ('chineseclip', 'ChineseCLIPTokenizer'), ('ernie_vil', 'ErnieViLTokenizer'), ('glm', 'GLMGPT2Tokenizer'), ('qwen', 'QWenTokenizer'), ('yuan', 'YuanTokenizer'),
+            ("bert_japanese", "BertJapaneseTokenizer"),
+            ("bigbird", "BigBirdTokenizer"),
+            ("blenderbot_small", "BlenderbotSmallTokenizer"),
+            ("chatglm", "ChatGLMTokenizer"),
+            ("chatglm_v2", "ChatGLMv2Tokenizer"),
+            ("chinesebert", "ChineseBertTokenizer"),
+            ("dallebart", "DalleBartTokenizer"),
+            ("ernie_ctm", "ErnieCtmTokenizer"),
+            ("ernie_doc", "ErnieDocBPETokenizer"),
+            ("ernie_gram", "ErnieGramTokenizer"),
+            ("ernie_layout", "ErnieLayoutTokenizer"),
+            ("ernie_code", "ErnieCodeTokenizer"),
+            ("megatronbert", "MegatronBertTokenizer"),
+            ("nystromformer", "NystromformerTokenizer"),
+            ("ppminilm", "PPMiniLMTokenizer"),
+            ("roformerv2", "RoFormerv2Tokenizer"),
+            ("skep", "SkepTokenizer"),
+            ("tinybert", "TinyBertTokenizer"),
+            ("unified_transformer", "UnifiedTransformerTokenizer"),
+            ("unimo", "UNIMOTokenizer"),
+            ("gpt", "GPTChineseTokenizer"),
+            ("gau_alpha", "GAUAlphaTokenizer"),
+            ("artist", "ArtistTokenizer"),
+            ("chineseclip", "ChineseCLIPTokenizer"),
+            ("ernie_vil", "ErnieViLTokenizer"),
+            ("glm", "GLMGPT2Tokenizer"),
+            ("qwen", "QWenTokenizer"),
+            ("yuan", "YuanTokenizer"),
         ]
     )
 
@@ -299,12 +317,15 @@ def tokenizer_class_from_name(class_name: str):
     for module_name, tokenizers in TOKENIZER_MAPPING_NAMES.items():
         if class_name in tokenizers:
             module_name = model_type_to_module_name(module_name)
-            print(f"module_name: {module_name}")
             module = importlib.import_module(f".{module_name}", "paddlenlp.transformers")
             try:
                 return getattr(module, class_name)
             except AttributeError:
-                continue
+                try:
+                    module = importlib.import_module(f".{module_name}.tokenizer", "paddlenlp.transformers")
+                    return getattr(module, class_name)
+                except AttributeError:
+                    continue
 
     for config, tokenizers in TOKENIZER_MAPPING._extra_content.items():
         for tokenizer in tokenizers:
@@ -313,7 +334,7 @@ def tokenizer_class_from_name(class_name: str):
 
     # We did not fine the class, but maybe it's because a dep is missing. In that case, the class will be in the main
     # init and we return the proper dummy to get an appropriate error message.
-    main_module = importlib.import_module("transformers")
+    main_module = importlib.import_module("paddlenlp")
     if hasattr(main_module, class_name):
         return getattr(main_module, class_name)
 
@@ -423,11 +444,6 @@ class AutoTokenizer:
     base tokenizer classes when created with the AutoTokenizer.from_pretrained() classmethod.
     """
 
-    # MAPPING_NAMES = get_configurations()
-    # _tokenizer_mapping = MAPPING_NAMES
-    # _name_mapping = TOKENIZER_MAPPING_NAMES
-    # tokenizer_config_file = "tokenizer_config.json"
-
     def __init__(self):
         raise EnvironmentError(
             "AutoTokenizer is designed to be instantiated "
@@ -536,7 +552,6 @@ class AutoTokenizer:
             config_tokenizer_class = config.tokenizer_class
         if config_tokenizer_class is not None:
             tokenizer_class = None
-            print(f"config_tokenizer_class: {config_tokenizer_class}")
             if use_fast and not config_tokenizer_class.endswith("Fast"):
                 tokenizer_class_candidate = f"{config_tokenizer_class}Fast"
                 tokenizer_class = tokenizer_class_from_name(tokenizer_class_candidate)
@@ -547,17 +562,13 @@ class AutoTokenizer:
                 raise ValueError(
                     f"Tokenizer class {tokenizer_class_candidate} does not exist or is not currently imported."
                 )
-
             return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
-        print("we have to be creative")
 
         # TODO: if model is an encoder decoder
 
         model_type = config_class_to_model_type(type(config).__name__)
         if model_type is not None:
-            print(f"model_type is not None: {model_type}")
             tokenizer_class_py, tokenizer_class_fast = TOKENIZER_MAPPING[type(config)]
-            print(tokenizer_class_py, tokenizer_class_fast)
             if tokenizer_class_fast and (use_fast or tokenizer_class_py is None):
                 return tokenizer_class_fast.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
             else:
@@ -568,54 +579,3 @@ class AutoTokenizer:
                         "This tokenizer cannot be instantiated. Please make sure you have `sentencepiece` installed "
                         "in order to use this tokenizer."
                     )
-
-        # Default not to use fast tokenizer
-        # use_faster = kwargs.pop("use_faster", None)
-        # use_fast = kwargs.pop("use_fast", None)
-        # if use_fast is not None or use_faster is not None:
-        #     raise ValueError("use_fast is deprecated")
-
-        # cache_dir = kwargs.get("cache_dir", None)
-        # subfolder = kwargs.get("subfolder", "")
-        # if subfolder is None:
-        #     subfolder = ""
-        # from_aistudio = kwargs.get("from_aistudio", False)
-        # from_hf_hub = kwargs.get("from_hf_hub", False)
-
-        # all_tokenizer_names = []
-        # for names, tokenizer_class in cls._tokenizer_mapping.items():
-        #     for name in names:
-        #         all_tokenizer_names.append(name)
-
-        # # From built-in pretrained models
-        # if pretrained_model_name_or_path in all_tokenizer_names:
-        #     for names, tokenizer_class in cls._tokenizer_mapping.items():
-        #         for pattern in names:
-        #             if pattern == pretrained_model_name_or_path:
-        #                 logger.info("We are using %s to load '%s'." % (tokenizer_class, pretrained_model_name_or_path))
-        #                 return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-
-        # config_file = resolve_file_path(
-        #     pretrained_model_name_or_path,
-        #     cls.tokenizer_config_file,
-        #     subfolder,
-        #     cache_dir=cache_dir,
-        #     from_hf_hub=from_hf_hub,
-        #     from_aistudio=from_aistudio,
-        # )
-        # print(f"config_file: {config_file}")
-        # print("cls.tokenizer_config_file: ", cls.tokenizer_config_file)
-        # if config_file is not None and os.path.exists(config_file):
-        #     tokenizer_class = cls._get_tokenizer_class_from_config(
-        #         pretrained_model_name_or_path, config_file, use_fast
-        #     )
-        #     logger.info(f"We are using {tokenizer_class} to load '{pretrained_model_name_or_path}'.")
-        #     return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
-        # else:
-        #     raise RuntimeError(
-        #         f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
-        #         f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-        #         "- a correct model-identifier of built-in pretrained models,\n"
-        #         "- or a correct model-identifier of community-contributed pretrained models,\n"
-        #         "- or the correct path to a directory containing relevant tokenizer files.\n"
-        #     )

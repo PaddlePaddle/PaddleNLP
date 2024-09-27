@@ -213,6 +213,9 @@ def resolve_file_path(
         elif from_hf_hub:
             log_endpoint = "Huggingface Hub"
             for filename in filenames:
+                print(
+                    f"params: repo_id={repo_id}, filename={filename}, subfolder={subfolder}, repo_type={repo_type}, revision={revision}, token={token}, endpoint={endpoint}, from_bos={from_bos}, from_aistudio={from_aistudio}, from_hf_hub={from_hf_hub}"
+                )
                 download_kwargs["filename"] = filename
                 is_available = bos_aistudio_hf_file_exist(
                     repo_id,
@@ -237,6 +240,9 @@ def resolve_file_path(
             download_kwargs["url"] = url
             for filename in filenames:
                 download_kwargs["filename"] = filename
+                print(
+                    f"params: repo_id={repo_id}, filename={filename}, subfolder={subfolder}, repo_type={repo_type}, revision={revision}, token={token}, endpoint={endpoint}, from_bos={from_bos}, from_aistudio={from_aistudio}, from_hf_hub={from_hf_hub}"
+                )
                 is_available = bos_aistudio_hf_file_exist(
                     repo_id,
                     filename,
@@ -274,7 +280,8 @@ def resolve_file_path(
             f"'{log_endpoint}' for available revisions."
         )
     except EntryNotFoundError:
-        raise EnvironmentError(f"Does not appear one of the {filenames} in {repo_id}.")
+        return None
+        # raise EnvironmentError(f"Does not appear one of the {filenames} in {repo_id}.")
     except HTTPError as err:
         raise EnvironmentError(f"There was a specific connection error when trying to load {repo_id}:\n{err}")
     except ValueError:
@@ -312,6 +319,7 @@ def bos_aistudio_hf_file_exist(
     if subfolder is None:
         subfolder = ""
     filename = os.path.join(subfolder, filename)
+    print(f"filename = {filename}")
     if from_aistudio:
         out = aistudio_hub_file_exists(
             repo_id=repo_id,
@@ -329,6 +337,7 @@ def bos_aistudio_hf_file_exist(
             revision=revision,
             token=token,
         )
+        print(f"out = {out}")
     else:
         out = bos_file_exists(
             repo_id=repo_id,
@@ -338,6 +347,7 @@ def bos_aistudio_hf_file_exist(
             token=token,  # donot need token
             endpoint=endpoint,
         )
+
     return out
 
 

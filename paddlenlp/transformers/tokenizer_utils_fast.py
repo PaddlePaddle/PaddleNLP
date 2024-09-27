@@ -62,6 +62,7 @@ MODEL_TO_TRAINER_MAPPING = {
 
 VOCAB_FILES_NAMES = {"tokenizer_file": FULL_TOKENIZER_NAME, "vocab_file": TIKTOKEN_VOCAB_FILE}
 
+
 class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
     """
     Base class for all fast tokenizers (wrapping HuggingFace tokenizers library).

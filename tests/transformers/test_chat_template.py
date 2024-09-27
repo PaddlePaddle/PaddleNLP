@@ -97,7 +97,7 @@ class ChatTemplateContextDataTest(unittest.TestCase):
 
 class ChatTemplateIntegrationTest(unittest.TestCase):
     def test_linlyai_chinese_llama_2_chat_template(self):
-        tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b")
+        tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b", use_fast=False)
         query = "你好"
         final_query = tokenizer.apply_chat_template(query, tokenize=False)
         expected_query = f"<s>### Instruction:{query}  ### Response:"
@@ -110,7 +110,7 @@ class ChatTemplateIntegrationTest(unittest.TestCase):
         self.assertEqual(final_query, expected_query)
 
     def test_linlyai_chinese_llama_2_chat_template_with_none_saved(self):
-        tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b")
+        tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b", use_fast=False)
         tokenizer.chat_template = None
         with tempfile.TemporaryDirectory() as tempdir:
             tokenizer.save_pretrained(tempdir)
@@ -182,7 +182,7 @@ class TestChatTemplateSpecialTokens(unittest.TestCase):
 
     def test_prefix(self):
         prompt = "欢迎使用 PaddleNLP 大模型开发套件"
-        tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=False)
         result = tokenizer.apply_chat_template(prompt, tokenize=False)
 
         result_ids = tokenizer(result, add_special_tokens=False)["input_ids"]
@@ -230,7 +230,7 @@ class TestChatTemplateTruncation(unittest.TestCase):
 
     def test_at_least_one_turn(self):
         query = [["你好", "您好，我是个人人工智能助手"], ["今天吃啥", "你可以选择不同的菜系"]]
-        tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b")
+        tokenizer = AutoTokenizer.from_pretrained("linly-ai/chinese-llama-2-7b", use_fast=False)
         # tokenizer.init_chat_template(self.chat_template_config_file)
 
         # get all query sentence

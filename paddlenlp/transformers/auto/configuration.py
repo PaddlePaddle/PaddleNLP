@@ -32,16 +32,83 @@ from ..model_utils import PretrainedModel
 __all__ = [
     "AutoConfig",
 ]
-# CONFIG_MAPPING_NAMES = OrderedDict(
-#     [
-#         # Add configs here
-#         ('albert', 'AlbertConfig'), ('bart', 'BartConfig'), ('bert', 'BertConfig'), ('bit', 'BitConfig'), ('blenderbot', 'BlenderbotConfig'), ('blip', 'BlipConfig'), ('bloom', 'BloomConfig'), ('clap', 'ClapConfig'), ('clip', 'CLIPConfig'), ('clipseg', 'CLIPSegConfig'), ('codegen', 'CodeGenConfig'), ('convbert', 'ConvBertConfig'), ('ctrl', 'CTRLConfig'), ('deberta', 'DebertaConfig'), ('distilbert', 'DistilBertConfig'), ('dpt', 'DPTConfig'), ('electra', 'ElectraConfig'), ('ernie', 'ErnieConfig'), ('ernie_m', 'ErnieMConfig'), ('fnet', 'FNetConfig'), ('funnel', 'FunnelConfig'), ('gemma', 'GemmaConfig'), ('gptj', 'GPTJConfig'), ('jamba', 'JambaConfig'), ('layoutlm', 'LayoutLMConfig'), ('layoutlmv2', 'LayoutLMv2Config'), ('llama', 'LlamaConfig'), ('luke', 'LukeConfig'), ('mamba', 'MambaConfig'), ('mbart', 'MBartConfig'), ('mistral', 'MistralConfig'), ('mixtral', 'MixtralConfig'), ('mobilebert', 'MobileBertConfig'), ('mpnet', 'MPNetConfig'), ('mt5', 'MT5Config'), ('nezha', 'NezhaConfig'), ('nystromformer', 'NystromformerConfig'), ('opt', 'OPTConfig'), ('pegasus', 'PegasusConfig'), ('prophetnet', 'ProphetNetConfig'), ('qwen2_moe', 'Qwen2MoeConfig'), ('reformer', 'ReformerConfig'), ('rembert', 'RemBertConfig'), ('roberta', 'RobertaConfig'), ('roformer', 'RoFormerConfig'), ('speecht5', 'SpeechT5Config'), ('squeezebert', 'SqueezeBertConfig'), ('t5', 'T5Config'), ('xlm', 'XLMConfig'), ('xlnet', 'XLNetConfig'),
-#     ]
-# )
 
 CONFIG_MAPPING_NAMES = OrderedDict(
     [
-        ('albert', 'AlbertConfig'), ('bigbird', 'BigBirdConfig'), ('blenderbot_small', 'BlenderbotSmallConfig'), ('blenderbot', 'BlenderbotConfig'), ('chatglm_v2', 'ChatGLMv2Config'), ('chatglm', 'ChatGLMConfig'), ('chineseclip', 'ChineseCLIPTextConfig'), ('chinesebert', 'ChineseBertConfig'), ('convbert', 'ConvBertConfig'), ('ctrl', 'CTRLConfig'), ('distilbert', 'DistilBertConfig'), ('dallebart', 'DalleBartConfig'), ('electra', 'ElectraConfig'), ('ernie_vil', 'ErnieViLConfig'), ('ernie_ctm', 'ErnieCtmConfig'), ('ernie_doc', 'ErnieDocConfig'), ('ernie_gen', 'ErnieGenConfig'), ('ernie_gram', 'ErnieGramConfig'), ('ernie_layout', 'ErnieLayoutConfig'), ('ernie_m', 'ErnieMConfig'), ('ernie_code', 'ErnieCodeConfig'), ('ernie', 'ErnieConfig'), ('fnet', 'FNetConfig'), ('funnel', 'FunnelConfig'), ('llama', 'LlamaConfig'), ('layoutxlm', 'LayoutXLMConfig'), ('layoutlmv2', 'LayoutLMv2Config'), ('layoutlm', 'LayoutLMConfig'), ('luke', 'LukeConfig'), ('mbart', 'MBartConfig'), ('megatronbert', 'MegatronBertConfig'), ('mobilebert', 'MobileBertConfig'), ('mpnet', 'MPNetConfig'), ('nezha', 'NeZhaConfig'), ('nystromformer', 'NystromformerConfig'), ('ppminilm', 'PPMiniLMConfig'), ('prophetnet', 'ProphetNetConfig'), ('reformer', 'ReformerConfig'), ('rembert', 'RemBertConfig'), ('roberta', 'RobertaConfig'), ('roformerv2', 'RoFormerv2Config'), ('roformer', 'RoFormerConfig'), ('skep', 'SkepConfig'), ('squeezebert', 'SqueezeBertConfig'), ('tinybert', 'TinyBertConfig'), ('unified_transformer', 'UnifiedTransformerConfig'), ('unimo', 'UNIMOConfig'), ('xlnet', 'XLNetConfig'), ('xlm', 'XLMConfig'), ('gpt', 'GPTConfig'), ('glm', 'GLMConfig'), ('mt5', 'MT5Config'), ('t5', 'T5Config'), ('bert', 'BertConfig'), ('bart', 'BartConfig'), ('gau_alpha', 'GAUAlphaConfig'), ('codegen', 'CodeGenConfig'), ('clip', 'CLIPConfig'), ('artist', 'ArtistConfig'), ('opt', 'OPTConfig'), ('pegasus', 'PegasusConfig'), ('dpt', 'DPTConfig'), ('bit', 'BitConfig'), ('blip', 'BlipConfig'), ('bloom', 'BloomConfig'), ('qwen', 'QWenConfig'), ('mistral', 'MistralConfig'), ('mixtral', 'MixtralConfig'), ('qwen2', 'Qwen2Config'), ('qwen2_moe', 'Qwen2MoeConfig'), ('gemma', 'GemmaConfig'), ('yuan', 'YuanConfig'), ('mamba', 'MambaConfig'), ('jamba', 'JambaConfig')
+        ("albert", "AlbertConfig"),
+        ("bigbird", "BigBirdConfig"),
+        ("blenderbot_small", "BlenderbotSmallConfig"),
+        ("blenderbot", "BlenderbotConfig"),
+        ("chatglm_v2", "ChatGLMv2Config"),
+        ("chatglm", "ChatGLMConfig"),
+        ("chineseclip", "ChineseCLIPTextConfig"),
+        ("chinesebert", "ChineseBertConfig"),
+        ("convbert", "ConvBertConfig"),
+        ("ctrl", "CTRLConfig"),
+        ("distilbert", "DistilBertConfig"),
+        ("dallebart", "DalleBartConfig"),
+        ("electra", "ElectraConfig"),
+        ("ernie_vil", "ErnieViLConfig"),
+        ("ernie_ctm", "ErnieCtmConfig"),
+        ("ernie_doc", "ErnieDocConfig"),
+        ("ernie_gen", "ErnieGenConfig"),
+        ("ernie_gram", "ErnieGramConfig"),
+        ("ernie_layout", "ErnieLayoutConfig"),
+        ("ernie_m", "ErnieMConfig"),
+        ("ernie_code", "ErnieCodeConfig"),
+        ("ernie", "ErnieConfig"),
+        ("fnet", "FNetConfig"),
+        ("funnel", "FunnelConfig"),
+        ("llama", "LlamaConfig"),
+        ("layoutxlm", "LayoutXLMConfig"),
+        ("layoutlmv2", "LayoutLMv2Config"),
+        ("layoutlm", "LayoutLMConfig"),
+        ("luke", "LukeConfig"),
+        ("mbart", "MBartConfig"),
+        ("megatronbert", "MegatronBertConfig"),
+        ("mobilebert", "MobileBertConfig"),
+        ("mpnet", "MPNetConfig"),
+        ("nezha", "NeZhaConfig"),
+        ("nystromformer", "NystromformerConfig"),
+        ("ppminilm", "PPMiniLMConfig"),
+        ("prophetnet", "ProphetNetConfig"),
+        ("reformer", "ReformerConfig"),
+        ("rembert", "RemBertConfig"),
+        ("roberta", "RobertaConfig"),
+        ("roformerv2", "RoFormerv2Config"),
+        ("roformer", "RoFormerConfig"),
+        ("skep", "SkepConfig"),
+        ("squeezebert", "SqueezeBertConfig"),
+        ("tinybert", "TinyBertConfig"),
+        ("unified_transformer", "UnifiedTransformerConfig"),
+        ("unimo", "UNIMOConfig"),
+        ("xlnet", "XLNetConfig"),
+        ("xlm", "XLMConfig"),
+        ("gpt", "GPTConfig"),
+        ("glm", "GLMConfig"),
+        ("mt5", "MT5Config"),
+        ("t5", "T5Config"),
+        ("bert", "BertConfig"),
+        ("bart", "BartConfig"),
+        ("gau_alpha", "GAUAlphaConfig"),
+        ("codegen", "CodeGenConfig"),
+        ("clip", "CLIPConfig"),
+        ("artist", "ArtistConfig"),
+        ("opt", "OPTConfig"),
+        ("pegasus", "PegasusConfig"),
+        ("dpt", "DPTConfig"),
+        ("bit", "BitConfig"),
+        ("blip", "BlipConfig"),
+        ("bloom", "BloomConfig"),
+        ("qwen", "QWenConfig"),
+        ("mistral", "MistralConfig"),
+        ("mixtral", "MixtralConfig"),
+        ("qwen2", "Qwen2Config"),
+        ("qwen2_moe", "Qwen2MoeConfig"),
+        ("gemma", "GemmaConfig"),
+        ("yuan", "YuanConfig"),
+        ("mamba", "MambaConfig"),
+        ("jamba", "JambaConfig"),
     ]
 )
 
@@ -50,7 +117,80 @@ MODEL_NAMES_MAPPING = OrderedDict(
     [
         # Add full (and cased) model names here
         # Base model mapping
-        ('albert', 'Albert'), ('bigbird', 'BigBird'), ('blenderbot_small', 'BlenderbotSmall'), ('blenderbot', 'Blenderbot'), ('chatglm_v2', 'ChatGLMv2'), ('chatglm', 'ChatGLM'), ('chineseclip', 'ChineseCLIPText'), ('chinesebert', 'ChineseBert'), ('convbert', 'ConvBert'), ('ctrl', 'CTRL'), ('distilbert', 'DistilBert'), ('dallebart', 'DalleBart'), ('electra', 'Electra'), ('ernie_vil', 'ErnieViL'), ('ernie_ctm', 'ErnieCtm'), ('ernie_doc', 'ErnieDoc'), ('ernie_gen', 'ErnieGen'), ('ernie_gram', 'ErnieGram'), ('ernie_layout', 'ErnieLayout'), ('ernie_m', 'ErnieM'), ('ernie_code', 'ErnieCode'), ('ernie', 'Ernie'), ('fnet', 'FNet'), ('funnel', 'Funnel'), ('llama', 'Llama'), ('layoutxlm', 'LayoutXLM'), ('layoutlmv2', 'LayoutLMv2'), ('layoutlm', 'LayoutLM'), ('luke', 'Luke'), ('mbart', 'MBart'), ('megatronbert', 'MegatronBert'), ('mobilebert', 'MobileBert'), ('mpnet', 'MPNet'), ('nezha', 'NeZha'), ('nystromformer', 'Nystromformer'), ('ppminilm', 'PPMiniLM'), ('prophetnet', 'ProphetNet'), ('reformer', 'Reformer'), ('rembert', 'RemBert'), ('roberta', 'Roberta'), ('roformerv2', 'RoFormerv2'), ('roformer', 'RoFormer'), ('skep', 'Skep'), ('squeezebert', 'SqueezeBert'), ('tinybert', 'TinyBert'), ('unified_transformer', 'UnifiedTransformer'), ('unimo', 'UNIMO'), ('xlnet', 'XLNet'), ('xlm', 'XLM'), ('gpt', 'GPT'), ('glm', 'GLM'), ('mt5', 'MT5'), ('t5', 'T5'), ('bert', 'Bert'), ('bart', 'Bart'), ('gau_alpha', 'GAUAlpha'), ('codegen', 'CodeGen'), ('clip', 'CLIP'), ('artist', 'Artist'), ('opt', 'OPT'), ('pegasus', 'Pegasus'), ('dpt', 'DPT'), ('bit', 'Bit'), ('blip', 'Blip'), ('bloom', 'Bloom'), ('qwen', 'QWen'), ('mistral', 'Mistral'), ('mixtral', 'Mixtral'), ('qwen2', 'Qwen2'), ('qwen2_moe', 'Qwen2Moe'), ('gemma', 'Gemma'), ('yuan', 'Yuan'), ('mamba', 'Mamba'), ('jamba', 'Jamba')
+        ("albert", "Albert"),
+        ("bigbird", "BigBird"),
+        ("blenderbot_small", "BlenderbotSmall"),
+        ("blenderbot", "Blenderbot"),
+        ("chatglm_v2", "ChatGLMv2"),
+        ("chatglm", "ChatGLM"),
+        ("chineseclip", "ChineseCLIPText"),
+        ("chinesebert", "ChineseBert"),
+        ("convbert", "ConvBert"),
+        ("ctrl", "CTRL"),
+        ("distilbert", "DistilBert"),
+        ("dallebart", "DalleBart"),
+        ("electra", "Electra"),
+        ("ernie_vil", "ErnieViL"),
+        ("ernie_ctm", "ErnieCtm"),
+        ("ernie_doc", "ErnieDoc"),
+        ("ernie_gen", "ErnieGen"),
+        ("ernie_gram", "ErnieGram"),
+        ("ernie_layout", "ErnieLayout"),
+        ("ernie_m", "ErnieM"),
+        ("ernie_code", "ErnieCode"),
+        ("ernie", "Ernie"),
+        ("fnet", "FNet"),
+        ("funnel", "Funnel"),
+        ("llama", "Llama"),
+        ("layoutxlm", "LayoutXLM"),
+        ("layoutlmv2", "LayoutLMv2"),
+        ("layoutlm", "LayoutLM"),
+        ("luke", "Luke"),
+        ("mbart", "MBart"),
+        ("megatronbert", "MegatronBert"),
+        ("mobilebert", "MobileBert"),
+        ("mpnet", "MPNet"),
+        ("nezha", "NeZha"),
+        ("nystromformer", "Nystromformer"),
+        ("ppminilm", "PPMiniLM"),
+        ("prophetnet", "ProphetNet"),
+        ("reformer", "Reformer"),
+        ("rembert", "RemBert"),
+        ("roberta", "Roberta"),
+        ("roformerv2", "RoFormerv2"),
+        ("roformer", "RoFormer"),
+        ("skep", "Skep"),
+        ("squeezebert", "SqueezeBert"),
+        ("tinybert", "TinyBert"),
+        ("unified_transformer", "UnifiedTransformer"),
+        ("unimo", "UNIMO"),
+        ("xlnet", "XLNet"),
+        ("xlm", "XLM"),
+        ("gpt", "GPT"),
+        ("glm", "GLM"),
+        ("mt5", "MT5"),
+        ("t5", "T5"),
+        ("bert", "Bert"),
+        ("bart", "Bart"),
+        ("gau_alpha", "GAUAlpha"),
+        ("codegen", "CodeGen"),
+        ("clip", "CLIP"),
+        ("artist", "Artist"),
+        ("opt", "OPT"),
+        ("pegasus", "Pegasus"),
+        ("dpt", "DPT"),
+        ("bit", "Bit"),
+        ("blip", "Blip"),
+        ("bloom", "Bloom"),
+        ("qwen", "QWen"),
+        ("mistral", "Mistral"),
+        ("mixtral", "Mixtral"),
+        ("qwen2", "Qwen2"),
+        ("qwen2_moe", "Qwen2Moe"),
+        ("gemma", "Gemma"),
+        ("yuan", "Yuan"),
+        ("mamba", "Mamba"),
+        ("jamba", "Jamba"),
     ]
 )
 
@@ -61,6 +201,61 @@ def config_class_to_model_type(config):
         if cls == config:
             return key
     return None
+
+
+class _LazyConfigMapping(OrderedDict):
+    """
+    A dictionary that lazily load its values when they are requested.
+    """
+
+    def __init__(self, mapping):
+        self._mapping = mapping
+        self._extra_content = {}
+        self._modules = {}
+
+    def __getitem__(self, key):
+        if key in self._extra_content:
+            return self._extra_content[key]
+        if key not in self._mapping:
+            raise KeyError(key)
+        value = self._mapping[key]
+        module_name = model_type_to_module_name(key)
+        if module_name not in self._modules:
+            self._modules[module_name] = importlib.import_module(f".{module_name}", "transformers.models")
+        if hasattr(self._modules[module_name], value):
+            return getattr(self._modules[module_name], value)
+
+        # Some of the mappings have entries model_type -> config of another model type. In that case we try to grab the
+        # object at the top level.
+        transformers_module = importlib.import_module("transformers")
+        return getattr(transformers_module, value)
+
+    def keys(self):
+        return list(self._mapping.keys()) + list(self._extra_content.keys())
+
+    def values(self):
+        return [self[k] for k in self._mapping.keys()] + list(self._extra_content.values())
+
+    def items(self):
+        return [(k, self[k]) for k in self._mapping.keys()] + list(self._extra_content.items())
+
+    def __iter__(self):
+        return iter(list(self._mapping.keys()) + list(self._extra_content.keys()))
+
+    def __contains__(self, item):
+        return item in self._mapping or item in self._extra_content
+
+    def register(self, key, value, exist_ok=False):
+        """
+        Register a new configuration in this mapping.
+        """
+        if key in self._mapping.keys() and not exist_ok:
+            raise ValueError(f"'{key}' is already used by a Transformers config, pick another name.")
+        self._extra_content[key] = value
+
+
+CONFIG_MAPPING = _LazyConfigMapping(CONFIG_MAPPING_NAMES)
+
 
 def get_configurations() -> Dict[str, List[Type[PretrainedConfig]]]:
     """load the configurations of PretrainedConfig mapping: {<model-name>: [<class-name>, <class-name>, ...], }
@@ -94,21 +289,12 @@ def get_configurations() -> Dict[str, List[Type[PretrainedConfig]]]:
 
     return mappings
 
+
 def model_type_to_module_name(key):
     """Converts a config key to the corresponding module."""
-    # Special treatment
-    # if key in SPECIAL_MODEL_TYPE_TO_MODULE_NAME:
-    #     key = SPECIAL_MODEL_TYPE_TO_MODULE_NAME[key]
-
-    #     if key in DEPRECATED_MODELS:
-    #         key = f"deprecated.{key}"
-    #     return key
-
     key = key.replace("-", "_")
-    # if key in DEPRECATED_MODELS:
-    #     key = f"deprecated.{key}"
-
     return key
+
 
 class AutoConfig(PretrainedConfig):
     """
@@ -243,6 +429,11 @@ class AutoConfig(PretrainedConfig):
             if config_class is cls:
                 return cls.from_file(config_file)
             return config_class.from_pretrained(config_file, *model_args, **kwargs)
+        elif config_file is None:
+            config_dict, unused_kwargs = PretrainedConfig.get_config_dict(pretrained_model_name_or_path, **kwargs)
+            for pattern in sorted(CONFIG_MAPPING.keys(), key=len, reverse=True):
+                if pattern in str(pretrained_model_name_or_path):
+                    return CONFIG_MAPPING[pattern].from_dict(config_dict, **unused_kwargs)
         else:
             raise RuntimeError(
                 f"Can't load config for '{pretrained_model_name_or_path}'.\n"

@@ -29,7 +29,11 @@ from tokenizers import (
 )
 from tokenizers.models import BPE, Unigram
 
-from paddlenlp.utils.import_utils import is_protobuf_available, is_sentencepiece_available
+from paddlenlp.utils.import_utils import (
+    is_protobuf_available,
+    is_sentencepiece_available,
+)
+
 
 def import_protobuf(error_message=""):
     if is_sentencepiece_available():
@@ -42,14 +46,19 @@ def import_protobuf(error_message=""):
         if version.parse(google.protobuf.__version__) < version.parse("4.0.0"):
             from transformers.utils import sentencepiece_model_pb2
         else:
-            from transformers.utils import sentencepiece_model_pb2_new as sentencepiece_model_pb2
+            from transformers.utils import (
+                sentencepiece_model_pb2_new as sentencepiece_model_pb2,
+            )
         return sentencepiece_model_pb2
     else:
-        raise ImportError(f"""
+        raise ImportError(
+            f"""
 {error_message} requires the protobuf library but it was not found in your environment. Checkout the instructions on the
 installation page of its repo: https://github.com/protocolbuffers/protobuf/tree/master/python#installation and follow the ones
 that match your environment. Please note that you may need to restart your runtime after installation.
-""")
+"""
+        )
+
 
 # Copied from transformers, adapted for tokenizers >= 0.19.0
 def _get_prepend_scheme(add_prefix_space: bool, original_tokenizer) -> str:
@@ -219,6 +228,7 @@ class SpmConverter(Converter):
 
         return tokenizer
 
+
 # Copied from paddlenlp/transformers/gpt/tokenizer.py
 def bytes_to_unicode():
     """
@@ -243,6 +253,7 @@ def bytes_to_unicode():
             n += 1
     cs = [_chr(n) for n in cs]
     return dict(zip(bs, cs))
+
 
 class TikTokenConverter:
     """
@@ -409,15 +420,14 @@ def convert_slow_tokenizer(transformer_tokenizer, from_tiktoken=False) -> Tokeni
         converter_class = SLOW_TO_FAST_CONVERTERS[tokenizer_class_name]
         return converter_class(transformer_tokenizer).converted()
     else:
-        # try:
-        return TikTokenConverter(
-            vocab_file=transformer_tokenizer.vocab_file,
-            additional_special_tokens=transformer_tokenizer.additional_special_tokens,
-        ).converted()
-        # except Exception:    
-        #     raise ValueError(
-        #         f"Converting from Tiktoken failed, if a converter for SentencePiece is available, provide a model path "
-        #         f"with a SentencePiece tokenizer.model file."
-        #         f"Currently available slow->fast convertors: {list(SLOW_TO_FAST_CONVERTERS.keys())}"
-        #     )
-    
+        try:
+            return TikTokenConverter(
+                vocab_file=transformer_tokenizer.vocab_file,
+                additional_special_tokens=transformer_tokenizer.additional_special_tokens,
+            ).converted()
+        except Exception:
+            raise ValueError(
+                f"Converting from Tiktoken failed, if a converter for SentencePiece is available, provide a model path "
+                f"with a SentencePiece tokenizer.model file."
+                f"Currently available slow->fast convertors: {list(SLOW_TO_FAST_CONVERTERS.keys())}"
+            )
