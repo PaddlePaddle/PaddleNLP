@@ -611,8 +611,6 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             split_special_tokens=split_special_tokens,
             **kwargs,
         )
-        print(batched_input)
-        print(batched_output)
 
         # Return tensor is None, then we can remove the leading batch axis
         # Overflowing tokens are returned as a batch of output so we keep them in this case
@@ -626,7 +624,6 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             )
 
         self._eventual_warn_about_too_long_sequence(batched_output["input_ids"], max_length, verbose)
-        print(f"final output = {batched_output}")
         return batched_output
 
     def convert_tokens_to_string(self, tokens: List[str]) -> str:

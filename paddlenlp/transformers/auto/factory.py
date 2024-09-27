@@ -1,4 +1,5 @@
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2018 Google AI, Google Brain and the HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,15 +28,15 @@ def getattribute_from_module(module, attr):
         return getattr(module, attr)
     # Some of the mappings have entries model_type -> object of another model type. In that case we try to grab the
     # object at the top level.
-    transformers_module = importlib.import_module("transformers")
+    paddlenlp_module = importlib.import_module("paddlenlp")
 
-    if module != transformers_module:
+    if module != paddlenlp_module:
         try:
-            return getattribute_from_module(transformers_module, attr)
+            return getattribute_from_module(paddlenlp_module, attr)
         except ValueError:
-            raise ValueError(f"Could not find {attr} neither in {module} nor in {transformers_module}!")
+            raise ValueError(f"Could not find {attr} neither in {module} nor in {paddlenlp_module}!")
     else:
-        raise ValueError(f"Could not find {attr} in {transformers_module}!")
+        raise ValueError(f"Could not find {attr} in {paddlenlp_module}!")
 
 
 class _LazyAutoMapping(OrderedDict):

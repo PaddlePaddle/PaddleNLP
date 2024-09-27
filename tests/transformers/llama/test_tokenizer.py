@@ -38,7 +38,6 @@ class LlamaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
         tokenizer = LlamaTokenizer.from_pretrained("__internal_testing__/tiny-random-llama", **kwargs)
-        print(f"tokenizer = {tokenizer}")
         tokenizer.pad_token = tokenizer.unk_token
         return tokenizer
 

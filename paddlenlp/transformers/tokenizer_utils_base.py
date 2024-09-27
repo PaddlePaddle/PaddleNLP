@@ -1521,11 +1521,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             "added_tokens_file": ADDED_TOKENS_FILE,
             "special_tokens_map_file": SPECIAL_TOKENS_MAP_FILE,
             "tokenizer_config_file": TOKENIZER_CONFIG_FILE,
-            "chat_template_file": CHAT_TEMPLATE_CONFIG_NAME, # what's this
+            "chat_template_file": CHAT_TEMPLATE_CONFIG_NAME,  # what's this
             # "tokenizer_file": FULL_TOKENIZER_FILE,
         }
-        print(f"cls = {cls}")
-        print(f"cls.resource_files_name1s = {cls.resource_files_names}")
 
         vocab_files_target = {**cls.resource_files_names, **additional_files_names}
         # From HF Hub or AI Studio
@@ -1551,15 +1549,12 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             # Assuming from community-contributed pretrained models
             for file_id, file_name in vocab_files_target.items():
                 vocab_files[file_id] = file_name
-        print("vocab_files: ", vocab_files)
         resolved_vocab_files = {}
-        
+
         for file_id, file_path in vocab_files.items():
-            print(f"file_id: {file_id}, file_path: {file_path}")
             if file_path is None or os.path.isfile(file_path):
                 resolved_vocab_files[file_id] = file_path
                 continue
-            print(f"Try resolving {file_id} from {pretrained_model_name_or_path}, {file_path}")
             resolved_vocab_files[file_id] = resolve_file_path(
                 pretrained_model_name_or_path,
                 [file_path],
@@ -1595,30 +1590,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         from_hf_hub=False,
         **kwargs,
     ):
-        """
-        Instantiate a `PretrainedTokenizer` from a predefined tokenizer class.
-
-        Args:
-            pretrained_model_name_or_path (str):
-                The model name or path to instantiate the tokenizer from.
-            *init_inputs (tuple):
-                Positional arguments to be passed to the tokenizer class `__init__` method.
-            cache_dir (str, optional):
-                Directory to cache the downloaded vocabulary files.
-            return_tokenizer_file_dir (bool, optional):
-                Whether to return the directory path of the tokenizer files.
-            from_hf_hub (bool, optional):
-                Whether to load from Huggingface Hub.
-            from_aistudio (bool, optional):
-                Whether to load from AI Studio.
-            **kwargs (dict):
-                Additional keyword arguments to be passed to the tokenizer class `__init__` method.
-
-        Returns:
-            PretrainedTokenizer: An instance of `PretrainedTokenizer`.
-            str: The directory path of the tokenizer files if `return_tokenizer_file_dir` is `True`.
-
-        """
         from_slow = kwargs.get("from_slow", False)
         has_tokenizer_file = resolved_vocab_files.get("tokenizer_file", None) is not None
         if (from_slow or not has_tokenizer_file) and cls.slow_tokenizer_class is not None:

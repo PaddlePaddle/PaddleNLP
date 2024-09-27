@@ -16,6 +16,7 @@
 # limitations under the License.
 
 from typing import Dict, List, Optional, Tuple
+
 import tokenizers
 from packaging import version
 from tokenizers import (

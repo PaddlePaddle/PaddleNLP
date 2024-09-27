@@ -17,7 +17,7 @@ import io
 import json
 import os
 from collections import OrderedDict
-from typing import Dict, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
 
 from paddlenlp.transformers.auto.configuration import (
     CONFIG_MAPPING_NAMES,
@@ -29,7 +29,7 @@ from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.tokenizer_utils_base import TOKENIZER_CONFIG_FILE
 from paddlenlp.transformers.tokenizer_utils_fast import PretrainedTokenizerFast
 
-from ...utils import is_sentencepiece_available, is_tokenizers_available
+from ...utils import is_tokenizers_available
 from ...utils.download import resolve_file_path
 from ...utils.import_utils import import_module
 from ...utils.log import logger
@@ -39,231 +39,57 @@ __all__ = [
     "AutoTokenizer",
 ]
 
-if False:
+if TYPE_CHECKING:
     # This significantly improves completion suggestion performance when
     # the transformers package is used with Microsoft's Pylance language server.
     TOKENIZER_MAPPING_NAMES: OrderedDict[str, Tuple[Optional[str], Optional[str]]] = OrderedDict()
 else:
     TOKENIZER_MAPPING_NAMES = OrderedDict(
         [
-            (
-                "albert",
-                (
-                    "AlbertChineseTokenizer" if is_sentencepiece_available() else None,
-                    "AlbertChineseTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            ("bart", ("BartTokenizer", "BartTokenizerFast")),
-            (
-                "bert",
-                (
-                    "BertTokenizer",
-                    None,
-                ),
-            ),
-            ("blenderbot", ("BlenderbotTokenizer", "BlenderbotTokenizerFast")),
-            (
-                "bloom",
-                (
-                    "BloomTokenizer",
-                    "BloomTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "clip",
-                (
-                    "CLIPTokenizer",
-                    "CLIPTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "codegen",
-                (
-                    "CodeGenTokenizer",
-                    "CodeGenTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "convbert",
-                (
-                    "ConvBertTokenizer",
-                    None,
-                ),
-            ),
-            ("ctrl", ("CTRLTokenizer", None)),
-            (
-                "distilbert",
-                (
-                    "DistilBertTokenizer",
-                    None,
-                ),
-            ),
-            (
-                "electra",
-                (
-                    "ElectraTokenizer",
-                    "ElectraTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "ernie",
-                (
-                    "ErnieTokenizer",
-                    "ErnieTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            ("ernie_m", ("ErnieMTokenizer" if is_sentencepiece_available() else None, None)),
-            (
-                "fnet",
-                (
-                    "FNetTokenizer",
-                    "FNetTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "funnel",
-                (
-                    "FunnelTokenizer",
-                    "FunnelTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "gemma",
-                (
-                    "GemmaTokenizer" if is_sentencepiece_available() else None,
-                    "GemmaTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "jamba",
-                (
-                    "JambaTokenizer" if is_sentencepiece_available() else None,
-                    "JambaTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "layoutlm",
-                (
-                    "LayoutLMTokenizer",
-                    "LayoutLMTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "layoutlmv2",
-                (
-                    "LayoutLMv2Tokenizer",
-                    "LayoutLMv2TokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "layoutxlm",
-                (
-                    "LayoutXLMTokenizer",
-                    "LayoutXLMTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
+            ("albert", "AlbertTokenizer"),
+            ("bart", "BartTokenizer"),
+            ("bert", "BertTokenizer"),
+            ("blenderbot", "BlenderbotTokenizer"),
+            ("bloom", "BloomTokenizer"),
+            ("clip", "CLIPTokenizer"),
+            ("codegen", "CodeGenTokenizer"),
+            ("convbert", "ConvBertTokenizer"),
+            ("ctrl", "CTRLTokenizer"),
+            ("distilbert", "DistilBertTokenizer"),
+            ("electra", "ElectraTokenizer"),
+            ("ernie", "ErnieTokenizer"),
+            ("ernie_m", "ErnieMTokenizer"),
+            ("fnet", "FNetTokenizer"),
+            ("funnel", "FunnelTokenizer"),
+            ("gemma", "GemmaTokenizer"),
+            ("jamba", "JambaTokenizer"),
+            ("layoutlm", "LayoutLMTokenizer"),
+            ("layoutlmv2", "LayoutLMv2Tokenizer"),
+            ("layoutxlm", "LayoutXLMTokenizer"),
             (
                 "llama",
                 (
-                    "LlamaTokenizer" if is_sentencepiece_available() else None,
+                    "LlamaTokenizer",
                     "LlamaTokenizerFast" if is_tokenizers_available() else None,
                 ),
             ),
-            ("luke", ("LukeTokenizer", None)),
-            (
-                "mamba",
-                (
-                    "MambaTokenizer",
-                    "MambaTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "mbart",
-                (
-                    "MBartTokenizer" if is_sentencepiece_available() else None,
-                    "MBart50Tokenizer" if is_sentencepiece_available() else None,
-                ),
-            ),
-            (
-                "mobilebert",
-                (
-                    "MobileBertTokenizer",
-                    None,
-                ),
-            ),
-            (
-                "mpnet",
-                (
-                    "MPNetTokenizer",
-                    "MPNetTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "nezha",
-                (
-                    "NeZhaTokenizer",
-                    "NeZhaTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "pegasus",
-                (
-                    "PegasusChineseTokenizer" if is_sentencepiece_available() else None,
-                    "PegasusChineseTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            ("prophetnet", ("ProphetNetTokenizer", None)),
-            (
-                "reformer",
-                (
-                    "ReformerTokenizer" if is_sentencepiece_available() else None,
-                    "ReformerTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "rembert",
-                (
-                    "RemBertTokenizer" if is_sentencepiece_available() else None,
-                    None,
-                ),
-            ),
-            (
-                "roberta",
-                (
-                    "RobertaBPETokenizer",
-                    "RobertaBPETokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            (
-                "roformer",
-                (
-                    "RoFormerTokenizer",
-                    "RoFormerTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            ("speecht5", ("SpeechT5Tokenizer" if is_sentencepiece_available() else None, None)),
-            (
-                "squeezebert",
-                (
-                    "SqueezeBertTokenizer",
-                    None,
-                ),
-            ),
-            (
-                "t5",
-                (
-                    "T5Tokenizer" if is_sentencepiece_available() else None,
-                    "T5TokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
-            ("xlm", ("XLMTokenizer", None)),
-            (
-                "xlnet",
-                (
-                    "XLNetTokenizer" if is_sentencepiece_available() else None,
-                    "XLNetTokenizerFast" if is_tokenizers_available() else None,
-                ),
-            ),
+            ("luke", "LukeTokenizer"),
+            ("mamba", "MambaTokenizer"),
+            ("mbart", "MBartTokenizer"),
+            ("mobilebert", "MobileBertTokenizer"),
+            ("mpnet", "MPNetTokenizer"),
+            ("nezha", "NeZhaTokenizer"),
+            ("pegasus", "PegasusChineseTokenizer"),
+            ("prophetnet", "ProphetNetTokenizer"),
+            ("reformer", "ReformerTokenizer"),
+            ("rembert", "RemBertTokenizer"),
+            ("roberta", "RobertaBPETokenizer"),
+            ("roformer", "RoFormerTokenizer"),
+            ("speecht5", "SpeechT5Tokenizer"),
+            ("squeezebert", "SqueezeBertTokenizer"),
+            ("t5", "T5Tokenizer"),
+            ("xlm", "XLMTokenizer"),
+            ("xlnet", "XLNetTokenizer"),
             ("bert_japanese", "BertJapaneseTokenizer"),
             ("bigbird", "BigBirdTokenizer"),
             ("blenderbot_small", "BlenderbotSmallTokenizer"),

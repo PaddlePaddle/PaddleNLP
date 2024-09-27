@@ -102,7 +102,7 @@ class LlamaTokenizer(PretrainedTokenizer):
     @property
     def eos_token_id(self) -> Optional[int]:
         return self.sp_model.eos_id()
-    
+
     def get_spm_processor(self, from_slow=False):
         tokenizer = spm.SentencePieceProcessor(**self.sp_model_kwargs)
         if from_slow:  # no dependency on protobuf

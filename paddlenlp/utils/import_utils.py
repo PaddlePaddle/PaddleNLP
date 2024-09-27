@@ -24,6 +24,7 @@ import pip
 
 from paddlenlp.utils.log import logger
 
+
 # TODO: This doesn't work for all packages (`bs4`, `faiss`, etc.) Talk to Sylvain to see how to do with it better.
 def _is_package_available(pkg_name: str, return_version: bool = False) -> Union[Tuple[bool, str], bool]:
     # Check if the package spec exists and grab its version to avoid importing a local directory
@@ -56,6 +57,7 @@ def _is_package_available(pkg_name: str, return_version: bool = False) -> Union[
         return package_exists, package_version
     else:
         return package_exists
+
 
 _g2p_en_available = _is_package_available("g2p_en")
 _sentencepiece_available = _is_package_available("sentencepiece")
@@ -116,10 +118,6 @@ def is_datasets_available():
 
     return importlib.util.find_spec("datasets") is not None
 
-def is_protobuf_available():
-    if importlib.util.find_spec("google") is None:
-        return False
-    return importlib.util.find_spec("google.protobuf") is not None
 
 def is_protobuf_available():
     if importlib.util.find_spec("google") is None:
@@ -135,11 +133,6 @@ def is_paddle_cuda_available() -> bool:
     else:
         return False
 
-def is_g2p_en_available():
-    return _g2p_en_available
-
-def is_sentencepiece_available():
-    return _sentencepiece_available
 
 def is_g2p_en_available():
     return _g2p_en_available
@@ -157,12 +150,12 @@ def is_paddle_available() -> bool:
     return is_package_available("paddle")
 
 
-def is_psutil_available():
-    return importlib.util.find_spec("psutil") is not None
-
-
 def is_tiktoken_available():
     return importlib.util.find_spec("tiktoken") is not None
+
+
+def is_psutil_available():
+    return importlib.util.find_spec("psutil") is not None
 
 
 def is_torch_available() -> bool:
