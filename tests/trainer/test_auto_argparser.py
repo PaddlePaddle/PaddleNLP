@@ -123,10 +123,9 @@ class AutoArgparserTest(unittest.TestCase):
         ]
         with patch("sys.argv", cmd_line_args):
             model_args = vars(parse_args()[0])
-        self.assertEqual(model_args.get("min_learning_rate"), 2e-5)
         self.assertEqual(model_args.get("max_steps"), 3000)
         self.assertEqual(model_args.get("log_on_each_node"), False)
         for key, value in AutoArgparserTest.args_dict.items():
-            if key not in ["min_learning_rate", "max_steps", "log_on_each_node"]:
+            if key not in ["max_steps", "log_on_each_node"]:
                 self.assertEqual(model_args.get(key), value)
         os.remove(tmpfile_path)
