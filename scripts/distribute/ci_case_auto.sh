@@ -1356,6 +1356,10 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1() {
 
 function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
     echo "=========== $FUNCNAME run begin ==========="
+    # Only A100 support this case.
+    if [ $IS_A100 -eq 0 ]; then
+        return
+    fi
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
     export FLAGS_max_inplace_grad_add=3
