@@ -154,7 +154,7 @@ def fusion_flash_attention(
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
     version = paddle.version.full_version
-    if version != "0.0.0" and version <= "2.5.2":
+    if version != "0.0.0" and version <= "2.5.2": # Add attn_mask in v2.5.2
         if alibi is not None:
             raise ValueError("Flash Attention doesn't support alibi")
         if config.context_parallel_degree > 1:
@@ -164,6 +164,7 @@ def fusion_flash_attention(
             key_states,
             value_states,
             causal=True,
+            attn_mask=attention_mask,
             return_softmax=output_attentions,
         )
     else:

@@ -1363,17 +1363,17 @@ class Trainer:
 
             divisor = 2**30
             # TODO(@gexiao): replace these codes with unified APIs in Paddle
-            current_device = framework._current_expected_place_()
-            if str(current_device) != "Place(cpu)":
-                device_id = current_device.get_device_id()
-                current_memory_allocated = core.device_memory_stat_current_value("Allocated", device_id)
-                current_memory_reserved = core.device_memory_stat_current_value("Reserved", device_id)
-                max_memory_allocated = core.device_memory_stat_peak_value("Allocated", device_id)
-                max_memory_reserved = core.device_memory_stat_peak_value("Reserved", device_id)
-                logs["current_memory_allocated"] = current_memory_allocated / divisor
-                logs["current_memory_reserved"] = current_memory_reserved / divisor
-                logs["max_memory_allocated"] = max_memory_allocated / divisor
-                logs["max_memory_reserved"] = max_memory_reserved / divisor
+            # current_device = framework._current_expected_place()
+            # if str(current_device) != "Place(cpu)":
+            #     device_id = current_device.get_device_id()
+            #     current_memory_allocated = core.device_memory_stat_current_value("Allocated", device_id)
+            #     current_memory_reserved = core.device_memory_stat_current_value("Reserved", device_id)
+            #     max_memory_allocated = core.device_memory_stat_peak_value("Allocated", device_id)
+            #     max_memory_reserved = core.device_memory_stat_peak_value("Reserved", device_id)
+            #     logs["current_memory_allocated"] = current_memory_allocated / divisor
+            #     logs["current_memory_reserved"] = current_memory_reserved / divisor
+            #     logs["max_memory_allocated"] = max_memory_allocated / divisor
+            #     logs["max_memory_reserved"] = max_memory_reserved / divisor
 
             total_train_batch_size = (
                 self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.dataset_world_size

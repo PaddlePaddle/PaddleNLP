@@ -119,10 +119,10 @@ def setup_fused_ln():
                         "-U__CUDA_NO_BFLOAT162_OPERATORS__",
                         "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
                         "-I./apex/contrib/csrc/layer_norm/",
-                        "--expt-relaxed-constexpr",
-                        "--expt-extended-lambda",
-                        "--use_fast_math",
-                        "-maxrregcount=50",
+                        # "--expt-relaxed-constexpr",
+                        # "--expt-extended-lambda",
+                        # "--use_fast_math",
+                        # "-maxrregcount=50",
                     ]
                     + gencode_flags,
                 },
@@ -130,5 +130,5 @@ def setup_fused_ln():
         )
 
 
-run(setup_fast_ln)
+# run(setup_fast_ln)
 run(setup_fused_ln)

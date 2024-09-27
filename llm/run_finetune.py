@@ -531,45 +531,49 @@ def main():
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        if model_args.neftune:
-            neft_post_hook_handle.remove()
-        if training_args.benchmark:
-            total_effective_tokens = (
-                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * training_args.num_train_epochs
-            )
-            effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
-            logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
-            logger.info("Benchmark done.")
-        else:
-            if model_args.save_to_aistudio:
-                kwargs = {}
-                if model_args.aistudio_token is not None:
-                    kwargs["token"] = model_args.aistudio_token
-                # PEFT Model only save PEFT parameters, if pretrained model obtains from aistudio
-                if model_args.from_aistudio and (model_args.lora or model_args.prefix_tuning):
-                    kwargs["base_model"] = model_args.model_name_or_path
-                else:
-                    trainer.tokenizer.save_to_aistudio(
+        if training_args.do_eval:
+            if model_args.neftune:
+                neft_post_hook_handle.remove()
+            if training_args.benchmark:
+                total_effective_tokens = (
+                    sum([len(i["input_ids"]) for i in trainer.train_dataset]) * training_args.num_train_epochs
+                )
+                effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+                logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
+                logger.info("Benchmark done.")
+            else:
+                if model_args.save_to_aistudio:
+                    kwargs = {}
+                    if model_args.aistudio_token is not None:
+                        kwargs["token"] = model_args.aistudio_token
+                    # PEFT Model only save PEFT parameters, if pretrained model obtains from aistudio
+                    if model_args.from_aistudio and (model_args.lora or model_args.prefix_tuning):
+                        kwargs["base_model"] = model_args.model_name_or_path
+                    else:
+                        trainer.tokenizer.save_to_aistudio(
+                            repo_id=model_args.aistudio_repo_id,
+                            private=model_args.aistudio_repo_private,
+                            license=model_args.aistudio_repo_license,
+                            exist_ok=True,
+                            **kwargs,
+                        )
+                    trainer.model.save_to_aistudio(
                         repo_id=model_args.aistudio_repo_id,
                         private=model_args.aistudio_repo_private,
                         license=model_args.aistudio_repo_license,
+                        merge_tensor_parallel=training_args.tensor_parallel_degree > 1,
                         exist_ok=True,
                         **kwargs,
                     )
-                trainer.model.save_to_aistudio(
-                    repo_id=model_args.aistudio_repo_id,
-                    private=model_args.aistudio_repo_private,
-                    license=model_args.aistudio_repo_license,
-                    merge_tensor_parallel=training_args.tensor_parallel_degree > 1,
-                    exist_ok=True,
-                    **kwargs,
-                )
 
-            if not training_args.autotuner_benchmark:
-                trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
-                trainer.log_metrics("train", train_result.metrics)
-                trainer.save_metrics("train", train_result.metrics)
-                trainer.save_state()
+                if not training_args.autotuner_benchmark:
+                    trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
+                    trainer.log_metrics("train", train_result.metrics)
+                    trainer.save_metrics("train", train_result.metrics)
+                    trainer.save_state()
+
+    if not training_args.do_train and training_args.do_eval:
+        trainer._load_from_checkpoint(resume_from_checkpoint=get_last_checkpoint(training_args.output_dir))
 
     # QAT
     if quant_args.do_qat:

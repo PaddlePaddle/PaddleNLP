@@ -1453,7 +1453,9 @@ class LlamaModel(LlamaPretrainedModel):
             expanded_attn_mask = expanded_attn_mask.astype(dtype)
             expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
         else:
-            expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+            import numpy as np
+            expanded_attn_mask = paddle.where(expanded_attn_mask, np.float32(0.0), np.float32(paddle.finfo(dtype).min)).astype(dtype)
+            # expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
         return expanded_attn_mask
 
     @paddle.jit.not_to_static

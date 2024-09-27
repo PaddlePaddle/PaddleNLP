@@ -121,6 +121,12 @@ def merge_tensor_parallel(model_class, state_dict_list, config) -> None:
 
     return state_dict_to_save
 
+def delete_files_with_pp(folder_path):
+    for filename in os.listdir(folder_path):
+        if '_pp' in filename:
+            file_path = os.path.join(folder_path, filename)
+            os.remove(file_path)
+            print(f"Remove: {file_path}")
 
 def main():
     args = parse_arguments()
@@ -144,11 +150,12 @@ def main():
             )
         else:
             tp_state_dict_list = load_tp_params(args.tensor_parallel_degree, args.model_name_or_path)
-        state_dict_to_save = merge_tensor_parallel(
-            model_class=model_class, state_dict_list=tp_state_dict_list, config=config
-        )
+        # state_dict_to_save = merge_tensor_parallel(
+        #     model_class=model_class, state_dict_list=tp_state_dict_list, config=config
+        # )
         logger.info("Saving")
-        paddle.save(state_dict_to_save, os.path.join(args.model_name_or_path, "model_state.pdparams"))
+        for i in range(len(tp_state_dict_list)):
+            paddle.save(tp_state_dict_list[i], os.path.join(args.model_name_or_path, f"model_state.tp{i:0>2d}.pdparams"))
     elif args.pipeline_parallel_degree > 1:
         state_dict_to_save = load_pp_params(args.pipeline_parallel_degree, args.model_name_or_path)
         logger.info("Saving")
@@ -156,6 +163,7 @@ def main():
     else:
         logger.info("No need to merge since config.tensor_parallel_degree <= 1.")
 
+    delete_files_with_pp(args.model_name_or_path)
 
 if __name__ == "__main__":
     main()
