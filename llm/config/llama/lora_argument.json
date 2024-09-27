@@ -31,5 +31,7 @@
     "zero_padding": false,
     "use_flash_attention": true,
     "unified_checkpoint": true,
+    "use_fused_head_and_loss_fn": false,
+    "use_sparse_head_and_loss_fn": false,
     "pissa": false
   }

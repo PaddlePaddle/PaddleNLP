@@ -139,10 +139,8 @@ class DPOCriterion(nn.Layer):
         use_sparse_head_and_loss_fn = getattr(self.config, "use_sparse_head_and_loss_fn", False)
         chunk_size = getattr(self.config, "chunk_size", 1024)
         labels = chosen_labels + rejected_labels
-        if use_fused_head_and_loss_fn:
+        if use_fused_head_and_loss_fn or use_sparse_head_and_loss_fn:
             hidden_states, weight, bias, transpose_y = logits
-        elif use_sparse_head_and_loss_fn:
-            hidden_states, weight, bias = logits
 
         if use_sparse_head_and_loss_fn:
             if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
@@ -176,7 +174,9 @@ class DPOCriterion(nn.Layer):
             )
         elif use_sparse_head_and_loss_fn:
             if bias is None:
-                logits = parallel_matmul(hidden_states, weight, self.config.tensor_parallel_output)
+                logits = parallel_matmul(
+                    hidden_states, weight, self.config.tensor_parallel_output, transpose_y=transpose_y
+                )
             else:
                 logits = parallel_linear(hidden_states, weight, bias, self.config.tensor_parallel_output)
             logits = logits.astype("float32")

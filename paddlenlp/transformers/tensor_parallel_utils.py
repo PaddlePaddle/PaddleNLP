@@ -24,7 +24,7 @@ from paddle.autograd import PyLayer
 from paddlenlp.utils.tools import get_env_device
 
 
-def parallel_matmul(lm_output, logit_weights, tensor_parallel_output=True, training=True):
+def parallel_matmul(lm_output, logit_weights, tensor_parallel_output=True, training=True, transpose_y=False):
     """
     Parallel matmul
     Args:
@@ -67,14 +67,14 @@ def parallel_matmul(lm_output, logit_weights, tensor_parallel_output=True, train
 
     if is_fleet_init and tensor_parallel_degree > 1 and is_logit_weight_distributed:
         input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=True)
+        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=transpose_y)
 
         if tensor_parallel_output:
             return logits
 
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
     else:
-        logits = paddle.matmul(lm_output, logit_weights, transpose_y=True)
+        logits = paddle.matmul(lm_output, logit_weights, transpose_y=transpose_y)
         return logits
 
 
@@ -202,6 +202,11 @@ class FusedHeadAndCrossEntropy(PyLayer):
         else:
             ctx.aux_num = 2
             loss_mask = loss_mask.reshape([-1]).astype("float32")
+        if lm_head_bias is None:
+            ctx.has_bias = False
+        else:
+            ctx.has_bias = True
+
         ctx.return_token_loss = return_token_loss
         if return_token_loss:
             divisor = 1
@@ -234,7 +239,7 @@ class FusedHeadAndCrossEntropy(PyLayer):
                 grad_lm_head_weight = paddle.zeros_like(lm_head_weight)
             else:
                 grad_lm_head_weight = None
-            if lm_head_weight is not None and not lm_head_weight.stop_gradient:
+            if lm_head_bias is not None and not lm_head_bias.stop_gradient:
                 grad_lm_head_bias = paddle.zeros_like(lm_head_bias)
             else:
                 grad_lm_head_bias = None
@@ -376,9 +381,15 @@ class FusedHeadAndCrossEntropy(PyLayer):
                 grad_lm_head_bias = None
 
             if ctx.aux_num == 1:
-                return grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias, None
+                if ctx.has_bias:
+                    return grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias, None
+                else:
+                    return grad_hidden_states, grad_lm_head_weight, None
             else:
-                return grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias, None, None
+                if ctx.has_bias:
+                    return grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias, None, None
+                else:
+                    return grad_hidden_states, grad_lm_head_weight, None, None
 
         # return_token_loss = True
         grad_token_loss = grad_output.reshape([-1])
@@ -427,7 +438,7 @@ class FusedHeadAndCrossEntropy(PyLayer):
             grad_lm_head_weight = paddle.zeros_like(lm_head_weight)
         else:
             grad_lm_head_weight = None
-        if lm_head_weight is not None and not lm_head_weight.stop_gradient:
+        if lm_head_bias is not None and not lm_head_bias.stop_gradient:
             grad_lm_head_bias = paddle.zeros_like(lm_head_bias)
         else:
             grad_lm_head_bias = None
@@ -494,6 +505,12 @@ class FusedHeadAndCrossEntropy(PyLayer):
             grad_hidden_states = grad_hidden_states.reshape(ctx.original_shape)
 
         if ctx.aux_num == 1:
-            return grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias, None
+            if ctx.has_bias:
+                return grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias, None
+            else:
+                return grad_hidden_states, grad_lm_head_weight, None
         else:
-            return grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias, None, None
+            if ctx.has_bias:
+                return grad_hidden_states, grad_lm_head_weight, grad_lm_head_bias, None, None
+            else:
+                return grad_hidden_states, grad_lm_head_weight, None, None
