@@ -113,6 +113,7 @@ sources = [
     "./gpu/append_attn/append_attention_kernel.cu",
     "./gpu/append_attn/encoder_write_cache_with_rope_kernel.cu",
     "./gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
+    "./gpu/sample_kernels/top_p_sampling_reject.cu",
 ]
 
 cutlass_dir = "third_party/cutlass"
@@ -137,12 +138,15 @@ nvcc_compile_args += [
     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
     "-U__CUDA_NO_BFLOAT162_OPERATORS__",
     "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+    "-Igpu",
     "-Igpu/cutlass_kernels",
+    "-Igpu/fp8_gemm_with_cutlass",
+    "-Igpu/cutlass_kernels/fp8_gemm_fused/autogen",
     "-Ithird_party/cutlass/include",
     "-Ithird_party/nlohmann_json/single_include",
-    "-Igpu/fp8_gemm_with_cutlass",
-    "-Igpu",
+    "-Igpu/sample_kernels",
 ]
+
 cc = get_sm_version()
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]

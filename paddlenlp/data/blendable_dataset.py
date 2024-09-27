@@ -47,8 +47,8 @@ class BlendableDataset(paddle.io.Dataset):
         def _build_indices():
             start_time = time.time()
 
-            tool_helpers_version = importlib.metadata.version("tool_helpers")
-            if tool_helpers_version > "0.1.1":
+            fast_dataindex_version = importlib.metadata.version("fast_dataindex")
+            if fast_dataindex_version > "0.1.1":
                 assert (
                     num_datasets < 32767
                 ), f"Detect num_datasets({num_datasets})>=32767. Currently, num_datasets should be less than 32767."
@@ -56,11 +56,11 @@ class BlendableDataset(paddle.io.Dataset):
             else:
                 assert (
                     num_datasets < 255
-                ), f"Detect num_datasets:({num_datasets})>=255. When 'tool_helpers<=0.1.1', num_datasets should be less than 255. To support num_datasets greater than 255, please upgrade `tool_helpers>=0.1.2`."
+                ), f"Detect num_datasets:({num_datasets})>=255. When 'fast_dataindex<=0.1.1', num_datasets should be less than 255. To support num_datasets greater than 255, please upgrade `fast_dataindex>=0.1.2`."
                 dataset_index = np.zeros(self.size, dtype=np.uint8)
             dataset_sample_index = np.zeros(self.size, dtype=np.int64)
 
-            from tool_helpers import helpers
+            from fast_dataindex import helpers
 
             helpers.build_blending_indices(
                 dataset_index,

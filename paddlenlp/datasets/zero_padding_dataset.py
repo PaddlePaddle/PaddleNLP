@@ -67,11 +67,14 @@ class ZeroPadding:
             elif "rejected_labels" in input_keys and "chosen_labels" in input_keys:
                 batched_features["rejected_labels"].extend(record["rejected_labels"])
                 batched_features["chosen_labels"].extend(record["chosen_labels"])
-                response_indexs = [
-                    record["response_indexs"][0] + sequence_sum,  # chosen_response_start_index
-                    record["response_indexs"][1] + sequence_sum,  # rejeted_response_start_index
-                    record["response_indexs"][2] + sequence_sum,  # rejeted_response_end_index + 1
-                ]
+                response_indexs = []
+                for ii in range(len(record["response_indexs"])):
+                    response_indexs.append(record["response_indexs"][ii] + sequence_sum)
+                batched_features["response_indexs"].append(response_indexs)
+            elif "response_indexs" in input_keys:
+                response_indexs = []
+                for ii in range(len(record["response_indexs"])):
+                    response_indexs.append(record["response_indexs"][ii] + sequence_sum)
                 batched_features["response_indexs"].append(response_indexs)
             else:
                 raise ValueError("labels is required for ZeroPadding Dataset")

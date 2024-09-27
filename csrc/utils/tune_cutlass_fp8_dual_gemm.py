@@ -15,7 +15,7 @@
 import argparse
 
 import paddle
-from paddlenlp_ops import cutlass_fp8_fp8_half_gemm_fused
+from paddlenlp_ops import cutlass_fp8_fp8_fp8_dual_gemm_fused
 
 
 def setup_args():
@@ -31,12 +31,25 @@ def setup_args():
 
 def gemm(m, n, k):
     A = paddle.ones([m, k], dtype="float8_e4m3fn")
-    B = paddle.ones([n, k], dtype="float8_e4m3fn")
-    res = cutlass_fp8_fp8_half_gemm_fused(
-        A, B, bias=None, transpose_x=False, transpose_y=True, output_dtype="bfloat16", scale=0.5, act="identity"
+    B0 = paddle.ones([n, k], dtype="float8_e4m3fn")
+    B1 = paddle.ones([n, k], dtype="float8_e4m3fn")
+    # C0 = paddle.ones([n], dtype="float16")
+    # C1 = paddle.ones([n], dtype="float16")
+    res = cutlass_fp8_fp8_fp8_dual_gemm_fused(
+        A,
+        B0,
+        B1,
+        bias0=None,
+        bias1=None,
+        transpose_x=False,
+        transpose_y=True,
+        scale0=0.1,
+        scale1=0.1,
+        scale_out=0.5,
+        act="swiglu",
     )
-    print(f"m: {m}, n: {n}, k: {k}")
-    print(res)
+    # print(res)
+    return res
 
 
 if __name__ == "__main__":
