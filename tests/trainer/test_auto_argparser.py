@@ -116,8 +116,6 @@ class AutoArgparserTest(unittest.TestCase):
         cmd_line_args = [
             AutoArgparserTest.script_name,
             tmpfile_path,
-            "--min_learning_rate",
-            "2e-5",
             "--max_steps",
             "3000",
             "--log_on_each_node",
