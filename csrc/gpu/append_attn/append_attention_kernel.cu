@@ -14,6 +14,7 @@
 
 #include "append_attention_kernel.h"
 
+
 // #define DEBUG_ATTN
 template <typename T,
           uint32_t GROUP_SIZE,
@@ -38,7 +39,7 @@ void MultiQueryAppendAttention(
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
-    const paddle::Tensor& block_tables,
+    const paddle::Tensor& block_table,
     const paddle::Tensor& batch_ids,
     const paddle::Tensor& tile_ids_per_batch,
     const int num_blocks_x_cpu,
@@ -63,7 +64,7 @@ void MultiQueryAppendAttention(
   const auto& cum_offsets_dims = cum_offsets.dims();
   const uint32_t token_num = q_dims[0];
   const uint32_t bsz = cum_offsets_dims[0];
-  const uint32_t max_block_num_per_seq = block_tables.dims()[1];
+  const uint32_t max_block_num_per_seq = block_table.dims()[1];
 
   constexpr uint32_t num_warps = 4;
   constexpr uint32_t NUM_WARP_KV = num_warps / NUM_WARP_Q;
@@ -104,16 +105,14 @@ void MultiQueryAppendAttention(
     int sm_count;
     // int act_blocks_per_sm;
     cudaDeviceGetAttribute(&sm_count, cudaDevAttrMultiProcessorCount, dev_id);
-
 #ifdef DEBUG_ATTN
     cudaDeviceSynchronize();
     CUDA_CHECK(cudaGetLastError());
-    std::cout << "multi_query_append_attention_kernel start NUM_WARP_Q="
-              << NUM_WARP_Q << "sm_count:" << sm_count << std::endl;
+    std::cout << "multi_query_append_attention_kernel start NUM_WARP_Q=" << NUM_WARP_Q << "sm_count:" << sm_count << std::endl;
 #endif
     // cudaOccupancyMaxActiveBlocksPerMultiprocessor(
     //     &act_blocks_per_sm, split_kv_kernel, num_warps * 32, smem_size);
-
+    
     // assert(act_blocks_per_sm > 1);
     // const int num_blocks_per_wave = sm_count * act_blocks_per_sm;
     // const int num_blocks_need = num_blocks_x_cpu * kv_num_heads;
@@ -152,9 +151,7 @@ void MultiQueryAppendAttention(
 #ifdef DEBUG_ATTN
       cudaDeviceSynchronize();
       CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_kernel start num_chunk = <1 "
-                   "NUM_WARP_Q="
-                << NUM_WARP_Q << std::endl;
+      std::cout << "multi_query_append_attention_kernel start num_chunk = <1 NUM_WARP_Q=" << NUM_WARP_Q << std::endl;
 #endif
       nosplit_kv_kernel<<<grids, blocks, smem_size, stream>>>(
           reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
@@ -171,7 +168,7 @@ void MultiQueryAppendAttention(
           batch_ids.data<int>(),
           tile_ids_per_batch.data<int>(),
           cum_offsets.data<int>(),
-          block_tables.data<int>(),
+          block_table.data<int>(),
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
@@ -186,9 +183,7 @@ void MultiQueryAppendAttention(
 #ifdef DEBUG_ATTN
       cudaDeviceSynchronize();
       CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_kernel end num_chunk <= 1 "
-                   "NUM_WARP_Q="
-                << NUM_WARP_Q << std::endl;
+      std::cout << "multi_query_append_attention_kernel end num_chunk <= 1 NUM_WARP_Q=" << NUM_WARP_Q << std::endl;
 #endif
     } else {
       phi::Allocator::AllocationPtr tmp_workspace, tmp_m, tmp_d;
@@ -219,9 +214,7 @@ void MultiQueryAppendAttention(
 #ifdef DEBUG_ATTN
       cudaDeviceSynchronize();
       CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_kernel start num_chunk > 1  "
-                   "NUM_WARP_Q="
-                << NUM_WARP_Q << std::endl;
+      std::cout << "multi_query_append_attention_kernel start num_chunk > 1  NUM_WARP_Q=" << NUM_WARP_Q << std::endl;
 #endif
       split_kv_kernel<<<grids, blocks, smem_size, stream>>>(
           reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
@@ -238,7 +231,7 @@ void MultiQueryAppendAttention(
           batch_ids.data<int>(),
           tile_ids_per_batch.data<int>(),
           cum_offsets.data<int>(),
-          block_tables.data<int>(),
+          block_table.data<int>(),
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
@@ -254,9 +247,7 @@ void MultiQueryAppendAttention(
 #ifdef DEBUG_ATTN
       cudaDeviceSynchronize();
       CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_kernel end num_chunk > 1  "
-                   "NUM_WARP_Q="
-                << NUM_WARP_Q << std::endl;
+      std::cout << "multi_query_append_attention_kernel end num_chunk > 1  NUM_WARP_Q=" << NUM_WARP_Q << std::endl;
 #endif
       constexpr int vec_size = num_elems_per_128b<NV_TYPE>();
       if (is_decoder) {
@@ -331,11 +322,10 @@ void MultiQueryAppendAttention(
 #ifdef DEBUG_ATTN
     cudaDeviceSynchronize();
     CUDA_CHECK(cudaGetLastError());
-    std::cout << "multi_query_append_attention_kernel merge end num_chunk > 1  "
-                 "NUM_WARP_Q="
-              << NUM_WARP_Q << std::endl;
+    std::cout << "multi_query_append_attention_kernel merge end num_chunk > 1  NUM_WARP_Q=" << NUM_WARP_Q << std::endl;
 #endif
   } else {
+    
     constexpr uint32_t num_frags_z = BLOCK_SIZE / 16 / NUM_WARP_KV;  // !!!
     constexpr uint32_t smem_size =
         (num_frags_x + NUM_WARP_KV * num_frags_z * 2) * 16 * HEAD_DIM *
@@ -367,9 +357,9 @@ void MultiQueryAppendAttention(
 #ifdef DEBUG_ATTN
     cudaDeviceSynchronize();
     CUDA_CHECK(cudaGetLastError());
-    std::cout << "multi_query_append_attention_warp1_4_kernel start NUM_WARP_Q="
-              << NUM_WARP_Q << "sm_count:" << sm_count << std::endl;
+    std::cout << "multi_query_append_attention_warp1_4_kernel start NUM_WARP_Q=" << NUM_WARP_Q << "sm_count:" << sm_count << std::endl;
 #endif
+
     // cudaOccupancyMaxActiveBlocksPerMultiprocessor(
     //     &act_blocks_per_sm, split_kv_kernel, num_warps * 32, smem_size);
     // assert(act_blocks_per_sm > 1);
@@ -391,11 +381,9 @@ void MultiQueryAppendAttention(
 
     if (num_chunks <= 1) {
 #ifdef DEBUG_ATTN
-      cudaDeviceSynchronize();
-      CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_warp1_4_kernel start "
-                   "num_chunk <= 1  NUM_WARP_Q="
-                << NUM_WARP_Q << std::endl;
+    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaGetLastError());
+    std::cout << "multi_query_append_attention_warp1_4_kernel start num_chunk <= 1  NUM_WARP_Q=" << NUM_WARP_Q << std::endl;
 #endif
       auto nosplit_kv_kernel =
           multi_query_append_attention_warp1_4_kernel<NV_TYPE,
@@ -417,6 +405,7 @@ void MultiQueryAppendAttention(
                              cudaFuncAttributeMaxDynamicSharedMemorySize,
                              smem_size);
       }
+
       nosplit_kv_kernel<<<grids, blocks, smem_size, stream>>>(
           reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
           reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_k.data<T>())),
@@ -432,7 +421,7 @@ void MultiQueryAppendAttention(
           batch_ids.data<int>(),
           tile_ids_per_batch.data<int>(),
           cum_offsets.data<int>(),
-          block_tables.data<int>(),
+          block_table.data<int>(),
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
@@ -445,11 +434,9 @@ void MultiQueryAppendAttention(
           reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
           speculate_max_draft_token_num);
 #ifdef DEBUG_ATTN
-      cudaDeviceSynchronize();
-      CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_warp1_4_kernel end num_chunk "
-                   "<= 1  NUM_WARP_Q="
-                << NUM_WARP_Q << std::endl;
+    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaGetLastError());
+    std::cout << "multi_query_append_attention_warp1_4_kernel end num_chunk <= 1  NUM_WARP_Q=" << NUM_WARP_Q << std::endl;
 #endif
     } else {
       phi::Allocator::AllocationPtr tmp_workspace, tmp_m, tmp_d;
@@ -493,9 +480,7 @@ void MultiQueryAppendAttention(
 #ifdef DEBUG_ATTN
       cudaDeviceSynchronize();
       CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_warp1_4_kernel start "
-                   "num_chunk > 1  NUM_WARP_Q="
-                << NUM_WARP_Q << std::endl;
+      std::cout << "multi_query_append_attention_warp1_4_kernel start num_chunk > 1  NUM_WARP_Q=" << NUM_WARP_Q << std::endl;
 #endif
       split_kv_kernel<<<grids, blocks, smem_size, stream>>>(
           reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
@@ -512,7 +497,7 @@ void MultiQueryAppendAttention(
           batch_ids.data<int>(),
           tile_ids_per_batch.data<int>(),
           cum_offsets.data<int>(),
-          block_tables.data<int>(),
+          block_table.data<int>(),
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
@@ -527,9 +512,7 @@ void MultiQueryAppendAttention(
 #ifdef DEBUG_ATTN
       cudaDeviceSynchronize();
       CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_warp1_4_kernel end num_chunk "
-                   "> 1  NUM_WARP_Q="
-                << NUM_WARP_Q << std::endl;
+      std::cout << "multi_query_append_attention_warp1_4_kernel end num_chunk > 1  NUM_WARP_Q=" << NUM_WARP_Q << std::endl;
 #endif
       // merge
       constexpr int vec_size = num_elems_per_128b<NV_TYPE>();
@@ -604,9 +587,7 @@ void MultiQueryAppendAttention(
 #ifdef DEBUG_ATTN
       cudaDeviceSynchronize();
       CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_warp1_4_kernel merge end "
-                   "num_chunk > 1  NUM_WARP_Q="
-                << NUM_WARP_Q << std::endl;
+      std::cout << "multi_query_append_attention_warp1_4_kernel merge end num_chunk > 1  NUM_WARP_Q=" << NUM_WARP_Q << std::endl;
 #endif
     }
   }
@@ -638,7 +619,7 @@ void MultiQueryAppendC8Attention(
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
-    const paddle::Tensor& block_tables,
+    const paddle::Tensor& block_table,
     const paddle::Tensor& batch_ids,
     const paddle::Tensor& tile_ids_per_batch,
     const int num_blocks_x_cpu,
@@ -654,10 +635,9 @@ void MultiQueryAppendC8Attention(
     cudaStream_t& stream,
     paddle::Tensor* out) {
 #ifdef DEBUG_ATTN
-  cudaDeviceSynchronize();
-  CUDA_CHECK(cudaGetLastError());
-  std::cout << "MultiQueryAppendC8Attention start NUM_WARP_Q=" << NUM_WARP_Q
-            << std::endl;
+    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaGetLastError());
+    std::cout << "MultiQueryAppendC8Attention start NUM_WARP_Q=" << NUM_WARP_Q << std::endl;
 #endif
   using NV_TYPE = typename cascade_attn_type_traits<T>::type;
   using OUT_NV_TYPE = typename cascade_attn_type_traits<OutT>::type;
@@ -668,7 +648,7 @@ void MultiQueryAppendC8Attention(
   const auto& cum_offsets_dims = cum_offsets.dims();
   const uint32_t token_num = q_dims[0];
   const uint32_t bsz = cum_offsets_dims[0];
-  const uint32_t max_block_num_per_seq = block_tables.dims()[1];
+  const uint32_t max_block_num_per_seq = block_table.dims()[1];
 
   constexpr uint32_t num_warps = 4;
   constexpr uint32_t NUM_WARP_KV = num_warps / NUM_WARP_Q;
@@ -684,8 +664,7 @@ void MultiQueryAppendC8Attention(
 #ifdef DEBUG_ATTN
     cudaDeviceSynchronize();
     CUDA_CHECK(cudaGetLastError());
-    std::cout << "multi_query_append_attention_c8_kernel start NUM_WARP_Q=4"
-              << std::endl;
+    std::cout << "multi_query_append_attention_c8_kernel start NUM_WARP_Q=4" << std::endl;
 #endif
     constexpr uint32_t num_frags_z = BLOCK_SIZE / 16;  // !!!
     constexpr uint32_t smem_size =
@@ -722,7 +701,7 @@ void MultiQueryAppendC8Attention(
     cudaDeviceSynchronize();
     CUDA_CHECK(cudaGetLastError());
     std::cout << "multi_query_append_attention_c8_kernel launched "
-              << " smem_size: " << smem_size << std::endl;
+        << " smem_size: " << smem_size << std::endl;
 #endif
     // assert(act_blocks_per_sm > 1);
     // const int num_blocks_per_wave = sm_count * act_blocks_per_sm;
@@ -736,15 +715,13 @@ void MultiQueryAppendC8Attention(
       chunk_size = static_cast<uint32_t>(encoder_max_partition_size);
     }
     const int num_chunks = div_up(max_dec_len, chunk_size);
-
     dim3 grids(num_blocks_x_cpu, num_chunks, kv_num_heads);
     dim3 blocks(32, num_warps);
     if (num_chunks <= 1) {
 #ifdef DEBUG_ATTN
       cudaDeviceSynchronize();
       CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_c8_kernel num_chunks<= 1"
-                << std::endl;
+      std::cout << "multi_query_append_attention_c8_kernel num_chunks<= 1" << std::endl;
 #endif
       auto nosplit_kv_kernel =
           multi_query_append_attention_c8_kernel<NV_TYPE,
@@ -768,6 +745,7 @@ void MultiQueryAppendC8Attention(
                              smem_size);
       }
 
+
       nosplit_kv_kernel<<<grids, blocks, smem_size, stream>>>(
           reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
           const_cast<uint8_t*>(cache_k.data<uint8_t>()),
@@ -785,7 +763,7 @@ void MultiQueryAppendC8Attention(
           batch_ids.data<int>(),
           tile_ids_per_batch.data<int>(),
           cum_offsets.data<int>(),
-          block_tables.data<int>(),
+          block_table.data<int>(),
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
@@ -800,8 +778,7 @@ void MultiQueryAppendC8Attention(
 #ifdef DEBUG_ATTN
       cudaDeviceSynchronize();
       CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_c8_kernel num_chunks <=1 end"
-                << std::endl;
+      std::cout << "multi_query_append_attention_c8_kernel num_chunks <=1 end" << std::endl;
 #endif
     } else {
       phi::Allocator::AllocationPtr tmp_workspace, tmp_m, tmp_d;
@@ -832,8 +809,7 @@ void MultiQueryAppendC8Attention(
 #ifdef DEBUG_ATTN
       cudaDeviceSynchronize();
       CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_c8_kernel num_chunks > 1"
-                << std::endl;
+      std::cout << "multi_query_append_attention_c8_kernel num_chunks > 1" << std::endl;
 #endif
       split_kv_kernel<<<grids, blocks, smem_size, stream>>>(
           reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
@@ -852,7 +828,7 @@ void MultiQueryAppendC8Attention(
           batch_ids.data<int>(),
           tile_ids_per_batch.data<int>(),
           cum_offsets.data<int>(),
-          block_tables.data<int>(),
+          block_table.data<int>(),
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
@@ -867,8 +843,7 @@ void MultiQueryAppendC8Attention(
 #ifdef DEBUG_ATTN
       cudaDeviceSynchronize();
       CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_c8_kernel num_chunks > 1 end"
-                << std::endl;
+      std::cout << "multi_query_append_attention_c8_kernel num_chunks > 1 end" << std::endl;
 #endif
       // merge
       constexpr int vec_size = num_elems_per_128b<NV_TYPE>();
@@ -942,18 +917,15 @@ void MultiQueryAppendC8Attention(
       }
     }
 #ifdef DEBUG_ATTN
-    cudaDeviceSynchronize();
-    CUDA_CHECK(cudaGetLastError());
-    std::cout << "multi_query_append_attention_c8_kernel NUM_WARP_Q=4 end"
-              << std::endl;
+      cudaDeviceSynchronize();
+      CUDA_CHECK(cudaGetLastError());
+      std::cout << "multi_query_append_attention_c8_kernel NUM_WARP_Q=4 end" << std::endl;
 #endif
   } else {
 #ifdef DEBUG_ATTN
     cudaDeviceSynchronize();
     CUDA_CHECK(cudaGetLastError());
-    std::cout
-        << "multi_query_append_attention_c8_warp1_4_kernel start NUM_WARP_Q=1"
-        << std::endl;
+    std::cout << "multi_query_append_attention_c8_warp1_4_kernel start NUM_WARP_Q=1" << std::endl;
 #endif
     constexpr uint32_t num_frags_z = BLOCK_SIZE / 16 / NUM_WARP_KV * 2;  // !!!
     constexpr uint32_t smem_size =
@@ -989,7 +961,7 @@ void MultiQueryAppendC8Attention(
     cudaDeviceSynchronize();
     CUDA_CHECK(cudaGetLastError());
     std::cout << "multi_query_append_attention_c8_warp1_4_kernel launched "
-              << " smem_size: " << smem_size << std::endl;
+        << " smem_size: " << smem_size << std::endl;
 #endif
     // assert(act_blocks_per_sm > 1);
     // const int num_blocks_per_wave = sm_count * act_blocks_per_sm;
@@ -1047,7 +1019,7 @@ void MultiQueryAppendC8Attention(
           batch_ids.data<int>(),
           tile_ids_per_batch.data<int>(),
           cum_offsets.data<int>(),
-          block_tables.data<int>(),
+          block_table.data<int>(),
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
@@ -1062,9 +1034,7 @@ void MultiQueryAppendC8Attention(
 #ifdef DEBUG_ATTN
       cudaDeviceSynchronize();
       CUDA_CHECK(cudaGetLastError());
-      std::cout << "multi_query_append_attention_c8_warp1_4_kernel launched "
-                   "act_blocks_per_sm:"
-                << std::endl;
+      std::cout << "multi_query_append_attention_c8_warp1_4_kernel launched act_blocks_per_sm:" << std::endl;
 #endif
     } else {
       phi::Allocator::AllocationPtr tmp_workspace, tmp_m, tmp_d;
@@ -1122,7 +1092,7 @@ void MultiQueryAppendC8Attention(
           batch_ids.data<int>(),
           tile_ids_per_batch.data<int>(),
           cum_offsets.data<int>(),
-          block_tables.data<int>(),
+          block_table.data<int>(),
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
@@ -1203,7 +1173,6 @@ void MultiQueryAppendC8Attention(
   }
 }
 
-
 template <typename T,
           uint32_t GROUP_SIZE,
           uint32_t HEAD_DIM,
@@ -1232,7 +1201,7 @@ void MultiQueryAppendC4Attention(
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
-    const paddle::Tensor& block_tables,
+    const paddle::Tensor& block_table,
     const paddle::Tensor& batch_ids,
     const paddle::Tensor& tile_ids_per_batch,
     const int num_blocks_x_cpu,
@@ -1257,8 +1226,7 @@ void MultiQueryAppendC4Attention(
   const auto& cum_offsets_dims = cum_offsets.dims();
   const uint32_t token_num = q_dims[0];
   const uint32_t bsz = cum_offsets_dims[0];
-  const uint32_t max_block_num_per_seq = block_tables.dims()[1];
-
+  const uint32_t max_block_num_per_seq = block_table.dims()[1];
   constexpr uint32_t num_warps = 4;
   constexpr uint32_t NUM_WARP_KV = num_warps / NUM_WARP_Q;
   constexpr uint32_t num_frags_x = BLOCK_SHAPE_Q / (16 * NUM_WARP_Q);  // 1 or 2
@@ -1363,7 +1331,7 @@ void MultiQueryAppendC4Attention(
           batch_ids.data<int>(),
           tile_ids_per_batch.data<int>(),
           cum_offsets.data<int>(),
-          block_tables.data<int>(),
+          block_table.data<int>(),
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
@@ -1424,7 +1392,7 @@ void MultiQueryAppendC4Attention(
           batch_ids.data<int>(),
           tile_ids_per_batch.data<int>(),
           cum_offsets.data<int>(),
-          block_tables.data<int>(),
+          block_table.data<int>(),
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
@@ -1547,6 +1515,7 @@ void MultiQueryAppendC4Attention(
     const float ratio = static_cast<float>(num_blocks_need) /
                         static_cast<float>(num_blocks_per_wave);
 
+
     uint32_t chunk_size = static_cast<uint32_t>(max_partition_size);
     if (!is_decoder) {
       chunk_size = static_cast<uint32_t>(encoder_max_partition_size);
@@ -1600,7 +1569,7 @@ void MultiQueryAppendC4Attention(
           batch_ids.data<int>(),
           tile_ids_per_batch.data<int>(),
           cum_offsets.data<int>(),
-          block_tables.data<int>(),
+          block_table.data<int>(),
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
@@ -1674,7 +1643,7 @@ void MultiQueryAppendC4Attention(
           batch_ids.data<int>(),
           tile_ids_per_batch.data<int>(),
           cum_offsets.data<int>(),
-          block_tables.data<int>(),
+          block_table.data<int>(),
           max_seq_len,
           max_dec_len,
           max_block_num_per_seq,
@@ -1785,7 +1754,7 @@ void CascadeAppendAttentionKernel(
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
-    const paddle::Tensor& block_tables,
+    const paddle::Tensor& block_table,
     const paddle::Tensor& batch_ids,
     const paddle::Tensor& tile_ids_per_batch,
     const std::string& cache_quant_type_str,
@@ -1806,14 +1775,14 @@ void CascadeAppendAttentionKernel(
     cudaStream_t& stream,
     paddle::Tensor* out) {
 #ifdef DEBUG_ATTN
-  cudaDeviceSynchronize();
-  CUDA_CHECK(cudaGetLastError());
-  std::cout << "CascadeAppendAttentionKernel start max_dec_len=" << max_dec_len
-            << "cache_quant_type_str:" << cache_quant_type_str << std::endl;
+    cudaDeviceSynchronize();
+    CUDA_CHECK(cudaGetLastError());
+    std::cout << "CascadeAppendAttentionKernel start max_dec_len=" << max_dec_len << 
+       "cache_quant_type_str:" << cache_quant_type_str << std::endl;
 #endif
-  //   if (max_dec_len <= 0) {
-  //     return;
-  //   }
+//   if (max_dec_len <= 0) {
+//     return;
+//   }
 
   const auto& q_dims = qkv.dims();
   const auto& k_dims = cache_k.dims();
@@ -1829,58 +1798,39 @@ void CascadeAppendAttentionKernel(
     CUDA_CHECK(cudaGetLastError());
     std::cout << "MultiQueryAppendAttentionC16 start" << std::endl;
 #endif
-    DISPATCH_CAUSAL(
-        causal,
-        CAUSAL,
-        {DISPATCH_ENABLE_PREFILL(
-            enable_prefill,
-            ENABLE_PREFILL,
-            {DISPATCH_GQA_GROUP_SIZE(
-                group_size,
-                GROUP_SIZE,
-                {DISPATCH_HEAD_DIM(
-                    head_dim,
-                    HEAD_DIM,
-                    {DISPATCH_BLOCK_SIZE(
-                        block_size,
-                        BLOCK_SIZE,
-                        {DISPATCH_BLOCKSHAPE_Q(
-                            block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, {
-                              MultiQueryAppendAttention<T,
-                                                        GROUP_SIZE,
-                                                        HEAD_DIM,
-                                                        BLOCK_SIZE,
-                                                        CAUSAL,
-                                                        BLOCK_SHAPE_Q,
-                                                        NUM_WARP_Q,
-                                                        OutT,
-                                                        ENABLE_PREFILL>(
-                                  qkv,
-                                  cache_k,
-                                  cache_v,
-                                  attn_mask,
-                                  shift_bias,
-                                  smooth_weight,
-                                  seq_lens_q,
-                                  seq_lens_kv,
-                                  seq_lens_encoder,
-                                  padding_offsets,
-                                  cum_offsets,
-                                  block_tables,
-                                  batch_ids,
-                                  tile_ids_per_batch,
-                                  num_blocks,
-                                  max_seq_len,
-                                  max_dec_len,
-                                  num_heads,
-                                  kv_num_heads,
-                                  in_scale,
-                                  max_partition_size,
-                                  encoder_max_partition_size,
-                                  speculate_max_draft_token_num,
-                                  is_decoder,
-                                  stream,
-                                  out);
+    DISPATCH_CAUSAL(causal, CAUSAL,
+        {DISPATCH_ENABLE_PREFILL(enable_prefill, ENABLE_PREFILL,
+            {DISPATCH_GQA_GROUP_SIZE(group_size, GROUP_SIZE,
+                {DISPATCH_HEAD_DIM(head_dim, HEAD_DIM,
+                    {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE,
+                        {DISPATCH_BLOCKSHAPE_Q(block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, 
+                        {MultiQueryAppendAttention<T, GROUP_SIZE, HEAD_DIM, BLOCK_SIZE, CAUSAL, BLOCK_SHAPE_Q, NUM_WARP_Q, OutT, ENABLE_PREFILL>(
+                            qkv,
+                            cache_k,
+                            cache_v,
+                            attn_mask,
+                            shift_bias,
+                            smooth_weight,
+                            seq_lens_q,
+                            seq_lens_kv,
+                            seq_lens_encoder,
+                            padding_offsets,
+                            cum_offsets,
+                            block_table,
+                            batch_ids,
+                            tile_ids_per_batch,
+                            num_blocks,
+                            max_seq_len,
+                            max_dec_len,
+                            num_heads,
+                            kv_num_heads,
+                            in_scale,
+                            max_partition_size,
+                            encoder_max_partition_size,
+                            speculate_max_draft_token_num,
+                            is_decoder,
+                            stream,
+                            out);
                             })})})})})})
   } else if (cache_quant_type_str == "cache_int8") {
 #ifdef DEBUG_ATTN
@@ -1888,118 +1838,80 @@ void CascadeAppendAttentionKernel(
     CUDA_CHECK(cudaGetLastError());
     std::cout << "MultiQueryAppendAttentionC8 start" << std::endl;
 #endif
-    DISPATCH_CAUSAL(
-        causal,
-        CAUSAL,
-        {DISPATCH_ENABLE_PREFILL(
-            enable_prefill,
-            ENABLE_PREFILL,
-            {DISPATCH_GQA_GROUP_SIZE(
-                group_size,
-                GROUP_SIZE,
-                {DISPATCH_HEAD_DIM(
-                    head_dim,
-                    HEAD_DIM,
-                    {DISPATCH_BLOCK_SIZE(
-                        block_size,
-                        BLOCK_SIZE,
-                        {DISPATCH_BLOCKSHAPE_Q(
-                            block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, {
-                              MultiQueryAppendC8Attention<T,
-                                                          GROUP_SIZE,
-                                                          HEAD_DIM,
-                                                          BLOCK_SIZE,
-                                                          CAUSAL,
-                                                          BLOCK_SHAPE_Q,
-                                                          NUM_WARP_Q,
-                                                          OutT,
-                                                          ENABLE_PREFILL>(
-                                  qkv,
-                                  cache_k,
-                                  cache_v,
-                                  attn_mask,
-                                  cache_k_scale.get(),
-                                  cache_v_scale.get(),
-                                  shift_bias,
-                                  smooth_weight,
-                                  seq_lens_q,
-                                  seq_lens_kv,
-                                  seq_lens_encoder,
-                                  padding_offsets,
-                                  cum_offsets,
-                                  block_tables,
-                                  batch_ids,
-                                  tile_ids_per_batch,
-                                  num_blocks,
-                                  max_seq_len,
-                                  max_dec_len,
-                                  num_heads,
-                                  kv_num_heads,
-                                  in_scale,
-                                  max_partition_size,
-                                  encoder_max_partition_size,
-                                  speculate_max_draft_token_num,
-                                  is_decoder,
-                                  stream,
-                                  out);
+    DISPATCH_CAUSAL(causal, CAUSAL,
+        {DISPATCH_ENABLE_PREFILL(enable_prefill, ENABLE_PREFILL,
+            {DISPATCH_GQA_GROUP_SIZE(group_size, GROUP_SIZE,
+                {DISPATCH_HEAD_DIM(head_dim, HEAD_DIM,
+                    {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE,
+                        {DISPATCH_BLOCKSHAPE_Q(block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, {
+                            MultiQueryAppendC8Attention<T, GROUP_SIZE, HEAD_DIM, BLOCK_SIZE, CAUSAL, BLOCK_SHAPE_Q, NUM_WARP_Q, OutT, ENABLE_PREFILL>(
+                                qkv,
+                                cache_k,
+                                cache_v,
+                                attn_mask,
+                                cache_k_scale.get(),
+                                cache_v_scale.get(),
+                                shift_bias,
+                                smooth_weight,
+                                seq_lens_q,
+                                seq_lens_kv,
+                                seq_lens_encoder,
+                                padding_offsets,
+                                cum_offsets,
+                                block_table,
+                                batch_ids,
+                                tile_ids_per_batch,
+                                num_blocks,
+                                max_seq_len,
+                                max_dec_len,
+                                num_heads,
+                                kv_num_heads,
+                                in_scale,
+                                max_partition_size,
+                                encoder_max_partition_size,
+                                speculate_max_draft_token_num,
+                                is_decoder,
+                                stream,
+                                out);
                             })})})})})})
   } else if (cache_quant_type_str == "cache_int4") {
-    DISPATCH_CAUSAL(
-        causal,
-        CAUSAL,
-        {DISPATCH_ENABLE_PREFILL(
-            enable_prefill,
-            ENABLE_PREFILL,
-            {DISPATCH_GQA_GROUP_SIZE(
-                group_size,
-                GROUP_SIZE,
-                {DISPATCH_HEAD_DIM(
-                    head_dim,
-                    HEAD_DIM,
-                    {DISPATCH_BLOCK_SIZE(
-                        block_size,
-                        BLOCK_SIZE,
-                        {DISPATCH_BLOCKSHAPE_Q(
-                            block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, {
-                              MultiQueryAppendC4Attention<T,
-                                                          GROUP_SIZE,
-                                                          HEAD_DIM,
-                                                          BLOCK_SIZE,
-                                                          CAUSAL,
-                                                          BLOCK_SHAPE_Q,
-                                                          NUM_WARP_Q,
-                                                          OutT,
-                                                          ENABLE_PREFILL>(
-                                  qkv,
-                                  cache_k,
-                                  cache_v,
-                                  attn_mask,
-                                  cache_k_scale.get(),
-                                  cache_v_scale.get(),
-                                  cache_k_zp,
-                                  cache_v_zp,
-                                  shift_bias,
-                                  smooth_weight,
-                                  seq_lens_q,
-                                  seq_lens_kv,
-                                  seq_lens_encoder,
-                                  padding_offsets,
-                                  cum_offsets,
-                                  block_tables,
-                                  batch_ids,
-                                  tile_ids_per_batch,
-                                  num_blocks,
-                                  max_seq_len,
-                                  max_dec_len,
-                                  num_heads,
-                                  kv_num_heads,
-                                  in_scale,
-                                  max_partition_size,
-                                  encoder_max_partition_size,
-                                  speculate_max_draft_token_num,
-                                  is_decoder,
-                                  stream,
-                                  out);
+    DISPATCH_CAUSAL(causal, CAUSAL,
+        {DISPATCH_ENABLE_PREFILL(enable_prefill, ENABLE_PREFILL,
+            {DISPATCH_GQA_GROUP_SIZE(group_size, GROUP_SIZE,
+                {DISPATCH_HEAD_DIM(head_dim, HEAD_DIM,
+                    {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE,
+                        {DISPATCH_BLOCKSHAPE_Q(block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q,
+                            {MultiQueryAppendC4Attention<T, GROUP_SIZE, HEAD_DIM, BLOCK_SIZE, CAUSAL, BLOCK_SHAPE_Q, NUM_WARP_Q, OutT, ENABLE_PREFILL>(
+                                qkv,
+                                cache_k,
+                                cache_v,
+                                attn_mask,
+                                cache_k_scale.get(),
+                                cache_v_scale.get(),
+                                cache_k_zp,
+                                cache_v_zp,
+                                shift_bias,
+                                smooth_weight,
+                                seq_lens_q,
+                                seq_lens_kv,
+                                seq_lens_encoder,
+                                padding_offsets,
+                                cum_offsets,
+                                block_table,
+                                batch_ids,
+                                tile_ids_per_batch,
+                                num_blocks,
+                                max_seq_len,
+                                max_dec_len,
+                                num_heads,
+                                kv_num_heads,
+                                in_scale,
+                                max_partition_size,
+                                encoder_max_partition_size,
+                                speculate_max_draft_token_num,
+                                is_decoder,
+                                stream,
+                                out);
                             })})})})})})
   } else {
     PD_THROW("append attention just support C16/C8/C4_zp now!");
@@ -2031,7 +1943,7 @@ template void CascadeAppendAttentionKernel<paddle::bfloat16, int8_t>(
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& padding_offsets,
     const paddle::Tensor& cum_offsets,
-    const paddle::Tensor& block_tables,
+    const paddle::Tensor& block_table,
     const paddle::Tensor& batch_ids,
     const paddle::Tensor& tile_ids_per_batch,
     const std::string& cache_quant_type_str,
@@ -2051,48 +1963,47 @@ template void CascadeAppendAttentionKernel<paddle::bfloat16, int8_t>(
     const bool enable_prefill,
     cudaStream_t& stream,
     paddle::Tensor* out);
-
-template void CascadeAppendAttentionKernel<paddle::bfloat16, paddle::bfloat16>(
-    const paddle::Tensor& qkv,  // [token_num, num_heads, head_dim]
-    const paddle::Tensor&
-        cache_k,  // [max_block_num, num_heads, block_size, head_dim]
-    const paddle::Tensor&
-        cache_v,  // [max_block_num, num_heads, head_dim, block_size]
-    const paddle::optional<paddle::Tensor>& attn_mask,
-    const paddle::optional<paddle::Tensor>&
-        cache_k_scale,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>&
-        cache_v_scale,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>&
-        cache_k_zp,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>&
-        cache_v_zp,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>&
-        shift_bias,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>&
-        smooth_weight,  // [num_kv_heads, head_dim]
-    const paddle::Tensor& seq_lens_q,
-    const paddle::Tensor& seq_lens_kv,
-    const paddle::Tensor& seq_lens_encoder,
-    const paddle::Tensor& padding_offsets,
-    const paddle::Tensor& cum_offsets,
-    const paddle::Tensor& block_tables,
-    const paddle::Tensor& batch_ids,
-    const paddle::Tensor& tile_ids_per_batch,
-    const std::string& cache_quant_type_str,
-    const int num_blocks,
-    const int block_shape_q,
-    const int max_seq_len,
-    const int max_dec_len,
-    const int num_heads,
-    const int kv_num_heads,
-    const int head_dim,
-    const float in_scale,
-    const int max_partition_size,
-    const int encoder_max_partition_size,
-    const int speculate_max_draft_token_num,
-    const bool causal,
-    const bool is_decoder,
-    const bool enable_prefill,
-    cudaStream_t& stream,
-    paddle::Tensor* out);
+// template void CascadeAppendAttentionKernel<paddle::bfloat16, paddle::bfloat16>(
+//     const paddle::Tensor& qkv,  // [token_num, num_heads, head_dim]
+//     const paddle::Tensor&
+//         cache_k,  // [max_block_num, num_heads, block_size, head_dim]
+//     const paddle::Tensor&
+//         cache_v,  // [max_block_num, num_heads, head_dim, block_size]
+//     const paddle::optional<paddle::Tensor>& attn_mask,
+//     const paddle::optional<paddle::Tensor>&
+//         cache_k_scale,  // [num_kv_heads, head_dim]
+//     const paddle::optional<paddle::Tensor>&
+//         cache_v_scale,  // [num_kv_heads, head_dim]
+//     const paddle::optional<paddle::Tensor>&
+//         cache_k_zp,  // [num_kv_heads, head_dim]
+//     const paddle::optional<paddle::Tensor>&
+//         cache_v_zp,  // [num_kv_heads, head_dim]
+//     const paddle::optional<paddle::Tensor>&
+//         shift_bias,  // [num_kv_heads, head_dim]
+//     const paddle::optional<paddle::Tensor>&
+//         smooth_weight,  // [num_kv_heads, head_dim]
+//     const paddle::Tensor& seq_lens_q,
+//     const paddle::Tensor& seq_lens_kv,
+//     const paddle::Tensor& seq_lens_encoder,
+//     const paddle::Tensor& padding_offsets,
+//     const paddle::Tensor& cum_offsets,
+//     const paddle::Tensor& block_table,
+//     const paddle::Tensor& batch_ids,
+//     const paddle::Tensor& tile_ids_per_batch,
+//     const std::string& cache_quant_type_str,
+//     const int num_blocks,
+//     const int block_shape_q,
+//     const int max_seq_len,
+//     const int max_dec_len,
+//     const int num_heads,
+//     const int kv_num_heads,
+//     const int head_dim,
+//     const float in_scale,
+//     const int max_partition_size,
+//     const int encoder_max_partition_size,
+//     const int speculate_max_draft_token_num,
+//     const bool causal,
+//     const bool is_decoder,
+//     const bool enable_prefill,
+//     cudaStream_t& stream,
+//     paddle::Tensor* out);

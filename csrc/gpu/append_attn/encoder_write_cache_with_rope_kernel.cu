@@ -18,7 +18,7 @@
 
 template <typename T>
 void CascadeAppendWriteCacheKVQKV(const paddle::Tensor& qkv, // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 * gqa_group_size, head_dim] if GQA)
-                                  const paddle::Tensor& block_tables,
+                                  const paddle::Tensor& block_table,
                                   const paddle::Tensor& padding_offsets,
                                   const paddle::Tensor& seq_lens_encoder,
                                   const paddle::Tensor& seq_lens_decoder,
@@ -30,7 +30,7 @@ void CascadeAppendWriteCacheKVQKV(const paddle::Tensor& qkv, // [token_num, 3, n
                                   paddle::Tensor *key_cache_out, 
                                   paddle::Tensor *value_cache_out) {
   auto qkv_dims = qkv.dims();
-  const int max_blocks_per_seq = block_tables.dims()[1];
+  const int max_blocks_per_seq = block_table.dims()[1];
   const int num_tokens = qkv_dims[0];
 
   const int32_t block_size = key_cache_out->dims()[2];
@@ -44,7 +44,7 @@ void CascadeAppendWriteCacheKVQKV(const paddle::Tensor& qkv, // [token_num, 3, n
     reinterpret_cast<T*>(const_cast<T*>(qkv.data<T>())),
     reinterpret_cast<T*>(key_cache_out->data<T>()),
     reinterpret_cast<T*>(value_cache_out->data<T>()),
-    block_tables.data<int>(),
+    block_table.data<int>(),
     padding_offsets.data<int>(),
     seq_lens_encoder.data<int>(),
     seq_lens_decoder.data<int>(),
@@ -66,7 +66,7 @@ void CascadeAppendWriteCacheKVC8QKV(const paddle::Tensor &cache_k, // [max_block
                                     const paddle::Tensor &seq_lens_decoder,
                                     const paddle::Tensor &padding_offsets,
                                     const paddle::Tensor &cum_offsets,
-                                    const paddle::Tensor &block_tables,
+                                    const paddle::Tensor &block_table,
                                     const paddle::Tensor &batch_ids,
                                     const paddle::Tensor &tile_ids_per_batch,
                                     int num_blocks_x_cpu,
@@ -82,7 +82,7 @@ void CascadeAppendWriteCacheKVC8QKV(const paddle::Tensor &cache_k, // [max_block
   const uint32_t token_num = qkv_dims[0];
   const uint32_t num_heads = kv_num_heads;
   const uint32_t bsz = cum_offsets_dims[0];
-  const int max_block_num_per_seq = block_tables.dims()[1];
+  const int max_block_num_per_seq = block_table.dims()[1];
   // VLOG(1) << "bsz: " << bsz << ", token_num: " << token_num << ", kv_num_heads: " << num_heads;
   // dev_ctx.template Alloc<uint8_t>(cache_k_out);
   // dev_ctx.template Alloc<uint8_t>(cache_v_out); 
@@ -128,7 +128,7 @@ void CascadeAppendWriteCacheKVC8QKV(const paddle::Tensor &cache_k, // [max_block
     seq_lens_decoder.data<int>(),
     padding_offsets.data<int>(),
     cum_offsets.data<int>(),
-    block_tables.data<int>(),
+    block_table.data<int>(),
     max_seq_len,
     max_block_num_per_seq,
     q_num_heads,
@@ -149,7 +149,7 @@ void CascadeAppendWriteCacheKVC4QKV(const paddle::Tensor &cache_k, // [max_block
                                     const paddle::Tensor &seq_lens_decoder,
                                     const paddle::Tensor &padding_offsets,
                                     const paddle::Tensor &cum_offsets,
-                                    const paddle::Tensor &block_tables,
+                                    const paddle::Tensor &block_table,
                                     const paddle::Tensor &batch_ids,
                                     const paddle::Tensor &tile_ids_per_batch,
                                     int num_blocks_x_cpu,
@@ -165,7 +165,7 @@ void CascadeAppendWriteCacheKVC4QKV(const paddle::Tensor &cache_k, // [max_block
   const uint32_t token_num = qkv_dims[0];
   const uint32_t num_heads = kv_num_heads;
   const uint32_t bsz = cum_offsets_dims[0];
-  const int max_block_num_per_seq = block_tables.dims()[1];
+  const int max_block_num_per_seq = block_table.dims()[1];
   // VLOG(1) << "bsz: " << bsz << ", token_num: " << token_num << ", kv_num_heads: " << num_heads;
   // dev_ctx.template Alloc<uint8_t>(cache_k_out);
   // dev_ctx.template Alloc<uint8_t>(cache_v_out); 
@@ -200,7 +200,7 @@ void CascadeAppendWriteCacheKVC4QKV(const paddle::Tensor &cache_k, // [max_block
     seq_lens_decoder.data<int>(),
     padding_offsets.data<int>(),
     cum_offsets.data<int>(),
-    block_tables.data<int>(),
+    block_table.data<int>(),
     max_seq_len,
     max_block_num_per_seq,
     q_num_heads,
@@ -290,15 +290,17 @@ void gqa_rotary_qk_variable(T *qkv_out, // [token_num, 3, num_head, dim_head]
                             const int dim_head,
                             const cudaStream_t& stream,
                             bool use_neox_style = false) {
-  int elem_nums = token_num * (num_heads + kv_num_heads) * dim_head; // for all q k v
+  int elem_nums = token_num * (num_heads + 2 * kv_num_heads) * dim_head; // for all q k v
   if (use_neox_style) {
     elem_nums /= 2;
   }
+
   constexpr int PackSize = 16 / sizeof(T);
   const int pack_num = elem_nums / PackSize;
   const int blocksize = 128;
   int grid_size = 1;
   GetNumBlocks(pack_num, &grid_size);
+  
   if (!use_neox_style) {
     const float *cos_emb = rotary_emb;
     const float *sin_emb = rotary_emb + input_output_len * dim_head / 2;
@@ -315,9 +317,9 @@ void gqa_rotary_qk_variable(T *qkv_out, // [token_num, 3, num_head, dim_head]
         qkv_out,
         elem_nums,
         num_heads,
+        kv_num_heads,
         seq_len,
-        dim_head,
-        kv_num_heads);
+        dim_head);
   } else {
     const float *cos_emb = rotary_emb;
     const float *sin_emb = rotary_emb + input_output_len * dim_head;
@@ -375,49 +377,47 @@ void EncoderWriteCacheWithRopeKernel(const paddle::Tensor& qkv, // [token_num, 3
   CUDA_CHECK(cudaGetLastError());
   std::cout << "gqa_rotary_qk_variable start" << std::endl;
 #endif
-  if(rotary_embs) {
-    if (num_heads == kv_num_heads) {
-      // std::cout << "rotary_qk_variable" << std::endl;
-      rotary_qk_variable(
-        qkv_out->data<T>(),
-        // qkv_out_int32.data<int>(),
-        qkv.data<QKV_TYPE>(),
-        qkv_out_scales? qkv_out_scales.get().data<float>() : nullptr,
-        qkv_biases? qkv_biases.get().data<T>(): nullptr,
-        rotary_embs.get().data<float>(),
-        padding_offsets.data<int>(),
-        seq_lens_encoder.data<int>(),
-        seq_lens_decoder.data<int>(),
-        token_num,
-        num_heads,
-        max_seq_len,
-        rotary_embs.get().dims()[2],
-        head_dim,
-        stream,
-        use_neox_style
-      );
-    } else {
-      // std::cout << "gqa_rotary_qk_variable" << std::endl;
-      gqa_rotary_qk_variable(
-        qkv_out->data<T>(),
-        // qkv_out_int32.data<int>(),
-        qkv.data<QKV_TYPE>(),
-        qkv_out_scales? qkv_out_scales.get().data<float>() : nullptr,
-        qkv_biases? qkv_biases.get().data<T>(): nullptr,
-        rotary_embs.get().data<float>(),
-        padding_offsets.data<int>(),
-        seq_lens_encoder.data<int>(),
-        seq_lens_decoder.data<int>(),
-        token_num,
-        num_heads,
-        kv_num_heads,
-        max_seq_len,
-        rotary_embs.get().dims()[2],
-        head_dim,
-        stream,
-        use_neox_style
-      );
-    }
+  if (num_heads == kv_num_heads) {
+    // std::cout << "rotary_qk_variable" << std::endl;
+    rotary_qk_variable(
+      qkv_out->data<T>(),
+      // qkv_out_int32.data<int>(),
+      qkv.data<QKV_TYPE>(),
+      qkv_out_scales? qkv_out_scales.get().data<float>() : nullptr,
+      qkv_biases? qkv_biases.get().data<T>(): nullptr,
+      rotary_embs.get().data<float>(),
+      padding_offsets.data<int>(),
+      seq_lens_encoder.data<int>(),
+      seq_lens_decoder.data<int>(),
+      token_num,
+      num_heads,
+      max_seq_len,
+      rotary_embs.get().dims()[2],
+      head_dim,
+      stream,
+      use_neox_style
+    );
+  } else {
+    // std::cout << "gqa_rotary_qk_variable" << std::endl;
+    gqa_rotary_qk_variable(
+      qkv_out->data<T>(),
+      // qkv_out_int32.data<int>(),
+      qkv.data<QKV_TYPE>(),
+      qkv_out_scales? qkv_out_scales.get().data<float>() : nullptr,
+      qkv_biases? qkv_biases.get().data<T>(): nullptr,
+      rotary_embs.get().data<float>(),
+      padding_offsets.data<int>(),
+      seq_lens_encoder.data<int>(),
+      seq_lens_decoder.data<int>(),
+      token_num,
+      num_heads,
+      kv_num_heads,
+      max_seq_len,
+      rotary_embs.get().dims()[2],
+      head_dim,
+      stream,
+      use_neox_style
+    );
   }
 #ifdef DEBUG_APPEND
   cudaDeviceSynchronize();

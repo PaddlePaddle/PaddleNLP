@@ -66,11 +66,9 @@ __global__ void VariableLengthRotaryKernel(
       float input_right = static_cast<float>(src_vec[2 * i + 1]);
       // dequant + bias_add
       input_left = qkv_biases ? input_left * out_scale_vec[2 * i] +
-                                    static_cast<float>(bias_vec[2 * i])
-                              : input_left * out_scale_vec[2 * i];
+                   static_cast<float>(bias_vec[2 * i]) : input_left * out_scale_vec[2 * i];
       input_right = qkv_biases ? input_right * out_scale_vec[2 * i + 1] +
-                                     static_cast<float>(bias_vec[2 * i + 1])
-                               : input_right * out_scale_vec[2 * i + 1];
+                    static_cast<float>(bias_vec[2 * i + 1]) : input_right * out_scale_vec[2 * i + 1];
       if (qkv_id < 2) {  // qk rope
         const float cos_tmp = cos_emb_vec[i];
         const float sin_tmp = sin_emb_vec[i];
@@ -147,8 +145,10 @@ __global__ void NeoxVariableLengthRotaryKernel(
       Load<T, VecSize>(&qkv_biases[bias_idx_left], &left_bias_vec);
       Load<T, VecSize>(&qkv_biases[bias_idx_right], &right_bias_vec);
     }
-    Load<float, VecSize>(&qkv_out_scales[bias_idx_left], &left_out_scale_vec);
-    Load<float, VecSize>(&qkv_out_scales[bias_idx_right], &right_out_scale_vec);
+    Load<float, VecSize>(&qkv_out_scales[bias_idx_left],
+                              &left_out_scale_vec);
+    Load<float, VecSize>(&qkv_out_scales[bias_idx_right],
+                              &right_out_scale_vec);
     if (qkv_id < 2) {
       Load<float, VecSize>(&cos_emb[emb_idx], &cos_emb_vec);
       Load<float, VecSize>(&sin_emb[emb_idx], &sin_emb_vec);
@@ -159,11 +159,9 @@ __global__ void NeoxVariableLengthRotaryKernel(
       float input_right = static_cast<float>(right_vec[i]);
       // dequant + bias_add
       input_left = qkv_biases ? input_left * left_out_scale_vec[i] +
-                                    static_cast<float>(left_bias_vec[i])
-                              : input_left * left_out_scale_vec[i];
+                   static_cast<float>(left_bias_vec[i]) : input_left * left_out_scale_vec[i];
       input_right = qkv_biases ? input_right * right_out_scale_vec[i] +
-                                     static_cast<float>(right_bias_vec[i])
-                               : input_right * right_out_scale_vec[i];
+                    static_cast<float>(right_bias_vec[i]) : input_right * right_out_scale_vec[i];
       if (qkv_id < 2) {  // qk rope
         const float cos_tmp = cos_emb_vec[i];
         const float sin_tmp = sin_emb_vec[i];
@@ -242,11 +240,9 @@ __global__ void GQAVariableLengthRotaryKernel(
       float input_right = static_cast<float>(src_vec[2 * i + 1]);
       // dequant + bias_add
       input_left = qkv_biases ? input_left * out_scale_vec[2 * i] +
-                                    static_cast<float>(bias_vec[2 * i])
-                              : input_left * out_scale_vec[2 * i];
+                   static_cast<float>(bias_vec[2 * i]) : input_left * out_scale_vec[2 * i];
       input_right = qkv_biases ? input_right * out_scale_vec[2 * i + 1] +
-                                     static_cast<float>(bias_vec[2 * i + 1])
-                               : input_right * out_scale_vec[2 * i + 1];
+                    static_cast<float>(bias_vec[2 * i + 1]) : input_right * out_scale_vec[2 * i + 1];
       if (hi < q_num_head + kv_num_head) {  // qk rope
         const float cos_tmp = cos_emb_vec[i];
         const float sin_tmp = sin_emb_vec[i];
@@ -319,8 +315,10 @@ __global__ void GQANeoxVariableLengthRotaryKernel(
       Load<T, VecSize>(&qkv_biases[bias_idx_left], &left_bias_vec);
       Load<T, VecSize>(&qkv_biases[bias_idx_right], &right_bias_vec);
     }
-    Load<float, VecSize>(&qkv_out_scales[bias_idx_left], &left_out_scale_vec);
-    Load<float, VecSize>(&qkv_out_scales[bias_idx_right], &right_out_scale_vec);
+    Load<float, VecSize>(&qkv_out_scales[bias_idx_left],
+                              &left_out_scale_vec);
+    Load<float, VecSize>(&qkv_out_scales[bias_idx_right],
+                              &right_out_scale_vec);
     if (hi < (q_num_head + kv_num_head)) {
       Load<float, VecSize>(&cos_emb[emb_idx], &cos_emb_vec);
       Load<float, VecSize>(&sin_emb[emb_idx], &sin_emb_vec);
@@ -331,11 +329,9 @@ __global__ void GQANeoxVariableLengthRotaryKernel(
       float input_right = static_cast<float>(right_vec[i]);
       // dequant + bias_add
       input_left = qkv_biases ? input_left * left_out_scale_vec[i] +
-                                    static_cast<float>(left_bias_vec[i])
-                              : input_left * left_out_scale_vec[i];
+                   static_cast<float>(left_bias_vec[i]) : input_left * left_out_scale_vec[i];
       input_right = qkv_biases ? input_right * right_out_scale_vec[i] +
-                                     static_cast<float>(right_bias_vec[i])
-                               : input_right * right_out_scale_vec[i];
+                    static_cast<float>(right_bias_vec[i]) : input_right * right_out_scale_vec[i];
       if (hi < (q_num_head + kv_num_head)) {  // qk rope
         const float cos_tmp = cos_emb_vec[i];
         const float sin_tmp = sin_emb_vec[i];
@@ -406,13 +402,10 @@ __global__ void VariableLengthRotaryKernel(
     Load<float, HalfVecSize>(&sin_emb[emb_idx], &sin_emb_vec);
 #pragma unroll
     for (int i = 0; i < HalfVecSize; i++) {
-      const float input_left =
-          qkv_biases ? static_cast<float>(src_vec[2 * i] + bias_vec[2 * i])
-                     : static_cast<float>(src_vec[2 * i]);
-      const float input_right =
-          qkv_biases
-              ? static_cast<float>(src_vec[2 * i + 1] + bias_vec[2 * i + 1])
-              : static_cast<float>(src_vec[2 * i + 1]);
+      const float input_left = qkv_biases ?
+          static_cast<float>(src_vec[2 * i] + bias_vec[2 * i]) : static_cast<float>(src_vec[2 * i]);
+      const float input_right = qkv_biases ?
+          static_cast<float>(src_vec[2 * i + 1] + bias_vec[2 * i + 1]) : static_cast<float>(src_vec[2 * i + 1]);
 
       if (qkv_id < 2) {  // qk rope
         const float cos_tmp = cos_emb_vec[i];
@@ -490,12 +483,10 @@ __global__ void NeoxVariableLengthRotaryKernel(
     Load<float, VecSize>(&sin_emb[emb_idx], &sin_emb_vec);
 #pragma unroll
     for (int i = 0; i < VecSize; i++) {
-      const float input_left =
-          qkv_biases ? static_cast<float>(left_vec[i] + left_bias_vec[i])
-                     : static_cast<float>(left_vec[i]);
-      const float input_right =
-          qkv_biases ? static_cast<float>(right_vec[i] + right_bias_vec[i])
-                     : static_cast<float>(right_vec[i]);
+      const float input_left = qkv_biases ?
+          static_cast<float>(left_vec[i] + left_bias_vec[i]) : static_cast<float>(left_vec[i]);
+      const float input_right = qkv_biases ?
+          static_cast<float>(right_vec[i] + right_bias_vec[i]) : static_cast<float>(right_vec[i]);
 
       if (qkv_id < 2) {  // qk rope
         const float cos_tmp = cos_emb_vec[i];
@@ -565,21 +556,18 @@ __global__ void GQAVariableLengthRotaryKernel(
     Load<float, HalfVecSize>(&sin_emb[emb_idx], &sin_emb_vec);
 #pragma unroll
     for (int i = 0; i < HalfVecSize; i++) {
-      const float input_left =
-          qkv_biases ? static_cast<float>(src_vec[2 * i] + bias_vec[2 * i])
-                     : static_cast<float>(src_vec[2 * i]);
-      const float input_right =
-          qkv_biases
-              ? static_cast<float>(src_vec[2 * i + 1] + bias_vec[2 * i + 1])
-              : static_cast<float>(src_vec[2 * i + 1]);
+      const float input_left = qkv_biases ?
+          static_cast<float>(src_vec[2 * i] + bias_vec[2 * i]) : static_cast<float>(src_vec[2 * i]);
+      const float input_right = qkv_biases ?
+          static_cast<float>(src_vec[2 * i + 1] + bias_vec[2 * i + 1]) : static_cast<float>(src_vec[2 * i + 1]);
 
       if (hi < q_num_head + kv_num_head) {  // qk rope
-        const float cos_tmp = cos_emb_vec[i];
-        const float sin_tmp = sin_emb_vec[i];
-        src_vec[2 * i] =
-            static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
-        src_vec[2 * i + 1] =
-            static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+      const float cos_tmp = cos_emb_vec[i];
+      const float sin_tmp = sin_emb_vec[i];
+      src_vec[2 * i] =
+          static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+      src_vec[2 * i + 1] =
+          static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
       } else {
         src_vec[2 * i] = static_cast<T>(input_left);
         src_vec[2 * i + 1] = static_cast<T>(input_right);
@@ -633,6 +621,7 @@ __global__ void GQANeoxVariableLengthRotaryKernel(
         token_idx * (q_num_head + 2 * kv_num_head) * last_dim + hi * last_dim +
         h_bias;
     const int base_idx_right = base_idx_left + half_lastdim;
+
     Load<T, VecSize>(&qkv[base_idx_left], &left_vec);
     Load<T, VecSize>(&qkv[base_idx_right], &right_vec);
     Load<float, VecSize>(&cos_emb[emb_idx], &cos_emb_vec);
@@ -710,16 +699,13 @@ __global__ void GQANeoxVariableLengthRotaryKernel(
 // #pragma unroll
 //     for (int i = 0; i < HalfVecSize; i++) {
 //       const float input_left = qkv_biases ?
-//           static_cast<float>(src_vec[2 * i] + bias_vec[2 * i]) :
-//           static_cast<float>(src_vec[2 * i]);
+//           static_cast<float>(src_vec[2 * i] + bias_vec[2 * i]) : static_cast<float>(src_vec[2 * i]);
 //       const float input_right = qkv_biases ?
-//           static_cast<float>(src_vec[2 * i + 1] + bias_vec[2 * i + 1]) :
-//           static_cast<float>(src_vec[2 * i + 1]);
+//           static_cast<float>(src_vec[2 * i + 1] + bias_vec[2 * i + 1]) : static_cast<float>(src_vec[2 * i + 1]);
 //       // const float cos_tmp = cos_emb_vec[i];
 //       // const float sin_tmp = sin_emb_vec[i];
 //       // src_vec[2 * i] = static_cast<T>(input_left * cos_tmp - input_right *
-//       // sin_tmp); src_vec[2 * i + 1] = static_cast<T>(input_right * cos_tmp
-//       +
+//       // sin_tmp); src_vec[2 * i + 1] = static_cast<T>(input_right * cos_tmp +
 //       // input_left * sin_tmp);
 
 //       if (qkv_id < 2) {  // qk rope
@@ -807,11 +793,9 @@ __global__ void GQANeoxVariableLengthRotaryKernel(
 //       float input_right = static_cast<float>(src_vec[2 * i + 1]);
 //       // dequant + bias_add
 //       input_left = qkv_biases ? input_left * out_scale_vec[2 * i] +
-//                    static_cast<float>(bias_vec[2 * i]) : input_left *
-//                    out_scale_vec[2 * i];
+//                    static_cast<float>(bias_vec[2 * i]) : input_left * out_scale_vec[2 * i];
 //       input_right = qkv_biases ? input_right * out_scale_vec[2 * i + 1] +
-//                     static_cast<float>(bias_vec[2 * i + 1]) : input_right *
-//                     out_scale_vec[2 * i + 1];
+//                     static_cast<float>(bias_vec[2 * i + 1]) : input_right * out_scale_vec[2 * i + 1];
 //       if (qkv_id < 2) {  // qk rope
 //         const float cos_tmp = cos_emb_vec[i];
 //         const float sin_tmp = sin_emb_vec[i];
@@ -956,7 +940,7 @@ __global__ void GQANeoxVariableLengthRotaryKernel(
 //     const int hi = bias / last_dim;
 //     const int h_bias = bias % last_dim;
 
-//     int ori_seq_id;
+//     int ori_seq_id;  
 //     ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
 //     // const int ori_seq_id = ori_token_idx % seq_len;
 

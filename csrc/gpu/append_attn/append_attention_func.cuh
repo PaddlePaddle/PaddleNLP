@@ -658,7 +658,7 @@ __device__ __forceinline__ void block_produce_kv(
     smem_t smem,
     uint32_t* smem_offset,
     T* gptr_base,  // [max_block_num, num_heads, block_size, head_dim]
-    const int* block_tables,
+    const int* block_table,
     const uint32_t kv_head_idx,
     const uint32_t kv_n_stride,
     const uint32_t kv_h_stride,
@@ -676,7 +676,7 @@ __device__ __forceinline__ void block_produce_kv(
           kv_idx_base + (i * 4 * num_warps + ty * 4 + tx / 8);
       const uint32_t kv_n_idx = row_now / block_size;
       const uint32_t kv_bid = row_now % block_size;
-      T* gptr = gptr_base + __ldg(&block_tables[kv_n_idx]) * kv_n_stride +
+      T* gptr = gptr_base + __ldg(&block_table[kv_n_idx]) * kv_n_stride +
                 kv_head_idx * kv_h_stride + kv_bid * kv_b_stride +
                 tx % 8 * num_elems_per_128b<T>();
 #pragma unroll
@@ -703,7 +703,7 @@ __device__ __forceinline__ void block_produce_kv(
         const uint32_t row_now = kv_idx_base + (i * 16 + j * 4 + row_id_per_tx);
         const uint32_t kv_n_idx = row_now / block_size;
         const uint32_t kv_bid = row_now % block_size;
-        T* gptr = gptr_base + __ldg(&block_tables[kv_n_idx]) * kv_n_stride +
+        T* gptr = gptr_base + __ldg(&block_table[kv_n_idx]) * kv_n_stride +
                   kv_head_idx * kv_h_stride + kv_bid * kv_b_stride +
                   col_id_per_tx * num_elems_per_128b<T>();
 #pragma unroll
@@ -2187,81 +2187,52 @@ __device__ __forceinline__ void write_o_reg_gmem_shift_smooth_quant(
       // 每个fy放16个数，vec size为8(f16/bf16)，所以y轴为2fy
       uint32_t o_frag_f16[4];
       vec_cast<T, float, 8>((T*)o_frag_f16, o_frag[fx][fy]);
-      uint32_t o_smem_offset_w = smem_t::get_permuted_offset<
-          num_vecs_per_head>(  // num_vecs_per_head = num_frags_y * 16 / 8 =
-                               // num_frags_y * 2
-          (ty * num_frags_x + fx) * 16 + tx / 4,
-          fy * 2);
+      uint32_t o_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_head>( // num_vecs_per_head = num_frags_y * 16 / 8 = num_frags_y * 2
+          (ty * num_frags_x + fx) * 16 + tx / 4, fy * 2);
       ((uint32_t*)(o_smem->base + o_smem_offset_w))[tx % 4] = o_frag_f16[0];
-      ((uint32_t*)(o_smem->base + o_smem_offset_w +
-                   8 * num_vecs_per_head))[tx % 4] = o_frag_f16[1];
-      ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1)))[tx % 4] =
-          o_frag_f16[2];  // 2fy，异或1往右移一位
-      ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1) +
-                   8 * num_vecs_per_head))[tx % 4] = o_frag_f16[3];
+      ((uint32_t*)(o_smem->base + o_smem_offset_w + 8 * num_vecs_per_head))[tx % 4] =
+          o_frag_f16[1];
+      ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1)))[tx % 4] = o_frag_f16[2]; // 2fy，异或1往右移一位
+      ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1) + 8 * num_vecs_per_head))[tx % 4] =
+          o_frag_f16[3];
     }
   }
   __syncthreads();
 
   // smem连续存储到gmem上， [num_frags_x * 16, num_frags_y * 16]
-  uint32_t o_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_head>(
-      ty * num_frags_x * 16 + tx / 8,
-      tx % 8);  // 每个warp一次搬4行，每次搬64个数
+  uint32_t o_smem_offset_w =
+      smem_t::get_permuted_offset<num_vecs_per_head>(ty * num_frags_x * 16 + tx / 8, tx % 8); // 每个warp一次搬4行，每次搬64个数
 
-  o_idx_base += (tx / 8) / group_size;
-  o_ptr_base += ((tx / 8) / group_size) * qo_n_stride +
-                ((tx / 8) % group_size) * qo_h_stride;
-  uint32_t q_head_idx_now_base = q_head_idx_base + (tx / 8) % group_size;
+  const uint32_t tx_offset = tx / 8;
+  // o_idx_base += (tx / 8) / group_size;
+  // o_ptr_base += ((tx / 8) / group_size) * qo_n_stride + ((tx / 8) % group_size) * qo_h_stride;
+  // uint32_t q_head_idx_now_base = q_head_idx_base + (tx / 8) % group_size;
 #pragma unroll
   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
+    const uint32_t base_offset = o_idx_base + fx * 16 + tx_offset;
 #pragma unroll
-    for (uint32_t j = 0; j < 4; ++j) {  // 4 * 4 = 16
-      const uint32_t o_idx = o_idx_base + (fx * 16 + j * 4) / group_size;
-      OutT* o_ptr = o_ptr_base +
-                    ((fx * 16 + j * 4) / group_size) * qo_n_stride +
-                    ((fx * 16 + j * 4) % group_size) * qo_h_stride;
-      uint32_t q_head_idx =
-          q_head_idx_now_base + (fx * 16 + j * 4) % group_size;
-      uint32_t shift_smooth_offset =
-          q_head_idx * head_dim + tx % 8 * num_elems_per_128b<T>();
+    for (uint32_t j = 0; j < 4; ++j) { // 4 * 4 = 16
+      const uint32_t offset_now = base_offset + j * 4;
+      const uint32_t n_offset = offset_now / group_size;
+      const uint32_t h_offset = offset_now % group_size;
+      OutT* o_ptr = o_ptr_base + n_offset * qo_n_stride + h_offset * qo_h_stride;
+      uint32_t shift_smooth_offset = (q_head_idx_base + h_offset) * head_dim + tx % 8 * num_elems_per_128b<T>();
 #pragma unroll
-      for (uint32_t fyo = 0; fyo < num_frags_y / 4;
-           ++fyo) {  // num_frags_y * 16 / (8[tid] *
-                     // num_elems_per_128b<T>()[vec_per_thread])
-        if (o_idx < qo_upper_bound) {
+      for (uint32_t fyo = 0; fyo < num_frags_y / 4; ++fyo) { // num_frags_y * 16 / (8[tid] * num_elems_per_128b<T>()[vec_per_thread])
+        if (n_offset < qo_upper_bound) {
           if (!partition_kv && in_scale > 0.0) {
-            Load<T, VEC_SIZE>(shift_bias + shift_smooth_offset,
-                              &shift_bias_vec);
-            Load<T, VEC_SIZE>(smooth_weight + shift_smooth_offset,
-                              &smooth_weight_vec);
-            Load<T, VEC_SIZE>(
-                reinterpret_cast<T*>(o_smem->base + o_smem_offset_w),
-                &ori_out_vec);
+            if (shift_bias) {
+              Load<T, VEC_SIZE>(shift_bias + shift_smooth_offset, &shift_bias_vec);
+              Load<T, VEC_SIZE>(smooth_weight + shift_smooth_offset, &smooth_weight_vec);
+            }
+            Load<T, VEC_SIZE>(reinterpret_cast<T*>(o_smem->base + o_smem_offset_w), &ori_out_vec);
 #pragma unroll
             for (int i = 0; i < VEC_SIZE; ++i) {
-              StoreFunc<T, VEC_SIZE, OutT>()(ori_out_vec,
-                                             shift_bias_vec,
-                                             smooth_weight_vec,
-                                             out_vec,
-                                             in_scale,
-                                             i);
+              StoreFunc<T, VEC_SIZE, OutT>()(ori_out_vec, shift_bias_vec, smooth_weight_vec, out_vec, in_scale, i);
 #ifdef DEBUG_ATTN_C4
-              if (threadIdx.x == PRINT_TID && threadIdx.y == 0 &&
-                  blockIdx.z == 0) {
-                printf(
-                    "write_o fx: %d, j: %d, fyo: %d, shift_bias[%d] = %f, "
-                    "smooth_weight[%d] = %f, ori_out[%d] = %f, out_vec[%d]: "
-                    "%f\n",
-                    (int)fx,
-                    (int)j,
-                    (int)fyo,
-                    i,
-                    (float)shift_bias_vec[i],
-                    i,
-                    (float)smooth_weight_vec[i],
-                    i,
-                    (float)ori_out_vec[i],
-                    (float)out_vec[i]);
+              if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
+                printf("write_o fx: %d, j: %d, fyo: %d, shift_bias[%d] = %f, smooth_weight[%d] = %f, ori_out[%d] = %f, out_vec[%d]: %f\n",
+                       (int)fx, (int)j, (int)fyo, i, (float)shift_bias_vec[i], i, (float)smooth_weight_vec[i], i, (float)ori_out_vec[i], (float)out_vec[i]);
               }
               __syncthreads();
 #endif
@@ -2273,12 +2244,10 @@ __device__ __forceinline__ void write_o_reg_gmem_shift_smooth_quant(
         }
         o_ptr += 8 * num_elems_per_128b<T>();
         shift_smooth_offset += 8 * num_elems_per_128b<T>();
-        o_smem_offset_w =
-            o_smem->advance_offset_by_column<8>(o_smem_offset_w, fyo);
+        o_smem_offset_w = o_smem->advance_offset_by_column<8>(o_smem_offset_w, fyo);
       }
-      o_smem_offset_w =
-          o_smem->advance_offset_by_row<4, num_vecs_per_head>(o_smem_offset_w) -
-          2 * num_frags_y;
+      o_smem_offset_w = o_smem->advance_offset_by_row<4, num_vecs_per_head>(o_smem_offset_w) -
+                        2 * num_frags_y;
     }
   }
 }

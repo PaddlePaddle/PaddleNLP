@@ -16,7 +16,6 @@
 #include "append_attn/decoder_write_cache_with_rope_kernel.h"
 #include "append_attn/encoder_write_cache_with_rope_kernel.h"
 
-
 template <paddle::DataType D>
 std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
     const paddle::Tensor& qkv,
@@ -84,7 +83,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
 
   paddle::Tensor qkv_out;
   if (qkv_out_scales) {
-    qkv_out = paddle::empty(qkv.shape(), D, qkv.place());
+    qkv_out = paddle::empty({token_num, total_num_head, head_dim}, D, qkv.place());
   } else {
     qkv_out = qkv;
   }
@@ -189,7 +188,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          is_decoder,
+          false,
           enable_prefill,
           stream,
           &fmha_out);
@@ -226,7 +225,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          is_decoder,
+          false,
           enable_prefill,
           stream,
           &fmha_out);
@@ -250,6 +249,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           cache_k_zp,
           cache_v_zp,
           cache_quant_type_str,
+          use_neox_rotary_style,
           max_input_length,
           num_heads,
           kv_num_heads,
@@ -274,6 +274,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           cache_k_zp,
           cache_v_zp,
           cache_quant_type_str,
+          use_neox_rotary_style,
           max_input_length,
           num_heads,
           kv_num_heads,
@@ -283,7 +284,6 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           const_cast<paddle::Tensor*>(&key_cache),
           const_cast<paddle::Tensor*>(&value_cache));
     }
-
     auto decoder_stream = qkv.stream();
     // cudaEvent_t event;
     // cudaStream_t decoder_stream;
@@ -323,7 +323,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          is_decoder,
+          false,
           enable_prefill,
           decoder_stream,
           &fmha_out);
@@ -360,7 +360,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          is_decoder,
+          false,
           enable_prefill,
           decoder_stream,
           &fmha_out);
@@ -368,6 +368,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
     // cudaEventRecord(event, decoder_stream);
     // cudaStreamWaitEvent(stream, event);
   }
+
   return {fmha_out};
 }
 

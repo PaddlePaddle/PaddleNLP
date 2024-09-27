@@ -15,6 +15,7 @@
 #include "decoder_write_cache_with_rope_kernel.h"
 
 // #define DEBUG
+
 template <typename T, int VecSize = 1>
 __global__ void append_decode_cache_T_rope_kernel(
     const T* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size,
@@ -1592,8 +1593,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
 
 template <typename T, typename QKV_TYPE>
 void DecoderWriteCacheWithRoPEKernel(
-    const paddle::Tensor&
-        qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
+    const paddle::Tensor& qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
               // gqa_group_size, head_dim] if GQA)
     const paddle::Tensor& seq_lens,
     const paddle::Tensor& seq_lens_encoder,
@@ -1608,6 +1608,7 @@ void DecoderWriteCacheWithRoPEKernel(
     const paddle::optional<paddle::Tensor>& cache_k_zp,
     const paddle::optional<paddle::Tensor>& cache_v_zp,
     const std::string& cache_quant_type_str,
+    const bool use_neox_rotary_style,
     const int max_seq_len,
     const int num_heads,
     const int kv_num_heads,
@@ -1628,8 +1629,11 @@ void DecoderWriteCacheWithRoPEKernel(
   // VLOG(1) << "gqa_group_size: " << gqa_group_size;
   const int32_t block_size = key_cache_out->dims()[2];
 
-  const float* cos_emb = rotary_embs.get().data<float>();
+  const float* cos_emb = rotary_embs ? rotary_embs.get().data<float>() : nullptr;
   const float* sin_emb = rotary_embs.get().data<float>() + max_seq_len * head_size / 2;
+  // if (rotary_embs) {
+  //   sin_emb = use_neox_rotary_style ? rotary_embs.get().data<float>() + max_seq_len * head_size : rotary_embs.get().data<float>() + max_seq_len * head_size / 2;
+  // }
 
   if (cache_quant_type_str == "none") {
     // VLOG(1) << "cache_quant_type_str: none";
@@ -1756,8 +1760,7 @@ void DecoderWriteCacheWithRoPEKernel(
 }
 
 template void DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, int>(
-    const paddle::Tensor&
-        qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
+    const paddle::Tensor& qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
               // gqa_group_size, head_dim] if GQA)
     const paddle::Tensor& seq_lens,
     const paddle::Tensor& seq_lens_encoder,
@@ -1772,6 +1775,7 @@ template void DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, int>(
     const paddle::optional<paddle::Tensor>& cache_k_zp,
     const paddle::optional<paddle::Tensor>& cache_v_zp,
     const std::string& cache_quant_type_str,
+    const bool use_neox_rotary_style,
     const int max_seq_len,
     const int num_heads,
     const int kv_num_heads,
@@ -1781,10 +1785,8 @@ template void DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, int>(
     paddle::Tensor* key_cache_out,
     paddle::Tensor* value_cache_out);
 
-template void
-DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, paddle::bfloat16>(
-    const paddle::Tensor&
-        qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
+template void DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, paddle::bfloat16>(
+    const paddle::Tensor& qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
               // gqa_group_size, head_dim] if GQA)
     const paddle::Tensor& seq_lens,
     const paddle::Tensor& seq_lens_encoder,
@@ -1799,6 +1801,7 @@ DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, paddle::bfloat16>(
     const paddle::optional<paddle::Tensor>& cache_k_zp,
     const paddle::optional<paddle::Tensor>& cache_v_zp,
     const std::string& cache_quant_type_str,
+    const bool use_neox_rotary_style,
     const int max_seq_len,
     const int num_heads,
     const int kv_num_heads,

@@ -1,11 +1,11 @@
 // Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
-//
+// 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-//
+// 
 //     http://www.apache.org/licenses/LICENSE-2.0
-//
+// 
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -52,15 +52,14 @@ __global__ void split_q_block(const int* __restrict__ seq_lens_q,
 std::vector<paddle::Tensor> GetBlockShape(
     const paddle::Tensor& sequence_lengths_stage,
     const paddle::optional<paddle::Tensor>& sequence_lengths_remove,
-    const paddle::Tensor& max_len_this_time,
+    const paddle::Tensor& max_len,
     const paddle::Tensor& com_offsets,
     const int num_qrow_per_block,
     const int group_size) {
   auto stream = sequence_lengths_stage.stream();
-  auto max_len_this_time_cpu =
-      max_len_this_time.copy_to(paddle::CPUPlace(), false);
-  int max_len_this_time_cpu_data = max_len_this_time_cpu.data<int>()[0];
-  if (max_len_this_time_cpu_data <= 0) {
+  auto max_len_cpu = max_len.copy_to(paddle::CPUPlace(), false);
+  int max_len_data = max_len_cpu.data<int>()[0];
+  if (max_len_data <= 0) {
     auto batch_ids =
         paddle::full({1}, -1, paddle::DataType::INT32, paddle::GPUPlace());
     auto tile_ids_per_batch =
@@ -71,7 +70,7 @@ std::vector<paddle::Tensor> GetBlockShape(
   }
   int bsz = com_offsets.shape()[0];
   const uint32_t max_tile_size_per_bs_q =
-      div_up((max_len_this_time_cpu_data * group_size), num_qrow_per_block);
+      div_up((max_len_data * group_size), num_qrow_per_block);
   auto batch_ids = paddle::empty({bsz * max_tile_size_per_bs_q},
                                  paddle::DataType::INT32,
                                  paddle::GPUPlace());
@@ -95,13 +94,14 @@ std::vector<paddle::Tensor> GetBlockShape(
                                       group_size);
 
   auto num_blocks_x_cpu = num_blocks_x.copy_to(paddle::CPUPlace(), false);
+
   return {batch_ids, tile_ids_per_batch, num_blocks_x_cpu};
 }
 
 std::vector<paddle::DataType> GetBlockShapeInferDtype(
     const paddle::DataType& sequence_lengths_stage_dtype,
     const paddle::optional<paddle::DataType>& sequence_lengths_remove_dtype,
-    const paddle::DataType& max_len_this_time_dtype,
+    const paddle::DataType& max_len_dtype,
     const paddle::DataType& com_offsets_dtype) {
   return {paddle::DataType::INT32,
           paddle::DataType::INT32,
@@ -111,7 +111,7 @@ std::vector<paddle::DataType> GetBlockShapeInferDtype(
 std::vector<std::vector<int64_t>> GetBlockShapeInferShape(
     const std::vector<int64_t>& sequence_lengths_stage_shape,
     const paddle::optional<std::vector<int64_t>>& sequence_lengths_remove_shape,
-    const std::vector<int64_t>& max_len_this_time_shape,
+    const std::vector<int64_t>& max_len_shape,
     const std::vector<int64_t>& com_offsets_shape) {
   std::vector<int64_t> dynamic_shape = {-1};
 
@@ -121,9 +121,9 @@ std::vector<std::vector<int64_t>> GetBlockShapeInferShape(
 PD_BUILD_OP(get_block_shape)
     .Inputs({"sequence_lengths_stage",
              paddle::Optional("sequence_lengths_remove"),
-             "max_len_this_time",
+             "max_len",
              "com_offsets"})
-    .Outputs({"batch_ids", "tile_ids_per_batch", "num_blocks"})
+    .Outputs({"batch_ids", "tile_ids_per_batch", "num_blocks_x_cpu"})
     .Attrs({"num_qrow_per_block: int", "group_size: int"})
     .SetKernelFn(PD_KERNEL(GetBlockShape))
     .SetInferShapeFn(PD_INFER_SHAPE(GetBlockShapeInferShape))

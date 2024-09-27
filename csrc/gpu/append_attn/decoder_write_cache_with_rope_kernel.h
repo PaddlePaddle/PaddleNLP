@@ -19,8 +19,7 @@
 
 template <typename T, typename QKV_TYPE = int>
 void DecoderWriteCacheWithRoPEKernel(
-    const paddle::Tensor&
-        qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
+    const paddle::Tensor& qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
               // gqa_group_size, head_dim] if GQA)
     const paddle::Tensor& seq_lens,
     const paddle::Tensor& seq_lens_encoder,
@@ -35,6 +34,7 @@ void DecoderWriteCacheWithRoPEKernel(
     const paddle::optional<paddle::Tensor>& cache_k_zp,
     const paddle::optional<paddle::Tensor>& cache_v_zp,
     const std::string& cache_quant_type_str,
+    const bool use_neox_rotary_style,
     const int max_seq_len,
     const int num_heads,
     const int kv_num_heads,
