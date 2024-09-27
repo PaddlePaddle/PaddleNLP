@@ -58,7 +58,7 @@ function llama_case_list_auto() {
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
     llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1
-    llama_align_dy2st_1f1b_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
+    llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
 }
 
 function llm_gpt_case_list_auto() {
@@ -1354,13 +1354,13 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1() {
     check_result $FUNCNAME ${loss1} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
 }
 
-function llama_align_dy2st_1f1b_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
+function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
     echo "=========== $FUNCNAME run begin ==========="
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
     export FLAGS_max_inplace_grad_add=3
 
-    task_name="llama_align_dy2st_1f1b_and_vpp_auto_bs2_fp32_DP1_MP1_PP4"
+    task_name="llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1_MP1_PP4"
     case_out_dir="output/$task_name"
     case_log_dir="output/$task_name""_log"
     loss1=0
@@ -1376,13 +1376,13 @@ function llama_align_dy2st_1f1b_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
         rm -rf $case_out_dir
         rm -rf $case_log_dir
         rm -rf ${log_path}/$FUNCNAME
-        if [ "$pp_mode" == "1F1B" ]; then
+        if [ "$pp_mode" == "FThenB" ]; then
             vpp_degree=1
         else
             vpp_degree=2
         fi
 
-        /usr/local/bin/python -u -m paddle.distributed.launch \
+        python -u -m paddle.distributed.launch \
             --gpus "0,1,2,3" \
             --log_dir $case_log_dir \
             run_pretrain_auto.py \
@@ -1444,7 +1444,7 @@ function llama_align_dy2st_1f1b_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
             >>${log_path}/$FUNCNAME 2>&1
         
         loss=$(grep "global_step: 10," "$case_log_dir/workerlog.0" | grep -oP '(?<=loss: )\d+(\.\d+)?' | awk -F ',' '{print $1}')
-        if [ "$pp_mode" == "1F1B" ]; then
+        if [ "$pp_mode" == "FThenB" ]; then
             loss1=loss
         else
             loss2=loss
