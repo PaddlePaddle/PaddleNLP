@@ -41,6 +41,7 @@ def create_json_from_dict(data_dict, file_path):
 class AutoArgparserTest(unittest.TestCase):
     script_name = "test_auto_argparser.py"
     args_dict = {
+        "enable_auto_parallel": True,
         "max_steps": 3000,
         "amp_master_grad": False,
         "adam_beta1": 0.9,
