@@ -338,7 +338,7 @@ class AutoTokenizer:
                 - Name of a community-contributed pretrained model.
                 - Local directory path which contains tokenizer related resources
                   and tokenizer config file ("tokenizer_config.json").
-            *args (tuple): position arguments for model `__init__`. If provided,
+            *inputs (tuple): position arguments for model `__init__`. If provided,
                 use these as position argument values for tokenizer initialization.
             **kwargs (dict): keyword arguments for model `__init__`. If provided,
                 use these to update pre-defined keyword argument values for tokenizer
@@ -411,3 +411,10 @@ class AutoTokenizer:
                         "This tokenizer cannot be instantiated. Please make sure you have `sentencepiece` installed "
                         "in order to use this tokenizer."
                     )
+        raise RuntimeError(
+            f"Can't load tokenizer for '{pretrained_model_name_or_path}'.\n"
+            f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+            "- a correct model-identifier of built-in pretrained models,\n"
+            "- or a correct model-identifier of community-contributed pretrained models,\n"
+            "- or the correct path to a directory containing relevant tokenizer files.\n"
+        )
