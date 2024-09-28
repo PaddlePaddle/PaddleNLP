@@ -206,6 +206,62 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, zero_pad
         return features
 
 
+
+def parse_positions(positions: str):
+    # parse position
+    first_n, last_n = 0, 0
+    if "+" in positions:
+        first_n = int(positions.split("+")[0].strip("f"))
+        last_n = int(positions.split("+")[1].strip("l"))
+    else:
+        if "f" in positions:
+            first_n = int(positions.strip("f"))
+        elif "l" in positions:
+            last_n = int(positions.strip("l"))
+    return first_n, last_n
+
+# layers * intervention tokens
+def get_intervention_locations(positions, last_position, num_interventions):
+    """
+    This function generates the intervention locations.
+    """
+    _first_n, _last_n = parse_positions(positions)
+
+    first_n = min(last_position // 2, _first_n)
+    last_n = min(last_position // 2, _last_n)
+
+    pad_amount = (_first_n - first_n) + (_last_n - last_n)
+    pad_position = -1
+
+    position_list = (
+        [i for i in range(first_n)]
+        + [i for i in range(last_position - last_n, last_position)]
+        + [pad_position for _ in range(pad_amount)]
+    )
+    intervention_locations = [position_list] * num_interventions
+
+    return intervention_locations
+
+
+def get_src_last_position(labels):
+    for i in range(len(labels)-1, -1, -1):
+        if labels[i] == -100:
+            return i + 2
+
+# reft
+def convert_example_for_reft(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False, positions="f7+l7", num_interventions=32):
+    features = convert_example_common(example, tokenizer, data_args, is_test, zero_padding, flash_mask)
+    # src的最后一个位置
+    last_position = get_src_last_position(features['labels'])
+    # add positons
+    intervention_locations = get_intervention_locations(
+            positions, last_position, num_interventions
+        )
+    features["intervention_locations"] = intervention_locations
+    return features
+
+
+
 def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False):
     """convert multi-rounds conversation example
 

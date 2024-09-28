@@ -11,3 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from .reft_model import ReFTModel
+from .reft_config import ReFTConfig
+from .reft_trainer import ReFTTrainer, ReftDataCollator
+from .interventions import LoreftIntervention
+from .predict import do_predict
+

@@ -23,32 +23,25 @@ from typing import Dict, Optional
 import paddle
 from paddle import nn
 
-from .basic_utils import count_parameters, create_directory, get_type_from_string
-from .configuration_intervenable_model import IntervenableConfig, RepresentationConfig
+from .modeling_utils import count_parameters, create_directory, get_type_from_string
+from .reft_config import ReFTConfig
 from .modeling_utils import (
     HandlerList,
     do_intervention,
     gather_neurons,
-    get_internal_model_type,
     get_module_hook,
     scatter_neurons,
 )
 
 
-# Generic intervenable model
-class IntervenableModel(nn.Layer):
+class ReFTModel(nn.Layer):
     def __init__(self, config, model, **kwargs):
         super().__init__()
         if isinstance(config, dict) or isinstance(config, list):
-            config = IntervenableConfig(representations=config)
+            config = ReFTConfig(representations=config)
         self.config = config
         intervention_type = config.intervention_types
         self.intervention_types = config.intervention_types
-        self.config.model_type = str(type(model))
-        self.model_has_grad = False
-        # each representation can get a different intervention type
-        if type(intervention_type) == list:
-            assert len(intervention_type) == len(config.representations)
         self.representations = {}
         self.interventions = {}
         # for the last charactor in intervention name
@@ -58,9 +51,9 @@ class IntervenableModel(nn.Layer):
         # for generate
         self._key_setter_call_counter = {}
         for i, representation in enumerate(config.representations):
-            _key = self._get_representation_key(representation)
-            if representation.intervention is not None:
-                intervention = representation.intervention
+            _key = f'layer.{representation["layer"]}'
+            if representation['intervention'] is not None:
+                intervention = representation['intervention']
             # when load reft model from saved config
             else:
                 intervention_function = intervention_type if type(intervention_type) != list else intervention_type[i]
@@ -85,7 +78,6 @@ class IntervenableModel(nn.Layer):
         self._intervention_group = OrderedDict(sorted(self._intervention_group.items()))
         self.model = model
         self.model_config = model.config
-        self.model_type = get_internal_model_type(model)
         self.disable_model_gradients()
         self.trainable_model_parameters = {}
 
@@ -103,24 +95,6 @@ class IntervenableModel(nn.Layer):
         }
         return json.dumps(attr_dict, indent=4)
 
-    def _get_representation_key(self, representation):
-        """
-        Provide unique key for each intervention
-        """
-        l = representation.layer
-        c = representation.component
-        u = representation.unit
-        n = representation.max_number_of_units
-        if "." in c:
-            # string access for sure
-            key_proposal = f"comp.{c}.unit.{u}.nunit.{n}"
-        else:
-            key_proposal = f"layer.{l}.comp.{c}.unit.{u}.nunit.{n}"
-        if key_proposal not in self._key_collision_counter:
-            self._key_collision_counter[key_proposal] = 0
-        else:
-            self._key_collision_counter[key_proposal] += 1
-        return f"{key_proposal}#{self._key_collision_counter[key_proposal]}"
 
     def get_trainable_parameters(self):
         """
@@ -174,31 +148,33 @@ class IntervenableModel(nn.Layer):
 
         saving_config = copy.deepcopy(self.config)
         saving_config.sorted_keys = self.sorted_keys
-        saving_config.model_type = str(saving_config.model_type)
         saving_config.intervention_types = []
         saving_config.intervention_dimensions = []
-        saving_config.intervention_constant_sources = []
-
+        
+    
+        
+        
+        # saving_config.intervention_constant_sources = []
         # handle constant source reprs if passed in.
-        serialized_representations = []
-        for reprs in saving_config.representations:
-            serialized_reprs = {}
-            for k, v in reprs._asdict().items():
-                if k == "hidden_source_representation":
-                    continue
-                if k == "source_representation":
-                    # hidden flag only set here
-                    if v is not None:
-                        serialized_reprs["hidden_source_representation"] = True
-                    serialized_reprs[k] = None
-                elif k == "intervention_type":
-                    serialized_reprs[k] = None
-                elif k == "intervention":
-                    serialized_reprs[k] = None
-                else:
-                    serialized_reprs[k] = v
-            serialized_representations += [RepresentationConfig(**serialized_reprs)]
-        saving_config.representations = serialized_representations
+        # serialized_representations = []
+        # for reprs in saving_config.representations:
+        #     serialized_reprs = {}
+        #     for k, v in reprs.items():
+        #         if k == "hidden_source_representation":
+        #             continue
+        #         if k == "source_representation":
+        #             # hidden flag only set here
+        #             if v is not None:
+        #                 serialized_reprs["hidden_source_representation"] = True
+        #             serialized_reprs[k] = None
+        #         elif k == "intervention_type":
+        #             serialized_reprs[k] = None
+        #         elif k == "intervention":
+        #             serialized_reprs[k] = None
+        #         else:
+        #             serialized_reprs[k] = v
+        #     serialized_representations += [ReFTConfig(**serialized_reprs)]
+        # saving_config.representations = serialized_representations
 
         for k, v in self.interventions.items():
             intervention = v[0]
@@ -210,15 +186,35 @@ class IntervenableModel(nn.Layer):
                 intervention.state_dict(),
                 os.path.join(save_directory, binary_filename),
             )
-            if intervention.interchange_dim is None:
-                saving_config.intervention_dimensions += [None]
-            else:
-                saving_config.intervention_dimensions += [intervention.interchange_dim.tolist()]
-            saving_config.intervention_constant_sources += [intervention.is_source_constant]
+            # if intervention.interchange_dim is None:
+            #     saving_config.intervention_dimensions += [None]
+            # else:
+            #     saving_config.intervention_dimensions += [intervention.interchange_dim.tolist()]
+            # saving_config.intervention_constant_sources += [intervention.is_source_constant]
 
+        saving_config = saving_config.to_dict()  
         saving_config["intervention_params"] = intervention_params
+        print('saving_config','='*100)
+        print(saving_config)
+        print('='*100)
+        
+        saving_config['representations'] = [
+            {
+                'layer': repr['layer'], 
+                'component': repr['component'], 
+                'low_rank_dimension': repr['low_rank_dimension'],
+            }
+            for repr in saving_config['representations']
+        ]
+        print('saving_config', saving_config)
+        print('saving_config end')
         # save metadata config
-        saving_config.save_pretrained(save_directory)
+        # saving_config.save_pretrained(save_directory)
+        # json.dumps(saving_config, indent=4, fp=open(os.path.join(save_directory, "config.json"), "w"))
+
+        with open(os.path.join(save_directory, "config.json"), 'w') as f:  
+            json.dump(saving_config, f, indent=4)
+
 
     @staticmethod
     def load(
@@ -334,13 +330,12 @@ class IntervenableModel(nn.Layer):
             return original_output
 
         # component = self.representations[representations_key].component
-        unit = self.representations[representations_key].unit
+        # unit = self.representations[representations_key].unit
 
         # scatter in-place
         _ = scatter_neurons(
             original_output,
             intervened_representation,
-            unit,
             unit_locations,
         )
 
@@ -372,11 +367,10 @@ class IntervenableModel(nn.Layer):
                 selected_output = self._gather_intervention_output(outputs, key, unit_locations_base[key_i])
 
                 if not isinstance(self.interventions[key][0], types.FunctionType):
-                    if intervention.is_source_constant:
-                        intervened_representation = do_intervention(
-                            selected_output,
-                            intervention,
-                        )
+                    intervened_representation = do_intervention(
+                        selected_output,
+                        intervention,
+                    )
                 if intervened_representation is None:
                     return
 
@@ -412,12 +406,8 @@ class IntervenableModel(nn.Layer):
         unit_locations_base = unit_locations["sources->base"][1]
         for group_id, keys in self._intervention_group.items():
             for key in keys:
-                if (
-                    isinstance(self.interventions[key][0], types.FunctionType)
-                    or self.interventions[key][0].is_source_constant
-                ):
-                    set_handlers = self._intervention_setter([key], [unit_locations_base[self.sorted_keys.index(key)]])
-                    all_set_handlers.extend(set_handlers)
+                set_handlers = self._intervention_setter([key], [unit_locations_base[self.sorted_keys.index(key)]])
+                all_set_handlers.extend(set_handlers)
         return all_set_handlers
 
     def forward(
@@ -497,3 +487,23 @@ class IntervenableModel(nn.Layer):
             raise e
         self._reset_hook_count()
         return base_outputs, counterfactual_outputs
+    
+    def print_trainable_parameters(self):
+        trainable_intervention_parameters = 0
+        for k, v in self.interventions.items():
+            trainable_intervention_parameters += count_parameters(v[0])
+
+        trainable_model_parameters = int(sum(p.numel() for p in self.model.parameters() if not p.stop_gradient))
+
+        all_model_parameters = int(sum(p.numel() for p in self.model.parameters()))
+
+        total_trainable_parameters = trainable_intervention_parameters + trainable_model_parameters
+
+        logging.info("trainable_intervention_parameters:", trainable_intervention_parameters)
+        logging.info("trainable_model_parameters:", trainable_model_parameters)
+        logging.info("all_model_parameters:", all_model_parameters)
+        logging.info("total_trainable_parameters:", total_trainable_parameters)
+        logging.info(
+            f"trainable intervention params: {trainable_intervention_parameters:,d} || trainable model params: {trainable_model_parameters:,d}\n"
+            f"model params: {all_model_parameters:,d} || trainable%: {100 * total_trainable_parameters / all_model_parameters}"
+        )

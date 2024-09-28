@@ -28,7 +28,7 @@ from utils.argument import (
     ReftArgument,
     TrainingArguments,
 )
-from utils.data import get_convert_example
+from utils.data import get_convert_example, convert_example_for_reft
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import (
@@ -45,15 +45,8 @@ from paddlenlp.peft import (
     VeRAConfig,
     VeRAModel,
 )
-from paddlenlp.peft.reft.pareft import (
-    LoreftIntervention,
-    ReftConfig,
-    ReftDataCollator,
-    ReftTrainer,
-    get_reft_model,
-)
-from paddlenlp.peft.reft.pareft.dataset import LoReftSupervisedDataset
-from paddlenlp.peft.reft.pareft.predict import do_predict
+from paddlenlp.peft.reft import ReFTModel, ReFTConfig, ReFTTrainer, ReftDataCollator, LoreftIntervention, do_predict
+
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
@@ -86,12 +79,11 @@ flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
 
 def main():
 
-    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
+    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, ReftArgument, DataArgument, TrainingArguments))
 
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         gen_args, quant_args, model_args, reft_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
-
         gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
 
@@ -217,14 +209,10 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
     if model_args.reft:
         # reft requires padding side right
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_args.model_name_or_path,
-            model_max_length=data_args.max_length,
-            padding_side="right",
-        )
-        # tokenizer.pad_token = tokenizer.unk_token
-        tokenizer.pad_token_id = tokenizer.unk_token_id
-        layers = None
+        tokenizer.padding_side = "right"
+        # 默认使用eos_token_id
+        # tokenizer.pad_token_id = tokenizer.unk_token_id
+        layers = reft_args.layers
         if reft_args.layers != "all":
             layers = [int(l) for l in layers.split(";")]
         else:
@@ -237,7 +225,7 @@ def main():
     if tokenizer.chat_template is not None:
         data_args.eval_with_do_generation = False
 
-    if not model_args.reft and (isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer)):
+    if isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if data_args.dataset_name_or_path is None:
@@ -247,19 +235,7 @@ def main():
         or os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev.json"))
         or os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json"))
     ):
-        if model_args.reft and training_args.do_train:
-            train_ds = LoReftSupervisedDataset(
-                data_args.dataset_name_or_path,
-                tokenizer,
-                data_split="train",
-                seed=42,
-                **{
-                    "num_interventions": len(layers),
-                    "position": reft_args.position,
-                    "trigger_tokens": "LLM Response: ",
-                },
-            )
-        elif training_args.do_train or quant_args.do_qat:
+        if training_args.do_train or quant_args.do_qat:
             train_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
@@ -267,19 +243,7 @@ def main():
             )[0]
         else:
             train_ds = None
-        if model_args.reft:
-            dev_ds = LoReftSupervisedDataset(
-                data_args.dataset_name_or_path,
-                tokenizer,
-                data_split="dev",
-                seed=42,
-                **{
-                    "num_interventions": len(layers),
-                    "position": reft_args.position,
-                    "trigger_tokens": "LLM Response: ",
-                },
-            )
-        elif training_args.do_eval:
+        if training_args.do_eval or model_args.reft:
             dev_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
@@ -387,11 +351,15 @@ def main():
         )
         train_ds = train_ds.skip(consumed_samples)
 
-    # reft has different data process
-    if not model_args.reft:
-        if training_args.pipeline_parallel_degree > 1:
-            from utils.data import convert_example_common
 
+    if training_args.pipeline_parallel_degree > 1:
+        from utils.data import convert_example_common
+        
+        trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
+    elif model_args.reft:
+        trans_func = partial(convert_example_for_reft, tokenizer=tokenizer, data_args=data_args, positions=reft_args.position, num_interventions=len(layers))
+    else:
+        trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
 
     train_ds = (
         train_ds.map(
@@ -592,8 +560,12 @@ def main():
             }
             for l in layers
         ]
-        reft_config = ReftConfig(representations=representations)
-        reft_model = get_reft_model(model, reft_config, set_device=False)
+        reft_config = ReFTConfig(representations=representations)
+        # get reft model
+        reft_model = ReFTModel(reft_config, model)
+        # disable origianl model gradients
+        reft_model.disable_model_gradients()
+        # reft_model = get_reft_model(model, reft_config, set_device=False)
         reft_model.print_trainable_parameters()
         reft_model.model.train()
         n_params = reft_model.count_parameters(include_model=False)
@@ -671,7 +643,7 @@ def main():
             tokenizer=tokenizer, model=model, label_pad_token_id=-100, padding="longest"
         )
         data_collator = ReftDataCollator(data_collator=data_collator_fn)
-        trainer = ReftTrainer(
+        trainer = ReFTTrainer(
             model=reft_model,
             tokenizer=tokenizer,
             args=training_args,
@@ -698,7 +670,7 @@ def main():
             intervenable=reft_model,
             tokenizer=tokenizer,
             eval_dataset=dev_ds,
-            data_items=dev_ds.raw_dataset,
+            # data_items=dev_ds.raw_dataset,
             batch_size=training_args.per_device_eval_batch_size,
             predict_path=f"{training_args.output_dir}/pred_result.json",
         )

@@ -18,7 +18,7 @@ import paddle
 import paddle.nn as nn
 from paddle import ParamAttr
 
-from paddlenlp.peft.reft.pavenv import SourcelessIntervention
+
 
 
 def linear_act(x):
@@ -46,9 +46,9 @@ class LowRankRotateLayer(nn.Layer):
 
 
 # existing methods  LoReFT(h) = h + R^T(Wh + b − Rh)
-class LoreftIntervention(SourcelessIntervention):
+class LoreftIntervention(nn.Layer):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs, keep_last_dim=True)
+        super(LoreftIntervention, self).__init__()  
         rotate_layer = LowRankRotateLayer(kwargs["embed_dim"], kwargs["low_rank_dimension"])
         self.rotate_layer = rotate_layer
         self.learned_source = nn.Linear(
@@ -94,7 +94,7 @@ class LoreftIntervention(SourcelessIntervention):
 
 
 # our proposed method
-class TinyIntervention(SourcelessIntervention):
+class TinyIntervention(nn.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs, keep_last_dim=True)
         self.rank = kwargs["low_rank_dimension"]

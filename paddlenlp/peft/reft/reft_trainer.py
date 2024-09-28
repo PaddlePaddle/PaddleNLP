@@ -18,8 +18,6 @@ from dataclasses import dataclass
 from typing import Dict, Sequence
 
 import paddle
-
-import paddlenlp.peft.reft.pavenv as pv
 from paddlenlp.trainer import Trainer
 
 
@@ -37,7 +35,7 @@ class ReftDataCollator(object):
         return batch_inputs
 
 
-class ReftTrainer(Trainer):
+class ReFTTrainer(Trainer):
     def save_model(self, output_dir, _internal_call=False):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
@@ -49,7 +47,7 @@ class ReftTrainer(Trainer):
         )
         self.model.load_intervention(f"{self.state.best_model_checkpoint}/intervenable_model", include_model=True)
 
-    def compute_loss(self, intervenable: pv.IntervenableModel, inputs, return_outputs=False):
+    def compute_loss(self, intervenable, inputs, return_outputs=False):
         # run intervened forward pass
         _, cf_outputs = intervenable(
             {

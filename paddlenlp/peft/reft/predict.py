@@ -19,15 +19,14 @@ import paddle
 from paddle.io import DataLoader, Dataset
 from tqdm import tqdm
 
-import paddlenlp.peft.reft.pavenv as pv
 from paddlenlp.data import DataCollatorForSeq2Seq
-from paddlenlp.peft.reft.pareft import ReftDataCollator
+from .reft_trainer import ReftDataCollator
 from paddlenlp.transformers import AutoTokenizer
 
 device = "gpu" if paddle.is_compiled_with_cuda() else "cpu"
 
 
-def make_data_collator(tokenizer, model) -> ReftDataCollator:
+def make_data_collator(tokenizer, model):
     data_collator_fn = DataCollatorForSeq2Seq(
         tokenizer=tokenizer,
         model=model,
@@ -45,10 +44,10 @@ def make_dataloader(
 
 
 def do_predict(
-    intervenable: pv.IntervenableModel,
+    intervenable,
     tokenizer: AutoTokenizer,
     eval_dataset: Dataset,
-    data_items: list,
+    # data_items: list,
     batch_size: int = 4,
     data_collator=None,
     greedy_decoding=True,
@@ -113,15 +112,16 @@ def do_predict(
             # detokenize in batch
             actual_preds = tokenizer.batch_decode(steered_response[0], skip_special_tokens=True)
 
-            for id, pred in zip(inputs["id"].tolist(), actual_preds):
-                example = data_items[id]
+            for inputs_id, label, pred in zip(inputs["input_ids"], inputs["labels"], actual_preds):
+                filtered_labels = label[label != -100] 
                 generations += [
                     {
-                        "src": example["src"],
-                        "trg": example["tgt"],
+                        "src": tokenizer.decode(inputs_id, skip_special_tokens=True),
+                        "trg": tokenizer.decode(filtered_labels, skip_special_tokens=True),
                         "pred": pred,
                     }
                 ]
+                
             if predict_path is not None:
                 with open(predict_path, "w") as json_file:
                     json.dump(generations, json_file, indent=4, ensure_ascii=False)

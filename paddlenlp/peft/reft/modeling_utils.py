@@ -13,15 +13,11 @@
 # limitations under the License.
 import paddle
 from paddle import nn
-
-from .constants import CONST_INPUT_HOOK, CONST_OUTPUT_HOOK
-from .intervenable_modelcard import type_to_module_mapping
-
-
-def get_internal_model_type(model):
-    """Return the model type."""
-    return type(model)
-
+import importlib
+import logging
+import os
+import random
+import numpy as np
 
 def getattr_for_paddle_module(model, parameter_name):
     """Recursively fetch the model based on the name."""
@@ -36,29 +32,8 @@ def getattr_for_paddle_module(model, parameter_name):
 
 def get_module_hook(model, representation) -> nn.Layer:
     """Render the intervening module with a hook."""
-    if (
-        get_internal_model_type(model) in type_to_module_mapping
-        and representation.component in type_to_module_mapping[get_internal_model_type(model)]
-    ):
-        type_info = type_to_module_mapping[get_internal_model_type(model)][representation.component]
-        parameter_name = type_info[0]
-        hook_type = type_info[1]
-
-        if "%s" in parameter_name and representation.moe_key is None:
-            # we assume it is for the layer.
-            parameter_name = parameter_name % (representation.layer)
-        elif "%s" in parameter_name and representation.moe_key is not None:
-            parameter_name = parameter_name % (
-                int(representation.layer),
-                int(representation.moe_key),
-            )
-    else:
-        parameter_name = ".".join(representation.component.split(".")[:-1])
-        if representation.component.split(".")[-1] == "input":
-            hook_type = CONST_INPUT_HOOK
-        elif representation.component.split(".")[-1] == "output":
-            hook_type = CONST_OUTPUT_HOOK
-
+    hook_type = 'register_forward_post_hook'
+    parameter_name = f'llama.layers[{representation["layer"]}]'
     module = getattr_for_paddle_module(model, parameter_name)
     module_hook = getattr(module, hook_type)
     return module_hook
@@ -99,7 +74,6 @@ def gather_neurons(tensor_input, unit_locations_as_list):
 def scatter_neurons(
     tensor_input,
     replacing_tensor_input,
-    unit,
     unit_locations_as_list,
 ):
     unit_locations = paddle.to_tensor(
@@ -118,12 +92,8 @@ def scatter_neurons(
     # last_dim = meta_component.shape[-1]
     # 0, 1, 2, ..., batch_size-1
     _batch_idx = paddle.arange(tensor_input.shape[0]).unsqueeze(1)
-
-    if unit in {"pos"}:
-        tensor_input[_batch_idx, unit_locations, start_index:end_index] = replacing_tensor_input
-        return tensor_input
-    else:
-        raise NotImplementedError(f"Unit {unit} not implemented.")
+    tensor_input[_batch_idx, unit_locations, start_index:end_index] = replacing_tensor_input
+    return tensor_input
 
 
 # do intervention
@@ -135,10 +105,56 @@ def do_intervention(
     # base_representation： 从隐藏状态抽取出的对应token的隐藏状态 f7+l7: batch_size, 14, hidden_size
     # intervention: 干预的模型
     # flatten
-    original_base_shape = base_representation.shape
-    if len(original_base_shape) == 2 or intervention.keep_last_dim:
-        base_representation_f = base_representation
+    # original_base_shape = base_representation.shape
+    # if len(original_base_shape) == 2 or intervention.keep_last_dim:
+    #     base_representation_f = base_representation
+    # intervened_representation = intervention(
+    #     base_representation_f,
+    # )
     intervened_representation = intervention(
-        base_representation_f,
+        base_representation,
     )
     return intervened_representation
+
+
+
+
+# Introducing corresponding classes based on strings
+def get_type_from_string(type_str):
+    """Help function to convert string to type"""
+    # Remove <class ' and '> from the string
+    type_str = type_str.replace("<class '", "").replace("'>", "")
+
+    # Split the string into module and class name
+    module_name, class_name = type_str.rsplit(".", 1)
+
+    # Import the module
+    if not module_name.startswith("paddlenlp"):
+        module_name = f"paddlenlp.peft.reft.{module_name}"
+    module = importlib.import_module(module_name)
+
+    # Get the class
+    cls = getattr(module, class_name)
+
+    return cls
+
+
+def create_directory(path):
+    """Create directory if not exist"""
+    if not os.path.exists(path):
+        os.makedirs(path)
+        logging.info(f"Directory '{path}' created successfully.")
+    else:
+        logging.info(f"Directory '{path}' already exists.")
+
+
+def set_seed(seed: int):
+    random.seed(seed)
+    np.random.seed(seed)
+    paddle.seed(seed)
+
+
+def count_parameters(model):
+    """Count parameters of a model that require gradients"""
+    return int(sum(p.numel() for p in model.parameters() if not p.stop_gradient))
+
