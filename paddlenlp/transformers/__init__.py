@@ -65,7 +65,6 @@ from .albert.configuration import *
 from .albert.modeling import *
 from .albert.tokenizer import *
 from .albert_chinese.tokenizer import *
-
 from .albert_english.tokenizer import *
 from .bit.modeling import *
 from .bit.configuration import *

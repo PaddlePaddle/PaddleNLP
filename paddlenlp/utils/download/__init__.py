@@ -143,8 +143,6 @@ def resolve_file_path(
                 continue
             else:
                 pass
-                # 临时解决方案
-                # raise FileNotFoundError(f"please make sure one of the {filenames} under the dir {repo_id}")
 
     # check cache
     for filename in filenames:
@@ -275,7 +273,6 @@ def resolve_file_path(
         )
     except EntryNotFoundError:
         return None
-        # raise EnvironmentError(f"Does not appear one of the {filenames} in {repo_id}.")
     except HTTPError as err:
         raise EnvironmentError(f"There was a specific connection error when trying to load {repo_id}:\n{err}")
     except ValueError:

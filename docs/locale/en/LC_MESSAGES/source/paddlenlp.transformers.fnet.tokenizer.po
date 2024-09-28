@@ -26,7 +26,7 @@ msgid "Tokenization class for FNet model."
 msgstr ""
 
 #: of paddlenlp.transformers.fnet.tokenizer.FNetTokenizer:1
-msgid "基类：:class:`paddlenlp.transformers.albert.albert_english.AlbertEnglishTokenizer`"
+msgid "基类：:class:`paddlenlp.transformers.albert_english.tokenizer.AlbertEnglishTokenizer`"
 msgstr ""
 
 #: of paddlenlp.transformers.fnet.tokenizer.FNetTokenizer:1
