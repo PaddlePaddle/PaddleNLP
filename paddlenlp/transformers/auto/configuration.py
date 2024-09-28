@@ -34,8 +34,6 @@ __all__ = [
 CONFIG_MAPPING_NAMES = OrderedDict(
     [
         ("albert", "AlbertConfig"),
-        ("albert_chinese", "AlbertConfig"),
-        ("albert_english", "AlbertConfig"),
         ("artist", "ArtistConfig"),
         ("bart", "BartConfig"),
         ("bert", "BertConfig"),
@@ -84,7 +82,6 @@ CONFIG_MAPPING_NAMES = OrderedDict(
         ("luke", "LukeConfig"),
         ("mamba", "MambaConfig"),
         ("mbart", "MBartConfig"),
-        ("mbart50", "MBartConfig"),
         ("megatronbert", "MegatronBertConfig"),
         ("minigpt4", "MiniGPT4Config"),
         ("mistral", "MistralConfig"),
@@ -126,8 +123,6 @@ MODEL_NAMES_MAPPING = OrderedDict(
     # Base model mapping
     [
         ("albert", "Albert"),
-        ("albert_chinese", "AlbertChinese"),
-        ("albert_english", "AlbertEnglish"),
         ("artist", "Artist"),
         ("bart", "Bart"),
         ("bert", "Bert"),
@@ -176,7 +171,6 @@ MODEL_NAMES_MAPPING = OrderedDict(
         ("luke", "Luke"),
         ("mamba", "Mamba"),
         ("mbart", "MBart"),
-        ("mbart50", "MBart50"),
         ("megatronbert", "MegatronBert"),
         ("minigpt4", "MiniGPT4"),
         ("mistral", "Mistral"),

@@ -400,7 +400,15 @@ class AutoTokenizer:
 
         model_type = config_class_to_model_type(type(config).__name__)
         if model_type is not None:
-            tokenizer_class_py, tokenizer_class_fast = TOKENIZER_MAPPING[type(config)]
+            tokenizer_class_py = TOKENIZER_MAPPING[type(config)]
+            if isinstance(tokenizer_class_py, (list, tuple)):
+                if len(tokenizer_class_py) == 2:
+                    tokenizer_class_fast = tokenizer_class_py[1]
+                    tokenizer_class_py = tokenizer_class_py[0]
+                else:
+                    tokenizer_class_fast = None
+            else:
+                tokenizer_class_fast = None
             if tokenizer_class_fast and (use_fast or tokenizer_class_py is None):
                 return tokenizer_class_fast.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
             else:
