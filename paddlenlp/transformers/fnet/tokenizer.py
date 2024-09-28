@@ -17,7 +17,8 @@ from typing import Any, Dict, List, Optional
 
 import sentencepiece as spm
 
-from ..albert.tokenizer import AddedToken, AlbertEnglishTokenizer
+from ..albert.tokenizer import AddedToken
+from ..albert_english.tokenizer import AlbertEnglishTokenizer
 
 __all__ = ["FNetTokenizer"]
 

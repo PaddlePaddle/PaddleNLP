@@ -19,7 +19,7 @@ import sentencepiece as spm
 
 from .. import AddedToken, PretrainedTokenizer
 
-__all__ = ["MBartTokenizer"]
+__all__ = ["MBart50Tokenizer"]
 
 MBART_PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "mbart-large-cc25": 1024,
@@ -33,18 +33,23 @@ MBART50_PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
 }
 
 
-class MBartTokenizer(PretrainedTokenizer):
+class MBart50Tokenizer(PretrainedTokenizer):
     resource_files_names = {
         "vocab_file": "sentencepiece.bpe.model",
     }
     pretrained_resource_files_map = {
         "vocab_file": {
-            "mbart-large-en-ro": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-en-ro.sentencepiece.bpe.model",
-            "mbart-large-cc25": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-cc25.sentencepiece.bpe.model",
+            "mbart-large-50-one-to-many-mmt": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.sentencepiece.bpe.model",
+            "mbart-large-50-many-to-one-mmt": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.sentencepiece.bpe.model",
+            "mbart-large-50-many-to-many-mmt": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.sentencepiece.bpe.model",
         }
     }
-    pretrained_init_configuration = {"mbart-large-cc25": {}, "mbart-large-en-ro": {}}
-    max_model_input_sizes = MBART_PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
+    pretrained_init_configuration = {
+        "mbart-large-50-one-to-many-mmt": {},
+        "mbart-large-50-many-to-one-mmt": {},
+        "mbart-large-50-many-to-many-mmt": {},
+    }
+    max_model_input_sizes = MBART50_PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
     model_input_names = ["input_ids"]
 
     FAIRSEQ_LANGUAGE_CODES = [
@@ -73,6 +78,33 @@ class MBartTokenizer(PretrainedTokenizer):
         "tr_TR",
         "vi_VN",
         "zh_CN",
+        "af_ZA",
+        "az_AZ",
+        "bn_IN",
+        "fa_IR",
+        "he_IL",
+        "hr_HR",
+        "id_ID",
+        "ka_GE",
+        "km_KH",
+        "mk_MK",
+        "ml_IN",
+        "mn_MN",
+        "mr_IN",
+        "pl_PL",
+        "ps_AF",
+        "pt_XX",
+        "sv_SE",
+        "sw_KE",
+        "ta_IN",
+        "te_IN",
+        "th_TH",
+        "tl_XX",
+        "uk_UA",
+        "ur_PK",
+        "xh_ZA",
+        "gl_ES",
+        "sl_SI",
     ]
 
     def __init__(
@@ -150,7 +182,7 @@ class MBartTokenizer(PretrainedTokenizer):
         if "truncation_strategy" in kwargs and kwargs["truncation_strategy"] != "longest_first":
             truncation = kwargs["truncation_strategy"]
 
-        return super(MBartTokenizer, self).__call__(
+        return super(MBart50Tokenizer, self).__call__(
             text=text,
             text_pair=text_pair,
             max_length=max_length,
@@ -193,6 +225,14 @@ class MBartTokenizer(PretrainedTokenizer):
                     content_spiece_model = self.sp_model.serialized_model_proto()
                     fi.write(content_spiece_model)
 
+    def get_vocab(self):
+        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
+        vocab.update(self.added_tokens_encoder)
+        return vocab
+
+    def _tokenize(self, text):
+        return self.sp_model.encode(text, out_type=str)
+
     @property
     def vocab_size(self):
         """
@@ -204,14 +244,6 @@ class MBartTokenizer(PretrainedTokenizer):
         """
 
         return len(self.sp_model) + len(self.lang_code_to_id) + self.fairseq_offset + 1
-
-    def get_vocab(self):
-        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
-        vocab.update(self.added_tokens_encoder)
-        return vocab
-
-    def _tokenize(self, text):
-        return self.sp_model.encode(text, out_type=str)
 
     def _convert_token_to_id(self, token):
         """
@@ -265,10 +297,10 @@ class MBartTokenizer(PretrainedTokenizer):
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
-        adding special tokens. An MBART sequence has the following format, where ``X`` represents the sequence:
+        adding special tokens. An MBART50 sequence has the following format, where ``X`` represents the sequence:
 
-        - ``input_ids`` (for encoder) ``X [eos, src_lang_code]``
-        - ``decoder_input_ids``: (for decoder) ``X [eos, tgt_lang_code]``
+        - ``input_ids`` (for encoder) ``[src_lang_code] X [eos]``
+        - ``labels``: (for decoder) ``[tgt_lang_code] X [eos]``
 
         BOS is never used. Pairs of sequences are not the expected use case, but they will be handled without a
         separator.
@@ -299,13 +331,23 @@ class MBartTokenizer(PretrainedTokenizer):
         return [(0, 0)] + offset_mapping_0 + offset_mapping_1 + [(0, 0)]
 
     def set_src_lang_special_tokens(self, src_lang):
-        """Reset the special tokens to the source lang setting. No prefix and suffix=[eos, src_lang_code]."""
+        """Reset the special tokens to the source lang setting. prefix=[src_lang_code] and suffix=[eos]."""
         self.cur_lang_code_id = self.lang_code_to_id[src_lang]
-        self.prefix_tokens = []
-        self.suffix_tokens = [self.eos_token_id, self.cur_lang_code_id]
+        self.prefix_tokens = [self.cur_lang_code_id]
+        self.suffix_tokens = [self.eos_token_id]
 
     def set_tgt_lang_special_tokens(self, tgt_lang):
-        """Reset the special tokens to the target language setting. No prefix and suffix=[eos, tgt_lang_code]."""
+        """Reset the special tokens to the target language setting. prefix=[tgt_lang_code] and suffix=[eos]."""
         self.cur_lang_code_id = self.lang_code_to_id[tgt_lang]
-        self.prefix_tokens = []
-        self.suffix_tokens = [self.eos_token_id, self.cur_lang_code_id]
+        self.prefix_tokens = [self.cur_lang_code_id]
+        self.suffix_tokens = [self.eos_token_id]
+
+    def _build_translation_inputs(self, raw_inputs, return_tensors, src_lang, tgt_lang, **extra_kwargs):
+        """Used by translation pipeline, to prepare inputs for the generate function"""
+        if src_lang is None or tgt_lang is None:
+            raise ValueError("Translation requires a `src_lang` and a `tgt_lang` for this model")
+        self.src_lang = src_lang
+        inputs = self(raw_inputs, add_special_tokens=True, return_tensors=return_tensors, **extra_kwargs)
+        tgt_lang_id = self.convert_tokens_to_ids(tgt_lang)
+        inputs["forced_bos_token_id"] = tgt_lang_id
+        return inputs

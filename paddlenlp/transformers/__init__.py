@@ -64,6 +64,9 @@ from .electra.configuration import *
 from .albert.configuration import *
 from .albert.modeling import *
 from .albert.tokenizer import *
+from .albert_chinese.tokenizer import *
+
+from .albert_english.tokenizer import *
 from .bit.modeling import *
 from .bit.configuration import *
 from .bit.image_processing import *
@@ -141,6 +144,7 @@ from .luke.configuration import *
 from .mbart.modeling import *
 from .mbart.tokenizer import *
 from .mbart.configuration import *
+from .mbart50.tokenizer import *
 from .megatronbert.modeling import *
 from .megatronbert.tokenizer import *
 from .megatronbert.configuration import *

@@ -47,6 +47,8 @@ else:
     TOKENIZER_MAPPING_NAMES = OrderedDict(
         [
             ("albert", "AlbertTokenizer"),
+            ("albert_chinese", "AlbertChineseTokenizer"),
+            ("albert_english", "AlbertEnglishTokenizer"),
             ("bart", "BartTokenizer"),
             ("bert", "BertTokenizer"),
             ("blenderbot", "BlenderbotTokenizer"),
@@ -76,6 +78,7 @@ else:
             ("luke", "LukeTokenizer"),
             ("mamba", "MambaTokenizer"),
             ("mbart", "MBartTokenizer"),
+            ("mbart50", "MBart50Tokenizer"),
             ("mobilebert", "MobileBertTokenizer"),
             ("mpnet", "MPNetTokenizer"),
             ("nezha", "NeZhaTokenizer"),
@@ -143,15 +146,18 @@ def tokenizer_class_from_name(class_name: str):
     for module_name, tokenizers in TOKENIZER_MAPPING_NAMES.items():
         if class_name in tokenizers:
             module_name = model_type_to_module_name(module_name)
-            module = importlib.import_module(f".{module_name}", "paddlenlp.transformers")
+            print(f"module_name: {module_name}")
             try:
+                module = importlib.import_module(f".{module_name}", "paddlenlp.transformers")
                 return getattr(module, class_name)
             except AttributeError:
                 try:
+                    print(f"module: {module}")
                     module = importlib.import_module(f".{module_name}.tokenizer", "paddlenlp.transformers")
+
                     return getattr(module, class_name)
                 except AttributeError:
-                    continue
+                    raise ValueError(f"Tokenizer class {class_name} is not currently imported.")
 
     for config, tokenizers in TOKENIZER_MAPPING._extra_content.items():
         for tokenizer in tokenizers:

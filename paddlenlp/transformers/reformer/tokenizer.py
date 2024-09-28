@@ -17,7 +17,7 @@ import warnings
 
 import sentencepiece as spm
 
-from ..albert.tokenizer import AlbertEnglishTokenizer
+from ..albert_english.tokenizer import AlbertEnglishTokenizer
 
 __all__ = ["ReformerTokenizer"]
 
