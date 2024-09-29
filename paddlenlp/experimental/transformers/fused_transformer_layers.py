@@ -2357,7 +2357,6 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
             encoder_max_partition_size,
             5, # speculate_max_draft_token_num
             True, # causal
-            False, # is_decoder
             True, # enable_prefill
         )[0]
         out_linear_out = self.compute_out_linear(fmha_out, i)
@@ -2671,8 +2670,8 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
         cache_k_zp = cache_k_zps[i] if cache_k_zps is not None else None
         cache_v_zp = cache_v_zps[i] if cache_v_zps is not None else None
 
-        from paddlenlp_ops import append_multihead_attention
-        fmha_out = append_multihead_attention(
+        from paddlenlp_ops import append_attention
+        fmha_out = append_attention(
             qkv,
             caches[2 * i],
             caches[2 * i + 1],
@@ -2716,7 +2715,6 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
             encoder_max_partition_size,
             5, # speculate_max_draft_token_num
             True, # causal
-            False, # is_decoder
             True, # enable_prefill
         )[0]
         out_linear_out = self.compute_out_linear(fmha_out, i)
