@@ -17,7 +17,7 @@
 #include "append_attn/encoder_write_cache_with_rope_kernel.h"
 
 template <paddle::DataType D>
-std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
+std::vector<paddle::Tensor> AppendAttentionKernel(
     const paddle::Tensor& qkv,
     const paddle::Tensor& key_cache,
     const paddle::Tensor& value_cache,
@@ -60,7 +60,6 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
     const int encoder_max_partition_size,
     const int speculate_max_draft_token_num,
     const bool causal,
-    const bool is_decoder,
     const bool enable_prefill) {
   typedef PDTraits<D> traits_;
   typedef typename traits_::DataType DataType_;
@@ -198,7 +197,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          true,
+          false,
           enable_prefill,
           main_stream,
           &fmha_out);
@@ -235,7 +234,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          true,
+          false,
           enable_prefill,
           main_stream,
           &fmha_out);
@@ -250,7 +249,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
     } else {
       decoder_stream = main_stream;
     }
-    
+
     if (qkv_out_scales) {
       DecoderWriteCacheWithRoPEKernel<data_t, int>(
           qkv,  // [token_num, num_heads, head_dim]
@@ -336,7 +335,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          false,
+          true,
           enable_prefill,
           decoder_stream,
           &fmha_out);
@@ -373,7 +372,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          false,
+          true,
           enable_prefill,
           decoder_stream,
           &fmha_out);
@@ -387,7 +386,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
   return {fmha_out};
 }
 
-std::vector<paddle::Tensor> AppendMultiheadAttention(
+std::vector<paddle::Tensor> AppendAttention(
     const paddle::Tensor& qkv,
     const paddle::Tensor& key_cache,
     const paddle::Tensor& value_cache,
@@ -431,11 +430,10 @@ std::vector<paddle::Tensor> AppendMultiheadAttention(
     const int encoder_max_partition_size,
     const int speculate_max_draft_token_num,
     const bool causal,
-    const bool is_decoder,
     const bool enable_prefill) {
   switch (qkv.dtype()) {
     case paddle::DataType::FLOAT16: {
-      return AppendMultiheadAttentionKernel<paddle::DataType::FLOAT16>(
+      return AppendAttentionKernel<paddle::DataType::FLOAT16>(
           qkv,
           key_cache,
           value_cache,
@@ -478,11 +476,10 @@ std::vector<paddle::Tensor> AppendMultiheadAttention(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          is_decoder,
           enable_prefill);
     }
     case paddle::DataType::BFLOAT16: {
-      return AppendMultiheadAttentionKernel<paddle::DataType::BFLOAT16>(
+      return AppendAttentionKernel<paddle::DataType::BFLOAT16>(
           qkv,
           key_cache,
           value_cache,
@@ -525,12 +522,11 @@ std::vector<paddle::Tensor> AppendMultiheadAttention(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          is_decoder,
           enable_prefill);
     }
     case paddle::DataType::INT32: {
       if (compute_dtype == "bf16") {
-        return AppendMultiheadAttentionKernel<paddle::DataType::BFLOAT16>(
+        return AppendAttentionKernel<paddle::DataType::BFLOAT16>(
             qkv,
             key_cache,
             value_cache,
@@ -573,10 +569,9 @@ std::vector<paddle::Tensor> AppendMultiheadAttention(
             encoder_max_partition_size,
             speculate_max_draft_token_num,
             causal,
-            is_decoder,
             enable_prefill);
       } else if (compute_dtype == "fp16") {
-        return AppendMultiheadAttentionKernel<paddle::DataType::FLOAT16>(
+        return AppendAttentionKernel<paddle::DataType::FLOAT16>(
             qkv,
             key_cache,
             value_cache,
@@ -619,7 +614,6 @@ std::vector<paddle::Tensor> AppendMultiheadAttention(
             encoder_max_partition_size,
             speculate_max_draft_token_num,
             causal,
-            is_decoder,
             enable_prefill);
       } else {
         PD_THROW("Only supported attr of compute_dtype in ['fp16', 'bf16'].");
@@ -636,7 +630,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttention(
   return {paddle::Tensor{}};
 }
 
-std::vector<std::vector<int64_t>> AppendMultiheadAttentionInferShape(
+std::vector<std::vector<int64_t>> AppendAttentionInferShape(
     const std::vector<int64_t>& qkv_shape,
     const std::vector<int64_t>& key_cache_shape,
     const std::vector<int64_t>& value_cache_shape,
@@ -677,7 +671,7 @@ std::vector<std::vector<int64_t>> AppendMultiheadAttentionInferShape(
   return {{token_num, num_heads * head_dim}};
 }
 
-std::vector<paddle::DataType> AppendMultiheadAttentionInferDtype(
+std::vector<paddle::DataType> AppendAttentionInferDtype(
     const paddle::DataType& qkv_dtype,
     const paddle::DataType& key_cache_dtype,
     const paddle::DataType& value_cache_dtype,
@@ -721,7 +715,6 @@ std::vector<paddle::DataType> AppendMultiheadAttentionInferDtype(
     const int encoder_max_partition_size,
     const int speculate_max_draft_token_num,
     const bool causal,
-    const bool is_decoder,
     const bool enable_prefill) {
   if (out_linear_in_scale > 0.0) {
     return {paddle::DataType::INT8};
@@ -729,7 +722,7 @@ std::vector<paddle::DataType> AppendMultiheadAttentionInferDtype(
   return {qkv_dtype};
 }
 
-PD_BUILD_OP(append_multihead_attention)
+PD_BUILD_OP(append_attention)
     .Inputs({"qkv",
              "key_cache",
              "value_cache",
@@ -776,8 +769,7 @@ PD_BUILD_OP(append_multihead_attention)
             "encoder_max_partition_size: int",
             "speculate_max_draft_token_num: int",
             "causal: bool",
-            "is_decoder: bool",
             "enable_prefill: bool"})
-    .SetKernelFn(PD_KERNEL(AppendMultiheadAttention))
-    .SetInferShapeFn(PD_INFER_SHAPE(AppendMultiheadAttentionInferShape))
-    .SetInferDtypeFn(PD_INFER_DTYPE(AppendMultiheadAttentionInferDtype));
+    .SetKernelFn(PD_KERNEL(AppendAttention))
+    .SetInferShapeFn(PD_INFER_SHAPE(AppendAttentionInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(AppendAttentionInferDtype));

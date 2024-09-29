@@ -2312,8 +2312,8 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
         encoder_max_partition_size,
         **kwargs,
     ):
-        from paddlenlp_ops import append_multihead_attention
-        fmha_out = append_multihead_attention(
+        from paddlenlp_ops import append_attention
+        fmha_out = append_attention(
             qkv,
             caches[2 * i],
             caches[2 * i + 1],
