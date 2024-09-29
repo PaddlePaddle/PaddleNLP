@@ -286,7 +286,6 @@ template <uint32_t BLOCK_THREADS,
 __global__ void TopPSamplingFromProbKernel(DType* probs,
                                            DType* uniform_samples,
                                            IdType* output,
-                                           bool* success,
                                            IdType* row_indices,
                                            float* top_p_arr,
                                            float* top_p_val,
@@ -371,16 +370,17 @@ __global__ void TopPSamplingFromProbKernel(DType* probs,
   __syncthreads();
   if (tx == 0) {
     output[bx] = sampled_id;
-    if (float(q) >= top_p) {
-      // failed to sample within MAX_TOP_P_ROUNDS
-      if (success != nullptr) {
-        success[bx] = false;
-      }
-    } else {
-      if (success != nullptr) {
-        success[bx] = true;
-      }
-    }
+    // todo:delete
+    // if (float(q) >= top_p) {
+    //   // failed to sample within MAX_TOP_P_ROUNDS
+    //   if (success != nullptr) {
+    //     success[bx] = false;
+    //   }
+    // } else {
+    //   if (success != nullptr) {
+    //     success[bx] = true;
+    //   }
+    // }
   }
 }
 
@@ -475,7 +475,6 @@ template <typename T, typename IdType>
 cudaError_t TopPSamplingFromProb(T* probs,
                                  T* uniform_samples,
                                  IdType* output,
-                                 bool* success,
                                  T* top_p_arr,
                                  uint32_t batch_size,
                                  const T* top_p_val,
@@ -494,7 +493,6 @@ cudaError_t TopPSamplingFromProb(T* probs,
   void* args[] = {&probs,
                   &uniform_samples,
                   &output,
-                  &success,
                   &row_indices_placeholder,
                   &top_p_arr,
                   &top_p_val,

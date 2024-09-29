@@ -36,50 +36,27 @@ std::vector<paddle::Tensor> TopPSamplingReject(const paddle::Tensor& probs,
   auto cu_stream = probs.stream();
 
   auto samples =
-      paddle::full({batch_size, 1}, 0, paddle::DataType::INT32, probs.place());
-  auto success =
-      paddle::full({batch_size, 1}, 0, paddle::DataType::BOOL, probs.place());
+      paddle::empty({batch_size, 1}, paddle::DataType::INT64, probs.place());
 
-  auto top_p_host =
-      paddle::experimental::copy_to(top_p, paddle::CPUPlace(), false);
-  float top_p_val = top_p_host.data<float>()[0];
   cudaError_t status;
-  if (top_p_val == 0.0) {
-    // top_p is 0，use top_k sampling .
-    status = sampling::TopKSamplingFromProb<float, int>(
-        const_cast<float*>(probs.data<float>()),
-        uniform_samples.data<float>(),
-        samples.data<int>(),
-        success.data<bool>(),
-        nullptr,
-        batch_size,
-        1,
-        vocab_size,
-        max_top_p_rounds,
-        true,
-        cu_stream);
-  } else {
-    status = sampling::TopPSamplingFromProb<float, int>(
-        const_cast<float*>(probs.data<float>()),
-        uniform_samples.data<float>(),
-        samples.data<int>(),
-        success.data<bool>(),
-        nullptr,
-        batch_size,
-        top_p.data<float>(),
-        vocab_size,
-        max_top_p_rounds,
-        true,
-        cu_stream);
-  }
 
+  status = sampling::TopPSamplingFromProb<float, int64_t>(
+      const_cast<float*>(probs.data<float>()),
+      uniform_samples.data<float>(),
+      samples.data<int64_t>(),
+      nullptr,
+      batch_size,
+      top_p.data<float>(),
+      vocab_size,
+      max_top_p_rounds,
+      true,
+      cu_stream);
+  
   PD_CHECK(status == cudaSuccess,
            "SamplingFromProbs failed with error code " +
                std::string(cudaGetErrorString(status)));
 
-  paddle::Tensor samples_output;
-  samples_output = paddle::experimental::cast(samples, paddle::DataType::INT64);
-  return {samples_output};
+  return {samples};
 }
 
 std::vector<std::vector<int64_t>> TopPSamplingRejectInferShape(
