@@ -22,7 +22,7 @@ from .utils import add_start_docstrings
 @add_start_docstrings(TrainingArguments.__doc__)
 class AutoTrainingArguments(TrainingArguments):
     """
-    自动并行相关参数配置
+    Training Arguments for auto_parallel.
     """
 
     fused_linear_param_grad_add: bool = field(

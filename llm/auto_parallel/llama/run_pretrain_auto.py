@@ -31,7 +31,6 @@ from paddlenlp.ops import Topology
 from paddlenlp.trainer import (
     AutoTrainingArguments,
     PdArgumentParser,
-    TrainingArguments,
     get_last_checkpoint,
 )
 from paddlenlp.trainer.auto_trainer import AutoTrainer
@@ -67,7 +66,7 @@ def add_start_docstrings(*docstr):
 
 
 @dataclass
-@add_start_docstrings(TrainingArguments.__doc__)
+@add_start_docstrings(AutoTrainingArguments.__doc__)
 class PreTrainingArguments(AutoTrainingArguments):
     min_learning_rate: float = field(
         default=1e-5,
