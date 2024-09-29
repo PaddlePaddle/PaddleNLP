@@ -79,23 +79,33 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
   int decoder_num_blocks_data = decoder_num_blocks.data<int>()[0];
   int max_enc_len_this_time_data = max_enc_len_this_time.data<int>()[0];
   int max_dec_len_this_time_data = max_dec_len_this_time.data<int>()[0];
-  auto stream = qkv.stream();
+  auto main_stream = qkv.stream();
+  cudaEvent_t main_event, decoder_event;
+  if (max_enc_len_this_time_data > 0 && max_dec_len_this_time_data > 0) {
+    cudaEventCreateWithFlags(&main_event, cudaEventDisableTiming);
+    cudaEventCreateWithFlags(&decoder_event, cudaEventDisableTiming);
+  }
 
   paddle::Tensor qkv_out;
   if (qkv_out_scales) {
-    qkv_out = paddle::empty({token_num, total_num_head, head_dim}, D, qkv.place());
+    qkv_out = GetEmptyTensor(qkv.dims(), D, qkv.place());
   } else {
     qkv_out = qkv;
   }
   paddle::Tensor fmha_out;
   if (out_linear_in_scale > 0.0) {
-    fmha_out = paddle::empty(
-        {token_num, num_heads * head_dim}, paddle::DataType::INT8, qkv.place());
+    fmha_out = GetEmptyTensor({token_num, num_heads * head_dim},
+                              paddle::DataType::INT8,
+                              qkv.place());
   } else {
-    fmha_out = paddle::empty({token_num, num_heads * head_dim}, D, qkv.place());
+    fmha_out =
+        GetEmptyTensor({token_num, num_heads * head_dim}, D, qkv.place());
   }
 
   if (max_enc_len_this_time_data > 0) {
+    if (max_dec_len_this_time_data > 0) {
+      cudaEventRecord(main_event, main_stream);
+    }
     if (qkv_out_scales) {
       EncoderWriteCacheWithRopeKernel<data_t, int>(
           qkv,
@@ -121,7 +131,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           kv_num_heads,
           head_dim,
           use_neox_rotary_style,
-          stream,
+          main_stream,
           &qkv_out,
           const_cast<paddle::Tensor*>(&key_cache),
           const_cast<paddle::Tensor*>(&value_cache));
@@ -150,7 +160,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           kv_num_heads,
           head_dim,
           use_neox_rotary_style,
-          stream,
+          main_stream,
           &qkv_out,
           const_cast<paddle::Tensor*>(&key_cache),
           const_cast<paddle::Tensor*>(&value_cache));
@@ -188,9 +198,9 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          false,
+          true,
           enable_prefill,
-          stream,
+          main_stream,
           &fmha_out);
     } else {
       CascadeAppendAttentionKernel<data_t, data_t>(
@@ -225,14 +235,22 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          false,
+          true,
           enable_prefill,
-          stream,
+          main_stream,
           &fmha_out);
     }
   }
 
   if (max_dec_len_this_time_data > 0) {
+    cudaStream_t decoder_stream;
+    if(max_enc_len_this_time_data > 0) {
+      cudaStreamCreate(&decoder_stream);
+      cudaStreamWaitEvent(decoder_stream, main_event);
+    } else {
+      decoder_stream = main_stream;
+    }
+    
     if (qkv_out_scales) {
       DecoderWriteCacheWithRoPEKernel<data_t, int>(
           qkv,  // [token_num, num_heads, head_dim]
@@ -254,7 +272,7 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           num_heads,
           kv_num_heads,
           head_dim,
-          stream,
+          decoder_stream,
           &qkv_out,
           const_cast<paddle::Tensor*>(&key_cache),
           const_cast<paddle::Tensor*>(&value_cache));
@@ -279,17 +297,12 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           num_heads,
           kv_num_heads,
           head_dim,
-          stream,
+          decoder_stream,
           &qkv_out,
           const_cast<paddle::Tensor*>(&key_cache),
           const_cast<paddle::Tensor*>(&value_cache));
     }
-    auto decoder_stream = qkv.stream();
-    // cudaEvent_t event;
-    // cudaStream_t decoder_stream;
-
-    // cudaEventCreateWithFlags(&event, cudaEventDisableTiming);
-    // cudaStreamCreate(&decoder_stream);
+    
     if (out_linear_in_scale > 0.0) {
       CascadeAppendAttentionKernel<data_t, int8_t>(
           qkv_out,
@@ -365,8 +378,10 @@ std::vector<paddle::Tensor> AppendMultiheadAttentionKernel(
           decoder_stream,
           &fmha_out);
     }
-    // cudaEventRecord(event, decoder_stream);
-    // cudaStreamWaitEvent(stream, event);
+    if (max_enc_len_this_time_data > 0) {
+      cudaEventRecord(decoder_event, decoder_stream);
+      cudaStreamWaitEvent(main_stream, decoder_event);
+    }
   }
 
   return {fmha_out};

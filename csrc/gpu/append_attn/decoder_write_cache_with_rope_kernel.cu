@@ -1643,7 +1643,7 @@ void DecoderWriteCacheWithRoPEKernel(
     const int pack_num = elem_nums / PackSize;
     const int blocksize = 128;
     int grid_size = 1;
-    GetNumBlocks(pack_num, &grid_size);
+    GetNumBlocks<128>(pack_num, &grid_size);
     append_decode_cache_T_rope_kernel<DataType_, PackSize>
         <<<grid_size, blocksize, 0, stream>>>(
             reinterpret_cast<const QKV_Data_TYPE*>(qkv_ptr),

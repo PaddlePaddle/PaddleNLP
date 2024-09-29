@@ -2,57 +2,6 @@
 
 #include <cuda_runtime.h>
 #include <cuda_bf16.h>
-#include "paddle/extension.h"
-// #include "glog/logging.h"
-// #include "paddle/phi/kernels/funcs/aligned_vector.h"
-
-
-template <typename T, int Size>
-struct alignas(sizeof(T) * Size) AlignedVector {
-  T val[Size];
-
-  HOSTDEVICE inline const T& operator[](int i) const { return val[i]; }
-  HOSTDEVICE inline T& operator[](int i) { return val[i]; }
-};
-
-template <typename T, int Size>
-HOSTDEVICE inline void Load(const T* addr, AlignedVector<T, Size>* vec) {
-  const AlignedVector<T, Size>* addr_vec =
-      reinterpret_cast<const AlignedVector<T, Size>*>(addr);
-  *vec = *addr_vec;
-}
-
-template <typename T, int Size>
-HOSTDEVICE inline void Store(const AlignedVector<T, Size>& vec, T* addr) {
-  AlignedVector<T, Size>* addr_vec =
-      reinterpret_cast<AlignedVector<T, Size>*>(addr);
-  *addr_vec = vec;
-}
-
-template <int Size>
-HOSTDEVICE inline void Store(const AlignedVector<__nv_bfloat16, Size>& vec, int8_t* addr) {
-  printf("Error: Store __nv_bfloat16 to int8_t is not supported!");
-}
-
-template <int Size>
-HOSTDEVICE inline void Store(const AlignedVector<half, Size>& vec, int8_t* addr) {
-  printf("Error: Store half to int8_t is not supported!");
-}
-
-template <typename T>
-T *SafeGetTensorPtr(const paddle::Tensor &t) {
-  return const_cast<T*>(t.data<T>());
-}
-
-template <typename T>
-T *SafeGetTensorPtr(const paddle::Tensor *t) {
-  return t ? SafeGetTensorPtr<T>(*t) : nullptr;
-}
-
-template <typename T>
-T *SafeGetTensorPtr(const paddle::optional<paddle::Tensor>& t) {
-  return t ? SafeGetTensorPtr<T>(t.get()) : nullptr;
-}
 
 __forceinline__ __host__ __device__ int div_up(int a, int b) {
   return (a + b - 1) / b;
@@ -410,27 +359,6 @@ __forceinline__ __host__ __device__  void vec_cast<nv_bfloat16, float>(nv_bfloat
     constexpr size_t NUM_WARP_Q = 1;                                                 \
     __VA_ARGS__                                                                      \
   }
-
-
-inline cudaError_t GetNumBlocks(int64_t n, int *num_blocks) {
-  constexpr int kBlockSize = 128;
-  constexpr int kNumWaves = 16;
-
-  int device_id = 0;
-  int sm_count = 0;
-  int max_thread_per_multiprocessor = 0;
-  cudaGetDevice(&device_id);
-  cudaDeviceGetAttribute(&sm_count, cudaDevAttrMultiProcessorCount, device_id);
-  cudaDeviceGetAttribute(
-      &max_thread_per_multiprocessor, cudaDevAttrMaxThreadsPerMultiProcessor, device_id);
-
-  *num_blocks =
-      std::max<int>(1,
-                    std::min<int64_t>((n + kBlockSize - 1) / kBlockSize,
-                                      sm_count * max_thread_per_multiprocessor /
-                                          kBlockSize * kNumWaves));
-  return cudaSuccess;
-}
 
 template <typename T>
 inline HOSTDEVICE T roundWithTiesToEven(T x) {

@@ -2453,7 +2453,7 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
             kwargs.get("block_size", 64),
         )
         decoder_batch_ids, decoder_tile_ids_per_batch, decoder_num_blocks = get_block_shape(
-            kwargs.get("seq_lens_decoder", None),
+            kwargs.get("seq_lens_this_time", None),
             kwargs.get("seq_lens_encoder", None),
             paddle.ones(shape=[1], dtype="int32"),
             kwargs.get("cum_offsets", None),

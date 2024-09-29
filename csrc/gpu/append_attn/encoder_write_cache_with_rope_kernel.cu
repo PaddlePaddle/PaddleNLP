@@ -39,7 +39,7 @@ void CascadeAppendWriteCacheKVQKV(const paddle::Tensor& qkv, // [token_num, 3, n
   const int pack_num = elem_nums / PackSize;
   const int blocksize = 128;
   int grid_size = 1;
-  GetNumBlocks(pack_num, &grid_size);
+  GetNumBlocks<128>(pack_num, &grid_size);
   cache_kernel<T, PackSize><<<grid_size, blocksize, 0, stream>>>(
     reinterpret_cast<T*>(const_cast<T*>(qkv.data<T>())),
     reinterpret_cast<T*>(key_cache_out->data<T>()),
@@ -233,7 +233,7 @@ void rotary_qk_variable(T *qkv_out, // [token_num, 3, num_head, dim_head]
   const int pack_num = elem_nums / PackSize;
   const int blocksize = 128;
   int grid_size = 1;
-  GetNumBlocks(pack_num, &grid_size);
+  GetNumBlocks<128>(pack_num, &grid_size);
   if (!use_neox_style) {
   const float *cos_emb = rotary_emb;
   const float *sin_emb = rotary_emb + input_output_len * dim_head / 2;
@@ -299,7 +299,7 @@ void gqa_rotary_qk_variable(T *qkv_out, // [token_num, 3, num_head, dim_head]
   const int pack_num = elem_nums / PackSize;
   const int blocksize = 128;
   int grid_size = 1;
-  GetNumBlocks(pack_num, &grid_size);
+  GetNumBlocks<128>(pack_num, &grid_size);
   
   if (!use_neox_style) {
     const float *cos_emb = rotary_emb;
