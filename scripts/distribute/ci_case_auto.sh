@@ -778,6 +778,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
 
 function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
     # Only A100 support this case.
+    echo IS_A100 is $IS_A100
     if [ $IS_A100 -ne 0 ]; then
         echo "=========== $FUNCNAME run begin ==========="
         export PYTHONPATH=$root_path/:$PYTHONPATH
@@ -876,6 +877,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
 
 function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
     # Only A100 support this case.
+    echo IS_A100 is $IS_A100
     if [ $IS_A100 -ne 0 ]; then
         echo "=========== $FUNCNAME run begin ==========="
         export PYTHONPATH=$root_path/:$PYTHONPATH
