@@ -867,6 +867,10 @@ class TrainingArguments:
     release_grads: Optional[bool] = field(
         default=False, metadata={"help": "Whether to release gradients during training. Default is `False`."}
     )
+    skip_data_intervals: Optional[List[List[int]]] = field(
+        default=None,
+        metadata={"help": "The intervals to skip, pass start global step and end global step at each interval"},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -970,6 +974,7 @@ class TrainingArguments:
         if self.sharding_degree > 0:
             warnings.warn("`sharding_degree` is deprecated, please use `sharding_parallel_degree`")
             self.sharding_parallel_degree = max(self.sharding_degree, self.sharding_parallel_degree)
+        self.data_parallel_degree = 1
 
         delattr(self, "sharding_degree")
 
@@ -1132,7 +1137,7 @@ class TrainingArguments:
                         "dp_comm_overlap": enable_dp_comm_overlap,
                         "sharding_comm_overlap": enable_sharding_comm_overlap,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
-                        "release_gradients": "enable_release_grads" in pipeline_parallel_config,
+                        "release_gradients": "enable_release_grads" in pipeline_parallel_config or self.release_grads,
                         "overlap_p2p_comm": "enable_overlap_p2p_comm" in pipeline_parallel_config,
                         "clear_every_step_cache": "enable_clear_every_step_cache" in pipeline_parallel_config,
                         "use_batch_p2p_comm": "disable_batch_p2p_comm" not in pipeline_parallel_config,
@@ -1461,6 +1466,7 @@ class TrainingArguments:
                 pipeline.accumulate_steps = self.gradient_accumulation_steps
                 pipeline.micro_batch_size = self.per_device_train_batch_size
                 pipeline.schedule_mode = self.pipeline_schedule_mode
+                pipeline.pp_degree = self.pipeline_parallel_degree
 
                 logger.info(f"PP configs:{strategy.pipeline}, use master_grad: {self.amp_master_grad}")
 

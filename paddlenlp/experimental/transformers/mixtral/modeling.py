@@ -54,6 +54,7 @@ from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
     register_base_model,
 )
+from paddlenlp.utils.download import resolve_file_path
 from paddlenlp.utils.log import logger
 
 __all__ = [
@@ -338,7 +339,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
             use_neox_rotary_style=self.use_neox,
             cachekv_int8_type=config.cachekv_int8_type,
             rank_id=config.tensor_parallel_rank,
-            trans_qkvw=(False if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8" else True),
+            trans_qkvw=(False if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type else True),
             moe_config=moe_config,
         )
 
@@ -527,7 +528,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                 unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
                     "mixtral.layers.{}.self_attn.v_proj.weight".format(idx)
                 ]
-                if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8":
+                if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type:
                     concated_qkv_weight = np.concatenate(
                         [
                             unfused_state_dict["self_attn.q_proj.weight"],
@@ -803,13 +804,13 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                 weight_scale_map_dict = scale_map_dict["weight_scale"]
                 cache_scale_map_dict = scale_map_dict["cachekv_scale"]
 
-                act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
-                weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
+                act_scale_json_path = resolve_file_path(self.quant_model_path, "act_scales.json")
+                weight_scale_json_path = resolve_file_path(self.quant_model_path, "weight_scales.json")
                 if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                    act_scale_json_path = os.path.join(
+                    act_scale_json_path = resolve_file_path(
                         self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
                     )
-                    weight_scale_json_path = os.path.join(
+                    weight_scale_json_path = resolve_file_path(
                         self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
                     )
                 act_scale_loader = ActScalesLoader(
@@ -826,9 +827,9 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                 )
 
                 if self.config.cachekv_int8_type == "static":
-                    cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_scales.json")
+                    cache_scale_json_path = resolve_file_path(self.quant_model_path, "cachekv_scales.json")
                     if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                        cache_scale_json_path = os.path.join(
+                        cache_scale_json_path = resolve_file_path(
                             self.quant_model_path, f"cachekv_act_scales_{self.config.tensor_parallel_rank}.json"
                         )
                     cache_scales_loader = CacheScaleLoader(

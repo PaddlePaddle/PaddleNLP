@@ -185,7 +185,7 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
         if self.post_layer_norm:
             LayerNormFunc = RMSNorm if config.rmsnorm else nn.LayerNorm
             # Final layer norm before output.
-            self.final_layernorm = LayerNormFunc(config.hidden_size, epsilon=config.layernorm_epsilon)
+            self.final_layernorm = LayerNormFunc(config.hidden_size, epsilon=config.layernorm_epsilon, config=config)
 
     def get_input_embeddings(self):
         return self.embedding.word_embeddings
@@ -290,6 +290,8 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        self.transformer_block.init_weight()
+
         # find the real name.
         def key(name):
             result_list = []
