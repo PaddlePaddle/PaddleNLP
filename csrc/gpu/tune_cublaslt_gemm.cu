@@ -717,9 +717,8 @@ void TuneCublasltGemm(const paddle::Tensor& K,
                       const bool is_test,
                       const bool is_read_from_file,
                       const std::string& path) {
-  // Ensure that K and N are all one-dimensional Tensors. is_test !=
-  // is_read_from_file
-  assert(M_end > M_start);
+  assert(M_end >= M_start);
+  assert(M_start >= 1);
   assert(K.dims().size() == 1 && N.dims().size() == 1);
   assert(is_test != is_read_from_file);
 
