@@ -105,6 +105,13 @@ static inline bool time_compare_algo_para(const algoSelect_t& algo_para_a,
   return (algo_para_a.time < algo_para_b.time);
 }
 
+// 获取当前 GPU 的剩余显存大小（以字节为单位）
+size_t get_remaining_memory() {
+  size_t free, total;
+  CUDA_CHECK(cudaMemGetInfo(&free, &total));
+  return free;
+}
+
 template <typename InT, typename OutT, typename ScaleT = OutT>
 static void TestMatmulRun(cublasLtHandle_t ltHandle,
                           cublasLtMatmulDesc_t matmulDesc,
@@ -122,7 +129,10 @@ static void TestMatmulRun(cublasLtHandle_t ltHandle,
   cublasLtMatmulHeuristicResult_t heurResult;
   cublasStatus_t algoStatus = cublasLtMatmulAlgoCheck(
       ltHandle, matmulDesc, A_desc, B_desc, C_desc, C_desc, &algo, &heurResult);
-  if (algoStatus == CUBLAS_STATUS_SUCCESS) {
+
+  auto remainingMemorySize = 0.95 * get_remaining_memory();
+  if (algoStatus == CUBLAS_STATUS_SUCCESS &&
+      remainingMemorySize > heurResult.workspaceSize) {
     ScaleT alpha = static_cast<ScaleT>(1), beta = static_cast<ScaleT>(0);
     void* workSpace;
     CUDA_CHECK(cudaMalloc(&workSpace, heurResult.workspaceSize));
@@ -166,8 +176,13 @@ static void TestMatmulRun(cublasLtHandle_t ltHandle,
     }
     CUDA_CHECK(cudaFree(workSpace));
   } else {
-    std::cerr << "not enough workspace! current workspace is "
-              << heurResult.workspaceSize;
+    std::cerr << "Not enough workspace! Required "
+              << static_cast<double>(heurResult.workspaceSize) / 1024.0 /
+                     1024.0 / 1024.0
+              << " GiB" << ", But remaining "
+              << static_cast<double>(remainingMemorySize) / 1024.0 / 1024.0 /
+                     1024.0
+              << " GiB" << std::endl;
     perfResults.status = CUBLAS_STATUS_NOT_SUPPORTED;  // Not enough workspace
   }
 }
@@ -442,7 +457,7 @@ void FindAlgo(const cublasLtHandle_t& ltHandle,
     if (perfResults[i].status != CUBLAS_STATUS_SUCCESS) {
       std::clog << "algo " << algos[i].algoId << " tile " << algos[i].tile
                 << " stages " << algos[i].stages << " splitK_val "
-                << algos[i].splitK_val;
+                << algos[i].splitK_val << std::endl;
       algos[i].time = std::numeric_limits<float>::max();
       std::cerr << " TestMatmulRun with status " << perfResults[i].status
                 << std::endl;
