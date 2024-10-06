@@ -886,12 +886,8 @@ class BlockInferencePredictorMixin(BasePredictor):
                 ]
             )
             # self.model_inputs["src_mask/tgt_mask"] is read only, will not be updated!
-            src_mask = (
-                alibi_encoder + (1 - src_mask) * paddle.finfo(self.dtype).min
-            ).cast(self.dtype)
-            tgt_mask = (
-                alibi_decoder + (1 - tgt_mask) * paddle.finfo(self.dtype).min
-            ).cast(self.dtype)
+            src_mask = (alibi_encoder + (1 - src_mask) * paddle.finfo(self.dtype).min).cast(self.dtype)
+            tgt_mask = (alibi_decoder + (1 - tgt_mask) * paddle.finfo(self.dtype).min).cast(self.dtype)
             self.model_inputs["rope_emb"] = paddle.concat([src_mask.reshape([-1]), tgt_mask.reshape([-1])])
 
     def _preprocess(self, input_text: list[str]):
