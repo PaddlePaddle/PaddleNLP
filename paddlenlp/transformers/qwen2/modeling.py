@@ -46,7 +46,7 @@ from ..model_outputs import (
 from ..model_utils import PretrainedModel, register_base_model
 from ..utils import caculate_llm_flops
 from .configuration import Qwen2Config
-
+from ..llama import fusion_ops
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
@@ -156,6 +156,7 @@ def scaled_dot_product_attention(
     value_states,
     attention_mask,
     output_attentions,
+    attn_mask_startend_row_indices=None,
     training=True,
     sequence_parallel=False,
 ):
@@ -166,32 +167,16 @@ def scaled_dot_product_attention(
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
 
-        version = paddle.version.full_version
-        if version != "0.0.0" and version <= "2.5.2":
-            attn_output, attn_weights = flash_attention(
-                query_states,
-                key_states,
-                value_states,
-                causal=True,
-                return_softmax=output_attentions,
-            )
-        else:
-            attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                is_causal=attention_mask is None,
-                dropout_p=config.attention_dropout if training else 0.0,
-                training=training,
-            )
-            attn_weights = None
-
-        if sequence_parallel:
-            attn_output = attn_output.reshape([bsz * q_len, head_dim * num_heads])
-        else:
-            attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
-        return (attn_output, attn_weights) if output_attentions else attn_output
+        return fusion_ops.fusion_flash_attention(
+            query_states,
+            config,
+            key_states,
+            value_states,
+            attention_mask,
+            output_attentions,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
+            sequence_parallel=sequence_parallel,
+        )
     else:
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
         query_states = paddle.transpose(query_states, [0, 2, 1, 3])
@@ -510,6 +495,7 @@ class Qwen2Attention(nn.Layer):
         attention_mask: Optional[paddle.Tensor] = None,
         output_attentions: bool = False,
         use_cache: bool = False,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         **kwargs,
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
@@ -574,6 +560,7 @@ class Qwen2Attention(nn.Layer):
                 value_states,
                 attention_mask,
                 output_attentions,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 training=self.training,
                 sequence_parallel=self.sequence_parallel,
                 use_reentrant=self.config.recompute_use_reentrant,
@@ -586,6 +573,7 @@ class Qwen2Attention(nn.Layer):
                 value_states,
                 attention_mask,
                 output_attentions,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 training=self.training,
                 sequence_parallel=self.sequence_parallel,
             )
@@ -640,6 +628,7 @@ class Qwen2DecoderLayer(nn.Layer):
         output_attentions: Optional[bool] = False,
         past_key_value: Optional[Tuple[paddle.Tensor]] = None,
         use_cache: Optional[bool] = False,
+        attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
         **kwargs,
     ) -> Tuple[paddle.Tensor, Optional[Tuple[paddle.Tensor, paddle.Tensor]]]:
         """
@@ -677,6 +666,7 @@ class Qwen2DecoderLayer(nn.Layer):
                 attention_mask,
                 output_attentions,
                 use_cache,
+                attn_mask_startend_row_indices,
                 use_reentrant=self.config.recompute_use_reentrant,
             )
         else:
@@ -687,6 +677,7 @@ class Qwen2DecoderLayer(nn.Layer):
                 attention_mask,
                 output_attentions,
                 use_cache,
+                attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             )
 
         if type(outputs) is tuple:
@@ -992,6 +983,7 @@ class Qwen2Model(Qwen2PretrainedModel):
         output_attentions: bool,
         past_key_value: Tensor,
         use_cache: bool,
+        attn_mask_startend_row_indices=None,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -1007,6 +999,7 @@ class Qwen2Model(Qwen2PretrainedModel):
             output_attentions,
             past_key_value,
             use_cache,
+            attn_mask_startend_row_indices,
             use_reentrant=self.config.recompute_use_reentrant,
         )
 
@@ -1023,6 +1016,7 @@ class Qwen2Model(Qwen2PretrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        attn_mask_startend_row_indices=None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
 
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -1062,16 +1056,17 @@ class Qwen2Model(Qwen2PretrainedModel):
             inputs_embeds = ScatterOp.apply(inputs_embeds)
 
         # embed positions
-        if attention_mask is None:
+        if attention_mask is None and attn_mask_startend_row_indices is None:
             # [bs, seq_len]
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
 
         if position_ids is None:
             position_ids = paddle.arange(seq_length, dtype="int64").expand((batch_size, seq_length))
 
-        attention_mask = self._prepare_decoder_attention_mask(
-            attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
-        )  # [bs, 1, seq_len, seq_len]
+        if attn_mask_startend_row_indices is None:
+            attention_mask = self._prepare_decoder_attention_mask(
+                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+            )  # [bs, 1, seq_len, seq_len]
         if self.config.use_flash_attention:
             is_casual = is_casual_mask(attention_mask)
             if is_casual:
@@ -1103,6 +1098,7 @@ class Qwen2Model(Qwen2PretrainedModel):
                     output_attentions,
                     past_key_value,
                     use_cache,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -1112,6 +1108,7 @@ class Qwen2Model(Qwen2PretrainedModel):
                     output_attentions,
                     past_key_value,
                     use_cache,
+                    attn_mask_startend_row_indices=attn_mask_startend_row_indices,
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
@@ -1340,6 +1337,7 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        attn_mask_startend_row_indices=None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         r"""
         Args:
@@ -1373,6 +1371,13 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
+        if attn_mask_startend_row_indices is not None and attention_mask is not None:
+            logger.warning(
+                "You have provided both attn_mask_startend_row_indices and attention_mask. "
+                "The attn_mask_startend_row_indices will be used."
+            )
+            attention_mask = None
+
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
         outputs = self.qwen2(
             input_ids=input_ids,
@@ -1384,6 +1389,7 @@ class Qwen2ForCausalLM(Qwen2PretrainedModel):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
+            attn_mask_startend_row_indices=attn_mask_startend_row_indices,
         )
 
         hidden_states = outputs[0]
