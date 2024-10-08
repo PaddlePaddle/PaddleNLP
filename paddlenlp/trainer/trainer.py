@@ -2183,6 +2183,9 @@ class Trainer:
         return (loss, outputs) if return_outputs else loss
 
     def _enable_delay_scale_loss(self):
+        if in_auto_parallel_align_mode():
+            return True
+
         key = "enable_delay_scale_loss"
         if self.args.pipeline_parallel_degree > 1:
             return key in self.args.pipeline_parallel_config
