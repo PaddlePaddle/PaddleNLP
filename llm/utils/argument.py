@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import List, Optional
 
 from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import IntervalStrategy
@@ -86,6 +86,12 @@ class DataArgument:
     dataset_name_or_path: str = field(default=None, metadata={"help": "Name or path for dataset"})
     task_name: str = field(default=None, metadata={"help": "Additional name to select a more specific task."})
     zero_padding: bool = field(default=False, metadata={"help": "Whether to use Zero Padding data stream"})
+    greedy_zero_padding: bool = field(
+        default=False,
+        metadata={
+            "help": "Whether to use Greedy Zero Padding data stream, should be used together with `zero_padding=True`."
+        },
+    )
     pad_to_multiple_of: int = field(
         default=None, metadata={"help": "If set will pad the sequence to a multiple of the provided value."}
     )
@@ -128,6 +134,10 @@ class DataArgument:
     )  # Alias for zero_padding
     # Pose ralated parameters
     use_pose_convert: bool = field(default=False, metadata={"help": "Whether to use PoSE data conversion function"})
+    pad_to_max_length: bool = field(
+        default=False,
+        metadata={"help": "Pad the input sequence to `max_length`."},
+    )
 
     def __post_init__(self):
         if self.task_name_or_path is not None:
@@ -233,9 +243,56 @@ class ModelArgument:
 
 @dataclass
 class QuantArgument:
+
+    # Quantization method config
     quant_type: str = field(
         default="a8w8",
-        metadata={"help": "Quantization type. Supported values: a8w8, weight_only_int4, weight_only_int8"},
+        metadata={"help": "Quantization type. Supported values: weight_only_int8, weight_only_int4, a8w8, a8w8c8"},
+    )
+
+    fp8_type: List[str] = field(
+        default_factory=lambda: ["e4m3", "e4m3"],
+        metadata={"help": "Quantization type for (activation, weight)", "nargs": "+"},
+    )
+
+    skip_list_names: List[str] = field(
+        default=lambda: [], metadata={"help": "Skip scales for quantization", "nargs": "+"}
+    )
+
+    weight_quant_method: str = field(
+        default="abs_max_channel_wise",
+        metadata={"help": "Weight quantization method, choosen from ['abs_max_channel_wise', 'groupwise']"},
+    )
+
+    act_quant_method: str = field(
+        default="avg",
+        metadata={"help": "Activation quantization method, choosen from ['abs_max', 'avg']"},
+    )
+
+    cachekv_quant_method: str = field(
+        default="avg_headwise",
+        metadata={"help": "KV quantization method, choosen from ['abs_max_headwise', 'avg_headwise']"},
+    )
+
+    # Piecewise Search Smooth related parameters
+    search_alpha_min: float = field(
+        default=0.2,
+        metadata={"help": "The minimum alpha for piece search"},
+    )
+
+    search_alpha_max: float = field(
+        default=0.8,
+        metadata={"help": "The maximum alpha for piece search"},
+    )
+
+    search_scale_min: float = field(
+        default=1.0,
+        metadata={"help": "The minimum scale for piece search"},
+    )
+
+    search_scale_max: float = field(
+        default=5.0,
+        metadata={"help": "The maximum scale for piece search"},
     )
 
     # QAT related parameters
@@ -245,11 +302,6 @@ class QuantArgument:
     # PTQ related parameters
     do_ptq: bool = field(default=False, metadata={"help": "Whether to use PTQ"})
     ptq_step: int = field(default=32, metadata={"help": "Step for PTQ"})
-
-    weight_quant_method: str = field(
-        default="abs_max_channel_wise",
-        metadata={"help": "Weight quantization method, choosen from ['abs_max_channel_wise', 'groupwise']"},
-    )
 
     # Pre-quant method Shift related parameters
     shift: bool = field(default=False, metadata={"help": "Whether to use Shift"})
@@ -281,6 +333,12 @@ class QuantArgument:
     auto_clip: bool = field(default=False, metadata={"help": "Whether to use AutoClip from AWQ"})
     awq_step: int = field(default=8, metadata={"help": "Step for AWQ Search"})
     autoclip_step: int = field(default=8, metadata={"help": "Step for AutoClip"})
+
+    # Other config
+    load_quant_model: bool = field(default=False, metadata={"help": "Whether to load quant model"})
+
+    do_quant_debug: bool = field(default=False, metadata={"help": "Whether to use debug"})
+    test_sample: Optional[str] = field(default=None, metadata={"help": "Test sample for quantization"})
 
 
 @dataclass

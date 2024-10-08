@@ -36,10 +36,10 @@ all_P0case_dic=("msra_ner"]=15
     ["gpt"]=2 
     ["ernie-1.0"]=2 
     ["xlnet"]=2
-    ["ofa"]=2 ["albert"]=2 ["SQuAD"]=20 ["lexical_analysis"]=5 ["word_embedding"]=5
+    ["ofa"]=2 ["albert"]=2 ["lexical_analysis"]=5
     ["transformer"]=5
     ["question_matching"]=5 ["ernie-csc"]=5  ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5
-    ["fast_generation"]=10 ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5  ["llm"]=5
+    ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5  ["llm"]=5
     ["ernie"]=2 ["ernie_layout"]=5 ["ernie_csc"]=5 ["ernie_ctm"]=5 ["segment_parallel_utils"]=5 ["ring_flash_attention"]=5)
 ####################################
 
@@ -126,8 +126,6 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
             P0case_list[${#P0case_list[*]}]=taskflow
         elif [[ ${dir3} =~ "transformers" ]];then
             P0case_list[${#P0case_list[*]}]=llm
-        elif [[ ${dir3} =~ "fast_transformer" ]] || [[ ${dir4} =~ "FasterTransformer" ]] ;then
-             P0case_list[${#P0case_list[*]}]=fast_generation
         fi
         Build_list[${dir1}]="paddlenlp" # 影响编包
     elif [[ ${dir1} =~ "examples" ]];then # 模型升级

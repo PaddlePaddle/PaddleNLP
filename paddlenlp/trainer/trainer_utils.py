@@ -46,6 +46,7 @@ from ..trainer.argparser import strtobool
 from ..transformers.tokenizer_utils_base import BatchEncoding
 from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
 from ..utils.log import logger
+from .utils.helper import distributed_file
 
 __all__ = [
     "TrainOutput",
@@ -239,7 +240,23 @@ PREFIX_CHECKPOINT_DIR = "checkpoint"
 _re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\-(\d+)$")
 
 
-def get_last_checkpoint(folder):
+def _check_checkpoint_files(folder_path, world_size, ignore_save_lr_and_optim, skip_save_model_weight):
+    files = os.listdir(folder_path)
+    model_weight_files = [f for f in files if f.startswith(".model_weight")]
+    a = len(model_weight_files) == world_size
+    if not ignore_save_lr_and_optim:
+        b = True
+        if not skip_save_model_weight:
+            master_weight_file = [f for f in files if f.startswith(".master_weight")]
+            b = len(master_weight_file) == world_size
+        optimizer_file = [f for f in files if f.startswith(".optimizer_weight")]
+        c = len(optimizer_file) == world_size
+        return a and b and c
+    else:
+        return a
+
+
+def get_last_checkpoint(folder, uc_async_save=False):
     content = os.listdir(folder)
     checkpoints = [
         path
@@ -253,8 +270,18 @@ def get_last_checkpoint(folder):
         for i in sorted(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0]), reverse=True):
             current_path = os.path.join(folder, i)
             # make sure the checkpoint is valid
-            if os.path.exists(os.path.join(current_path, ".checkpoint_done")):
-                return current_path
+            if not uc_async_save:
+                if os.path.exists(os.path.join(current_path, ".checkpoint_done")):
+                    return current_path
+            else:
+                saving_info = paddle.load(distributed_file(os.path.join(current_path, ".saving_info")))
+                pre_world_size = saving_info.get("world_size", 1)
+                ignore_save_lr_and_optim = saving_info.get("ignore_save_lr_and_optim", False)
+                skip_save_model_weight = saving_info.get("skip_save_model_weight", False)
+                if _check_checkpoint_files(
+                    current_path, pre_world_size, ignore_save_lr_and_optim, skip_save_model_weight
+                ):
+                    return current_path
         return
     else:
         return os.path.join(folder, max(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
@@ -317,7 +344,7 @@ def total_processes_number(local_rank):
     return 1
 
 
-def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_length=None):
+def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_length=None, model_flops=None):
     """
     Measure and return speed performance metrics.
 
@@ -338,6 +365,11 @@ def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_lengt
         if seq_length is not None:
             tokens_per_second_per_device = samples_per_second * seq_length / paddle.distributed.get_world_size()
             result[f"{split}_tokens_per_second_per_device"] = round(tokens_per_second_per_device, 4)
+        if model_flops is not None:
+            result[f"{split}_hardware_tflops_per_device"] = round(
+                tokens_per_second_per_device * model_flops / seq_length / 2**40, 2
+            )
+
     if num_steps is not None:
         steps_per_second = num_steps / runtime
         result[f"{split}_steps_per_second"] = round(steps_per_second, 4)
@@ -1073,3 +1105,20 @@ def set_hyrbid_parallel_seed(basic_seed, dataset_rank, tp_rank, pp_rank=0):
         tracker.add("global_seed", global_seed)
     if "local_seed" not in tracker.states_ and local_seed not in tracker.seeds_:
         tracker.add("local_seed", local_seed)
+
+
+def should_skip_data(global_step, skip_data_intervals):
+    """Whether to skip current step data"""
+
+    if skip_data_intervals is None:
+        return False
+    skip_flag = False
+    for interval in skip_data_intervals:
+        if len(interval) != 2 or interval[0] > interval[1] or interval[0] <= 0:
+            raise ValueError(f"Please check your skip interval {interval}")
+        start_global_step, end_global_step = interval[0], interval[1]
+        # start_global_step and end_global_step start from 1, while global_step start from 0
+        if start_global_step <= global_step + 1 <= end_global_step:
+            skip_flag = True
+            break
+    return skip_flag

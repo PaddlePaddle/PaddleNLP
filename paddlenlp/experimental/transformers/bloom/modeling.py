@@ -80,11 +80,14 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
 
         self.embed_dim = config.hidden_size
         self.n_head = config.n_head
+
         self.use_weight_only = False
-        self.weight_only_quant_bits = config.weight_only_quant_bits
-        self.quant_algo = "weight_only_int" + str(self.weight_only_quant_bits)
-        if self.weight_only_quant_bits != -1:
+        if config.quant_type == "weight_only_int8":
             self.use_weight_only = True
+            self.quant_algo = "weight_only_int8"
+        elif config.quant_type == "weight_only_int4":
+            self.use_weight_only = True
+            self.quant_algo = "weight_only_int4"
 
         if self.use_weight_only:
             assert (
@@ -171,7 +174,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
             self.embed_dim,
             self.n_head,
             4 * self.embed_dim,
-            weight_only_quant_bits=self.weight_only_quant_bits,
+            quant_type=config.quant_type,
             activation="gelu",
             num_layers=config.n_layer,
             nranks=config.tensor_parallel_degree,
@@ -290,6 +293,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict, use_structured_name=True):
+        self.transformer_block.init_weight()
         for k, v in state_dict.items():
             if k.find("word_embeddings.weight") >= 0:
                 self.word_embeddings.weight.set_value(paddle.to_tensor(v))
