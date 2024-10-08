@@ -214,8 +214,8 @@ class CheckpointConverter:
             assert self.model_meta is not None
             global_model_state_shapes = []
             sharding_metas_keys = []
-            for i in range(self.pp_degree):
-                for j in range(self.tp_degree):
+            for i in range(self.tp_degree):
+                for j in range(self.pp_degree):
                     sharding_metas_keys.append("tp{:02d}_pp{:02d}".format(i, j))
             for key in sharding_metas_keys:
                 param_meta = self.model_meta["sharding_metas"][key]["param_meta"]
@@ -247,24 +247,25 @@ class CheckpointConverter:
             # Generate the optimizer states corresponding to the model weights.
             logger.info("Requesting GPU memory space to concatenate tensors split by sharding1 v2.")
             optimizer_state_dict = {}
-            for key in cur_rank_need_load_model_state_keys:
-                for tp_rank in range(self.tp_degree):
-                    tp_rank_suffix = "_tp{:02d}".format(tp_rank)
-                    optimizer_state_dict[key + ".moment1" + tp_rank_suffix] = paddle.zeros(
-                        (param_flattened_shapes[key],), "float32"
-                    )
-                    optimizer_state_dict[key + ".moment2" + tp_rank_suffix] = paddle.zeros(
-                        (param_flattened_shapes[key],), "float32"
-                    )
-                    if self.optimizer_state_with_master_weights:
-                        optimizer_state_dict[key + ".master_weight" + tp_rank_suffix] = paddle.zeros(
+            with paddle.base.dygraph.guard(place=paddle.CPUPlace()):
+                for key in cur_rank_need_load_model_state_keys:
+                    for tp_rank in range(self.tp_degree):
+                        tp_rank_suffix = "_tp{:02d}".format(tp_rank)
+                        optimizer_state_dict[key + ".moment1" + tp_rank_suffix] = paddle.zeros(
                             (param_flattened_shapes[key],), "float32"
                         )
-                    # When handling tensor parallelism (TP), if some tensors are replicated, we initially assume that they are partitioned.
-                    # Later, when these are compared with the global shape, we realize that they are replicated.
+                        optimizer_state_dict[key + ".moment2" + tp_rank_suffix] = paddle.zeros(
+                            (param_flattened_shapes[key],), "float32"
+                        )
+                        if self.optimizer_state_with_master_weights:
+                            optimizer_state_dict[key + ".master_weight" + tp_rank_suffix] = paddle.zeros(
+                                (param_flattened_shapes[key],), "float32"
+                            )
+                        # When handling tensor parallelism (TP), if some tensors are replicated, we initially assume that they are partitioned.
+                        # Later, when these are compared with the global shape, we realize that they are replicated.
 
-                    optimizer_state_dict[key + ".beta1_pow_acc" + tp_rank_suffix] = paddle.zeros((1,), "float32")
-                    optimizer_state_dict[key + ".beta2_pow_acc" + tp_rank_suffix] = paddle.zeros((1,), "float32")
+                        optimizer_state_dict[key + ".beta1_pow_acc" + tp_rank_suffix] = paddle.zeros((1,), "float32")
+                        optimizer_state_dict[key + ".beta2_pow_acc" + tp_rank_suffix] = paddle.zeros((1,), "float32")
 
             malloc_size = 0
             for opt_state_name, opt_state_value in optimizer_state_dict.items():

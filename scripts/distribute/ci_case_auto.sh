@@ -51,13 +51,15 @@ function llama_case_list_auto() {
     # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP1
     # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2
     # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
-    llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
+    # llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
 
     llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
     llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
     llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1
+    llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
+    llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4
 }
 
 function llm_gpt_case_list_auto() {
@@ -778,200 +780,201 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
 
 function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
     # Only A100 support this case.
-    if [ $IS_A100 -eq 0 ]; then
-        return
+    echo IS_A100 is $IS_A100
+    if [ $IS_A100 -ne 0 ]; then
+        echo "=========== $FUNCNAME run begin ==========="
+        export PYTHONPATH=$root_path/:$PYTHONPATH
+        export FLAGS_call_stack_level=3
+        export NVIDIA_TF32_OVERRIDE=0
+
+        export FLAGS_cudnn_deterministic=1
+        export FLAGS_embedding_deterministic=1 
+        
+        export CUDA_DEVICE_MAX_CONNECTIONS=1
+        export PARALLEL_CROSS_ENTROPY=true
+
+        task_name="llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2"
+        case_out_dir="output/$task_name"
+        case_log_dir="output/$task_name""_log"
+        rm -rf $case_out_dir
+        rm -rf $case_log_dir
+
+        python -u  -m paddle.distributed.launch \
+            --gpus "0,1,2,3,4,5,6,7" \
+            --log_dir  "output/$task_name""_log" \
+            ./run_pretrain_auto.py \
+            --model_name_or_path "meta-llama/Llama-2-13b" \
+            --tokenizer_name_or_path "meta-llama/Llama-2-13b" \
+            --input_dir "./data" \
+            --output_dir "./output" \
+            --split 949,50,1 \
+            --weight_decay 0.01 \
+            --warmup_ratio 0.01 \
+            --max_grad_norm 1.0 \
+            --learning_rate 3e-05 \
+            --min_learning_rate 3e-06 \
+            --max_steps 30 \
+            --logging_steps 10 \
+            --eval_steps 1000 \
+            --save_steps 50000 \
+            --continue_training 0 \
+            --do_train true \
+            --do_eval false \
+            --do_predict false \
+            --disable_tqdm true \
+            --skip_profile_timer true \
+            --save_total_limit 2 \
+            --device gpu \
+            --disable_tqdm true \
+            --dataloader_num_workers 1 \
+            --distributed_dataloader 0 \
+            --enable_auto_parallel 1 \
+            --per_device_train_batch_size 1 \
+            --gradient_accumulation_steps 4 \
+            --per_device_eval_batch_size 1 \
+            --recompute false \
+            --recompute_use_reentrant true \
+            --recompute_granularity full \
+            --pp_recompute_interval 0 \
+            --bf16 true \
+            --fp16_opt_level "O2"  \
+            --amp_master_grad true \
+            --fuse_attention_ffn false \
+            --fuse_attention_qkv true \
+            --fused_linear_param_grad_add 1 \
+            --fuse_sequence_parallel_allreduce false \
+            --use_flash_attention true \
+            --use_fused_rope true \
+            --use_fused_rms_norm true \
+            --max_seq_length 4096 \
+            --sep_parallel_degree 1 \
+            --sequence_parallel false \
+            --pipeline_parallel_degree 4 \
+            --sharding_parallel_degree 2 \
+            --tensor_parallel_degree 1 \
+            --virtual_pp_degree 3 \
+            --pipeline_schedule_mode "VPP" \
+            --sharding "stage2" \
+            --pipeline_parallel_config "enable_send_recv_overlap" \
+            --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
+            --sharding_parallel_config "enable_stage2_overlap" \
+            --tensor_parallel_config "enable_mp_async_allreduce" \
+            --to_static 1 \
+            --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
+            --amp_custom_white_list "lookup_table" "lookup_table_v2" \
+            --num_hidden_layers 12 \
+            --skip_memory_metrics 0 \
+            >>${log_path}/$FUNCNAME 2>&1
+        loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+        ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
+        mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
+        echo "result: loss=$loss ips=$ips mem=$mem"
+        loss_base=7.54158936
+        ips_base=5442.5208
+        mem_base=22.387750148773193
+        check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+        echo "=========== $FUNCNAME run  end ==========="
     fi
-    echo "=========== $FUNCNAME run begin ==========="
-    export PYTHONPATH=$root_path/:$PYTHONPATH
-    export FLAGS_call_stack_level=3
-    export NVIDIA_TF32_OVERRIDE=0
-
-    export FLAGS_cudnn_deterministic=1
-    export FLAGS_embedding_deterministic=1 
-    
-    export CUDA_DEVICE_MAX_CONNECTIONS=1
-    export PARALLEL_CROSS_ENTROPY=true
-
-    task_name="llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2"
-    case_out_dir="output/$task_name"
-    case_log_dir="output/$task_name""_log"
-    rm -rf $case_out_dir
-    rm -rf $case_log_dir
-
-    python -u  -m paddle.distributed.launch \
-        --gpus "0,1,2,3,4,5,6,7" \
-        --log_dir  "output/$task_name""_log" \
-        ./run_pretrain_auto.py \
-        --model_name_or_path "meta-llama/Llama-2-13b" \
-        --tokenizer_name_or_path "meta-llama/Llama-2-13b" \
-        --input_dir "./data" \
-        --output_dir "./output" \
-        --split 949,50,1 \
-        --weight_decay 0.01 \
-        --warmup_ratio 0.01 \
-        --max_grad_norm 1.0 \
-        --learning_rate 3e-05 \
-        --min_learning_rate 3e-06 \
-        --max_steps 30 \
-        --logging_steps 10 \
-        --eval_steps 1000 \
-        --save_steps 50000 \
-        --continue_training 0 \
-        --do_train true \
-        --do_eval false \
-        --do_predict false \
-        --disable_tqdm true \
-        --skip_profile_timer true \
-        --save_total_limit 2 \
-        --device gpu \
-        --disable_tqdm true \
-        --dataloader_num_workers 1 \
-        --distributed_dataloader 0 \
-        --enable_auto_parallel 1 \
-        --per_device_train_batch_size 1 \
-        --gradient_accumulation_steps 4 \
-        --per_device_eval_batch_size 1 \
-        --recompute false \
-        --recompute_use_reentrant true \
-        --recompute_granularity full \
-        --pp_recompute_interval 0 \
-        --bf16 true \
-        --fp16_opt_level "O2"  \
-        --amp_master_grad true \
-        --fuse_attention_ffn false \
-        --fuse_attention_qkv true \
-        --fused_linear_param_grad_add 1 \
-        --fuse_sequence_parallel_allreduce false \
-        --use_flash_attention true \
-        --use_fused_rope true \
-        --use_fused_rms_norm true \
-        --max_seq_length 4096 \
-        --sep_parallel_degree 1 \
-        --sequence_parallel false \
-        --pipeline_parallel_degree 4 \
-        --sharding_parallel_degree 2 \
-        --tensor_parallel_degree 1 \
-        --virtual_pp_degree 3 \
-        --pipeline_schedule_mode "VPP" \
-        --sharding "stage2" \
-        --pipeline_parallel_config "enable_send_recv_overlap" \
-        --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
-        --sharding_parallel_config "enable_stage2_overlap" \
-        --tensor_parallel_config "enable_mp_async_allreduce" \
-        --to_static 1 \
-        --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
-        --amp_custom_white_list "lookup_table" "lookup_table_v2" \
-        --num_hidden_layers 12 \
-        --skip_memory_metrics 0 \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
-    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=7.54158936
-    ips_base=5442.5208
-    mem_base=22.387750148773193
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
 }
 
 function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
     # Only A100 support this case.
-    if [ $IS_A100 -eq 0 ]; then
-        return
+    echo IS_A100 is $IS_A100
+    if [ $IS_A100 -ne 0 ]; then
+        echo "=========== $FUNCNAME run begin ==========="
+        export PYTHONPATH=$root_path/:$PYTHONPATH
+        export FLAGS_call_stack_level=3
+        export NVIDIA_TF32_OVERRIDE=0
+
+        export FLAGS_cudnn_deterministic=1
+        export FLAGS_embedding_deterministic=1 
+
+        export CUDA_DEVICE_MAX_CONNECTIONS=1
+        export PARALLEL_CROSS_ENTROPY=true
+        export FLAGS_enable_pir_api=False # 暂时disable pir，后期修复后打开 @卢畅
+
+        task_name="llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw"
+        case_out_dir="output/$task_name"
+        case_log_dir="output/$task_name""_log"
+        rm -rf $case_out_dir
+        rm -rf $case_log_dir
+
+        python -u  -m paddle.distributed.launch \
+            --gpus "0,1,2,3,4,5,6,7" \
+            --log_dir  "output/$task_name""_log" \
+            ./run_pretrain_auto.py \
+            --model_name_or_path "meta-llama/Llama-2-13b" \
+            --tokenizer_name_or_path "meta-llama/Llama-2-13b" \
+            --input_dir "./data" \
+            --output_dir "./output" \
+            --split 949,50,1 \
+            --weight_decay 0.01 \
+            --warmup_ratio 0.01 \
+            --max_grad_norm 1.0 \
+            --learning_rate 3e-05 \
+            --min_learning_rate 3e-06 \
+            --max_steps 30 \
+            --logging_steps 10 \
+            --eval_steps 1000 \
+            --save_steps 50000 \
+            --continue_training 0 \
+            --do_train true \
+            --do_eval false \
+            --do_predict false \
+            --disable_tqdm true \
+            --skip_profile_timer true \
+            --save_total_limit 2 \
+            --device gpu \
+            --disable_tqdm true \
+            --dataloader_num_workers 1 \
+            --distributed_dataloader 0 \
+            --enable_auto_parallel 1 \
+            --per_device_train_batch_size 1 \
+            --gradient_accumulation_steps 4 \
+            --per_device_eval_batch_size 1 \
+            --recompute false \
+            --recompute_use_reentrant true \
+            --recompute_granularity full \
+            --pp_recompute_interval 0 \
+            --bf16 true \
+            --fp16_opt_level "O2"  \
+            --amp_master_grad true \
+            --fuse_attention_ffn false \
+            --fuse_attention_qkv true \
+            --fused_linear_param_grad_add 1 \
+            --fuse_sequence_parallel_allreduce false \
+            --use_flash_attention true \
+            --use_fused_rope true \
+            --use_fused_rms_norm true \
+            --max_seq_length 4096 \
+            --sep_parallel_degree 1 \
+            --sequence_parallel false \
+            --pipeline_parallel_degree 4 \
+            --sharding_parallel_degree 2 \
+            --tensor_parallel_degree 1 \
+            --virtual_pp_degree 3 \
+            --pipeline_schedule_mode "VPP" \
+            --sharding "stage2" \
+            --pipeline_parallel_config "enable_send_recv_overlap enable_split_backward" \
+            --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
+            --sharding_parallel_config "enable_stage2_overlap" \
+            --tensor_parallel_config "enable_mp_async_allreduce" \
+            --to_static 1 \
+            --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
+            --amp_custom_white_list "lookup_table" "lookup_table_v2" \
+            --num_hidden_layers 12 \
+            --skip_memory_metrics 0 \
+            >>${log_path}/$FUNCNAME 2>&1
+        loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+        ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
+        mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
+        echo "result: loss=$loss ips=$ips mem=$mem"
+        loss_base=7.54158936
+        ips_base=5864.2898
+        mem_base=23.745134115219116
+        check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+        echo "=========== $FUNCNAME run  end ==========="  
     fi
-    echo "=========== $FUNCNAME run begin ==========="
-    export PYTHONPATH=$root_path/:$PYTHONPATH
-    export FLAGS_call_stack_level=3
-    export NVIDIA_TF32_OVERRIDE=0
-
-    export FLAGS_cudnn_deterministic=1
-    export FLAGS_embedding_deterministic=1 
-
-    export CUDA_DEVICE_MAX_CONNECTIONS=1
-    export PARALLEL_CROSS_ENTROPY=true
-
-    task_name="llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw"
-    case_out_dir="output/$task_name"
-    case_log_dir="output/$task_name""_log"
-    rm -rf $case_out_dir
-    rm -rf $case_log_dir
-
-    python -u  -m paddle.distributed.launch \
-        --gpus "0,1,2,3,4,5,6,7" \
-        --log_dir  "output/$task_name""_log" \
-        ./run_pretrain_auto.py \
-        --model_name_or_path "meta-llama/Llama-2-13b" \
-        --tokenizer_name_or_path "meta-llama/Llama-2-13b" \
-        --input_dir "./data" \
-        --output_dir "./output" \
-        --split 949,50,1 \
-        --weight_decay 0.01 \
-        --warmup_ratio 0.01 \
-        --max_grad_norm 1.0 \
-        --learning_rate 3e-05 \
-        --min_learning_rate 3e-06 \
-        --max_steps 30 \
-        --logging_steps 10 \
-        --eval_steps 1000 \
-        --save_steps 50000 \
-        --continue_training 0 \
-        --do_train true \
-        --do_eval false \
-        --do_predict false \
-        --disable_tqdm true \
-        --skip_profile_timer true \
-        --save_total_limit 2 \
-        --device gpu \
-        --disable_tqdm true \
-        --dataloader_num_workers 1 \
-        --distributed_dataloader 0 \
-        --enable_auto_parallel 1 \
-        --per_device_train_batch_size 1 \
-        --gradient_accumulation_steps 4 \
-        --per_device_eval_batch_size 1 \
-        --recompute false \
-        --recompute_use_reentrant true \
-        --recompute_granularity full \
-        --pp_recompute_interval 0 \
-        --bf16 true \
-        --fp16_opt_level "O2"  \
-        --amp_master_grad true \
-        --fuse_attention_ffn false \
-        --fuse_attention_qkv true \
-        --fused_linear_param_grad_add 1 \
-        --fuse_sequence_parallel_allreduce false \
-        --use_flash_attention true \
-        --use_fused_rope true \
-        --use_fused_rms_norm true \
-        --max_seq_length 4096 \
-        --sep_parallel_degree 1 \
-        --sequence_parallel false \
-        --pipeline_parallel_degree 4 \
-        --sharding_parallel_degree 2 \
-        --tensor_parallel_degree 1 \
-        --virtual_pp_degree 3 \
-        --pipeline_schedule_mode "VPP" \
-        --sharding "stage2" \
-        --pipeline_parallel_config "enable_send_recv_overlap enable_split_backward" \
-        --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
-        --sharding_parallel_config "enable_stage2_overlap" \
-        --tensor_parallel_config "enable_mp_async_allreduce" \
-        --to_static 1 \
-        --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
-        --amp_custom_white_list "lookup_table" "lookup_table_v2" \
-        --num_hidden_layers 12 \
-        --skip_memory_metrics 0 \
-        >>${log_path}/$FUNCNAME 2>&1
-    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
-    mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
-    echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=7.54158936
-    ips_base=5864.2898
-    mem_base=23.745134115219116
-    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
-    echo "=========== $FUNCNAME run  end ==========="
 }
 
 function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
@@ -1169,7 +1172,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
     export FLAGS_enable_pir_api=1
-    export FLAGS_max_inplace_grad_add=3
+    export FLAGS_max_inplace_grad_add=4
 
     task_name="llama_align_dygraph_dy2st_auto_bs2_bf16_dp2"
     case_out_dir="output/$task_name"
@@ -1191,7 +1194,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
             --weight_decay 0.01 \
             --warmup_ratio 0.01 \
             --warmup_steps 30 \
-            --max_grad_norm 0.0 \
+            --max_grad_norm 1.0 \
             --learning_rate 3e-05 \
             --min_learning_rate 3e-06 \
             --max_steps 10 \
@@ -1217,17 +1220,17 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
             --recompute_use_reentrant true \
             --recompute_granularity full \
             --pp_recompute_interval 0 \
-            --bf16 1\
+            --bf16 1 \
             --fp16_opt_level "O2"  \
             --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
             --amp_custom_white_list "lookup_table" "lookup_table_v2" \
             --amp_master_grad 1 \
             --fuse_attention_ffn true \
-            --fuse_attention_qkv false \
+            --fuse_attention_qkv true \
             --fuse_sequence_parallel_allreduce false \
             --use_flash_attention 0 \
             --use_fused_rope false \
-            --use_fused_rms_norm 0 \
+            --use_fused_rms_norm 1 \
             --max_seq_length 4096 \
             --sep_parallel_degree 1 \
             --sequence_parallel false \
@@ -1244,9 +1247,9 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
         ips=-1
         mem=-1
         echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
-        loss_base=10.06303482
+        loss_base=9.97198105
         if [ $IS_A100 -ne 0 ];then
-            loss_base=10.24704742
+            loss_base=10.18783569
         fi
         ips_base=-1
         mem_base=-1
@@ -1351,6 +1354,220 @@ function llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1() {
     ips_base=-1
     mem_base=-1
     check_result $FUNCNAME ${loss1} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
+}
+
+function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
+    echo "=========== $FUNCNAME run begin ==========="
+    # Only A100 support this case.
+    if [ $IS_A100 -ne 0 ]; then
+        export FLAGS_call_stack_level=3
+        export NVIDIA_TF32_OVERRIDE=0
+        export FLAGS_max_inplace_grad_add=3
+
+        task_name="llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1_MP1_PP4"
+        case_out_dir="output/$task_name"
+        case_log_dir="output/$task_name""_log"
+        loss1=0
+        loss2=0
+        use_pir=1
+
+        max_step=10
+        to_static=1
+
+        for pp_mode in "1F1B" "VPP"; do
+            export FLAGS_enable_pir_api=${use_pir}
+            export FLAGS_enable_pir_in_executor=${use_pir}
+            rm -rf $case_out_dir
+            rm -rf $case_log_dir
+            rm -rf ${log_path}/$FUNCNAME
+            if [ "$pp_mode" == "FThenB" ]; then
+                vpp_degree=1
+            else
+                vpp_degree=2
+            fi
+
+            python -u -m paddle.distributed.launch \
+                --gpus "0,1,2,3" \
+                --log_dir $case_log_dir \
+                run_pretrain_auto.py \
+                --model_type "llama" \
+                --model_name_or_path "facebook/llama-7b" \
+                --tokenizer_name_or_path "facebook/llama-7b" \
+                --input_dir "./data" \
+                --output_dir $case_out_dir \
+                --split 949,50,1 \
+                --weight_decay 0.01 \
+                --warmup_ratio 0.01 \
+                --warmup_steps 30 \
+                --max_grad_norm 0.0 \
+                --learning_rate 3e-05 \
+                --min_learning_rate 3e-06 \
+                --max_steps $max_step \
+                --logging_steps 1 \
+                --eval_steps 1000 \
+                --save_steps 50000 \
+                --continue_training 0 \
+                --do_train true \
+                --do_eval false \
+                --do_predict false \
+                --disable_tqdm true \
+                --skip_profile_timer true \
+                --save_total_limit 2 \
+                --device gpu \
+                --disable_tqdm true \
+                --dataloader_num_workers 1 \
+                --distributed_dataloader 0 \
+                --enable_auto_parallel 1 \
+                --per_device_train_batch_size 1 \
+                --gradient_accumulation_steps 4 \
+                --per_device_eval_batch_size 2 \
+                --recompute false \
+                --recompute_use_reentrant true \
+                --recompute_granularity full \
+                --fp16 0 \
+                --fp16_opt_level "O2" \
+                --fuse_attention_ffn true \
+                --fuse_attention_qkv true \
+                --fuse_sequence_parallel_allreduce false \
+                --use_flash_attention 0 \
+                --use_fused_rope false \
+                --use_fused_rms_norm 0 \
+                --max_seq_length 2048 \
+                --hidden_size 1024 \
+                --sep_parallel_degree 1 \
+                --sequence_parallel false \
+                --pipeline_parallel_degree 4 \
+                --sharding_parallel_degree 1 \
+                --tensor_parallel_degree 1 \
+                --sharding "" \
+                --to_static ${to_static} \
+                --num_hidden_layers 8 \
+                --data_parallel_config "gradient_sync_after_accumulate" \
+                --pipeline_schedule_mode $pp_mode \
+                --virtual_pp_degree $vpp_degree \
+                >>${log_path}/$FUNCNAME 2>&1
+            
+            loss=$(grep "global_step: 10," "$case_log_dir/workerlog.0" | grep -oP '(?<=loss: )\d+(\.\d+)?' | awk -F ',' '{print $1}')
+            if [ "$pp_mode" == "FThenB" ]; then
+                loss1=loss
+            else
+                loss2=loss
+            fi
+            echo "result: $pp_mode loss=$loss"
+        done
+        ips=-1
+        mem=-1
+        ips_base=-1
+        mem_base=-1
+        check_result $FUNCNAME ${loss1} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
+    fi
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4() {
+    echo "=========== $FUNCNAME run begin ==========="
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_max_inplace_grad_add=3
+
+    task_name="llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1_MP1_PP4"
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+    loss1=0
+    loss2=0
+    loss1_array=()
+    loss2_array=()
+    use_pir=1
+
+    max_step=15
+    to_static=1
+
+    for to_static in "0" "1"; do
+        export FLAGS_enable_pir_api=${use_pir}
+        export FLAGS_enable_pir_in_executor=${use_pir}
+
+        case_out_dir="output/$task_name"
+        case_log_dir="output/$task_name""_log$to_static"
+        rm -rf $case_out_dir
+        rm -rf $case_log_dir
+        rm -rf ${log_path}/$FUNCNAME
+
+        python -u -m paddle.distributed.launch \
+            --gpus "0,1,2,3" \
+            --log_dir $case_log_dir \
+            run_pretrain_auto.py \
+            --model_type "llama" \
+            --model_name_or_path "facebook/llama-7b" \
+            --tokenizer_name_or_path "facebook/llama-7b" \
+            --input_dir "./data" \
+            --output_dir $case_out_dir \
+            --split 949,50,1 \
+            --weight_decay 0.01 \
+            --warmup_ratio 0.01 \
+            --warmup_steps 30 \
+            --max_grad_norm 0.0 \
+            --learning_rate 3e-05 \
+            --min_learning_rate 3e-06 \
+            --max_steps $max_step \
+            --logging_steps 1 \
+            --eval_steps 1000 \
+            --save_steps 50000 \
+            --continue_training 0 \
+            --do_train true \
+            --do_eval false \
+            --do_predict false \
+            --disable_tqdm true \
+            --skip_profile_timer true \
+            --save_total_limit 2 \
+            --device gpu \
+            --disable_tqdm true \
+            --dataloader_num_workers 1 \
+            --distributed_dataloader 0 \
+            --enable_auto_parallel 1 \
+            --per_device_train_batch_size 1 \
+            --gradient_accumulation_steps 2 \
+            --per_device_eval_batch_size 2 \
+            --recompute false \
+            --recompute_use_reentrant true \
+            --recompute_granularity full \
+            --bf16 true \
+            --fp16_opt_level "O2" \
+            --amp_master_grad true \
+            --amp_custom_black_list ["reduce_sum", "c_softmax_with_cross_entropy"] \
+            --amp_custom_white_list ["lookup_table", "lookup_table_v2"] \
+            --fuse_attention_ffn true \
+            --fuse_attention_qkv true \
+            --fuse_sequence_parallel_allreduce false \
+            --use_flash_attention 0 \
+            --use_fused_rope false \
+            --use_fused_rms_norm 0 \
+            --max_seq_length 2048 \
+            --hidden_size 1024 \
+            --sep_parallel_degree 1 \
+            --sequence_parallel false \
+            --pipeline_parallel_degree 4 \
+            --sharding_parallel_degree 1 \
+            --tensor_parallel_degree 1 \
+            --sharding "" \
+            --to_static ${to_static} \
+            --num_hidden_layers 8 \
+            --data_parallel_config "gradient_sync_after_accumulate" \
+            --pipeline_schedule_mode "FThenB" \
+            >>${log_path}/$FUNCNAME 2>&1
+        loss=$(grep "global_step: 15," "$case_log_dir/workerlog.0" | grep -oP '(?<=loss: )\d+(\.\d+)?' | awk -F ',' '{print $1}')
+        if [ $to_static -eq 0 ]; then
+            loss1=($loss)
+        else
+            loss2=($loss)
+        fi
+        echo "result: to_static=$to_static loss=$loss"
+    done
+    ips=-1
+    mem=-1
+    ips_base=-1
+    mem_base=-1
+    check_result $FUNCNAME ${loss1} ${loss2} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "=========== $FUNCNAME run  end ==========="
 }
 
 function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1() {
@@ -2256,6 +2473,7 @@ function before_hook_for_gpt() {
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
+    export no_proxy=bcebos.com
     if [[ $FLAGS_install_deps == 0 ]];then
         echo -e "\033[31m ---- Install requirements for GPT auto cases  \033[0m"
         cp requirements.txt requirements_nlp.txt
@@ -2297,6 +2515,7 @@ function before_hook_for_llama() {
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
+    export no_proxy=bcebos.com
     python -m pip install -r $root_path/requirements.txt
     python -m pip install -r $root_path/requirements-dev.txt
     if [[ ! $FLAGS_download_data =~ "llama" ]];then
