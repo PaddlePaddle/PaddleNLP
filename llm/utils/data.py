@@ -325,17 +325,3 @@ def get_example_pose(example, tokenizer, data_args):
     features = {"input_ids": chunked_ids, "labels": labels, "position_ids": pos_ids}
 
     return features
-
-
-def test_preprocess_function(example, tokenizer, inference_length):
-
-    source = example["text"]
-    tokenized_source = tokenizer(
-        source, padding=False, truncation=True, max_length=inference_length, return_dict=False
-    )
-    input_ids = tokenized_source["input_ids"]
-    input_ids, labels = input_ids[:-1], input_ids[1:]
-    position_ids = list(range(len(input_ids)))
-    features = {"input_ids": input_ids, "position_ids": position_ids, "labels": labels}
-
-    return features
