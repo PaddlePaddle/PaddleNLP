@@ -16,3 +16,4 @@
 
 from .configuration import *
 from .modeling import *
+from .tokenizer import *

@@ -88,9 +88,9 @@ def do_train(args):
 
     # Create dataset, tokenizer and dataloader.
     if args.dataset == "peoples_daily_ner":
-        raw_datasets = load_dataset(args.dataset)
+        raw_datasets = load_dataset(args.dataset, trust_remote_code=True)
     else:
-        raw_datasets = load_dataset(args.dataset)
+        raw_datasets = load_dataset(args.dataset, trust_remote_code=True)
 
     AutoForTokenClassification, AutoTokenizer = MODEL_CLASSES[args.model_type]
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)

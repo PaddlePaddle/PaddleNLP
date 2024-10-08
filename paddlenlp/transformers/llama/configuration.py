@@ -155,6 +155,9 @@ class LlamaConfig(PretrainedConfig):
         long_sequence_strategy_name=None,
         long_sequence_init_args=None,
         use_long_sequence_strategies=False,
+        use_flash_attention_for_generation=False,
+        use_last_token_for_generation=False,
+        immediate_clear_past_key_value=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -189,6 +192,9 @@ class LlamaConfig(PretrainedConfig):
         self.long_sequence_strategy_name = long_sequence_strategy_name
         self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
         self.use_long_sequence_strategies = use_long_sequence_strategies
+        self.use_flash_attention_for_generation = use_flash_attention_for_generation
+        self.use_last_token_for_generation = use_last_token_for_generation
+        self.immediate_clear_past_key_value = immediate_clear_past_key_value
 
         super().__init__(
             pad_token_id=pad_token_id,

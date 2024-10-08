@@ -18,10 +18,9 @@
 
 import collections
 import contextlib
-import copy
 import inspect
+import json
 import math
-import multiprocessing
 import os
 import random
 import re
@@ -114,12 +113,7 @@ from ..utils.log import logger
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import RuntimeTimer, get_timers, set_timers
-from .plugins.unified_checkpoint import (
-    load_unified_checkpoint,
-    load_unified_optimizer,
-    save_unified_checkpoint,
-    save_unified_optimizer,
-)
+from .plugins.unified_checkpoint import UnifiedCheckpointHandler
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -133,6 +127,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     PREFIX_CHECKPOINT_DIR,
     EvalLoopOutput,
     EvalPrediction,
+    IntervalStrategy,
     IterableDatasetShard,
     OptimizerNames,
     PredictionOutput,
@@ -145,11 +140,14 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     get_scheduler,
     has_length,
     set_seed,
+    should_skip_data,
     speed_metrics,
 )
 from .training_args import TrainingArguments
 from .utils import reshard as reshard_util
+from .utils.async_save import AsyncSaver
 from .utils.helper import (  # nested_truncate,
+    broadcast_dataset_rank0_model,
     broadcast_dp_optimizer,
     broadcast_moe_optimizer,
     distributed_concat,
@@ -188,77 +186,18 @@ try:
 except:
     from paddle.fluid.dataloader.dataloader_iter import _DataLoaderIterBase
 
+try:
+    from paddle.distributed import in_auto_parallel_align_mode
+except:
+
+    def in_auto_parallel_align_mode():
+        """
+        hack for paddlenlp develop branch.
+        """
+        return False
+
 
 __all__ = ["Trainer"]
-
-async_save_queue = []
-g_cpu_optimizer_state_dict = {}
-
-
-def _save_func(obj, path, saved_signal_path, protocol):
-    paddle.save(obj, path, protocol)
-    # dump savd_siganl
-    with open(saved_signal_path, mode="w+") as f:
-        f.write("1")
-
-
-def check_exitcode(task):
-    exitcode = task.exitcode
-    if exitcode != 0:
-        print(f"Error: save ckpt process failed with exitcode {exitcode}!!!")
-
-
-def clear_async_save_task_queue():
-    """
-    wait until all async save task to be done.
-    """
-    while len(async_save_queue) > 0:
-        task = async_save_queue.pop()
-        if task and task.is_alive():
-            task.join(timeout=60)
-            if task.is_alive():
-                logger.error("Error: save ckpt process timeout!!!")
-                async_save_queue.append(task)
-            else:
-                check_exitcode(task)
-        else:
-            check_exitcode(task)
-
-
-def async_save_optimizer(optimizer_state_dict, path, saved_signal_path, protocol=4):
-    global g_cpu_optimizer_state_dict
-    g_cpu_optimizer_state_dict.clear()
-    for k, v in optimizer_state_dict.items():
-        if k == "master_weights":
-            g_cpu_optimizer_state_dict[k] = {}
-            for kk, vv in v.items():
-                tensor_name = vv.name
-                g_cpu_optimizer_state_dict[k][kk] = vv.pin_memory()
-                g_cpu_optimizer_state_dict[k][kk].name = tensor_name
-        elif k == "LR_Scheduler":
-            g_cpu_optimizer_state_dict[k] = copy.deepcopy(v)
-        else:
-            g_cpu_optimizer_state_dict[k] = v.pin_memory()
-        paddle.device.synchronize()
-    clear_async_save_task_queue()
-
-    attempt = 0
-    ctx = multiprocessing.get_context("spawn")
-
-    def start_process():
-        nonlocal attempt
-        try:
-            p = ctx.Process(target=_save_func, args=(g_cpu_optimizer_state_dict, path, saved_signal_path, protocol))
-            p.start()
-            return p
-        except Exception as e:
-            print(f"Attempt {attempt + 1} failed with error: {e}")
-            attempt += 1
-            time.sleep(1)
-            return start_process()
-
-    p = start_process()
-    async_save_queue.append(p)
 
 
 class Trainer:
@@ -350,9 +289,16 @@ class Trainer:
 
         # Seed must be set before instantiating the model when using model
         set_seed(seed=self.args.seed)
-
+        self._skip_global_steps = 0  # total skip global steps
+        self._skip_steps_since_last_logged = 0  # skip steps since last logged
         if model is None:
-            raise RuntimeError("`Trainer` requires either a `model` or `model_init` argument")
+            logger.warning("Model is None.")
+            self.model = None
+            self.train_dataset = train_dataset
+            self.tokenizer = tokenizer
+            default_collator = default_data_collator if tokenizer is None else DataCollatorWithPadding(tokenizer)
+            self.data_collator = data_collator if data_collator is not None else default_collator
+            return
 
         if self.args.to_static:
             model = paddle.jit.to_static(model)
@@ -404,6 +350,8 @@ class Trainer:
         self.sharding_io = None
         if self.args.should_save_sharding_stage1_model or self.args.should_load_sharding_stage1_model:
             self.sharding_io = ShardingIO(self.args, self.model, self.optimizer)
+        if self.args.unified_checkpoint:
+            self.unified_checkpoint_handler = UnifiedCheckpointHandler(self.args)
 
         if self.sharding is not None and self.optimizer is not None:
             raise RuntimeError(
@@ -425,8 +373,20 @@ class Trainer:
         )
         self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
 
-        self._save_ckpt_func = dist.save_state_dict if self.args.enable_auto_parallel else paddle.save
+        def _save_ckpt_func(state_dict, path, signal_path=None):
+            if self.args.enable_auto_parallel:
+                dist.save_state_dict(state_dict, path)
+            else:
+                paddle.save(state_dict, path)
+
+            if signal_path is not None:
+                with open(signal_path, mode="w+") as f:
+                    f.write("1")
+
+        self._save_ckpt_func = _save_ckpt_func
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
+        if self.args.use_async_save:
+            self._async_optimizer_saver = AsyncSaver()
 
         if args.max_steps > 0:
             logger.info("max_steps is given, it will override any value given in num_train_epochs")
@@ -609,7 +569,8 @@ class Trainer:
 
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
-            resume_from_checkpoint = get_last_checkpoint(self.args.output_dir)
+            uc_async_save = self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config
+            resume_from_checkpoint = get_last_checkpoint(self.args.output_dir, uc_async_save)
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
@@ -622,12 +583,10 @@ class Trainer:
                     logger.info("Loading origin checkpoint, the next checkpoint will be saved as unified checkpoint")
 
                 if use_unified_checkpoint:
-                    load_unified_checkpoint(
-                        self.args,
+                    self.unified_checkpoint_handler.load_unified_checkpoint(
                         self.model,
                         self.optimizer,
                         resume_from_checkpoint,
-                        safe_serialization=True,
                     )
                     logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
                     self.runtime_timer.stop()
@@ -748,11 +707,6 @@ class Trainer:
                     os.makedirs(resume_from_checkpoint, exist_ok=True)
                     logger.info(f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}")
 
-        # memory metrics - must set up as early as possible
-        self._memory_tracker.start()
-        if not self.args.should_load_sharding_stage1_model:
-            self._load_from_checkpoint(resume_from_checkpoint)
-
         train_dataloader = self.get_train_dataloader()
 
         total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.dataset_world_size
@@ -803,34 +757,44 @@ class Trainer:
 
         self.state = TrainerState()
 
-        if self.args.should_load_sharding_stage1_model:
-            model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
 
-        elif self.args.should_save_sharding_stage1_model:
-            # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
-            # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
-            model = self._wrap_model(self.model_wrapped)
-            if self.sharding_io is not None:
-                assert delay_optimizer_creation is False, "delay_optimizer_creation should be False"
-                # the self.optimizer should be wrapped and it is done in _wrap_model
-                self.sharding_io.set_optimizer(self.optimizer)
-            # for the rest of this function `model` is the outside model, whether it was wrapped or not
-            if model is not self.model:
-                self.model_wrapped = model
-            if delay_optimizer_creation:
-                self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-            self._load_optimizer_and_scheduler(resume_from_checkpoint)
+        if not self.args.enable_auto_parallel:
+            if not self.args.should_load_sharding_stage1_model:
+                self._load_from_checkpoint(resume_from_checkpoint)
+
+            if self.args.should_load_sharding_stage1_model:
+                model = self._wrap_model_and_load_sharded_checkpoint(resume_from_checkpoint)
+
+            elif self.args.should_save_sharding_stage1_model:
+                # In the non-sharded mode, should invoke _load_from_checkpoint before _wrap_model.
+                # In this mode, the rank0 load all params and the _wrap_model implicitly broadcast params from rank0 to the other ranks.
+                model = self._wrap_model(self.model_wrapped)
+                if self.sharding_io is not None:
+                    assert delay_optimizer_creation is False, "delay_optimizer_creation should be False"
+                    # the self.optimizer should be wrapped and it is done in _wrap_model
+                    self.sharding_io.set_optimizer(self.optimizer)
+                # for the rest of this function `model` is the outside model, whether it was wrapped or not
+                if model is not self.model:
+                    self.model_wrapped = model
+                if delay_optimizer_creation:
+                    self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+                self._load_optimizer_and_scheduler(resume_from_checkpoint)
+            else:
+                model = self._wrap_model(self.model_wrapped)
+                # for the rest of this function `model` is the outside model, whether it was wrapped or not
+                if model is not self.model:
+                    self.model_wrapped = model
+                if delay_optimizer_creation:
+                    self.create_optimizer_and_scheduler(num_training_steps=max_steps)
+                self._load_optimizer_and_scheduler(resume_from_checkpoint)
         else:
-            model = self._wrap_model(self.model_wrapped)
-            # for the rest of this function `model` is the outside model, whether it was wrapped or not
-            if model is not self.model:
-                self.model_wrapped = model
+            model = self.model_wrapped
             if delay_optimizer_creation:
                 self.create_optimizer_and_scheduler(num_training_steps=max_steps)
-            self._load_optimizer_and_scheduler(resume_from_checkpoint)
 
         logger.info(f"{self.runtime_timer.log()}")
-
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples:,}")
         logger.info(f"  Num Epochs = {num_train_epochs}")
@@ -990,6 +954,7 @@ class Trainer:
             step_control = 0  # used in loop control, reset to 0 after every step
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
+            step = -1
             for step, inputs in enumerate(epoch_iterator):
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
@@ -1025,6 +990,44 @@ class Trainer:
                 elif steps_trained_progress_bar is not None:
                     steps_trained_progress_bar.close()
                     steps_trained_progress_bar = None
+
+                if should_skip_data(self.state.global_step, self.args.skip_data_intervals):
+                    # skip this step
+
+                    if (step_control + 1) % self.args.gradient_accumulation_steps == 0 or (
+                        # last step in epoch but step is always smaller than gradient_accumulation_steps
+                        steps_in_epoch <= args.gradient_accumulation_steps
+                        and (step + 1) == steps_in_epoch
+                    ):
+                        # update current global step and skip step
+                        self.state.global_step += 1
+                        self._skip_global_steps += 1
+                        self._skip_steps_since_last_logged += 1
+
+                        self.state.epoch = epoch + (step + 1) / steps_in_epoch
+
+                        if self.state.global_step == 1 and self.args.logging_first_step:
+                            self.control.should_log = True
+                        if (
+                            self.args.logging_strategy == IntervalStrategy.STEPS
+                            and self.state.global_step % self.args.logging_steps == 0
+                        ):
+                            self.control.should_log = True
+
+                        self.control.should_evaluate = False
+                        self.control.should_save = False
+
+                        # log loss and memeory usage
+                        self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                        self._print_timer()
+                        step_control = 0
+                    else:
+                        step_control += 1
+                    if self.state.global_step >= self.state.max_steps:
+                        break
+
+                    self.timers and self.timers("read-data").start()
+                    continue
 
                 if step_control % args.gradient_accumulation_steps == 0:
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
@@ -1159,7 +1162,7 @@ class Trainer:
                     if optimizer_was_run:
                         self.lr_scheduler.step()
 
-                    if enable_release_grads:
+                    if args.release_grads or enable_release_grads:
                         self.optimizer.clear_grad(set_to_zero=False)
                         if args.pipeline_parallel_degree > 1:
                             for _, buffers in model._chunk_2_comm_buffers.items():
@@ -1207,6 +1210,11 @@ class Trainer:
             delattr(self, "_past")
 
         logger.info("\nTraining completed. \n")
+
+        # unlink shared_memory if used.
+        if self.args.unified_checkpoint:
+            self.unified_checkpoint_handler.unlink_shared_memory()
+
         if args.load_best_model_at_end and self.state.best_model_checkpoint is not None:
             if args.local_rank != -1:
                 dist.barrier()
@@ -1218,13 +1226,13 @@ class Trainer:
                 self._load_best_model_from_peft_checkpoint()
             else:
                 if self.args.unified_checkpoint:
-                    load_unified_checkpoint(
-                        self.args,
+                    self.unified_checkpoint_handler.load_unified_checkpoint(
                         self.model,
                         self.optimizer,
                         self.state.best_model_checkpoint,
-                        safe_serialization=True,
                     )
+                    if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
+                        broadcast_dataset_rank0_model(self.model)
                 else:
                     weight_name = PADDLE_WEIGHTS_NAME
                     best_model_path = os.path.join(
@@ -1242,7 +1250,13 @@ class Trainer:
                         )
 
         self._total_loss_scalar += tr_loss.item()
-        train_loss = self._total_loss_scalar / self.state.global_step
+
+        # In case all steps were skipped, the total loss is set to 0.
+        if self.state.global_step == self._skip_global_steps:
+            logger.info("All steps were skipped, the total loss is set to 0.")
+            train_loss = 0.0
+        else:
+            train_loss = self._total_loss_scalar / (self.state.global_step - self._skip_global_steps)
 
         metrics = speed_metrics("train", start_time, num_samples=num_train_samples, num_steps=self.state.max_steps)
 
@@ -1260,13 +1274,13 @@ class Trainer:
 
     def _load_best_model_from_peft_checkpoint(self):
         if self.args.unified_checkpoint:
-            load_unified_checkpoint(
-                self.args,
+            self.unified_checkpoint_handler.load_unified_checkpoint(
                 self.model,
                 self.optimizer,
                 self.state.best_model_checkpoint,
-                safe_serialization=True,
             )
+            if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
+                broadcast_dataset_rank0_model(self.model)
             return
 
         convert_tp = False
@@ -1351,22 +1365,34 @@ class Trainer:
 
     def _get_item_from_loss(self, loss):
         assert isinstance(loss, paddle.Tensor) and loss._is_initialized()
-        return loss.item()
+        loss_value = loss.item()
+        if not self.args.fp16:
+            if not np.isfinite(loss_value).all():
+                raise ValueError(f"Loss contains inf or nan values, its value is {loss_value}")
+        return loss_value
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         if self.control.should_log:
 
             logs: Dict[str, float] = {}
-
+            num_steps = self.state.global_step - self._globalstep_last_logged - self._skip_steps_since_last_logged
+            self._skip_steps_since_last_logged = 0
             # all_gather + mean() to get average loss over all processes
-            tr_loss_scalar = self._get_item_from_loss(self._nested_gather(tr_loss).mean())
+            avg_loss = self._nested_gather(tr_loss).mean()
+            tr_loss_scalar = self._get_item_from_loss(avg_loss)
 
             # reset tr_loss to zero
             tr_loss.subtract_(tr_loss)
+            # set loss to zero if all steps are skipped since last log
+            if num_steps == 0:
+                logs["loss"] = 0.0
+            else:
+                logs["loss"] = round(tr_loss_scalar / num_steps, 8)
 
-            logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
+            if in_auto_parallel_align_mode():
+                logs["loss_md5"] = avg_loss._md5sum()
 
             divisor = 2**30
             # TODO(@gexiao): replace these codes with unified APIs in Paddle
@@ -1385,19 +1411,28 @@ class Trainer:
             total_train_batch_size = (
                 self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.dataset_world_size
             )
-            num_steps = self.state.global_step - self._globalstep_last_logged
+
             seq_length = None
+            model_flops = None
             if getattr(self, "is_pretraining", False) and hasattr(self.model, "config"):
                 seq_length = getattr(self.model.config, "seq_length", None)
-            logs.update(
-                speed_metrics(
-                    "interval",
-                    self._globalstep_last_start_time,
-                    num_samples=total_train_batch_size * num_steps,
-                    num_steps=num_steps,
-                    seq_length=seq_length,
+                try:
+                    model_flops = self.model.get_hardware_flops(seq_length=seq_length, recompute=self.args.recompute)
+                except NotImplementedError:
+                    model_flops = None
+
+            # Do not log speed metrics if all steps are skipped since last log.
+            if num_steps > 0:
+                logs.update(
+                    speed_metrics(
+                        "interval",
+                        self._globalstep_last_start_time,
+                        num_samples=total_train_batch_size * num_steps,
+                        num_steps=num_steps,
+                        seq_length=seq_length,
+                        model_flops=model_flops,
+                    )
                 )
-            )
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
@@ -1462,12 +1497,16 @@ class Trainer:
             raise ValueError("We don't need train_dataset when should_load_dataset is False.")
 
         train_dataset = self.train_dataset
+        if self.args.distributed_dataloader:
+            is_iterable_dataset = self._is_iterable_dataset_distributed(train_dataset)
+        else:
+            is_iterable_dataset = self._is_iterable_dataset(train_dataset)
         if is_datasets_available() and train_dataset is not None and isinstance(train_dataset, datasets.Dataset):
             train_dataset = self._remove_unused_columns(train_dataset, description="training")
         _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
-        if self._is_iterable_dataset(train_dataset):
-            if self.args.dataset_world_size > 1:
+        if is_iterable_dataset:  # For iterable dataset
+            if self.args.dataset_world_size > 1 and train_dataset is not None:
                 train_dataset = IterableDatasetShard(
                     train_dataset,
                     batch_size=self.args.per_device_train_batch_size,
@@ -1476,24 +1515,28 @@ class Trainer:
                     process_index=self.args.dataset_rank,
                 )
 
+            if self.args.distributed_dataloader:
+                logger.info("Training using DistDataLoader.")
+                additional_configs = {"is_iterable_dataset": True}
+            else:
+                additional_configs = {}
             return _DataLoader(
                 train_dataset,
                 batch_size=self.args.per_device_train_batch_size,
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
+                **additional_configs,
             )
-
-        train_sampler = self._get_train_sampler()
-
-        if self.args.distributed_dataloader:
-            logger.info("Training using DistDataLoader.")
-
-        return _DataLoader(
-            train_dataset,
-            batch_sampler=train_sampler,
-            collate_fn=self.data_collator,
-            num_workers=self.args.dataloader_num_workers,
-        )
+        else:
+            train_sampler = self._get_train_sampler()
+            if self.args.distributed_dataloader:
+                logger.info("Training using DistDataLoader.")
+            return _DataLoader(
+                train_dataset,
+                batch_sampler=train_sampler,
+                collate_fn=self.data_collator,
+                num_workers=self.args.dataloader_num_workers,
+            )
 
     def _get_eval_sampler(self, eval_dataset: Dataset):
         if eval_dataset is None or not has_length(eval_dataset):
@@ -1540,12 +1583,16 @@ class Trainer:
             raise ValueError("We don't need eval_dataset when should_load_dataset is False.")
 
         eval_dataset = eval_dataset if eval_dataset is not None else self.eval_dataset
-
+        if self.args.distributed_dataloader:
+            is_iterable_dataset = self._is_iterable_dataset_distributed(eval_dataset)
+        else:
+            is_iterable_dataset = self._is_iterable_dataset(eval_dataset)
         if is_datasets_available() and eval_dataset is not None and isinstance(eval_dataset, datasets.Dataset):
             eval_dataset = self._remove_unused_columns(eval_dataset, description="evaluation")
+        _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
-        if self._is_iterable_dataset(eval_dataset):
-            if self.args.dataset_world_size > 1:
+        if is_iterable_dataset:
+            if self.args.dataset_world_size > 1 and eval_dataset is not None:
                 eval_dataset = IterableDatasetShard(
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
@@ -1553,41 +1600,31 @@ class Trainer:
                     num_processes=self.args.dataset_world_size,
                     process_index=self.args.dataset_rank,
                 )
-
             if self.args.distributed_dataloader:
-                return DistDataLoader(
-                    eval_dataset,
-                    batch_size=self.args.per_device_eval_batch_size,
-                    collate_fn=self.data_collator,
-                    num_workers=0,
-                    eval=True,
-                )
+                logger.info("Eval using DistDataLoader.")
+                additional_configs = {"eval": True, "is_iterable_dataset": True}
             else:
-                return DataLoader(
-                    eval_dataset,
-                    batch_size=self.args.per_device_eval_batch_size,
-                    collate_fn=self.data_collator,
-                    num_workers=0,
-                )
-
-        eval_sampler = self._get_eval_sampler(eval_dataset)
-
-        if self.args.distributed_dataloader:
-            logger.info("Eval using DistDataLoader.")
-
-            return DistDataLoader(
+                additional_configs = {}
+            return _DataLoader(
                 eval_dataset,
-                batch_sampler=eval_sampler,
+                batch_size=self.args.per_device_eval_batch_size,
                 collate_fn=self.data_collator,
-                num_workers=self.args.dataloader_num_workers,
-                eval=True,
+                num_workers=0,
+                **additional_configs,
             )
         else:
-            return DataLoader(
+            eval_sampler = self._get_eval_sampler(eval_dataset)
+            if self.args.distributed_dataloader:
+                logger.info("Eval using DistDataLoader.")
+                additional_configs = {"eval": True}
+            else:
+                additional_configs = {}
+            return _DataLoader(
                 eval_dataset,
                 batch_sampler=eval_sampler,
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
+                **additional_configs,
             )
 
     def get_test_dataloader(self, test_dataset: Dataset) -> DataLoader:
@@ -1606,11 +1643,16 @@ class Trainer:
         if not self.args.should_load_dataset and test_dataset is not None:
             raise ValueError("We don't need test_dataset when should_load_dataset is False.")
 
+        if self.args.distributed_dataloader:
+            is_iterable_dataset = self._is_iterable_dataset_distributed(test_dataset)
+        else:
+            is_iterable_dataset = self._is_iterable_dataset(test_dataset)
         if is_datasets_available() and test_dataset is not None and isinstance(test_dataset, datasets.Dataset):
             test_dataset = self._remove_unused_columns(test_dataset, description="test")
+        _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
-        if self._is_iterable_dataset(test_dataset):
-            if self.args.dataset_world_size > 1:
+        if is_iterable_dataset:
+            if self.args.dataset_world_size > 1 and test_dataset is not None:
                 test_dataset = IterableDatasetShard(
                     test_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
@@ -1620,40 +1662,31 @@ class Trainer:
                 )
 
             if self.args.distributed_dataloader:
-                return DistDataLoader(
-                    test_dataset,
-                    batch_size=self.args.per_device_eval_batch_size * self.world_size,
-                    collate_fn=self.data_collator,  # _get_collator_with_removed_columns
-                    num_workers=self.args.dataloader_num_workers,
-                    eval=True,
-                )
+                logger.info("Test using DistDataLoader.")
+                additional_config = {"eval": True, "is_iterable_dataset": True}
             else:
-                return DataLoader(
-                    test_dataset,
-                    batch_size=self.args.per_device_eval_batch_size * self.world_size,
-                    collate_fn=self.data_collator,  # _get_collator_with_removed_columns
-                    num_workers=self.args.dataloader_num_workers,
-                )
-
-        test_sampler = self._get_eval_sampler(test_dataset)
-
-        if self.args.distributed_dataloader:
-            logger.info("Test using DistDataLoader.")
-
-            # We use the same batch_size as for eval.
-            return DistDataLoader(
+                additional_config = {}
+            return _DataLoader(
                 test_dataset,
-                batch_sampler=test_sampler,
+                batch_size=self.args.per_device_eval_batch_size * self.world_size,
                 collate_fn=self.data_collator,
-                drop_last=self.args.dataloader_drop_last,
-                eval=True,
+                num_workers=self.args.dataloader_num_workers,
+                **additional_config,
             )
         else:
-            return DataLoader(
+            test_sampler = self._get_eval_sampler(test_dataset)
+            if self.args.distributed_dataloader:
+                logger.info("Test using DistDataLoader.")
+                additional_config = {"eval": True}
+            else:
+                additional_config = {}
+            # We use the same batch_size as for eval.
+            return _DataLoader(
                 test_dataset,
                 batch_sampler=test_sampler,
                 collate_fn=self.data_collator,
                 drop_last=self.args.dataloader_drop_last,
+                **additional_config,
             )
 
     def create_optimizer_and_scheduler(self, num_training_steps: int):
@@ -1758,6 +1791,8 @@ class Trainer:
 
         if self.args.use_hybrid_parallel:
             if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:
+                if self.args.tensor_parallel_degree <= 1:
+                    checkpoint_rng_state["hybrid_parallel_rng_state_tracker"].pop("model_parallel_rng", None)
                 fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
                     checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
                 )
@@ -1885,7 +1920,18 @@ class Trainer:
         # Multi-gpu training
         if self.args.world_size > 1 and (not self.args.use_hybrid_parallel):
             # MOE use DDP to broadcaset parameters.
-            model = paddle.DataParallel(model)
+            ddp_kwargs = {}
+            if self.args.ddp_find_unused_parameters is not None:
+                ddp_kwargs["find_unused_parameters"] = self.args.ddp_find_unused_parameters
+            elif isinstance(model, PretrainedModel):
+                # find_unused_parameters breaks checkpointing as per
+                # https://github.com/huggingface/transformers/pull/4659#issuecomment-643356021
+                ddp_kwargs["find_unused_parameters"] = not any(
+                    hasattr(m, "enable_recompute") and m.enable_recompute for m in model.sublayers(include_self=True)
+                )
+            else:
+                ddp_kwargs["find_unused_parameters"] = True
+            model = paddle.DataParallel(model, **ddp_kwargs)
             # Distributed training (should be after fp16 initialization)
 
             if self.args.amp_master_grad:
@@ -2251,21 +2297,31 @@ class Trainer:
             self.model_wrapped.get_all_parameters(convert2cpu=True)
 
         if self.args.should_save_model_state:
-            unified_checkpoint_config_backup = self.args.unified_checkpoint_config
-            # backup and remove unified_checkpoint_config for not trine stage
-            if not self.is_in_train:
-                self.args.unified_checkpoint_config = []
-
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
+        else:
+            if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
+                os.makedirs(output_dir, exist_ok=True)
+                if self.is_in_train:
+                    global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                    paddle.save(global_rank, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
 
-            # recover unified_checkpoint_config for not trine stage
-            if not self.is_in_train:
-                self.args.unified_checkpoint_config = unified_checkpoint_config_backup
         if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
             # save model_done file to ensure model is complete
-            if self.args.should_save_model_state and self.args.should_save:
+            if (
+                self.args.should_save_model_state
+                and self.args.should_save
+                and not ("async_save" in self.args.unified_checkpoint_config)
+            ):
                 # For ckpt integrity
                 paddle.save(self.state.global_step, os.path.join(output_dir, ".model_done"))
+        if (
+            self.args.unified_checkpoint
+            and "async_save" in self.args.unified_checkpoint_config
+            and not self.is_in_train
+        ):
+            os.makedirs(output_dir, exist_ok=True)
+            global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+            paddle.save(self.state.global_step, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
 
     def _filter_moe_no_sync_optimizer_params(self):
         """
@@ -2291,9 +2347,6 @@ class Trainer:
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
         self.runtime_timer.start("checkpoint saving time")
 
-        if self.args.use_async_save:
-            clear_async_save_task_queue()
-
         # Save model checkpoint
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
 
@@ -2318,58 +2371,72 @@ class Trainer:
                     os.makedirs(output_dir, exist_ok=True)
                     logger.info("Saving optimizer files.")
                     if self.args.unified_checkpoint:
-                        save_unified_optimizer(
-                            self.args,
+                        self.unified_checkpoint_handler.save_unified_optimizer(
                             self.model,
                             self.optimizer,
                             output_dir,
-                            safe_serialization=True,
                         )
                     else:
                         if self.dp_group.rank > 0:  # this should only work for MoE saving
                             self._save_ckpt_func(
                                 self._filter_moe_no_sync_optimizer_params(),
                                 os.path.join(output_dir, optimizer_name),
+                                saved_signal_path,
                             )
+
                         else:
                             state_dict = self.optimizer.state_dict()
                             save_path = os.path.join(output_dir, optimizer_name)
                             if self.args.use_async_save:
                                 assert not strtobool(os.getenv("FLAG_LLM_PDC", "False")), "Dont support FLAG_LLM_PDC"
-                                async_save_optimizer(
-                                    state_dict,
-                                    save_path,
-                                    saved_signal_path=saved_signal_path,
+                                self._async_optimizer_saver.run(
+                                    state_dict, save_path, saved_signal_path=saved_signal_path
                                 )
                             else:
-                                self._save_ckpt_func(state_dict, save_path)
-                                with open(saved_signal_path, mode="w+") as f:
-                                    f.write("1")
-
+                                self._save_ckpt_func(state_dict, save_path, saved_signal_path)
+                else:
+                    if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
+                        global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                        os.makedirs(output_dir, exist_ok=True)
+                        paddle.save(global_rank, os.path.join(output_dir, f".optimizer_weight.done.{global_rank}"))
+                        if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
+                            paddle.save(global_rank, os.path.join(output_dir, f".master_weight.done.{global_rank}"))
             if self.args.should_save or self.args.use_expert_parallel:
                 if not self.args.use_hybrid_parallel:
                     logger.info("Saving optimizer files.")
                     if self.args.unified_checkpoint:
-                        save_unified_optimizer(
-                            self.args,
+                        self.unified_checkpoint_handler.save_unified_optimizer(
                             self.model,
                             self.optimizer,
                             output_dir,
-                            safe_serialization=True,
                         )
                     else:
                         if self.args.data_parallel_rank > 0 and self.args.use_expert_parallel:
                             self._save_ckpt_func(
-                                self._filter_moe_no_sync_optimizer_params(), os.path.join(output_dir, OPTIMIZER_NAME)
+                                self._filter_moe_no_sync_optimizer_params(),
+                                os.path.join(output_dir, optimizer_name),
+                                saved_signal_path,
                             )
                         else:
-                            self._save_ckpt_func(self.optimizer.state_dict(), os.path.join(output_dir, OPTIMIZER_NAME))
+                            self._save_ckpt_func(
+                                self.optimizer.state_dict(),
+                                os.path.join(output_dir, optimizer_name),
+                                saved_signal_path,
+                            )
 
                 # FIXME: maybe only save one copy
                 paddle.save(self.lr_scheduler.state_dict(), os.path.join(output_dir, SCHEDULER_NAME))
 
                 if self.do_grad_scaling:
                     paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
+            else:
+                if self.args.unified_checkpoint and not self.args.use_hybrid_parallel:
+                    if "async_save" in self.args.unified_checkpoint_config:
+                        global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                        os.makedirs(output_dir, exist_ok=True)
+                        paddle.save(global_rank, os.path.join(output_dir, f".optimizer_weight.done.{global_rank}"))
+                        if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
+                            paddle.save(global_rank, os.path.join(output_dir, f".master_weight.done.{global_rank}"))
 
         self.runtime_timer.stop()
         # Determine the new best metric / best model checkpoint
@@ -2428,7 +2495,7 @@ class Trainer:
         if need_to_rotate_checkpoints:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
 
-        if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
+        if strtobool(os.getenv("FLAG_LLM_PDC", "False")) and not ("async_save" in self.args.unified_checkpoint_config):
             # save checkpoint_done file to ensure checkpoint is complete
             if self.args.should_save_model_state and self.args.should_save:
                 # For ckpt integrity
@@ -2508,6 +2575,24 @@ class Trainer:
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
 
+        if (
+            strtobool(os.getenv("FLAG_LLM_PDC", "False"))
+            and paddle.distributed.get_rank() == 0
+            and self.args.unified_checkpoint
+            and "async_save" in self.args.unified_checkpoint_config
+        ):
+            os.makedirs(self.args.logging_dir, exist_ok=True)
+            world_size = paddle.distributed.get_world_size()
+            save_info = {
+                "world_size": world_size,
+                "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
+                "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
+            }
+            if os.path.exists(os.path.join(self.args.logging_dir, "async_save_info.json")):  # afs cannot overwrite
+                os.remove(os.path.join(self.args.logging_dir, "async_save_info.json"))
+            with open(os.path.join(self.args.logging_dir, "async_save_info.json"), "w") as f:
+                json.dump(save_info, f)
+
         if self.args.should_save:
             if self.tokenizer is not None:
                 self.tokenizer.save_pretrained(output_dir)
@@ -2515,7 +2600,17 @@ class Trainer:
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
         if self.args.unified_checkpoint:
-            save_unified_checkpoint(self.args, self.model, self.optimizer, output_dir, safe_serialization=True)
+            unified_checkpoint_config_backup = self.args.unified_checkpoint_config
+            # backup and remove unified_checkpoint_config for not trine stage
+            if not self.is_in_train:
+                self.args.unified_checkpoint_config = []
+
+            self.unified_checkpoint_handler.save_unified_checkpoint(self.model, self.optimizer, output_dir)
+
+            # recover unified_checkpoint_config for not trine stage
+            if not self.is_in_train:
+                self.args.unified_checkpoint_config = unified_checkpoint_config_backup
+
             return
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
@@ -2638,12 +2733,11 @@ class Trainer:
                 else:
                     opt_state_dict = None
             else:
-                opt_state_dict = load_unified_optimizer(
+                opt_state_dict = self.unified_checkpoint_handler.load_unified_optimizer(
                     args=self.args,
                     model=self.model,
                     optimizer=self.optimizer,
                     resume_from_checkpoint=checkpoint,
-                    safe_serialization=True,
                 )
 
         if self.args.ignore_load_lr_and_optim and opt_state_dict:
@@ -2656,7 +2750,9 @@ class Trainer:
             dist.barrier()
         if self.args.use_expert_parallel:
             opt_state_dict = broadcast_moe_optimizer(
-                opt_state_dict, broadcast_dp=not self.args.should_load_sharding_stage1_model
+                opt_state_dict,
+                model_state_dict=self.model.state_dict(),
+                broadcast_dp=not self.args.should_load_sharding_stage1_model,
             )
         else:
             if not self.args.should_load_sharding_stage1_model:
@@ -2797,6 +2893,9 @@ class Trainer:
 
         if self.args.pipeline_parallel_degree > 1:
             # Only accept wrapped model for pipeline_parallel mode
+            if self.model is self.model_wrapped:
+                # NOTE(gongenlei): when do_train=False, do_eval=True, we need to wrap model for pipeline
+                self.model_wrapped = fleet.distributed_model(self.model_wrapped)
             model = self.model_wrapped
         else:
             model = self.model
@@ -3218,7 +3317,7 @@ class Trainer:
             self._signature_columns += list(set(["label", "label_ids"] + self.label_names))
 
     def _remove_unused_columns(self, dataset: "datasets.Dataset", description: Optional[str] = None):
-        if not self.args.remove_unused_columns:
+        if not self.args.remove_unused_columns or self.model is None:
             return dataset
         if self._signature_columns is None:
             # Inspect model forward signature to keep only the arguments it accepts.
@@ -3267,6 +3366,15 @@ class Trainer:
 
     def _is_iterable_dataset(self, dataset):
         return isinstance(dataset, paddle.io.IterableDataset)
+
+    def _is_iterable_dataset_distributed(self, dataset):
+        # For distributed dataloaer.
+        is_iterable_dataset_tensor = paddle.to_tensor(self._is_iterable_dataset(dataset)).astype("int32").reshape([1])
+        if dist.get_world_size() > 1:
+            dist.all_reduce(is_iterable_dataset_tensor, op=dist.ReduceOp.MAX)
+        if is_iterable_dataset_tensor.item() == 1:
+            return True
+        return False
 
     def print_config(self, args=None, key=""):
         """

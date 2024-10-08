@@ -92,7 +92,7 @@ def do_train():
 
     sentence1_key, sentence2_key = task_to_keys[model_args.task_name]
 
-    train_ds = load_dataset("glue", model_args.task_name, split="train")
+    train_ds = load_dataset("glue", model_args.task_name, split="train", trust_remote_code=True)
     columns = train_ds.column_names
     is_regression = model_args.task_name == "stsb"
     label_list = None

@@ -20,9 +20,9 @@ cd ../legacy/model_zoo/gpt-3/external_ops/
 python setup.py install
 cd -
 
-# install tool_helpers
+# install fast_dataindex
 cd ../llm/
-python -m pip install tool_helpers
+python -m pip install fast_dataindex
 
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz

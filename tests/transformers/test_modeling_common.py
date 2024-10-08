@@ -926,6 +926,7 @@ class GenerationD2STestMixin:
         paddle.disable_static()
         super().setUp()
 
+    @unittest.skip("Paddle enable PIR API in Python")
     def test_to_static_use_top_k(self):
         tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
         if tokenizer.__class__.__name__ == "LlamaTokenizer":
@@ -967,8 +968,10 @@ class GenerationD2STestMixin:
                         use_top_p=False,
                     ),
                 )
-
-                model_path = os.path.join(tempdir, "model.pdmodel")
+                if paddle.framework.use_pir_api():
+                    model_path = os.path.join(tempdir, "model.json")
+                else:
+                    model_path = os.path.join(tempdir, "model.pdmodel")
                 params_path = os.path.join(tempdir, "model.pdiparams")
                 config = paddle.inference.Config(model_path, params_path)
 
@@ -1004,6 +1007,7 @@ class GenerationD2STestMixin:
         self.assertEqual(len(static_decoded_ids[0]), self.max_new_tokens)
         self.assertEqual(dygraph_decoded_ids, static_decoded_ids)
 
+    @unittest.skip("Paddle enable PIR API in Python")
     def test_to_static_use_top_p(self):
         tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
         if tokenizer.__class__.__name__ == "LlamaTokenizer":
@@ -1036,7 +1040,10 @@ class GenerationD2STestMixin:
                     ),
                 )
 
-                model_path = os.path.join(tempdir, "model.pdmodel")
+                if paddle.framework.use_pir_api():
+                    model_path = os.path.join(tempdir, "model.json")
+                else:
+                    model_path = os.path.join(tempdir, "model.pdmodel")
                 params_path = os.path.join(tempdir, "model.pdiparams")
                 config = paddle.inference.Config(model_path, params_path)
 

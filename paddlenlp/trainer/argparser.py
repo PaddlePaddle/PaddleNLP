@@ -24,7 +24,17 @@ from copy import copy
 from enum import Enum
 from inspect import isclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, NewType, Optional, Tuple, Union, get_type_hints
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    NewType,
+    Optional,
+    Tuple,
+    Union,
+    get_args,
+    get_type_hints,
+)
 
 DataClass = NewType("DataClass", Any)
 DataClassType = NewType("DataClassType", Any)
@@ -129,14 +139,20 @@ class PdArgumentParser(ArgumentParser):
                 # This is the value that will get picked if we do --field_name (without value)
                 kwargs["const"] = True
         elif isclass(origin_type) and issubclass(origin_type, list):
-            kwargs["type"] = field.type.__args__[0]
+            # supprt one dimension list and two dimension list
+            if hasattr(get_args(field.type)[0], "__args__"):
+                kwargs["type"] = field.type.__args__[0].__args__[0]
+                kwargs["action"] = "append"
+            else:
+                kwargs["type"] = field.type.__args__[0]
+
             kwargs["nargs"] = "+"
             if field.default_factory is not dataclasses.MISSING:
                 kwargs["default"] = field.default_factory()
             elif field.default is dataclasses.MISSING:
                 kwargs["required"] = True
         else:
-            kwargs["type"] = field.type
+            kwargs["type"] = json.loads if field.type is dict else field.type
             if field.default is not dataclasses.MISSING:
                 kwargs["default"] = field.default
             elif field.default_factory is not dataclasses.MISSING:
@@ -246,6 +262,8 @@ class PdArgumentParser(ArgumentParser):
             for key, value in data.items():
                 if isinstance(value, list):
                     json_args.extend([f"--{key}", *[str(v) for v in value]])
+                elif isinstance(value, dict):
+                    json_args.extend([f"--{key}", json.dumps(value)])
                 else:
                     json_args.extend([f"--{key}", str(value)])
             return json_args
