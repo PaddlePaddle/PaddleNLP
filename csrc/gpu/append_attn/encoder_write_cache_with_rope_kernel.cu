@@ -15,6 +15,207 @@
 #include "encoder_write_cache_with_rope_kernel.h"
 
 // #define DEBUG_APPEND
+template <typename T, typename QKV_TYPE>
+void rotary_qk_variable(T *qkv_out, // [token_num, 3, num_head, dim_head]
+                        const QKV_TYPE *qkv_input,  // qkv
+                        const float *qkv_out_scales, // [3, num_head, dim_head]
+                        const T *qkv_bias,
+                        const float *rotary_emb, // [2, 1, 1, seq_len, dim_head / 2]
+                        const int *padding_offsets,
+                        const int *seq_lens,
+                        const int *seq_lens_decoder,
+                        const int token_num,
+                        const int head_num,
+                        const int seq_len,
+                        const int input_output_len,
+                        const int dim_head,
+                        const cudaStream_t& stream,
+                        bool use_neox_style = false) {
+  int64_t elem_nums = qkv_out_scales ? token_num * 3 * head_num * dim_head : token_num * 2 * head_num * dim_head; // for all q k v
+  if (use_neox_style) {
+    elem_nums /= 2;
+  }
+
+  constexpr int PackSize = 16 / sizeof(T);
+  const int pack_num = elem_nums / PackSize;
+  const int blocksize = 128;
+  int grid_size = 1;
+  GetNumBlocks<128>(pack_num, &grid_size);
+  if (!use_neox_style) {
+  const float *cos_emb = rotary_emb;
+  const float *sin_emb = rotary_emb + input_output_len * dim_head / 2;
+    if (qkv_out_scales) {
+      VariableLengthRotaryKernel<T, PackSize>
+        <<<grid_size, blocksize, 0, stream>>>(
+          reinterpret_cast<const int*>(qkv_input),
+          cos_emb,
+          sin_emb,
+          padding_offsets,
+          seq_lens,
+          seq_lens_decoder,
+          qkv_out_scales,
+          qkv_bias,
+          qkv_out,
+          elem_nums,
+          head_num,
+          seq_len,
+          dim_head);
+    } else {
+      VariableLengthRotaryKernel<T, PackSize>
+        <<<grid_size, blocksize, 0, stream>>>(
+          reinterpret_cast<const T*>(qkv_input),
+          cos_emb,
+          sin_emb,
+          padding_offsets,
+          seq_lens,
+          seq_lens_decoder,
+          qkv_out,
+          elem_nums,
+          head_num,
+          seq_len,
+          dim_head);
+    }
+  } else {
+    const float *cos_emb = rotary_emb;
+    const float *sin_emb = rotary_emb + input_output_len * dim_head;
+    if (qkv_out_scales) {
+      NeoxVariableLengthRotaryKernel<T, PackSize>
+        <<<grid_size, blocksize, 0, stream>>>(
+          reinterpret_cast<const int*>(qkv_input),
+          cos_emb,
+          sin_emb,
+          padding_offsets,
+          seq_lens,
+          seq_lens_decoder,
+          qkv_out_scales,
+          qkv_bias,
+          qkv_out,
+          elem_nums,
+          head_num,
+          seq_len,
+          dim_head);
+    } else {
+      NeoxVariableLengthRotaryKernel<T, PackSize>
+        <<<grid_size, blocksize, 0, stream>>>(
+          reinterpret_cast<const T*>(qkv_input),
+          cos_emb,
+          sin_emb,
+          padding_offsets,
+          seq_lens,
+          seq_lens_decoder,
+          qkv_out,
+          elem_nums,
+          head_num,
+          seq_len,
+          dim_head);
+    }
+  }
+}
+
+template <typename T, typename QKV_TYPE>
+void gqa_rotary_qk_variable(T *qkv_out, // [token_num, 3, num_head, dim_head]
+                            const QKV_TYPE *qkv_input,  // qkv
+                            const float *qkv_out_scales, // [3, num_head, dim_head]
+                            const T *qkv_bias,
+                            const float *rotary_emb, // [2, 1, 1, seq_len, dim_head / 2]
+                            const int *padding_offsets,
+                            const int *seq_lens,
+                            const int *seq_lens_decoder,
+                            const int token_num,
+                            const int num_heads,
+                            const int kv_num_heads,
+                            const int seq_len,
+                            const int input_output_len,
+                            const int dim_head,
+                            const cudaStream_t& stream,
+                            bool use_neox_style = false) {
+  int64_t elem_nums = qkv_out_scales ? token_num * (num_heads + 2 * kv_num_heads) * dim_head : token_num * (num_heads + kv_num_heads) * dim_head; // for all q k v
+  if (use_neox_style) {
+    elem_nums /= 2;
+  }
+
+  constexpr int PackSize = 16 / sizeof(T);
+  const int pack_num = elem_nums / PackSize;
+  const int blocksize = 128;
+  int grid_size = 1;
+  GetNumBlocks<128>(pack_num, &grid_size);
+  
+  if (!use_neox_style) {
+    const float *cos_emb = rotary_emb;
+    const float *sin_emb = rotary_emb + input_output_len * dim_head / 2;
+    if (qkv_out_scales) {
+      GQAVariableLengthRotaryKernel<T, PackSize>
+        <<<grid_size, blocksize, 0, stream>>>(
+          reinterpret_cast<const int*>(qkv_input),
+          cos_emb,
+          sin_emb,
+          padding_offsets,
+          seq_lens,
+          seq_lens_decoder,
+          qkv_out_scales,
+          qkv_bias,
+          qkv_out,
+          elem_nums,
+          num_heads,
+          kv_num_heads,
+          seq_len,
+          dim_head);
+    } else {
+      GQAVariableLengthRotaryKernel<T, PackSize>
+      <<<grid_size, blocksize, 0, stream>>>(
+        reinterpret_cast<const T*>(qkv_input),
+        cos_emb,
+        sin_emb,
+        padding_offsets,
+        seq_lens,
+        seq_lens_decoder,
+        qkv_out,
+        elem_nums,
+        num_heads,
+        kv_num_heads,
+        seq_len,
+        dim_head);
+    }
+  } else {
+    const float *cos_emb = rotary_emb;
+    const float *sin_emb = rotary_emb + input_output_len * dim_head;
+    if (qkv_out_scales) {
+    GQANeoxVariableLengthRotaryKernel<T, PackSize>
+      <<<grid_size, blocksize, 0, stream>>>(
+        reinterpret_cast<const int*>(qkv_input),
+        cos_emb,
+        sin_emb,
+        padding_offsets,
+        seq_lens,
+        seq_lens_decoder,
+        qkv_out_scales,
+        qkv_bias,
+        qkv_out,
+        elem_nums,
+        num_heads,
+        kv_num_heads,
+        seq_len,
+        dim_head);
+    } else {
+      GQANeoxVariableLengthRotaryKernel<T, PackSize>
+      <<<grid_size, blocksize, 0, stream>>>(
+        reinterpret_cast<const T*>(qkv_input),
+        cos_emb,
+        sin_emb,
+        padding_offsets,
+        seq_lens,
+        seq_lens_decoder,
+        qkv_out_scales,
+        qkv_bias,
+        qkv_out,
+        elem_nums,
+        num_heads,
+        kv_num_heads,
+        seq_len,
+        dim_head);
+    }
+  }
+}
 
 template <typename T>
 void CascadeAppendWriteCacheKVQKV(const paddle::Tensor& qkv, // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 * gqa_group_size, head_dim] if GQA)
@@ -206,140 +407,6 @@ void CascadeAppendWriteCacheKVC4QKV(const paddle::Tensor &cache_k, // [max_block
     q_num_heads,
     kv_num_heads
   );
-}
-
-template <typename T, typename QKV_TYPE>
-void rotary_qk_variable(T *qkv_out, // [token_num, 3, num_head, dim_head]
-                        const QKV_TYPE *qkv_input,  // qkv
-                        const float *qkv_out_scales, // [3, num_head, dim_head]
-                        const T *qkv_bias,
-                        const float *rotary_emb, // [2, 1, 1, seq_len, dim_head / 2]
-                        const int *padding_offsets,
-                        const int *seq_lens,
-                        const int *seq_lens_decoder,
-                        const int token_num,
-                        const int head_num,
-                        const int seq_len,
-                        const int input_output_len,
-                        const int dim_head,
-                        const cudaStream_t& stream,
-                        bool use_neox_style = false) {
-  int elem_nums = token_num * 3 * head_num * dim_head; // for all q k v
-  if (use_neox_style) {
-    elem_nums = token_num * 3 * head_num * dim_head / 2;
-  }
-
-  constexpr int PackSize = 16 / sizeof(T);
-  const int pack_num = elem_nums / PackSize;
-  const int blocksize = 128;
-  int grid_size = 1;
-  GetNumBlocks<128>(pack_num, &grid_size);
-  if (!use_neox_style) {
-  const float *cos_emb = rotary_emb;
-  const float *sin_emb = rotary_emb + input_output_len * dim_head / 2;
-    VariableLengthRotaryKernel<T, PackSize>
-      <<<grid_size, blocksize, 0, stream>>>(
-        qkv_input,
-        cos_emb,
-        sin_emb,
-        padding_offsets,
-        seq_lens,
-        seq_lens_decoder,
-        qkv_out_scales,
-        qkv_bias,
-        qkv_out,
-        elem_nums,
-        head_num,
-        seq_len,
-        dim_head);
-  } else {
-    const float *cos_emb = rotary_emb;
-    const float *sin_emb = rotary_emb + input_output_len * dim_head;
-    NeoxVariableLengthRotaryKernel<T, PackSize>
-      <<<grid_size, blocksize, 0, stream>>>(
-        qkv_input,
-        cos_emb,
-        sin_emb,
-        padding_offsets,
-        seq_lens,
-        seq_lens_decoder,
-        qkv_out_scales,
-        qkv_bias,
-        qkv_out,
-        elem_nums,
-        head_num,
-        seq_len,
-        dim_head);
-  }
-}
-
-template <typename T, typename QKV_TYPE>
-void gqa_rotary_qk_variable(T *qkv_out, // [token_num, 3, num_head, dim_head]
-                            const QKV_TYPE *qkv_input,  // qkv
-                            const float *qkv_out_scales, // [3, num_head, dim_head]
-                            const T *qkv_bias,
-                            const float *rotary_emb, // [2, 1, 1, seq_len, dim_head / 2]
-                            const int *padding_offsets,
-                            const int *seq_lens,
-                            const int *seq_lens_decoder,
-                            const int token_num,
-                            const int num_heads,
-                            const int kv_num_heads,
-                            const int seq_len,
-                            const int input_output_len,
-                            const int dim_head,
-                            const cudaStream_t& stream,
-                            bool use_neox_style = false) {
-  int elem_nums = token_num * (num_heads + 2 * kv_num_heads) * dim_head; // for all q k v
-  if (use_neox_style) {
-    elem_nums /= 2;
-  }
-
-  constexpr int PackSize = 16 / sizeof(T);
-  const int pack_num = elem_nums / PackSize;
-  const int blocksize = 128;
-  int grid_size = 1;
-  GetNumBlocks<128>(pack_num, &grid_size);
-  
-  if (!use_neox_style) {
-    const float *cos_emb = rotary_emb;
-    const float *sin_emb = rotary_emb + input_output_len * dim_head / 2;
-    GQAVariableLengthRotaryKernel<T, PackSize>
-      <<<grid_size, blocksize, 0, stream>>>(
-        qkv_input,
-        cos_emb,
-        sin_emb,
-        padding_offsets,
-        seq_lens,
-        seq_lens_decoder,
-        qkv_out_scales,
-        qkv_bias,
-        qkv_out,
-        elem_nums,
-        num_heads,
-        kv_num_heads,
-        seq_len,
-        dim_head);
-  } else {
-    const float *cos_emb = rotary_emb;
-    const float *sin_emb = rotary_emb + input_output_len * dim_head;
-    GQANeoxVariableLengthRotaryKernel<T, PackSize>
-      <<<grid_size, blocksize, 0, stream>>>(
-        qkv_input,
-        cos_emb,
-        sin_emb,
-        padding_offsets,
-        seq_lens,
-        seq_lens_decoder,
-        qkv_out_scales,
-        qkv_bias,
-        qkv_out,
-        elem_nums,
-        num_heads,
-        kv_num_heads,
-        seq_len,
-        dim_head);
-  }
 }
 
 template <typename T, typename QKV_TYPE>
