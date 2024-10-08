@@ -453,6 +453,8 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                         ffn_hidden_size=self.intermediate_size,
                         num_key_value_heads=self.num_key_value_heads,
                         mp_size=self.config.tensor_parallel_degree,
+                        concat_qkv=True,
+                        concat_ffn1=True,
                     )
                 self.transformer_block.weight_scales = weight_scales_loader.scale
                 self.transformer_block.act_scales = act_scale_loader.scale
