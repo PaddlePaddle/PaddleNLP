@@ -202,6 +202,22 @@ def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_out
         logits = paddle.matmul(x, y, transpose_y=transpose_y)
         return logits
 
+def shift(qkv, bsz, q_len, group_size, num_heads, head_dim):
+    if qkv.shape != [bsz, num_heads, q_len, head_dim]:
+        raise ValueError("qkv shape does not match expected shape")
+    
+    # Calculate the shift amount for rolling
+    shift_amount = -group_size // 2
+
+    # Roll the qkv tensor along the sequence length axis
+    qkv[:, :, num_heads // 2:] = qkv[:, :, num_heads // 2:].roll(shift_amount, dims=1)
+
+    # Transpose and reshape the tensor to the desired shape
+    qkv = qkv.transpose([0, 2, 1, 3]).reshape([bsz * (q_len // group_size), num_heads, group_size, head_dim])
+
+    return qkv
+
+
 
 def scaled_dot_product_attention(
     query_states,
@@ -247,6 +263,19 @@ def scaled_dot_product_attention(
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
+        if config.use_ssa and config.group_size_ratio:
+            # Calculate the group size based on the sequence length and the group size ratio
+            group_size = int(q_len * config.group_size_ratio)
+
+            # Ensure the sequence length is divisible by the group size
+            if q_len % group_size > 0:
+                raise ValueError("q_len %d should be divisible by group size %d."%(q_len, group_size))
+            num_group = q_len // group_size
+
+            # Apply shifting to the query, key, and value states
+            query_states = shift(query_states, bsz, q_len, group_size, num_heads, head_dim)
+            key_states = shift(key_states, bsz, q_len, group_size, num_heads, head_dim)
+            value_states = shift(value_states, bsz, q_len, group_size, num_heads, head_dim)
         # matmul and devide by sqrt(head_dim)
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
         # then add alibi bias
@@ -254,11 +283,17 @@ def scaled_dot_product_attention(
             alibi = alibi.reshape([bsz, num_heads, 1, -1])
             attn_weights = attn_weights + alibi
 
-        if paddle.in_dynamic_mode() and attn_weights.shape != [bsz, num_heads, q_len, kv_seq_len]:
-            raise ValueError(
-                f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
-                f" {attn_weights.shape}"
-            )
+        if paddle.in_dynamic_mode():
+            if config.use_ssa and attn_weights.shape != [bsz * num_group, num_heads, group_size, group_size]:
+                raise ValueError(
+                    f"Attention weights should be of shape {(bsz * num_group, num_heads, group_size, group_size)}, but is"
+                    f" {attn_weights.shape}"
+                )
+            elif not config.use_ssa and attn_weights.shape != [bsz,num_heads, q_len, kv_seq_len]:
+                raise ValueError(
+                    f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
+                    f" {attn_weights.shape}"
+                )
 
         # In sep mode, the attenion mask should be created in the runtime.
         if reshard_layer is not None:
@@ -269,11 +304,19 @@ def scaled_dot_product_attention(
         # we just make it triangle_upper_mask
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
-        attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
-        if paddle.in_dynamic_mode() and attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
-            raise ValueError(
-                f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
-            )
+
+        if config.use_ssa:
+            attention_mask = attention_mask[:, :, :group_size, :group_size].repeat_interleave(num_group, 0)
+            if attention_mask.shape != [bsz * num_group, 1, group_size, group_size]:
+                raise ValueError(
+                    f"Attention mask should be of size {(bsz * num_group, 1, group_size, group_size)}, but is {attention_mask.shape}"
+                )
+        else:
+            attention_mask = attention_mask.reshape([bsz, 1, q_len, kv_seq_len])
+            if paddle.in_dynamic_mode() and attention_mask.shape != [bsz, 1, q_len, kv_seq_len]:
+                raise ValueError(
+                    f"Attention mask should be of shape {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
+                )
 
         attn_weights = attn_weights + attention_mask
         if not paddle.in_dynamic_mode():
@@ -284,6 +327,11 @@ def scaled_dot_product_attention(
 
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
+
+        if config.use_ssa:
+            # shift back
+            attn_output = attn_output.reshape([bsz, q_len, num_heads, head_dim])
+            attn_output[:, :, num_heads // 2:] = attn_output[:, :, num_heads // 2:].roll(group_size // 2, axis=1)
 
         if reshard_layer is not None:
             attn_output = reshard_layer(
