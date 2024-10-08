@@ -1496,11 +1496,11 @@ function llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4() {
         python -u -m paddle.distributed.launch \
             --gpus "0,1,2,3" \
             --log_dir $case_log_dir \
-            ../run_pretrain_auto.py \
+            run_pretrain_auto.py \
             --model_type "llama" \
             --model_name_or_path "facebook/llama-7b" \
             --tokenizer_name_or_path "facebook/llama-7b" \
-            --input_dir "../data" \
+            --input_dir "./data" \
             --output_dir $case_out_dir \
             --split 949,50,1 \
             --weight_decay 0.01 \
