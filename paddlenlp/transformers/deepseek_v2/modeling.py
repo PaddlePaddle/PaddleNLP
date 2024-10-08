@@ -64,6 +64,8 @@ from ..model_outputs import (
     SequenceClassifierOutputWithPast,
 )
 from ..model_utils import PretrainedModel, register_base_model
+from ..moe_gate import BaseGate
+from ..moe_layer import MoELayer
 from .configuration import DeepseekV2Config
 
 
@@ -602,9 +604,13 @@ class DeepseekV2MLP(nn.Layer):
         return down_proj
 
 
-class MoEGate(nn.Layer):
+class MoEGate(BaseGate):
     def __init__(self, config: DeepseekV2Config):
-        super().__init__()
+        super().__init__(
+            num_experts=config.n_routed_experts,
+            expert_hidden_size=config.hidden_size,
+        )
+
         self.config = config
         self.top_k = config.num_experts_per_tok
         self.n_routed_experts = config.n_routed_experts
@@ -619,27 +625,15 @@ class MoEGate(nn.Layer):
         # topk selection algorithm
         self.norm_topk_prob = config.norm_topk_prob
         self.gating_dim = config.hidden_size
-        self.weight = paddle.create_parameter(
-            shape=[self.gating_dim, self.n_routed_experts],
-            dtype=paddle.get_default_dtype(),
-            default_initializer=nn.initializer.Constant(1.0),
-        )
 
     def forward(self, hidden_states):
         bsz, seq_len, h = hidden_states.shape
         # compute gating score
         hidden_states = hidden_states.reshape([-1, h])
+
         with paddle.amp.auto_cast(False):
-            logits = F.linear(
-                paddle.cast(hidden_states, paddle.float32), paddle.cast(self.weight, paddle.float32), None
-            )
-
-        if self.scoring_func == "softmax":
-
-            with paddle.amp.auto_cast(False):
-                scores = F.softmax(logits.astype("float32"), axis=-1)
-        else:
-            raise NotImplementedError(f"insupportable scoring function for MoE gating: {self.scoring_func}")
+            logits = F.linear(paddle.cast(hidden_states, paddle.float32), self.weight, None)
+        scores = self.gate_score_func(logits=logits)
 
         # select top-k experts
         if self.topk_method == "greedy":
@@ -647,8 +641,7 @@ class MoEGate(nn.Layer):
         elif self.topk_method == "group_limited_greedy":
             group_scores = scores.reshape([bsz * seq_len, self.n_group, -1]).max(axis=-1).values  # [n, n_group]
             group_idx = paddle.topk(group_scores, k=self.topk_group, axis=-1, sorted=False)[1]  # [n, top_k_group]
-            group_mask = paddle.zeros_like(group_scores)  # [n, n_group]
-            group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
+            group_mask = paddle.zeros_like(group_scores).put_along_axis(group_idx, paddle.to_tensor(1.0), axis=1)  # fmt:skip
             score_mask = (
                 group_mask.unsqueeze(-1)
                 .expand(bsz * seq_len, self.n_group, self.n_routed_experts // self.n_group)

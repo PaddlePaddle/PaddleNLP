@@ -18,9 +18,7 @@ from typing import Any, List, Tuple
 
 import paddle
 import paddle.distributed as dist
-import paddle.nn.functional as F
-from paddle import Tensor, nn
-from paddle.distributed import fleet
+import paddle.nn as nn
 from paddle.distributed.communication import stream
 from paddle.distributed.communication.group import Group
 from paddle.distributed.fleet.utils import recompute
@@ -35,46 +33,6 @@ GateOutput = namedtuple(
         "logits",
     ],
 )
-
-
-def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
-    """
-    Rearranges the input tensor `x` based on gate results, truncates it according to the specified capacity, and performs padding.
-
-    Args:
-        x (Tensor)[Seq, Dim]: The input tensor.
-        dispatch_mask (List[Tensor[Seq, 1], Tensor[Seq, 1]]): A list of dispatch masks.
-        scatter_index (Union[List[Tensor[Seq,], Tensor[Seq]], Tensor[Seq, 2]]): A list or tensor representing scatter indices.
-        num_experts (int): The number of experts.
-        capacity (int): The capacity size.
-
-    Returns:
-        Tensor [Expert*Capacity, Dim]: The output tensor after dispatching.
-    """
-    output = None
-    orig_dtype = x.dtype
-    if isinstance(scatter_index, paddle.Tensor):
-        scatter_index = scatter_index.unbind(1)
-    for i_scatter_index, i_dispatch_mask in zip(scatter_index, dispatch_mask):
-        init_output = paddle.zeros([num_experts * capacity, x.shape[-1]], dtype="float32")
-        updates = x * i_dispatch_mask.cast(x.dtype)
-        if output is None:
-            output = paddle.scatter(
-                init_output,
-                i_scatter_index,
-                updates,
-                overwrite=False,
-            )
-        else:
-            output = output + paddle.scatter(
-                init_output,
-                i_scatter_index,
-                updates,
-                overwrite=False,
-            )
-        if output.dtype != orig_dtype:
-            output = output.cast(orig_dtype)
-    return output
 
 
 def combining(x, combine_weights, scatter_index):
@@ -105,40 +63,45 @@ class _AllToAll(paddle.autograd.PyLayer):
     @staticmethod
     def forward(
         ctx: Any,
-        input: Tensor,
+        input: paddle.Tensor,
         group: Group,
-    ) -> Tensor:  # type: ignore
+    ) -> paddle.Tensor:
         """
         All-to-all communication in the group.
 
         Args:
             ctx (Any): Context object.
-            input (Tensor): Input tensor.
+            input (paddle.Tensor): Input tensor.
             group (Group): The group object.
 
         Returns:
             Tensor: Output tensor.
         """
-
         ctx.group = group
-        # return input
-        if dist.get_world_size(group) <= 1:
+
+        if group is not None and not group.is_member():
+            # when process is not in the group, return input
             return input
+
+        if dist.get_world_size(group) <= 1:
+            # when world size is 1, return input
+            return input
+
         output = paddle.empty_like(input)
         stream.alltoall_single(output, input, None, None, group, True, True)
         return output
 
     @staticmethod
-    def backward(ctx: Any, *grad_output: Tensor) -> Tuple[Tensor]:
+    def backward(ctx: Any, *grad_output: paddle.Tensor) -> Tuple[paddle.Tensor]:
         """
         Aggregates gradient information from all input tensors into a single tensor.
 
         Args:
             ctx (Any): The context object used to store information that needs to be passed.
-            *grad_output (Tensor): A list of input tensors whose gradients are to be aggregated.
+            *grad_output (paddle.Tensor): A list of input tensors whose gradients are to be aggregated.
 
         Returns:
-            Tuple[Tensor]: A tuple containing a tensor that holds the gradients of all input tensors.
+            Tuple[paddle.Tensor]: A tuple containing a tensor that holds the gradients of all input tensors.
 
         """
         # return grad_output
@@ -163,57 +126,81 @@ class MoELayer(nn.Layer):
         expert (paddle.nn.LayerList):
             expert network, LayerList 长度是 per_device 上的 expert 数。
         group (paddle.ProgressGroup)
-        recompute: 启用MOE内recomupte
     Returns:
         output
         combine_weight
         router-loss
+
+    Examples:
+        .. code-block:: python
+
+            >>> # doctest: +REQUIRES(env:DISTRIBUTED)
+            >>> import paddle
+            >>> import paddle.nn as nn
+            >>> import paddle.distributed as dist
+
+            >>> class SimpleNet(nn.Layer):
+            ...     def __init__(self):
+            ...         super().__init__()
+            ...         self._linear = nn.Linear(10, 1)
+            ...     def forward(self, x):
+            ...         return self._linear(x)
+
+            >>> dist.init_parallel_env()
+            >>> model = SimpleNet()
+            >>> dp_model = paddle.DataParallel(model)
+
+            >>> inputs_1 = paddle.randn([10, 10], 'float32')
+            >>> inputs_2 = paddle.ones([10, 10], 'float32')
+
+            >>> with dp_model.no_sync():
+            ...     # gradients will not be synchronized
+            ...     dp_model(inputs_1).backward()
+
+            >>> # synchronization happens here
+            >>> dp_model(inputs_2).backward()
     """
 
     def __init__(
         self,
         gate: nn.Layer,
+        num_experts: int,
         experts: List[nn.Layer],
-        layer_idx,
         group: Group = None,
-        recompute=False,
         all_to_all_dropout=0.0,
-        moe_num_experts=2,
     ):
         super().__init__()
         self.gate = gate
-        self.layer_idx = layer_idx
-        self.recompute = recompute
-        logger.info(f"using moe recompute={recompute}")
-        for p in self.gate.parameters():
-            p.is_gate = True
-        if type(experts) == nn.LayerList:
-            self.experts = experts
-        else:
-            logger.info(f"using fused experts, type={type(experts)}")
-            self.experts = nn.LayerList([experts])
+
+        self.num_experts = num_experts
+        self.experts = experts
+
         self.group = group
         self.all_to_all_dropout = all_to_all_dropout
-        is_dummy_moe = dist.get_world_size(group) == 1 or dist.get_world_size(group) == -1
+
+        self.enable_recompute = False
+
+        self.world_size = 1 if dist.get_world_size(self.group) < 1 else dist.get_world_size(group)
+        is_dummy_moe = dist.get_world_size(group) == 1
+        self.rank = 0 if dist.get_rank(self.group) < 0 else dist.get_rank(self.group)
+
+        for p in self.gate.parameters():
+            p.is_gate = True
 
         for k in experts:
             if k is not None:
                 for p in k.parameters():
                     p.expert = not is_dummy_moe
                     p.no_sync = not is_dummy_moe
-                    # logger.info(f"expert param={p.name}, no-sync={p.no_sync}")
 
-        self.world_size = dist.get_world_size(group)
-        self.rank = dist.get_rank(self.group)
-        if self.world_size < 1:
-            self.world_size = 1
-        if self.rank < 0:
-            self.rank = 0
-
-        self.num_local_experts = moe_num_experts // self.world_size
+        assert (
+            num_experts // self.world_size == 0
+        ), f"num_experts must be divisible by world_size, got: {num_experts} vs {self.world_size}"
+        self.num_local_experts = num_experts // self.world_size
 
     def forward(self, input):
         true_experts = self.experts[self.rank * self.num_local_experts : (self.rank + 1) * self.num_local_experts]
+
         if input.ndim == 3:
             orig_shape = input.shape
             reshaped_input = input.reshape([-1, input.shape[-1]])
