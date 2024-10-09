@@ -1108,7 +1108,7 @@ __device__ __forceinline__ void mask_s(const uint32_t qo_idx_base,
                                   8 * (reg_id / 4) + reg_id % 2;
           const bool out_of_boundary =
               (causal ? (kv_idx > kv_len + q_idx - qo_len ||
-                         (partition_kv && kv_idx >= chunk_end))
+                         (kv_idx >= chunk_end))
                       : kv_idx >= chunk_end);
           if constexpr (std::is_same<T, half>::value) {
             s_frag[fx][fz][reg_id] =
@@ -1123,7 +1123,7 @@ __device__ __forceinline__ void mask_s(const uint32_t qo_idx_base,
                                   8 * (reg_id / 4) + reg_id % 2;
           const bool out_of_boundary =
               (causal ? (kv_idx > kv_len + q_idx - qo_len ||
-                         (partition_kv && kv_idx >= chunk_end))
+                         (kv_idx >= chunk_end))
                       : kv_idx >= chunk_end);
 #ifdef DEBUG_ATTN_C4
           if (threadIdx.x == PRINT_TID && threadIdx.y == PRINT_WID &&
@@ -1951,7 +1951,7 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
   AlignedVector<OutT, VEC_SIZE> out_vec;
   // [num_warps * num_frags_x * 16, num_frags_y * 16]
   if (ty == 0) {
-    // [num_frags_x * 16, num_frags_y * 16]
+  // [num_frags_x * 16, num_frags_y * 16]
 #pragma unroll
     for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
 #pragma unroll
@@ -2070,10 +2070,10 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
               Load<T, VEC_SIZE>(smooth_weight + shift_smooth_offset,
                                 &smooth_weight_vec);
             }
-            Load<T, VEC_SIZE>(
+          }
+          Load<T, VEC_SIZE>(
                 reinterpret_cast<T*>(o_smem->base + o_smem_offset_w),
                 &ori_out_vec);
-          }
 #ifdef DEBUG_ATTN
           __syncthreads();
           if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
@@ -2117,8 +2117,8 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
           if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
               blockIdx.x == gridDim.x - 1) {
             printf("Store start");
-          }
-          __syncthreads();
+            }
+            __syncthreads();
 #endif
           Store<OutT, VEC_SIZE>(out_vec, o_ptr);
 #ifdef DEBUG_ATTN
@@ -2140,7 +2140,7 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
     }
     o_smem_offset_w =
         o_smem->advance_offset_by_row<16, num_vecs_per_head>(o_smem_offset_w) -
-        2 * num_frags_y;
+                      2 * num_frags_y;
     // }
   }
 #ifdef DEBUG_ATTN

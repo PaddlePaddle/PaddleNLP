@@ -574,7 +574,9 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
   T *q_base_ptr = q + q_offset;
   T *o_base_ptr_T = nullptr;
   OutT *o_base_ptr_int8 = nullptr;
-  if constexpr (partition_kv) {
+  if (num_chunks_this_seq <= 1) {
+    o_base_ptr_int8 = out + o_offset;
+  } else {
     if (ENABLE_PREFILL) {
       o_base_ptr_T = tmp_workspace + batch_id * num_chunks * q_n_stride +
                      chunk_idx * q_n_stride + q_head_idx * HEAD_DIM +
@@ -586,21 +588,9 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
           chunk_idx * q_n_stride + q_head_idx * HEAD_DIM +
           tid % 8 * num_elems_per_128b<T>();
     }
-  } else {
-    o_base_ptr_int8 = out + o_offset;
+  // } else {
+  //   o_base_ptr_int8 = out + o_offset;
   }
-#ifdef DEBUG_ATTN
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
-    printf(
-        "q_base_seq_id_this_block: %d, q_base_seq_id_this_block: %d, q_offset: "
-        "%d, o_offset: %d\n",
-        (int)q_base_seq_id_this_block,
-        (int)q_base_seq_id_this_block,
-        (int)q_offset,
-        (int)o_offset);
-  }
-  __syncthreads();
-#endif
 
   smem_t qo_smem(smem);
 
@@ -624,49 +614,9 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
   commit_group();
   wait_group<0>();
   __syncthreads();
-#ifdef DEBUG_ATTN
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
-    printf("before scale\n");
-    T *q_smem_t = reinterpret_cast<T *>(qo_smem.base);
-    for (uint32_t i = 0; i < num_frags_x * 16; ++i) {
-      for (uint32_t j = 0; j < num_frags_y * 16; ++j) {
-        if (blockIdx.z == 0) {
-          printf("q_smem[%d][%d] = %f  ",
-                 (int)i,
-                 (int)(j),
-                 (float)q_smem_t[i * num_frags_y * 16 + j]);
-        } else {
-          int res = q_smem_t[i * num_frags_y * 16 + j] + static_cast<T>(1.f);
-        }
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
 
   q_smem_inplace_multiply_sm_scale_multi_warps<num_frags_x, num_frags_y, T>(
       &qo_smem, scale);
-#ifdef DEBUG_ATTN
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
-    printf("after scale\n");
-    T *q_smem_t = reinterpret_cast<T *>(qo_smem.base);
-    for (uint32_t i = 0; i < num_frags_x * 16; ++i) {
-      for (uint32_t j = 0; j < num_frags_y * 16; ++j) {
-        if (blockIdx.z == 0) {
-          printf("q_smem[%d][%d] = %f  ",
-                 (int)i,
-                 (int)(j),
-                 (float)q_smem_t[i * num_frags_y * 16 + j]);
-        } else {
-          int res = q_smem_t[i * num_frags_y * 16 + j] + static_cast<T>(1.f);
-        }
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
 
   smem_t k_smem(smem + num_frags_x * 16 * HEAD_DIM * sizeof(T)),
       v_smem(smem + (num_frags_x + NUM_WARP_KV * num_frags_z) * 16 * HEAD_DIM *
@@ -689,24 +639,7 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
                          chunk_start)))
               : chunk_len) /
       (NUM_WARP_KV * num_frags_z * 16);
-#ifdef DEBUG_ATTN
-  if (tid == 0 && wid == 0 && kv_head_idx == 0) {
-    printf(
-        "batch_id: %d, tile_id: %d, chunk_size: %d, q_len: %d, kv_len: %d, "
-        "chunk_start: %d, chunk_end: %d, num_iterations: %d, "
-        "mask_check_iteration: %d\n",
-        (int)batch_id,
-        (int)tile_id,
-        (int)chunk_size,
-        (int)q_len,
-        (int)kv_len,
-        (int)chunk_start,
-        (int)chunk_end,
-        (int)num_iterations,
-        (int)mask_check_iteration);
-  }
-  __syncthreads();
-#endif
+
   /*
     1 ｜ 2
     ——————
@@ -739,18 +672,6 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
   // num_elems_per_128b<T>();
   T *cache_k_now = cache_k + block_id * kv_n_stride + const_offset;
   T *cache_v_now = cache_v + block_id * kv_n_stride + const_offset;
-#ifdef DEBUG_ATTN
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-    printf(
-        "2108 ori q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: "
-        "%d, kv_smem_offset_w: %d\n",
-        (int)q_smem_offset_r,
-        (int)k_smem_offset_r,
-        (int)v_smem_offset_r,
-        (int)kv_smem_offset_w);
-  }
-  __syncthreads();
-#endif
 
   // load BLOCK_SIZE * HEAD_DIM each time
   produce_kv_blockwise<SharedMemFillMode::kNoFill,
@@ -768,18 +689,7 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
                                    kv_idx_base,
                                    chunk_end);
   commit_group();
-#ifdef DEBUG_ATTN
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-    printf(
-        "2139 ori q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: "
-        "%d, kv_smem_offset_w: %d\n",
-        (int)q_smem_offset_r,
-        (int)k_smem_offset_r,
-        (int)v_smem_offset_r,
-        (int)kv_smem_offset_w);
-  }
-  __syncthreads();
-#endif
+
   produce_kv_blockwise<SharedMemFillMode::kFillZero,
                        NUM_WARPS,
                        BLOCK_SIZE,
@@ -795,38 +705,12 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
                                    kv_idx_base,
                                    chunk_end);
   commit_group();
-#ifdef DEBUG_ATTN
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-    printf(
-        "2021 ori q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: "
-        "%d, kv_smem_offset_w: %d\n",
-        (int)q_smem_offset_r,
-        (int)k_smem_offset_r,
-        (int)v_smem_offset_r,
-        (int)kv_smem_offset_w);
-  }
-  __syncthreads();
-#endif
+
 #pragma unroll 1
   for (uint32_t iter = 0; iter < num_iterations; ++iter) {
     wait_group<1>();
     __syncthreads();
-#ifdef DEBUG_ATTN
-    if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0 && blockIdx.x == 0) {
-      printf("cache_k_smem\n");
-      T *k_smem_t = reinterpret_cast<T *>(k_smem.base);
-      for (uint32_t i = 0; i < NUM_WARP_KV * num_frags_z * 16; ++i) {
-        for (uint32_t j = 0; j < num_frags_y * 16; ++j) {
-          printf("k_smem[%d][%d] = %f  ",
-                 (int)i,
-                 (int)j,
-                 (float)k_smem_t[i * num_frags_y * 16 + j]);
-        }
-        printf("\n");
-      }
-    }
-    __syncthreads();
-#endif
+
     // s = qk
     compute_qk<num_frags_x, num_frags_y, num_frags_z, T>(
         &qo_smem, &q_smem_offset_r, &k_smem, &k_smem_offset_r, s_frag);
@@ -846,47 +730,11 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
                           chunk_end,
                           s_frag);
     }
-#ifdef DEBUG_ATTN
-    if (tid == 0 && threadIdx.y == 0 && blockIdx.z == 0) {
-      for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-        for (uint32_t fz = 0; fz < num_frags_z; ++fz) {
-          for (int k = 0; k < 8; k++) {
-            printf("mask_s_s_frag[%d][%d][%d]:%f  ",
-                   (int)fx,
-                   (int)fz,
-                   (int)k,
-                   s_frag[fx][fz][k]);
-          }
-          printf("\n");
-        }
-        printf("\n");
-      }
-    }
-    __syncthreads();
-#endif
 
     // update m,d
     update_mdo_states<num_frags_x, num_frags_y, num_frags_z>(
         s_frag, o_frag, m_frag, d_frag);
     __syncthreads();
-#ifdef DEBUG_ATTN
-    if (tid == 0 && threadIdx.y == 0 && blockIdx.z == 0) {
-      for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-        for (uint32_t fz = 0; fz < num_frags_z; ++fz) {
-          for (int k = 0; k < 8; k++) {
-            printf("after_update_mdo_states, s_frag[%d][%d][%d]:%f  ",
-                   (int)fx,
-                   (int)fz,
-                   (int)k,
-                   s_frag[fx][fz][k]);
-          }
-          printf("\n");
-        }
-        printf("\n");
-      }
-    }
-    __syncthreads();
-#endif
 
     kv_idx_base += NUM_WARP_KV * num_frags_z * 16;
     block_id = __ldg(&block_table_now[kv_idx_base / BLOCK_SIZE]);
@@ -911,22 +759,7 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
     commit_group();
     wait_group<1>();
     __syncthreads();
-#ifdef DEBUG_ATTN
-    if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0 && blockIdx.x == 0) {
-      printf("cache_v_smem\n");
-      T *v_smem_t = reinterpret_cast<T *>(v_smem.base);
-      for (uint32_t i = 0; i < NUM_WARP_KV * num_frags_z * 16; ++i) {
-        for (uint32_t j = 0; j < num_frags_y * 16; ++j) {
-          printf("v_smem[%d][%d] = %f  ",
-                 (int)i,
-                 (int)j,
-                 (float)v_smem_t[i * num_frags_y * 16 + j]);
-        }
-        printf("\n");
-      }
-    }
-    __syncthreads();
-#endif
+
     // compute sfm*v
     compute_sfm_v<num_frags_x, num_frags_y, num_frags_z, T>(
         &v_smem, &v_smem_offset_r, s_frag, o_frag, d_frag);
@@ -951,57 +784,31 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
   }
   wait_group<0>();
   __syncthreads();
-#ifdef DEBUG_ATTN
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-    printf("before merge z\n");
-    for (uint32_t i = 0; i < num_frags_x; ++i) {
-      printf("m1: %f, m2: %f\n", m_frag[i][0], m_frag[i][1]);
-      printf("d1: %f, d2: %f\n", d_frag[i][0], d_frag[i][1]);
-      for (uint32_t j = 0; j < num_frags_y; ++j) {
-        for (int r_id = 0; r_id < 8; r_id++) {
-          printf("o_frag[%d][%d][%d]: %f ",
-                 (int)i,
-                 (int)j,
-                 r_id,
-                 o_frag[i][j][r_id]);
-        }
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
 
   merge_block_res_v2<num_frags_x, num_frags_y, T>(
       o_frag, reinterpret_cast<float *>(smem), m_frag, d_frag, wid, tid);
-#ifdef DEBUG_ATTN
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-    printf("after merge z\n");
-    for (uint32_t i = 0; i < num_frags_x; ++i) {
-      printf("m1: %f, m2: %f\n", m_frag[i][0], m_frag[i][1]);
-      printf("d1: %f, d2: %f\n", d_frag[i][0], d_frag[i][1]);
-      for (uint32_t j = 0; j < num_frags_y; ++j) {
-        for (int r_id = 0; r_id < 8; r_id++) {
-          printf("o_frag[%d][%d][%d]: %f ",
-                 (int)i,
-                 (int)j,
-                 r_id,
-                 o_frag[i][j][r_id]);
-        }
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
 
-  if constexpr (!partition_kv) {
+  if (num_chunks_this_seq <= 1) {
     normalize_d<num_frags_x, num_frags_y>(o_frag, d_frag);
   }
 
   // write o
   // [num_frags_x, 16, num_frags_y, 16]
-  if constexpr (partition_kv) {
+  if (num_chunks_this_seq <= 1) {
+    write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE, num_frags_x, num_frags_y, false>(
+      o_frag,
+      &qo_smem,
+      o_base_ptr_int8,
+      shift_bias,
+      smooth_weight,
+      q_base_seq_id_this_block,
+      q_head_idx,
+      in_scale,
+      q_len,
+      q_n_stride, 
+      HEAD_DIM
+    );
+  } else {
     write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
                                                     num_frags_x,
                                                     num_frags_y,
@@ -1015,27 +822,27 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
         q_head_idx,
         in_scale,
         q_len,
-        partition_kv ? q_n_stride * num_chunks : q_n_stride,
+        q_n_stride * num_chunks,
         HEAD_DIM);
-  } else {
-    write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
-                                                    num_frags_x,
-                                                    num_frags_y,
-                                                    partition_kv>(
-        o_frag,
-        &qo_smem,
-        o_base_ptr_int8,
-        shift_bias,
-        smooth_weight,
-        q_base_seq_id_this_block,
-        q_head_idx,
-        in_scale,
-        q_len,
-        partition_kv ? q_n_stride * num_chunks : q_n_stride,
-        HEAD_DIM);
+  // } else {
+  //   write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
+  //                                                   num_frags_x,
+  //                                                   num_frags_y,
+  //                                                   partition_kv>(
+  //       o_frag,
+  //       &qo_smem,
+  //       o_base_ptr_int8,
+  //       shift_bias,
+  //       smooth_weight,
+  //       q_base_seq_id_this_block,
+  //       q_head_idx,
+  //       in_scale,
+  //       q_len,
+  //       partition_kv ? q_n_stride * num_chunks : q_n_stride,
+  //       HEAD_DIM);
   }
 
-  if constexpr (partition_kv) {
+  if (num_chunks_this_seq > 1) {
     if (wid == 0) {
 #pragma unroll
       for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
@@ -1045,24 +852,7 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
               q_base_seq_id_this_block + tid / 4 + j * 8 + fx * 16;
           const uint32_t qo_head_idx = q_head_idx + qo_idx_now % GROUP_SIZE;
           const uint32_t qo_idx = q_start_seq_id + qo_idx_now / GROUP_SIZE;
-#ifdef DEBUG_ATTN
-          if (batch_id == 0) {
-            printf(
-                "bid: %d, tid: %d, wid: %d, q_base_seq_id_this_block: %d, "
-                "qo_idx_now: %d, qo_idx: %d, q_start_seq_id: %d, q_len: %d, m: "
-                "%f, d: %f\n",
-                (int)batch_id,
-                (int)tid,
-                (int)wid,
-                (int)q_base_seq_id_this_block,
-                (int)qo_idx_now,
-                (int)qo_idx,
-                (int)q_start_seq_id,
-                (int)q_len,
-                (float)m_frag[fx][j],
-                (float)d_frag[fx][j]);
-          }
-#endif
+
           if (qo_idx - q_start_seq_id < q_len) {
             uint32_t offset;
             if (ENABLE_PREFILL) {
@@ -1574,27 +1364,6 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
   const uint32_t tid = threadIdx.x, wid = threadIdx.y;
   const uint32_t num_chunks = gridDim.y;
   const uint32_t chunk_idx = blockIdx.y;
-  if (tid == PRINT_TID && wid == 0) {
-    
-  }
-#ifdef DEBUG_ATTN_C8
-  __syncthreads(); 
-  printf("---1771---");
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0 &&
-      blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
-    __syncthreads();
-    
-    printf(
-        "num_vecs_per_head: %d, num_vecs_per_head_k: %d, "
-        "num_vecs_per_blocksize: %d, inv_k_stride: %d, inv_v_stride: %d\n",
-        (int)num_vecs_per_head,
-        (int)num_vecs_per_head_k,
-        (int)num_vecs_per_blocksize,
-        (int)inv_k_stride,
-        (int)inv_v_stride);
-  }
-  __syncthreads();
-#endif
 
   const uint32_t batch_id = batch_ids[btid];
   const uint32_t tile_id = tile_ids_per_batch[btid];
@@ -1654,20 +1423,13 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
                             q_head_idx * HEAD_DIM +
                             tid % 8 * num_elems_per_128b<T>();
   T *q_base_ptr = q + q_offset;
-#ifdef DEBUG_ATTN_C8
-  __syncthreads();
-  if (tid == PRINT_TID && wid == 0) {
-    printf("q_start_seq_id: %d, q_offset: %d, q_ori_n_stride: %d, q_base: %f\n",
-           (int)q_start_seq_id,
-           (int)q_offset,
-           (int)q_ori_n_stride,
-           (float)*q_base_ptr);
-  }
-  __syncthreads();
-#endif
+
   T *o_base_ptr_T = nullptr;
   OutT *o_base_ptr_int8 = nullptr;
-  if constexpr (partition_kv) {
+  if (num_chunks_this_seq <= 1) {
+    o_base_ptr_int8 = out + o_offset;
+  } else {
+  // if constexpr (partition_kv) {
     if (ENABLE_PREFILL) {
       o_base_ptr_T = tmp_workspace + batch_id * num_chunks * q_n_stride +
                      chunk_idx * q_n_stride + q_head_idx * HEAD_DIM +
@@ -1679,8 +1441,8 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
           chunk_idx * q_n_stride + q_head_idx * HEAD_DIM +
           tid % 8 * num_elems_per_128b<T>();
     }
-  } else {
-    o_base_ptr_int8 = out + o_offset;
+  // } else {
+  //   o_base_ptr_int8 = out + o_offset;
   }
 #ifdef DEBUG_ATTN_C8
   if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
@@ -1717,26 +1479,6 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
   commit_group();
   wait_group<0>();
   __syncthreads();
-#ifdef DEBUG_ATTN_C8
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
-    printf("before scale\n");
-    T *q_smem_t = reinterpret_cast<T *>(qo_smem.base);
-    for (uint32_t i = 0; i < num_frags_x * 16; ++i) {
-      for (uint32_t j = 0; j < num_frags_y * 16; ++j) {
-        if (blockIdx.z == 0) {
-          printf("q_smem[%d][%d] = %f  ",
-                 (int)i,
-                 (int)(j),
-                 (float)q_smem_t[i * num_frags_y * 16 + j]);
-        } else {
-          int res = q_smem_t[i * num_frags_y * 16 + j] + static_cast<T>(1.f);
-        }
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
 
   q_smem_inplace_multiply_sm_scale_multi_warps<num_frags_x, num_frags_y, T>(
       &qo_smem, scale);
@@ -2106,7 +1848,7 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
   __syncthreads();
 #endif
 
-  if constexpr (!partition_kv) {
+  if (num_chunks_this_seq <= 1) {
     normalize_d<num_frags_x, num_frags_y>(o_frag, d_frag);
   }
 #ifdef DEBUG_ATTN_C8
@@ -2134,7 +1876,21 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
 
   // write o
   // [num_frags_x, 16, num_frags_y, 16]
-  if constexpr (partition_kv) {
+  if (num_chunks_this_seq <= 1) {
+    write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE, num_frags_x, num_frags_y, false>(
+      o_frag,
+      &qo_smem,
+      o_base_ptr_int8,
+      shift_bias,
+      smooth_weight,
+      q_base_seq_id_this_block,
+      q_head_idx,
+      in_scale,
+      q_len,
+      q_n_stride, 
+      HEAD_DIM
+    );
+  } else {
     write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
                                                     num_frags_x,
                                                     num_frags_y,
@@ -2148,24 +1904,24 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
         q_head_idx,
         in_scale,
         q_len,
-        partition_kv ? q_n_stride * num_chunks : q_n_stride,
+        q_n_stride * num_chunks,
         HEAD_DIM);
-  } else {
-    write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
-                                                    num_frags_x,
-                                                    num_frags_y,
-                                                    partition_kv>(
-        o_frag,
-        &qo_smem,
-        o_base_ptr_int8,
-        shift_bias,
-        smooth_weight,
-        q_base_seq_id_this_block,
-        q_head_idx,
-        in_scale,
-        q_len,
-        partition_kv ? q_n_stride * num_chunks : q_n_stride,
-        HEAD_DIM);
+  // } else {
+  //   write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
+  //                                                   num_frags_x,
+  //                                                   num_frags_y,
+  //                                                   partition_kv>(
+  //       o_frag,
+  //       &qo_smem,
+  //       o_base_ptr_int8,
+  //       shift_bias,
+  //       smooth_weight,
+  //       q_base_seq_id_this_block,
+  //       q_head_idx,
+  //       in_scale,
+  //       q_len,
+  //       partition_kv ? q_n_stride * num_chunks : q_n_stride,
+  //       HEAD_DIM);
   }
 #ifdef DEBUG_ATTN_C8
   __syncthreads();
@@ -2190,7 +1946,7 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
   __syncthreads();
 #endif
 
-  if constexpr (partition_kv) {
+  if (num_chunks_this_seq > 1) {
     if (wid == 0) {
 #pragma unroll
       for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
@@ -3080,7 +2836,9 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
 #endif
   T *o_base_ptr_T = nullptr;
   OutT *o_base_ptr_int8 = nullptr;
-  if constexpr (partition_kv) {
+  if (num_chunks_this_seq <= 1) {
+    o_base_ptr_int8 = out + o_offset;
+  } else {
     if (ENABLE_PREFILL) {
       o_base_ptr_T = tmp_workspace + batch_id * num_chunks * q_n_stride +
                      chunk_idx * q_n_stride + q_head_idx * HEAD_DIM +
@@ -3092,8 +2850,8 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
           chunk_idx * q_n_stride + q_head_idx * HEAD_DIM +
           tid % 8 * num_elems_per_128b<T>();
     }
-  } else {
-    o_base_ptr_int8 = out + o_offset;
+  // } else {
+  //   o_base_ptr_int8 = out + o_offset;
   }
 #ifdef DEBUG_ATTN_C4
   if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
@@ -3560,13 +3318,27 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
   __syncthreads();
 #endif
 
-  if constexpr (!partition_kv) {
+  if (num_chunks_this_seq <= 1) {
     normalize_d<num_frags_x, num_frags_y>(o_frag, d_frag);
   }
 
   // write o
   // [num_frags_x, 16, num_frags_y, 16]
-  if constexpr (partition_kv) {
+  if (num_chunks_this_seq <= 1) {
+    write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE, num_frags_x, num_frags_y, false>(
+      o_frag,
+      &qo_smem,
+      o_base_ptr_int8,
+      shift_bias,
+      smooth_weight,
+      q_base_seq_id_this_block,
+      q_head_idx,
+      in_scale,
+      q_len,
+      q_n_stride, 
+      HEAD_DIM
+    );
+  } else {
     write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
                                                     num_frags_x,
                                                     num_frags_y,
@@ -3580,27 +3352,27 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
         q_head_idx,
         in_scale,
         q_len,
-        partition_kv ? q_n_stride * num_chunks : q_n_stride,
+        q_n_stride * num_chunks,
         HEAD_DIM);
-  } else {
-    write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
-                                                    num_frags_x,
-                                                    num_frags_y,
-                                                    partition_kv>(
-        o_frag,
-        &qo_smem,
-        o_base_ptr_int8,
-        shift_bias,
-        smooth_weight,
-        q_base_seq_id_this_block,
-        q_head_idx,
-        in_scale,
-        q_len,
-        partition_kv ? q_n_stride * num_chunks : q_n_stride,
-        HEAD_DIM);
+  // } else {
+  //   write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
+  //                                                   num_frags_x,
+  //                                                   num_frags_y,
+  //                                                   partition_kv>(
+  //       o_frag,
+  //       &qo_smem,
+  //       o_base_ptr_int8,
+  //       shift_bias,
+  //       smooth_weight,
+  //       q_base_seq_id_this_block,
+  //       q_head_idx,
+  //       in_scale,
+  //       q_len,
+  //       partition_kv ? q_n_stride * num_chunks : q_n_stride,
+  //       HEAD_DIM);
   }
 
-  if constexpr (partition_kv) {
+  if (num_chunks_this_seq > 1) {
     if (wid == 0) {
 #pragma unroll
       for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
@@ -3696,9 +3468,9 @@ __global__ void merge_multi_chunks_decoder_kernel(
     return;
   }
   const int num_chunks_this_seq = div_up(seq_len_kv, chunk_size);
-  // if (num_chunks_this_seq == 1) {
-  //   return;
-  // }
+  if (num_chunks_this_seq <= 1) {
+    return;
+  }
 
   using LoadT = AlignedVector<T, vec_size>;
   LoadT load_vec;
@@ -3838,9 +3610,9 @@ __global__ void merge_multi_chunks_v2_kernel(
       seq_len_kv += seq_len_q;
     }
     const int num_chunks_this_seq = div_up(seq_len_kv, chunk_size);
-    // if (num_chunks_this_seq == 1) {
-    //   continue;
-    // }
+    if (num_chunks_this_seq <= 1) {
+      continue;
+    }
 
     using LoadT = AlignedVector<T, vec_size>;
     LoadT load_vec;
