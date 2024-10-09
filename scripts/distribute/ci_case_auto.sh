@@ -52,13 +52,12 @@ function llama_case_list_auto() {
     # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2
     # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
     # llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
-
+    llama_pir_auto_fuse_ffn_attention_qkv_MP2
     llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
     llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
     llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1
-    llama_pir_auto_fuse_ffn_attention_qkv_MP2
     llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
     llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4
 }
