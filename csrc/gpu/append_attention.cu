@@ -244,7 +244,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
   if (max_dec_len_this_time_data > 0) {
     cudaStream_t decoder_stream;
     if(max_enc_len_this_time_data > 0) {
-      cudaStreamCreate(&decoder_stream);
+      cudaStreamCreateWithFlags(&decoder_stream, cudaStreamNonBlocking);
       cudaStreamWaitEvent(decoder_stream, main_event);
     } else {
       decoder_stream = main_stream;
@@ -380,6 +380,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
     if (max_enc_len_this_time_data > 0) {
       cudaEventRecord(decoder_event, decoder_stream);
       cudaStreamWaitEvent(main_stream, decoder_event);
+      cudaStreamDestroy(decoder_stream);
     }
   }
 
