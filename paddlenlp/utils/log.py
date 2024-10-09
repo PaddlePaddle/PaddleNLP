@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import atexit
 import contextlib
 import functools
 import json
@@ -141,6 +142,8 @@ class MetricsDumper(object):
         # Ensure subprocess exits when main process is interrupted
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
+
+        atexit.register(self.close)
 
     def append(self, data):
         """
