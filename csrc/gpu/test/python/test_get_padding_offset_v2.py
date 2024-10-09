@@ -40,7 +40,7 @@ class GetPaddingOffsetV2Test(unittest.TestCase):
             paddle.to_tensor(seq_lens),
         )
 
-        print("input_ids:\n", input_ids)
+        print("input_ids is :\n", input_ids)
         print("cum_offset:\n", cum_offset)
         print("token_num:\n", token_num)
         print("seq_lens:\n", seq_lens)
