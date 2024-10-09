@@ -13,12 +13,15 @@
 # limitations under the License.
 
 import math
+
 import paddle
 import paddle.nn as nn
 from paddle import ParamAttr
 
+
 def linear_act(x):
     return x
+
 
 ACT2FN = {
     "linear": linear_act,
@@ -43,7 +46,7 @@ class LowRankRotateLayer(nn.Layer):
 # existing methods  LoReFT(h) = h + R^T(Wh + b − Rh)
 class LoreftIntervention(nn.Layer):
     def __init__(self, **kwargs):
-        super(LoreftIntervention, self).__init__()  
+        super(LoreftIntervention, self).__init__()
         rotate_layer = LowRankRotateLayer(kwargs["embed_dim"], kwargs["low_rank_dimension"])
         self.rotate_layer = rotate_layer
         self.learned_source = nn.Linear(
@@ -91,7 +94,7 @@ class LoreftIntervention(nn.Layer):
 # our proposed method
 class TinyIntervention(nn.Layer):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs, keep_last_dim=True)
+        super(TinyIntervention, self).__init__()
         self.rank = kwargs["low_rank_dimension"]
         self.hidden_size = kwargs["embed_dim"]
         dropout = 0.0

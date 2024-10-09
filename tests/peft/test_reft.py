@@ -12,30 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import unittest
-from tempfile import TemporaryDirectory
 
 import paddle
 
 from paddlenlp.data import DataCollatorForSeq2Seq
-from paddlenlp.peft.reft.pareft import (
+from paddlenlp.peft.reft import (
     LoreftIntervention,
     LowRankRotateLayer,
-    ReftConfig,
+    ReFTConfig,
     ReftDataCollator,
-    ReftTrainer,
+    ReFTModel,
     TinyIntervention,
-    get_reft_model,
 )
-from paddlenlp.peft.reft.pareft.dataset import (
-    LoReftSupervisedDataset,
-    ReftDataset,
-    get_intervention_locations,
-    parse_positions,
-)
-from paddlenlp.peft.reft.pareft.predict import do_predict
-from paddlenlp.peft.reft.pareft.reft_model import ReftModel
-from paddlenlp.peft.reft.pavenv.models.basic_utils import (
+from paddlenlp.peft.reft.modeling_utils import (
     count_parameters,
     get_type_from_string,
     set_seed,
@@ -78,45 +69,9 @@ class TestReftDataCollator(unittest.TestCase):
 
 class TestBasicUtils(unittest.TestCase):
     def test_get_type_from_string(self):
-        class_str = "pareft.interventions.LoreftIntervention"
+        class_str = "paddlenlp.peft.reft.LoreftIntervention"
         cls = get_type_from_string(class_str)
         self.assertIsInstance(cls, type(LoreftIntervention))
-
-    def test_parse_positions(self):
-        positions = "f7+l7"
-        self.assertEqual(parse_positions(positions), (7, 7))
-        positions = "f7"
-        self.assertEqual(parse_positions(positions), (7, 0))
-        positions = "l7"
-        self.assertEqual(parse_positions(positions), (0, 7))
-
-    def test_get_intervention_locations(self):
-        kwargs = {"last_position": 10, "positions": "f7+l7", "num_interventions": 1}
-        intervention_locations1 = get_intervention_locations(**kwargs)
-        print(intervention_locations1)
-        kwargs = {"last_position": 10, "first_n": 7, "last_n": 7, "num_interventions": 1}
-        intervention_locations2 = get_intervention_locations(**kwargs)
-        self.assertEqual(intervention_locations1, intervention_locations2)
-
-    def test_reft_dataset(self):
-        tokenizer = AutoTokenizer.from_pretrained(
-            "__internal_testing__/tiny-random-llama",
-            model_max_length=512,
-            padding_side="right",
-        )
-        tokenizer.pad_token_id = tokenizer.unk_token_id
-        train_ds = LoReftSupervisedDataset(
-            "./tests/fixtures/llm/data",
-            tokenizer,
-            data_split="train",
-            seed=42,
-            **{
-                "num_interventions": 2,
-                "position": "f7+l7",
-                "trigger_tokens": "LLM Response: ",
-            },
-        )
-        self.assertIsInstance(train_ds, ReftDataset)
 
     def test_set_seed(self):
         set_seed(42)
@@ -146,7 +101,7 @@ class TestReftConfig(unittest.TestCase):
             }
             for l in layers
         ]
-        reft_config = ReftConfig(representations=representations)
+        reft_config = ReFTConfig(representations=representations)
         reft_config.__str__()
 
 
@@ -253,10 +208,10 @@ class TestReftModel(unittest.TestCase):
             }
             for l in layers
         ]
-        reft_config = ReftConfig(representations=representations)
-        reft_model = get_reft_model(model, reft_config, set_device=False)
+        reft_config = ReFTConfig(representations=representations)
+        reft_model = ReFTModel(reft_config, model)
         reft_model.print_trainable_parameters()
-        self.assertTrue(type(reft_model), ReftModel)
+        self.assertTrue(type(reft_model), ReFTModel)
 
     def test_reft_model_forward(self):
         model = AutoModelForCausalLM.from_pretrained("__internal_testing__/tiny-random-llama")
@@ -279,100 +234,11 @@ class TestReftModel(unittest.TestCase):
             }
             for l in layers
         ]
-        reft_config = ReftConfig(representations=representations)
-        reft_model = get_reft_model(model, reft_config, set_device=False)
+        reft_config = ReFTConfig(representations=representations)
+        reft_model = ReFTModel(reft_config, model)
         reft_model.print_trainable_parameters()
         outputs = reft_model.model(**{"input_ids": paddle.randint(low=1, high=100, shape=(5, 10))})
         self.assertTrue(outputs[0].shape, [5, 10, 32000])
-
-
-class TestReftModelTrain(unittest.TestCase):
-    def test_reft_model_train(self):
-        model_name = "__internal_testing__/tiny-random-llama"
-        tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            model_max_length=128,
-            padding_side="right",
-        )
-        tokenizer.pad_token_id = tokenizer.unk_token_id
-        model = AutoModelForCausalLM.from_pretrained(model_name, dtype="float32")
-        intervention_dtype = "float32"
-        layers = [int(l) for l in range(1)]
-        representations = [
-            {
-                "layer": l,
-                "component": "block_output",
-                "low_rank_dimension": 4,
-                "intervention": LoreftIntervention(
-                    embed_dim=768,
-                    low_rank_dimension=4,
-                    dropout=0.00,
-                    dtype=intervention_dtype,
-                    act_fn="linear",
-                    device="gpu",
-                    add_bias=False,
-                ),
-            }
-            for l in layers
-        ]
-        reft_config = ReftConfig(representations=representations)
-        reft_model = get_reft_model(model, reft_config, set_device=False)
-        reft_model.print_trainable_parameters()
-        reft_model.model.train()
-        train_ds = LoReftSupervisedDataset(
-            "./tests/fixtures/llm/data",
-            tokenizer,
-            data_split="train",
-            seed=42,
-            **{
-                "num_interventions": len(layers),
-                "position": "f5+l5",
-                "trigger_tokens": "LLM Response: ",
-            },
-        )
-        dev_ds = LoReftSupervisedDataset(
-            "./tests/fixtures/llm/data",
-            tokenizer,
-            data_split="dev",
-            seed=42,
-            **{
-                "num_interventions": len(layers),
-                "position": "f5+l5",
-                "trigger_tokens": "LLM Response: ",
-            },
-        )
-        data_collator_fn = DataCollatorForSeq2Seq(
-            tokenizer=tokenizer, model=model, label_pad_token_id=-100, padding="longest"
-        )
-        data_collator = ReftDataCollator(data_collator=data_collator_fn)
-        trainer = ReftTrainer(
-            model=reft_model,
-            tokenizer=tokenizer,
-            # args=training_args,
-            train_dataset=train_ds,
-            data_collator=data_collator,
-            eval_dataset=None,
-            compute_metrics=None,
-        )
-        trainer.train()
-        params = {
-            "embed_dim": 768,
-            "low_rank_dimension": 4,
-            "dropout": 0.00,
-            "dtype": "float32",
-            "act_fn": "linear",
-            "device": "gpu",
-            "add_bias": False,
-        }
-        with TemporaryDirectory() as tempdir:
-            reft_model.save(tempdir, params)
-        do_predict(
-            intervenable=reft_model,
-            tokenizer=tokenizer,
-            eval_dataset=dev_ds,
-            data_items=dev_ds.raw_dataset,
-            batch_size=1,
-        )
 
 
 if __name__ == "__main__":

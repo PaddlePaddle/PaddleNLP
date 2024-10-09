@@ -206,7 +206,6 @@ def convert_example_common(example, tokenizer, data_args, is_test=True, zero_pad
         return features
 
 
-
 def parse_positions(positions: str):
     # parse position
     first_n, last_n = 0, 0
@@ -219,6 +218,7 @@ def parse_positions(positions: str):
         elif "l" in positions:
             last_n = int(positions.strip("l"))
     return first_n, last_n
+
 
 # layers * intervention tokens
 def get_intervention_locations(positions, last_position, num_interventions):
@@ -244,27 +244,32 @@ def get_intervention_locations(positions, last_position, num_interventions):
 
 
 def get_src_last_position(labels):
-    for i in range(len(labels)-1, -1, -1):
+    for i in range(len(labels) - 1, -1, -1):
         if labels[i] == -100:
             return i + 2
 
+
 # reft
-def convert_example_for_reft(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False, positions="f7+l7", num_interventions=32):
+def convert_example_for_reft(
+    example,
+    tokenizer,
+    data_args,
+    is_test=True,
+    zero_padding=False,
+    flash_mask=False,
+    positions="f7+l7",
+    num_interventions=32,
+):
     features = convert_example_common(example, tokenizer, data_args, is_test, zero_padding, flash_mask)
     # src的最后一个位置
     if not is_test:
-        last_position = get_src_last_position(features['labels'])
+        last_position = get_src_last_position(features["labels"])
     else:
-        last_position = len(features['input_ids'])
+        last_position = len(features["input_ids"])
     # add positons
-    intervention_locations = get_intervention_locations(
-            positions, last_position, num_interventions
-        )
-    print('intervention_locations is', intervention_locations)
-    
+    intervention_locations = get_intervention_locations(positions, last_position, num_interventions)
     features["intervention_locations"] = intervention_locations
     return features
-
 
 
 def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False):

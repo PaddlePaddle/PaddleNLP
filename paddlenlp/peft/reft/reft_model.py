@@ -17,27 +17,29 @@ import json
 import logging
 import os
 import types
-from collections import OrderedDict
 from typing import Dict, Optional
 
 import paddle
 from paddle import nn
 
-from .modeling_utils import count_parameters, create_directory, get_type_from_string
-from .reft_config import ReFTConfig
 from .modeling_utils import (
     HandlerList,
+    count_parameters,
+    create_directory,
     do_intervention,
     gather_neurons,
     get_module_hook,
+    get_type_from_string,
     scatter_neurons,
 )
+from .reft_config import ReFTConfig
 
 
 class ReFTModel(nn.Layer):
-    '''
+    """
     config: ReFTConfig
-    '''
+    """
+
     def __init__(self, config, model, **kwargs):
         super().__init__()
         self.config = config
@@ -49,8 +51,8 @@ class ReFTModel(nn.Layer):
         self._key_setter_call_counter = {}
         for i, representation in enumerate(config.representations):
             _key = f'layer.{representation["layer"]}'
-            if representation['intervention'] is not None:
-                intervention = representation['intervention']
+            if representation["intervention"] is not None:
+                intervention = representation["intervention"]
 
             module_hook = get_module_hook(model, representation)
             self.representations[_key] = representation
@@ -66,7 +68,6 @@ class ReFTModel(nn.Layer):
         self.model_config = model.config
         self.disable_model_gradients()
         self.trainable_model_parameters = {}
-
 
     def forward(
         self,
@@ -121,7 +122,6 @@ class ReFTModel(nn.Layer):
             raise e
         self._reset_hook_count()
         return base_outputs, counterfactual_outputs
-    
 
     def _wait_for_forward_with_intervention(
         self,
@@ -133,7 +133,7 @@ class ReFTModel(nn.Layer):
         for key_id, key in enumerate(self.sorted_keys):
             set_handlers = self._intervention_setter(key, unit_locations_base[key_id])
             all_set_handlers.extend(set_handlers)
-        return all_set_handlers  
+        return all_set_handlers
 
     def _intervention_setter(
         self,
@@ -156,9 +156,6 @@ class ReFTModel(nn.Layer):
                 self._key_setter_call_counter[key] += 1
             if not is_prompt:
                 return
-            
-            print('unit_locations_base in setter', unit_locations_base)
-
 
             selected_output = self._gather_intervention_output(outputs, key, unit_locations_base)
 
@@ -193,7 +190,6 @@ class ReFTModel(nn.Layer):
 
         return HandlerList(handlers)
 
-    
     def _gather_intervention_output(self, output, representations_key, unit_locations) -> paddle.Tensor:
         """
         Gather intervening activations from the output based on indices
@@ -245,7 +241,6 @@ class ReFTModel(nn.Layer):
 
         return original_output
 
-
     def save(self, save_directory):
         """
         Save interventions to disk or hub
@@ -256,7 +251,7 @@ class ReFTModel(nn.Layer):
         saving_config.sorted_keys = self.sorted_keys
         saving_config.intervention_types = []
         saving_config.intervention_dimensions = []
-    
+
         for k, v in self.interventions.items():
             intervention = v[0]
             saving_config.intervention_types += [(type(intervention))]
@@ -268,12 +263,10 @@ class ReFTModel(nn.Layer):
                 os.path.join(save_directory, binary_filename),
             )
 
-
         ReFTConfig.save_config(
             saving_config,
             save_directory=save_directory,
         )
-
 
     @staticmethod
     def load(
@@ -293,7 +286,7 @@ class ReFTModel(nn.Layer):
                 **saved_config["intervention_params"]
             )
 
-        reft_config =  ReFTConfig(
+        reft_config = ReFTConfig(
             representations=saved_config["representations"],
             intervention_params=saved_config["intervention_params"],
         )
@@ -308,7 +301,7 @@ class ReFTModel(nn.Layer):
             saved_state_dict = paddle.load(os.path.join(load_directory, binary_filename))
             intervention.load_state_dict(saved_state_dict)
         return intervenable
-    
+
     def save_intervention(self, save_directory, include_model=True):
         """
         Instead of saving the metadata with artifacts, it only saves artifacts such as
@@ -353,7 +346,6 @@ class ReFTModel(nn.Layer):
             saved_model_state_dict = paddle.load(os.path.join(load_directory, model_binary_filename))
             self.model.load_state_dict(saved_model_state_dict, strict=False)
 
-
     def train(self):
         self.model.train()
 
@@ -388,7 +380,6 @@ class ReFTModel(nn.Layer):
             f"model params: {all_model_parameters:,d} || trainable%: {100 * total_trainable_parameters / all_model_parameters}"
         )
 
-
     def _reset_hook_count(self):
         """
         Reset the hook count before any generate call
@@ -402,7 +393,6 @@ class ReFTModel(nn.Layer):
             "alignabls": self.sorted_keys,
         }
         return json.dumps(attr_dict, indent=4)
-
 
     def get_trainable_parameters(self):
         """
@@ -447,9 +437,3 @@ class ReFTModel(nn.Layer):
         for param in self.model.parameters():
             param.stop_gradient = True
         self.model_has_grad = False
-        
-        
-
-
-
-
