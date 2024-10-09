@@ -14,7 +14,6 @@
 """
 Custome Attention Layer for quantization.
 """
-# import paddle
 import paddle.tensor as tensor
 from paddle.nn import Layer
 from paddle.nn.quant.format import ConvertibleQuantedLayer
@@ -38,28 +37,13 @@ class QuantizedCustomAttentionLayer(ConvertibleQuantedLayer):
         self.activation_quanter_k = q_config.weight._instance(layer)
         self.activation_quanter_v = q_config.activation._instance(layer)
         self.layer = layer
-        self.enable_fake_quant = False
         self.quant_info = None
         layer_name = self.layer.full_name()
         self.layer_id = int(layer_name.split("_")[-1])
         self.kv_losses = {}
 
-    def forward(
-        self,
-        q,
-        config,
-        k,
-        v,
-        attention_mask,
-        output_attentions,
-        # alibi,
-        # attn_mask_startend_row_indices,
-        # sequence_parallel,
-        **kwargs
-    ):
+    def forward(self, q, config, k, v, attention_mask, output_attentions, **kwargs):
         """forward"""
-        if self.enable_fake_quant:
-            self.collect_kv_quant_policy(q, k, v, **kwargs)
         perm = [0, 2, 1, 3]  # [1, 2, 0, 3] if self.sequence_parallel else [0, 2, 1, 3]
         tmp_k = tensor.transpose(x=k, perm=perm)
         tmp_v = tensor.transpose(x=v, perm=perm)
@@ -76,9 +60,6 @@ class QuantizedCustomAttentionLayer(ConvertibleQuantedLayer):
             v,
             attention_mask,
             output_attentions,
-            # alibi,
-            # attn_mask_startend_row_indices,
-            # sequence_parallel,
             **kwargs,
         )
 
