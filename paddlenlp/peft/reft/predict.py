@@ -20,8 +20,9 @@ from paddle.io import DataLoader, Dataset
 from tqdm import tqdm
 
 from paddlenlp.data import DataCollatorForSeq2Seq
-from .reft_trainer import ReftDataCollator
 from paddlenlp.transformers import AutoTokenizer
+
+from .reft_trainer import ReftDataCollator
 
 device = "gpu" if paddle.is_compiled_with_cuda() else "cpu"
 
@@ -114,7 +115,7 @@ def do_predict(
             actual_preds = tokenizer.batch_decode(steered_response[0], skip_special_tokens=True)
 
             for inputs_id, label, pred in zip(inputs["input_ids"], inputs["labels"], actual_preds):
-                filtered_labels = label[label != -100] 
+                filtered_labels = label[label != -100]
                 generations += [
                     {
                         "src": tokenizer.decode(inputs_id, skip_special_tokens=True),
@@ -122,7 +123,7 @@ def do_predict(
                         "pred": pred,
                     }
                 ]
-                
+
             if predict_path is not None:
                 with open(predict_path, "w") as json_file:
                     json.dump(generations, json_file, indent=4, ensure_ascii=False)

@@ -11,13 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import paddle
-from paddle import nn
 import importlib
 import logging
 import os
 import random
+
 import numpy as np
+import paddle
+from paddle import nn
+
 
 def getattr_for_paddle_module(model, parameter_name):
     """Recursively fetch the model based on the name."""
@@ -32,7 +34,7 @@ def getattr_for_paddle_module(model, parameter_name):
 
 def get_module_hook(model, representation) -> nn.Layer:
     """Render the intervening module with a hook."""
-    hook_type = 'register_forward_post_hook'
+    hook_type = "register_forward_post_hook"
     parameter_name = f'llama.layers[{representation["layer"]}]'
     module = getattr_for_paddle_module(model, parameter_name)
     module_hook = getattr(module, hook_type)
@@ -117,8 +119,6 @@ def do_intervention(
     return intervened_representation
 
 
-
-
 # Introducing corresponding classes based on strings
 def get_type_from_string(type_str):
     """Help function to convert string to type"""
@@ -157,4 +157,3 @@ def set_seed(seed: int):
 def count_parameters(model):
     """Count parameters of a model that require gradients"""
     return int(sum(p.numel() for p in model.parameters() if not p.stop_gradient))
-

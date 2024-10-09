@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Dict, Sequence
 
 import paddle
+
 from paddlenlp.trainer import Trainer
 
 
