@@ -1,3 +1,16 @@
+// Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 #pragma once
 
 #include "helper.h"
@@ -2030,39 +2043,17 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
     __syncthreads();
 #endif
     OutT* o_ptr = o_ptr_base + n_offset * qo_n_stride + h_offset * qo_h_stride;
-#ifdef DEBUG_ATTN
-    __syncthreads();
-    if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-        blockIdx.x == gridDim.x - 1) {
-      printf("o_ptr end.\n");
-    }
-    __syncthreads();
-#endif
+
     uint32_t shift_smooth_offset = (q_head_idx_base + h_offset) * head_dim +
                                    tx % 8 * num_elems_per_128b<T>();
 #pragma unroll
     for (uint32_t fyo = 0; fyo < num_frags_y / 4;
          ++fyo) {  // num_frags_y * 16 / (8[tid] *
                    // num_elems_per_128b<T>()[vec_per_thread])
-#ifdef DEBUG_ATTN
-      __syncthreads();
-      if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-          blockIdx.x == gridDim.x - 1) {
-        printf("n_offset: %d, qo_upper_bound:%d.\n", n_offset, qo_upper_bound);
-      }
-      __syncthreads();
-#endif
+
       if (n_offset < qo_upper_bound) {
         if constexpr (!partition_kv) {
-#ifdef DEBUG_ATTN
-          __syncthreads();
-          if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-              blockIdx.x == gridDim.x - 1) {
-            printf(
-                "write_o_reg_gmem_multi_warps_shift_smooth_quant load start");
-          }
-          __syncthreads();
-#endif
+
           if (in_scale > 0.0) {
             if (shift_bias) {
               Load<T, VEC_SIZE>(shift_bias + shift_smooth_offset,
@@ -2074,14 +2065,7 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
           Load<T, VEC_SIZE>(
                 reinterpret_cast<T*>(o_smem->base + o_smem_offset_w),
                 &ori_out_vec);
-#ifdef DEBUG_ATTN
-          __syncthreads();
-          if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-              blockIdx.x == gridDim.x - 1) {
-            printf("write_o_reg_gmem_multi_warps_shift_smooth_quant load end");
-          }
-          __syncthreads();
-#endif
+
 #pragma unroll
           for (int i = 0; i < VEC_SIZE; ++i) {
             StoreFunc<T, VEC_SIZE, OutT>()(ori_out_vec,
@@ -2112,23 +2096,7 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
             __syncthreads();
 #endif
           }
-#ifdef DEBUG_ATTN
-          __syncthreads();
-          if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-              blockIdx.x == gridDim.x - 1) {
-            printf("Store start");
-            }
-            __syncthreads();
-#endif
           Store<OutT, VEC_SIZE>(out_vec, o_ptr);
-#ifdef DEBUG_ATTN
-          __syncthreads();
-          if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-              blockIdx.x == gridDim.x - 1) {
-            printf("Store end");
-          }
-          __syncthreads();
-#endif
         } else {
           o_smem->store_128b(o_smem_offset_w, o_ptr);
         }
@@ -2143,14 +2111,6 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
                       2 * num_frags_y;
     // }
   }
-#ifdef DEBUG_ATTN
-  __syncthreads();
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-      blockIdx.x == gridDim.x - 1) {
-    printf("kernel end");
-  }
-  __syncthreads();
-#endif
 }
 
 template <uint32_t group_size,
