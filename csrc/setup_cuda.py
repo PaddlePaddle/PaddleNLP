@@ -108,7 +108,7 @@ sources = [
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
     "./gpu/sample_kernels/top_p_sampling_reject.cu",
-    "./gpu/update_all.cu",
+    "./gpu/update_inputs_v2.cu",
     "./gpu/set_preids_token_penalty_multi_scores.cu",
 ]
 

@@ -16,7 +16,7 @@ import unittest
 
 import numpy as np
 import paddle
-from paddlenlp_ops import set_stop_value_multi_ends_v2, update_all, update_inputs
+from paddlenlp_ops import set_stop_value_multi_ends_v2, update_inputs_v2, update_inputs
 
 np.random.seed(100)
 
@@ -110,7 +110,7 @@ class UpdateAllOperatorsTest(unittest.TestCase):
 
         not_need_stop_2 = paddle.to_tensor(np.array([1], "bool"))
         # Run fused_update_inputs
-        update_all(
+        update_inputs_v2(
             stop_flags_2,
             step_idx,
             not_need_stop_2,

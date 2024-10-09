@@ -14,7 +14,7 @@
 
 #include "helper.h"
 
-__device__ bool is_in_end_update_all(const int64_t id, const int64_t *end_ids, int length) {
+__device__ bool is_in_end_v3(const int64_t id, const int64_t *end_ids, int length) {
     bool flag = false;
     for (int i = 0; i < length; i++) {
         if (id == end_ids[i]) {
@@ -25,7 +25,7 @@ __device__ bool is_in_end_update_all(const int64_t id, const int64_t *end_ids, i
 }
 
 template <int THREADBLOCK_SIZE>
-__global__ void update_all_kernel(
+__global__ void update_inputs_kernel_v2(
     bool *not_need_stop,
     int64_t *step_idx,
     bool *stop_flags,
@@ -67,7 +67,7 @@ __global__ void update_all_kernel(
     } else {
       kwargs_next_tokens[thread_idx] = next_tokens[thread_idx];
     }
-    if (is_in_end_update_all(next_tokens[thread_idx], end_ids, end_length)) {
+    if (is_in_end_v3(next_tokens[thread_idx], end_ids, end_length)) {
       stop_flags[thread_idx] = true;
     }
   }
@@ -108,7 +108,7 @@ __global__ void update_all_kernel(
   }
 }
 
-void UpdateAll(const paddle::Tensor& stop_flags,
+void UpdateInputesV2(const paddle::Tensor& stop_flags,
                const paddle::Tensor& step_idx,
                const paddle::Tensor& not_need_stop,
                const paddle::Tensor& seq_lens_this_time,
@@ -125,7 +125,7 @@ void UpdateAll(const paddle::Tensor& stop_flags,
   const int now_bsz = seq_lens_this_time.shape()[0];
   const int input_ids_stride = input_ids.shape()[1];
   const int end_length = end_ids.shape()[0];
-  update_all_kernel<1024><<<1, 1024, 0, input_ids.stream()>>>(
+  update_inputs_kernel_v2<1024><<<1, 1024, 0, input_ids.stream()>>>(
     const_cast<bool*>(not_need_stop.data<bool>()),
     const_cast<int64_t*>(step_idx.data<int64_t>()),
     const_cast<bool*>(stop_flags.data<bool>()),
@@ -146,7 +146,7 @@ void UpdateAll(const paddle::Tensor& stop_flags,
   );
 }
 
-PD_BUILD_OP(update_all)
+PD_BUILD_OP(update_inputs_v2)
     .Inputs({"stop_flags", 
              "step_idx",
              "not_need_stop", 
@@ -176,4 +176,4 @@ PD_BUILD_OP(update_all)
                     {"next_tokens", "next_tokens_out"},
                     {"kwargs_next_tokens", "kwargs_next_tokens_out"},
                     {"step_idx", "step_idx_out"}})
-    .SetKernelFn(PD_KERNEL(UpdateAll));
+    .SetKernelFn(PD_KERNEL(UpdateInputesV2));

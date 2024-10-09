@@ -675,9 +675,9 @@ class GenerationBlockInferenceModel(GenerationMixin):
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
 
-            from paddlenlp_ops import update_all
+            from paddlenlp_ops import update_inputs_v2
 
-            update_all(
+            update_inputs_v2(
                 model_kwargs["stop_flags"],
                 model_kwargs["step_idx"],
                 model_kwargs["not_need_stop"],
