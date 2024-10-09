@@ -18,7 +18,6 @@ from functools import partial
 
 import paddle
 from utils.argument import (
-    CEvalArgument,
     DataArgument,
     GenerateArgument,
     ModelArgument,
@@ -65,6 +64,7 @@ from paddlenlp.utils.llm_utils import (
     init_chat_template,
 )
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import get_env_device
 
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "False"
@@ -73,13 +73,11 @@ flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
 
 
 def main():
-    parser = PdArgumentParser(
-        (GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments, CEvalArgument)
-    )
+    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        gen_args, quant_args, model_args, data_args, training_args, ceval_args = parser.parse_json_file_and_cmd_lines()
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
-        gen_args, quant_args, model_args, data_args, training_args, ceval_args = parser.parse_args_into_dataclasses()
+        gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -107,6 +105,15 @@ def main():
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
+
+    if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
+        try:
+            from paddle_xpu.layers.nn.linear import LinearConfig  # noqa: F401
+            LinearConfig.enable_accumulate_steps_opt()
+            LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
+        except ImportError:
+            # It's OK, not use accumulate_steps optimization
+            pass
 
     # Load model
     if training_args.fp16_opt_level == "O2":
@@ -340,14 +347,6 @@ def main():
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
 
-    if data_args.zero_padding:
-        if (
-            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen", "mistral", "jamba"]
-            and training_args.pipeline_parallel_degree < 1
-        ):
-            raise NotImplementedError(
-                "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM, QWen and Mistral so far."
-            )
     train_ds = (
         train_ds.map(
             partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
@@ -561,10 +560,6 @@ def main():
         data_args=data_args,
     )
 
-    # Evaluation dev set
-    if training_args.do_eval:
-        before_eval_result = trainer.evaluate(dev_ds)
-
     # Train
     if training_args.do_train:
         checkpoint = None
@@ -726,20 +721,9 @@ def main():
     # Evaluation dev set
     if training_args.do_eval:
 
-        logger.info("*** Evaluate result before train/ptq/qat/ etc.***")
-        trainer.log_metrics("eval", before_eval_result)
-
         logger.info("*** Evaluate result after train/ptq/qat/ etc.***")
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
-
-    # C-Eval after qat/ptq/train
-    if ceval_args.do_ceval:
-        logger.info("*** Evaluate on C-Eval ***")
-        ceval_args.output_dir = training_args.output_dir
-        from experimental.ceval.default.eval import run_eval
-
-        run_eval(tokenizer, trainer.model, ceval_args)
 
 
 if __name__ == "__main__":

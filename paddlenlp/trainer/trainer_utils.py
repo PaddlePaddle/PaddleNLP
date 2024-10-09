@@ -344,7 +344,7 @@ def total_processes_number(local_rank):
     return 1
 
 
-def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_length=None):
+def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_length=None, model_flops=None):
     """
     Measure and return speed performance metrics.
 
@@ -365,6 +365,11 @@ def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_lengt
         if seq_length is not None:
             tokens_per_second_per_device = samples_per_second * seq_length / paddle.distributed.get_world_size()
             result[f"{split}_tokens_per_second_per_device"] = round(tokens_per_second_per_device, 4)
+        if model_flops is not None:
+            result[f"{split}_hardware_tflops_per_device"] = round(
+                tokens_per_second_per_device * model_flops / seq_length / 2**40, 2
+            )
+
     if num_steps is not None:
         steps_per_second = num_steps / runtime
         result[f"{split}_steps_per_second"] = round(steps_per_second, 4)
@@ -1100,3 +1105,20 @@ def set_hyrbid_parallel_seed(basic_seed, dataset_rank, tp_rank, pp_rank=0):
         tracker.add("global_seed", global_seed)
     if "local_seed" not in tracker.states_ and local_seed not in tracker.seeds_:
         tracker.add("local_seed", local_seed)
+
+
+def should_skip_data(global_step, skip_data_intervals):
+    """Whether to skip current step data"""
+
+    if skip_data_intervals is None:
+        return False
+    skip_flag = False
+    for interval in skip_data_intervals:
+        if len(interval) != 2 or interval[0] > interval[1] or interval[0] <= 0:
+            raise ValueError(f"Please check your skip interval {interval}")
+        start_global_step, end_global_step = interval[0], interval[1]
+        # start_global_step and end_global_step start from 1, while global_step start from 0
+        if start_global_step <= global_step + 1 <= end_global_step:
+            skip_flag = True
+            break
+    return skip_flag

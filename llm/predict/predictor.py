@@ -886,12 +886,8 @@ class BlockInferencePredictorMixin(BasePredictor):
                 ]
             )
             # self.model_inputs["src_mask/tgt_mask"] is read only, will not be updated!
-            src_mask = (
-                alibi_encoder + (1 - src_mask) * paddle.finfo(self.dtype).min
-            ).cast(self.dtype)
-            tgt_mask = (
-                alibi_decoder + (1 - tgt_mask) * paddle.finfo(self.dtype).min
-            ).cast(self.dtype)
+            src_mask = (alibi_encoder + (1 - src_mask) * paddle.finfo(self.dtype).min).cast(self.dtype)
+            tgt_mask = (alibi_decoder + (1 - tgt_mask) * paddle.finfo(self.dtype).min).cast(self.dtype)
             self.model_inputs["rope_emb"] = paddle.concat([src_mask.reshape([-1]), tgt_mask.reshape([-1])])
 
     def _preprocess(self, input_text: list[str]):
@@ -993,7 +989,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
         tensor_queue.put(output_tensor)
-        done_event.wait()
+        if self.tensor_parallel_rank == 0:
+            done_event.wait()
         s_time = time.time()
         while self.model_inputs["not_need_stop"]:
             self._infer(self.model_inputs)
@@ -1119,7 +1116,8 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
             read_res_process.start()
         output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
         tensor_queue.put(output_tensor)
-        done_event.wait()
+        if self.tensor_parallel_rank == 0:
+            done_event.wait()
         s_time = time.time()
         while self.model_inputs["not_need_stop"]:
             self.predictor.run(list(self.model_inputs.values()))

@@ -48,7 +48,7 @@
    :maxdepth: 1
    :caption: 飞桨大模型
 
-   大模型预训练文档 <llm/pretraining/index.rst>
+   大模型预训练文档 <llm/docs/pretrain.rst>
    大模型精调文档 <llm/docs/finetune.md>
    大模型常用算法文档 <llm/docs/algorithm_overview.md>
    大模型RLHF文档 <llm/docs/rlhf.md>

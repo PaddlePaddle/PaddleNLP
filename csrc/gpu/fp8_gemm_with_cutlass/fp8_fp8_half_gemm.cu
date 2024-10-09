@@ -68,11 +68,11 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_half_gemm(
 
   std::string input_dtype = "";
   if (x.dtype() == phi::DataType::FLOAT8_E4M3FN) {
-    input_dtype = "e4m3";
+    input_dtype = "float8_e4m3fn";
     x_ptr = reinterpret_cast<const void*>(x.data<phi::dtype::float8_e4m3fn>());
     y_ptr = reinterpret_cast<const void*>(y.data<phi::dtype::float8_e4m3fn>());
   } else if (x.dtype() == phi::DataType::FLOAT8_E5M2) {
-    input_dtype = "e5m2";
+    input_dtype = "float8_e5m2";
     x_ptr = reinterpret_cast<const void*>(x.data<phi::dtype::float8_e5m2>());
     y_ptr = reinterpret_cast<const void*>(y.data<phi::dtype::float8_e5m2>());    
   } else {
@@ -84,27 +84,24 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_half_gemm(
   out_shape[rank - 1] = N;
   out_shape[rank - 2] = M;
 
-  std::string cutlass_output_dtype = "";
   if (output_dtype == "bfloat16") {
     out = paddle::empty(out_shape, paddle::DataType::BFLOAT16, x.place());
     out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::bfloat16>());
-    cutlass_output_dtype = std::string("bf16");
   } else if (output_dtype == "float16") {
     out = paddle::empty(out_shape, paddle::DataType::FLOAT16, x.place());
     out_ptr = reinterpret_cast<void*>(out.data<phi::dtype::float16>());
-    cutlass_output_dtype = std::string("fp16");
   } else {
     PADDLE_THROW(phi::errors::Fatal(
         "fp8_fp8_half_gemm_fused only support bfloat16 and float16 output"));
   }
 
-  std::string isbias = bias ? "bias_" : "";
+  std::string isbias = bias ? "true" : "false";
   std::string act = (activation_type == "" || activation_type == "identity")
-                        ? "identity"
+                        ? "noact"
                         : activation_type;
 
-  std::string gemm_config =
-      input_dtype + "_" + cutlass_output_dtype + "_" + isbias + act;
+  std::string fuse_gemm_config =
+      input_dtype + "_" + output_dtype + "_" + isbias + "_" + act;
 
   void* bias_data = nullptr;
   std::vector<int64_t> bias_dims{};
@@ -137,7 +134,7 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_half_gemm(
       0.01,  // for leaky_relu
       bias_data,
       bias_dims,
-      gemm_config};
+      fuse_gemm_config};
   fp8_fp8_gemm_scale_bias_act(params);
   return {out};
 }
@@ -206,4 +203,3 @@ PD_BUILD_OP(cutlass_fp8_fp8_half_gemm_fused)
     .SetKernelFn(PD_KERNEL(cutlass_fp8_fp8_half_gemm))
     .SetInferShapeFn(PD_INFER_SHAPE(CutlassFp8Fp8HalfGemmFusedInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(CutlassFp8Fp8HalfGemmFusedInferDtype));
-

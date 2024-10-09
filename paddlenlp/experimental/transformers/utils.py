@@ -91,7 +91,7 @@ class EmptyActScale:
         self.key_map = key_map_dict
         self.scale = {}
         for scale_type, key_template in self.key_map.items():
-            self.scale[scale_type] = np.full([num_of_layers], fill_value=0.1)
+            self.scale[scale_type] = np.full([num_of_layers], fill_value=0.1, dtype="float32")
 
 
 class EmptyWeightScale:

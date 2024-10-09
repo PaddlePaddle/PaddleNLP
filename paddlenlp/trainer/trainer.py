@@ -127,6 +127,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     PREFIX_CHECKPOINT_DIR,
     EvalLoopOutput,
     EvalPrediction,
+    IntervalStrategy,
     IterableDatasetShard,
     OptimizerNames,
     PredictionOutput,
@@ -139,6 +140,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     get_scheduler,
     has_length,
     set_seed,
+    should_skip_data,
     speed_metrics,
 )
 from .training_args import TrainingArguments
@@ -287,9 +289,16 @@ class Trainer:
 
         # Seed must be set before instantiating the model when using model
         set_seed(seed=self.args.seed)
-
+        self._skip_global_steps = 0  # total skip global steps
+        self._skip_steps_since_last_logged = 0  # skip steps since last logged
         if model is None:
-            raise RuntimeError("`Trainer` requires either a `model` or `model_init` argument")
+            logger.warning("Model is None.")
+            self.model = None
+            self.train_dataset = train_dataset
+            self.tokenizer = tokenizer
+            default_collator = default_data_collator if tokenizer is None else DataCollatorWithPadding(tokenizer)
+            self.data_collator = data_collator if data_collator is not None else default_collator
+            return
 
         if self.args.to_static:
             model = paddle.jit.to_static(model)
@@ -945,6 +954,7 @@ class Trainer:
             step_control = 0  # used in loop control, reset to 0 after every step
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
+            step = -1
             for step, inputs in enumerate(epoch_iterator):
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
@@ -980,6 +990,44 @@ class Trainer:
                 elif steps_trained_progress_bar is not None:
                     steps_trained_progress_bar.close()
                     steps_trained_progress_bar = None
+
+                if should_skip_data(self.state.global_step, self.args.skip_data_intervals):
+                    # skip this step
+
+                    if (step_control + 1) % self.args.gradient_accumulation_steps == 0 or (
+                        # last step in epoch but step is always smaller than gradient_accumulation_steps
+                        steps_in_epoch <= args.gradient_accumulation_steps
+                        and (step + 1) == steps_in_epoch
+                    ):
+                        # update current global step and skip step
+                        self.state.global_step += 1
+                        self._skip_global_steps += 1
+                        self._skip_steps_since_last_logged += 1
+
+                        self.state.epoch = epoch + (step + 1) / steps_in_epoch
+
+                        if self.state.global_step == 1 and self.args.logging_first_step:
+                            self.control.should_log = True
+                        if (
+                            self.args.logging_strategy == IntervalStrategy.STEPS
+                            and self.state.global_step % self.args.logging_steps == 0
+                        ):
+                            self.control.should_log = True
+
+                        self.control.should_evaluate = False
+                        self.control.should_save = False
+
+                        # log loss and memeory usage
+                        self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                        self._print_timer()
+                        step_control = 0
+                    else:
+                        step_control += 1
+                    if self.state.global_step >= self.state.max_steps:
+                        break
+
+                    self.timers and self.timers("read-data").start()
+                    continue
 
                 if step_control % args.gradient_accumulation_steps == 0:
                     self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
@@ -1202,7 +1250,13 @@ class Trainer:
                         )
 
         self._total_loss_scalar += tr_loss.item()
-        train_loss = self._total_loss_scalar / self.state.global_step
+
+        # In case all steps were skipped, the total loss is set to 0.
+        if self.state.global_step == self._skip_global_steps:
+            logger.info("All steps were skipped, the total loss is set to 0.")
+            train_loss = 0.0
+        else:
+            train_loss = self._total_loss_scalar / (self.state.global_step - self._skip_global_steps)
 
         metrics = speed_metrics("train", start_time, num_samples=num_train_samples, num_steps=self.state.max_steps)
 
@@ -1321,15 +1375,20 @@ class Trainer:
         if self.control.should_log:
 
             logs: Dict[str, float] = {}
-
+            num_steps = self.state.global_step - self._globalstep_last_logged - self._skip_steps_since_last_logged
+            self._skip_steps_since_last_logged = 0
             # all_gather + mean() to get average loss over all processes
             avg_loss = self._nested_gather(tr_loss).mean()
             tr_loss_scalar = self._get_item_from_loss(avg_loss)
 
             # reset tr_loss to zero
             tr_loss.subtract_(tr_loss)
+            # set loss to zero if all steps are skipped since last log
+            if num_steps == 0:
+                logs["loss"] = 0.0
+            else:
+                logs["loss"] = round(tr_loss_scalar / num_steps, 8)
 
-            logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
             logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
             if in_auto_parallel_align_mode():
@@ -1352,19 +1411,28 @@ class Trainer:
             total_train_batch_size = (
                 self.args.train_batch_size * self.args.gradient_accumulation_steps * self.args.dataset_world_size
             )
-            num_steps = self.state.global_step - self._globalstep_last_logged
+
             seq_length = None
+            model_flops = None
             if getattr(self, "is_pretraining", False) and hasattr(self.model, "config"):
                 seq_length = getattr(self.model.config, "seq_length", None)
-            logs.update(
-                speed_metrics(
-                    "interval",
-                    self._globalstep_last_start_time,
-                    num_samples=total_train_batch_size * num_steps,
-                    num_steps=num_steps,
-                    seq_length=seq_length,
+                try:
+                    model_flops = self.model.get_hardware_flops(seq_length=seq_length, recompute=self.args.recompute)
+                except NotImplementedError:
+                    model_flops = None
+
+            # Do not log speed metrics if all steps are skipped since last log.
+            if num_steps > 0:
+                logs.update(
+                    speed_metrics(
+                        "interval",
+                        self._globalstep_last_start_time,
+                        num_samples=total_train_batch_size * num_steps,
+                        num_steps=num_steps,
+                        seq_length=seq_length,
+                        model_flops=model_flops,
+                    )
                 )
-            )
 
             self._total_loss_scalar += tr_loss_scalar
             self._globalstep_last_logged = self.state.global_step
@@ -2229,18 +2297,10 @@ class Trainer:
             self.model_wrapped.get_all_parameters(convert2cpu=True)
 
         if self.args.should_save_model_state:
-            unified_checkpoint_config_backup = self.args.unified_checkpoint_config
-            # backup and remove unified_checkpoint_config for not trine stage
-            if not self.is_in_train:
-                self.args.unified_checkpoint_config = []
-
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
-
-            # recover unified_checkpoint_config for not trine stage
-            if not self.is_in_train:
-                self.args.unified_checkpoint_config = unified_checkpoint_config_backup
         else:
             if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
+                os.makedirs(output_dir, exist_ok=True)
                 if self.is_in_train:
                     global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
                     paddle.save(global_rank, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
@@ -2259,6 +2319,7 @@ class Trainer:
             and "async_save" in self.args.unified_checkpoint_config
             and not self.is_in_train
         ):
+            os.makedirs(output_dir, exist_ok=True)
             global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
             paddle.save(self.state.global_step, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
 
@@ -2336,6 +2397,7 @@ class Trainer:
                 else:
                     if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                        os.makedirs(output_dir, exist_ok=True)
                         paddle.save(global_rank, os.path.join(output_dir, f".optimizer_weight.done.{global_rank}"))
                         if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
                             paddle.save(global_rank, os.path.join(output_dir, f".master_weight.done.{global_rank}"))
@@ -2367,6 +2429,14 @@ class Trainer:
 
                 if self.do_grad_scaling:
                     paddle.save(self.scaler.state_dict(), os.path.join(output_dir, SCALER_NAME))
+            else:
+                if self.args.unified_checkpoint and not self.args.use_hybrid_parallel:
+                    if "async_save" in self.args.unified_checkpoint_config:
+                        global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
+                        os.makedirs(output_dir, exist_ok=True)
+                        paddle.save(global_rank, os.path.join(output_dir, f".optimizer_weight.done.{global_rank}"))
+                        if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
+                            paddle.save(global_rank, os.path.join(output_dir, f".master_weight.done.{global_rank}"))
 
         self.runtime_timer.stop()
         # Determine the new best metric / best model checkpoint
@@ -2505,10 +2575,9 @@ class Trainer:
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
 
-        local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
         if (
             strtobool(os.getenv("FLAG_LLM_PDC", "False"))
-            and local_rank == 0
+            and paddle.distributed.get_rank() == 0
             and self.args.unified_checkpoint
             and "async_save" in self.args.unified_checkpoint_config
         ):
@@ -2519,9 +2588,10 @@ class Trainer:
                 "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
                 "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
             }
-            if not os.path.exists(os.path.join(self.args.logging_dir, "async_save_info.json")):
-                with open(os.path.join(self.args.logging_dir, "async_save_info.json"), "w") as f:
-                    json.dump(save_info, f)
+            if os.path.exists(os.path.join(self.args.logging_dir, "async_save_info.json")):  # afs cannot overwrite
+                os.remove(os.path.join(self.args.logging_dir, "async_save_info.json"))
+            with open(os.path.join(self.args.logging_dir, "async_save_info.json"), "w") as f:
+                json.dump(save_info, f)
 
         if self.args.should_save:
             if self.tokenizer is not None:
@@ -2530,7 +2600,17 @@ class Trainer:
             paddle.save(self.args, os.path.join(output_dir, TRAINING_ARGS_NAME))
 
         if self.args.unified_checkpoint:
+            unified_checkpoint_config_backup = self.args.unified_checkpoint_config
+            # backup and remove unified_checkpoint_config for not trine stage
+            if not self.is_in_train:
+                self.args.unified_checkpoint_config = []
+
             self.unified_checkpoint_handler.save_unified_checkpoint(self.model, self.optimizer, output_dir)
+
+            # recover unified_checkpoint_config for not trine stage
+            if not self.is_in_train:
+                self.args.unified_checkpoint_config = unified_checkpoint_config_backup
+
             return
 
         merge_tensor_parallel = merge_tensor_parallel and self.args.use_hybrid_parallel
@@ -3236,7 +3316,7 @@ class Trainer:
             self._signature_columns += list(set(["label", "label_ids"] + self.label_names))
 
     def _remove_unused_columns(self, dataset: "datasets.Dataset", description: Optional[str] = None):
-        if not self.args.remove_unused_columns:
+        if not self.args.remove_unused_columns or self.model is None:
             return dataset
         if self._signature_columns is None:
             # Inspect model forward signature to keep only the arguments it accepts.
@@ -3288,7 +3368,7 @@ class Trainer:
 
     def _is_iterable_dataset_distributed(self, dataset):
         # For distributed dataloaer.
-        is_iterable_dataset_tensor = paddle.to_tensor(self._is_iterable_dataset(dataset)).reshape([1])
+        is_iterable_dataset_tensor = paddle.to_tensor(self._is_iterable_dataset(dataset)).astype("int32").reshape([1])
         if dist.get_world_size() > 1:
             dist.all_reduce(is_iterable_dataset_tensor, op=dist.ReduceOp.MAX)
         if is_iterable_dataset_tensor.item() == 1:
