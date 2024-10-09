@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "helper.h"
-#include "mem_util.cuh"
-#include "mma_tensor_op.cuh"
-#include "utils.cuh"
+#include "decoder_write_cache_with_rope_impl.cuh"
 
 template <typename T, typename QKV_TYPE = int>
 void DecoderWriteCacheWithRoPEKernel(

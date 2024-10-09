@@ -383,7 +383,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
     }
   }
 
-  return {fmha_out};
+  return {fmha_out, qkv_out};
 }
 
 std::vector<paddle::Tensor> AppendAttention(
@@ -668,7 +668,7 @@ std::vector<std::vector<int64_t>> AppendAttentionInferShape(
   const int head_dim = key_cache_shape[3];
   const int total_num_head = qkv_shape[qkv_shape.size() - 1] / head_dim;
   const int num_heads = total_num_head - 2 * kv_num_heads;
-  return {{token_num, num_heads * head_dim}};
+  return {{token_num, num_heads * head_dim}, qkv_shape};
 }
 
 std::vector<paddle::DataType> AppendAttentionInferDtype(
@@ -716,10 +716,21 @@ std::vector<paddle::DataType> AppendAttentionInferDtype(
     const int speculate_max_draft_token_num,
     const bool causal,
     const bool enable_prefill) {
-  if (out_linear_in_scale > 0.0) {
-    return {paddle::DataType::INT8};
+  if (compute_dtype == "bf16") {
+    if (out_linear_in_scale > 0.0) {
+      return {paddle::DataType::INT8, paddle::DataType::BFLOAT16};
+    } else {
+      return {paddle::DataType::BFLOAT16, paddle::DataType::BFLOAT16};
+    }
+  } else if (compute_dtype == "fp16") {
+    if (out_linear_in_scale > 0.0) {
+      return {paddle::DataType::INT8, paddle::DataType::FLOAT16};
+    } else {
+      return {paddle::DataType::FLOAT16, paddle::DataType::FLOAT16};
+    }
+  } else {
+    PD_THROW("Only supported attr of compute_dtype in ['fp16', 'bf16'].");
   }
-  return {qkv_dtype};
 }
 
 PD_BUILD_OP(append_attention)
@@ -755,7 +766,7 @@ PD_BUILD_OP(append_attention)
              paddle::Optional("cache_v_zp"),
              paddle::Optional("out_linear_shifts"),
              paddle::Optional("out_linear_smooths")})
-    .Outputs({"fmha_out", "key_cache_out", "value_cache_out"})
+    .Outputs({"fmha_out", "qkv_out", "key_cache_out", "value_cache_out"})
     .SetInplaceMap({{"key_cache", "key_cache_out"},
                     {"value_cache", "value_cache_out"}})
     .Attrs({"compute_type: std::string",
