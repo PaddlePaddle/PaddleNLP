@@ -32,6 +32,7 @@ from paddle.profiler.utils import job_schedule_profiler_range
 
 from paddlenlp.ops import Topology
 from paddlenlp.trainer import (
+    AutoTrainingArguments,
     PdArgumentParser,
     Trainer,
     TrainingArguments,
@@ -88,7 +89,7 @@ def exec_mode_guard():
 
 @dataclass
 @add_start_docstrings(TrainingArguments.__doc__)
-class PreTrainingArguments(TrainingArguments):
+class PreTrainingArguments(AutoTrainingArguments):
     min_learning_rate: float = field(
         default=1e-5,
         metadata={"help": "Minimum learning rate deacyed to."},
@@ -97,12 +98,6 @@ class PreTrainingArguments(TrainingArguments):
         default=None,
         metadata={
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
-        },
-    )
-    fused_linear_param_grad_add: bool = field(
-        default=False,
-        metadata={
-            "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
     )
     job_schedule_profiler_start: int = field(
@@ -127,10 +122,7 @@ class PreTrainingArguments(TrainingArguments):
     def __post_init__(self):
         super().__post_init__()
         assert self.enable_auto_parallel
-        if self.fused_linear_param_grad_add:
-            fused_passes = self.strategy.fused_passes
-            fused_passes.enable = True
-            fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
+
         logger.info(self.strategy)
 
 
