@@ -252,11 +252,16 @@ def get_src_last_position(labels):
 def convert_example_for_reft(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False, positions="f7+l7", num_interventions=32):
     features = convert_example_common(example, tokenizer, data_args, is_test, zero_padding, flash_mask)
     # src的最后一个位置
-    last_position = get_src_last_position(features['labels'])
+    if not is_test:
+        last_position = get_src_last_position(features['labels'])
+    else:
+        last_position = len(features['input_ids'])
     # add positons
     intervention_locations = get_intervention_locations(
             positions, last_position, num_interventions
         )
+    print('intervention_locations is', intervention_locations)
+    
     features["intervention_locations"] = intervention_locations
     return features
 

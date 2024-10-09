@@ -239,7 +239,7 @@ class ReftArgument:
     position: str = field(default="f7+l7", metadata={"help": "Position parameter for model."})
     intervention_type: str = field(default="LoreftIntervention", metadata={"help": "Type of intervention."})
     rank: int = field(default=8, metadata={"help": "Rank parameter for model."})
-    act_fn: str = field(default=None, metadata={"help": "Activation function."})
+    act_fn: str = field(default="linear", metadata={"help": "Activation function."})
     add_bias: bool = field(default=False, metadata={"help": "Flag indicating whether to add bias."})
     dropout: float = field(default=0.0, metadata={"help": "Dropout rate."})
 

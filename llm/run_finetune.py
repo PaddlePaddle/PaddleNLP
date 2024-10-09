@@ -368,6 +368,7 @@ def main():
         if train_ds is not None
         else None
     )
+
     ptq_ds = (
         ptq_ds.map(
             partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
@@ -543,24 +544,27 @@ def main():
     if model_args.reft:
         # intervention config based on model type
         intervention_dtype = "bfloat16"
+        intervention_params = {
+            "embed_dim": model_config.hidden_size,
+            "low_rank_dimension": reft_args.rank,
+            "dropout": reft_args.dropout,
+            "dtype": intervention_dtype,
+            "act_fn": reft_args.act_fn,
+            "device": "gpu",
+            "add_bias": reft_args.add_bias,
+        }
         representations = [
             {
                 "layer": l,
                 "component": "block_output",
                 "low_rank_dimension": reft_args.rank,
                 "intervention": LoreftIntervention(
-                    embed_dim=model_config.hidden_size,
-                    low_rank_dimension=reft_args.rank,
-                    dropout=reft_args.dropout,
-                    dtype=intervention_dtype,
-                    act_fn=reft_args.act_fn,
-                    device="gpu",
-                    add_bias=reft_args.add_bias,
+                    **intervention_params
                 ),
             }
             for l in layers
         ]
-        reft_config = ReFTConfig(representations=representations)
+        reft_config = ReFTConfig(representations=representations, intervention_params=intervention_params, position=reft_args.position)
         # get reft model
         reft_model = ReFTModel(reft_config, model)
         # disable origianl model gradients
@@ -568,8 +572,6 @@ def main():
         # reft_model = get_reft_model(model, reft_config, set_device=False)
         reft_model.print_trainable_parameters()
         reft_model.model.train()
-        n_params = reft_model.count_parameters(include_model=False)
-        logging.info(f"Reft model has {n_params} trainable parameters.")
 
     def compute_metrics_do_generation(eval_preds):
         rouge1 = Rouge1()
@@ -654,17 +656,17 @@ def main():
         )
         trainer.train()
         run_name = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        # 定义参数字典
-        params = {
-            "embed_dim": model_config.hidden_size,
-            "low_rank_dimension": reft_args.rank,
-            "dropout": reft_args.dropout,
-            "dtype": intervention_dtype,
-            "act_fn": reft_args.act_fn,
-            "device": "gpu",
-            "add_bias": reft_args.add_bias,
-        }
-        reft_model.save(f"{training_args.output_dir}/{run_name}", params)
+        # # 定义参数字典
+        # params = {
+        #     "embed_dim": model_config.hidden_size,
+        #     "low_rank_dimension": reft_args.rank,
+        #     "dropout": reft_args.dropout,
+        #     "dtype": intervention_dtype,
+        #     "act_fn": reft_args.act_fn,
+        #     "device": "gpu",
+        #     "add_bias": reft_args.add_bias,
+        # }
+        reft_model.save(f"{training_args.output_dir}/{run_name}")
         # 预测
         do_predict(
             intervenable=reft_model,

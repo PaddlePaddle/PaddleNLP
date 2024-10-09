@@ -35,18 +35,15 @@ from .modeling_utils import (
 
 
 class ReFTModel(nn.Layer):
+    '''
+    config: ReFTConfig
+    '''
     def __init__(self, config, model, **kwargs):
         super().__init__()
-        if isinstance(config, dict) or isinstance(config, list):
-            config = ReFTConfig(representations=config)
         self.config = config
-        intervention_type = config.intervention_types
         self.intervention_types = config.intervention_types
         self.representations = {}
         self.interventions = {}
-        # for the last charactor in intervention name
-        self._key_collision_counter = {}
-        self._intervention_group = {}
         _original_key_order = []
         # for generate
         self._key_setter_call_counter = {}
@@ -54,10 +51,6 @@ class ReFTModel(nn.Layer):
             _key = f'layer.{representation["layer"]}'
             if representation['intervention'] is not None:
                 intervention = representation['intervention']
-            # when load reft model from saved config
-            else:
-                intervention_function = intervention_type if type(intervention_type) != list else intervention_type[i]
-                intervention = intervention_function(**config["intervention_params"])
 
             module_hook = get_module_hook(model, representation)
             self.representations[_key] = representation
@@ -69,17 +62,332 @@ class ReFTModel(nn.Layer):
             self._key_setter_call_counter[_key] = 0
 
         self.sorted_keys = _original_key_order
-        # assign each key to an unique group based on topological order
-        _group_key_inc = 0
-        for _key in self.sorted_keys:
-            self._intervention_group[_group_key_inc] = [_key]
-            _group_key_inc += 1
-        # sort group key with ascending order
-        self._intervention_group = OrderedDict(sorted(self._intervention_group.items()))
         self.model = model
         self.model_config = model.config
         self.disable_model_gradients()
         self.trainable_model_parameters = {}
+
+
+    def forward(
+        self,
+        base,
+        unit_locations: Optional[Dict] = None,
+        labels: Optional[paddle.Tensor] = None,
+        output_original_output: Optional[bool] = False,
+    ):
+        self._reset_hook_count()
+        # if no intervention, return base
+        if unit_locations is None and len(self.interventions) == 0:
+            return self.model(**base), None
+
+        base_outputs = None
+        if output_original_output:
+            base_outputs = self.model(**base, labels=labels)
+        try:
+            # intervene, register hook after decoder block
+            set_handlers_to_remove = self._wait_for_forward_with_intervention(unit_locations)
+            # run intervened forward
+            counterfactual_outputs = self.model(**base, labels=labels)
+            set_handlers_to_remove.remove()
+        except Exception as e:
+            raise e
+        self._reset_hook_count()
+        return base_outputs, counterfactual_outputs
+
+    def generate(
+        self,
+        base,
+        unit_locations: Optional[Dict] = None,
+        intervene_on_prompt: bool = False,
+        output_original_output: Optional[bool] = False,
+        **kwargs,
+    ):
+        self._reset_hook_count()
+        self._intervene_on_prompt = intervene_on_prompt
+        base_outputs = None
+        if output_original_output or True:
+            # returning un-intervened output
+            base_outputs = self.model.generate(**base, **kwargs)
+        set_handlers_to_remove = None
+        try:
+            # intervene, register hook after decoder block
+            set_handlers_to_remove = self._wait_for_forward_with_intervention(
+                unit_locations,
+            )
+            # run intervened generate
+            counterfactual_outputs = self.model.generate(**base, **kwargs)
+            set_handlers_to_remove.remove()
+        except Exception as e:
+            raise e
+        self._reset_hook_count()
+        return base_outputs, counterfactual_outputs
+    
+
+    def _wait_for_forward_with_intervention(
+        self,
+        unit_locations,
+    ):
+        # torch.autograd.set_detect_anomaly(True)
+        all_set_handlers = HandlerList([])
+        unit_locations_base = unit_locations["sources->base"][1]
+        for key_id, key in enumerate(self.sorted_keys):
+            set_handlers = self._intervention_setter(key, unit_locations_base[key_id])
+            all_set_handlers.extend(set_handlers)
+        return all_set_handlers  
+
+    def _intervention_setter(
+        self,
+        key,
+        unit_locations_base,
+    ) -> HandlerList:
+        """
+        Create a list of setter handlers that will set activations
+        """
+        handlers = []
+        intervention, module_hook = self.interventions[key]
+
+        def hook_callback(
+            model,
+            inputs,
+            outputs,
+        ):
+            is_prompt = self._key_setter_call_counter[key] == 0
+            if is_prompt:
+                self._key_setter_call_counter[key] += 1
+            if not is_prompt:
+                return
+            
+            print('unit_locations_base in setter', unit_locations_base)
+
+
+            selected_output = self._gather_intervention_output(outputs, key, unit_locations_base)
+
+            if not isinstance(self.interventions[key][0], types.FunctionType):
+                intervened_representation = do_intervention(
+                    selected_output,
+                    intervention,
+                )
+            if intervened_representation is None:
+                return
+
+            if isinstance(outputs, tuple):
+                _ = self._scatter_intervention_output(
+                    outputs[0],
+                    intervened_representation,
+                    key,
+                    unit_locations_base,
+                )
+            else:
+                _ = self._scatter_intervention_output(
+                    outputs,
+                    intervened_representation,
+                    key,
+                    unit_locations_base,
+                )
+
+        handlers.append(
+            module_hook(
+                hook_callback,
+            )
+        )
+
+        return HandlerList(handlers)
+
+    
+    def _gather_intervention_output(self, output, representations_key, unit_locations) -> paddle.Tensor:
+        """
+        Gather intervening activations from the output based on indices
+        """
+        if isinstance(output, tuple):
+            original_output = output[0].clone()
+        else:
+            original_output = output.clone()
+        if unit_locations is None:
+            return original_output
+
+        # gather based on intervention locations
+        selected_output = gather_neurons(
+            original_output,
+            unit_locations,
+        )
+        return selected_output
+
+    def _scatter_intervention_output(
+        self,
+        output,
+        intervened_representation,
+        representations_key,
+        unit_locations,
+    ) -> paddle.Tensor:
+        """
+        Scatter in the intervened activations in the output
+        """
+        # data structure casting
+        if isinstance(output, tuple):
+            original_output = output[0]
+        else:
+            original_output = output
+        # for non-sequence-based models, we simply replace
+        # all the activations.
+        if unit_locations is None:
+            original_output[:] = intervened_representation[:]
+            return original_output
+
+        # component = self.representations[representations_key].component
+        # unit = self.representations[representations_key].unit
+
+        # scatter in-place
+        _ = scatter_neurons(
+            original_output,
+            intervened_representation,
+            unit_locations,
+        )
+
+        return original_output
+
+
+    def save(self, save_directory):
+        """
+        Save interventions to disk or hub
+        """
+        create_directory(save_directory)
+
+        saving_config = copy.deepcopy(self.config)
+        saving_config.sorted_keys = self.sorted_keys
+        saving_config.intervention_types = []
+        saving_config.intervention_dimensions = []
+    
+        for k, v in self.interventions.items():
+            intervention = v[0]
+            saving_config.intervention_types += [(type(intervention))]
+            binary_filename = f"intkey_{k}.bin"
+            # save intervention binary file
+            logging.info(f"Saving trainable intervention to {binary_filename}.")
+            paddle.save(
+                intervention.state_dict(),
+                os.path.join(save_directory, binary_filename),
+            )
+
+
+        ReFTConfig.save_config(
+            saving_config,
+            save_directory=save_directory,
+        )
+
+
+    @staticmethod
+    def load(
+        load_directory,
+        model,
+    ):
+        """
+        Load interventions from disk
+        """
+        saved_config = ReFTConfig.load_config(
+            load_directory=load_directory,
+        )
+        for representation, intervention_type in zip(
+            saved_config["representations"], saved_config["intervention_types"]
+        ):
+            representation["intervention"] = get_type_from_string(intervention_type)(
+                **saved_config["intervention_params"]
+            )
+
+        reft_config =  ReFTConfig(
+            representations=saved_config["representations"],
+            intervention_params=saved_config["intervention_params"],
+        )
+
+        intervenable = ReFTModel(reft_config, model)
+        intervenable.disable_model_gradients()
+
+        # load binary files
+        for i, (k, v) in enumerate(intervenable.interventions.items()):
+            intervention = v[0]
+            binary_filename = f"intkey_{k}.bin"
+            saved_state_dict = paddle.load(os.path.join(load_directory, binary_filename))
+            intervention.load_state_dict(saved_state_dict)
+        return intervenable
+    
+    def save_intervention(self, save_directory, include_model=True):
+        """
+        Instead of saving the metadata with artifacts, it only saves artifacts such as
+        trainable weights. This is not a static method, and returns nothing.
+        """
+        create_directory(save_directory)
+
+        # save binary files
+        for k, v in self.interventions.items():
+            intervention = v[0]
+            binary_filename = f"intkey_{k}.bin"
+            # save intervention binary file
+            paddle.save(
+                intervention.state_dict(),
+                os.path.join(save_directory, binary_filename),
+            )
+
+        # save model's trainable parameters as well
+        if include_model:
+            model_state_dict = {}
+            model_binary_filename = "paddle_model.bin"
+            for n, p in self.model.named_parameters():
+                if not p.stop_gradient:
+                    model_state_dict[n] = p
+            paddle.save(model_state_dict, os.path.join(save_directory, model_binary_filename))
+
+    def load_intervention(self, load_directory, include_model=True):
+        """
+        Instead of creating an new object, this function loads existing weights onto
+        the current object. This is not a static method, and returns nothing.
+        """
+        # load binary files
+        for i, (k, v) in enumerate(self.interventions.items()):
+            intervention = v[0]
+            binary_filename = f"intkey_{k}.bin"
+            saved_state_dict = paddle.load(os.path.join(load_directory, binary_filename))
+            intervention.load_state_dict(saved_state_dict)
+
+        # load model's trainable parameters as well
+        if include_model:
+            model_binary_filename = "pypaddle_model.bin"
+            saved_model_state_dict = paddle.load(os.path.join(load_directory, model_binary_filename))
+            self.model.load_state_dict(saved_model_state_dict, strict=False)
+
+
+    def train(self):
+        self.model.train()
+
+    def eval(self):
+        self.model.eval()
+
+    def count_parameters(self, include_model=False):
+        total_parameters = 0
+        for k, v in self.interventions.items():
+            total_parameters += count_parameters(v[0])
+        if include_model:
+            total_parameters += sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        return total_parameters
+
+    def print_trainable_parameters(self):
+        trainable_intervention_parameters = 0
+        for k, v in self.interventions.items():
+            trainable_intervention_parameters += count_parameters(v[0])
+
+        trainable_model_parameters = int(sum(p.numel() for p in self.model.parameters() if not p.stop_gradient))
+
+        all_model_parameters = int(sum(p.numel() for p in self.model.parameters()))
+
+        total_trainable_parameters = trainable_intervention_parameters + trainable_model_parameters
+
+        logging.info("trainable_intervention_parameters:", trainable_intervention_parameters)
+        logging.info("trainable_model_parameters:", trainable_model_parameters)
+        logging.info("all_model_parameters:", all_model_parameters)
+        logging.info("total_trainable_parameters:", total_trainable_parameters)
+        logging.info(
+            f"trainable intervention params: {trainable_intervention_parameters:,d} || trainable model params: {trainable_model_parameters:,d}\n"
+            f"model params: {all_model_parameters:,d} || trainable%: {100 * total_trainable_parameters / all_model_parameters}"
+        )
+
 
     def _reset_hook_count(self):
         """
@@ -139,371 +447,9 @@ class ReFTModel(nn.Layer):
         for param in self.model.parameters():
             param.stop_gradient = True
         self.model_has_grad = False
-
-    def save(self, save_directory, intervention_params):
-        """
-        Save interventions to disk or hub
-        """
-        create_directory(save_directory)
-
-        saving_config = copy.deepcopy(self.config)
-        saving_config.sorted_keys = self.sorted_keys
-        saving_config.intervention_types = []
-        saving_config.intervention_dimensions = []
-        
-    
         
         
-        # saving_config.intervention_constant_sources = []
-        # handle constant source reprs if passed in.
-        # serialized_representations = []
-        # for reprs in saving_config.representations:
-        #     serialized_reprs = {}
-        #     for k, v in reprs.items():
-        #         if k == "hidden_source_representation":
-        #             continue
-        #         if k == "source_representation":
-        #             # hidden flag only set here
-        #             if v is not None:
-        #                 serialized_reprs["hidden_source_representation"] = True
-        #             serialized_reprs[k] = None
-        #         elif k == "intervention_type":
-        #             serialized_reprs[k] = None
-        #         elif k == "intervention":
-        #             serialized_reprs[k] = None
-        #         else:
-        #             serialized_reprs[k] = v
-        #     serialized_representations += [ReFTConfig(**serialized_reprs)]
-        # saving_config.representations = serialized_representations
-
-        for k, v in self.interventions.items():
-            intervention = v[0]
-            saving_config.intervention_types += [str(type(intervention))]
-            binary_filename = f"intkey_{k}.bin"
-            # save intervention binary file
-            logging.info(f"Saving trainable intervention to {binary_filename}.")
-            paddle.save(
-                intervention.state_dict(),
-                os.path.join(save_directory, binary_filename),
-            )
-            # if intervention.interchange_dim is None:
-            #     saving_config.intervention_dimensions += [None]
-            # else:
-            #     saving_config.intervention_dimensions += [intervention.interchange_dim.tolist()]
-            # saving_config.intervention_constant_sources += [intervention.is_source_constant]
-
-        saving_config = saving_config.to_dict()  
-        saving_config["intervention_params"] = intervention_params
-        print('saving_config','='*100)
-        print(saving_config)
-        print('='*100)
-        
-        saving_config['representations'] = [
-            {
-                'layer': repr['layer'], 
-                'component': repr['component'], 
-                'low_rank_dimension': repr['low_rank_dimension'],
-            }
-            for repr in saving_config['representations']
-        ]
-        print('saving_config', saving_config)
-        print('saving_config end')
-        # save metadata config
-        # saving_config.save_pretrained(save_directory)
-        # json.dumps(saving_config, indent=4, fp=open(os.path.join(save_directory, "config.json"), "w"))
-
-        with open(os.path.join(save_directory, "config.json"), 'w') as f:  
-            json.dump(saving_config, f, indent=4)
 
 
-    @staticmethod
-    def load(
-        load_directory,
-        model,
-    ):
-        """
-        Load interventions from disk
-        """
-        # load config
-        saving_config = IntervenableConfig.from_pretrained(load_directory)
-        casted_intervention_types = []
-        for type_str in saving_config.intervention_types:
-            casted_intervention_types += [get_type_from_string(type_str)]
-        saving_config.intervention_types = casted_intervention_types
-        casted_representations = []
-        for representation_opts in saving_config.representations:
-            casted_representations += [RepresentationConfig(*representation_opts)]
-        saving_config.representations = casted_representations
-        intervenable = IntervenableModel(saving_config, model)
 
-        # load binary files
-        for i, (k, v) in enumerate(intervenable.interventions.items()):
-            intervention = v[0]
-            binary_filename = f"intkey_{k}.bin"
-            intervention.is_source_constant = saving_config.intervention_constant_sources[i]
-            intervention.set_interchange_dim(saving_config.intervention_dimensions[i])
-            saved_state_dict = paddle.load(os.path.join(load_directory, binary_filename))
-            intervention.load_state_dict(saved_state_dict)
-        return intervenable
 
-    def save_intervention(self, save_directory, include_model=True):
-        """
-        Instead of saving the metadata with artifacts, it only saves artifacts such as
-        trainable weights. This is not a static method, and returns nothing.
-        """
-        create_directory(save_directory)
-
-        # save binary files
-        for k, v in self.interventions.items():
-            intervention = v[0]
-            binary_filename = f"intkey_{k}.bin"
-            # save intervention binary file
-            paddle.save(
-                intervention.state_dict(),
-                os.path.join(save_directory, binary_filename),
-            )
-
-        # save model's trainable parameters as well
-        if include_model:
-            model_state_dict = {}
-            model_binary_filename = "paddle_model.bin"
-            for n, p in self.model.named_parameters():
-                if not p.stop_gradient:
-                    model_state_dict[n] = p
-            paddle.save(model_state_dict, os.path.join(save_directory, model_binary_filename))
-
-    def load_intervention(self, load_directory, include_model=True):
-        """
-        Instead of creating an new object, this function loads existing weights onto
-        the current object. This is not a static method, and returns nothing.
-        """
-        # load binary files
-        for i, (k, v) in enumerate(self.interventions.items()):
-            intervention = v[0]
-            binary_filename = f"intkey_{k}.bin"
-            saved_state_dict = paddle.load(os.path.join(load_directory, binary_filename))
-            intervention.load_state_dict(saved_state_dict)
-
-        # load model's trainable parameters as well
-        if include_model:
-            model_binary_filename = "pypaddle_model.bin"
-            saved_model_state_dict = paddle.load(os.path.join(load_directory, model_binary_filename))
-            self.model.load_state_dict(saved_model_state_dict, strict=False)
-
-    def _gather_intervention_output(self, output, representations_key, unit_locations) -> paddle.Tensor:
-        """
-        Gather intervening activations from the output based on indices
-        """
-        if isinstance(output, tuple):
-            original_output = output[0].clone()
-        else:
-            original_output = output.clone()
-        if unit_locations is None:
-            return original_output
-
-        # gather based on intervention locations
-        selected_output = gather_neurons(
-            original_output,
-            unit_locations,
-        )
-        return selected_output
-
-    def _scatter_intervention_output(
-        self,
-        output,
-        intervened_representation,
-        representations_key,
-        unit_locations,
-    ) -> paddle.Tensor:
-        """
-        Scatter in the intervened activations in the output
-        """
-        # data structure casting
-        if isinstance(output, tuple):
-            original_output = output[0]
-        else:
-            original_output = output
-        # for non-sequence-based models, we simply replace
-        # all the activations.
-        if unit_locations is None:
-            original_output[:] = intervened_representation[:]
-            return original_output
-
-        # component = self.representations[representations_key].component
-        # unit = self.representations[representations_key].unit
-
-        # scatter in-place
-        _ = scatter_neurons(
-            original_output,
-            intervened_representation,
-            unit_locations,
-        )
-
-        return original_output
-
-    def _intervention_setter(
-        self,
-        keys,
-        unit_locations_base,
-    ) -> HandlerList:
-        """
-        Create a list of setter handlers that will set activations
-        """
-        handlers = []
-        for key_i, key in enumerate(keys):
-            intervention, module_hook = self.interventions[key]
-
-            def hook_callback(
-                model,
-                inputs,
-                outputs,
-            ):
-                is_prompt = self._key_setter_call_counter[key] == 0
-                if is_prompt:
-                    self._key_setter_call_counter[key] += 1
-                if not is_prompt:
-                    return
-
-                selected_output = self._gather_intervention_output(outputs, key, unit_locations_base[key_i])
-
-                if not isinstance(self.interventions[key][0], types.FunctionType):
-                    intervened_representation = do_intervention(
-                        selected_output,
-                        intervention,
-                    )
-                if intervened_representation is None:
-                    return
-
-                if isinstance(outputs, tuple):
-                    _ = self._scatter_intervention_output(
-                        outputs[0],
-                        intervened_representation,
-                        key,
-                        unit_locations_base[key_i],
-                    )
-                else:
-                    _ = self._scatter_intervention_output(
-                        outputs,
-                        intervened_representation,
-                        key,
-                        unit_locations_base[key_i],
-                    )
-
-            handlers.append(
-                module_hook(
-                    hook_callback,
-                )
-            )
-
-        return HandlerList(handlers)
-
-    def _wait_for_forward_with_parallel_intervention(
-        self,
-        unit_locations,
-    ):
-        # torch.autograd.set_detect_anomaly(True)
-        all_set_handlers = HandlerList([])
-        unit_locations_base = unit_locations["sources->base"][1]
-        for group_id, keys in self._intervention_group.items():
-            for key in keys:
-                set_handlers = self._intervention_setter([key], [unit_locations_base[self.sorted_keys.index(key)]])
-                all_set_handlers.extend(set_handlers)
-        return all_set_handlers
-
-    def forward(
-        self,
-        base,
-        unit_locations: Optional[Dict] = None,
-        labels: Optional[paddle.Tensor] = None,
-        output_original_output: Optional[bool] = False,
-        use_cache: Optional[bool] = True,
-    ):
-
-        self._reset_hook_count()
-        # if no intervention, return base
-        if unit_locations is None and len(self.interventions) == 0:
-            return self.model(**base), None
-
-        if unit_locations is not None:
-            assert "sources->base" in unit_locations or "base" in unit_locations
-
-        base_outputs = None
-        if output_original_output:
-            base_outputs = self.model(**base, labels=labels)
-        try:
-            # intervene
-            set_handlers_to_remove = self._wait_for_forward_with_parallel_intervention(unit_locations)
-            # run intervened forward
-            model_kwargs = {}
-            if labels is not None:  # for training
-                model_kwargs["labels"] = labels
-            if "use_cache" in self.model.config.to_dict():  # for transformer models
-                model_kwargs["use_cache"] = use_cache
-            counterfactual_outputs = self.model(**base, labels=labels)
-            set_handlers_to_remove.remove()
-        except Exception as e:
-            raise e
-        self._reset_hook_count()
-        return base_outputs, counterfactual_outputs
-
-    def train(self):
-        self.model.train()
-
-    def eval(self):
-        self.model.eval()
-
-    def count_parameters(self, include_model=False):
-        total_parameters = 0
-        for k, v in self.interventions.items():
-            total_parameters += count_parameters(v[0])
-        if include_model:
-            total_parameters += sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-        return total_parameters
-
-    def generate(
-        self,
-        base,
-        unit_locations: Optional[Dict] = None,
-        intervene_on_prompt: bool = False,
-        output_original_output: Optional[bool] = False,
-        **kwargs,
-    ):
-        self._reset_hook_count()
-        self._intervene_on_prompt = intervene_on_prompt
-        base_outputs = None
-        if output_original_output or True:
-            # returning un-intervened output
-            base_outputs = self.model.generate(**base, **kwargs)
-        set_handlers_to_remove = None
-        try:
-            # intervene
-            set_handlers_to_remove = self._wait_for_forward_with_parallel_intervention(
-                unit_locations,
-            )
-            # run intervened generate
-            counterfactual_outputs = self.model.generate(**base, **kwargs)
-            set_handlers_to_remove.remove()
-        except Exception as e:
-            raise e
-        self._reset_hook_count()
-        return base_outputs, counterfactual_outputs
-    
-    def print_trainable_parameters(self):
-        trainable_intervention_parameters = 0
-        for k, v in self.interventions.items():
-            trainable_intervention_parameters += count_parameters(v[0])
-
-        trainable_model_parameters = int(sum(p.numel() for p in self.model.parameters() if not p.stop_gradient))
-
-        all_model_parameters = int(sum(p.numel() for p in self.model.parameters()))
-
-        total_trainable_parameters = trainable_intervention_parameters + trainable_model_parameters
-
-        logging.info("trainable_intervention_parameters:", trainable_intervention_parameters)
-        logging.info("trainable_model_parameters:", trainable_model_parameters)
-        logging.info("all_model_parameters:", all_model_parameters)
-        logging.info("total_trainable_parameters:", total_trainable_parameters)
-        logging.info(
-            f"trainable intervention params: {trainable_intervention_parameters:,d} || trainable model params: {trainable_model_parameters:,d}\n"
-            f"model params: {all_model_parameters:,d} || trainable%: {100 * total_trainable_parameters / all_model_parameters}"
-        )

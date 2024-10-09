@@ -75,10 +75,11 @@ def do_predict(
             intervention_locations = paddle.transpose(inputs["intervention_locations"], perm=[1, 0, 2])
             # get left padding count, [batch_size], and add to locations
             left_padding = (inputs["input_ids"] == tokenizer.bos_token_id).nonzero(as_tuple=True)[1]
+
             if left_padding.numel() > 0:
                 left_padding = left_padding.reshape([1, -1, 1]).to(device)  # [1, batch_size, 1]
                 intervention_locations += left_padding
-                intervention_locations -= 1  # offset for the sink padding
+                # intervention_locations -= 1  # offset for the sink padding
             else:
                 logging.info("Warning: No BOS token found, skipping left padding adjustment.")
 

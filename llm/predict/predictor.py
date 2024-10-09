@@ -17,7 +17,6 @@ import json
 import os
 import sys
 
-sys.path.append("/home/ldn/baidu/pyreft/paddle-version/mypr/0705/reft-pr/PaddleNLP/llm")
 import time
 from abc import abstractmethod
 from dataclasses import dataclass, field

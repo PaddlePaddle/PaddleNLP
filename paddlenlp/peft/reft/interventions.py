@@ -13,17 +13,12 @@
 # limitations under the License.
 
 import math
-
 import paddle
 import paddle.nn as nn
 from paddle import ParamAttr
 
-
-
-
 def linear_act(x):
     return x
-
 
 ACT2FN = {
     "linear": linear_act,

@@ -1,11 +1,12 @@
 import json
-# from paddlenlp.transformers.configuration_utils import PretrainedConfig
-
+import os
 
 class ReFTConfig():
     def __init__(
         self,
         representations,
+        intervention_params=None,
+        position=None,
         intervention_types=None,
         sorted_keys=None,
         intervention_dimensions=None,
@@ -24,37 +25,38 @@ class ReFTConfig():
         self.intervention_types = overwrite_intervention_types
         self.sorted_keys = sorted_keys
         self.intervention_dimensions = intervention_dimensions
-        # self.intervention_params = None
-        # super().__init__(**kwargs)
+        self.intervention_params = intervention_params
+        self.position = position
 
-    # def __repr__(self):
-    #     representations = []
-    #     for reprs in self.representations:
-    #         print(reprs)
-    #         new_d = {}
-    #         for k, v in reprs.items():
-    #             if type(v) not in {str, int, list, tuple, dict} and v is not None and v != [None]:
-    #                 new_d[k] = "PLACEHOLDER"
-    #             else:
-    #                 new_d[k] = v
-    #         representations += [new_d]
-    #     _repr = {
-    #         "model_type": str(self.model_type),
-    #         "representations": tuple(representations),
-    #         "intervention_types": str(self.intervention_types),
-    #         "sorted_keys": tuple(self.sorted_keys) if self.sorted_keys is not None else str(self.sorted_keys),
-    #         "intervention_dimensions": str(self.intervention_dimensions),
-    #     }
-    #     _repr_string = json.dumps(_repr, indent=4)
-    #     return f"ReFTConfig\n{_repr_string}"
-
-    # def __str__(self):
-    #     return self.__repr__()
-    
-    
     def to_dict(self):  
         return {  
             'representations': self.representations,  
             'intervention_types': self.intervention_types,  
             'sorted_keys': self.sorted_keys,
         }  
+
+    @staticmethod
+    def load_config(load_directory):
+        config_dict = json.load(open(os.path.join(load_directory, 'config.json'), 'r'))
+        return config_dict
+    
+
+
+    @staticmethod
+    def save_config(config, save_directory):
+        config_dict = {}
+        config_dict['representations'] = [
+            {
+                'layer': repr['layer'], 
+                'component': repr['component'], 
+                'low_rank_dimension': repr['low_rank_dimension'],
+            }
+            for repr in config.representations
+        ]
+        
+        config_dict['intervention_params'] = config.intervention_params
+        config_dict['intervention_types'] = [
+           repr(intervention_type) for intervention_type in config.intervention_types]
+        config_dict['position'] = config.position
+        with open(os.path.join(save_directory, "config.json"), 'w') as f:  
+            json.dump(config_dict, f, indent=4)
