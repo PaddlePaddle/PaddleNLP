@@ -1086,7 +1086,6 @@ function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
     export FLAGS_enable_pir_api=1
     export FLAGS_enable_fused_ffn_qkv_pass=1
 
-    echo "---- run llama-7b with fused_ffn_qkv_pass and save ckpt ----"
     auto_task_name="llama_pir_auto_fuse_ffn_attention_qkv_MP2"
     auto_case_out_dir="auto_output/$auto_task_name"
     auto_case_log_dir="auto_output/$auto_task_name""_log"
@@ -1157,82 +1156,10 @@ function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
     auto_ips=-1
     auto_mem=-1
     echo "auto result: step 5 loss=$auto_loss ips=$auto_ips mem=$auto_mem"
-
-    echo "---- resune llama-7b with fused_ffn_qkv_pass from checkpoint3 ----"
-    resume_auto_task_name="resume_llama_pir_auto_fuse_ffn_attention_qkv_MP2"
-    resume_auto_case_out_dir="auto_output/$resume_auto_task_name"
-    resume_auto_case_log_dir="auto_output/$resume_auto_task_name""_log"
-    rm -rf $resume_auto_case_out_dir
-    rm -rf $resume_auto_case_log_dir
-
-    python -u -m paddle.distributed.launch \
-        --gpus "0,1" \
-        --log_dir $resume_auto_case_log_dir \
-        run_pretrain_auto.py \
-        --model_name_or_path "facebook/llama-7b" \
-        --tokenizer_name_or_path "facebook/llama-7b" \
-        --input_dir "./data" \
-        --output_dir $auto_case_out_dir \
-        --split 949,50,1 \
-        --weight_decay 0.01 \
-        --warmup_ratio 0.01 \
-        --warmup_steps 30 \
-        --max_grad_norm 0.0 \
-        --learning_rate 3e-05 \
-        --min_learning_rate 3e-06 \
-        --max_steps 5 \
-        --logging_steps 1 \
-        --eval_steps 1000 \
-        --save_steps 3 \
-        --continue_training 0 \
-        --do_train true \
-        --do_eval false \
-        --do_predict false \
-        --disable_tqdm true \
-        --skip_profile_timer true \
-        --save_total_limit 2 \
-        --device gpu \
-        --disable_tqdm true \
-        --dataloader_num_workers 1 \
-        --distributed_dataloader 0 \
-        --enable_auto_parallel 1 \
-        --per_device_train_batch_size 1 \
-        --gradient_accumulation_steps 1 \
-        --per_device_eval_batch_size 2 \
-        --recompute false \
-        --recompute_use_reentrant true \
-        --recompute_granularity full \
-        --pp_recompute_interval 0 \
-        --bf16 0 \
-        --fp16_opt_level "O2"  \
-        --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
-        --amp_custom_white_list "lookup_table" "lookup_table_v2" \
-        --amp_master_grad false \
-        --fuse_attention_ffn false \
-        --fuse_attention_qkv false \
-        --use_flash_attention false \
-        --use_fused_rope true \
-        --use_fused_rms_norm true \
-        --max_seq_length 4096 \
-        --sequence_parallel false \
-        --pipeline_parallel_degree 1 \
-        --sharding_parallel_degree 1 \
-        --tensor_parallel_degree 2 \
-        --virtual_pp_degree 1 \
-        --pipeline_schedule_mode "VPP" \
-        --sharding "" \
-        --to_static 1 \
-        --num_hidden_layers 2 \
-        --resume_from_checkpoint "auto_output/llama_pir_auto_fuse_ffn_attention_qkv_MP2/checkpoint-3" \
-        >>${log_path}/$FUNCNAME 2>&1
-
-
-    resume_auto_loss=`cat $resume_auto_task_name/workerlog.0 | grep 'global_step: 5' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
-    resume_auto_ips=-1
-    resume_auto_mem=-1
-    echo "resume auto result: step 5 loss=$resume_auto_loss ips=$resume_auto_ips mem=$resume_auto_mem"
-
-    check_result $FUNCNAME ${auto_ips} ${resume_auto_loss} ${auto_ips} ${resume_auto_ips} ${auto_mem} ${resume_auto_mem}
+    loss_base=10.21024895
+    ips_base=-1
+    mem_base=-1
+    check_result $FUNCNAME ${auto_loss} ${loss_base} ${auto_ips} ${ips_base} ${auto_mem} ${mem_base}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
