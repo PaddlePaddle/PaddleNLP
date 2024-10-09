@@ -154,6 +154,14 @@ class AutoTrainer(Trainer):
         self.do_grad_scaling = True if self.args.fp16 else False
         self.scaler = dist.shard_scaler(paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss))
 
+    def _loss_sum(self, loss):
+        if loss.ndim == 0:
+            return float(loss)
+        ret = paddle.to_tensor(float(0.0))
+        for l in loss.flatten():
+            ret += paddle.to_tensor(l)
+        return float(ret.item())
+
     def _get_item_from_loss(self, loss):
         if isinstance(loss, paddle.Tensor):
             if loss.is_dist():
@@ -539,7 +547,7 @@ class AutoTrainer(Trainer):
         if isinstance(loss, paddle.Tensor):
             return loss.detach() if loss._is_initialized() else float(0.0)
         elif isinstance(loss, np.ndarray):
-            return np.sum(loss)
+            return self._loss_sum(loss)
         elif loss is None:
             return float(0.0)
         else:
