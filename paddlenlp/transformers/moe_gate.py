@@ -13,7 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Tuple
 
 import paddle
 import paddle.distributed as dist
@@ -23,114 +23,27 @@ import paddle.nn.functional as F
 from ..utils.log import logger
 
 
-@paddle.no_grad()
-def compute_optimal_transport(M, r, c, lam=1.0, epsilon=1e-8, max_iters: int = 10):
-    """
-    Computes the optimal transport matrix and Slinkhorn distance using the
-    Sinkhorn-Knopp algorithm
-
-    Inputs:
-        - M : cost matrix (n x m)
-        - r : vector of marginals (n, )
-        - c : vector of marginals (m, )
-        - lam : strength of the entropic regularization
-        - epsilon : convergence parameter
-
-    Outputs:
-        - P : optimal transport matrix (n x m)
-        - dist : Sinkhorn distance
-    """
-    n, _ = M.shape
-    # P = (- lam * M).exp()
-    # P /= P.sum()
-    P = F.softmax(-M / lam)
-    u = paddle.zeros(n, "float32")
-    # normalize this matrix
-    for _ in range(max_iters):
-        if (u - P.sum(1)).abs().max() < epsilon:
-            break
-        u = P.sum(1)
-        P *= (r / (u + 1e-8)).reshape((-1, 1))
-        P *= (c / (P.sum(0) + 1e-8)).reshape((1, -1))
-    P = paddle.where(~P.isnan(), P, paddle.zeros_like(P))
-    return P, _
-
-
-class BaseGate(nn.Layer):
-    def __init__(
-        self,
-        num_experts,
-        expert_hidden_size,
-        weight_attr=None,
-        bias_attr=None,
-        **kwargs,
-    ):
-        super(BaseGate, self).__init__()
-
-        self.num_experts = num_experts
-        self.expert_hidden_size = expert_hidden_size
-
-        # force keep in float32 when using amp
-        self._cast_to_low_precision = False
-        self._weight_attr = weight_attr
-        self._bias_attr = bias_attr
-
-        self.weight = paddle.create_parameter(
-            shape=[self.expert_hidden_size, self.num_experts],
-            attr=self._weight_attr,
-            dtype="float32",
-            is_bias=False,
-        )
-        self.bias = paddle.create_parameter(
-            shape=[self.num_experts],
-            attr=self._bias_attr,
-            dtype="float32",
-            is_bias=True,
-        )
-
-        self.group = getattr(kwargs, "group", None)
-        self.global_aux_loss = getattr(kwargs, "global_aux_loss", False)
-        if self.global_aux_loss:
-            assert self.group is not None, "group is required when global_aux_loss is True"
-            self.rank = dist.get_rank(self.group)
-
-        self.expert_drop = getattr(kwargs, "expert_drop", False)
-
-    def gate_score_func(self, logits):
+class MoEGateMixin:
+    def gate_score_func(self, logits: paddle.Tensor) -> paddle.Tensor:
         # [..., hidden_dim] -> [..., num_experts]
         with paddle.amp.auto_cast(False):
             scoring_func = getattr(self, "scoring_func", None)
             if scoring_func == "softmax":
-                scores = F.softmax(logits.astype("float32"), axis=-1)
+                scores = F.softmax(logits.cast("float32"), axis=-1)
             elif scoring_func == "sigmoid":
-                scores = F.sigmoid(logits)
+                scores = F.sigmoid(logits.cast("float32"))
             elif scoring_func == "tanh":
-                scores = F.tanh(logits)
+                scores = F.tanh(logits.cast("float32"))
             elif scoring_func == "relu":
-                scores = F.relu(logits)
+                scores = F.relu(logits.cast("float32"))
             elif scoring_func == "gelu":
-                scores = F.gelu(logits)
+                scores = F.gelu(logits.cast("float32"))
             elif scoring_func == "leaky_relu":
-                scores = F.leaky_relu(logits)
+                scores = F.leaky_relu(logits.cast("float32"))
             else:
                 logger.warning(f"insupportable scoring function for MoE gating: {scoring_func}, use softmax instead")
-                scores = F.softmax(logits.astype("float32"), axis=-1)
+                scores = F.softmax(logits.cast("float32"), axis=-1)
         return scores
-
-    def scaling_weight(self, weight: paddle.Tensor):
-        topk = getattr(self, "topk", 1)
-        scaling_attr = getattr(self, "scaling_attr", None)
-
-        if topk > 1 and isinstance(scaling_attr, bool) and scaling_attr:
-            # if scaling is a bool, it means that scaling with the weight
-            scaling_factor = 1 / (weight.sum(axis=-1, keepdim=True) + 1e-20)
-        elif isinstance(scaling_attr, (int, float)):
-            scaling_factor = float(scaling_attr)
-        else:
-            logger.warning_once(f"scaling_attr is not set, use the default value 1.0")
-            scaling_factor = 1.0
-
-        return weight * scaling_factor
 
     def gumbel_rsample(self, logits: paddle.Tensor) -> paddle.Tensor:
         gumbel = paddle.distribution.gumbel.Gumbel(0, 1)
@@ -139,6 +52,42 @@ class BaseGate(nn.Layer):
     def uniform_sample(self, logits: paddle.Tensor) -> paddle.Tensor:
         uniform = paddle.distribution.uniform.Uniform(0, 1)
         return uniform.sample(logits.shape)
+
+    @paddle.no_grad()
+    def _one_hot_to_float(self, x, num_classes):
+        if x.dtype not in (paddle.int32, paddle.int64):
+            x = paddle.cast(x, paddle.int64)
+        return F.one_hot(x, num_classes=num_classes).cast(paddle.float32)
+
+    @paddle.no_grad()
+    def _one_hot_to_int64(self, x, num_classes):
+        if x.dtype not in (paddle.int32, paddle.int64):
+            x = paddle.cast(x, paddle.int64)
+        return F.one_hot(x, num_classes=num_classes).cast(paddle.int64)
+
+    @paddle.no_grad()
+    def _capacity(self, gates: paddle.Tensor, capacity_factor: float, min_capacity: int) -> paddle.Tensor:
+        """Calculate the capacity for each expert based on the gates and capacity factor.
+
+        Args:
+            gates (paddle.Tensor): A tensor of shape [num_tokens, num_experts] representing the probability distribution
+                over experts for each token.
+            capacity_factor (float): A scalar float value representing the capacity factor for each expert.
+            min_capacity (int): A scalar integer value representing the minimum capacity for each expert.
+
+        Returns:
+            int: A tensor value representing the calculated capacity for each expert.
+        """
+        assert gates.ndim == 2, f"gates should be 2D, but got {gates.ndim}, {gates.shape}"
+        # gates has shape of SE
+        num_tokens = gates.shape[0]
+        num_experts = gates.shape[1]
+        capacity = int((num_tokens // num_experts) * capacity_factor)
+        if capacity < min_capacity:
+            capacity = min_capacity
+        assert capacity > 0, f"requires capacity > 0, capacity_factor: {capacity_factor}, input_shape: {gates.shape}"
+
+        return capacity
 
     def _cal_aux_loss(self, gates, mask):
         """
@@ -187,62 +136,68 @@ class BaseGate(nn.Layer):
         orthogonal_loss = paddle.mean(paddle.square(paddle.matmul(weight.T, weight) - paddle.eye(self.num_experts)))
         return orthogonal_loss
 
-    @paddle.no_grad()
-    def _capacity(self, gates: paddle.Tensor, capacity_factor: float, min_capacity: int) -> paddle.Tensor:
-        """Calculate the capacity for each expert based on the gates and capacity factor.
 
-        Args:
-            gates (paddle.Tensor): A tensor of shape [num_tokens, num_experts] representing the probability distribution
-                over experts for each token.
-            capacity_factor (float): A scalar float value representing the capacity factor for each expert.
-            min_capacity (int): A scalar integer value representing the minimum capacity for each expert.
+class PretrainedMoEGate(nn.Layer, MoEGateMixin):
+    def __init__(self, num_experts, expert_hidden_size, **kwargs):
+        super(PretrainedMoEGate, self).__init__()
 
-        Returns:
-            int: A tensor value representing the calculated capacity for each expert.
-        """
-        assert gates.ndim == 2, f"gates should be 2D, but got {gates.ndim}, {gates.shape}"
-        # gates has shape of SE
-        num_tokens = gates.shape[0]
-        num_experts = gates.shape[1]
-        capacity = int((num_tokens // num_experts) * capacity_factor)
-        if capacity < min_capacity:
-            capacity = min_capacity
-        assert capacity > 0, f"requires capacity > 0, capacity_factor: {capacity_factor}, input_shape: {gates.shape}"
+        self.num_experts = num_experts
+        self.expert_hidden_size = expert_hidden_size
 
-        return capacity
+        self.capacity_factor = kwargs["capacity_factor"] if hasattr(kwargs, "capacity_factor") else 1.0  # fmt:skip
+        self.eval_capacity_factor = kwargs["eval_capacity_factor"] if hasattr(kwargs, "eval_capacity_factor") else 1.0  # fmt:skip
+        self.min_capacity = kwargs["min_capacity"] if hasattr(kwargs, "min_capacity") else 1.0  # fmt:skip
 
-    @paddle.no_grad()
-    def _one_hot_to_float(self, x, num_classes):
-        if x.dtype not in (paddle.int32, paddle.int64):
-            x = paddle.cast(x, paddle.int64)
-        return F.one_hot(x, num_classes=num_classes).cast(paddle.float32)
+        # force keep in float32 when using amp
+        self._cast_to_low_precision = False
+        self._weight_attr = kwargs["weight_attr"] if hasattr(kwargs, "weight_attr") else None  # fmt:skip
+        self._bias_attr = kwargs["bias_attr"] if hasattr(kwargs, "bias_attr") else None  # fmt:skip
 
-    @paddle.no_grad()
-    def _one_hot_to_int64(self, x, num_classes):
-        if x.dtype not in (paddle.int32, paddle.int64):
-            x = paddle.cast(x, paddle.int64)
-        return F.one_hot(x, num_classes=num_classes).cast(paddle.int64)
+        self.weight = paddle.create_parameter(
+            shape=[self.expert_hidden_size, self.num_experts],
+            attr=self._weight_attr,
+            dtype="float32",
+            is_bias=False,
+        )
+        if self._bias_attr is not None and self._bias_attr:
+            self.bias = paddle.create_parameter(
+                shape=[self.num_experts],
+                attr=self._bias_attr,
+                dtype="float32",
+                is_bias=True,
+            )
+
+        self.group = kwargs["group"] if hasattr(kwargs, "group") else None
+        self.global_aux_loss = kwargs["global_aux_loss"] if hasattr(kwargs, "global_aux_loss") else False
+        if self.global_aux_loss:
+            assert self.group is not None, "group is required when global_aux_loss is True"
+            self.rank = dist.get_rank(self.group)
+
+        self.expert_drop = kwargs["expert_drop"] if hasattr(kwargs, "expert_drop") else False
+        self.noisy_gate_policy = kwargs["noisy_gate_policy"] if hasattr(kwargs, "noisy_gate_policy") else None
+        self.drop_tokens = kwargs["drop_tokens"] if hasattr(kwargs, "drop_tokens") else True
+        self.use_rts = kwargs["use_rts"] if hasattr(kwargs, "use_rts") else True
+        self.top2_2nd_expert_sampling = (
+            kwargs["top2_2nd_expert_sampling"] if hasattr(kwargs, "top2_2nd_expert_sampling") else True
+        )
+        self.drop_policy = kwargs["drop_policy"] if hasattr(kwargs, "drop_policy") else "probs"
+        self.top_k = kwargs["top_k"] if hasattr(kwargs, "top_k") else 1
 
     def top1gating(
         self,
         logits: paddle.Tensor,
-        capacity_factor: float,
-        min_capacity: int,
         used_token: paddle.Tensor = None,
-        noisy_gate_policy: Optional[str] = None,
-        drop_tokens: bool = True,
-        use_rts: bool = True,
     ) -> Tuple[int, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor]:
         """Implements Top1Gating on logits."""
-        if noisy_gate_policy == "RSample":
+        if self.noisy_gate_policy == "RSample":
             logits += self.gumbel_rsample(logits.shape)
 
         gates = self.gate_score_func(logits=logits)
-        capacity = self._capacity(gates, capacity_factor, min_capacity)
+        capacity = self._capacity(gates, self.capacity_factor, self.min_capacity)
 
         # Create a mask for 1st's expert per token
         # noisy gating
-        indices1_s = paddle.argmax(logits if noisy_gate_policy == "RSample" else gates, axis=1)  # 仅保存最大值位置
+        indices1_s = paddle.argmax(logits if self.noisy_gate_policy == "RSample" else gates, axis=1)  # 仅保存最大值位置
         mask1 = self._one_hot_to_float(indices1_s, num_classes=self.num_experts)  # 将最大值位置转换为one-hot向量 [s, e]
 
         # mask only used tokens
@@ -253,7 +208,7 @@ class BaseGate(nn.Layer):
         exp_counts = paddle.sum(mask1, axis=0)  # 计算每个专家的token数量
 
         # if we don't want to drop any tokens
-        if not drop_tokens:
+        if not self.drop_tokens:
             new_capacity = paddle.max(exp_counts)  # 计算每个专家的token数量
             # Communicate across expert processes to pick the maximum capacity.
             if self.group is not None:
@@ -265,13 +220,13 @@ class BaseGate(nn.Layer):
         l_zloss = self._cal_z_loss(logits)
 
         # Random Token Selection
-        if use_rts:
+        if self.use_rts:
             mask1_rand = mask1 * self.uniform_sample(mask1)
         else:
             mask1_rand = mask1
 
         assert (
-            logits.shape[0] >= min_capacity
+            logits.shape[0] >= self.min_capacity
         ), "No. of tokens (batch-size) should be greater than min_capacity. Either set min_capacity to 0 or increase your batch size."
 
         _, top_idx = paddle.topk(mask1_rand, k=capacity, axis=0)  # 选择top_capacity个token
@@ -299,10 +254,6 @@ class BaseGate(nn.Layer):
     def top2gating(
         self,
         logits: paddle.Tensor,
-        capacity_factor: float,
-        min_capacity: int,
-        drop_tokens: bool = True,
-        top2_2nd_expert_sampling: bool = True,
     ) -> Tuple[int, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor]:
         """
         Args:
@@ -312,9 +263,9 @@ class BaseGate(nn.Layer):
         Returns:
             tuple:
                 - capacity: 每个token可分发的最大数量。
-                - dispatch_masks: 用于dispatching的mask。第一个元素是第一类token的mask；第二个元素是第二类token的mask。
-                - combine_weights：用于combining的权重。第一个元素是第一类token的权重；第二个元素是第二类token的权重。
-                - scatter_indexes: 用于scattering的索引。第一个元素是第一类token的索引；第二个元素是第二类token的索引。
+                - dispatch_masks: 用于dispatching的mask。
+                - combine_weights：用于combining的权重。
+                - scatter_indexes: 用于scattering的索引。
                 - loss_aux: aux loss。
                 - loss_z: z loss。
         """
@@ -326,7 +277,7 @@ class BaseGate(nn.Layer):
         indices1_s = paddle.argmax(gates, axis=1)  # [S, 1]
         mask1 = self._one_hot_to_int64(indices1_s, self.num_experts)  # [S, E]
 
-        if top2_2nd_expert_sampling:
+        if self.top2_2nd_expert_sampling:
             # Create a mask for 2nd's expert per token using Gumbel-max trick.
             # https://timvieira.github.io/blog/post/2014/07/31/gumbel-max-trick/
             logits += self.gumbel_rsample(logits)
@@ -351,9 +302,9 @@ class BaseGate(nn.Layer):
 
         # gating decisions
         exp_counts = paddle.sum(mask1 + mask2, axis=0)
-        if drop_tokens:
+        if self.drop_tokens:
             # Calculate configured capacity and remove locations outside capacity from mask
-            capacity = self._capacity(gates, capacity_factor, min_capacity)
+            capacity = self._capacity(gates, self.capacity_factor, self.min_capacity)
             # Remove locations outside capacity from mask.
             mask1 *= (locations1 < capacity).cast(paddle.int64)
             mask2 *= (locations2 < capacity).cast(paddle.int64)
@@ -394,17 +345,10 @@ class BaseGate(nn.Layer):
     def topkgating(
         self,
         logits: paddle.Tensor,
-        k: int,
-        capacity_factor: float,
-        min_capacity: int,
-        drop_tokens: bool = True,
-        drop_policy: str = "probs",
     ) -> Tuple[int, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor]:
         """Implements TopKGating on logits."""
-
-        # everything is in fp32 in this function
         # get topk gates
-        top_gate, top_idx = paddle.topk(logits, k=k, axis=1)
+        top_gate, top_idx = paddle.topk(logits, k=self.top_k, axis=1)
         # gating decisions
         gates = self.gate_score_func(logits=logits)
         # get topk mask
@@ -415,24 +359,22 @@ class BaseGate(nn.Layer):
         l_aux = self._cal_aux_loss(gates, mask)
         l_zloss = self._cal_z_loss(logits)
 
-        if drop_tokens:
+        if self.drop_tokens:
             # Calculate configured capacity and remove locations outside capacity from mask
-            capacity = self._capacity(gates, capacity_factor * k, min_capacity)
+            capacity = self._capacity(gates, self.capacity_factor * self.top_k, self.min_capacity)
 
             # update mask and locations by capacity
-            if drop_policy == "probs":
+            if self.drop_policy == "probs":
                 capacity_probs, capacity_indices = paddle.topk(topk_masked_gates, k=capacity, axis=0, sorted=False)
-                capacity_mask = paddle.zeros_like(logits).put_along_axis(
-                    capacity_indices, paddle.to_tensor(1.0), axis=0
-                )
+                capacity_mask = paddle.zeros_like(logits).put_along_axis(capacity_indices, paddle.to_tensor(1.0), axis=0)  # fmt:skip
                 mask = mask * capacity_mask
                 locations = paddle.cumsum(mask, axis=0) - 1
 
-            elif drop_policy == "position":
+            elif self.drop_policy == "position":
                 locations = paddle.cumsum(mask, axis=0) - 1
                 mask *= (locations < capacity).cast(paddle.int64)
             else:
-                raise ValueError(f"Invalid drop_policy: {drop_policy}")
+                raise ValueError(f"Invalid drop_policy: {self.drop_policy}")
 
         else:
             # Do not drop tokens - set capacity according to current expert assignments
@@ -458,19 +400,21 @@ class BaseGate(nn.Layer):
         raise NotImplementedError("Please implement the forward function.")
 
 
-class TopKGate(BaseGate):
+class TopKGate(PretrainedMoEGate):
     def __init__(
         self,
         num_experts,
         expert_hidden_size,
         weight_attr=None,
         bias_attr=None,
-        topk=2,
+        top_k=2,
+        capacity_factor=1.0,
+        eval_capacity_factor=1.0,
         scoring_func="softmax",
         scaling_attr=None,
     ):
         super().__init__(num_experts, expert_hidden_size, weight_attr, bias_attr)
-        self.topk = topk
+        self.top_k = top_k
         self.scoring_func = scoring_func
         self.scaling_attr = scaling_attr
 
@@ -482,7 +426,7 @@ class TopKGate(BaseGate):
         bsz, seq_len, hidden_size = hidden_states.shape
         hidden_states = hidden_states.reshape([-1, hidden_size])
         logits = F.linear(x=paddle.cast(hidden_states, paddle.float32), weight=self.weight, bias=self.bias)
-        if self.topk == 1:
+        if self.top_k == 1:
             gate_output = self.top1gating(
                 logits,
                 self.capacity_factor if self.training else self.eval_capacity_factor,
@@ -491,7 +435,7 @@ class TopKGate(BaseGate):
                 self.noisy_gate_policy if self.training else None,
                 self.drop_tokens,
             )
-        elif self.topk == 2:
+        elif self.top_k == 2:
             gate_output = self.top2gating(
                 logits,
                 self.capacity_factor if self.training else self.eval_capacity_factor,
@@ -502,53 +446,10 @@ class TopKGate(BaseGate):
         else:
             gate_output = self.topkgating(
                 logits,
-                self.topk,
+                self.top_k,
                 self.capacity_factor if self.training else self.eval_capacity_factor,
                 self.min_capacity,
                 self.drop_tokens,
             )
 
         return gate_output
-
-
-class GroupTopKGate(BaseGate):
-    def __init__(
-        self,
-        num_experts,
-        expert_hidden_size,
-        weight_attr=None,
-        bias_attr=None,
-        topk=2,
-        scoring_func="softmax",
-        scaling_attr=None,
-        n_group=1,
-        topk_group=1,
-    ):
-        super().__init__(num_experts, expert_hidden_size, weight_attr, bias_attr)
-        self.topk = topk
-        self.scoring_func = scoring_func
-        self.scaling_attr = scaling_attr
-        self.n_group = n_group
-        self.topk_group = topk_group
-
-    def forward(self, hidden_states):
-        bsz, seq_len, hidden_size = hidden_states.shape
-        hidden_states = hidden_states.reshape([-1, hidden_size])
-        scores = self.gate_score_func(hidden_states)
-
-        group_scores = scores.reshape([bsz * seq_len, self.n_group, -1]).max(axis=-1).values  # [n, n_group]
-        group_idx = paddle.topk(group_scores, k=self.topk_group, axis=-1, sorted=False)[1]  # [n, top_k_group]
-        group_mask = paddle.zeros_like(group_scores).scatter_(1, group_idx, 1)  # [n, n_group]
-        score_mask = (
-            group_mask.unsqueeze(-1)
-            .expand(bsz * seq_len, self.n_group, self.num_experts // self.n_group)
-            .reshape(bsz * seq_len, -1)
-        )  # [n, e]
-        tmp_scores = scores.masked_fill(~score_mask.bool(), 0.0)  # [n, e]
-
-        topk_weight, topk_idx = paddle.topk(tmp_scores, k=self.topk, axis=-1, largest=True, sorted=False)
-
-        if self.scaling_attr is not None:
-            topk_weight = self.scaling_weight(topk_weight)
-
-        return topk_weight, topk_idx, scores
