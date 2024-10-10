@@ -99,7 +99,7 @@ git checkout release-mxmaca/2.6
 # 2. 拉取第三方依赖
 git submodule update --init
 # 3. 配置环境变量
-export MACA_PATH=/real?maca/install/path
+export MACA_PATH=/real/maca/install/path
 export CUDA_PATH=/real/cuda/install/path
 export CUCC_PATH=${MACA_PATH}/tools/cu-bridge
 export PATH=${CUDA_PATH}/bin:${CUCC_PATH}/bin:${CUCC_PATH}/tools:${MACA_PATH}/bin:$PATH
@@ -120,6 +120,7 @@ pip install python/dist/paddlepaddle_gpu*.whl
 # PaddleNLP是基于paddlepaddle『飞桨』的自然语言处理和大语言模型(LLM)开发库，存放了基于『飞桨』框架实现的各种大模型，llama2-13B模型也包含其中。为了便于您更好地使用PaddleNLP，您需要clone整个仓库。
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
 cd PaddleNLP
+git checkout origin/release/3.0-beta1
 python -m pip install -r requirements.txt
 python -m pip install -e .
 ```
@@ -129,8 +130,8 @@ python -m pip install -e .
 1. 尝试运行推理demo
 
 ```
-cd llm
-python predictor.py --model_name_or_path meta-llama/llama-13b-chat --dtype bfloat16 --output_file "infer.json" --batch_size 1
+cd llm/predict
+python predictor.py --model_name_or_path meta-llama/Llama-2-13b-chat --dtype bfloat16 --output_file "infer.json" --batch_size 1 --decode_strategy "greedy_search"
 ```
 
 成功运行后，可以查看到推理结果的生成，样例如下：
@@ -141,13 +142,13 @@ python predictor.py --model_name_or_path meta-llama/llama-13b-chat --dtype bfloa
 ***********Target**********
 
 ***********Output**********
- "温故而知新" (wēn gù er zhī xīn) is a Chinese idiom that means "to know the old in order to discover the new." It is often used to describe the idea that one can gain a deeper understanding of something by studying its history and roots, rather than just focusing on the present moment.
+ "温故而知新" (wēn gù er zhī xīn) is a Chinese idiom that means "to know the old and appreciate the new." It is often used to describe the idea that one can gain a deeper understanding and appreciation of something by studying its history and traditions, and then applying that knowledge to new situations and challenges.
 
-The phrase is often used in the context of learning and education, where it suggests that students should study the classics and the history of their subject in order to gain a more profound understanding of it. By understanding the origins and development of a subject, students can gain a deeper appreciation of its principles and concepts, and be better equipped to apply them in new and innovative ways.
+The word "温" (wēn) in this idiom means "old" or "ancient," and "故" (gù) means "former" or "past." The word "知" (zhī) means "to know" or "to understand," and "新" (xīn) means "new."
 
-In a broader sense, "温故而知新" can also be applied to life in general. By studying the past and understanding the traditions and cultural heritage of one's community, individuals can gain a deeper understanding of the present and be better prepared to face the challenges of the future.
+This idiom is often used in the context of education, where it is believed that students should be taught the traditional methods and theories of a subject before being introduced to new and innovative ideas. By understanding the history and foundations of a subject, students can better appreciate and apply the new ideas and techniques that they are learning.
 
-In short, "温故而知新" is a reminder that understanding the past is essential to moving forward and making progress in any field or aspect of life.
+In addition to education, "温故而知新" can also be applied to other areas of life, such as business, where it is important to understand the traditions and practices of the industry before introducing new products or services. By understanding the past and the foundations of a particular field, one can gain a deeper appreciation of the present and make more informed decisions about the future.
 ```
 
 2. 您也可以尝试参考 [文档](../../../legacy/examples/benchmark/wiki_lambada/README.md) 中的说明使用 wikitext 数据集验证推理精度。
