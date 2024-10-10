@@ -95,13 +95,13 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
   auto decoder_batch_ids =
       GetEmptyTensor({bsz * decoder_max_tile_size_per_bs_q},
                      paddle::DataType::INT32,
-                     paddle::GPUPlace());
+                     seq_lens_encoder.place());
   auto decoder_tile_ids_per_batch =
       GetEmptyTensor({bsz * decoder_max_tile_size_per_bs_q},
                      paddle::DataType::INT32,
-                     paddle::GPUPlace());
+                     seq_lens_encoder.place());
   auto decoder_num_blocks_x =
-      GetEmptyTensor({1}, paddle::DataType::INT32, paddle::GPUPlace());
+      GetEmptyTensor({1}, paddle::DataType::INT32, seq_lens_encoder.place());
   split_q_block<<<1, 32, 0, stream>>>(seq_lens_this_time.data<int>(),
                                       seq_lens_encoder.data<int>(),
                                       decoder_batch_ids.data<int>(),
@@ -145,13 +145,13 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
   auto encoder_batch_ids =
       GetEmptyTensor({bsz * encoder_max_tile_size_per_bs_q},
                      paddle::DataType::INT32,
-                     paddle::GPUPlace());
+                     seq_lens_encoder.place());
   auto encoder_tile_ids_per_batch =
       GetEmptyTensor({bsz * encoder_max_tile_size_per_bs_q},
                      paddle::DataType::INT32,
-                     paddle::GPUPlace());
+                     seq_lens_encoder.place());
   auto encoder_num_blocks_x =
-      GetEmptyTensor({1}, paddle::DataType::INT32, paddle::GPUPlace());
+      GetEmptyTensor({1}, paddle::DataType::INT32, seq_lens_encoder.place());
   split_q_block<<<1, 32, 0, stream>>>(seq_lens_encoder.data<int>(),
                                       nullptr,
                                       encoder_batch_ids.data<int>(),
@@ -168,12 +168,12 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
       div_up(max_enc_len_this_time_data, block_size);
   auto kv_batch_ids = GetEmptyTensor({bsz * max_tile_size_per_bs_kv},
                                      paddle::DataType::INT32,
-                                     paddle::GPUPlace());
+                                     seq_lens_encoder.place());
   auto kv_tile_ids_per_batch = GetEmptyTensor({bsz * max_tile_size_per_bs_kv},
                                               paddle::DataType::INT32,
-                                              paddle::GPUPlace());
+                                              seq_lens_encoder.place());
   auto kv_num_blocks_x =
-      GetEmptyTensor({1}, paddle::DataType::INT32, paddle::GPUPlace());
+      GetEmptyTensor({1}, paddle::DataType::INT32, seq_lens_encoder.place());
   split_kv_block<<<1, 32, 0, stream>>>(seq_lens_decoder.data<int>(),
                                        seq_lens_encoder.data<int>(),
                                        kv_batch_ids.data<int>(),
@@ -183,7 +183,6 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
                                        block_size,
                                        block_size);
   auto kv_num_blocks_x_cpu = kv_num_blocks_x.copy_to(paddle::CPUPlace(), false);
-
   return {encoder_batch_ids,
           encoder_tile_ids_per_batch,
           encoder_num_blocks_x_cpu, /*cpu*/

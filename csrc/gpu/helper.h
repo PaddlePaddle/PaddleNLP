@@ -196,6 +196,7 @@ inline json ReadJsonFromFile(const std::string& filePath) {
     return j;
 }
 
+// place must be an existing place object and cannot use paddle::CPUPlace() or paddle::GPUPlace()
 inline paddle::Tensor GetEmptyTensor(const common::DDim& dims, const paddle::DataType& dtype, const paddle::Place& place){
   auto* allocator = paddle::GetAllocator(place);
   phi::DenseTensor dense_tensor;

@@ -22,6 +22,8 @@ from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
+    FusedAppendMultiTransformer,
+    FusedAppendMultiTransformerWeightOnly,
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerBase,
@@ -256,6 +258,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             use_neox_rotary_style=self.use_neox,
             rank_id=config.tensor_parallel_rank,
             moe_config=moe_config,
+            append_attn=config.append_attn,
         )
 
         self.set_transformer_block(transformer_config)
@@ -761,15 +764,22 @@ class Qwen2MoeForCausalLMInferenceModel(GenerationInferenceModel, Qwen2MoePretra
 @register_base_model
 class Qwen2MoeBlockInferenceModel(Qwen2MoeInferenceModel):
     def __init__(self, config: Qwen2MoeConfig):
+        self.append_attn = config.append_attn
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size
 
     def set_transformer_block(self, transformer_config):
-        if self.use_weight_only:
-            self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
+        if not self.append_attn:
+            if self.use_weight_only:
+                self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
+            else:
+                self.transformer_block = FusedBlockMultiTransformer(transformer_config)
         else:
-            self.transformer_block = FusedBlockMultiTransformer(transformer_config)
+            if self.use_weight_only:
+                self.transformer_block = FusedAppendMultiTransformerWeightOnly(transformer_config)
+            else:
+                self.transformer_block = FusedAppendMultiTransformer(transformer_config)
 
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)

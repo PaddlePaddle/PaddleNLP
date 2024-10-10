@@ -29,8 +29,9 @@ from paddlenlp.experimental.model_utils import (
     WeightScalesLoader,
 )
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
+    FusedAppendMultiTransformer,
+    FusedAppendMultiTransformerWeightOnly,
     FusedBlockMultiTransformer,
-    FusedBlockMultiTransformerA8W8,
     FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerA8W8,
     FusedMultiTransformerBase,
@@ -341,6 +342,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
             rank_id=config.tensor_parallel_rank,
             trans_qkvw=(False if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type else True),
             moe_config=moe_config,
+            append_attn=config.append_attn,
         )
 
         self.set_transformer_block(transformer_config)
@@ -494,6 +496,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        self.transformer_block.init_weight()
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
         split_fn = split_param_func()
@@ -840,7 +843,10 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                     )
                     for k, v in cache_scales_loader.scale.items():
                         for i_layer, weight_scale in enumerate(v):
-                            weight_scale = weight_scale.astype("float32")
+                            if self.config.append_attn:
+                                weight_scale = paddle.to_tensor(weight_scale).cast(paddle.get_default_dtype())
+                            else:
+                                weight_scale = weight_scale.astype("float32")
                             if k == "cache_k_scale":
                                 self.transformer_block.cache_k_scales[i_layer].set_value(weight_scale)
                             elif k == "cache_v_scale":
@@ -1062,17 +1068,22 @@ class MixtralForCausalLMInferenceModel(GenerationInferenceModel, MixtralPretrain
 @register_base_model
 class MixtralBlockInferenceModel(MixtralInferenceModel):
     def __init__(self, config: MixtralConfig):
+        self.append_attn = config.append_attn
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size
 
     def set_transformer_block(self, transformer_config):
-        if self.use_weight_only:
-            self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
-        elif "a8w8" in self.quant_type:
-            self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
+        if not self.append_attn:
+            if self.use_weight_only:
+                self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
+            else:
+                self.transformer_block = FusedBlockMultiTransformer(transformer_config)
         else:
-            self.transformer_block = FusedBlockMultiTransformer(transformer_config)
+            if self.use_weight_only:
+                self.transformer_block = FusedAppendMultiTransformerWeightOnly(transformer_config)
+            else:
+                self.transformer_block = FusedAppendMultiTransformer(transformer_config)
 
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)

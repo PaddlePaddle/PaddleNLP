@@ -2500,12 +2500,21 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
             # ffn layernorm
             tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
 
-            # ffn1 matmul
-            ffn1_out = self.compute_ffn1(tmp_out, i)
-            ffn1_out = self.compute_activation(ffn1_out, i)
+            if self.config.moe_config.use_moe(i):
+                # fused moe
+                ffn2_out = self.compute_fused_moe(tmp_out, i)
 
-            # ffn2 matmul
-            ffn2_out = self.compute_ffn2(ffn1_out, i)
+                # shared_expert
+                if self.config.moe_config.use_shared_expert(i):
+                    shared_expert_out = self.compute_shared_expert(tmp_out, i)
+                    ffn2_out = ffn2_out + shared_expert_out
+            else:
+                # ffn1 matmul
+                ffn1_out = self.compute_ffn1(tmp_out, i)
+                ffn1_out = self.compute_activation(ffn1_out, i)
+
+                # ffn2 matmul
+                ffn2_out = self.compute_ffn2(ffn1_out, i)
 
             # all_reduce
             if self.nranks > 1:
