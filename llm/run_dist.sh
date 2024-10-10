@@ -34,14 +34,12 @@ python=python
 
 cd ../model_zoo/gpt-3/external_ops/ &&  ${python} setup.py install && cd -
 
-MUSA_KERNEL_TIMEOUT=900000 PYTHONPATH=../ ${python} -m paddle.distributed.launch \
+export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4
+
+PYTHONPATH=../ ${python} -m paddle.distributed.launch \
 	--master "127.0.0.1:8678" \
 	--nnodes 1 \
 	--log_dir log_$(hostname) \
         --gpus 0,1,2,3,4,5,6,7 \
 	run_pretrain.py \
-    "llama/pretrain-llama_13b-pp4tp2sd2_stage1.json"
-
-# llama/pretrain-llama_13b-tp2sd4_stage2.json 
-# llama/pretrain-llama_13b-pp4tp2sd2_stage1.json
-# llama/pretrain-llama_13b-tp2sd4_stage2.json 
+        "llama/pretrain-llama_13b-pp4tp2sd2_stage1.json"
