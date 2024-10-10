@@ -38,6 +38,7 @@ from paddlenlp.experimental.model_utils import (
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedAppendMultiTransformer,
     FusedAppendMultiTransformerA8W8,
+    FusedAppendMultiTransformerWeightOnly,
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerA8W8,
     FusedBlockMultiTransformerFP8,
@@ -711,16 +712,24 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                                 dtype=paddle.get_default_dtype(),
                             )
                     self.transformer_block.linear_shifts[idx].set_value(
-                        paddle.to_tensor(state_dict["qwen2.layers.{}.self_attn.o_proj.shift_bias".format(idx)]).astype(paddle.get_default_dtype())
+                        paddle.to_tensor(state_dict["qwen2.layers.{}.self_attn.o_proj.shift_bias".format(idx)]).astype(
+                            paddle.get_default_dtype()
+                        )
                     )
                     self.transformer_block.linear_smooths[idx].set_value(
-                        paddle.to_tensor(state_dict["qwen2.layers.{}.self_attn.o_proj.smooth_weight".format(idx)]).astype(paddle.get_default_dtype())
+                        paddle.to_tensor(
+                            state_dict["qwen2.layers.{}.self_attn.o_proj.smooth_weight".format(idx)]
+                        ).astype(paddle.get_default_dtype())
                     )
                     self.transformer_block.ffn2_shifts[idx].set_value(
-                        paddle.to_tensor(state_dict["qwen2.layers.{}.mlp.down_proj.shift_bias".format(idx)]).astype(paddle.get_default_dtype())
+                        paddle.to_tensor(state_dict["qwen2.layers.{}.mlp.down_proj.shift_bias".format(idx)]).astype(
+                            paddle.get_default_dtype()
+                        )
                     )
                     self.transformer_block.ffn2_smooths[idx].set_value(
-                        paddle.to_tensor(state_dict["qwen2.layers.{}.mlp.down_proj.smooth_weight".format(idx)]).astype(paddle.get_default_dtype())
+                        paddle.to_tensor(state_dict["qwen2.layers.{}.mlp.down_proj.smooth_weight".format(idx)]).astype(
+                            paddle.get_default_dtype()
+                        )
                     )
 
                 if self.shift:
@@ -1521,16 +1530,12 @@ class Qwen2BlockInferenceModel(Qwen2InferenceModel):
             else:
                 self.transformer_block = FusedBlockMultiTransformer(transformer_config)
         else:
-            # if self.use_weight_only:
-            #     self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
-            # elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
-            #     self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
-            # elif "fp8" in self.quant_type:
-            #     self.transformer_block = FusedBlockMultiTransformerFP8(transformer_config)
-            # else:
-
-            if self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
+            if self.use_weight_only:
+                self.transformer_block = FusedAppendMultiTransformerWeightOnly(transformer_config)
+            elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
                 self.transformer_block = FusedAppendMultiTransformerA8W8(transformer_config)
+            # elif "fp8" in self.quant_type:
+            #     self.transformer_block = FusedAppendMultiTransformerFP8(transformer_config)
             else:
                 self.transformer_block = FusedAppendMultiTransformer(transformer_config)
 

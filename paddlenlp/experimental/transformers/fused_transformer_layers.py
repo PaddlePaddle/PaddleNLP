@@ -72,6 +72,7 @@ __all__ = [
     "FusedMultiTransformerWeightOnly",
     "FusedMultiTransformerWeightOnlyPostLayernorm",
     "FusedAppendMultiTransformer",
+    "FusedAppendMultiTransformerWeightOnly",
     "FusedAppendMultiTransformerA8W8",
     "FusedBlockMultiTransformer",
     "FusedBlockMultiTransformerWeightOnly",
@@ -2541,6 +2542,11 @@ class FusedBlockMultiTransformerWeightOnly(FusedBlockMultiTransformer, FusedMult
         super().__init__(config)
 
 
+class FusedAppendMultiTransformerWeightOnly(FusedAppendMultiTransformer, FusedMultiTransformerWeightOnly):
+    def __init__(self, config: FusedMultiTransformerConfig):
+        super().__init__(config)
+
+
 class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTransformerA8W8):
     def __init__(self, config: FusedMultiTransformerConfig):
         super().__init__(config)
@@ -2701,8 +2707,8 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
             v_quant_scale,
             k_dequant_scale,
             v_dequant_scale,
-            cache_k_zps,
-            cache_v_zps,
+            cache_k_zp,
+            cache_v_zp,
             self.linear_shifts[i] if len(self.linear_shifts) > 0 else None,
             self.linear_smooths[i] if len(self.linear_smooths) > 0 else None,
             self._fuse_kernel_compute_dtype,
