@@ -732,6 +732,8 @@ class UnifiedCheckpointHandler:
                 param_shape_info[key] = (
                     buffer._sharding_param_grad_view[key]._param.shape,
                     buffer._sharding_param_grad_view[key]._param.numel().item(),
+                    buffer._sharding_param_grad_view[key]._index,
+                    buffer._sharding_param_grad_view[key]._padded_size,
                 )
         param_slice_info["global_rank"] = global_rank
         param_slice_info_list = []
@@ -752,7 +754,7 @@ class UnifiedCheckpointHandler:
                 if optim_state_dict[key].numel().item() == 1:  # for example: beta1, beta2
                     continue
                 begin, end = param_slice_info[static_name]
-                shape, numel = param_shape_info[static_name]
+                shape, numel, _, _ = param_shape_info[static_name]
                 if end - begin == numel:  # full tensor
                     optim_state_dict[key] = optim_state_dict[key].reshape(shape)
                 elif end <= begin:  # empty tensor
@@ -1945,26 +1947,44 @@ def distributed_send_recv_splited_param(
             continue
 
         static_name = key if is_master_weights else generate_base_static_name(key)[0]
+        shape, numel, index, padded_size = param_shape_info[static_name]
+
         if static_name not in partial_tensor_list:
+            state_dict[key] = state_dict[key].reshape(shape)
             continue
 
         recv_rank = recv_table[static_name]
         send_info = send_table[static_name]
 
+        base_padding_start = index + numel
+        base_padding_end = index + padded_size
+
         if global_rank == recv_rank:
             tmp_tensor_list = []
             for send_rank, begin, end in send_info:
+                padding_start = max(begin, base_padding_start)
+                padding_end = min(end, base_padding_end)
+
                 if send_rank == recv_rank:
-                    tmp_tensor_list.append(state_dict[key])
+                    tensor = (
+                        state_dict[key] if padding_start >= padding_end else state_dict[key][: padding_start - begin]
+                    )
+                    tmp_tensor_list.append(tensor)
                 else:
-                    tmp_tensor = paddle.empty(shape=[end - begin], dtype=state_dict[key].dtype)
+                    length = end - begin if padding_start >= padding_end else padding_start - begin
+                    tmp_tensor = paddle.empty(shape=[length], dtype=state_dict[key].dtype)
                     dist.stream.recv(tmp_tensor, src=send_rank)
                     tmp_tensor_list.append(tmp_tensor)
-            state_dict[key] = paddle.concat(tmp_tensor_list, axis=0).reshape(param_shape_info[static_name][0])
+            state_dict[key] = paddle.concat(tmp_tensor_list, axis=0).reshape(shape)
         else:
-            for send_rank, _, _ in send_info:
+            for send_rank, begin, end in send_info:
+                padding_start = max(begin, base_padding_start)
+                padding_end = min(end, base_padding_end)
                 if global_rank == send_rank:
-                    dist.stream.send(state_dict[key], dst=recv_rank)
+                    tensor = (
+                        state_dict[key] if padding_start >= padding_end else state_dict[key][: padding_start - begin]
+                    )
+                    dist.stream.send(tensor, dst=recv_rank)
                     state_dict.pop(key)
     return state_dict
 
