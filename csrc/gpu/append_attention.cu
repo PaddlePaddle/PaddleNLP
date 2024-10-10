@@ -251,7 +251,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
     cudaStream_t exec_stream;
     if (max_enc_len_this_time_data > 0) {
       cudaStreamWaitEvent(decoder_stream, main_event);
-      exec_stream = decoder_stream
+      exec_stream = decoder_stream;
     } else {
       exec_stream = main_stream;
     }
