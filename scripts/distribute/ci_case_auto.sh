@@ -1159,7 +1159,10 @@ function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
     loss_base=10.21024895
     ips_base=-1
     mem_base=-1
-    check_result $FUNCNAME ${auto_loss} ${loss_base} ${auto_ips} ${ips_base} ${auto_mem} ${mem_base}
+    if [ $IS_A100 -ne 0 ];then
+        loss_base=10.27925682
+    fi
+    check_result $FUNCNAME ${loss_base} ${auto_loss} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
