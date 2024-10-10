@@ -48,6 +48,16 @@ try:
 except:
     QuantizationLinear = None
 
+try:
+    from paddle.distributed import in_auto_parallel_align_mode
+except:
+
+    def in_auto_parallel_align_mode():
+        """
+        hack for paddlenlp develop branch.
+        """
+        return False
+
 MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
 DIST_CKPT_PATH = "dist_ckpt"
@@ -547,7 +557,10 @@ class AutoTrainer(Trainer):
         if isinstance(loss, paddle.Tensor):
             return loss.detach() if loss._is_initialized() else float(0.0)
         elif isinstance(loss, np.ndarray):
-            return self._loss_sum(loss)
+            if in_auto_parallel_align_mode():
+                return self._loss_sum(loss)
+            else:
+                return np.sum(loss)
         elif loss is None:
             return float(0.0)
         else:
