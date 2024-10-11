@@ -130,10 +130,14 @@ class EmptyWeightScale:
 
         # concat qkv and ffn1
         if concat_qkv:
-            self.scale["qkv_weight_scale"] = np.full([num_of_layers, qkv_out_size // mp_size], fill_value=0.1, dtype="float32")
+            self.scale["qkv_weight_scale"] = np.full(
+                [num_of_layers, qkv_out_size // mp_size], fill_value=0.1, dtype="float32"
+            )
 
         if concat_ffn1:
-            self.scale["ffn1_weight_scale"]= np.full([num_of_layers, ffn_hidden_size * 2 // mp_size], fill_value=0.1, dtype="float32")
+            self.scale["ffn1_weight_scale"] = np.full(
+                [num_of_layers, ffn_hidden_size * 2 // mp_size], fill_value=0.1, dtype="float32"
+            )
 
 
 class EmptyCacheScale:
