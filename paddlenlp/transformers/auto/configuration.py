@@ -238,7 +238,9 @@ class _LazyConfigMapping(OrderedDict):
         value = self._mapping[key]
         module_name = model_type_to_module_name(key)
         if module_name not in self._modules:
-            self._modules[module_name] = importlib.import_module(f".{module_name}", "paddlenlp.transformers")
+            self._modules[module_name] = importlib.import_module(
+                f".{module_name}.configuration", "paddlenlp.transformers"
+            )
         if hasattr(self._modules[module_name], value):
             return getattr(self._modules[module_name], value)
 
@@ -440,14 +442,24 @@ class AutoConfig(PretrainedConfig):
             from_hf_hub=from_hf_hub,
             from_aistudio=from_aistudio,
         )
-        if config_file is not None and os.path.exists(config_file):
+        config_dict, unused_kwargs = PretrainedConfig.get_config_dict(pretrained_model_name_or_path, **kwargs)
+        if "model_type" in config_dict:
+            try:
+                config_class = CONFIG_MAPPING[config_dict["model_type"]]
+            except KeyError:
+                raise ValueError(
+                    f"The checkpoint you are trying to load has model type `{config_dict['model_type']}` "
+                    "but Transformers does not recognize this architecture. This could be because of an "
+                    "issue with the checkpoint, or because your version of Transformers is out of date."
+                )
+            return config_class.from_dict(config_dict, **unused_kwargs)
+        elif "model_type" not in config_dict and config_file is not None and os.path.exists(config_file):
             config_class = cls._get_config_class_from_config(pretrained_model_name_or_path, config_file)
             logger.info("We are using %s to load '%s'." % (config_class, pretrained_model_name_or_path))
             if config_class is cls:
                 return cls.from_file(config_file)
             return config_class.from_pretrained(config_file, *model_args, **kwargs)
         elif config_file is None:
-            config_dict, unused_kwargs = PretrainedConfig.get_config_dict(pretrained_model_name_or_path, **kwargs)
             # Fallback: use pattern matching on the string.
             # We go from longer names to shorter names to catch roberta before bert (for instance)
             for pattern in sorted(CONFIG_MAPPING.keys(), key=len, reverse=True):
@@ -461,3 +473,20 @@ class AutoConfig(PretrainedConfig):
                 "- or a correct model-identifier of community-contributed pretrained models,\n"
                 "- or the correct path to a directory containing relevant config files.\n"
             )
+
+    @staticmethod
+    def register(model_type, config, exist_ok=False):
+        """
+        Register a new configuration for this class.
+
+        Args:
+            model_type (`str`): The model type like "bert" or "gpt".
+            config ([`PretrainedConfig`]): The config to register.
+        """
+        if issubclass(config, PretrainedConfig) and config.model_type != model_type:
+            raise ValueError(
+                "The config you are passing has a `model_type` attribute that is not consistent with the model type "
+                f"you passed (config has {config.model_type} and you passed {model_type}. Fix one of those so they "
+                "match!"
+            )
+        CONFIG_MAPPING.register(model_type, config, exist_ok=exist_ok)
