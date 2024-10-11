@@ -2246,10 +2246,7 @@ class Trainer:
         else:
             loss.backward()
 
-        detached_loss = loss.detach()
-        if in_auto_parallel_align_mode():
-            detached_loss *= _get_align_mode_scale()
-        return detached_loss
+        return _unscale_loss_in_align_mode(loss.detach())
 
     def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         """
