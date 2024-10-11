@@ -1,11 +1,11 @@
 // Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -205,9 +205,11 @@ __global__ void append_decode_cache_T_rope_kernel(
       float input_left = static_cast<float>(src_vec[2 * i]);
       float input_right = static_cast<float>(src_vec[2 * i + 1]);
       input_left = qkv_biases ? input_left * out_scale_vec[2 * i] +
-                   static_cast<float>(bias_vec[2 * i]) : input_left * out_scale_vec[2 * i];
+                                    static_cast<float>(bias_vec[2 * i])
+                              : input_left * out_scale_vec[2 * i];
       input_right = qkv_biases ? input_right * out_scale_vec[2 * i + 1] +
-                    static_cast<float>(bias_vec[2 * i + 1]) : input_right * out_scale_vec[2 * i + 1];
+                                     static_cast<float>(bias_vec[2 * i + 1])
+                               : input_right * out_scale_vec[2 * i + 1];
       if (hi < num_heads + gqa_group_size) {
         const float cos_tmp = cos_emb_vec[i];
         const float sin_tmp = sin_emb_vec[i];
@@ -241,10 +243,12 @@ __global__ void append_decode_cache_T_rope_kernel(
 
 template <typename T, int VecSize = 1>
 __global__ void append_decode_cache_T_neox_rope_kernel(
-    const T* __restrict__ qkv,  // [bsz, num_heads + 2 * gqa_group_size,
-                                        // head_size]
-    T* __restrict__ key_cache,    // [num_blocks, gqa_group_size, block_size, head_size // 2]
-    T* __restrict__ value_cache,  // [num_blocks, gqa_group_size, block_size, head_size // 2]
+    const T* __restrict__ qkv,    // [bsz, num_heads + 2 * gqa_group_size,
+                                  // head_size]
+    T* __restrict__ key_cache,    // [num_blocks, gqa_group_size, block_size,
+                                  // head_size // 2]
+    T* __restrict__ value_cache,  // [num_blocks, gqa_group_size, block_size,
+                                  // head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
     const int* __restrict__ padding_offsets,  // [num_tokens]
@@ -277,7 +281,7 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
   const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * head_size;
   const int64_t half_hidden_size = hidden_size / 2;
   // const int64_t offset = 2 * hidden_size;
-  
+
   for (int32_t linear_index = global_thread_idx * VecSize,
                step = gridDim.x * blockDim.x * VecSize;
        linear_index < elem_cnt;
@@ -298,8 +302,7 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
     const int block_offset = write_seq_id % block_size;
     const uint32_t ori_idx_left =
         start_token_idx * hidden_size + hi * head_size + h_bias;
-    const uint32_t ori_idx_right =
-        ori_idx_left + half_head_size;
+    const uint32_t ori_idx_right = ori_idx_left + half_head_size;
 
     Load<T, VecSize>(&qkv[ori_idx_left], &left_vec);
     Load<T, VecSize>(&qkv[ori_idx_right], &right_vec);
@@ -354,8 +357,10 @@ template <typename T, int VecSize = 1>
 __global__ void append_decode_cache_T_neox_rope_kernel(
     const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size,
                                         // head_size]
-    T* __restrict__ key_cache,    // [num_blocks, gqa_group_size, block_size, head_size // 2]
-    T* __restrict__ value_cache,  // [num_blocks, gqa_group_size, block_size, head_size // 2]
+    T* __restrict__ key_cache,    // [num_blocks, gqa_group_size, block_size,
+                                  // head_size // 2]
+    T* __restrict__ value_cache,  // [num_blocks, gqa_group_size, block_size,
+                                  // head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
     const int* __restrict__ padding_offsets,  // [num_tokens]
@@ -364,8 +369,10 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
     const int* __restrict__ seq_lens_encoder,  // [bsz]
     const float* __restrict__ cos_emb,
     const float* __restrict__ sin_emb,
-    const float* __restrict__ qkv_out_scales,  // [num_head + 2 * gqa_group_size, dim_head]
-    const T* __restrict__ qkv_biases,  // [num_head + 2 * gqa_group_size, dim_head]
+    const float* __restrict__ qkv_out_scales,  // [num_head + 2 *
+                                               // gqa_group_size, dim_head]
+    const T* __restrict__ qkv_biases,  // [num_head + 2 * gqa_group_size,
+                                       // dim_head]
     const int max_seq_len,
     const int max_blocks_per_seq,
     const int num_heads,
@@ -394,7 +401,7 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
   const int half_head_size = head_size / 2;
   const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * head_size;
   const int64_t half_hidden_size = hidden_size / 2;
-  
+
   for (int32_t linear_index = global_thread_idx * VecSize,
                step = gridDim.x * blockDim.x * VecSize;
        linear_index < elem_cnt;
@@ -415,8 +422,7 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
     const int block_offset = write_seq_id % block_size;
     const uint32_t ori_idx_left =
         start_token_idx * hidden_size + hi * head_size + h_bias;
-    const uint32_t ori_idx_right =
-        ori_idx_left + half_head_size;
+    const uint32_t ori_idx_right = ori_idx_left + half_head_size;
 
     // const int bias_idx = hi * head_size + h_bias;
     const int bias_idx_left = hi * head_size + h_bias;
@@ -446,9 +452,11 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
       float input_left = static_cast<float>(left_vec[i]);
       float input_right = static_cast<float>(right_vec[i]);
       input_left = qkv_biases ? input_left * left_out_scale_vec[i] +
-                   static_cast<float>(left_bias_vec[i]) : input_left * left_out_scale_vec[i];
+                                    static_cast<float>(left_bias_vec[i])
+                              : input_left * left_out_scale_vec[i];
       input_right = qkv_biases ? input_right * right_out_scale_vec[i] +
-                    static_cast<float>(right_bias_vec[i]) : input_right * right_out_scale_vec[i];
+                                     static_cast<float>(right_bias_vec[i])
+                               : input_right * right_out_scale_vec[i];
       if (hi < num_heads + gqa_group_size) {
         const float cos_tmp = cos_emb_vec[i];
         const float sin_tmp = sin_emb_vec[i];
@@ -796,7 +804,6 @@ __global__ void append_decode_cache_int8_rope_kernel(
 #pragma unroll
     for (uint32_t head_bias = lane_id * VecSize; head_bias < HeadDim;
          head_bias += 32 * VecSize) {
-
       const int bias_idx = head_idx * HeadDim + head_bias;
       Load<int, VecSize>(&qkv_now[bias_idx], &src_vec);
 
@@ -1008,9 +1015,12 @@ __global__ void append_decode_cache_int8_rope_kernel(
 
 template <typename T, int VecSize = 4, int RoundType = 0, int HeadDim = 128>
 __global__ void append_decode_cache_int8_neox_rope_kernel(
-    const T* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size, head_size]
-    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size, block_size, head_size // 2]
-    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size, block_size, head_size // 2]
+    const T* __restrict__ quant_qkv,    // [bsz, num_heads + 2 * gqa_group_size,
+                                        // head_size]
+    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size,
+                                        // block_size, head_size // 2]
+    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size,
+                                        // block_size, head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
     const int* __restrict__ padding_offsets,  // [num_tokens]
@@ -1073,10 +1083,9 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
 #pragma unroll
     for (uint32_t head_bias = lane_id * VecSize; head_bias < half_head_size;
          head_bias += 32 * VecSize) {
-
       const int bias_idx_left = head_idx * HeadDim + head_bias;
       const int bias_idx_right = bias_idx_left + half_head_size;
-      
+
       Load<T, VecSize>(&qkv_now[bias_idx_left], &left_vec);
       Load<T, VecSize>(&qkv_now[bias_idx_right], &right_vec);
 
@@ -1148,7 +1157,8 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
 
         LoadKVResT left_cache_vec, right_cache_vec;
         LoadT left_src_vec1, left_src_vec2, right_src_vec1, right_src_vec2;
-        LoadBiasT left_bias_vec1, left_bias_vec2, right_bias_vec1, right_bias_vec2;
+        LoadBiasT left_bias_vec1, left_bias_vec2, right_bias_vec1,
+            right_bias_vec2;
         LoadEmbT cos_emb_vec1, cos_emb_vec2;
         LoadEmbT sin_emb_vec1, sin_emb_vec2;
 
@@ -1168,18 +1178,18 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
         Load<float, HALF_K_VEC_SIZE>(&sin_emb[emb_idx], &sin_emb_vec1);
         Load<float, HALF_K_VEC_SIZE>(&sin_emb[emb_idx + 8], &sin_emb_vec2);
         scale = __ldg(&cache_k_scales[kv_head_idx]);
-  #pragma unroll
-        for(int i = 0; i < HALF_K_VEC_SIZE; i++) {
+#pragma unroll
+        for (int i = 0; i < HALF_K_VEC_SIZE; i++) {
           float input_left = static_cast<float>(left_src_vec1[i]);
           float input_right = static_cast<float>(right_src_vec1[i]);
-          
+
           float cos_tmp = cos_emb_vec1[i];
           float sin_tmp = sin_emb_vec1[i];
           left_bias_vec1[i] =
               static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
           right_bias_vec1[i] =
               static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
-          
+
           input_left = static_cast<float>(left_src_vec2[i]);
           input_right = static_cast<float>(right_src_vec2[i]);
           cos_tmp = cos_emb_vec2[i];
@@ -1192,8 +1202,10 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
           float quant_value1 = static_cast<float>(scale * left_bias_vec1[i]);
           float quant_value2 = static_cast<float>(scale * left_bias_vec2[i]);
           if constexpr (RoundType == 0) {
-            quant_value1 = static_cast<float>(roundWithTiesToEven(quant_value1));
-            quant_value2 = static_cast<float>(roundWithTiesToEven(quant_value2));
+            quant_value1 =
+                static_cast<float>(roundWithTiesToEven(quant_value1));
+            quant_value2 =
+                static_cast<float>(roundWithTiesToEven(quant_value2));
           } else {
             quant_value1 = static_cast<float>(round(quant_value1));
             quant_value2 = static_cast<float>(round(quant_value2));
@@ -1205,12 +1217,14 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
           left_cache_vec[i] = static_cast<uint8_t>(quant_value1 + 128.0f);
           left_cache_vec[i + HALF_K_VEC_SIZE] =
               static_cast<uint8_t>(quant_value2 + 128.0f);
-          
+
           quant_value1 = static_cast<float>(scale * right_bias_vec1[i]);
           quant_value2 = static_cast<float>(scale * right_bias_vec2[i]);
           if constexpr (RoundType == 0) {
-            quant_value1 = static_cast<float>(roundWithTiesToEven(quant_value1));
-            quant_value2 = static_cast<float>(roundWithTiesToEven(quant_value2));
+            quant_value1 =
+                static_cast<float>(roundWithTiesToEven(quant_value1));
+            quant_value2 =
+                static_cast<float>(roundWithTiesToEven(quant_value2));
           } else {
             quant_value1 = static_cast<float>(round(quant_value1));
             quant_value2 = static_cast<float>(round(quant_value2));
@@ -1233,17 +1247,22 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
         const uint32_t left_tgt_cache_idx =
             block_idx * gqa_group_size * block_size * HeadDim +
             kv_head_idx * block_size * HeadDim + left_start_block_16 * HeadDim +
-            lane_id / 4 / 2 * 32 + (block_offset % 16) / 8 * 16 + lane_id % 4 * 4;
-        
+            lane_id / 4 / 2 * 32 + (block_offset % 16) / 8 * 16 +
+            lane_id % 4 * 4;
+
         const int right_lane_id = lane_id + 16;
-        const int right_start_block_16 =
-            block_offset / 16 * 16 + block_offset % 8 + right_lane_id / 4 % 2 * 8;
+        const int right_start_block_16 = block_offset / 16 * 16 +
+                                         block_offset % 8 +
+                                         right_lane_id / 4 % 2 * 8;
         const uint32_t right_tgt_cache_idx =
             block_idx * gqa_group_size * block_size * HeadDim +
-            kv_head_idx * block_size * HeadDim + right_start_block_16 * HeadDim +
-            right_lane_id / 4 / 2 * 32 + (block_offset % 16) / 8 * 16 + right_lane_id % 4 * 4;
-        Store<uint8_t, K_VEC_SIZE>(left_cache_vec, &key_cache[left_tgt_cache_idx]);
-        Store<uint8_t, K_VEC_SIZE>(right_cache_vec, &key_cache[right_tgt_cache_idx]);
+            kv_head_idx * block_size * HeadDim +
+            right_start_block_16 * HeadDim + right_lane_id / 4 / 2 * 32 +
+            (block_offset % 16) / 8 * 16 + right_lane_id % 4 * 4;
+        Store<uint8_t, K_VEC_SIZE>(left_cache_vec,
+                                   &key_cache[left_tgt_cache_idx]);
+        Store<uint8_t, K_VEC_SIZE>(right_cache_vec,
+                                   &key_cache[right_tgt_cache_idx]);
       }
     } else {
       // v
@@ -1313,9 +1332,12 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
 
 template <typename T, int VecSize = 4, int RoundType = 0, int HeadDim = 128>
 __global__ void append_decode_cache_int8_neox_rope_kernel(
-    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size, head_size]
-    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size, block_size, head_size // 2]
-    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size, block_size, head_size // 2]
+    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size,
+                                        // head_size]
+    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size,
+                                        // block_size, head_size // 2]
+    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size,
+                                        // block_size, head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
     const int* __restrict__ padding_offsets,  // [num_tokens]
@@ -1324,8 +1346,10 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
     const int* __restrict__ seq_lens_encoder,  // [bsz]
     const float* __restrict__ cos_emb,
     const float* __restrict__ sin_emb,
-    const float* __restrict__ qkv_out_scales,  // [num_head + 2 * gqa_group_size, dim_head]
-    const T* __restrict__ qkv_biases,  // [num_head + 2 * gqa_group_size, dim_head]
+    const float* __restrict__ qkv_out_scales,  // [num_head + 2 *
+                                               // gqa_group_size, dim_head]
+    const T* __restrict__ qkv_biases,  // [num_head + 2 * gqa_group_size,
+                                       // dim_head]
     const T* __restrict__ cache_k_scales,
     const T* __restrict__ cache_v_scales,
     const int max_seq_len,
@@ -1384,11 +1408,10 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
 #pragma unroll
     for (uint32_t head_bias = lane_id * VecSize; head_bias < half_head_size;
          head_bias += 32 * VecSize) {
-
       // const int bias_idx = head_idx * HeadDim + head_bias;
       const int bias_idx_left = head_idx * HeadDim + head_bias;
       const int bias_idx_right = bias_idx_left + half_head_size;
-      
+
       // Load<int, VecSize>(&qkv_now[bias_idx], &src_vec);
       Load<int, VecSize>(&qkv_now[bias_idx_left], &left_vec);
       Load<int, VecSize>(&qkv_now[bias_idx_right], &right_vec);
@@ -1399,10 +1422,9 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
         Load<T, VecSize>(&qkv_biases[bias_idx_right], &right_bias_vec);
       }
       // Load<float, VecSize>(&qkv_out_scales[bias_idx], &out_scale_vec);
-      Load<float, VecSize>(&qkv_out_scales[bias_idx_left],
-                              &left_out_scale_vec);
+      Load<float, VecSize>(&qkv_out_scales[bias_idx_left], &left_out_scale_vec);
       Load<float, VecSize>(&qkv_out_scales[bias_idx_right],
-                              &right_out_scale_vec);
+                           &right_out_scale_vec);
 
       // q rope
       const uint32_t emb_idx = write_seq_id * HeadDim + head_bias;
@@ -1480,8 +1502,10 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
 
         LoadKVResT left_cache_vec, right_cache_vec;
         LoadT left_src_vec1, left_src_vec2, right_src_vec1, right_src_vec2;
-        LoadBiasT left_bias_vec1, left_bias_vec2, right_bias_vec1, right_bias_vec2;
-        LoadOutScaleT left_out_scale_vec1, left_out_scale_vec2, right_out_scale_vec1, right_out_scale_vec2;
+        LoadBiasT left_bias_vec1, left_bias_vec2, right_bias_vec1,
+            right_bias_vec2;
+        LoadOutScaleT left_out_scale_vec1, left_out_scale_vec2,
+            right_out_scale_vec1, right_out_scale_vec2;
         LoadEmbT cos_emb_vec1, cos_emb_vec2;
         LoadEmbT sin_emb_vec1, sin_emb_vec2;
 
@@ -1492,19 +1516,25 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
         Load<int, HALF_K_VEC_SIZE>(&qkv_now[left_bias_idx], &left_src_vec1);
         Load<int, HALF_K_VEC_SIZE>(&qkv_now[left_bias_idx + 8], &left_src_vec2);
         Load<int, HALF_K_VEC_SIZE>(&qkv_now[right_bias_idx], &right_src_vec1);
-        Load<int, HALF_K_VEC_SIZE>(&qkv_now[right_bias_idx + 8], &right_src_vec2);
+        Load<int, HALF_K_VEC_SIZE>(&qkv_now[right_bias_idx + 8],
+                                   &right_src_vec2);
         if (qkv_biases) {
           Load<T, HALF_K_VEC_SIZE>(&qkv_biases[left_bias_idx], &left_bias_vec1);
-          Load<T, HALF_K_VEC_SIZE>(&qkv_biases[left_bias_idx + 8], &left_bias_vec2);
-          Load<T, HALF_K_VEC_SIZE>(&qkv_biases[right_bias_idx], &right_bias_vec1);
-          Load<T, HALF_K_VEC_SIZE>(&qkv_biases[right_bias_idx + 8], &right_bias_vec2);
+          Load<T, HALF_K_VEC_SIZE>(&qkv_biases[left_bias_idx + 8],
+                                   &left_bias_vec2);
+          Load<T, HALF_K_VEC_SIZE>(&qkv_biases[right_bias_idx],
+                                   &right_bias_vec1);
+          Load<T, HALF_K_VEC_SIZE>(&qkv_biases[right_bias_idx + 8],
+                                   &right_bias_vec2);
         }
-        Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[left_bias_idx], &left_out_scale_vec1);
+        Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[left_bias_idx],
+                                     &left_out_scale_vec1);
         Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[left_bias_idx + 8],
-                                    &left_out_scale_vec2);
-        Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[right_bias_idx], &right_out_scale_vec1);
+                                     &left_out_scale_vec2);
+        Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[right_bias_idx],
+                                     &right_out_scale_vec1);
         Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[right_bias_idx + 8],
-                                    &right_out_scale_vec2);
+                                     &right_out_scale_vec2);
 
         T scale;
         const uint32_t emb_idx = write_seq_id * HeadDim + head_bias;
@@ -1513,32 +1543,32 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
         Load<float, HALF_K_VEC_SIZE>(&sin_emb[emb_idx], &sin_emb_vec1);
         Load<float, HALF_K_VEC_SIZE>(&sin_emb[emb_idx + 8], &sin_emb_vec2);
         scale = __ldg(&cache_k_scales[kv_head_idx]);
-  #pragma unroll
-        for(int i = 0; i < HALF_K_VEC_SIZE; i++) {
+#pragma unroll
+        for (int i = 0; i < HALF_K_VEC_SIZE; i++) {
           float input_left = static_cast<float>(left_src_vec1[i]);
           float input_right = static_cast<float>(right_src_vec1[i]);
           input_left = qkv_biases ? input_left * left_out_scale_vec1[i] +
                                         static_cast<float>(left_bias_vec1[i])
                                   : input_left * left_out_scale_vec1[i];
           input_right = qkv_biases ? input_right * right_out_scale_vec1[i] +
-                                        static_cast<float>(right_bias_vec1[i])
-                                  : input_right * right_out_scale_vec1[i];
-          
+                                         static_cast<float>(right_bias_vec1[i])
+                                   : input_right * right_out_scale_vec1[i];
+
           float cos_tmp = cos_emb_vec1[i];
           float sin_tmp = sin_emb_vec1[i];
           left_bias_vec1[i] =
               static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
           right_bias_vec1[i] =
               static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
-          
+
           input_left = static_cast<float>(left_src_vec2[i]);
           input_right = static_cast<float>(right_src_vec2[i]);
           input_left = qkv_biases ? input_left * left_out_scale_vec2[i] +
                                         static_cast<float>(left_bias_vec2[i])
                                   : input_left * left_out_scale_vec2[i];
           input_right = qkv_biases ? input_right * right_out_scale_vec2[i] +
-                                        static_cast<float>(right_bias_vec2[i])
-                                  : input_right * right_out_scale_vec2[i];
+                                         static_cast<float>(right_bias_vec2[i])
+                                   : input_right * right_out_scale_vec2[i];
           cos_tmp = cos_emb_vec2[i];
           sin_tmp = sin_emb_vec2[i];
           left_bias_vec2[i] =
@@ -1549,8 +1579,10 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
           float quant_value1 = static_cast<float>(scale * left_bias_vec1[i]);
           float quant_value2 = static_cast<float>(scale * left_bias_vec2[i]);
           if constexpr (RoundType == 0) {
-            quant_value1 = static_cast<float>(roundWithTiesToEven(quant_value1));
-            quant_value2 = static_cast<float>(roundWithTiesToEven(quant_value2));
+            quant_value1 =
+                static_cast<float>(roundWithTiesToEven(quant_value1));
+            quant_value2 =
+                static_cast<float>(roundWithTiesToEven(quant_value2));
           } else {
             quant_value1 = static_cast<float>(round(quant_value1));
             quant_value2 = static_cast<float>(round(quant_value2));
@@ -1562,12 +1594,14 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
           left_cache_vec[i] = static_cast<uint8_t>(quant_value1 + 128.0f);
           left_cache_vec[i + HALF_K_VEC_SIZE] =
               static_cast<uint8_t>(quant_value2 + 128.0f);
-          
+
           quant_value1 = static_cast<float>(scale * right_bias_vec1[i]);
           quant_value2 = static_cast<float>(scale * right_bias_vec2[i]);
           if constexpr (RoundType == 0) {
-            quant_value1 = static_cast<float>(roundWithTiesToEven(quant_value1));
-            quant_value2 = static_cast<float>(roundWithTiesToEven(quant_value2));
+            quant_value1 =
+                static_cast<float>(roundWithTiesToEven(quant_value1));
+            quant_value2 =
+                static_cast<float>(roundWithTiesToEven(quant_value2));
           } else {
             quant_value1 = static_cast<float>(round(quant_value1));
             quant_value2 = static_cast<float>(round(quant_value2));
@@ -1590,17 +1624,22 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
         const uint32_t left_tgt_cache_idx =
             block_idx * gqa_group_size * block_size * HeadDim +
             kv_head_idx * block_size * HeadDim + left_start_block_16 * HeadDim +
-            lane_id / 4 / 2 * 32 + (block_offset % 16) / 8 * 16 + lane_id % 4 * 4;
-        
+            lane_id / 4 / 2 * 32 + (block_offset % 16) / 8 * 16 +
+            lane_id % 4 * 4;
+
         const int right_lane_id = lane_id + 16;
-        const int right_start_block_16 =
-            block_offset / 16 * 16 + block_offset % 8 + right_lane_id / 4 % 2 * 8;
+        const int right_start_block_16 = block_offset / 16 * 16 +
+                                         block_offset % 8 +
+                                         right_lane_id / 4 % 2 * 8;
         const uint32_t right_tgt_cache_idx =
             block_idx * gqa_group_size * block_size * HeadDim +
-            kv_head_idx * block_size * HeadDim + right_start_block_16 * HeadDim +
-            right_lane_id / 4 / 2 * 32 + (block_offset % 16) / 8 * 16 + right_lane_id % 4 * 4;
-        Store<uint8_t, K_VEC_SIZE>(left_cache_vec, &key_cache[left_tgt_cache_idx]);
-        Store<uint8_t, K_VEC_SIZE>(right_cache_vec, &key_cache[right_tgt_cache_idx]);
+            kv_head_idx * block_size * HeadDim +
+            right_start_block_16 * HeadDim + right_lane_id / 4 / 2 * 32 +
+            (block_offset % 16) / 8 * 16 + right_lane_id % 4 * 4;
+        Store<uint8_t, K_VEC_SIZE>(left_cache_vec,
+                                   &key_cache[left_tgt_cache_idx]);
+        Store<uint8_t, K_VEC_SIZE>(right_cache_vec,
+                                   &key_cache[right_tgt_cache_idx]);
       }
     } else {
       // v
@@ -1627,7 +1666,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
       }
       Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[bias_idx], &out_scale_vec1);
       Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[bias_idx + 8],
-                                  &out_scale_vec2);
+                                   &out_scale_vec2);
 
       T scale = __ldg(&cache_v_scales[kv_head_idx]);
 
@@ -1637,9 +1676,9 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
                                     static_cast<float>(bias_vec1[0])
                               : input_left * out_scale_vec1[0];
       input_right = qkv_biases ? input_right * out_scale_vec1[1] +
-                                    static_cast<float>(bias_vec1[1])
-                              : input_right * out_scale_vec1[1];
-    
+                                     static_cast<float>(bias_vec1[1])
+                               : input_right * out_scale_vec1[1];
+
       bias_vec1[0] = static_cast<T>(input_left);
       bias_vec1[1] = static_cast<T>(input_right);
 
@@ -1649,8 +1688,8 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
                                     static_cast<float>(bias_vec2[0])
                               : input_left * out_scale_vec2[0];
       input_right = qkv_biases ? input_right * out_scale_vec2[1] +
-                                    static_cast<float>(bias_vec2[1])
-                              : input_right * out_scale_vec2[1];
+                                     static_cast<float>(bias_vec2[1])
+                               : input_right * out_scale_vec2[1];
 
       bias_vec2[0] = static_cast<T>(input_left);
       bias_vec2[1] = static_cast<T>(input_right);
@@ -2029,9 +2068,12 @@ __global__ void append_decode_cache_int4_rope_kernel(
 
 template <typename T, int VecSize = 4, int RoundType = 0, int HeadDim = 128>
 __global__ void append_decode_cache_int4_rope_kernel(
-    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size, head_size]
-    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size, block_size, head_size // 2]
-    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size, block_size, head_size // 2]
+    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size,
+                                        // head_size]
+    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size,
+                                        // block_size, head_size // 2]
+    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size,
+                                        // block_size, head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
     const int* __restrict__ padding_offsets,  // [num_tokens]
@@ -2040,8 +2082,10 @@ __global__ void append_decode_cache_int4_rope_kernel(
     const int* __restrict__ seq_lens_encoder,  // [bsz]
     const float* __restrict__ cos_emb,
     const float* __restrict__ sin_emb,
-    const float* __restrict__ qkv_out_scales,  // [num_head + 2 * gqa_group_size, dim_head]
-    const T* __restrict__ qkv_biases,  // [num_head + 2 * gqa_group_size, dim_head]
+    const float* __restrict__ qkv_out_scales,  // [num_head + 2 *
+                                               // gqa_group_size, dim_head]
+    const T* __restrict__ qkv_biases,  // [num_head + 2 * gqa_group_size,
+                                       // dim_head]
     const T* __restrict__ cache_k_scale,
     const T* __restrict__ cache_v_scale,
     const T* __restrict__ cache_k_zero_points,
@@ -2217,12 +2261,12 @@ __global__ void append_decode_cache_int4_rope_kernel(
 
     float input_left = static_cast<float>(src_vec1[0]);
     float input_right = static_cast<float>(src_vec1[1]);
-    input_left = qkv_biases ?
-        input_left * out_scale_vec1[0] + static_cast<float>(bias_vec1[0])
-        : input_left * out_scale_vec1[0];
-    input_right = qkv_biases ?
-        input_right * out_scale_vec1[1] + static_cast<float>(bias_vec1[1])
-        : input_right * out_scale_vec1[1];
+    input_left = qkv_biases ? input_left * out_scale_vec1[0] +
+                                  static_cast<float>(bias_vec1[0])
+                            : input_left * out_scale_vec1[0];
+    input_right = qkv_biases ? input_right * out_scale_vec1[1] +
+                                   static_cast<float>(bias_vec1[1])
+                             : input_right * out_scale_vec1[1];
     if (head_idx < num_heads + gqa_group_size) {
       float cos_tmp = cos_emb_vec1[0];
       float sin_tmp = sin_emb_vec1[0];
@@ -2237,12 +2281,12 @@ __global__ void append_decode_cache_int4_rope_kernel(
 
     input_left = static_cast<float>(src_vec2[0]);
     input_right = static_cast<float>(src_vec2[1]);
-    input_left = qkv_biases ?
-        input_left * out_scale_vec2[0] + static_cast<float>(bias_vec2[0])
-        : input_left * out_scale_vec2[0];
-    input_right = qkv_biases ?
-        input_right * out_scale_vec2[1] + static_cast<float>(bias_vec2[1])
-        : input_right * out_scale_vec2[1];
+    input_left = qkv_biases ? input_left * out_scale_vec2[0] +
+                                  static_cast<float>(bias_vec2[0])
+                            : input_left * out_scale_vec2[0];
+    input_right = qkv_biases ? input_right * out_scale_vec2[1] +
+                                   static_cast<float>(bias_vec2[1])
+                             : input_right * out_scale_vec2[1];
     if (head_idx < num_heads + gqa_group_size) {
       float cos_tmp = cos_emb_vec2[0];
       float sin_tmp = sin_emb_vec2[0];
@@ -2414,8 +2458,364 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
     const float max_bound,
     const float min_bound,
     const int gqa_group_size) {
+  static_assert(HeadDim == 128, "just support HeadDim be 128 now!");
+  static_assert(VecSize == 4, "just support VecSize be 4 now, 32 * 4!");
+  constexpr int NUM_WARPS = 4;
+  const int tid = threadIdx.x;
+  const int wid = tid / 32;
+  const int lane_id = tid % 32;
+  const int bid = blockIdx.x, head_idx = blockIdx.y * NUM_WARPS + wid;
+  // q : dequant + add_bias + rope + write
+  // k : dequant + add_bias + rope + quant + write
+  // v : dequant + add_bias + quant + write
+  // kv在0位置全补0
+  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
+  constexpr int half_head_size = HeadDim / 2;
+  const int half_block_size = block_size / 2;
+  const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
+  if (seq_lens_encoder[bid] > 0) return;
+  const int write_seq_id = seq_lens[bid];
+  if (write_seq_id == 0) return;
+  const int* block_table_now = nullptr;
 
+  block_table_now = block_tables + bid * max_blocks_per_seq;
+
+  const int block_idx = __ldg(&block_table_now[write_seq_id / block_size]);
+  const int block_offset = write_seq_id % block_size;
+
+  if (head_idx < num_heads) {
+    // q
+    using LoadT = AlignedVector<T, VecSize>;
+    using LoadBiasT = AlignedVector<T, VecSize>;
+    constexpr int HalfVecSize = VecSize / 2;
+    using LoadEmbT = AlignedVector<float, VecSize>;
+
+    LoadT left_vec;
+    LoadT right_vec;
+    LoadBiasT left_out_vec;
+    LoadBiasT right_out_vec;
+    LoadEmbT cos_emb_vec;
+    LoadEmbT sin_emb_vec;
+    const T* qkv_now = quant_qkv + start_token_idx * hidden_size;
+    T* qkv_out_now = qkv_out + start_token_idx * hidden_size;
+#pragma unroll
+    for (uint32_t head_bias = lane_id * VecSize; head_bias < half_head_size;
+         head_bias += 32 * VecSize) {
+      const int bias_idx_left = head_idx * HeadDim + head_bias;
+      const int bias_idx_right = bias_idx_left + half_head_size;
+      Load<T, VecSize>(&qkv_now[bias_idx_left], &left_vec);
+      Load<T, VecSize>(&qkv_now[bias_idx_right], &right_vec);
+
+      // q rope
+      const uint32_t emb_idx = write_seq_id * HeadDim + head_bias;
+      Load<float, VecSize>(&cos_emb[emb_idx], &cos_emb_vec);
+      Load<float, VecSize>(&sin_emb[emb_idx], &sin_emb_vec);
+#pragma unroll
+      for (int i = 0; i < VecSize; i++) {
+        // dequant + add_bias + rope
+        float input_left = static_cast<float>(left_vec[i]);
+        float input_right = static_cast<float>(right_vec[i]);
+
+        const float cos_tmp = cos_emb_vec[i];
+        const float sin_tmp = sin_emb_vec[i];
+        left_out_vec[i] =
+            static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+        right_out_vec[i] =
+            static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+      }
+      Store<T, VecSize>(left_out_vec, &qkv_out_now[bias_idx_left]);
+      Store<T, VecSize>(right_out_vec, &qkv_out_now[bias_idx_right]);
     }
+  } else if (head_idx < num_heads + 2 * gqa_group_size) {
+    // k
+    constexpr int KV_VEC_SIZE = 16 / sizeof(uint8_t);  // 16
+    using LoadPadKVT = AlignedVector<uint8_t, KV_VEC_SIZE>;
+    const uint32_t kv_head_idx = (head_idx - num_heads) % gqa_group_size;
+    if (block_offset == 0) {
+      // pad zero for this kv_head_idx for this block
+      LoadPadKVT pad_cache_vec;
+      *(reinterpret_cast<uint4*>(pad_cache_vec.val)) = make_uint4(0, 0, 0, 0);
+      if (head_idx < num_heads + gqa_group_size) {
+        constexpr int num_vecs_per_head_dim = half_head_size / KV_VEC_SIZE;
+        constexpr int num_token_each_time = 32 / num_vecs_per_head_dim;
+        const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
+                                     block_size * half_head_size +
+                                 lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
+        for (int block_i = lane_id / num_vecs_per_head_dim;
+             block_i < block_size;
+             block_i += num_token_each_time) {
+          Store<uint8_t, KV_VEC_SIZE>(
+              pad_cache_vec, &key_cache[tgt_idx + block_i * half_head_size]);
+        }
+      } else {
+        const int num_vecs_per_head_dim = half_block_size / KV_VEC_SIZE;
+        const int num_token_each_time = 32 / num_vecs_per_head_dim;
+        const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
+                                     HeadDim * half_block_size +
+                                 lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
+        for (int block_i = lane_id / num_vecs_per_head_dim; block_i < HeadDim;
+             block_i += num_token_each_time) {
+          Store<uint8_t, KV_VEC_SIZE>(
+              pad_cache_vec, &value_cache[tgt_idx + block_i * half_block_size]);
+        }
+      }
+    }
+    if (head_idx < num_heads + gqa_group_size) {
+      const int head_bias = lane_id / 4 * 16 + lane_id % 4 * 2;
+      if (head_bias < half_head_size) {
+        constexpr int K_VEC_SIZE = 4;
+        constexpr int HALF_K_VEC_SIZE = 2;
+        using LoadKVResT = AlignedVector<uint8_t, K_VEC_SIZE>;
+        using LoadT = AlignedVector<T, HALF_K_VEC_SIZE>;
+        using LoadBiasT = AlignedVector<T, HALF_K_VEC_SIZE>;
+        using LoadScaleT = AlignedVector<T, HALF_K_VEC_SIZE>;
+        using LoadEmbT = AlignedVector<float, HALF_K_VEC_SIZE>;
+        LoadT left_src_vec1, left_src_vec2, right_src_vec1, right_src_vec2;
+        LoadBiasT left_out_vec1, left_out_vec2, right_out_vec1, right_out_vec2;
+        LoadScaleT left_scale_vec1, left_scale_vec2, right_scale_vec1,
+            right_scale_vec2;
+        LoadScaleT left_zp_vec1, left_zp_vec2, right_zp_vec1, right_zp_vec2;
+        LoadEmbT cos_emb_vec1, cos_emb_vec2;
+        LoadEmbT sin_emb_vec1, sin_emb_vec2;
+
+        const T* qkv_now = quant_qkv + start_token_idx * hidden_size;
+        const int left_bias_idx = head_idx * HeadDim + head_bias;
+        const int right_bias_idx = left_bias_idx + half_head_size;
+
+        const uint32_t left_cache_idx = kv_head_idx * HeadDim + head_bias;
+        const uint32_t right_cache_idx = left_cache_idx + half_head_size;
+
+        Load<T, HALF_K_VEC_SIZE>(&qkv_now[left_bias_idx], &left_src_vec1);
+        Load<T, HALF_K_VEC_SIZE>(&qkv_now[left_bias_idx + 8], &left_src_vec2);
+        Load<T, HALF_K_VEC_SIZE>(&qkv_now[right_bias_idx], &right_src_vec1);
+        Load<T, HALF_K_VEC_SIZE>(&qkv_now[right_bias_idx + 8], &right_src_vec2);
+        const uint32_t emb_idx = write_seq_id * HeadDim + head_bias;
+        Load<float, HALF_K_VEC_SIZE>(&cos_emb[emb_idx], &cos_emb_vec1);
+        Load<float, HALF_K_VEC_SIZE>(&cos_emb[emb_idx + 8], &cos_emb_vec2);
+        Load<float, HALF_K_VEC_SIZE>(&sin_emb[emb_idx], &sin_emb_vec1);
+        Load<float, HALF_K_VEC_SIZE>(&sin_emb[emb_idx + 8], &sin_emb_vec2);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_scale[left_cache_idx],
+                                 &left_scale_vec1);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_scale[left_cache_idx + 8],
+                                 &left_scale_vec2);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_zero_points[left_cache_idx],
+                                 &left_zp_vec1);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_zero_points[left_cache_idx + 8],
+                                 &left_zp_vec2);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_scale[right_cache_idx],
+                                 &right_scale_vec1);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_scale[right_cache_idx + 8],
+                                 &right_scale_vec2);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_zero_points[right_cache_idx],
+                                 &right_zp_vec1);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_zero_points[right_cache_idx + 8],
+                                 &right_zp_vec2);
+
+        for (int i = 0; i < HALF_K_VEC_SIZE; i++) {
+          float input_left = static_cast<float>(left_src_vec1[i]);
+          float input_right = static_cast<float>(right_src_vec1[i]);
+          float cos_tmp = cos_emb_vec1[0];
+          float sin_tmp = sin_emb_vec1[0];
+          left_out_vec1[i] =
+              static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+          right_out_vec1[i] =
+              static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+
+
+          input_left = static_cast<float>(left_src_vec2[i]);
+          input_right = static_cast<float>(right_src_vec2[i]);
+          cos_tmp = cos_emb_vec2[i];
+          sin_tmp = sin_emb_vec2[i];
+          left_out_vec2[i] =
+              static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+          right_out_vec2[i] =
+              static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+          // quant + write k
+        }
+
+        // 大分块 lane_id / 4 / 4
+        // 上下 lane_id / 4 % 4 / 2
+        // 左16还是右16 lane_id / 4 % 2
+        // 小偏移 lane_id % 4 * 2
+        LoadKVResT left_cache_vec, right_cache_vec;
+        const int left_start_block_16 =
+            block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 4 / 2 * 8;
+        const uint32_t left_tgt_cache_idx =
+            block_idx * gqa_group_size * block_size * half_head_size +
+            kv_head_idx * block_size * half_head_size +
+            left_start_block_16 * half_head_size + lane_id / 4 / 4 * 32 +
+            lane_id / 4 % 2 * 16 + lane_id % 4 * 4;
+
+        const int right_lane_id = lane_id + 16;
+        const int right_start_block_16 = block_offset / 16 * 16 +
+                                         block_offset % 8 +
+                                         right_lane_id / 4 % 4 / 2 * 8;
+        const uint32_t right_tgt_cache_idx =
+            block_idx * gqa_group_size * block_size * half_head_size +
+            kv_head_idx * block_size * half_head_size +
+            right_start_block_16 * half_head_size + right_lane_id / 4 / 4 * 32 +
+            right_lane_id / 4 % 2 * 16 + right_lane_id % 4 * 4;
+        Load<uint8_t, K_VEC_SIZE>(&key_cache[left_tgt_cache_idx],
+                                  &left_cache_vec);
+        Load<uint8_t, K_VEC_SIZE>(&key_cache[right_tgt_cache_idx],
+                                  &right_cache_vec);
+
+#pragma unroll
+        for (uint32_t i = 0; i < HALF_K_VEC_SIZE; i++) {
+          float quant_value1 = static_cast<float>(
+              left_scale_vec1[i] * left_out_vec1[i] + left_zp_vec1[i]);
+          float quant_value2 = static_cast<float>(
+              left_scale_vec2[i] * left_out_vec2[i] + left_zp_vec2[i]);
+          if constexpr (RoundType == 0) {
+            quant_value1 = roundWithTiesToEven(quant_value1);
+            quant_value2 = roundWithTiesToEven(quant_value2);
+          } else {
+            quant_value1 = round(quant_value1);
+            quant_value2 = round(quant_value2);
+          }
+          quant_value1 = quant_value1 > max_bound ? max_bound : quant_value1;
+          quant_value1 = quant_value1 < min_bound ? min_bound : quant_value1;
+          quant_value2 = quant_value2 > max_bound ? max_bound : quant_value2;
+          quant_value2 = quant_value2 < min_bound ? min_bound : quant_value2;
+          uint8_t uint_quant_value1 = static_cast<uint8_t>(quant_value1 + 8.0f);
+          uint8_t uint_quant_value2 = static_cast<uint8_t>(quant_value2 + 8.0f);
+          uint8_t ano_uint_quant_value = 0;
+          if (block_offset % 16 / 8 == 0) {
+            left_cache_vec[i] |=
+                ((ano_uint_quant_value) | (uint_quant_value1 & 0x0F));
+            left_cache_vec[i + HALF_K_VEC_SIZE] |=
+                ((ano_uint_quant_value) | (uint_quant_value2 & 0x0F));
+          } else {
+            left_cache_vec[i] |=
+                ((uint_quant_value1 << 4) | (ano_uint_quant_value));
+            left_cache_vec[i + HALF_K_VEC_SIZE] |=
+                ((uint_quant_value2 << 4) | (ano_uint_quant_value));
+          }
+
+          quant_value1 = static_cast<float>(
+              right_scale_vec1[i] * right_out_vec1[i] + right_zp_vec1[i]);
+          quant_value2 = static_cast<float>(
+              right_scale_vec2[i] * right_out_vec2[i] + right_zp_vec2[i]);
+          if constexpr (RoundType == 0) {
+            quant_value1 = roundWithTiesToEven(quant_value1);
+            quant_value2 = roundWithTiesToEven(quant_value2);
+          } else {
+            quant_value1 = round(quant_value1);
+            quant_value2 = round(quant_value2);
+          }
+          quant_value1 = quant_value1 > max_bound ? max_bound : quant_value1;
+          quant_value1 = quant_value1 < min_bound ? min_bound : quant_value1;
+          quant_value2 = quant_value2 > max_bound ? max_bound : quant_value2;
+          quant_value2 = quant_value2 < min_bound ? min_bound : quant_value2;
+          uint_quant_value1 = static_cast<uint8_t>(quant_value1 + 8.0f);
+          uint_quant_value2 = static_cast<uint8_t>(quant_value2 + 8.0f);
+          ano_uint_quant_value = 0;
+          if (block_offset % 16 / 8 == 0) {
+            right_cache_vec[i] |=
+                ((ano_uint_quant_value) | (uint_quant_value1 & 0x0F));
+            right_cache_vec[i + HALF_K_VEC_SIZE] |=
+                ((ano_uint_quant_value) | (uint_quant_value2 & 0x0F));
+          } else {
+            right_cache_vec[i] |=
+                ((uint_quant_value1 << 4) | (ano_uint_quant_value));
+            right_cache_vec[i + HALF_K_VEC_SIZE] |=
+                ((uint_quant_value2 << 4) | (ano_uint_quant_value));
+          }
+        }
+        Store<uint8_t, K_VEC_SIZE>(left_cache_vec,
+                                   &key_cache[left_tgt_cache_idx]);
+        Store<uint8_t, K_VEC_SIZE>(right_cache_vec,
+                                   &key_cache[right_tgt_cache_idx]);
+      }
+    } else {
+      constexpr int K_VEC_SIZE = 4;
+      constexpr int HALF_K_VEC_SIZE = 2;
+      using LoadKVResT = AlignedVector<uint8_t, K_VEC_SIZE>;
+      using LoadT = AlignedVector<T, HALF_K_VEC_SIZE>;
+      using LoadBiasT = AlignedVector<T, HALF_K_VEC_SIZE>;
+      using LoadScaleT = AlignedVector<T, HALF_K_VEC_SIZE>;
+      LoadT src_vec1, src_vec2;
+      LoadBiasT out_vec1, out_vec2;
+      LoadScaleT scale_vec1, scale_vec2;
+      LoadScaleT zp_vec1, zp_vec2;
+
+      const T* qkv_now = quant_qkv + start_token_idx * hidden_size;
+      const int head_bias = lane_id / 4 * 16 + lane_id % 4 * 2;
+      const uint32_t cache_idx = kv_head_idx * HeadDim + head_bias;
+      const int bias_idx = head_idx * HeadDim + head_bias;
+      Load<T, HALF_K_VEC_SIZE>(&qkv_now[bias_idx], &src_vec1);
+      Load<T, HALF_K_VEC_SIZE>(&qkv_now[bias_idx + 8], &src_vec2);
+      Load<T, HALF_K_VEC_SIZE>(&cache_v_scale[cache_idx], &scale_vec1);
+      Load<T, HALF_K_VEC_SIZE>(&cache_v_scale[cache_idx + 8], &scale_vec2);
+      Load<T, HALF_K_VEC_SIZE>(&cache_v_zero_points[cache_idx], &zp_vec1);
+      Load<T, HALF_K_VEC_SIZE>(&cache_v_zero_points[cache_idx + 8], &zp_vec2);
+
+      out_vec1[0] = src_vec1[0];
+      out_vec1[1] = src_vec1[1];
+      out_vec2[0] = src_vec2[0];
+      out_vec2[1] = src_vec2[1];
+
+      // quant + write v
+      // write v transpose
+      // 大分块 block_offset / 16 / 4 * 32
+      // 大上下 lane_id / 4 * 16 * block_size + lane_id % 4 * 2
+      // 小上下 block_offset / 16 % 4 / 2 * block_size
+      // 左16还是右16 block_offset / 16 % 2 * 16
+      // 小偏移
+      const uint32_t base_tgt_cache_idx =
+          block_idx * gqa_group_size * HeadDim * half_block_size +
+          kv_head_idx * HeadDim * half_block_size +
+          (lane_id / 4 * 16 + lane_id % 4 * 2) * half_block_size +
+          block_offset / 16 % 4 / 2 * 8 * half_block_size +
+          block_offset / 16 / 4 * 32 + block_offset / 16 % 2 * 16;
+      const uint32_t tgt_cache_idx1 = base_tgt_cache_idx +
+                                      block_offset % 8 / 2 * 4     // per 4
+                                      + block_offset % 16 / 8 * 2  // per 2
+                                      + block_offset % 2;          // per 1
+      const uint32_t tgt_cache_idx2 = tgt_cache_idx1 + half_block_size;
+
+      float quant_value1 =
+          static_cast<float>(scale_vec1[0] * out_vec1[0] + zp_vec1[0]);
+      float quant_value2 =
+          static_cast<float>(scale_vec2[0] * out_vec2[0] + zp_vec2[0]);
+      if constexpr (RoundType == 0) {
+        quant_value1 = roundWithTiesToEven(quant_value1);
+        quant_value2 = roundWithTiesToEven(quant_value2);
+      } else {
+        quant_value1 = round(quant_value1);
+        quant_value2 = round(quant_value2);
+      }
+      quant_value1 = quant_value1 > max_bound ? max_bound : quant_value1;
+      quant_value1 = quant_value1 < min_bound ? min_bound : quant_value1;
+      quant_value2 = quant_value2 > max_bound ? max_bound : quant_value2;
+      quant_value2 = quant_value2 < min_bound ? min_bound : quant_value2;
+      uint8_t uint_quant_value1 = static_cast<uint8_t>(quant_value1 + 8.0f);
+      uint8_t uint_quant_value2 = static_cast<uint8_t>(quant_value2 + 8.0f);
+      value_cache[tgt_cache_idx1] =
+          (uint_quant_value2 << 4) | (uint_quant_value1 & 0x0F);
+
+      quant_value1 =
+          static_cast<float>(scale_vec1[1] * out_vec1[1] + zp_vec1[1]);
+      quant_value2 =
+          static_cast<float>(scale_vec2[1] * out_vec2[1] + zp_vec2[1]);
+      if constexpr (RoundType == 0) {
+        quant_value1 = roundWithTiesToEven(quant_value1);
+        quant_value2 = roundWithTiesToEven(quant_value2);
+      } else {
+        quant_value1 = round(quant_value1);
+        quant_value2 = round(quant_value2);
+      }
+      quant_value1 = quant_value1 > max_bound ? max_bound : quant_value1;
+      quant_value1 = quant_value1 < min_bound ? min_bound : quant_value1;
+      quant_value2 = quant_value2 > max_bound ? max_bound : quant_value2;
+      quant_value2 = quant_value2 < min_bound ? min_bound : quant_value2;
+      uint_quant_value1 = static_cast<uint8_t>(quant_value1 + 8.0f);
+      uint_quant_value2 = static_cast<uint8_t>(quant_value2 + 8.0f);
+      value_cache[tgt_cache_idx2] =
+          (uint_quant_value2 << 4) | (uint_quant_value1 & 0x0F);
+    }
+  }
+}
 
 template <typename T, int VecSize = 4, int RoundType = 0, int HeadDim = 128>
 __global__ void append_decode_cache_int4_neox_rope_kernel(
@@ -2448,5 +2848,444 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
     const float max_bound,
     const float min_bound,
     const int gqa_group_size) {
+  static_assert(HeadDim == 128, "just support HeadDim be 128 now!");
+  static_assert(VecSize == 4, "just support VecSize be 4 now, 32 * 4!");
+  constexpr int NUM_WARPS = 4;
+  const int tid = threadIdx.x;
+  const int wid = tid / 32;
+  const int lane_id = tid % 32;
+  const int bid = blockIdx.x, head_idx = blockIdx.y * NUM_WARPS + wid;
+  // q : dequant + add_bias + rope + write
+  // k : dequant + add_bias + rope + quant + write
+  // v : dequant + add_bias + quant + write
+  // kv在0位置全补0
+  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
+  constexpr int half_head_size = HeadDim / 2;
+  const int half_block_size = block_size / 2;
+  const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
+  if (seq_lens_encoder[bid] > 0) return;
+  const int write_seq_id = seq_lens[bid];
+  if (write_seq_id == 0) return;
+  const int* block_table_now = nullptr;
 
+  block_table_now = block_tables + bid * max_blocks_per_seq;
+
+  const int block_idx = __ldg(&block_table_now[write_seq_id / block_size]);
+  const int block_offset = write_seq_id % block_size;
+  // if (layer_id == 0 && bid == 0 && head_idx == num_heads && wid == 0 &&
+  // lane_id == 0) {
+  //   printf("bid: %d, start_token_idx: %d, num_heads: %d, gqa_group_size: %d,
+  //   head_idx: %d, block_idx: %d, block_offset: %d\n",
+  //           bid, start_token_idx, (int)num_heads, (int)gqa_group_size,
+  //           head_idx, block_idx, block_offset);
+  // }
+  // __syncwarp();
+
+  if (head_idx < num_heads) {
+    // q
+    using LoadT = AlignedVector<int, VecSize>;
+    using LoadBiasT = AlignedVector<T, VecSize>;
+    using LoadOutScaleT = AlignedVector<float, VecSize>;
+    constexpr int HalfVecSize = VecSize / 2;
+    using LoadEmbT = AlignedVector<float, VecSize>;
+
+    LoadT left_vec;
+    LoadT right_vec;
+    LoadBiasT left_bias_vec;
+    LoadBiasT right_bias_vec;
+    LoadOutScaleT left_out_scale_vec;
+    LoadOutScaleT right_out_scale_vec;
+    LoadEmbT cos_emb_vec;
+    LoadEmbT sin_emb_vec;
+    const int* qkv_now = quant_qkv + start_token_idx * hidden_size;
+    T* qkv_out_now = qkv_out + start_token_idx * hidden_size;
+#pragma unroll
+    for (uint32_t head_bias = lane_id * VecSize; head_bias < half_head_size;
+         head_bias += 32 * VecSize) {
+      const int bias_idx_left = head_idx * HeadDim + head_bias;
+      const int bias_idx_right = bias_idx_left + half_head_size;
+      Load<int, VecSize>(&qkv_now[bias_idx_left], &left_vec);
+      Load<int, VecSize>(&qkv_now[bias_idx_right], &right_vec);
+
+      if (qkv_biases) {
+        // Load<T, VecSize>(&qkv_biases[bias_idx], &bias_vec);
+        Load<T, VecSize>(&qkv_biases[bias_idx_left], &left_bias_vec);
+        Load<T, VecSize>(&qkv_biases[bias_idx_right], &right_bias_vec);
+      }
+      // Load<float, VecSize>(&qkv_out_scales[bias_idx], &out_scale_vec);
+      Load<float, VecSize>(&qkv_out_scales[bias_idx_left], &left_out_scale_vec);
+      Load<float, VecSize>(&qkv_out_scales[bias_idx_right],
+                           &right_out_scale_vec);
+      // q rope
+      const uint32_t emb_idx = write_seq_id * HeadDim + head_bias;
+      Load<float, VecSize>(&cos_emb[emb_idx], &cos_emb_vec);
+      Load<float, VecSize>(&sin_emb[emb_idx], &sin_emb_vec);
+#pragma unroll
+      for (int i = 0; i < VecSize; i++) {
+        // dequant + add_bias + rope
+        float input_left = static_cast<float>(left_vec[i]);
+        float input_right = static_cast<float>(right_vec[i]);
+        input_left = qkv_biases ? input_left * left_out_scale_vec[i] +
+                                      static_cast<float>(left_bias_vec[i])
+                                : input_left * left_out_scale_vec[i];
+        input_right = qkv_biases ? input_right * right_out_scale_vec[i] +
+                                       static_cast<float>(right_bias_vec[i])
+                                 : input_right * right_out_scale_vec[i];
+        const float cos_tmp = cos_emb_vec[i];
+        const float sin_tmp = sin_emb_vec[i];
+        left_bias_vec[i] =
+            static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+        right_bias_vec[i] =
+            static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+      }
+      Store<T, VecSize>(left_bias_vec, &qkv_out_now[bias_idx_left]);
+      Store<T, VecSize>(right_bias_vec, &qkv_out_now[bias_idx_right]);
     }
+  } else if (head_idx < num_heads + 2 * gqa_group_size) {
+    // k
+    constexpr int KV_VEC_SIZE = 16 / sizeof(uint8_t);  // 16
+    using LoadPadKVT = AlignedVector<uint8_t, KV_VEC_SIZE>;
+    const uint32_t kv_head_idx = (head_idx - num_heads) % gqa_group_size;
+    if (block_offset == 0) {
+      // pad zero for this kv_head_idx for this block
+      LoadPadKVT pad_cache_vec;
+      *(reinterpret_cast<uint4*>(pad_cache_vec.val)) = make_uint4(0, 0, 0, 0);
+      if (head_idx < num_heads + gqa_group_size) {
+        constexpr int num_vecs_per_head_dim = half_head_size / KV_VEC_SIZE;
+        constexpr int num_token_each_time = 32 / num_vecs_per_head_dim;
+        const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
+                                     block_size * half_head_size +
+                                 lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
+        for (int block_i = lane_id / num_vecs_per_head_dim;
+             block_i < block_size;
+             block_i += num_token_each_time) {
+          Store<uint8_t, KV_VEC_SIZE>(
+              pad_cache_vec, &key_cache[tgt_idx + block_i * half_head_size]);
+        }
+      } else {
+        const int num_vecs_per_head_dim = half_block_size / KV_VEC_SIZE;
+        const int num_token_each_time = 32 / num_vecs_per_head_dim;
+        const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
+                                     HeadDim * half_block_size +
+                                 lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
+        for (int block_i = lane_id / num_vecs_per_head_dim; block_i < HeadDim;
+             block_i += num_token_each_time) {
+          Store<uint8_t, KV_VEC_SIZE>(
+              pad_cache_vec, &value_cache[tgt_idx + block_i * half_block_size]);
+        }
+      }
+    }
+    if (head_idx < num_heads + gqa_group_size) {
+      const int head_bias = lane_id / 4 * 16 + lane_id % 4 * 2;
+      if (head_bias < half_head_size) {
+        constexpr int K_VEC_SIZE = 4;
+        constexpr int HALF_K_VEC_SIZE = 2;
+        using LoadKVResT = AlignedVector<uint8_t, K_VEC_SIZE>;
+        using LoadT = AlignedVector<int, HALF_K_VEC_SIZE>;
+        using LoadBiasT = AlignedVector<T, HALF_K_VEC_SIZE>;
+        using LoadOutScaleT = AlignedVector<float, HALF_K_VEC_SIZE>;
+        using LoadScaleT = AlignedVector<T, HALF_K_VEC_SIZE>;
+        using LoadEmbT = AlignedVector<float, HALF_K_VEC_SIZE>;
+        LoadT left_src_vec1, left_src_vec2, right_src_vec1, right_src_vec2;
+        LoadBiasT left_bias_vec1, left_bias_vec2, right_bias_vec1,
+            right_bias_vec2;
+        LoadOutScaleT left_out_scale_vec1, left_out_scale_vec2,
+            right_out_scale_vec1, right_out_scale_vec2;
+        LoadScaleT left_scale_vec1, left_scale_vec2, right_scale_vec1,
+            right_scale_vec2;
+        LoadScaleT left_zp_vec1, left_zp_vec2, right_zp_vec1, right_zp_vec2;
+        LoadEmbT cos_emb_vec1, cos_emb_vec2;
+        LoadEmbT sin_emb_vec1, sin_emb_vec2;
+
+        const int* qkv_now = quant_qkv + start_token_idx * hidden_size;
+        const int left_bias_idx = head_idx * HeadDim + head_bias;
+        const int right_bias_idx = left_bias_idx + half_head_size;
+
+        const uint32_t left_cache_idx = kv_head_idx * HeadDim + head_bias;
+        const uint32_t right_cache_idx = left_cache_idx + half_head_size;
+
+        Load<int, HALF_K_VEC_SIZE>(&qkv_now[left_bias_idx], &left_src_vec1);
+        Load<int, HALF_K_VEC_SIZE>(&qkv_now[left_bias_idx + 8], &left_src_vec2);
+        Load<int, HALF_K_VEC_SIZE>(&qkv_now[right_bias_idx], &right_src_vec1);
+        Load<int, HALF_K_VEC_SIZE>(&qkv_now[right_bias_idx + 8],
+                                   &right_src_vec2);
+        if (qkv_biases) {
+          Load<T, HALF_K_VEC_SIZE>(&qkv_biases[left_bias_idx], &left_bias_vec1);
+          Load<T, HALF_K_VEC_SIZE>(&qkv_biases[left_bias_idx + 8],
+                                   &left_bias_vec2);
+          Load<T, HALF_K_VEC_SIZE>(&qkv_biases[right_bias_idx],
+                                   &right_bias_vec1);
+          Load<T, HALF_K_VEC_SIZE>(&qkv_biases[right_bias_idx + 8],
+                                   &right_bias_vec2);
+        }
+        Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[left_bias_idx],
+                                     &left_out_scale_vec1);
+        Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[left_bias_idx + 8],
+                                     &left_out_scale_vec2);
+        Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[right_bias_idx],
+                                     &right_out_scale_vec1);
+        Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[right_bias_idx + 8],
+                                     &right_out_scale_vec2);
+
+        const uint32_t emb_idx = write_seq_id * HeadDim + head_bias;
+        Load<float, HALF_K_VEC_SIZE>(&cos_emb[emb_idx], &cos_emb_vec1);
+        Load<float, HALF_K_VEC_SIZE>(&cos_emb[emb_idx + 8], &cos_emb_vec2);
+        Load<float, HALF_K_VEC_SIZE>(&sin_emb[emb_idx], &sin_emb_vec1);
+        Load<float, HALF_K_VEC_SIZE>(&sin_emb[emb_idx + 8], &sin_emb_vec2);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_scale[left_cache_idx],
+                                 &left_scale_vec1);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_scale[left_cache_idx + 8],
+                                 &left_scale_vec2);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_zero_points[left_cache_idx],
+                                 &left_zp_vec1);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_zero_points[left_cache_idx + 8],
+                                 &left_zp_vec2);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_scale[right_cache_idx],
+                                 &right_scale_vec1);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_scale[right_cache_idx + 8],
+                                 &right_scale_vec2);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_zero_points[right_cache_idx],
+                                 &right_zp_vec1);
+        Load<T, HALF_K_VEC_SIZE>(&cache_k_zero_points[right_cache_idx + 8],
+                                 &right_zp_vec2);
+
+        for (int i = 0; i < HALF_K_VEC_SIZE; i++) {
+          float input_left = static_cast<float>(left_src_vec1[i]);
+          float input_right = static_cast<float>(right_src_vec1[i]);
+          input_left = qkv_biases ? input_left * left_out_scale_vec1[i] +
+                                        static_cast<float>(left_bias_vec1[i])
+                                  : input_left * left_out_scale_vec1[i];
+          input_right = qkv_biases ? input_right * right_out_scale_vec1[i] +
+                                         static_cast<float>(right_bias_vec1[i])
+                                   : input_right * right_out_scale_vec1[i];
+          float cos_tmp = cos_emb_vec1[0];
+          float sin_tmp = sin_emb_vec1[0];
+          left_bias_vec1[i] =
+              static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+          right_bias_vec1[i] =
+              static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+
+
+          input_left = static_cast<float>(left_src_vec2[i]);
+          input_right = static_cast<float>(right_src_vec2[i]);
+          cos_tmp = cos_emb_vec2[i];
+          sin_tmp = sin_emb_vec2[i];
+          left_bias_vec2[i] =
+              static_cast<T>(input_left * cos_tmp - input_right * sin_tmp);
+          right_bias_vec2[i] =
+              static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
+          // quant + write k
+        }
+
+        // 大分块 lane_id / 4 / 4
+        // 上下 lane_id / 4 % 4 / 2
+        // 左16还是右16 lane_id / 4 % 2
+        // 小偏移 lane_id % 4 * 2
+        LoadKVResT left_cache_vec, right_cache_vec;
+        const int left_start_block_16 =
+            block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 4 / 2 * 8;
+        const uint32_t left_tgt_cache_idx =
+            block_idx * gqa_group_size * block_size * half_head_size +
+            kv_head_idx * block_size * half_head_size +
+            left_start_block_16 * half_head_size + lane_id / 4 / 4 * 32 +
+            lane_id / 4 % 2 * 16 + lane_id % 4 * 4;
+
+        const int right_lane_id = lane_id + 16;
+        const int right_start_block_16 = block_offset / 16 * 16 +
+                                         block_offset % 8 +
+                                         right_lane_id / 4 % 4 / 2 * 8;
+        const uint32_t right_tgt_cache_idx =
+            block_idx * gqa_group_size * block_size * half_head_size +
+            kv_head_idx * block_size * half_head_size +
+            right_start_block_16 * half_head_size + right_lane_id / 4 / 4 * 32 +
+            right_lane_id / 4 % 2 * 16 + right_lane_id % 4 * 4;
+        Load<uint8_t, K_VEC_SIZE>(&key_cache[left_tgt_cache_idx],
+                                  &left_cache_vec);
+        Load<uint8_t, K_VEC_SIZE>(&key_cache[right_tgt_cache_idx],
+                                  &right_cache_vec);
+
+#pragma unroll
+        for (uint32_t i = 0; i < HALF_K_VEC_SIZE; i++) {
+          float quant_value1 = static_cast<float>(
+              left_scale_vec1[i] * left_bias_vec1[i] + left_zp_vec1[i]);
+          float quant_value2 = static_cast<float>(
+              left_scale_vec2[i] * left_bias_vec2[i] + left_zp_vec2[i]);
+          if constexpr (RoundType == 0) {
+            quant_value1 = roundWithTiesToEven(quant_value1);
+            quant_value2 = roundWithTiesToEven(quant_value2);
+          } else {
+            quant_value1 = round(quant_value1);
+            quant_value2 = round(quant_value2);
+          }
+          quant_value1 = quant_value1 > max_bound ? max_bound : quant_value1;
+          quant_value1 = quant_value1 < min_bound ? min_bound : quant_value1;
+          quant_value2 = quant_value2 > max_bound ? max_bound : quant_value2;
+          quant_value2 = quant_value2 < min_bound ? min_bound : quant_value2;
+          uint8_t uint_quant_value1 = static_cast<uint8_t>(quant_value1 + 8.0f);
+          uint8_t uint_quant_value2 = static_cast<uint8_t>(quant_value2 + 8.0f);
+          uint8_t ano_uint_quant_value = 0;
+          if (block_offset % 16 / 8 == 0) {
+            left_cache_vec[i] |=
+                ((ano_uint_quant_value) | (uint_quant_value1 & 0x0F));
+            left_cache_vec[i + HALF_K_VEC_SIZE] |=
+                ((ano_uint_quant_value) | (uint_quant_value2 & 0x0F));
+          } else {
+            left_cache_vec[i] |=
+                ((uint_quant_value1 << 4) | (ano_uint_quant_value));
+            left_cache_vec[i + HALF_K_VEC_SIZE] |=
+                ((uint_quant_value2 << 4) | (ano_uint_quant_value));
+          }
+
+          quant_value1 = static_cast<float>(
+              right_scale_vec1[i] * right_bias_vec1[i] + right_zp_vec1[i]);
+          quant_value2 = static_cast<float>(
+              right_scale_vec2[i] * right_bias_vec2[i] + right_zp_vec2[i]);
+          if constexpr (RoundType == 0) {
+            quant_value1 = roundWithTiesToEven(quant_value1);
+            quant_value2 = roundWithTiesToEven(quant_value2);
+          } else {
+            quant_value1 = round(quant_value1);
+            quant_value2 = round(quant_value2);
+          }
+          quant_value1 = quant_value1 > max_bound ? max_bound : quant_value1;
+          quant_value1 = quant_value1 < min_bound ? min_bound : quant_value1;
+          quant_value2 = quant_value2 > max_bound ? max_bound : quant_value2;
+          quant_value2 = quant_value2 < min_bound ? min_bound : quant_value2;
+          uint_quant_value1 = static_cast<uint8_t>(quant_value1 + 8.0f);
+          uint_quant_value2 = static_cast<uint8_t>(quant_value2 + 8.0f);
+          ano_uint_quant_value = 0;
+          if (block_offset % 16 / 8 == 0) {
+            right_cache_vec[i] |=
+                ((ano_uint_quant_value) | (uint_quant_value1 & 0x0F));
+            right_cache_vec[i + HALF_K_VEC_SIZE] |=
+                ((ano_uint_quant_value) | (uint_quant_value2 & 0x0F));
+          } else {
+            right_cache_vec[i] |=
+                ((uint_quant_value1 << 4) | (ano_uint_quant_value));
+            right_cache_vec[i + HALF_K_VEC_SIZE] |=
+                ((uint_quant_value2 << 4) | (ano_uint_quant_value));
+          }
+        }
+        Store<uint8_t, K_VEC_SIZE>(left_cache_vec,
+                                   &key_cache[left_tgt_cache_idx]);
+        Store<uint8_t, K_VEC_SIZE>(right_cache_vec,
+                                   &key_cache[right_tgt_cache_idx]);
+      }
+    } else {
+      constexpr int K_VEC_SIZE = 4;
+      constexpr int HALF_K_VEC_SIZE = 2;
+      using LoadKVResT = AlignedVector<uint8_t, K_VEC_SIZE>;
+      using LoadT = AlignedVector<int, HALF_K_VEC_SIZE>;
+      using LoadBiasT = AlignedVector<T, HALF_K_VEC_SIZE>;
+      using LoadOutScaleT = AlignedVector<float, HALF_K_VEC_SIZE>;
+      using LoadScaleT = AlignedVector<T, HALF_K_VEC_SIZE>;
+      LoadT src_vec1, src_vec2;
+      LoadBiasT bias_vec1, bias_vec2;
+      LoadOutScaleT out_scale_vec1, out_scale_vec2;
+      LoadScaleT scale_vec1, scale_vec2;
+      LoadScaleT zp_vec1, zp_vec2;
+
+      const int* qkv_now = quant_qkv + start_token_idx * hidden_size;
+      const int head_bias = lane_id / 4 * 16 + lane_id % 4 * 2;
+      const uint32_t cache_idx = kv_head_idx * HeadDim + head_bias;
+      const int bias_idx = head_idx * HeadDim + head_bias;
+      Load<int, HALF_K_VEC_SIZE>(&qkv_now[bias_idx], &src_vec1);
+      Load<int, HALF_K_VEC_SIZE>(&qkv_now[bias_idx + 8], &src_vec2);
+      if (qkv_biases) {
+        Load<T, HALF_K_VEC_SIZE>(&qkv_biases[bias_idx], &bias_vec1);
+        Load<T, HALF_K_VEC_SIZE>(&qkv_biases[bias_idx + 8], &bias_vec2);
+      }
+      Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[bias_idx], &out_scale_vec1);
+      Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[bias_idx + 8],
+                                   &out_scale_vec2);
+
+      Load<T, HALF_K_VEC_SIZE>(&cache_v_scale[cache_idx], &scale_vec1);
+      Load<T, HALF_K_VEC_SIZE>(&cache_v_scale[cache_idx + 8], &scale_vec2);
+      Load<T, HALF_K_VEC_SIZE>(&cache_v_zero_points[cache_idx], &zp_vec1);
+      Load<T, HALF_K_VEC_SIZE>(&cache_v_zero_points[cache_idx + 8], &zp_vec2);
+
+      float input_left = static_cast<float>(src_vec1[0]);
+      float input_right = static_cast<float>(src_vec1[1]);
+      input_left = qkv_biases ? input_left * out_scale_vec1[0] +
+                                    static_cast<float>(bias_vec1[0])
+                              : input_left * out_scale_vec1[0];
+      input_right = qkv_biases ? input_right * out_scale_vec2[1] +
+                                     static_cast<float>(bias_vec1[1])
+                               : input_right * out_scale_vec2[1];
+
+      bias_vec1[0] = static_cast<T>(input_left);
+      bias_vec1[1] = static_cast<T>(input_right);
+
+      input_left = static_cast<float>(src_vec2[0]);
+      input_right = static_cast<float>(src_vec2[1]);
+      input_left = qkv_biases ? input_left * out_scale_vec1[0] +
+                                    static_cast<float>(bias_vec2[0])
+                              : input_left * out_scale_vec1[0];
+      input_right = qkv_biases ? input_right * out_scale_vec1[1] +
+                                     static_cast<float>(bias_vec2[1])
+                               : input_right * out_scale_vec1[1];
+
+      bias_vec2[0] = static_cast<T>(input_left);
+      bias_vec2[1] = static_cast<T>(input_right);
+
+      // quant + write v
+      // write v transpose
+      // 大分块 block_offset / 16 / 4 * 32
+      // 大上下 lane_id / 4 * 16 * block_size + lane_id % 4 * 2
+      // 小上下 block_offset / 16 % 4 / 2 * block_size
+      // 左16还是右16 block_offset / 16 % 2 * 16
+      // 小偏移
+      const uint32_t base_tgt_cache_idx =
+          block_idx * gqa_group_size * HeadDim * half_block_size +
+          kv_head_idx * HeadDim * half_block_size +
+          (lane_id / 4 * 16 + lane_id % 4 * 2) * half_block_size +
+          block_offset / 16 % 4 / 2 * 8 * half_block_size +
+          block_offset / 16 / 4 * 32 + block_offset / 16 % 2 * 16;
+      const uint32_t tgt_cache_idx1 = base_tgt_cache_idx +
+                                      block_offset % 8 / 2 * 4     // per 4
+                                      + block_offset % 16 / 8 * 2  // per 2
+                                      + block_offset % 2;          // per 1
+      const uint32_t tgt_cache_idx2 = tgt_cache_idx1 + half_block_size;
+
+      float quant_value1 =
+          static_cast<float>(scale_vec1[0] * bias_vec1[0] + zp_vec1[0]);
+      float quant_value2 =
+          static_cast<float>(scale_vec2[0] * bias_vec2[0] + zp_vec2[0]);
+      if constexpr (RoundType == 0) {
+        quant_value1 = roundWithTiesToEven(quant_value1);
+        quant_value2 = roundWithTiesToEven(quant_value2);
+      } else {
+        quant_value1 = round(quant_value1);
+        quant_value2 = round(quant_value2);
+      }
+      quant_value1 = quant_value1 > max_bound ? max_bound : quant_value1;
+      quant_value1 = quant_value1 < min_bound ? min_bound : quant_value1;
+      quant_value2 = quant_value2 > max_bound ? max_bound : quant_value2;
+      quant_value2 = quant_value2 < min_bound ? min_bound : quant_value2;
+      uint8_t uint_quant_value1 = static_cast<uint8_t>(quant_value1 + 8.0f);
+      uint8_t uint_quant_value2 = static_cast<uint8_t>(quant_value2 + 8.0f);
+      value_cache[tgt_cache_idx1] =
+          (uint_quant_value2 << 4) | (uint_quant_value1 & 0x0F);
+
+      quant_value1 =
+          static_cast<float>(scale_vec1[1] * bias_vec1[1] + zp_vec1[1]);
+      quant_value2 =
+          static_cast<float>(scale_vec2[1] * bias_vec2[1] + zp_vec2[1]);
+      if constexpr (RoundType == 0) {
+        quant_value1 = roundWithTiesToEven(quant_value1);
+        quant_value2 = roundWithTiesToEven(quant_value2);
+      } else {
+        quant_value1 = round(quant_value1);
+        quant_value2 = round(quant_value2);
+      }
+      quant_value1 = quant_value1 > max_bound ? max_bound : quant_value1;
+      quant_value1 = quant_value1 < min_bound ? min_bound : quant_value1;
+      quant_value2 = quant_value2 > max_bound ? max_bound : quant_value2;
+      quant_value2 = quant_value2 < min_bound ? min_bound : quant_value2;
+      uint_quant_value1 = static_cast<uint8_t>(quant_value1 + 8.0f);
+      uint_quant_value2 = static_cast<uint8_t>(quant_value2 + 8.0f);
+      value_cache[tgt_cache_idx2] =
+          (uint_quant_value2 << 4) | (uint_quant_value1 & 0x0F);
+    }
+  }
+}
