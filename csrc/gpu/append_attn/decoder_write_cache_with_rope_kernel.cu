@@ -598,3 +598,55 @@ template void DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, paddle::bfloat16
     paddle::Tensor* qkv_out,
     paddle::Tensor* key_cache_out,
     paddle::Tensor* value_cache_out);
+
+template void DecoderWriteCacheWithRoPEKernel<paddle::float16, int>(
+    const paddle::Tensor& qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
+              // gqa_group_size, head_dim] if GQA)
+    const paddle::Tensor& seq_lens,
+    const paddle::Tensor& seq_lens_encoder,
+    const paddle::Tensor& padding_offsets,
+    const paddle::Tensor& cum_offsets,
+    const paddle::Tensor& block_tables,
+    const paddle::optional<paddle::Tensor>& rotary_embs,
+    const paddle::optional<paddle::Tensor>& qkv_out_scales,
+    const paddle::optional<paddle::Tensor>& qkv_biases,
+    const paddle::optional<paddle::Tensor>& cache_k_scale,
+    const paddle::optional<paddle::Tensor>& cache_v_scale,
+    const paddle::optional<paddle::Tensor>& cache_k_zp,
+    const paddle::optional<paddle::Tensor>& cache_v_zp,
+    const std::string& cache_quant_type_str,
+    const bool use_neox_rotary_style,
+    const int max_seq_len,
+    const int num_heads,
+    const int kv_num_heads,
+    const int head_size,
+    cudaStream_t& stream,
+    paddle::Tensor* qkv_out,
+    paddle::Tensor* key_cache_out,
+    paddle::Tensor* value_cache_out);
+
+template void DecoderWriteCacheWithRoPEKernel<paddle::float16, paddle::float16>(
+    const paddle::Tensor& qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
+              // gqa_group_size, head_dim] if GQA)
+    const paddle::Tensor& seq_lens,
+    const paddle::Tensor& seq_lens_encoder,
+    const paddle::Tensor& padding_offsets,
+    const paddle::Tensor& cum_offsets,
+    const paddle::Tensor& block_tables,
+    const paddle::optional<paddle::Tensor>& rotary_embs,
+    const paddle::optional<paddle::Tensor>& qkv_out_scales,
+    const paddle::optional<paddle::Tensor>& qkv_biases,
+    const paddle::optional<paddle::Tensor>& cache_k_scale,
+    const paddle::optional<paddle::Tensor>& cache_v_scale,
+    const paddle::optional<paddle::Tensor>& cache_k_zp,
+    const paddle::optional<paddle::Tensor>& cache_v_zp,
+    const std::string& cache_quant_type_str,
+    const bool use_neox_rotary_style,
+    const int max_seq_len,
+    const int num_heads,
+    const int kv_num_heads,
+    const int head_size,
+    cudaStream_t& stream,
+    paddle::Tensor* qkv_out,
+    paddle::Tensor* key_cache_out,
+    paddle::Tensor* value_cache_out);
