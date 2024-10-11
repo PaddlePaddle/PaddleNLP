@@ -1092,6 +1092,36 @@ class FusedMultiTransformerBase(Layer):
         kwargs["max_enc_len_this_time"] = max_enc_len_this_time
         kwargs["max_dec_len_this_time"] = max_dec_len_this_time
 
+        if self.config.append_attn:
+            kwargs["encoder_block_shape_q"] = 64
+            kwargs["decoder_block_shape_q"] = 16
+            kwargs["max_partition_size"] = 32768
+            kwargs["encoder_max_partition_size"] = 32768
+
+            from paddlenlp_ops import get_block_shape_and_split_kv_block
+
+            (
+                kwargs["encoder_batch_ids"],
+                kwargs["encoder_tile_ids_per_batch"],
+                kwargs["encoder_num_blocks"],
+                kwargs["kv_batch_ids"],
+                kwargs["kv_tile_ids_per_batch"],
+                kwargs["kv_num_blocks"],
+                kwargs["decoder_batch_ids"],
+                kwargs["decoder_tile_ids_per_batch"],
+                kwargs["decoder_num_blocks"],
+            ) = get_block_shape_and_split_kv_block(
+                kwargs.get("seq_lens_encoder", None),
+                kwargs.get("seq_lens_decoder", None),
+                max_enc_len_this_time,
+                kwargs.get("seq_lens_this_time", None),
+                kwargs.get("cum_offsets", None),
+                kwargs.get("encoder_block_shape_q", 64),
+                kwargs.get("decoder_block_shape_q", 16),
+                self.num_heads // self.kv_num_heads,
+                kwargs.get("block_size", 64),
+            )
+
         residual_input = src
         for i in range(self.num_layers):
             qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
@@ -2300,19 +2330,6 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
         pre_caches_length,
         attn_mask,
         i,
-        encoder_batch_ids,
-        encoder_tile_ids_per_batch,
-        encoder_num_blocks,
-        kv_batch_ids,
-        kv_tile_ids_per_batch,
-        kv_num_blocks,
-        decoder_batch_ids,
-        decoder_tile_ids_per_batch,
-        decoder_num_blocks,
-        encoder_block_shape_q,
-        decoder_block_shape_q,
-        max_partition_size,
-        encoder_max_partition_size,
         **kwargs,
     ):
         from paddlenlp_ops import append_attention
@@ -2327,15 +2344,15 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
             kwargs.get("padding_offsets", None),
             kwargs.get("cum_offsets", None),
             kwargs.get("block_tables", None),
-            encoder_batch_ids,
-            encoder_tile_ids_per_batch,
-            encoder_num_blocks,
-            kv_batch_ids,
-            kv_tile_ids_per_batch,
-            kv_num_blocks,
-            decoder_batch_ids,
-            decoder_tile_ids_per_batch,
-            decoder_num_blocks,
+            kwargs.get("encoder_batch_ids", None),
+            kwargs.get("encoder_tile_ids_per_batch", None),
+            kwargs.get("encoder_num_blocks", None),
+            kwargs.get("kv_batch_ids", None),
+            kwargs.get("kv_tile_ids_per_batch", None),
+            kwargs.get("kv_num_blocks", None),
+            kwargs.get("decoder_batch_ids", None),
+            kwargs.get("decoder_tile_ids_per_batch", None),
+            kwargs.get("decoder_num_blocks", None),
             kwargs.get("max_enc_len_this_time", None),
             kwargs.get("max_dec_len_this_time", None),
             rotary_embs,
@@ -2355,10 +2372,10 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
             self.use_neox_rotary_style,
             kwargs.get("max_input_length", -1),
             0.0,  # out_linear_in_scale
-            encoder_block_shape_q,
-            decoder_block_shape_q,
-            max_partition_size,
-            encoder_max_partition_size,
+            kwargs.get("encoder_block_shape_q", 64),
+            kwargs.get("decoder_block_shape_q", 16),
+            kwargs.get("max_partition_size", 32768),
+            kwargs.get("encoder_max_partition_size", 32768),
             5,  # speculate_max_draft_token_num
             True,  # causal
             True,  # enable_prefill
@@ -2366,173 +2383,6 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
         return out_linear_out
-
-    def forward(
-        self,
-        input_ids,
-        src,
-        cum_offsets=None,
-        padding_offset=None,
-        attn_mask=None,
-        caches=None,
-        pre_caches=None,
-        pre_caches_length=0,
-        rotary_embs=None,
-        rotary_emb_dims=0,
-        seq_lens=None,
-        time_step=None,
-        **kwargs,
-    ):
-        r"""
-        Applies multi transformer layers on the input.
-
-        Parameters:
-            src (Tensor): The input of Transformer layers. It is
-                a tensor with shape `[batch_size, sequence_length, d_model]`.
-                The data type should be float16 or float32.
-            attn_mask (Tensor, optional): A tensor used in multi-head attention
-                to prevents attention to some unwanted positions, usually the
-                paddings or the subsequent positions. It is a tensor with shape
-                `[batch_size, 1, sequence_length, sequence_length]`. It can be
-                None when nothing wanted or needed to be prevented attention to.
-                Default None.
-            caches (list(Tensor)|tuple(Tensor), optional): The cache structure
-                tensors for the inference generation model. It is only used for
-                inference and should be None for training. The shape is
-                `[2, batch_size, num_head, max_seq_len, head_dim]`. Default None.
-            pre_caches (list(Tensor)|tuple(Tensor), optional): The prefix caches
-                for the generation model. The shape is `[2, bsz, num\_head, cache\_len, head\_dim]`. Default None.
-            rotary_embs (Tensor optional): The RoPE embs for the rotary computation. The shape is `[2, bsz, 1, seq\_len, head\_dim]`. Default None.
-            rotary_emb_dims (int, optional): The rotary_emb_dims of rotary computation, and it is 0 when rotary_embs is None,
-                1 when rotary_embs is not None and pos_extra_ids is None, 2 when rotary_embs and pos_extra_ids are both not None. Default 0.
-            seq_lens (Tensor optional): The sequence lengths of this batch. The shape is `[bsz]`. Default None.
-            time_step (Tensor, optional): The time step tensor for the generation
-                model. Which used in decode stage, to represent the time step,
-                that is, the real seq_len of CacheKV. The shape is `[1]`, must be
-                in CPUPlace. Default None.
-
-        Returns:
-            Tensor|tuple: If `caches` is None, return a tensor that has
-            the same shape and data type with `src`, representing the output
-            of Transformer layers. If `caches` is not None, return the
-            tuple (output, caches), which output is the output of
-            Transformer layers, caches is inplace with input `caches`.
-        """
-        self.pre_process(**kwargs)
-        kwargs["cum_offsets"] = cum_offsets
-
-        if caches is not None:
-            assert len(caches) == len(self.qkv_weights) or len(caches) == 2 * len(self.qkv_weights)
-
-        assert self.num_layers == len(self.qkv_weights)
-
-        max_enc_len_this_time, max_dec_len_this_time = self.compute_max_len(
-            kwargs.get("seq_lens_encoder", None), kwargs.get("seq_lens_decoder", None), cum_offsets
-        )
-        kwargs["max_enc_len_this_time"] = max_enc_len_this_time
-        kwargs["max_dec_len_this_time"] = max_dec_len_this_time
-
-        encoder_block_shape_q = 64
-        decoder_block_shape_q = 16
-        max_partition_size = 32768
-        encoder_max_partition_size = 32768
-
-        from paddlenlp_ops import get_block_shape_and_split_kv_block
-
-        (
-            encoder_batch_ids,
-            encoder_tile_ids_per_batch,
-            encoder_num_blocks,
-            kv_batch_ids,
-            kv_tile_ids_per_batch,
-            kv_num_blocks,
-            decoder_batch_ids,
-            decoder_tile_ids_per_batch,
-            decoder_num_blocks,
-        ) = get_block_shape_and_split_kv_block(
-            kwargs.get("seq_lens_encoder", None),
-            kwargs.get("seq_lens_decoder", None),
-            max_enc_len_this_time,
-            kwargs.get("seq_lens_this_time", None),
-            kwargs.get("cum_offsets", None),
-            encoder_block_shape_q,
-            decoder_block_shape_q,
-            self.num_heads // self.kv_num_heads,
-            kwargs.get("block_size", 64),
-        )
-
-        residual_input = src
-        for i in range(self.num_layers):
-            qkv_out, residual_input = self.compute_qkv(src, residual_input, i)
-
-            out_linear_out = self.compute_attn(
-                time_step,
-                qkv_out,
-                padding_offset,
-                seq_lens,
-                input_ids,
-                rotary_embs,
-                rotary_emb_dims,
-                caches,
-                pre_caches,
-                pre_caches_length,
-                attn_mask,
-                i,
-                encoder_batch_ids,
-                encoder_tile_ids_per_batch,
-                encoder_num_blocks,
-                kv_batch_ids,
-                kv_tile_ids_per_batch,
-                kv_num_blocks,
-                decoder_batch_ids,
-                decoder_tile_ids_per_batch,
-                decoder_num_blocks,
-                encoder_block_shape_q,
-                decoder_block_shape_q,
-                max_partition_size,
-                encoder_max_partition_size,
-                **kwargs,
-            )
-            # all_reduce
-            if self.nranks > 1:
-                dist.all_reduce(out_linear_out)
-
-            # ffn layernorm
-            tmp_out, residual_input = self.compute_ffn_layernorm(out_linear_out, residual_input, i)
-
-            if self.config.moe_config.use_moe(i):
-                # fused moe
-                ffn2_out = self.compute_fused_moe(tmp_out, i)
-
-                # shared_expert
-                if self.config.moe_config.use_shared_expert(i):
-                    shared_expert_out = self.compute_shared_expert(tmp_out, i)
-                    ffn2_out = ffn2_out + shared_expert_out
-            else:
-                # ffn1 matmul
-                ffn1_out = self.compute_ffn1(tmp_out, i)
-                ffn1_out = self.compute_activation(ffn1_out, i)
-
-                # ffn2 matmul
-                ffn2_out = self.compute_ffn2(ffn1_out, i)
-
-            # all_reduce
-            if self.nranks > 1:
-                dist.all_reduce(ffn2_out)
-
-            # norm + residual_add_bias
-            tmp_out, residual_input = self.compute_bias_residual_layernorm(
-                ffn2_out, residual_input, i, self.num_layers
-            )
-            src = tmp_out
-
-        kwargs["time_step"] = time_step
-        kwargs["multi_block_output"] = tmp_out
-        kwargs["seq_lens"] = seq_lens
-        kwargs["input_ids"] = input_ids
-
-        out = self.post_process(**kwargs)
-        return out, caches
 
     def post_process(self, **kwargs):
         multi_block_output = kwargs.get("multi_block_output", None)
@@ -2648,19 +2498,6 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
         pre_caches_length,
         attn_mask,
         i,
-        encoder_batch_ids,
-        encoder_tile_ids_per_batch,
-        encoder_num_blocks,
-        kv_batch_ids,
-        kv_tile_ids_per_batch,
-        kv_num_blocks,
-        decoder_batch_ids,
-        decoder_tile_ids_per_batch,
-        decoder_num_blocks,
-        encoder_block_shape_q,
-        decoder_block_shape_q,
-        max_partition_size,
-        encoder_max_partition_size,
         **kwargs,
     ):
         k_quant_scales = kwargs.get("k_quant_scales", None)
@@ -2697,15 +2534,15 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
             kwargs.get("padding_offsets", None),
             kwargs.get("cum_offsets", None),
             kwargs.get("block_tables", None),
-            encoder_batch_ids,
-            encoder_tile_ids_per_batch,
-            encoder_num_blocks,
-            kv_batch_ids,
-            kv_tile_ids_per_batch,
-            kv_num_blocks,
-            decoder_batch_ids,
-            decoder_tile_ids_per_batch,
-            decoder_num_blocks,
+            kwargs.get("encoder_batch_ids", None),
+            kwargs.get("encoder_tile_ids_per_batch", None),
+            kwargs.get("encoder_num_blocks", None),
+            kwargs.get("kv_batch_ids", None),
+            kwargs.get("kv_tile_ids_per_batch", None),
+            kwargs.get("kv_num_blocks", None),
+            kwargs.get("decoder_batch_ids", None),
+            kwargs.get("decoder_tile_ids_per_batch", None),
+            kwargs.get("decoder_num_blocks", None),
             kwargs.get("max_enc_len_this_time", None),
             kwargs.get("max_dec_len_this_time", None),
             rotary_embs,
@@ -2725,10 +2562,10 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
             self.use_neox_rotary_style,
             kwargs.get("max_input_length", -1),
             self.act_scales["out_linear_in_scale"][i],
-            encoder_block_shape_q,
-            decoder_block_shape_q,
-            max_partition_size,
-            encoder_max_partition_size,
+            kwargs.get("encoder_block_shape_q", 64),
+            kwargs.get("decoder_block_shape_q", 16),
+            kwargs.get("max_partition_size", 32768),
+            kwargs.get("encoder_max_partition_size", 32768),
             5,  # speculate_max_draft_token_num
             True,  # causal
             True,  # enable_prefill
