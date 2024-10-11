@@ -983,7 +983,160 @@ def unified_checkpoint_into_shards(
     return state_dict, shard_file, sharded_index
 
 
+def load_unified_optimizer_split_param(args, model, optimizer, resume_from_checkpoint):
+    returned_optim_state_dict = nested_copy(optimizer.state_dict())
+
+    index_filename, index_filename_master_weights = SAFE_OPTIMIZER_INDEX_NAME, SAFE_MASTER_WEIGHTS_INDEX_NAME
+
+    resolved_archive_file, sharded_metadata = get_optimizer_shard_files(
+        optimizer_path=resume_from_checkpoint,
+        index_filename=os.path.join(resume_from_checkpoint, index_filename),
+    )
+    has_master_weights = True if sharded_metadata["master_weights"] else False
+
+    typename_set = set()
+    for key in sharded_metadata["weight_map"].keys():
+        _, typename = key.split("/")
+        typename_set.add(typename)
+
+    model_state_dict = get_expected_state_dict(model)
+    model_keys = list(model_state_dict.keys())
+    static2struct_name_mappings = {v.name: k for k, v in model_state_dict.items()}  # get optimizer param mappings
+    struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}
+
+    expected_keys = []
+    param_slice_info = {}
+    param_shape_info = {}
+    for buffer in optimizer._inner_opt._comm_buffer_list:
+        for key in buffer._sharding_param_grad_view.keys():
+            begin = buffer._sharding_param_grad_view[key]._param_begin
+            end = buffer._sharding_param_grad_view[key]._param_end
+            if end > begin:
+                expected_keys.append(key)
+                shape = buffer._sharding_param_grad_view[key]._param.shape
+                numel = buffer._sharding_param_grad_view[key]._param.numel().item()
+                index = buffer._sharding_param_grad_view[key]._index
+                padded_size = buffer._sharding_param_grad_view[key]._padded_size
+                param_slice_info[key] = (begin, end)
+                param_shape_info[key] = (shape, numel, index, padded_size)
+
+    expected_keys = set([static2struct_name_mappings.get(name, None) for name in expected_keys])
+    expected_keys_optim = []
+    for key in expected_keys:
+        for typename in typename_set:
+            expected_keys_optim.append(f"{key}/{typename}")
+    expected_keys_optim = set(expected_keys_optim)
+
+    if len(resolved_archive_file) > 1:
+        resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
+
+    if has_master_weights:
+        returned_optim_state_dict["master_weights"] = {}
+        resolved_archive_file_mw, sharded_metadata_mw = get_optimizer_shard_files(
+            optimizer_path=resume_from_checkpoint,
+            index_filename=os.path.join(resume_from_checkpoint, index_filename_master_weights),
+        )
+        if len(resolved_archive_file_mw) > 1:
+            resolved_archive_file_mw = tqdm(resolved_archive_file_mw, desc="Loading master weights shards")
+
+    def load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, is_master_weights=False):
+        returned_state_dict = {}
+
+        if model.config.tensor_parallel_degree > 1:
+            if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
+                tp_actions = model._get_tensor_parallel_convert_actions(model_keys, is_split=True, ignore_error=True)
+            else:
+                tp_actions = model.get_tensor_parallel_convert_actions(model.config, model_keys, ignore_error=True)
+            if not is_master_weights:
+                tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)
+
+        for shard_file in resolved_archive_file:
+            if expected_keys.isdisjoint(sharded_metadata["file_map"][os.path.split(shard_file)[-1]]):
+                continue
+
+            if model.config.tensor_parallel_degree > 1:
+                state_dict = load_state_dict(shard_file, tp_actions, expected_keys, device="expected")
+            else:
+                state_dict = load_state_dict(shard_file, None, expected_keys, device="expected")
+
+            returned_state_dict.update(state_dict)
+            del state_dict
+            gc.collect()
+
+        return returned_state_dict
+
+    # get tp params
+    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys_optim)
+    if has_master_weights:
+        state_dict_master_weight = load_resolved_archive_file(
+            resolved_archive_file_mw,
+            sharded_metadata_mw,
+            expected_keys,
+            is_master_weights=True,
+        )
+
+    # need to split param for different sharding rank, maybe need to deal with oom issue.
+    for key in list(state_dict_optim.keys()):
+        key_name = key.split("/")
+        static_name = struct2static_name_mappings.get(key_name[0], None)
+
+        if state_dict_optim[key].numel().item() > 1:
+            begin, end = param_slice_info[static_name]
+            shape, numel, index, padded_size = param_shape_info[static_name]
+            state_dict_optim[key] = state_dict_optim[key].reshape([-1])
+            state_dict_optim[key] = state_dict_optim[key][begin - index : end - index]
+
+            padding_start = max(begin, index + numel)
+            padding_end = min(end, index + padded_size)
+            if padding_start < padding_end:
+                state_dict_optim[key] = paddle.concat(
+                    (
+                        state_dict_optim[key],
+                        paddle.zeros([padding_end - padding_start], dtype=state_dict_optim[key].dtype),
+                    )
+                )
+
+        if has_master_weights:
+            key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
+        else:
+            key_name = "_".join([static_name, key_name[1]])
+        returned_optim_state_dict[key_name] = state_dict_optim.pop(key)
+        returned_optim_state_dict[key_name].name = key_name
+
+    if has_master_weights:
+        for key in list(state_dict_master_weight.keys()):
+            static_name = struct2static_name_mappings.get(key, None)
+            if state_dict_master_weight[key].numel().item() > 1:
+                begin, end = param_slice_info[static_name]
+                shape, numel, index, padded_size = param_shape_info[static_name]
+                state_dict_master_weight[key] = state_dict_master_weight[key].reshape([-1])
+                state_dict_master_weight[key] = state_dict_master_weight[key][begin - index : end - index]
+
+                padding_start = max(begin, index + numel)
+                padding_end = min(end, index + padded_size)
+                if padding_start < padding_end:
+                    state_dict_master_weight[key] = paddle.concat(
+                        (
+                            state_dict_master_weight[key],
+                            paddle.zeros([padding_end - padding_start], dtype=state_dict_master_weight[key].dtype),
+                        )
+                    )
+            returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight.pop(key)
+            returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, FP32_MASTER])
+
+    return returned_optim_state_dict
+
+
 def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
+    # Special process with split param.
+    if (
+        args.sharding_parallel_degree > 1
+        and ShardingOption.SHARD_OP in args.sharding
+        and "split_param" in args.sharding_parallel_config
+    ):
+        returned_optim_state_dict = load_unified_optimizer_split_param(args, model, optimizer, resume_from_checkpoint)
+        return returned_optim_state_dict
+
     # init and get optimizer LR_Scheduler
     returned_optim_state_dict = nested_copy(optimizer.state_dict())
 
@@ -1314,6 +1467,16 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
     sharding_group = hcg.get_sharding_parallel_group()
     sharding_rank = sharding_group.rank
     struct2static_name_mappings = {k: v.name for k, v in model.state_dict().items()}
+
+    if (
+        args.sharding_parallel_degree > 1
+        and ShardingOption.SHARD_OP in args.sharding
+        and "split_param" in args.sharding_parallel_config
+    ):
+        # We do not check optimizer files completion for split_param, since it is very complicated. Directly support local resume.
+        logger.warning("We only support local resume for split_param mode, do not support dynamically loading.")
+        return True
+
     if sharding_group.nranks > 1:
         param2rank = optimizer._param2rank
 
