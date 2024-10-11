@@ -182,32 +182,7 @@ class UnifiedCheckpointHandler:
 
                     quant_weight = None
 
-                    if ckpt_quant_stage == "O2":
-                        # m1: wint8, m2: wint8, fusion
-                        if momentum2:
-                            # moment2
-                            sqrt_m2 = np.sqrt(state_dict[k])
-                            quant_weight, codebook = qdq_weight(sqrt_m2, quant_bit=8)
-                            peek_dequant, _ = qdq_weight(quant_weight, scales=codebook, quant_bit=8, dequant=True)
-                            nonzero_mask = sqrt_m2 != 0.0
-                            # outlier flag
-                            has_outlier = not np.all(peek_dequant[nonzero_mask] != 0.0)
-                            # has_outlier = True
-                            if has_outlier:
-                                # quant_weight = state_dict[k].astype(np.float16)
-                                quant_weight = sqrt_m2.astype(np.float16)
-                                quant_bits += k_size * 2
-                            else:
-                                codebook_dict[k + "_codebook"] = codebook
-                                quant_bits += k_size
-                        elif momentum1:
-                            # moment1
-                            quant_weight, codebook = qdq_weight(state_dict[k], quant_bit=8)
-                            codebook_dict[k + "_codebook"] = codebook
-                            quant_bits += k_size
-                        else:
-                            quant_weight = state_dict[k]
-                    elif ckpt_quant_stage == "O1":
+                    if ckpt_quant_stage == "O1":
                         # m1: wint8, 1/(sqrt(m2)+eps): wint8
                         if momentum2:
                             # m1: m1_quant_weight, m2: ratio
@@ -221,7 +196,7 @@ class UnifiedCheckpointHandler:
                             codebook_dict[k + "_max_codebook"] = maxs
                         elif not momentum1:
                             quant_weight = state_dict[k]
-                    elif ckpt_quant_stage == "O3":
+                    elif ckpt_quant_stage == "O2":
                         # m1: bw-wint4, 1/(sqrt(m2)+eps): bw-wint4
                         if momentum2:
                             if len(state_dict[k].shape) < 2:
@@ -242,7 +217,6 @@ class UnifiedCheckpointHandler:
                         elif not momentum1:
                             quant_weight = state_dict[k]
 
-                    # print(f'{k}: {state_dict[k].dtype}')
                     if quant_weight is not None:
                         state_dict[k] = quant_weight
 
@@ -2169,7 +2143,7 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
 
     if tp_rank == 0:
         quant = False
-        if model_to_save.config.ckpt_quant_stage != "0":
+        if model_to_save.config.ckpt_quant_stage != "O0":
             quant = True
         if not quant or not is_optimizer:
             tensor_bytes_dict = {}

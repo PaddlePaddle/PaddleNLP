@@ -202,12 +202,7 @@ def split_int8(final):
 
     # 还原 high 和 low
     # 对 int4_high 进行符号扩展还原 high
-    # print("int4_low:", int4_high)
     int4_high = np.where(int4_high > 8, int4_high - 16, int4_high)
-
-    # 对 int4_low 进行符号扩展还原 low
-    # print("int4_low:", int4_low)
-    # low = np.where(int4_low > 8, int4_low - 16, int4_low)
 
     # 转换为 Paddle tensor
     high_tensor = paddle.Tensor(int4_high, zero_copy=True)
@@ -296,17 +291,12 @@ def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-
                     / bnt
                     * scales[rank * scales.shape[0] // world_size : (rank + 1) * scales.shape[0] // world_size]
                 )
-            # print(f"{quant_x.shape}, * {scales.shape} == {qdq_x.shape}")
             # fp32 , int8, int, fp32 or fp64
-            # print(quant_x.dtype, scales.dtype, bnt, qdq_x.dtype)
-            # return qdq_x, scales
             return qdq_x.astype(np.float32), scales
         else:
             if len(scales.shape) == 0 or quant_x.shape[-1] == scales.shape[-1]:
-                # print(qdq_x, quant_x, bnt, scales)
                 qdq_x = quant_x / bnt * scales.unsqueeze(0).expand(quant_x.shape)
             else:
-                # print("scales cut: ", rank * scales.shape[0] // world_size,  (rank + 1) * scales.shape[0] // world_size)
                 qdq_x = (
                     quant_x
                     / bnt
@@ -314,10 +304,7 @@ def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-
                     .unsqueeze(0)
                     .expand(quant_x.shape)
                 )
-            # print(f"{quant_x.shape}, * {scales.shape} == {qdq_x.shape}")
             # fp32 , int8, int, fp32 or fp64
-            # print(quant_x.dtype, scales.dtype, bnt, qdq_x.dtype)
-            # return qdq_x, scales
             return qdq_x.astype(paddle.float32), scales
 
 
@@ -609,43 +596,13 @@ def load_state_dict(
                     with device_guard():
                         state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
             if quant:
-                # print("vvvv ", state_dict.keys(), checkpoint_file)
                 rank, world_size = -1, 1
                 if paddle.distributed.get_world_size() > 1:
                     hcg = fleet.get_hybrid_communicate_group()
                     tp_group = hcg.get_model_parallel_group()
                     rank, world_size = tp_group.rank, tp_group.nranks
 
-                if ckpt_quant_stage == "O2":
-                    # print("xxx ", scale_dict.keys())
-                    for quant_key in state_dict.keys():
-                        if not quant_key.endswith("moment1_0") and not quant_key.endswith("moment2_0"):
-                            continue
-                        scale_key = quant_key + "_codebook"
-                        weight = state_dict[quant_key]
-                        if scale_key in scale_dict:
-                            # partial m2, all m1
-                            scales = scale_dict[scale_key]
-                            weight, _ = qdq_weight(
-                                weight,
-                                scales=scales,
-                                quant_bit=8,
-                                dequant=True,
-                                rank=rank,
-                                world_size=world_size,
-                                peek=True,
-                            )
-                            # print(f"dequant {quant_key}, dtype: {weight.shape}")
-                        else:
-                            # partial m2
-                            weight = weight.astype(paddle.float32)
-                            # print(f"loading {quant_key}, dtype: {weight.shape}")
-
-                        if quant_key.endswith("moment2_0") and scale_key in scale_dict:
-                            weight = paddle.square(weight)
-                            # print(f"squaring {quant_key}, dtype: {weight.shape}")
-                        state_dict[quant_key] = weight
-                elif ckpt_quant_stage == "O1":
+                if ckpt_quant_stage == "O1":
                     # set eps
                     eps = 1e-8
                     for quant_key in state_dict.keys():
@@ -683,14 +640,9 @@ def load_state_dict(
                                 peek=True,
                             )
                             # cal m2
-                            # all_positive = paddle.all(weight > 0)
-                            # if not all_positive:
-                            #    logger.info(f"{quant_key}'s ratio not all positive, {weight}, {weight.mean().item()}, {weight.max().item()}, {weight.min().item()}")
-
                             weight = paddle.square(1.0 / weight - eps)
-                            # print(weight)
                             state_dict[quant_key] = weight
-                elif ckpt_quant_stage == "O3":
+                elif ckpt_quant_stage == "O2":
                     # set eps
                     eps = 1e-8
                     m1_state_dict = {}
@@ -700,7 +652,6 @@ def load_state_dict(
                             continue
                         # split int8
                         weight = state_dict[quant_key]
-                        # print(weight)
                         m1_quant, ratio_quant = split_int8(weight.numpy())
                         # dequant ratio
                         ratio_min_scale_key = quant_key + "_min_codebook"
@@ -737,7 +688,6 @@ def load_state_dict(
                         #    logger.info(f"{quant_key}'s ratio not all positive, {ratio_weight}, {ratio_weight.mean().item()}, {ratio_weight.max().item()}, {ratio_weight.min().item()}")
 
                         ratio_weight = paddle.square(1.0 / ratio_weight - eps)
-                        # print(m1_weight)
                         state_dict[quant_key] = ratio_weight
                         m1_state_dict[quant_key[: -len("moment2_0")] + "moment1_0"] = m1_weight
 
