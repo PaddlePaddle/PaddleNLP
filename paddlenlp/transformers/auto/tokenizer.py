@@ -367,7 +367,7 @@ class AutoTokenizer:
         config = kwargs.pop("config", None)
         kwargs["_from_auto"] = True
 
-        use_fast = kwargs.pop("use_fast", True)
+        use_fast = kwargs.pop("use_fast", False)
         tokenizer_type = kwargs.pop("tokenizer_type", None)
         if tokenizer_type is not None:
             # TODO: Support tokenizer_type

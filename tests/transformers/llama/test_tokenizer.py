@@ -258,13 +258,14 @@ class TikTokenIntegrationTests(unittest.TestCase):
             add_bos_token=True,
             add_eos_token=True,
             from_hf_hub=True,
+            use_fast=True,
         )
         self.assertTrue(isinstance(tiktoken_tokenizer, PretrainedTokenizerFast))
         tokens = tiktoken_tokenizer.encode(test_text, add_special_tokens=True)["input_ids"]
         self.assertEqual(tokens, test_tokens)
         tmpdirname = tempfile.mkdtemp()
         tiktoken_tokenizer.save_pretrained(tmpdirname)
-        tokenizer_reload = AutoTokenizer.from_pretrained(tmpdirname)
+        tokenizer_reload = AutoTokenizer.from_pretrained(tmpdirname, use_fast=True)
         self.assertTrue(isinstance(tokenizer_reload, PretrainedTokenizerFast))
         tokens = tokenizer_reload.encode(test_text, add_special_tokens=True)["input_ids"]
         self.assertEqual(tokens, test_tokens)
@@ -279,6 +280,7 @@ class TikTokenIntegrationTests(unittest.TestCase):
             add_bos_token=True,
             add_eos_token=True,
             from_hf_hub=True,
+            use_fast=True,
         )
         tokens = tiktoken_tokenizer.encode(test_text, add_special_tokens=True)["input_ids"]
         self.assertEqual(tokens, test_tokens)
