@@ -52,7 +52,7 @@ function llama_case_list_auto() {
     # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2
     # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
     # llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
-
+    llama_pir_auto_fuse_ffn_attention_qkv_MP2
     llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
     llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
@@ -1068,6 +1068,101 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
         # check_md5_result $FUNCNAME ${loss_md5_base} ${loss_md5}
     done
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
+    echo "=========== $FUNCNAME run begin ==========="
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=3
+    export FLAGS_max_inplace_grad_add=100
+    export FLAGS_cudnn_deterministic=1
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_embedding_deterministic=1
+    export FLAGS_flash_attn_version=v1
+    export PARALLEL_CROSS_ENTROPY=true
+    export FLAGS_enable_auto_parallel_align_mode=1
+
+    export FLAGS_enable_pir_api=1
+    export FLAGS_enable_fused_ffn_qkv_pass=1
+
+    auto_task_name="llama_pir_auto_fuse_ffn_attention_qkv_MP2"
+    auto_case_out_dir="auto_output/$auto_task_name"
+    auto_case_log_dir="auto_output/$auto_task_name""_log"
+    rm -rf $auto_case_out_dir
+    rm -rf $auto_case_log_dir
+
+    python -u -m paddle.distributed.launch \
+        --gpus "0,1" \
+        --log_dir $auto_case_log_dir \
+        run_pretrain_auto.py \
+        --model_name_or_path "facebook/llama-7b" \
+        --tokenizer_name_or_path "facebook/llama-7b" \
+        --input_dir "./data" \
+        --output_dir $auto_case_out_dir \
+        --split 949,50,1 \
+        --weight_decay 0.01 \
+        --warmup_ratio 0.01 \
+        --warmup_steps 30 \
+        --max_grad_norm 0.0 \
+        --learning_rate 3e-05 \
+        --min_learning_rate 3e-06 \
+        --max_steps 5 \
+        --logging_steps 1 \
+        --eval_steps 1000 \
+        --save_steps 3 \
+        --continue_training 0 \
+        --do_train true \
+        --do_eval false \
+        --do_predict false \
+        --disable_tqdm true \
+        --skip_profile_timer true \
+        --save_total_limit 2 \
+        --device gpu \
+        --disable_tqdm true \
+        --dataloader_num_workers 1 \
+        --distributed_dataloader 0 \
+        --enable_auto_parallel 1 \
+        --per_device_train_batch_size 1 \
+        --gradient_accumulation_steps 1 \
+        --per_device_eval_batch_size 2 \
+        --recompute false \
+        --recompute_use_reentrant true \
+        --recompute_granularity full \
+        --pp_recompute_interval 0 \
+        --bf16 0 \
+        --fp16_opt_level "O2"  \
+        --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \
+        --amp_custom_white_list "lookup_table" "lookup_table_v2" \
+        --amp_master_grad false \
+        --fuse_attention_ffn false \
+        --fuse_attention_qkv false \
+        --use_flash_attention false \
+        --use_fused_rope true \
+        --use_fused_rms_norm true \
+        --max_seq_length 4096 \
+        --sequence_parallel false \
+        --pipeline_parallel_degree 1 \
+        --sharding_parallel_degree 1 \
+        --tensor_parallel_degree 2 \
+        --virtual_pp_degree 1 \
+        --pipeline_schedule_mode "VPP" \
+        --sharding "" \
+        --to_static 1 \
+        --num_hidden_layers 2 \
+        >>${log_path}/$FUNCNAME 2>&1
+
+    auto_loss=`cat $auto_case_log_dir/workerlog.0 | grep 'global_step: 5' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    auto_ips=-1
+    auto_mem=-1
+    echo "auto result: step 5 loss=$auto_loss ips=$auto_ips mem=$auto_mem"
+    loss_base=10.21024895
+    ips_base=-1
+    mem_base=-1
+    if [ $IS_A100 -ne 0 ];then
+        loss_base=10.27925682
+    fi
+    check_result $FUNCNAME ${loss_base} ${auto_loss} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
 
