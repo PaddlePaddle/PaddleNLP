@@ -2245,7 +2245,6 @@ class Trainer:
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
-
         return _unscale_loss_in_align_mode(loss.detach())
 
     def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
