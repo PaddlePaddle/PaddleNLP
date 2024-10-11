@@ -22,7 +22,7 @@ from paddlenlp.transformers.llama.tokenizer import LlamaTokenizer
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.transformers.tokenizer_utils_fast import PretrainedTokenizerFast
 
-from ...transformers.test_tokenizer_common import TokenizerTesterMixin
+from ..test_tokenizer_common import TokenizerTesterMixin
 
 VOCAB_FILES_NAMES = {
     "vocab_file": "vocab.json",

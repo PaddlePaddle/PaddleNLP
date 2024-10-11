@@ -19,20 +19,19 @@ import os
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
 
-from paddlenlp.transformers.auto.configuration import (
+from ...utils import is_tokenizers_available
+from ...utils.download import resolve_file_path
+from ...utils.import_utils import import_module
+from ...utils.log import logger
+from ..configuration_utils import PretrainedConfig
+from ..tokenizer_utils_base import TOKENIZER_CONFIG_FILE
+from ..tokenizer_utils_fast import PretrainedTokenizerFast
+from .configuration import (
     CONFIG_MAPPING_NAMES,
     AutoConfig,
     config_class_to_model_type,
     model_type_to_module_name,
 )
-from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.transformers.tokenizer_utils_base import TOKENIZER_CONFIG_FILE
-from paddlenlp.transformers.tokenizer_utils_fast import PretrainedTokenizerFast
-
-from ...utils import is_tokenizers_available
-from ...utils.download import resolve_file_path
-from ...utils.import_utils import import_module
-from ...utils.log import logger
 from .factory import _LazyAutoMapping
 
 __all__ = [
@@ -40,8 +39,6 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:
-    # This significantly improves completion suggestion performance when
-    # the transformers package is used with Microsoft's Pylance language server.
     TOKENIZER_MAPPING_NAMES: OrderedDict[str, Tuple[Optional[str], Optional[str]]] = OrderedDict()
 else:
     TOKENIZER_MAPPING_NAMES = OrderedDict(

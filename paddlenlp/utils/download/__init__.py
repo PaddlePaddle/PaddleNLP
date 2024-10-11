@@ -142,7 +142,7 @@ def resolve_file_path(
             elif index < len(filenames) - 1:
                 continue
             else:
-                pass
+                raise FileNotFoundError(f"please make sure one of the {filenames} under the dir {repo_id}")
 
     # check cache
     for filename in filenames:
@@ -272,7 +272,7 @@ def resolve_file_path(
             f"'{log_endpoint}' for available revisions."
         )
     except EntryNotFoundError:
-        return None
+        raise EnvironmentError(f"Does not appear one of the {filenames} in {repo_id}.")
     except HTTPError as err:
         raise EnvironmentError(f"There was a specific connection error when trying to load {repo_id}:\n{err}")
     except ValueError:
