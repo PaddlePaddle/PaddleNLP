@@ -625,7 +625,7 @@ class StaticInferencePredictor(InferencePredictorMixin):
             predictor_args.model_name_or_path, predictor_args.model_prefix
         )
 
-        config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
+        config = paddle.inference.Config(infer_model_path)
 
         config.switch_ir_optim(True)
         # remove `gpu_cpu_map_matmul_v2_to_matmul_pass` to avoid mapping matmul_v2 -> matmul op
@@ -1057,7 +1057,7 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
             predictor_args.model_name_or_path, predictor_args.model_prefix
         )
 
-        config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
+        config = paddle.inference.Config(infer_model_path)
 
         config.switch_ir_optim(False)
         if predictor_args.device in paddle.device.get_all_custom_device_type():
