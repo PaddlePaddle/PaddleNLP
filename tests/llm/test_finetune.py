@@ -39,7 +39,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
 
-    def test_finetune(self):
+    def t1est_finetune(self):
         finetune_config = load_test_config(self.config_path, "finetune", self.model_dir)
 
         finetune_config["dataset_name_or_path"] = self.data_dir
@@ -55,3 +55,20 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             self.run_predictor({"inference_model": True})
 
         self.run_predictor({"inference_model": False})
+
+    def test_ckpt_quant(self):
+        finetune_config = load_test_config(self.config_path, "ckpt_quant", self.model_dir)
+
+        finetune_config["dataset_name_or_path"] = self.data_dir
+        finetune_config["output_dir"] = self.output_dir
+
+        with argv_context_guard(finetune_config):
+            from run_finetune import main
+
+            main()
+
+        # resume from quant checkpoint
+        with argv_context_guard(finetune_config):
+            from run_finetune import main
+
+            main()
