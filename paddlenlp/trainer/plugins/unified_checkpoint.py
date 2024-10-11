@@ -157,92 +157,92 @@ class UnifiedCheckpointHandler:
             self._shared_save_master_weight_flag = multiprocessing.Array("i", 1)
             self._shared_save_optimizer_flag = multiprocessing.Array("i", 1)
 
-    def _file_save_async_or_sync(
-        self, state_dict, path, is_sync=True, state_dict_type="model_weight", ckpt_quant_stage="O0"
-    ):
+    def quant_unified_optimizer(self, state_dict, state_dict_type, ckpt_quant_stage):
         quant = False
         if ckpt_quant_stage != "O0":
             quant = True
+        del_key = []
+        if quant and state_dict_type == "optimizer_weight":
+            codebook_dict = {}
+            opt_keys = state_dict.keys()
+            all_bits, quant_bits = paddle.to_tensor(0.0), paddle.to_tensor(0.0)
+            for k in opt_keys:
+                momentum1 = k.endswith("moment1_0")
+                momentum2 = k.endswith("moment2_0")
+                k_size = state_dict[k].size
+                if momentum1 or momentum2:
+                    all_bits += k_size * 4
+
+                quant_weight = None
+
+                if ckpt_quant_stage == "O1":
+                    # m1: wint8, 1/(sqrt(m2)+eps): wint8
+                    if momentum2:
+                        # m1: m1_quant_weight, m2: ratio
+                        m1_key = k.split("/")[0] + "/moment1_0"
+                        ratio = cal_ratio(state_dict[m1_key], state_dict[k])
+                        m1_quant, codebook = qdq_weight(state_dict[m1_key], quant_bit=8)
+                        quant_weight, mins, maxs = asymmetry_qdq_weight(ratio, quant_bit=8)
+                        state_dict[m1_key] = m1_quant
+                        codebook_dict[m1_key + "_codebook"] = codebook
+                        codebook_dict[k + "_min_codebook"] = mins
+                        codebook_dict[k + "_max_codebook"] = maxs
+                    elif not momentum1:
+                        quant_weight = state_dict[k]
+                elif ckpt_quant_stage == "O2":
+                    # m1: bw-wint4, 1/(sqrt(m2)+eps): bw-wint4
+                    if momentum2:
+                        if len(state_dict[k].shape) < 2:
+                            continue
+                        # m1: m1_quant_weight, m2: ratio
+                        m1_key = k.split("/")[0] + "/moment1_0"
+                        ratio = cal_ratio(state_dict[m1_key], state_dict[k])
+                        m1_quant, m1_mins = group_wise_quant_dequant(state_dict[m1_key], quant_bits=4, symetry=True)
+                        quant_weight, r_mins, r_maxs = group_wise_quant_dequant(ratio, quant_bits=4)
+                        quant_weight = merge_int4(m1_quant, quant_weight)
+                        codebook_dict[m1_key + "_min_codebook"] = m1_mins
+                        # codebook_dict[m1_key + '_max_codebook'] = m1_maxs
+                        codebook_dict[k + "_min_codebook"] = r_mins
+                        codebook_dict[k + "_max_codebook"] = r_maxs
+                        del_key.append(m1_key)
+                    elif not momentum1:
+                        quant_weight = state_dict[k]
+
+                if quant_weight is not None:
+                    state_dict[k] = quant_weight
+
+            for k in del_key:
+                state_dict.pop(k, None)
+
+            state_dict.update(codebook_dict)
+
+            if paddle.distributed.get_world_size() > 1:
+                dist.all_reduce(all_bits)
+                dist.all_reduce(quant_bits)
+
+            model_numel = all_bits / 4
+            all_bits = model_numel * 7.0
+            quant_bits_mw = quant_bits + model_numel * 6.0
+            quant_bits = quant_bits + model_numel * 2.0
+            logger.info(
+                f"all bits: {all_bits.item()}, quant bits: {quant_bits.item()}, quant bits mw: {quant_bits_mw.item()}"
+            )
+            logger.info(f"quant ratio (w/o Master Weight): {(all_bits.item() - quant_bits.item()) / all_bits.item()}")
+            logger.info(
+                f"quant ratio (w/ Master Weight): {(all_bits.item() - quant_bits_mw.item()) / all_bits.item()}"
+            )
+
+        return state_dict
+
+    def _file_save_async_or_sync(
+        self, state_dict, path, is_sync=True, state_dict_type="model_weight", ckpt_quant_stage="O0"
+    ):
         if is_sync:
             for k in list(state_dict.keys()):
                 if isinstance(state_dict[k], paddle.Tensor):
                     state_dict[k] = state_dict.pop(k).cpu().numpy()
 
-            del_key = []
-            if quant and state_dict_type == "optimizer_weight":
-                codebook_dict = {}
-                opt_keys = state_dict.keys()
-                all_bits, quant_bits = paddle.to_tensor(0.0), paddle.to_tensor(0.0)
-                for k in opt_keys:
-                    momentum1 = k.endswith("moment1_0")
-                    momentum2 = k.endswith("moment2_0")
-                    k_size = state_dict[k].size
-                    if momentum1 or momentum2:
-                        all_bits += k_size * 4
-
-                    quant_weight = None
-
-                    if ckpt_quant_stage == "O1":
-                        # m1: wint8, 1/(sqrt(m2)+eps): wint8
-                        if momentum2:
-                            # m1: m1_quant_weight, m2: ratio
-                            m1_key = k.split("/")[0] + "/moment1_0"
-                            ratio = cal_ratio(state_dict[m1_key], state_dict[k])
-                            m1_quant, codebook = qdq_weight(state_dict[m1_key], quant_bit=8)
-                            quant_weight, mins, maxs = asymmetry_qdq_weight(ratio, quant_bit=8)
-                            state_dict[m1_key] = m1_quant
-                            codebook_dict[m1_key + "_codebook"] = codebook
-                            codebook_dict[k + "_min_codebook"] = mins
-                            codebook_dict[k + "_max_codebook"] = maxs
-                        elif not momentum1:
-                            quant_weight = state_dict[k]
-                    elif ckpt_quant_stage == "O2":
-                        # m1: bw-wint4, 1/(sqrt(m2)+eps): bw-wint4
-                        if momentum2:
-                            if len(state_dict[k].shape) < 2:
-                                continue
-                            # m1: m1_quant_weight, m2: ratio
-                            m1_key = k.split("/")[0] + "/moment1_0"
-                            ratio = cal_ratio(state_dict[m1_key], state_dict[k])
-                            m1_quant, m1_mins = group_wise_quant_dequant(
-                                state_dict[m1_key], quant_bits=4, symetry=True
-                            )
-                            quant_weight, r_mins, r_maxs = group_wise_quant_dequant(ratio, quant_bits=4)
-                            quant_weight = merge_int4(m1_quant, quant_weight)
-                            codebook_dict[m1_key + "_min_codebook"] = m1_mins
-                            # codebook_dict[m1_key + '_max_codebook'] = m1_maxs
-                            codebook_dict[k + "_min_codebook"] = r_mins
-                            codebook_dict[k + "_max_codebook"] = r_maxs
-                            del_key.append(m1_key)
-                        elif not momentum1:
-                            quant_weight = state_dict[k]
-
-                    if quant_weight is not None:
-                        state_dict[k] = quant_weight
-
-                for k in del_key:
-                    state_dict.pop(k, None)
-
-                state_dict.update(codebook_dict)
-
-                if paddle.distributed.get_world_size() > 1:
-                    dist.all_reduce(all_bits)
-                    dist.all_reduce(quant_bits)
-
-                model_numel = all_bits / 4
-                all_bits = model_numel * 7.0
-                quant_bits_mw = quant_bits + model_numel * 6.0
-                quant_bits = quant_bits + model_numel * 2.0
-                logger.info(
-                    f"all bits: {all_bits.item()}, quant bits: {quant_bits.item()}, quant bits mw: {quant_bits_mw.item()}"
-                )
-                logger.info(
-                    f"quant ratio (w/o Master Weight): {(all_bits.item() - quant_bits.item()) / all_bits.item()}"
-                )
-                logger.info(
-                    f"quant ratio (w/ Master Weight): {(all_bits.item() - quant_bits_mw.item()) / all_bits.item()}"
-                )
-
+            state_dict = self.quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage)
             safe_save_file(state_dict, path, metadata={"format": "np"})
         else:
             if state_dict_type == "model_weight":
@@ -264,6 +264,7 @@ class UnifiedCheckpointHandler:
                             self._lock,
                             state_dict_type,
                             self.global_rank,
+                            ckpt_quant_stage,
                         ),
                     )
                     self._process_model_weight.start()
@@ -288,6 +289,7 @@ class UnifiedCheckpointHandler:
                             if "skip_save_model_weight" in self.args.unified_checkpoint_config
                             else state_dict_type,
                             self.global_rank,
+                            ckpt_quant_stage,
                         ),
                     )
                     self._process_master_weight.start()
@@ -310,6 +312,7 @@ class UnifiedCheckpointHandler:
                             self._lock,
                             state_dict_type,
                             self.global_rank,
+                            ckpt_quant_stage,
                         ),
                     )
                     self._process_optimizer_weight.start()
@@ -335,6 +338,7 @@ class UnifiedCheckpointHandler:
         lock,
         state_dict_type,
         global_rank,
+        ckpt_quant_stage,
     ):
         shm = shared_memory.SharedMemory(name=shm_name)
         while True:
@@ -347,6 +351,9 @@ class UnifiedCheckpointHandler:
                 path = shared_save_path[:].decode("utf-8").rstrip("\x00")
                 logger.info(f"Start to async save {path}")
                 state_dict = _read_state_dict_from_shm(meta_dict, shm)  # numpy array
+                state_dict = self.quant_unified_optimizer(
+                    state_dict, state_dict_type, ckpt_quant_stage
+                )  # ckpt quantization
                 safe_save_file(state_dict, path, {"format": "np"})
                 del state_dict
                 saved_signal_path = os.path.join(os.path.dirname(path), f".{state_dict_type}.done.{global_rank}")
