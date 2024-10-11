@@ -92,7 +92,19 @@ __all__ = [
     "register_base_model",
 ]
 
-def group_wise_quant_dequant(inputs, mins=None, maxs=None, quant_bits=4, group_size=32, quant=True, rank=-1, world_size=1, use_pd=False, symetry=False):
+
+def group_wise_quant_dequant(
+    inputs,
+    mins=None,
+    maxs=None,
+    quant_bits=4,
+    group_size=32,
+    quant=True,
+    rank=-1,
+    world_size=1,
+    use_pd=False,
+    symetry=False,
+):
     qmax = (1 << (quant_bits)) - 1
     qmin = 0
     shape = inputs.shape
@@ -103,8 +115,8 @@ def group_wise_quant_dequant(inputs, mins=None, maxs=None, quant_bits=4, group_s
             bnt = (1 << (quant_bits - 1)) - 1
             scales = np.max(np.abs(inputs_processed), axis=1)
             new_scales = np.repeat(scales, repeats=group_size, axis=0)
-            quant_tensor = np.clip(np.round(inputs / new_scales * bnt), -bnt-1, bnt)
-            return quant_tensor.astype('int8'), scales
+            quant_tensor = np.clip(np.round(inputs / new_scales * bnt), -bnt - 1, bnt)
+            return quant_tensor.astype("int8"), scales
 
         # scales: [shape[0] // group_size, shape[1]]
         maxs = np.max(inputs_processed, axis=1)
@@ -116,7 +128,7 @@ def group_wise_quant_dequant(inputs, mins=None, maxs=None, quant_bits=4, group_s
         # add eps to avoid devide zero
         quant_tensor = np.clip(np.round((inputs - new_mins) / (new_scales) * qmax), qmin, qmax)
         quant_tensor = np.nan_to_num(quant_tensor)
-        return quant_tensor.astype('uint8'), mins, maxs
+        return quant_tensor.astype("uint8"), mins, maxs
     else:
         if symetry:
             scales = mins
@@ -127,11 +139,23 @@ def group_wise_quant_dequant(inputs, mins=None, maxs=None, quant_bits=4, group_s
                 new_scales = np.repeat(scales, repeats=group_size, axis=0)
 
             if rank == -1:
-                dequant_tensor = inputs.astype('float32') * new_scales / bnt 
+                dequant_tensor = inputs.astype("float32") * new_scales / bnt
             elif len(new_scales.shape) == 0 or inputs.shape[-1] == new_scales.shape[-1]:
-                dequant_tensor = inputs.astype('float32') * new_scales[rank * new_scales.shape[0] // world_size: (rank + 1) * new_scales.shape[0] // world_size] / bnt 
+                dequant_tensor = (
+                    inputs.astype("float32")
+                    * new_scales[
+                        rank * new_scales.shape[0] // world_size : (rank + 1) * new_scales.shape[0] // world_size
+                    ]
+                    / bnt
+                )
             else:
-                dequant_tensor = (inputs.astype('float32') * new_scales[:, rank * new_scales.shape[-1] // world_size: (rank + 1) * new_scales.shape[-1] // world_size] / bnt)
+                dequant_tensor = (
+                    inputs.astype("float32")
+                    * new_scales[
+                        :, rank * new_scales.shape[-1] // world_size : (rank + 1) * new_scales.shape[-1] // world_size
+                    ]
+                    / bnt
+                )
             return dequant_tensor
 
         scales = maxs - mins
@@ -143,35 +167,47 @@ def group_wise_quant_dequant(inputs, mins=None, maxs=None, quant_bits=4, group_s
             new_mins = np.repeat(mins, repeats=group_size, axis=0)
 
         if rank == -1:
-            dequant_tensor = (inputs.astype('float32') / qmax * new_scales) + new_mins
+            dequant_tensor = (inputs.astype("float32") / qmax * new_scales) + new_mins
         elif len(new_scales.shape) == 0 or inputs.shape[-1] == new_scales.shape[-1]:
-            dequant_tensor = (inputs.astype('float32') / qmax * new_scales[rank * new_scales.shape[0] // world_size: (rank + 1) * new_scales.shape[0] // world_size]) + new_mins[rank * new_mins.shape[0] // world_size: (rank + 1) * new_mins.shape[0] // world_size]
+            dequant_tensor = (
+                inputs.astype("float32")
+                / qmax
+                * new_scales[rank * new_scales.shape[0] // world_size : (rank + 1) * new_scales.shape[0] // world_size]
+            ) + new_mins[rank * new_mins.shape[0] // world_size : (rank + 1) * new_mins.shape[0] // world_size]
         else:
-            dequant_tensor = (inputs.astype('float32') / qmax * new_scales[:, rank * new_scales.shape[-1] // world_size: (rank + 1) * new_scales.shape[-1] // world_size]) + new_mins[:, rank * new_mins.shape[-1] // world_size: (rank + 1) * new_mins.shape[-1] // world_size]
+            dequant_tensor = (
+                inputs.astype("float32")
+                / qmax
+                * new_scales[
+                    :, rank * new_scales.shape[-1] // world_size : (rank + 1) * new_scales.shape[-1] // world_size
+                ]
+            ) + new_mins[:, rank * new_mins.shape[-1] // world_size : (rank + 1) * new_mins.shape[-1] // world_size]
         return dequant_tensor
 
+
 def merge_int4(x, y):
-    int4_high = (x << 4)
+    int4_high = x << 4
     int4_low = y & 0x0F
     final = int4_high | int4_low
-    return final.astype('int8')
+    return final.astype("int8")
+
 
 def split_int8(final):
-    #offset = 2 ** 4
-    #x, y = z // offset, z % offset
-    #return x, y
+    # offset = 2 ** 4
+    # x, y = z // offset, z % offset
+    # return x, y
     # 获取 int4_high 和 int4_low
     int4_high = final >> 4
     int4_low = final & 0x0F
 
     # 还原 high 和 low
     # 对 int4_high 进行符号扩展还原 high
-    #print("int4_low:", int4_high)
+    # print("int4_low:", int4_high)
     int4_high = np.where(int4_high > 8, int4_high - 16, int4_high)
 
     # 对 int4_low 进行符号扩展还原 low
-    #print("int4_low:", int4_low)
-    #low = np.where(int4_low > 8, int4_low - 16, int4_low)
+    # print("int4_low:", int4_low)
+    # low = np.where(int4_low > 8, int4_low - 16, int4_low)
 
     # 转换为 Paddle tensor
     high_tensor = paddle.Tensor(int4_high, zero_copy=True)
@@ -179,20 +215,23 @@ def split_int8(final):
 
     return high_tensor, low_tensor
 
+
 def cal_abs_min_max_channel(inputs, quant_axis=1):
-    reduce_axis = tuple(
-        [i for i in range(len(inputs.shape)) if i != quant_axis])
+    reduce_axis = tuple([i for i in range(len(inputs.shape)) if i != quant_axis])
     abs_max_values = np.max(inputs, axis=reduce_axis)
     abs_min_values = np.min(inputs, axis=reduce_axis)
     abs_max_values = np.where(
-        abs_max_values == np.array(0, dtype=inputs.dtype),
-        np.array(1e-8, dtype=inputs.dtype), abs_max_values)
+        abs_max_values == np.array(0, dtype=inputs.dtype), np.array(1e-8, dtype=inputs.dtype), abs_max_values
+    )
     abs_min_values = np.where(
-        abs_min_values == np.array(0, dtype=inputs.dtype),
-        np.array(1e-8, dtype=inputs.dtype), abs_min_values)
+        abs_min_values == np.array(0, dtype=inputs.dtype), np.array(1e-8, dtype=inputs.dtype), abs_min_values
+    )
     return abs_max_values, abs_min_values
 
-def asymmetry_qdq_weight(x, quant_bit=8, quant_axis=-1, mins=None, maxs=None, dequant=False, rank=-1, world_size=1, peek=False):
+
+def asymmetry_qdq_weight(
+    x, quant_bit=8, quant_axis=-1, mins=None, maxs=None, dequant=False, rank=-1, world_size=1, peek=False
+):
     if mins is None:
         maxs, mins = cal_abs_min_max_channel(x)
     bnt = (1 << (quant_bit)) - 1
@@ -208,23 +247,34 @@ def asymmetry_qdq_weight(x, quant_bit=8, quant_axis=-1, mins=None, maxs=None, de
             if len(scales.shape) == 0 or quant_x.shape[-1] == scales.shape[-1]:
                 qdq_x = (quant_x / bnt * scales) + mins
             else:
-                qdq_x = (quant_x / bnt * scales[rank * scales.shape[0] // world_size: (rank + 1) * scales.shape[0] // world_size]) + mins[rank * mins.shape[0] // world_size: (rank + 1) * mins.shape[0] // world_size]
+                qdq_x = (
+                    quant_x
+                    / bnt
+                    * scales[rank * scales.shape[0] // world_size : (rank + 1) * scales.shape[0] // world_size]
+                ) + mins[rank * mins.shape[0] // world_size : (rank + 1) * mins.shape[0] // world_size]
             return qdq_x.astype(np.float32), scales
         else:
             if len(scales.shape) == 0 or quant_x.shape[-1] == scales.shape[-1]:
                 qdq_x = (quant_x / bnt * scales.unsqueeze(0).expand(quant_x.shape)) + mins
             else:
-                qdq_x = (quant_x / bnt * scales[rank * scales.shape[0] // world_size: (rank + 1) * scales.shape[0] // world_size].unsqueeze(0).expand(quant_x.shape)) + mins[rank * mins.shape[0] // world_size: (rank + 1) * mins.shape[0] // world_size]
+                qdq_x = (
+                    quant_x
+                    / bnt
+                    * scales[rank * scales.shape[0] // world_size : (rank + 1) * scales.shape[0] // world_size]
+                    .unsqueeze(0)
+                    .expand(quant_x.shape)
+                ) + mins[rank * mins.shape[0] // world_size : (rank + 1) * mins.shape[0] // world_size]
             return qdq_x.astype(paddle.float32), scales
 
+
 def cal_abs_max_channel(inputs, quant_axis=1):
-    reduce_axis = tuple(
-        [i for i in range(len(inputs.shape)) if i != quant_axis])
+    reduce_axis = tuple([i for i in range(len(inputs.shape)) if i != quant_axis])
     abs_max_values = np.max(np.abs(inputs), axis=reduce_axis)
     abs_max_values = np.where(
-        abs_max_values == np.array(0, dtype=inputs.dtype),
-        np.array(1e-8, dtype=inputs.dtype), abs_max_values)
+        abs_max_values == np.array(0, dtype=inputs.dtype), np.array(1e-8, dtype=inputs.dtype), abs_max_values
+    )
     return abs_max_values
+
 
 def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-1, world_size=1, peek=False):
     if scales is None:
@@ -241,24 +291,35 @@ def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-
             if len(scales.shape) == 0 or quant_x.shape[-1] == scales.shape[-1]:
                 qdq_x = quant_x / bnt * scales
             else:
-                qdq_x = quant_x / bnt * scales[rank * scales.shape[0] // world_size: (rank + 1) * scales.shape[0] // world_size]
-            #print(f"{quant_x.shape}, * {scales.shape} == {qdq_x.shape}")
+                qdq_x = (
+                    quant_x
+                    / bnt
+                    * scales[rank * scales.shape[0] // world_size : (rank + 1) * scales.shape[0] // world_size]
+                )
+            # print(f"{quant_x.shape}, * {scales.shape} == {qdq_x.shape}")
             # fp32 , int8, int, fp32 or fp64
-            #print(quant_x.dtype, scales.dtype, bnt, qdq_x.dtype)
-            #return qdq_x, scales
+            # print(quant_x.dtype, scales.dtype, bnt, qdq_x.dtype)
+            # return qdq_x, scales
             return qdq_x.astype(np.float32), scales
         else:
             if len(scales.shape) == 0 or quant_x.shape[-1] == scales.shape[-1]:
-                #print(qdq_x, quant_x, bnt, scales)
+                # print(qdq_x, quant_x, bnt, scales)
                 qdq_x = quant_x / bnt * scales.unsqueeze(0).expand(quant_x.shape)
             else:
-                #print("scales cut: ", rank * scales.shape[0] // world_size,  (rank + 1) * scales.shape[0] // world_size)
-                qdq_x = quant_x / bnt * scales[rank * scales.shape[0] // world_size: (rank + 1) * scales.shape[0] // world_size].unsqueeze(0).expand(quant_x.shape)
-            #print(f"{quant_x.shape}, * {scales.shape} == {qdq_x.shape}")
+                # print("scales cut: ", rank * scales.shape[0] // world_size,  (rank + 1) * scales.shape[0] // world_size)
+                qdq_x = (
+                    quant_x
+                    / bnt
+                    * scales[rank * scales.shape[0] // world_size : (rank + 1) * scales.shape[0] // world_size]
+                    .unsqueeze(0)
+                    .expand(quant_x.shape)
+                )
+            # print(f"{quant_x.shape}, * {scales.shape} == {qdq_x.shape}")
             # fp32 , int8, int, fp32 or fp64
-            #print(quant_x.dtype, scales.dtype, bnt, qdq_x.dtype)
-            #return qdq_x, scales
+            # print(quant_x.dtype, scales.dtype, bnt, qdq_x.dtype)
+            # return qdq_x, scales
             return qdq_x.astype(paddle.float32), scales
+
 
 def dy2st_nocheck_guard_context():
     try:
@@ -488,13 +549,17 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 
 
 def load_state_dict(
-    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None, device="cpu", ckpt_quant_stage="O0"
+    checkpoint_file: Union[str, os.PathLike],
+    tensor_parallel_split_mapping=None,
+    fliter_dict_keys=None,
+    device="cpu",
+    ckpt_quant_stage="O0",
 ):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
     """
     quant = False
-    if ckpt_quant_stage != 'O0':
+    if ckpt_quant_stage != "O0":
         quant = "optimizer" in checkpoint_file
 
     if tensor_parallel_split_mapping is None:
@@ -534,7 +599,7 @@ def load_state_dict(
                 for key in f.keys():
                     if key.endswith("_codebook"):
                         scale = f.get_tensor(key)
-                        #np.save('tmp.npy', scale)
+                        # np.save('tmp.npy', scale)
                         with device_guard():
                             scale = paddle.Tensor(scale, zero_copy=True)
                         scale_dict[key] = scale
@@ -544,15 +609,15 @@ def load_state_dict(
                     with device_guard():
                         state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
             if quant:
-                #print("vvvv ", state_dict.keys(), checkpoint_file)
+                # print("vvvv ", state_dict.keys(), checkpoint_file)
                 rank, world_size = -1, 1
                 if paddle.distributed.get_world_size() > 1:
                     hcg = fleet.get_hybrid_communicate_group()
                     tp_group = hcg.get_model_parallel_group()
                     rank, world_size = tp_group.rank, tp_group.nranks
 
-                if ckpt_quant_stage == 'O2':
-                    #print("xxx ", scale_dict.keys())
+                if ckpt_quant_stage == "O2":
+                    # print("xxx ", scale_dict.keys())
                     for quant_key in state_dict.keys():
                         if not quant_key.endswith("moment1_0") and not quant_key.endswith("moment2_0"):
                             continue
@@ -561,18 +626,26 @@ def load_state_dict(
                         if scale_key in scale_dict:
                             # partial m2, all m1
                             scales = scale_dict[scale_key]
-                            weight, _ = qdq_weight(weight, scales=scales, quant_bit=8, dequant=True, rank=rank, world_size=world_size, peek=True)
-                            #print(f"dequant {quant_key}, dtype: {weight.shape}")
+                            weight, _ = qdq_weight(
+                                weight,
+                                scales=scales,
+                                quant_bit=8,
+                                dequant=True,
+                                rank=rank,
+                                world_size=world_size,
+                                peek=True,
+                            )
+                            # print(f"dequant {quant_key}, dtype: {weight.shape}")
                         else:
                             # partial m2
                             weight = weight.astype(paddle.float32)
-                            #print(f"loading {quant_key}, dtype: {weight.shape}")
+                            # print(f"loading {quant_key}, dtype: {weight.shape}")
 
                         if quant_key.endswith("moment2_0") and scale_key in scale_dict:
                             weight = paddle.square(weight)
-                            #print(f"squaring {quant_key}, dtype: {weight.shape}")
+                            # print(f"squaring {quant_key}, dtype: {weight.shape}")
                         state_dict[quant_key] = weight
-                elif ckpt_quant_stage == 'O1':
+                elif ckpt_quant_stage == "O1":
                     # set eps
                     eps = 1e-8
                     for quant_key in state_dict.keys():
@@ -583,7 +656,15 @@ def load_state_dict(
                             scale_key = quant_key + "_codebook"
                             weight = state_dict[quant_key]
                             scales = scale_dict[scale_key]
-                            weight, _ = qdq_weight(weight, scales=scales, quant_bit=8, dequant=True, rank=rank, world_size=world_size, peek=True)
+                            weight, _ = qdq_weight(
+                                weight,
+                                scales=scales,
+                                quant_bit=8,
+                                dequant=True,
+                                rank=rank,
+                                world_size=world_size,
+                                peek=True,
+                            )
                             state_dict[quant_key] = weight
                         elif is_moment2:
                             # dequant ratio
@@ -591,16 +672,25 @@ def load_state_dict(
                             min_scale_key = quant_key + "_min_codebook"
                             max_scale_key = quant_key + "_max_codebook"
                             mins, maxs = scale_dict[min_scale_key], scale_dict[max_scale_key]
-                            weight, _ = asymmetry_qdq_weight(weight, mins=mins, maxs=maxs, quant_bit=8, dequant=True, rank=rank, world_size=world_size, peek=True)
+                            weight, _ = asymmetry_qdq_weight(
+                                weight,
+                                mins=mins,
+                                maxs=maxs,
+                                quant_bit=8,
+                                dequant=True,
+                                rank=rank,
+                                world_size=world_size,
+                                peek=True,
+                            )
                             # cal m2
-                            #all_positive = paddle.all(weight > 0)
-                            #if not all_positive:
+                            # all_positive = paddle.all(weight > 0)
+                            # if not all_positive:
                             #    logger.info(f"{quant_key}'s ratio not all positive, {weight}, {weight.mean().item()}, {weight.max().item()}, {weight.min().item()}")
 
                             weight = paddle.square(1.0 / weight - eps)
-                            #print(weight)
+                            # print(weight)
                             state_dict[quant_key] = weight
-                elif ckpt_quant_stage == 'O3':
+                elif ckpt_quant_stage == "O3":
                     # set eps
                     eps = 1e-8
                     m1_state_dict = {}
@@ -610,30 +700,48 @@ def load_state_dict(
                             continue
                         # split int8
                         weight = state_dict[quant_key]
-                        #print(weight)
+                        # print(weight)
                         m1_quant, ratio_quant = split_int8(weight.numpy())
                         # dequant ratio
                         ratio_min_scale_key = quant_key + "_min_codebook"
                         ratio_max_scale_key = quant_key + "_max_codebook"
-                        m1_min_scale_key = quant_key[:-len("moment2_0")] + "moment1_0_min_codebook"
-                        m1_max_scale_key = quant_key[:-len("moment2_0")] + "moment1_0_max_codebook"
-                        #m1_mins, m1_maxs = scale_dict[m1_min_scale_key], scale_dict[m1_max_scale_key]
+                        m1_min_scale_key = quant_key[: -len("moment2_0")] + "moment1_0_min_codebook"
+                        # m1_max_scale_key = quant_key[: -len("moment2_0")] + "moment1_0_max_codebook"
+                        # m1_mins, m1_maxs = scale_dict[m1_min_scale_key], scale_dict[m1_max_scale_key]
                         m1_mins = scale_dict[m1_min_scale_key]
                         ratio_mins, ratio_maxs = scale_dict[ratio_min_scale_key], scale_dict[ratio_max_scale_key]
-                        m1_weight = group_wise_quant_dequant(m1_quant, mins=m1_mins, maxs=None, quant_bits=4, quant=False, rank=rank, world_size=world_size, use_pd=True, symetry=True)
-                        ratio_weight = group_wise_quant_dequant(ratio_quant, mins=ratio_mins, maxs=ratio_maxs, quant_bits=4, quant=False, rank=rank, world_size=world_size, use_pd=True)
+                        m1_weight = group_wise_quant_dequant(
+                            m1_quant,
+                            mins=m1_mins,
+                            maxs=None,
+                            quant_bits=4,
+                            quant=False,
+                            rank=rank,
+                            world_size=world_size,
+                            use_pd=True,
+                            symetry=True,
+                        )
+                        ratio_weight = group_wise_quant_dequant(
+                            ratio_quant,
+                            mins=ratio_mins,
+                            maxs=ratio_maxs,
+                            quant_bits=4,
+                            quant=False,
+                            rank=rank,
+                            world_size=world_size,
+                            use_pd=True,
+                        )
                         # cal m2
-                        #all_positive = paddle.all(ratio_weight > 0)
-                        #if not all_positive:
+                        # all_positive = paddle.all(ratio_weight > 0)
+                        # if not all_positive:
                         #    logger.info(f"{quant_key}'s ratio not all positive, {ratio_weight}, {ratio_weight.mean().item()}, {ratio_weight.max().item()}, {ratio_weight.min().item()}")
 
                         ratio_weight = paddle.square(1.0 / ratio_weight - eps)
-                        #print(m1_weight)
+                        # print(m1_weight)
                         state_dict[quant_key] = ratio_weight
-                        m1_state_dict[quant_key[:-len("moment2_0")] + "moment1_0"] = m1_weight
+                        m1_state_dict[quant_key[: -len("moment2_0")] + "moment1_0"] = m1_weight
 
                     state_dict.update(m1_state_dict)
-
 
             return state_dict
 
@@ -2236,7 +2344,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     filter_dict_keys = None
 
                 state_dict = load_state_dict(
-                    shard_file, tp_actions if pre_tensor_parallel_split else None, filter_dict_keys, ckpt_quant_stage=config.ckpt_quant_stage
+                    shard_file,
+                    tp_actions if pre_tensor_parallel_split else None,
+                    filter_dict_keys,
+                    ckpt_quant_stage=config.ckpt_quant_stage,
                 )
 
                 # convert for fusing or splitting weights
@@ -2559,7 +2670,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 with safe_open(resolved_archive_file, framework="np", device="cpu") as f:
                     loaded_keys = f.keys()
                 tp_actions = cls.get_tensor_parallel_convert_actions(config, loaded_keys)
-                state_dict = load_state_dict(resolved_archive_file, tp_actions, ckpt_quant_stage=config.ckpt_quant_stage)
+                state_dict = load_state_dict(
+                    resolved_archive_file, tp_actions, ckpt_quant_stage=config.ckpt_quant_stage
+                )
             else:
                 state_dict = load_state_dict(resolved_archive_file, ckpt_quant_stage=config.ckpt_quant_stage)
 

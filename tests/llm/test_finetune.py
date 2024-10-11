@@ -64,6 +64,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
 
         with argv_context_guard(finetune_config):
             from run_finetune import main
+
             main()
             # resume from quant checkpoint
             main()

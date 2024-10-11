@@ -35,14 +35,14 @@ from paddlenlp.transformers.model_utils import (
     PretrainedModel,
     _add_variant,
     _load_state_dict_into_model,
+    asymmetry_qdq_weight,
     faster_set_state_dict,
     get_parameter_dtype,
-    load_state_dict,
-    unwrap_model,
-    qdq_weight,
-    asymmetry_qdq_weight,
     group_wise_quant_dequant,
+    load_state_dict,
     merge_int4,
+    qdq_weight,
+    unwrap_model,
 )
 from paddlenlp.transformers.utils import (
     device_guard,
@@ -124,7 +124,8 @@ class UnifiedCheckpointOption(ExplicitEnum):
 
 
 def cal_ratio(m, v, eps=1e-8):
-    return (1/(np.sqrt(v) + eps))
+    return 1 / (np.sqrt(v) + eps)
+
 
 class UnifiedCheckpointHandler:
     def __init__(self, args):
@@ -160,7 +161,7 @@ class UnifiedCheckpointHandler:
         self, state_dict, path, is_sync=True, state_dict_type="model_weight", ckpt_quant_stage="O0"
     ):
         quant = False
-        if ckpt_quant_stage != 'O0':
+        if ckpt_quant_stage != "O0":
             quant = True
         if is_sync:
             for k in list(state_dict.keys()):
@@ -181,7 +182,7 @@ class UnifiedCheckpointHandler:
 
                     quant_weight = None
 
-                    if ckpt_quant_stage == 'O2':
+                    if ckpt_quant_stage == "O2":
                         # m1: wint8, m2: wint8, fusion
                         if momentum2:
                             # moment2
@@ -191,55 +192,57 @@ class UnifiedCheckpointHandler:
                             nonzero_mask = sqrt_m2 != 0.0
                             # outlier flag
                             has_outlier = not np.all(peek_dequant[nonzero_mask] != 0.0)
-                            #has_outlier = True
+                            # has_outlier = True
                             if has_outlier:
-                                #quant_weight = state_dict[k].astype(np.float16)
+                                # quant_weight = state_dict[k].astype(np.float16)
                                 quant_weight = sqrt_m2.astype(np.float16)
                                 quant_bits += k_size * 2
                             else:
-                                codebook_dict[k + '_codebook'] = codebook
+                                codebook_dict[k + "_codebook"] = codebook
                                 quant_bits += k_size
                         elif momentum1:
                             # moment1
                             quant_weight, codebook = qdq_weight(state_dict[k], quant_bit=8)
-                            codebook_dict[k + '_codebook'] = codebook
+                            codebook_dict[k + "_codebook"] = codebook
                             quant_bits += k_size
                         else:
                             quant_weight = state_dict[k]
-                    elif ckpt_quant_stage == 'O1':
+                    elif ckpt_quant_stage == "O1":
                         # m1: wint8, 1/(sqrt(m2)+eps): wint8
                         if momentum2:
                             # m1: m1_quant_weight, m2: ratio
-                            m1_key = k.split('/')[0] + '/moment1_0'
+                            m1_key = k.split("/")[0] + "/moment1_0"
                             ratio = cal_ratio(state_dict[m1_key], state_dict[k])
                             m1_quant, codebook = qdq_weight(state_dict[m1_key], quant_bit=8)
                             quant_weight, mins, maxs = asymmetry_qdq_weight(ratio, quant_bit=8)
                             state_dict[m1_key] = m1_quant
-                            codebook_dict[m1_key + '_codebook'] = codebook
-                            codebook_dict[k + '_min_codebook'] = mins
-                            codebook_dict[k + '_max_codebook'] = maxs
+                            codebook_dict[m1_key + "_codebook"] = codebook
+                            codebook_dict[k + "_min_codebook"] = mins
+                            codebook_dict[k + "_max_codebook"] = maxs
                         elif not momentum1:
                             quant_weight = state_dict[k]
-                    elif ckpt_quant_stage == 'O3':
+                    elif ckpt_quant_stage == "O3":
                         # m1: bw-wint4, 1/(sqrt(m2)+eps): bw-wint4
                         if momentum2:
                             if len(state_dict[k].shape) < 2:
                                 continue
                             # m1: m1_quant_weight, m2: ratio
-                            m1_key = k.split('/')[0] + '/moment1_0'
+                            m1_key = k.split("/")[0] + "/moment1_0"
                             ratio = cal_ratio(state_dict[m1_key], state_dict[k])
-                            m1_quant, m1_mins = group_wise_quant_dequant(state_dict[m1_key], quant_bits=4, symetry=True)
+                            m1_quant, m1_mins = group_wise_quant_dequant(
+                                state_dict[m1_key], quant_bits=4, symetry=True
+                            )
                             quant_weight, r_mins, r_maxs = group_wise_quant_dequant(ratio, quant_bits=4)
                             quant_weight = merge_int4(m1_quant, quant_weight)
-                            codebook_dict[m1_key + '_min_codebook'] = m1_mins
-                            #codebook_dict[m1_key + '_max_codebook'] = m1_maxs
-                            codebook_dict[k + '_min_codebook'] = r_mins
-                            codebook_dict[k + '_max_codebook'] = r_maxs
+                            codebook_dict[m1_key + "_min_codebook"] = m1_mins
+                            # codebook_dict[m1_key + '_max_codebook'] = m1_maxs
+                            codebook_dict[k + "_min_codebook"] = r_mins
+                            codebook_dict[k + "_max_codebook"] = r_maxs
                             del_key.append(m1_key)
                         elif not momentum1:
                             quant_weight = state_dict[k]
 
-                    #print(f'{k}: {state_dict[k].dtype}')
+                    # print(f'{k}: {state_dict[k].dtype}')
                     if quant_weight is not None:
                         state_dict[k] = quant_weight
 
@@ -256,9 +259,15 @@ class UnifiedCheckpointHandler:
                 all_bits = model_numel * 7.0
                 quant_bits_mw = quant_bits + model_numel * 6.0
                 quant_bits = quant_bits + model_numel * 2.0
-                logger.info(f"all bits: {all_bits.item()}, quant bits: {quant_bits.item()}, quant bits mw: {quant_bits_mw.item()}")
-                logger.info(f"quant ratio (w/o Master Weight): {(all_bits.item() - quant_bits.item()) / all_bits.item()}")
-                logger.info(f"quant ratio (w/ Master Weight): {(all_bits.item() - quant_bits_mw.item()) / all_bits.item()}")
+                logger.info(
+                    f"all bits: {all_bits.item()}, quant bits: {quant_bits.item()}, quant bits mw: {quant_bits_mw.item()}"
+                )
+                logger.info(
+                    f"quant ratio (w/o Master Weight): {(all_bits.item() - quant_bits.item()) / all_bits.item()}"
+                )
+                logger.info(
+                    f"quant ratio (w/ Master Weight): {(all_bits.item() - quant_bits_mw.item()) / all_bits.item()}"
+                )
 
             safe_save_file(state_dict, path, metadata={"format": "np"})
         else:
@@ -736,7 +745,11 @@ class UnifiedCheckpointHandler:
 
         # save checkpoint
         self._file_save_async_or_sync(
-            state_dict, path=os.path.join(output_dir, weight_filename), is_sync=True, state_dict_type="model_weight", ckpt_quant_stage=model_to_save.config.ckpt_quant_stage,
+            state_dict,
+            path=os.path.join(output_dir, weight_filename),
+            is_sync=True,
+            state_dict_type="model_weight",
+            ckpt_quant_stage=model_to_save.config.ckpt_quant_stage,
         )
 
         if isinstance(model_to_save, PrefixModelForCausalLM):
@@ -853,6 +866,7 @@ class UnifiedCheckpointHandler:
 
         dist.barrier()
 
+
 def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, safe_serialization=False):
     """
     Only dataset_rank == 0 can enter this function.
@@ -911,7 +925,11 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
                 tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
         # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
         state_dict = load_state_dict(
-            shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys, device="expected", ckpt_quant_stage=model.config.ckpt_quant_stage
+            shard_file,
+            tp_actions if pre_tensor_parallel_split else None,
+            expected_keys,
+            device="expected",
+            ckpt_quant_stage=model.config.ckpt_quant_stage,
         )
 
         if not pre_tensor_parallel_split:
@@ -1095,10 +1113,22 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
                         tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)
 
                     # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-                    state_dict = load_state_dict(shard_file, tp_actions, expected_keys, device="expected", ckpt_quant_stage=model.config.ckpt_quant_stage)
+                    state_dict = load_state_dict(
+                        shard_file,
+                        tp_actions,
+                        expected_keys,
+                        device="expected",
+                        ckpt_quant_stage=model.config.ckpt_quant_stage,
+                    )
                 else:
                     # for pipeline model, we don't need to use tp_actions
-                    state_dict = load_state_dict(shard_file, None, expected_keys, device="expected", ckpt_quant_stage=model.config.ckpt_quant_stage)
+                    state_dict = load_state_dict(
+                        shard_file,
+                        None,
+                        expected_keys,
+                        device="expected",
+                        ckpt_quant_stage=model.config.ckpt_quant_stage,
+                    )
 
             returned_state_dict.update(state_dict)
             # force memory release
@@ -1119,8 +1149,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         logger.info("converting model weights to master weights done.")
         has_master_weights = True
         returned_optim_state_dict["master_weights"] = {}
-    
-    
+
     # rename optimizer param
     for key in list(state_dict_optim.keys()):
         key_name = key.split("/")
@@ -1832,7 +1861,9 @@ def load_single_card_checkpoint(args, model, resume_from_checkpoint: str):
     if len(missing_keys) > 0:
         raise ValueError(f"Missing keys: {missing_keys}")
 
-    state_dict = load_state_dict(resolved_archive_file[0], None, expected_keys, ckpt_quant_stage=model.config.ckpt_quant_stage)
+    state_dict = load_state_dict(
+        resolved_archive_file[0], None, expected_keys, ckpt_quant_stage=model.config.ckpt_quant_stage
+    )
     error_msgs = _load_state_dict_into_model(model, state_dict, "")
     del state_dict
     gc.collect()
@@ -1862,9 +1893,13 @@ def load_single_card_optimizer(args, model, optimizer, resume_from_checkpoint: s
         )
         expected_keys_mw = sharded_metadata_mw["all_optimizer_keys"]
 
-    state_dict_optim = load_state_dict(resolved_archive_file[0], None, expected_keys, ckpt_quant_stage=model.config.ckpt_quant_stage)
+    state_dict_optim = load_state_dict(
+        resolved_archive_file[0], None, expected_keys, ckpt_quant_stage=model.config.ckpt_quant_stage
+    )
     if has_master_weights:
-        state_dict_optim_mw = load_state_dict(resolved_archive_file_mw[0], None, expected_keys_mw, ckpt_quant_stage=model.config.ckpt_quant_stage)
+        state_dict_optim_mw = load_state_dict(
+            resolved_archive_file_mw[0], None, expected_keys_mw, ckpt_quant_stage=model.config.ckpt_quant_stage
+        )
 
     for key in list(state_dict_optim.keys()):
         key_name = key.split("/")
@@ -2134,9 +2169,9 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
 
     if tp_rank == 0:
         quant = False
-        if model_to_save.config.ckpt_quant_stage != '0':
+        if model_to_save.config.ckpt_quant_stage != "0":
             quant = True
-        if not quant or not is_optimizer:    
+        if not quant or not is_optimizer:
             tensor_bytes_dict = {}
             model_state_dict = get_expected_state_dict(model_to_save)
             for (k, v) in state_dict.items():
@@ -2202,10 +2237,10 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
                     current_block = []
                     current_block_size = 0
 
-                current_block.append(key + '/moment1_0')
-                current_block.append(key + '/moment2_0')
-                current_block.append(key + '/beta1_pow_acc_0')
-                current_block.append(key + '/beta2_pow_acc_0')
+                current_block.append(key + "/moment1_0")
+                current_block.append(key + "/moment2_0")
+                current_block.append(key + "/beta1_pow_acc_0")
+                current_block.append(key + "/beta2_pow_acc_0")
                 current_block_size += weight_size
                 total_size += weight_size
 
