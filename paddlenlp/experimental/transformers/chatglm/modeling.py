@@ -294,19 +294,19 @@ class ChatGLMStackDyBatch(nn.Layer):
         time_step=None,
         **kwargs,
     ):
+        is_decoder = cache is not None
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
             batch_size, seq_length = input_ids.shape[:2]
         elif inputs_embeds is not None:
-            batch_size, seq_length, _ = inputs_embeds.shape[:2]
+            batch_size, seq_length, _ = inputs_embeds.shape[:3]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
-        encode_seq_length = input_ids.shape[1]
-        seq_lens = seq_len_decoder if encode_seq_length == 1 else seq_len_encoder
+        seq_lens = seq_len_decoder if is_decoder else seq_len_encoder
 
-        if encode_seq_length > 1:
+        if not is_decoder:
             ids_remove_padding, padding_offset, cum_offsets = self.remove_padding(input_ids, seq_len_encoder)
         else:
             ids_remove_padding = input_ids
@@ -354,7 +354,7 @@ class ChatGLMStackDyBatch(nn.Layer):
         hidden_states = self.input_layernorm(hidden_states)
 
         position_offset = 0
-        if encode_seq_length > 1 and pre_caches is not None:
+        if not is_decoder and pre_caches is not None:
             position_offset = 128
 
         with dy2st_nocheck_guard_context():
@@ -377,6 +377,7 @@ class ChatGLMStackDyBatch(nn.Layer):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict, use_structured_name=True):
+        self.transformer_block.init_weight()
         dtype = paddle.get_default_dtype()
         config = self.config
         embed_dim = config.hidden_size

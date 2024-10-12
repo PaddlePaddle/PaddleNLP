@@ -122,7 +122,7 @@ class BlendableDataset(paddle.io.Dataset):
             dataset_index = np.zeros(self.size, dtype=np.uint8)
             dataset_sample_index = np.zeros(self.size, dtype=np.int64)
 
-            from tool_helpers import helpers
+            from fast_dataindex import helpers
 
             helpers.build_blending_indices(
                 dataset_index,
@@ -782,7 +782,7 @@ def _build_index_mappings(
             # Use C++ implementation for speed.
             # First compile and then import.
             # from megatron.data import helpers
-            from tool_helpers import helpers
+            from fast_dataindex import helpers
 
             assert doc_idx.dtype == np.int32
             assert sizes.dtype == np.int32

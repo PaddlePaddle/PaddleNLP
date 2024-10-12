@@ -21,7 +21,7 @@ from paddle.utils.cpp_extension import CUDAExtension, setup
 
 def clone_git_repo(version, repo_url, destination_path):
     try:
-        subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path], check=True)
+        subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path, "--depth=1"], check=True)
         return True
     except subprocess.CalledProcessError as e:
         print(f"Git clone {repo_url} operation failed with the following error: {e}")
@@ -107,6 +107,7 @@ sources = [
     "./gpu/dequant_int8.cu",
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
+    "./gpu/sample_kernels/top_p_sampling_reject.cu",
 ]
 
 cutlass_dir = "third_party/cutlass"
@@ -131,12 +132,15 @@ nvcc_compile_args += [
     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
     "-U__CUDA_NO_BFLOAT162_OPERATORS__",
     "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+    "-Igpu",
     "-Igpu/cutlass_kernels",
+    "-Igpu/fp8_gemm_with_cutlass",
+    "-Igpu/cutlass_kernels/fp8_gemm_fused/autogen",
     "-Ithird_party/cutlass/include",
     "-Ithird_party/nlohmann_json/single_include",
-    "-Igpu/fp8_gemm_with_cutlass",
-    "-Igpu",
+    "-Igpu/sample_kernels",
 ]
+
 cc = get_sm_version()
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]

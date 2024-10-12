@@ -39,6 +39,17 @@ from .trainer_utils import (
     ShardingOption,
 )
 
+try:
+    from paddle.distributed import in_auto_parallel_align_mode
+except Exception:
+
+    def in_auto_parallel_align_mode():
+        """
+        hack for paddlenlp develop branch.
+        """
+        return False
+
+
 __all__ = [
     "default_logdir",
     "TrainingArguments",
@@ -867,8 +878,18 @@ class TrainingArguments:
     release_grads: Optional[bool] = field(
         default=False, metadata={"help": "Whether to release gradients during training. Default is `False`."}
     )
+    skip_data_intervals: Optional[List[List[int]]] = field(
+        default=None,
+        metadata={"help": "The intervals to skip, pass start global step and end global step at each interval"},
+    )
 
     def __post_init__(self):
+        if in_auto_parallel_align_mode():
+            self.max_grad_norm = 0.0
+            os.environ["FLAGS_max_inplace_grad_add"] = "65536"
+            os.environ["FLAGS_embedding_deterministic"] = "1"
+            os.environ["FLAGS_cudnn_deterministic"] = "1"
+
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size() > 1:
             self.local_rank = env_local_rank

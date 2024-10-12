@@ -13,17 +13,24 @@
 # limitations under the License.
 
 # llama2-7B
-# nohup python ./gpu/test_fp8_gemm.py \
+# nohup python ./utils/tune_cutlass_fp8_gemm.py \
 #         --m_min 32 \
 #         --m_max 2049 \
 #         --n 4096 12288 \
 #         --k 4096 11008 \
-#         >  tune_gemm.log 2>&1 &
+#         >  tune_fp8_gemm.log 2>&1 &
 
 # llama3-8B
-nohup python ./gpu/test_fp8_gemm.py \
+nohup python ./utils/tune_cutlass_fp8_gemm.py \
         --m_min 32 \
         --m_max 32768 \
         --n 4096 6144 \
         --k 4096 14336 \
-        >  tune_gemm.log 2>&1 &
+        >  tune_fp8_gemm.log 2>&1 &
+
+# nohup python ./utils/tune_cutlass_fp8_dual_gemm.py \
+#         --m_min 32 \
+#         --m_max 32768 \
+#         --n 14336 \
+#         --k 4096 \
+#         >  tune_fp8_dual_gemm.log 2>&1 &
