@@ -931,6 +931,7 @@ class GenerationD2STestMixin:
         tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
         if tokenizer.__class__.__name__ == "LlamaTokenizer":
             tokenizer.pad_token = tokenizer.eos_token if tokenizer.eos_token else "<pad>"
+
         model = self.CausalLMClass.from_pretrained(self.internal_testing_model)
         model_kwargs = tokenizer(
             self.article,
