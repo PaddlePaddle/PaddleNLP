@@ -716,16 +716,24 @@ class MixtralInferenceModel(MixtralPretrainedModel):
             if "a8w8" in self.quant_type:
                 if self.shift_smooth_all_linears:
                     self.transformer_block.linear_shifts[idx].set_value(
-                        paddle.to_tensor(state_dict["mixtral.layers.{}.self_attn.o_proj.shift_bias".format(idx)])
+                        paddle.to_tensor(
+                            state_dict["mixtral.layers.{}.self_attn.o_proj.shift_bias".format(idx)]
+                        ).astype(paddle.get_default_dtype())
                     )
                     self.transformer_block.linear_smooths[idx].set_value(
-                        paddle.to_tensor(state_dict["mixtral.layers.{}.self_attn.o_proj.smooth_weight".format(idx)])
+                        paddle.to_tensor(
+                            state_dict["mixtral.layers.{}.self_attn.o_proj.smooth_weight".format(idx)]
+                        ).astype(paddle.get_default_dtype())
                     )
                     self.transformer_block.ffn2_shifts[idx].set_value(
-                        paddle.to_tensor(state_dict["mixtral.layers.{}.mlp.down_proj.shift_bias".format(idx)])
+                        paddle.to_tensor(state_dict["mixtral.layers.{}.mlp.down_proj.shift_bias".format(idx)]).astype(
+                            paddle.get_default_dtype()
+                        )
                     )
                     self.transformer_block.ffn2_smooths[idx].set_value(
-                        paddle.to_tensor(state_dict["mixtral.layers.{}.mlp.down_proj.smooth_weight".format(idx)])
+                        paddle.to_tensor(
+                            state_dict["mixtral.layers.{}.mlp.down_proj.smooth_weight".format(idx)]
+                        ).astype(paddle.get_default_dtype())
                     )
 
                 if self.shift:
