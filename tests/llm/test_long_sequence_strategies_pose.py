@@ -4873,7 +4873,7 @@ class TestLongSequenceStrategiesTest(LLMTest, unittest.TestCase):
         model_config.use_long_sequence_strategies = True
         model_config.long_sequence_strategy_type = self.strategy_type
         model_config.long_sequence_strategy_name = self.strategy_name
-        max_position_embeddings = 10 if self.strategy_name == "YaRNScalingRotaryEmbedding" else 2048
+        # max_position_embeddings = 10 if self.strategy_name == "YaRNScalingRotaryEmbedding" else 2048
         scaling_factor = 4
         model_config.long_sequence_init_args = {
             "dim": int(model_config.hidden_size / model_config.num_attention_heads),
