@@ -321,7 +321,7 @@ class AutoTokenizer:
             return tokenizer_class
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, *inputs, **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         """
         Creates an instance of `AutoTokenizer`. Related resources are loaded by
         specifying name of a built-in pretrained model, or a community-contributed
@@ -335,7 +335,7 @@ class AutoTokenizer:
                 - Name of a community-contributed pretrained model.
                 - Local directory path which contains tokenizer related resources
                   and tokenizer config file ("tokenizer_config.json").
-            *inputs (tuple): position arguments for model `__init__`. If provided,
+            *model_args (tuple): position arguments for model `__init__`. If provided,
                 use these as position argument values for tokenizer initialization.
             **kwargs (dict): keyword arguments for model `__init__`. If provided,
                 use these to update pre-defined keyword argument values for tokenizer
@@ -391,7 +391,7 @@ class AutoTokenizer:
                 raise ValueError(
                     f"Tokenizer class {tokenizer_class_candidate} does not exist or is not currently imported."
                 )
-            return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
+            return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
         # TODO: if model is an encoder decoder
 
@@ -407,10 +407,10 @@ class AutoTokenizer:
             else:
                 tokenizer_class_fast = None
             if tokenizer_class_fast and (use_fast or tokenizer_class_py is None):
-                return tokenizer_class_fast.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
+                return tokenizer_class_fast.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
             else:
                 if tokenizer_class_py is not None:
-                    return tokenizer_class_py.from_pretrained(pretrained_model_name_or_path, *inputs, **kwargs)
+                    return tokenizer_class_py.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
                 else:
                     raise ValueError(
                         "This tokenizer cannot be instantiated. Please make sure you have `sentencepiece` installed "

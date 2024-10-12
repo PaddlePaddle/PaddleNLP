@@ -102,7 +102,7 @@ class AutoConfigTest(unittest.TestCase):
             # Wrong model type will raise an error
             with self.assertRaises(ValueError):
                 AutoConfig.register("model", CustomConfig)
-            # Trying to register something existing in the Transformers library will raise an error
+            # Trying to register something existing in the PaddleNLP library will raise an error
             with self.assertRaises(ValueError):
                 AutoConfig.register("bert", BertConfig)
 

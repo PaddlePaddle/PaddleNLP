@@ -336,7 +336,6 @@ def bos_aistudio_hf_file_exist(
             token=token,  # donot need token
             endpoint=endpoint,
         )
-
     return out
 
 
