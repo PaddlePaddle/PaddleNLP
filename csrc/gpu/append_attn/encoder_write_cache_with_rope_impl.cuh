@@ -699,8 +699,8 @@ __global__ void append_write_cache_kv_c8_qkv(
     const int *__restrict__ cum_offsets,
     const int *__restrict__ block_tables,
     const int max_seq_len,
-    const int max_block_num_per_seq,
-    const int q_num_heads,
+    const int max_blocks_per_seq,
+    const int num_heads,
     const int kv_num_heads) {
   constexpr uint32_t num_vecs_per_head = HEAD_DIM / num_elems_per_128b<T>();
   constexpr uint32_t pad_len = BLOCK_SIZE;
@@ -716,7 +716,7 @@ __global__ void append_write_cache_kv_c8_qkv(
   }
   const int *block_table_now = nullptr;
 
-  block_table_now = block_tables + batch_id * max_block_num_per_seq;
+  block_table_now = block_tables + batch_id * max_blocks_per_seq;
 
   const uint32_t num_rows_per_block =
       NUM_WARPS * num_frags_z * 16;  // BLOCK_SIZE
@@ -732,7 +732,7 @@ __global__ void append_write_cache_kv_c8_qkv(
   // 前 start_len % pad_len 部分不搬，
   const uint32_t start_token_idx =
       batch_id * max_seq_len - cum_offsets[batch_id];
-  const uint32_t kv_batch_stride = (q_num_heads + 2 * kv_num_heads) * HEAD_DIM;
+  const uint32_t kv_batch_stride = (num_heads + 2 * kv_num_heads) * HEAD_DIM;
   const uint32_t kv_h_stride = HEAD_DIM;
   __shared__ T k_smem_ori[num_rows_per_block * HEAD_DIM];
   __shared__ T v_smem_ori[num_rows_per_block * HEAD_DIM];
@@ -764,11 +764,11 @@ __global__ void append_write_cache_kv_c8_qkv(
                                         tile_id * num_rows_per_block +
                                         wid * num_frags_z * 16 + tid / 8;
   uint32_t k_read_idx = real_start_token_idx * kv_batch_stride +
-                        (q_num_heads + kv_head_idx) * kv_h_stride +
+                        (num_heads + kv_head_idx) * kv_h_stride +
                         tid % 8 * num_elems_per_128b<T>();
   uint32_t v_read_idx =
       real_start_token_idx * kv_batch_stride +
-      (q_num_heads + kv_num_heads + kv_head_idx) * kv_h_stride +
+      (num_heads + kv_num_heads + kv_head_idx) * kv_h_stride +
       tid % 8 * num_elems_per_128b<T>();
 #pragma unroll
   for (uint32_t fz = 0; fz < num_frags_z; ++fz) {
@@ -961,8 +961,8 @@ __global__ void append_write_cache_kv_c4_qkv(
     const int *__restrict__ cum_offsets,
     const int *__restrict__ block_tables,
     const int max_seq_len,
-    const int max_block_num_per_seq,
-    const int q_num_heads,
+    const int max_blocks_per_seq,
+    const int num_heads,
     const int kv_num_heads) {
   constexpr uint32_t num_vecs_per_head = HEAD_DIM / num_elems_per_128b<T>();
   constexpr uint32_t pad_len = BLOCK_SIZE;
@@ -976,7 +976,7 @@ __global__ void append_write_cache_kv_c4_qkv(
   }
   const int *block_table_now = nullptr;
 
-  block_table_now = block_tables + batch_id * max_block_num_per_seq;
+  block_table_now = block_tables + batch_id * max_blocks_per_seq;
 
   const uint32_t num_rows_per_block =
       NUM_WARPS * num_frags_z * 16;  // BLOCK_SIZE
@@ -992,7 +992,7 @@ __global__ void append_write_cache_kv_c4_qkv(
   // 前 start_len % pad_len 部分不搬，
   const uint32_t start_token_idx =
       batch_id * max_seq_len - cum_offsets[batch_id];
-  const uint32_t kv_batch_stride = (q_num_heads + 2 * kv_num_heads) * HEAD_DIM;
+  const uint32_t kv_batch_stride = (num_heads + 2 * kv_num_heads) * HEAD_DIM;
   const uint32_t kv_h_stride = HEAD_DIM;
   __shared__ T k_smem_ori[num_rows_per_block * HEAD_DIM];
   __shared__ T v_smem_ori[num_rows_per_block * HEAD_DIM];
@@ -1040,11 +1040,11 @@ __global__ void append_write_cache_kv_c4_qkv(
                                         tile_id * num_rows_per_block +
                                         wid * num_frags_z * 16 + tid / 8;
   uint32_t k_read_idx = real_start_token_idx * kv_batch_stride +
-                        (q_num_heads + kv_head_idx) * kv_h_stride +
+                        (num_heads + kv_head_idx) * kv_h_stride +
                         tid % 8 * num_elems_per_128b<T>();
   uint32_t v_read_idx =
       real_start_token_idx * kv_batch_stride +
-      (q_num_heads + kv_num_heads + kv_head_idx) * kv_h_stride +
+      (num_heads + kv_num_heads + kv_head_idx) * kv_h_stride +
       tid % 8 * num_elems_per_128b<T>();
 #pragma unroll
   for (uint32_t fz = 0; fz < num_frags_z; ++fz) {
@@ -1568,23 +1568,23 @@ void gqa_rotary_qk_variable(T *qkv_out, // [token_num, 3, num_head, dim_head]
 }
 
 template <typename T>
-void CascadeAppendWriteCacheKVQKV(const paddle::Tensor& qkv, // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 * gqa_group_size, head_dim] if GQA)
+void CascadeAppendWriteCacheKVQKV(const AppendAttnMetaData& meta_data,
+                                  const paddle::Tensor& qkv, // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 * gqa_group_size, head_dim] if GQA)
                                   const paddle::Tensor& block_table,
                                   const paddle::Tensor& padding_offsets,
                                   const paddle::Tensor& seq_lens_encoder,
                                   const paddle::Tensor& seq_lens_decoder,
                                   const int max_seq_len,
-                                  const int num_heads,
-                                  const int head_dim,
-                                  const int kv_num_heads,
                                   cudaStream_t& stream,
                                   paddle::Tensor *key_cache_out, 
                                   paddle::Tensor *value_cache_out) {
-  auto qkv_dims = qkv.dims();
-  const int max_blocks_per_seq = block_table.dims()[1];
-  const int num_tokens = qkv_dims[0];
+  auto max_blocks_per_seq = meta_data.max_blocks_per_seq;
+  auto num_tokens = meta_data.token_nums;
+  auto num_heads = meta_data.q_num_heads;
+  auto kv_num_heads = meta_data.kv_num_heads;
+  auto head_dim = meta_data.head_dims;
+  auto block_size = meta_data.block_size;
 
-  const int32_t block_size = key_cache_out->dims()[2];
   const uint32_t elem_nums = num_tokens * 2 * kv_num_heads * head_dim; // just k and v
   constexpr int PackSize = 16 / sizeof(T);
   const int pack_num = elem_nums / PackSize;
@@ -1609,7 +1609,8 @@ void CascadeAppendWriteCacheKVQKV(const paddle::Tensor& qkv, // [token_num, 3, n
 }
 
 template <typename T, uint32_t HEAD_DIM, uint32_t BLOCK_SIZE>
-void CascadeAppendWriteCacheKVC8QKV(const paddle::Tensor &cache_k, // [max_block_num, num_heads, block_size, head_dim]
+void CascadeAppendWriteCacheKVC8QKV(const AppendAttnMetaData& meta_data,
+                                    const paddle::Tensor &cache_k, // [max_block_num, num_heads, block_size, head_dim]
                                     const paddle::Tensor &cache_v, // [max_block_num, num_heads, head_dim, block_size]
                                     const paddle::Tensor &qkv, // [token_num, num_heads, head_dim]
                                     const paddle::Tensor &cache_k_scale, // [num_kv_heads, head_dim]
@@ -1623,18 +1624,14 @@ void CascadeAppendWriteCacheKVC8QKV(const paddle::Tensor &cache_k, // [max_block
                                     const paddle::Tensor &tile_ids_per_batch,
                                     int num_blocks_x_cpu,
                                     int max_seq_len,
-                                    int q_num_heads,
-                                    int kv_num_heads,
                                     cudaStream_t& stream,
                                     paddle::Tensor *cache_k_out,
                                     paddle::Tensor *cache_v_out) {
-  const auto &qkv_dims = qkv.dims();
-  const auto &cache_k_dims = cache_k.dims();
-  const auto &cum_offsets_dims = cum_offsets.dims();
-  const uint32_t token_num = qkv_dims[0];
-  const uint32_t num_heads = kv_num_heads;
-  const uint32_t bsz = cum_offsets_dims[0];
-  const int max_block_num_per_seq = block_table.dims()[1];
+  auto max_blocks_per_seq = meta_data.max_blocks_per_seq;
+  auto num_tokens = meta_data.token_nums;
+  auto num_heads = meta_data.q_num_heads;
+  auto kv_num_heads = meta_data.kv_num_heads;
+  auto head_dim = meta_data.head_dims;
 
   const uint32_t pad_len = BLOCK_SIZE;
 
@@ -1666,14 +1663,15 @@ void CascadeAppendWriteCacheKVC8QKV(const paddle::Tensor &cache_k, // [max_block
     cum_offsets.data<int>(),
     block_table.data<int>(),
     max_seq_len,
-    max_block_num_per_seq,
-    q_num_heads,
+    max_blocks_per_seq,
+    num_heads,
     kv_num_heads
   );
 }
 
 template <typename T, uint32_t HEAD_DIM, uint32_t BLOCK_SIZE>
-void CascadeAppendWriteCacheKVC4QKV(const paddle::Tensor &cache_k, // [max_block_num, num_heads, block_size, head_dim]
+void CascadeAppendWriteCacheKVC4QKV(const AppendAttnMetaData& meta_data,
+                                    const paddle::Tensor &cache_k, // [max_block_num, num_heads, block_size, head_dim]
                                     const paddle::Tensor &cache_v, // [max_block_num, num_heads, head_dim, block_size]
                                     const paddle::Tensor &qkv, // [token_num, num_heads, head_dim]
                                     const paddle::Tensor &cache_k_scale, // [num_kv_heads, head_dim]
@@ -1689,18 +1687,14 @@ void CascadeAppendWriteCacheKVC4QKV(const paddle::Tensor &cache_k, // [max_block
                                     const paddle::Tensor &tile_ids_per_batch,
                                     int num_blocks_x_cpu,
                                     int max_seq_len,
-                                    int q_num_heads,
-                                    int kv_num_heads,
                                     cudaStream_t& stream,
                                     paddle::Tensor *cache_k_out,
                                     paddle::Tensor *cache_v_out) {
-  const auto &qkv_dims = qkv.dims();
-  const auto &cache_k_dims = cache_k.dims();
-  const auto &cum_offsets_dims = cum_offsets.dims();
-  const uint32_t token_num = qkv_dims[0];
-  const uint32_t num_heads = kv_num_heads;
-  const uint32_t bsz = cum_offsets_dims[0];
-  const int max_block_num_per_seq = block_table.dims()[1];
+  auto max_blocks_per_seq = meta_data.max_blocks_per_seq;
+  auto num_tokens = meta_data.token_nums;
+  auto num_heads = meta_data.q_num_heads;
+  auto kv_num_heads = meta_data.kv_num_heads;
+  auto head_dim = meta_data.head_dims;
 
   const uint32_t pad_len = BLOCK_SIZE;
 
@@ -1733,8 +1727,8 @@ void CascadeAppendWriteCacheKVC4QKV(const paddle::Tensor &cache_k, // [max_block
     cum_offsets.data<int>(),
     block_table.data<int>(),
     max_seq_len,
-    max_block_num_per_seq,
-    q_num_heads,
+    max_blocks_per_seq,
+    num_heads,
     kv_num_heads
   );
 }

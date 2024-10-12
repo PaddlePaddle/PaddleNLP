@@ -13,10 +13,12 @@
 // limitations under the License.
 #pragma once
 #include "append_attention_impl.cuh"
+#include "utils.cuh"
 // #define DEBUG_DEC_ATTN
 
 template <typename T, typename OutT>
 void CascadeAppendAttentionKernel(
+    const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,  // [token_num, num_heads, head_dim]
     const paddle::Tensor& cache_k,  // [max_block_num, num_heads, block_size, head_dim]
     const paddle::Tensor& cache_v,  // [max_block_num, num_heads, head_dim, block_size]
@@ -40,9 +42,6 @@ void CascadeAppendAttentionKernel(
     const int block_shape_q,
     const int max_seq_len,
     const int max_dec_len,
-    const int num_heads,
-    const int kv_num_heads,
-    const int head_dim,
     const float in_scale,
     const int max_partition_size,
     const int encoder_max_partition_size,
@@ -52,13 +51,12 @@ void CascadeAppendAttentionKernel(
     const bool enable_prefill,
     cudaStream_t& stream,
     paddle::Tensor* out) {
-  const auto& q_dims = qkv.dims();
-  const auto& k_dims = cache_k.dims();
-  const auto& cum_offsets_dims = cum_offsets.dims();
-  const uint32_t token_num = q_dims[0];
-  const uint32_t block_size = k_dims[2];
-  const uint32_t bsz = cum_offsets_dims[0];
-  const uint32_t group_size = num_heads / kv_num_heads;
+  const auto token_num = meta_data.token_nums;
+  const auto block_size = meta_data.block_size;
+  const auto bsz = meta_data.batch_size;
+  const auto num_heads = meta_data.q_num_heads;
+  const auto group_size = meta_data.q_num_heads / meta_data.kv_num_heads;
+  const auto head_dim = meta_data.head_dims;
 
   if (cache_quant_type_str == "none") {
     DISPATCH_CAUSAL(causal, CAUSAL,
@@ -69,6 +67,7 @@ void CascadeAppendAttentionKernel(
                         {DISPATCH_BLOCKSHAPE_Q(block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, 
                         {MultiQueryAppendAttention<T, GROUP_SIZE, HEAD_DIM, BLOCK_SIZE, CAUSAL,
                             BLOCK_SHAPE_Q, NUM_WARP_Q, OutT, ENABLE_PREFILL>(
+                                meta_data,
                                 qkv,
                                 cache_k,
                                 cache_v,
@@ -86,8 +85,6 @@ void CascadeAppendAttentionKernel(
                                 num_blocks,
                                 max_seq_len,
                                 max_dec_len,
-                                num_heads,
-                                kv_num_heads,
                                 in_scale,
                                 max_partition_size,
                                 encoder_max_partition_size,
@@ -105,6 +102,7 @@ void CascadeAppendAttentionKernel(
                         {DISPATCH_BLOCKSHAPE_Q(block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q, {
                             MultiQueryAppendC8Attention<T, GROUP_SIZE, HEAD_DIM, BLOCK_SIZE, CAUSAL,
                                 BLOCK_SHAPE_Q, NUM_WARP_Q, OutT, ENABLE_PREFILL>(
+                                    meta_data,
                                     qkv,
                                     cache_k,
                                     cache_v,
@@ -124,8 +122,6 @@ void CascadeAppendAttentionKernel(
                                     num_blocks,
                                     max_seq_len,
                                     max_dec_len,
-                                    num_heads,
-                                    kv_num_heads,
                                     in_scale,
                                     max_partition_size,
                                     encoder_max_partition_size,
@@ -143,6 +139,7 @@ void CascadeAppendAttentionKernel(
                         {DISPATCH_BLOCKSHAPE_Q(block_shape_q, BLOCK_SHAPE_Q, NUM_WARP_Q,
                             {MultiQueryAppendC4Attention<T, GROUP_SIZE, HEAD_DIM, BLOCK_SIZE, CAUSAL,
                                 BLOCK_SHAPE_Q, NUM_WARP_Q, OutT, ENABLE_PREFILL>(
+                                    meta_data,
                                     qkv,
                                     cache_k,
                                     cache_v,
@@ -164,8 +161,6 @@ void CascadeAppendAttentionKernel(
                                     num_blocks,
                                     max_seq_len,
                                     max_dec_len,
-                                    num_heads,
-                                    kv_num_heads,
                                     in_scale,
                                     max_partition_size,
                                     encoder_max_partition_size,

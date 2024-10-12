@@ -3740,8 +3740,8 @@ template <typename T,
           uint32_t NUM_WARP_Q,
           typename OutT,
           bool ENABLE_PREFILL = true>
-
 void MultiQueryAppendAttention(
+    const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,
     const paddle::Tensor& cache_k,
     const paddle::Tensor& cache_v,
@@ -3759,8 +3759,6 @@ void MultiQueryAppendAttention(
     const int num_blocks_x_cpu,
     const int max_seq_len,
     const int max_dec_len,
-    const int num_heads,
-    const int kv_num_heads,
     const float in_scale,
     const int max_partition_size,
     const int encoder_max_partition_size,
@@ -3771,12 +3769,11 @@ void MultiQueryAppendAttention(
   using NV_TYPE = typename cascade_attn_type_traits<T>::type;
   using OUT_NV_TYPE = typename cascade_attn_type_traits<OutT>::type;
 
-  const auto& q_dims = qkv.dims();
-  const auto& k_dims = cache_k.dims();
-  const auto& cum_offsets_dims = cum_offsets.dims();
-  const uint32_t token_num = q_dims[0];
-  const uint32_t bsz = cum_offsets_dims[0];
-  const uint32_t max_block_num_per_seq = block_table.dims()[1];
+  auto num_heads = meta_data.q_num_heads;
+  auto kv_num_heads = meta_data.kv_num_heads;
+  auto token_num = meta_data.token_nums;
+  auto bsz = meta_data.batch_size;
+  auto max_block_num_per_seq = meta_data.max_blocks_per_seq;
 
   constexpr uint32_t num_warps = 4;
   constexpr uint32_t NUM_WARP_KV = num_warps / NUM_WARP_Q;
@@ -4223,6 +4220,7 @@ template <typename T,
           typename OutT = T,
           bool ENABLE_PREFILL = true>
 void MultiQueryAppendC8Attention(
+    const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,
     const paddle::Tensor& cache_k,
     const paddle::Tensor& cache_v,
@@ -4242,8 +4240,6 @@ void MultiQueryAppendC8Attention(
     const int num_blocks_x_cpu,
     const int max_seq_len,
     const int max_dec_len,
-    const int num_heads,
-    const int kv_num_heads,
     const float in_scale,
     const int max_partition_size,
     const int encoder_max_partition_size,
@@ -4254,12 +4250,11 @@ void MultiQueryAppendC8Attention(
   using NV_TYPE = typename cascade_attn_type_traits<T>::type;
   using OUT_NV_TYPE = typename cascade_attn_type_traits<OutT>::type;
 
-  const auto& q_dims = qkv.dims();
-  const auto& k_dims = cache_k.dims();
-  const auto& cum_offsets_dims = cum_offsets.dims();
-  const uint32_t token_num = q_dims[0];
-  const uint32_t bsz = cum_offsets_dims[0];
-  const uint32_t max_block_num_per_seq = block_table.dims()[1];
+  auto num_heads = meta_data.q_num_heads;
+  auto kv_num_heads = meta_data.kv_num_heads;
+  auto token_num = meta_data.token_nums;
+  auto bsz = meta_data.batch_size;
+  auto max_block_num_per_seq = meta_data.max_blocks_per_seq;
 
   constexpr uint32_t num_warps = 4;
   constexpr uint32_t NUM_WARP_KV = num_warps / NUM_WARP_Q;
@@ -4707,6 +4702,7 @@ template <typename T,
           typename OutT = T,
           bool ENABLE_PREFILL = true>
 void MultiQueryAppendC4Attention(
+    const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,
     const paddle::Tensor& cache_k,
     const paddle::Tensor& cache_v,
@@ -4728,8 +4724,6 @@ void MultiQueryAppendC4Attention(
     const int num_blocks_x_cpu,
     const int max_seq_len,
     const int max_dec_len,
-    const int num_heads,
-    const int kv_num_heads,
     const float in_scale,
     const int max_partition_size,
     const int encoder_max_partition_size,
@@ -4740,12 +4734,12 @@ void MultiQueryAppendC4Attention(
   using NV_TYPE = typename cascade_attn_type_traits<T>::type;
   using OUT_NV_TYPE = typename cascade_attn_type_traits<OutT>::type;
 
-  const auto& q_dims = qkv.dims();
-  const auto& k_dims = cache_k.dims();
-  const auto& cum_offsets_dims = cum_offsets.dims();
-  const uint32_t token_num = q_dims[0];
-  const uint32_t bsz = cum_offsets_dims[0];
-  const uint32_t max_block_num_per_seq = block_table.dims()[1];
+  auto num_heads = meta_data.q_num_heads;
+  auto kv_num_heads = meta_data.kv_num_heads;
+  auto token_num = meta_data.token_nums;
+  auto bsz = meta_data.batch_size;
+  auto max_block_num_per_seq = meta_data.max_blocks_per_seq;
+
   constexpr uint32_t num_warps = 4;
   constexpr uint32_t NUM_WARP_KV = num_warps / NUM_WARP_Q;
   constexpr uint32_t num_frags_x = BLOCK_SHAPE_Q / (16 * NUM_WARP_Q);  // 1 or 2

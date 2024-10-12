@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #pragma once
+
 #include "encoder_write_cache_with_rope_impl.cuh"
 
 template <typename T, typename QKV_TYPE>
-void EncoderWriteCacheWithRopeKernel(const paddle::Tensor& qkv, // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 * gqa_group_size, head_dim] if GQA)
+void EncoderWriteCacheWithRopeKernel(const AppendAttnMetaData& meta_data,
+                                    const paddle::Tensor& qkv, // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 * gqa_group_size, head_dim] if GQA)
                                     const paddle::Tensor& seq_lens_this_time,
                                     const paddle::Tensor& seq_lens_encoder,
                                     const paddle::Tensor& seq_lens_decoder,
@@ -34,16 +36,15 @@ void EncoderWriteCacheWithRopeKernel(const paddle::Tensor& qkv, // [token_num, 3
                                     const std::string& cache_quant_type_str,
                                     const int num_blocks,
                                     const int max_seq_len,
-                                    const int num_heads,
-                                    const int kv_num_heads,
-                                    const int head_dim,
                                     const bool use_neox_style,
                                     cudaStream_t& stream,
                                     paddle::Tensor *qkv_out, 
                                     paddle::Tensor *key_cache_out, 
                                     paddle::Tensor *value_cache_out) {
-  auto qkv_dims = qkv.dims();
-  const uint32_t token_num = qkv_dims[0];
+  auto token_num = meta_data.token_nums;
+  auto num_heads = meta_data.q_num_heads;
+  auto kv_num_heads = meta_data.kv_num_heads;
+  auto head_dim = meta_data.head_dims;
 
   if (num_heads == kv_num_heads) {
     rotary_qk_variable(
@@ -83,23 +84,22 @@ void EncoderWriteCacheWithRopeKernel(const paddle::Tensor& qkv, // [token_num, 3
       use_neox_style
     );
   }
-  const auto &cache_k_dims = key_cache_out->dims();
-  const uint32_t block_size = cache_k_dims[2];
+  const uint32_t block_size = meta_data.block_size;
   if (cache_quant_type_str == "none") {
-    CascadeAppendWriteCacheKVQKV<T>(*qkv_out, block_tables, padding_offsets, seq_lens_encoder, seq_lens_decoder,
-      max_seq_len,  num_heads, head_dim, kv_num_heads, stream, key_cache_out, value_cache_out);
+    CascadeAppendWriteCacheKVQKV<T>(meta_data, *qkv_out, block_tables, padding_offsets, seq_lens_encoder, seq_lens_decoder,
+      max_seq_len, stream, key_cache_out, value_cache_out);
   } else if (cache_quant_type_str == "cache_int8") {
     DISPATCH_HEAD_DIM(head_dim, HEAD_DIM,
       {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, 
         {CascadeAppendWriteCacheKVC8QKV<T, HEAD_DIM, BLOCK_SIZE>(
-          *key_cache_out, *value_cache_out, *qkv_out, cache_k_scale.get(), cache_v_scale.get(), seq_lens_this_time,
-          seq_lens_decoder, padding_offsets, cum_offsets, block_tables, batch_ids, tile_ids, num_blocks, max_seq_len, num_heads, kv_num_heads, stream, key_cache_out, value_cache_out);})})
+          meta_data, *key_cache_out, *value_cache_out, *qkv_out, cache_k_scale.get(), cache_v_scale.get(), seq_lens_this_time,
+          seq_lens_decoder, padding_offsets, cum_offsets, block_tables, batch_ids, tile_ids, num_blocks, max_seq_len, stream, key_cache_out, value_cache_out);})})
   } else if (cache_quant_type_str == "cache_int4") {
     DISPATCH_HEAD_DIM(head_dim, HEAD_DIM, 
       {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, 
         {CascadeAppendWriteCacheKVC4QKV<T, HEAD_DIM, BLOCK_SIZE>(
-          *key_cache_out, *value_cache_out, *qkv_out, cache_k_scale.get(), cache_v_scale.get(), cache_k_zp.get(), cache_v_zp.get(), seq_lens_this_time,
-          seq_lens_decoder, padding_offsets, cum_offsets, block_tables, batch_ids, tile_ids, num_blocks, max_seq_len, num_heads, kv_num_heads, stream, key_cache_out, value_cache_out);})})
+          meta_data, *key_cache_out, *value_cache_out, *qkv_out, cache_k_scale.get(), cache_v_scale.get(), cache_k_zp.get(), cache_v_zp.get(), seq_lens_this_time,
+          seq_lens_decoder, padding_offsets, cum_offsets, block_tables, batch_ids, tile_ids, num_blocks, max_seq_len, stream, key_cache_out, value_cache_out);})})
   } else {
     PD_THROW(
         "NOT supported cache_quant_type. "

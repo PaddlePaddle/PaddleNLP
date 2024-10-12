@@ -16,6 +16,16 @@
 #include <cuda_runtime.h>
 #include <cuda_bf16.h>
 
+struct AppendAttnMetaData {
+  int batch_size;
+  int block_size;
+  int q_num_heads;
+  int kv_num_heads;
+  int token_nums;
+  int head_dims;
+  int max_blocks_per_seq;
+};
+
 __forceinline__ __host__ __device__ int div_up(int a, int b) {
   return (a + b - 1) / b;
 }

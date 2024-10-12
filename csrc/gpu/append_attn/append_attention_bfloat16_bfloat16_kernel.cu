@@ -12,18 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include "append_attention_kernel.h"
+#include "utils.cuh"
 
 template void CascadeAppendAttentionKernel<paddle::bfloat16, paddle::bfloat16>(
+    const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,  // [token_num, num_heads, head_dim]
-    const paddle::Tensor& cache_k,  // [max_block_num, num_heads, block_size, head_dim]
-    const paddle::Tensor& cache_v,  // [max_block_num, num_heads, head_dim, block_size]
+    const paddle::Tensor&
+        cache_k,  // [max_block_num, num_heads, block_size, head_dim]
+    const paddle::Tensor&
+        cache_v,  // [max_block_num, num_heads, head_dim, block_size]
     const paddle::optional<paddle::Tensor>& attn_mask,
-    const paddle::optional<paddle::Tensor>& cache_k_scale,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>& cache_v_scale,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>& cache_k_zp,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>& cache_v_zp,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>& shift_bias,  // [num_kv_heads, head_dim]
-    const paddle::optional<paddle::Tensor>& smooth_weight,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>&
+        cache_k_scale,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>&
+        cache_v_scale,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>&
+        cache_k_zp,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>&
+        cache_v_zp,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>&
+        shift_bias,  // [num_kv_heads, head_dim]
+    const paddle::optional<paddle::Tensor>&
+        smooth_weight,  // [num_kv_heads, head_dim]
     const paddle::Tensor& seq_lens_q,
     const paddle::Tensor& seq_lens_kv,
     const paddle::Tensor& seq_lens_encoder,
@@ -37,9 +47,6 @@ template void CascadeAppendAttentionKernel<paddle::bfloat16, paddle::bfloat16>(
     const int block_shape_q,
     const int max_seq_len,
     const int max_dec_len,
-    const int num_heads,
-    const int kv_num_heads,
-    const int head_dim,
     const float in_scale,
     const int max_partition_size,
     const int encoder_max_partition_size,

@@ -18,6 +18,7 @@
 
 template <paddle::DataType D>
 std::vector<paddle::Tensor> AppendAttentionKernel(
+    const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,
     const paddle::Tensor& key_cache,
     const paddle::Tensor& value_cache,
@@ -65,14 +66,6 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
   typedef typename traits_::DataType DataType_;
   typedef typename traits_::data_t data_t;
 
-  const auto& qkv_dims = qkv.dims();
-  const auto& key_cache_dims = key_cache.dims();
-  const int token_num = qkv_dims[0];
-  const int kv_num_heads = key_cache_dims[1];
-  const int head_dim = key_cache_dims[3];
-  const int total_num_head = qkv_dims[qkv_dims.size() - 1] / head_dim;
-  const int num_heads = total_num_head - 2 * kv_num_heads;
-
   int encoder_num_blocks_data = encoder_num_blocks.data<int>()[0];
   int kv_num_blocks_data = kv_num_blocks.data<int>()[0];
   int decoder_num_blocks_data = decoder_num_blocks.data<int>()[0];
@@ -101,10 +94,14 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
   paddle::Tensor fmha_out;
   if (out_linear_in_scale > 0.0) {
     fmha_out = GetEmptyTensor(
-        {token_num, num_heads * head_dim}, paddle::DataType::INT8, qkv.place());
+        {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims},
+        paddle::DataType::INT8,
+        qkv.place());
   } else {
-    fmha_out =
-        GetEmptyTensor({token_num, num_heads * head_dim}, D, qkv.place());
+    fmha_out = GetEmptyTensor(
+        {meta_data.token_nums, meta_data.q_num_heads * meta_data.head_dims},
+        D,
+        qkv.place());
   }
 
   if (max_enc_len_this_time_data > 0) {
@@ -113,6 +110,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
     }
     if (qkv_out_scales) {
       EncoderWriteCacheWithRopeKernel<data_t, int>(
+          meta_data,
           qkv,
           seq_lens_this_time,
           seq_lens_encoder,
@@ -132,9 +130,6 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           cache_quant_type_str,
           kv_num_blocks_data,
           max_input_length,
-          num_heads,
-          kv_num_heads,
-          head_dim,
           use_neox_rotary_style,
           main_stream,
           &qkv_out,
@@ -142,6 +137,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           const_cast<paddle::Tensor*>(&value_cache));
     } else {
       EncoderWriteCacheWithRopeKernel<data_t, data_t>(
+          meta_data,
           qkv_out,
           seq_lens_this_time,
           seq_lens_encoder,
@@ -161,9 +157,6 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           cache_quant_type_str,
           kv_num_blocks_data,
           max_input_length,
-          num_heads,
-          kv_num_heads,
-          head_dim,
           use_neox_rotary_style,
           main_stream,
           &qkv_out,
@@ -172,6 +165,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
     }
     if (out_linear_in_scale > 0.0) {
       CascadeAppendAttentionKernel<data_t, int8_t>(
+          meta_data,
           qkv_out,
           key_cache,
           value_cache,
@@ -195,9 +189,6 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           encoder_block_shape_q,
           max_input_length,
           max_enc_len_this_time_data,
-          num_heads,
-          kv_num_heads,
-          head_dim,
           out_linear_in_scale,
           max_partition_size,
           encoder_max_partition_size,
@@ -209,6 +200,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           &fmha_out);
     } else {
       CascadeAppendAttentionKernel<data_t, data_t>(
+          meta_data,
           qkv_out,
           key_cache,
           value_cache,
@@ -232,9 +224,6 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           encoder_block_shape_q,
           max_input_length,
           max_enc_len_this_time_data,
-          num_heads,
-          kv_num_heads,
-          head_dim,
           out_linear_in_scale,
           max_partition_size,
           encoder_max_partition_size,
@@ -258,6 +247,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
 
     if (qkv_out_scales) {
       DecoderWriteCacheWithRoPEKernel<data_t, int>(
+          meta_data,
           qkv,  // [token_num, num_heads, head_dim]
           seq_lens_decoder,
           seq_lens_encoder,
@@ -274,15 +264,13 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           cache_quant_type_str,
           use_neox_rotary_style,
           max_input_length,
-          num_heads,
-          kv_num_heads,
-          head_dim,
           exec_stream,
           &qkv_out,
           const_cast<paddle::Tensor*>(&key_cache),
           const_cast<paddle::Tensor*>(&value_cache));
     } else {
       DecoderWriteCacheWithRoPEKernel<data_t, data_t>(
+          meta_data,
           qkv_out,  // [token_num, num_heads, head_dim]
           seq_lens_decoder,
           seq_lens_encoder,
@@ -299,9 +287,6 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           cache_quant_type_str,
           use_neox_rotary_style,
           max_input_length,
-          num_heads,
-          kv_num_heads,
-          head_dim,
           exec_stream,
           &qkv_out,
           const_cast<paddle::Tensor*>(&key_cache),
@@ -310,6 +295,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
 
     if (out_linear_in_scale > 0.0) {
       CascadeAppendAttentionKernel<data_t, int8_t>(
+          meta_data,
           qkv_out,
           key_cache,
           value_cache,
@@ -333,9 +319,6 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           decoder_block_shape_q,
           max_input_length,
           max_dec_len_this_time_data + 1,
-          num_heads,
-          kv_num_heads,
-          head_dim,
           out_linear_in_scale,
           max_partition_size,
           encoder_max_partition_size,
@@ -347,6 +330,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           &fmha_out);
     } else {
       CascadeAppendAttentionKernel<data_t, data_t>(
+          meta_data,
           qkv_out,
           key_cache,
           value_cache,
@@ -370,9 +354,6 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           decoder_block_shape_q,
           max_input_length,
           max_dec_len_this_time_data + 1,
-          num_heads,
-          kv_num_heads,
-          head_dim,
           out_linear_in_scale,
           max_partition_size,
           encoder_max_partition_size,
@@ -437,9 +418,24 @@ std::vector<paddle::Tensor> AppendAttention(
     const int speculate_max_draft_token_num,
     const bool causal,
     const bool enable_prefill) {
+  AppendAttnMetaData meta_data;
+
+  const auto& qkv_dims = qkv.dims();
+  const auto& key_cache_dims = key_cache.dims();
+  meta_data.token_nums = qkv_dims[0];
+  meta_data.kv_num_heads = key_cache_dims[1];
+  meta_data.head_dims = key_cache_dims[3];
+  const int total_num_head = qkv_dims[qkv_dims.size() - 1] / meta_data.head_dims;
+  meta_data.q_num_heads = total_num_head - 2 * meta_data.kv_num_heads;
+
+  meta_data.max_blocks_per_seq = block_tables.dims()[1];
+  meta_data.block_size = key_cache.dims()[2];
+  meta_data.batch_size = cum_offsets.dims()[0];
+
   switch (qkv.dtype()) {
     case paddle::DataType::FLOAT16: {
       return AppendAttentionKernel<paddle::DataType::FLOAT16>(
+          meta_data,
           qkv,
           key_cache,
           value_cache,
@@ -486,6 +482,7 @@ std::vector<paddle::Tensor> AppendAttention(
     }
     case paddle::DataType::BFLOAT16: {
       return AppendAttentionKernel<paddle::DataType::BFLOAT16>(
+          meta_data,
           qkv,
           key_cache,
           value_cache,
@@ -533,6 +530,7 @@ std::vector<paddle::Tensor> AppendAttention(
     case paddle::DataType::INT32: {
       if (compute_dtype == "bf16") {
         return AppendAttentionKernel<paddle::DataType::BFLOAT16>(
+            meta_data,
             qkv,
             key_cache,
             value_cache,
@@ -578,6 +576,7 @@ std::vector<paddle::Tensor> AppendAttention(
             enable_prefill);
       } else if (compute_dtype == "fp16") {
         return AppendAttentionKernel<paddle::DataType::FLOAT16>(
+            meta_data,
             qkv,
             key_cache,
             value_cache,

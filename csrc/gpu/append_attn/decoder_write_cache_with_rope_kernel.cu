@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "decoder_write_cache_with_rope_kernel.h"
+#include "utils.cuh"
 
 template <typename T, typename QKV_TYPE>
 void append_decode_cache_rope(const QKV_TYPE* qkv,
@@ -32,12 +33,12 @@ void append_decode_cache_rope(const QKV_TYPE* qkv,
                               const int max_blocks_per_seq,
                               const int num_heads,
                               const int kv_num_heads,
-                              const int head_size,
+                              const int dim_head,
                               const int block_size,
                               const int bsz,
                               const cudaStream_t& stream,
                               const bool use_neox_style) {
-  const uint32_t elem_nums = use_neox_style ? bsz * (num_heads + 2 * kv_num_heads) * head_size / 2 : bsz * (num_heads + 2 * kv_num_heads) * head_size;
+  const uint32_t elem_nums = use_neox_style ? bsz * (num_heads + 2 * kv_num_heads) * dim_head / 2 : bsz * (num_heads + 2 * kv_num_heads) * dim_head;
 
   constexpr int PackSize = 16 / sizeof(T);
   const int pack_num = elem_nums / PackSize;
@@ -64,7 +65,7 @@ void append_decode_cache_rope(const QKV_TYPE* qkv,
             max_seq_len,
             max_blocks_per_seq,
             num_heads,
-            head_size,
+            dim_head,
             block_size,
             elem_nums,
             kv_num_heads);
@@ -85,7 +86,7 @@ void append_decode_cache_rope(const QKV_TYPE* qkv,
             max_seq_len,
             max_blocks_per_seq,
             num_heads,
-            head_size,
+            dim_head,
             block_size,
             elem_nums,
             kv_num_heads);
@@ -110,7 +111,7 @@ void append_decode_cache_rope(const QKV_TYPE* qkv,
             max_seq_len,
             max_blocks_per_seq,
             num_heads,
-            head_size,
+            dim_head,
             block_size,
             elem_nums,
             kv_num_heads);
@@ -131,7 +132,7 @@ void append_decode_cache_rope(const QKV_TYPE* qkv,
             max_seq_len,
             max_blocks_per_seq,
             num_heads,
-            head_size,
+            dim_head,
             block_size,
             elem_nums,
             kv_num_heads);
@@ -160,7 +161,7 @@ void append_decode_cache_int8_rope(const QKV_TYPE* qkv,
                                   const int max_blocks_per_seq,
                                   const int num_heads,
                                   const int kv_num_heads,
-                                  const int head_size,
+                                  const int dim_head,
                                   const int block_size,
                                   const int bsz,
                                   const cudaStream_t& stream,
@@ -294,7 +295,7 @@ void append_decode_cache_int4_rope(const QKV_TYPE* qkv,
                                   const int max_blocks_per_seq,
                                   const int num_heads,
                                   const int kv_num_heads,
-                                  const int head_size,
+                                  const int dim_head,
                                   const int block_size,
                                   const int bsz,
                                   const cudaStream_t& stream,
@@ -415,6 +416,7 @@ void append_decode_cache_int4_rope(const QKV_TYPE* qkv,
 }
 template <typename T, typename QKV_TYPE>
 void DecoderWriteCacheWithRoPEKernel(
+    const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,
     const paddle::Tensor& seq_lens,
     const paddle::Tensor& seq_lens_encoder,
@@ -431,9 +433,6 @@ void DecoderWriteCacheWithRoPEKernel(
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_seq_len,
-    const int num_heads,
-    const int kv_num_heads,
-    const int head_size,
     cudaStream_t& stream,
     paddle::Tensor* qkv_out,
     paddle::Tensor* key_cache_out,
@@ -443,17 +442,18 @@ void DecoderWriteCacheWithRoPEKernel(
   typedef typename traits_::type DataType_;
   typedef typename qkt_nv_type_::type QKV_Data_TYPE;
   const QKV_TYPE* qkv_ptr = qkv.data<QKV_TYPE>();
-  auto qkv_dims = qkv.dims();
-  const int max_blocks_per_seq = block_tables.dims()[1];
-  const int bsz = cum_offsets.dims()[0];
 
-  // VLOG(1) << "gqa_group_size: " << gqa_group_size;
-  const int32_t block_size = key_cache_out->dims()[2];
+  auto max_blocks_per_seq = meta_data.max_blocks_per_seq;
+  auto bsz = meta_data.batch_size;
+  auto block_size = meta_data.block_size;
+  auto dim_head = meta_data.head_dims;
+  auto num_heads = meta_data.q_num_heads;
+  auto kv_num_heads = meta_data.kv_num_heads;
 
   const float* cos_emb = rotary_embs ? rotary_embs.get().data<float>() : nullptr;
   const float* sin_emb;
   if (rotary_embs) {
-    sin_emb = use_neox_rotary_style ? rotary_embs.get().data<float>() + max_seq_len * head_size : rotary_embs.get().data<float>() + max_seq_len * head_size / 2;
+    sin_emb = use_neox_rotary_style ? rotary_embs.get().data<float>() + max_seq_len * dim_head : rotary_embs.get().data<float>() + max_seq_len * dim_head / 2;
   }
   if (cache_quant_type_str == "none") {
     append_decode_cache_rope(
@@ -475,7 +475,7 @@ void DecoderWriteCacheWithRoPEKernel(
       max_blocks_per_seq,
       num_heads,
       kv_num_heads,
-      head_size,
+      dim_head,
       block_size,
       bsz,
       stream,
@@ -504,7 +504,7 @@ void DecoderWriteCacheWithRoPEKernel(
       max_blocks_per_seq,
       num_heads,
       kv_num_heads,
-      head_size,
+      dim_head,
       block_size,
       bsz,
       stream,
@@ -537,7 +537,7 @@ void DecoderWriteCacheWithRoPEKernel(
             max_blocks_per_seq,
             num_heads,
             kv_num_heads,
-            head_size,
+            dim_head,
             block_size,
             bsz,
             stream,
@@ -548,6 +548,7 @@ void DecoderWriteCacheWithRoPEKernel(
 }
 
 template void DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, int>(
+    const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
               // gqa_group_size, head_dim] if GQA)
     const paddle::Tensor& seq_lens,
@@ -565,15 +566,13 @@ template void DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, int>(
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_seq_len,
-    const int num_heads,
-    const int kv_num_heads,
-    const int head_size,
     cudaStream_t& stream,
     paddle::Tensor* qkv_out,
     paddle::Tensor* key_cache_out,
     paddle::Tensor* value_cache_out);
 
 template void DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, paddle::bfloat16>(
+    const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
               // gqa_group_size, head_dim] if GQA)
     const paddle::Tensor& seq_lens,
@@ -591,15 +590,13 @@ template void DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, paddle::bfloat16
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_seq_len,
-    const int num_heads,
-    const int kv_num_heads,
-    const int head_size,
     cudaStream_t& stream,
     paddle::Tensor* qkv_out,
     paddle::Tensor* key_cache_out,
     paddle::Tensor* value_cache_out);
 
 template void DecoderWriteCacheWithRoPEKernel<paddle::float16, int>(
+    const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
               // gqa_group_size, head_dim] if GQA)
     const paddle::Tensor& seq_lens,
@@ -617,15 +614,13 @@ template void DecoderWriteCacheWithRoPEKernel<paddle::float16, int>(
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_seq_len,
-    const int num_heads,
-    const int kv_num_heads,
-    const int head_size,
     cudaStream_t& stream,
     paddle::Tensor* qkv_out,
     paddle::Tensor* key_cache_out,
     paddle::Tensor* value_cache_out);
 
 template void DecoderWriteCacheWithRoPEKernel<paddle::float16, paddle::float16>(
+    const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
               // gqa_group_size, head_dim] if GQA)
     const paddle::Tensor& seq_lens,
@@ -643,9 +638,6 @@ template void DecoderWriteCacheWithRoPEKernel<paddle::float16, paddle::float16>(
     const std::string& cache_quant_type_str,
     const bool use_neox_rotary_style,
     const int max_seq_len,
-    const int num_heads,
-    const int kv_num_heads,
-    const int head_size,
     cudaStream_t& stream,
     paddle::Tensor* qkv_out,
     paddle::Tensor* key_cache_out,
