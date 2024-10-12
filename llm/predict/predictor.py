@@ -24,7 +24,7 @@ from threading import Thread
 import numpy as np
 import paddle
 import paddle.incubate.multiprocessing as mp
-from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
+from paddle.base.framework import in_cinn_mode, in_pir_executor_mode, use_pir_api
 from paddle.distributed import fleet
 
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
@@ -630,8 +630,10 @@ class StaticInferencePredictor(InferencePredictorMixin):
         infer_model_path = llm_utils.get_infer_model_path(
             predictor_args.model_name_or_path, predictor_args.model_prefix
         )
-
-        config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
+        if use_pir_api():
+            config = paddle.inference.Config(infer_model_path + ".json", infer_model_path + ".pdiparams")
+        else:
+            config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
         config.switch_ir_optim(True)
         # remove `gpu_cpu_map_matmul_v2_to_matmul_pass` to avoid mapping matmul_v2 -> matmul op
@@ -1063,7 +1065,10 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
             predictor_args.model_name_or_path, predictor_args.model_prefix
         )
 
-        config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
+        if use_pir_api():
+            config = paddle.inference.Config(infer_model_path + ".json", infer_model_path + ".pdiparams")
+        else:
+            config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
         config.switch_ir_optim(False)
         if predictor_args.device in paddle.device.get_all_custom_device_type():

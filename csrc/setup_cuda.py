@@ -21,7 +21,7 @@ from paddle.utils.cpp_extension import CUDAExtension, setup
 
 def clone_git_repo(version, repo_url, destination_path):
     try:
-        subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path], check=True)
+        subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path, "--depth=1"], check=True)
         return True
     except subprocess.CalledProcessError as e:
         print(f"Git clone {repo_url} operation failed with the following error: {e}")
