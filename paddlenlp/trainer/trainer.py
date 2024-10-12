@@ -206,13 +206,13 @@ def _get_align_mode_scale():
     sharding_parallel_world_size = hcg.get_sharding_parallel_world_size()
     return max(data_parallel_world_size, 1) * max(sharding_parallel_world_size, 1)
 
-def _scale_loss_in_align_mode(loss):
+def _maybe_scale_loss_in_align_mode(loss):
     if in_auto_parallel_align_mode():
         return loss / _get_align_mode_scale()
     else:
         return loss
 
-def _unscale_loss_in_align_mode(loss):
+def _maybe_unscale_loss_in_align_mode(loss):
     if in_auto_parallel_align_mode():
         return loss * _get_align_mode_scale()
     else:
@@ -2229,7 +2229,7 @@ class Trainer:
         """
         if self.args.pipeline_parallel_degree > 1:
             loss = self.training_pipeline_step(model, inputs)
-            return _scale_loss_in_align_mode(loss)
+            return _maybe_scale_loss_in_align_mode(loss)
 
         model.train()
         inputs = self._prepare_inputs(inputs)
@@ -2239,13 +2239,13 @@ class Trainer:
         if self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
 
-        loss = _scale_loss_in_align_mode(loss)
+        loss = _maybe_scale_loss_in_align_mode(loss)
 
         if self.do_grad_scaling:
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
-        return _unscale_loss_in_align_mode(loss.detach())
+        return _maybe_unscale_loss_in_align_mode(loss.detach())
 
     def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         """
@@ -2302,7 +2302,7 @@ class Trainer:
 
         model.micro_batch_size, model.accumulate_steps = config_backup
 
-        return _unscale_loss_in_align_mode(loss.detach())
+        return _maybe_unscale_loss_in_align_mode(loss.detach())
 
     def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
         """
