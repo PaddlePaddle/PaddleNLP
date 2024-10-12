@@ -1,11 +1,11 @@
 // Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -31,7 +31,8 @@ template <typename T,
           bool ENABLE_PREFILL = true>
 __global__ void multi_query_append_attention_kernel(
     T *__restrict__ q,        // [token_num. num_heads, head_dim]
-    T *__restrict__ cache_k,  // [max_block_num, num_heads, block_size, head_dim]
+    T *__restrict__ cache_k,  // [max_block_num, num_heads, block_size,
+                              // head_dim]
     T *__restrict__ cache_v,
     const T *__restrict__ shift_bias,     // [q_num_heads * HEAD_DIM]
     const T *__restrict__ smooth_weight,  // [q_num_heads * HEAD_DIM]
@@ -47,7 +48,8 @@ __global__ void multi_query_append_attention_kernel(
     const float scale,
     const float in_scale,
     const uint32_t chunk_size,
-    T *__restrict__ tmp_workspace,  // split kv [token_num, num_chunks, num_heads, head_dim]
+    T *__restrict__ tmp_workspace,  // split kv [token_num, num_chunks,
+                                    // num_heads, head_dim]
     float *__restrict__ tmp_m,      // [token_num, num_chunks, num_heads]
     float *__restrict__ tmp_d,      // [token_num, num_chunks, num_heads]
     OutT *__restrict__ out,
@@ -602,8 +604,8 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
           chunk_idx * q_n_stride + q_head_idx * HEAD_DIM +
           tid % 8 * num_elems_per_128b<T>();
     }
-  // } else {
-  //   o_base_ptr_int8 = out + o_offset;
+    // } else {
+    //   o_base_ptr_int8 = out + o_offset;
   }
 
   smem_t qo_smem(smem);
@@ -809,19 +811,21 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
   // write o
   // [num_frags_x, 16, num_frags_y, 16]
   if (num_chunks_this_seq <= 1) {
-    write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE, num_frags_x, num_frags_y, false>(
-      o_frag,
-      &qo_smem,
-      o_base_ptr_int8,
-      shift_bias,
-      smooth_weight,
-      q_base_seq_id_this_block,
-      q_head_idx,
-      in_scale,
-      q_len,
-      q_n_stride, 
-      HEAD_DIM
-    );
+    write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
+                                                    num_frags_x,
+                                                    num_frags_y,
+                                                    false>(
+        o_frag,
+        &qo_smem,
+        o_base_ptr_int8,
+        shift_bias,
+        smooth_weight,
+        q_base_seq_id_this_block,
+        q_head_idx,
+        in_scale,
+        q_len,
+        q_n_stride,
+        HEAD_DIM);
   } else {
     write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
                                                     num_frags_x,
@@ -838,22 +842,22 @@ __global__ void multi_query_append_attention_warp1_4_kernel(
         q_len,
         q_n_stride * num_chunks,
         HEAD_DIM);
-  // } else {
-  //   write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
-  //                                                   num_frags_x,
-  //                                                   num_frags_y,
-  //                                                   partition_kv>(
-  //       o_frag,
-  //       &qo_smem,
-  //       o_base_ptr_int8,
-  //       shift_bias,
-  //       smooth_weight,
-  //       q_base_seq_id_this_block,
-  //       q_head_idx,
-  //       in_scale,
-  //       q_len,
-  //       partition_kv ? q_n_stride * num_chunks : q_n_stride,
-  //       HEAD_DIM);
+    // } else {
+    //   write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
+    //                                                   num_frags_x,
+    //                                                   num_frags_y,
+    //                                                   partition_kv>(
+    //       o_frag,
+    //       &qo_smem,
+    //       o_base_ptr_int8,
+    //       shift_bias,
+    //       smooth_weight,
+    //       q_base_seq_id_this_block,
+    //       q_head_idx,
+    //       in_scale,
+    //       q_len,
+    //       partition_kv ? q_n_stride * num_chunks : q_n_stride,
+    //       HEAD_DIM);
   }
 
   if (num_chunks_this_seq > 1) {
@@ -906,7 +910,8 @@ template <typename T,
           bool ENABLE_PREFILL = true>
 __global__ void multi_query_append_attention_c8_kernel(
     T *__restrict__ q,             // [token_num. num_heads, head_dim]
-    CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size, head_dim]
+    CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size,
+                                   // head_dim]
     CacheT *__restrict__ cache_v,
     const T *__restrict__ cache_k_scale,  // [num_kv_heads]
     const T *__restrict__ cache_v_scale,  // [num_kv_heads]
@@ -935,9 +940,12 @@ __global__ void multi_query_append_attention_c8_kernel(
   printf("launched multi_query_append_attention_c8_kernel");
   __syncthreads();
 #endif
-  constexpr uint32_t num_vecs_per_head = HEAD_DIM / num_elems_per_128b<T>(); // 128 / 8 = 16
-  constexpr uint32_t num_vecs_per_head_k = HEAD_DIM / num_elems_per_128b<CacheT>(); // 128 / 16 = 8
-  constexpr uint32_t num_vecs_per_blocksize = BLOCK_SIZE / num_elems_per_128b<CacheT>(); //  64 / 16 = 4
+  constexpr uint32_t num_vecs_per_head =
+      HEAD_DIM / num_elems_per_128b<T>();  // 128 / 8 = 16
+  constexpr uint32_t num_vecs_per_head_k =
+      HEAD_DIM / num_elems_per_128b<CacheT>();  // 128 / 16 = 8
+  constexpr uint32_t num_vecs_per_blocksize =
+      BLOCK_SIZE / num_elems_per_128b<CacheT>();  //  64 / 16 = 4
   constexpr uint32_t inv_k_stride = 8 / num_vecs_per_head_k;
   constexpr uint32_t inv_v_stride = 8 / num_vecs_per_blocksize;
   const uint32_t btid = blockIdx.x, kv_head_idx = blockIdx.z;
@@ -949,8 +957,14 @@ __global__ void multi_query_append_attention_c8_kernel(
   const uint32_t chunk_idx = blockIdx.y;
 #ifdef DEBUG_ATTN_C8
   if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
-    printf("num_vecs_per_head: %d, num_vecs_per_head_k: %d, num_vecs_per_blocksize: %d, inv_k_stride: %d, inv_v_stride: %d\n",
-            (int)num_vecs_per_head, (int)num_vecs_per_head_k, (int)num_vecs_per_blocksize, (int)inv_k_stride, (int)inv_v_stride);
+    printf(
+        "num_vecs_per_head: %d, num_vecs_per_head_k: %d, "
+        "num_vecs_per_blocksize: %d, inv_k_stride: %d, inv_v_stride: %d\n",
+        (int)num_vecs_per_head,
+        (int)num_vecs_per_head_k,
+        (int)num_vecs_per_blocksize,
+        (int)inv_k_stride,
+        (int)inv_v_stride);
   }
   __syncthreads();
 #endif
@@ -969,10 +983,11 @@ __global__ void multi_query_append_attention_c8_kernel(
   const T cache_k_scale_reg = cache_k_scale[kv_head_idx];
   const T cache_v_scale_reg = cache_v_scale[kv_head_idx];
 
-  const uint32_t q_end = min(q_len, div_up((tile_id + 1) * num_rows_per_block, GROUP_SIZE));
+  const uint32_t q_end =
+      min(q_len, div_up((tile_id + 1) * num_rows_per_block, GROUP_SIZE));
   uint32_t kv_len = seq_lens_kv[batch_id];
   if (ENABLE_PREFILL) {
-    kv_len += q_len; // !!!
+    kv_len += q_len;  // !!!
     if (kv_len <= 0) {
       return;
     }
@@ -988,7 +1003,8 @@ __global__ void multi_query_append_attention_c8_kernel(
   }
 
   const uint32_t chunk_start = partition_kv ? chunk_idx * chunk_size : 0;
-  const uint32_t chunk_end = partition_kv ? min(kv_len, chunk_start + chunk_size) : kv_len;
+  const uint32_t chunk_end =
+      partition_kv ? min(kv_len, chunk_start + chunk_size) : kv_len;
   const uint32_t chunk_len = chunk_end - chunk_start;
 
   extern __shared__ uint8_t smem[];
@@ -1004,15 +1020,24 @@ __global__ void multi_query_append_attention_c8_kernel(
   const uint32_t kv_h_stride = BLOCK_SIZE * HEAD_DIM;
   const uint32_t kv_b_stride = HEAD_DIM;
   const uint32_t kv_d_stride = BLOCK_SIZE;
-  const uint32_t q_start_seq_id = batch_id * max_seq_len - __ldg(&cum_offsets[batch_id]);
-  const uint32_t q_base_seq_id_this_block = (tile_id * NUM_WARPS + wid) * num_frags_x * 16;
-  const uint32_t q_offset = q_start_seq_id * q_ori_n_stride + q_head_idx * HEAD_DIM + tid % 8 * num_elems_per_128b<T>();
-  const uint32_t o_offset = q_start_seq_id * q_n_stride + q_head_idx * HEAD_DIM + tid % 8 * num_elems_per_128b<T>();
+  const uint32_t q_start_seq_id =
+      batch_id * max_seq_len - __ldg(&cum_offsets[batch_id]);
+  const uint32_t q_base_seq_id_this_block =
+      (tile_id * NUM_WARPS + wid) * num_frags_x * 16;
+  const uint32_t q_offset = q_start_seq_id * q_ori_n_stride +
+                            q_head_idx * HEAD_DIM +
+                            tid % 8 * num_elems_per_128b<T>();
+  const uint32_t o_offset = q_start_seq_id * q_n_stride +
+                            q_head_idx * HEAD_DIM +
+                            tid % 8 * num_elems_per_128b<T>();
   T *q_base_ptr = q + q_offset;
 #ifdef DEBUG_ATTN_C8
   if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
     printf("q_start_seq_id: %d, q_offset: %d, q_ori_n_stride: %d, q_base: %f\n",
-            (int)q_start_seq_id, (int)q_offset, (int)q_ori_n_stride, (float)*q_base_ptr);
+           (int)q_start_seq_id,
+           (int)q_offset,
+           (int)q_ori_n_stride,
+           (float)*q_base_ptr);
   }
   __syncthreads();
 #endif
@@ -1021,9 +1046,15 @@ __global__ void multi_query_append_attention_c8_kernel(
   OutT *o_base_ptr_int8 = nullptr;
   if constexpr (partition_kv) {
     if (ENABLE_PREFILL) {
-      o_base_ptr_T = tmp_workspace + q_start_seq_id * num_chunks * q_n_stride + chunk_idx * q_n_stride + q_head_idx * HEAD_DIM + tid % 8 * num_elems_per_128b<T>();
+      o_base_ptr_T = tmp_workspace + q_start_seq_id * num_chunks * q_n_stride +
+                     chunk_idx * q_n_stride + q_head_idx * HEAD_DIM +
+                     tid % 8 * num_elems_per_128b<T>();
     } else {
-      o_base_ptr_T = tmp_workspace + batch_id * speculate_max_draft_token_num * num_chunks * q_n_stride + chunk_idx * q_n_stride + q_head_idx * HEAD_DIM + tid % 8 * num_elems_per_128b<T>();
+      o_base_ptr_T =
+          tmp_workspace +
+          batch_id * speculate_max_draft_token_num * num_chunks * q_n_stride +
+          chunk_idx * q_n_stride + q_head_idx * HEAD_DIM +
+          tid % 8 * num_elems_per_128b<T>();
     }
   } else {
     o_base_ptr_int8 = out + o_offset;
@@ -1035,36 +1066,58 @@ __global__ void multi_query_append_attention_c8_kernel(
     ——————
     2 ｜ 4
   */
-  uint32_t q_smem_offset_r = smem_t::get_permuted_offset<num_vecs_per_head>(wid * num_frags_x * 16 + tid % 16, tid / 16); // 16 * 16
+  uint32_t q_smem_offset_r = smem_t::get_permuted_offset<num_vecs_per_head>(
+      wid * num_frags_x * 16 + tid % 16, tid / 16);  // 16 * 16
   load_q_global_smem<GROUP_SIZE, num_frags_x, num_frags_y, HEAD_DIM, T>(
-    q_base_ptr,
-    &qo_smem,
-    q_base_seq_id_this_block,
-    q_end,
-    q_ori_n_stride,
-    HEAD_DIM
-  );
+      q_base_ptr,
+      &qo_smem,
+      q_base_seq_id_this_block,
+      q_end,
+      q_ori_n_stride,
+      HEAD_DIM);
   commit_group();
   wait_group<0>();
   __syncthreads();
 
-  q_smem_inplace_multiply_sm_scale<num_frags_x, num_frags_y, T>(&qo_smem, scale);
+  q_smem_inplace_multiply_sm_scale<num_frags_x, num_frags_y, T>(&qo_smem,
+                                                                scale);
   smem_t k_smem(smem + NUM_WARPS * num_frags_x * 16 * HEAD_DIM * sizeof(T)),
-         v_smem(smem + NUM_WARPS * num_frags_x * 16 * HEAD_DIM * sizeof(T) + num_frags_z * 16 * HEAD_DIM * sizeof(CacheT));
-  
+      v_smem(smem + NUM_WARPS * num_frags_x * 16 * HEAD_DIM * sizeof(T) +
+             num_frags_z * 16 * HEAD_DIM * sizeof(CacheT));
 
-  const uint32_t num_iterations = div_up(CAUSAL ? 
-                                         (min(chunk_len, 
-                                              sub_if_greater_or_zero(kv_len - q_len + div_up((tile_id + 1) * num_rows_per_block, GROUP_SIZE), chunk_start)))
-                                              : chunk_len, num_frags_z * 16);
-  const uint32_t mask_check_iteration = (CAUSAL ? 
-                                          (min(chunk_len, 
-                                            sub_if_greater_or_zero(kv_len - q_len + tile_id * num_rows_per_block / GROUP_SIZE, chunk_start)))
-                                            : chunk_len) / (num_frags_z * 16);
+
+  const uint32_t num_iterations = div_up(
+      CAUSAL
+          ? (min(chunk_len,
+                 sub_if_greater_or_zero(
+                     kv_len - q_len +
+                         div_up((tile_id + 1) * num_rows_per_block, GROUP_SIZE),
+                     chunk_start)))
+          : chunk_len,
+      num_frags_z * 16);
+  const uint32_t mask_check_iteration =
+      (CAUSAL ? (min(chunk_len,
+                     sub_if_greater_or_zero(
+                         kv_len - q_len +
+                             tile_id * num_rows_per_block / GROUP_SIZE,
+                         chunk_start)))
+              : chunk_len) /
+      (num_frags_z * 16);
 #ifdef DEBUG_ATTN_C8
   if (tid == 0 && wid == 0) {
-    printf("batch_id: %d, tile_id: %d, chunk_size: %d, q_len: %d, kv_len: %d, chunk_start: %d, chunk_end: %d, num_iterations: %d, mask_check_iteration: %d\n",
-           (int)batch_id, (int)tile_id, (int)chunk_size, (int)q_len, (int)kv_len, (int)chunk_start, (int)chunk_end, (int)num_iterations, (int)mask_check_iteration);
+    printf(
+        "batch_id: %d, tile_id: %d, chunk_size: %d, q_len: %d, kv_len: %d, "
+        "chunk_start: %d, chunk_end: %d, num_iterations: %d, "
+        "mask_check_iteration: %d\n",
+        (int)batch_id,
+        (int)tile_id,
+        (int)chunk_size,
+        (int)q_len,
+        (int)kv_len,
+        (int)chunk_start,
+        (int)chunk_end,
+        (int)num_iterations,
+        (int)mask_check_iteration);
   }
   __syncthreads();
 #endif
@@ -1073,64 +1126,95 @@ __global__ void multi_query_append_attention_c8_kernel(
     1 ｜ 2
     ——————
     3 ｜ 4
-  */       
-  uint32_t k_smem_offset_r = smem_t::get_permuted_offset<num_vecs_per_head_k, inv_k_stride>(8 * (tid / 16) + tid % 8, (tid % 16) / 8);
+  */
+  uint32_t k_smem_offset_r =
+      smem_t::get_permuted_offset<num_vecs_per_head_k, inv_k_stride>(
+          8 * (tid / 16) + tid % 8, (tid % 16) / 8);
   /*
     1 ｜ 2
     ——————
     3 ｜ 4
-  */ 
-  uint32_t v_smem_offset_r = smem_t::get_permuted_offset<num_vecs_per_blocksize, inv_v_stride>(8 * (tid / 16) + tid % 8, (tid % 16) / 8);
-  
-  uint32_t k_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_head_k, inv_k_stride>(wid * 4 + tid / 8, tid % 8); // 8 * 128 / 8 = 128 !!! just for HEAD_DIM >= 128
-  uint32_t v_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_blocksize, inv_v_stride>(wid * 8 + tid / 4, tid % 4); // 4 * 128 / 8 = 64
-  
+  */
+  uint32_t v_smem_offset_r =
+      smem_t::get_permuted_offset<num_vecs_per_blocksize, inv_v_stride>(
+          8 * (tid / 16) + tid % 8, (tid % 16) / 8);
+
+  uint32_t k_smem_offset_w =
+      smem_t::get_permuted_offset<num_vecs_per_head_k, inv_k_stride>(
+          wid * 4 + tid / 8,
+          tid % 8);  // 8 * 128 / 8 = 128 !!! just for HEAD_DIM >= 128
+  uint32_t v_smem_offset_w =
+      smem_t::get_permuted_offset<num_vecs_per_blocksize, inv_v_stride>(
+          wid * 8 + tid / 4, tid % 4);  // 4 * 128 / 8 = 64
+
   uint32_t kv_idx_base = chunk_start;
   // int block_id = __ldg(&block_table_now[kv_idx_base / BLOCK_SIZE]);
-  const uint32_t const_k_offset = kv_head_idx * kv_h_stride + (wid * 4 + tid / 8) * kv_b_stride + tid % 8 * num_elems_per_128b<CacheT>();
-  const uint32_t const_v_offset = kv_head_idx * kv_h_stride + (wid * 8 + tid / 4) * kv_d_stride + tid % 4 * num_elems_per_128b<CacheT>();
+  const uint32_t const_k_offset = kv_head_idx * kv_h_stride +
+                                  (wid * 4 + tid / 8) * kv_b_stride +
+                                  tid % 8 * num_elems_per_128b<CacheT>();
+  const uint32_t const_v_offset = kv_head_idx * kv_h_stride +
+                                  (wid * 8 + tid / 4) * kv_d_stride +
+                                  tid % 4 * num_elems_per_128b<CacheT>();
   // CacheT *cache_k_now = cache_k + block_id * kv_n_stride + const_k_offset;
   // CacheT *cache_v_now = cache_v + block_id * kv_n_stride + const_v_offset;
 #ifdef DEBUG_ATTN_C8
   if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-    printf("387 ori q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: %d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
-           (int)q_smem_offset_r, (int)k_smem_offset_r, (int)v_smem_offset_r, (int)k_smem_offset_w, (int)v_smem_offset_w);
+    printf(
+        "387 ori q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: "
+        "%d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
+        (int)q_smem_offset_r,
+        (int)k_smem_offset_r,
+        (int)v_smem_offset_r,
+        (int)k_smem_offset_w,
+        (int)v_smem_offset_w);
   }
   __syncthreads();
 #endif
 
-  produce_k_blockwise_c8<SharedMemFillMode::kNoFill, NUM_WARPS, BLOCK_SIZE, num_frags_y, num_frags_z, NUM_WARP_Q>(
-    k_smem,
-    &k_smem_offset_w,
-    cache_k,
-    block_table_now,
-    kv_head_idx,
-    kv_n_stride,
-    kv_h_stride,
-    kv_b_stride,
-    kv_idx_base,
-    chunk_end,
-    const_k_offset
-  );
+  produce_k_blockwise_c8<SharedMemFillMode::kNoFill,
+                         NUM_WARPS,
+                         BLOCK_SIZE,
+                         num_frags_y,
+                         num_frags_z,
+                         NUM_WARP_Q>(k_smem,
+                                     &k_smem_offset_w,
+                                     cache_k,
+                                     block_table_now,
+                                     kv_head_idx,
+                                     kv_n_stride,
+                                     kv_h_stride,
+                                     kv_b_stride,
+                                     kv_idx_base,
+                                     chunk_end,
+                                     const_k_offset);
   commit_group();
-  produce_v_blockwise_c8<SharedMemFillMode::kNoFill, NUM_WARPS, BLOCK_SIZE, num_frags_y, num_frags_z, NUM_WARP_Q>(
-    v_smem,
-    &v_smem_offset_w,
-    cache_v,
-    block_table_now,
-    kv_head_idx,
-    kv_n_stride,
-    kv_h_stride,
-    kv_d_stride,
-    kv_idx_base,
-    chunk_end,
-    const_v_offset
-  );
+  produce_v_blockwise_c8<SharedMemFillMode::kNoFill,
+                         NUM_WARPS,
+                         BLOCK_SIZE,
+                         num_frags_y,
+                         num_frags_z,
+                         NUM_WARP_Q>(v_smem,
+                                     &v_smem_offset_w,
+                                     cache_v,
+                                     block_table_now,
+                                     kv_head_idx,
+                                     kv_n_stride,
+                                     kv_h_stride,
+                                     kv_d_stride,
+                                     kv_idx_base,
+                                     chunk_end,
+                                     const_v_offset);
   commit_group();
 #ifdef DEBUG_ATTN_C8
   if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-    printf("418 ori q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: %d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
-           (int)q_smem_offset_r, (int)k_smem_offset_r, (int)v_smem_offset_r, (int)k_smem_offset_w, (int)v_smem_offset_w);
+    printf(
+        "418 ori q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: "
+        "%d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
+        (int)q_smem_offset_r,
+        (int)k_smem_offset_r,
+        (int)v_smem_offset_r,
+        (int)k_smem_offset_w,
+        (int)v_smem_offset_w);
   }
   __syncthreads();
 #endif
@@ -1142,10 +1226,13 @@ __global__ void multi_query_append_attention_c8_kernel(
 #ifdef DEBUG_ATTN_C8
     if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
       printf("cache_k_smem\n");
-      uint8_t *k_smem_t = reinterpret_cast<uint8_t*>(k_smem.base);
+      uint8_t *k_smem_t = reinterpret_cast<uint8_t *>(k_smem.base);
       for (uint32_t i = 0; i < num_frags_z * 16; ++i) {
         for (uint32_t j = 0; j < num_frags_y * 16; ++j) {
-          printf("k_smem[%d][%d] = %d  ", (int)i, (int)j, (int)k_smem_t[i * num_frags_y * 16 + j]);
+          printf("k_smem[%d][%d] = %d  ",
+                 (int)i,
+                 (int)j,
+                 (int)k_smem_t[i * num_frags_y * 16 + j]);
         }
         printf("\n");
       }
@@ -1155,33 +1242,55 @@ __global__ void multi_query_append_attention_c8_kernel(
 
     // s = qk
     compute_qk_c8<num_frags_x, num_frags_y, num_frags_z, T, CacheT>(
-      &qo_smem, 
-      &q_smem_offset_r, 
-      &k_smem,
-      &k_smem_offset_r, 
-      cache_k_scale_reg, 
-      s_frag);
+        &qo_smem,
+        &q_smem_offset_r,
+        &k_smem,
+        &k_smem_offset_r,
+        cache_k_scale_reg,
+        s_frag);
 #ifdef DEBUG_ATTN_C8
     if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-      printf("111 iter: %d, q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: %d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
-            (int)iter, (int)q_smem_offset_r, (int)k_smem_offset_r, (int)v_smem_offset_r, (int)k_smem_offset_w, (int)v_smem_offset_w);
+      printf(
+          "111 iter: %d, q_smem_offset_r: %d, k_smem_offset_r: %d, "
+          "v_smem_offset_r: %d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
+          (int)iter,
+          (int)q_smem_offset_r,
+          (int)k_smem_offset_r,
+          (int)v_smem_offset_r,
+          (int)k_smem_offset_w,
+          (int)v_smem_offset_w);
     }
     __syncthreads();
 #endif
 
     // mask according to kv_idx and q_idx
     if (iter >= mask_check_iteration) {
-      mask_s<T, partition_kv, CAUSAL, GROUP_SIZE, NUM_WARPS, num_frags_x, num_frags_y, num_frags_z>(
-             q_base_seq_id_this_block, kv_idx_base, q_len, kv_len, chunk_end, s_frag);
+      mask_s<T,
+             partition_kv,
+             CAUSAL,
+             GROUP_SIZE,
+             NUM_WARPS,
+             num_frags_x,
+             num_frags_y,
+             num_frags_z>(q_base_seq_id_this_block,
+                          kv_idx_base,
+                          q_len,
+                          kv_len,
+                          chunk_end,
+                          s_frag);
     }
 #ifdef DEBUG_ATTN_C8
     if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
       for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
         for (uint32_t fz = 0; fz < num_frags_z; ++fz) {
           for (int k = 0; k < 8; k++) {
-            printf("mask_s s_frag[%d][%d][%d]: %f  ", (int)fx, (int)fz, (int)k, s_frag[fx][fz][k]);
+            printf("mask_s s_frag[%d][%d][%d]: %f  ",
+                   (int)fx,
+                   (int)fz,
+                   (int)k,
+                   s_frag[fx][fz][k]);
           }
-          printf("\n"); 
+          printf("\n");
         }
         printf("\n");
       }
@@ -1189,70 +1298,97 @@ __global__ void multi_query_append_attention_c8_kernel(
     __syncthreads();
 #endif
 
-     // update m,d
+    // update m,d
     update_mdo_states<num_frags_x, num_frags_y, num_frags_z>(
-      s_frag, o_frag, m_frag, d_frag);
+        s_frag, o_frag, m_frag, d_frag);
     __syncthreads();
 
     kv_idx_base += num_frags_z * 16;
-    produce_k_blockwise_c8<SharedMemFillMode::kNoFill, NUM_WARPS, BLOCK_SIZE, num_frags_y, num_frags_z, NUM_WARP_Q>(
-      k_smem,
-      &k_smem_offset_w,
-      cache_k,
-      block_table_now,
-      kv_head_idx,
-      kv_n_stride,
-      kv_h_stride,
-      kv_b_stride,
-      kv_idx_base,
-      chunk_end,
-      const_k_offset
-    );
+    produce_k_blockwise_c8<SharedMemFillMode::kNoFill,
+                           NUM_WARPS,
+                           BLOCK_SIZE,
+                           num_frags_y,
+                           num_frags_z,
+                           NUM_WARP_Q>(k_smem,
+                                       &k_smem_offset_w,
+                                       cache_k,
+                                       block_table_now,
+                                       kv_head_idx,
+                                       kv_n_stride,
+                                       kv_h_stride,
+                                       kv_b_stride,
+                                       kv_idx_base,
+                                       chunk_end,
+                                       const_k_offset);
     commit_group();
     wait_group<1>();
     __syncthreads();
 #ifdef DEBUG_ATTN_C8
     if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-      printf("222 iter: %d, q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: %d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
-            (int)iter, (int)q_smem_offset_r, (int)k_smem_offset_r, (int)v_smem_offset_r, (int)k_smem_offset_w, (int)v_smem_offset_w);
+      printf(
+          "222 iter: %d, q_smem_offset_r: %d, k_smem_offset_r: %d, "
+          "v_smem_offset_r: %d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
+          (int)iter,
+          (int)q_smem_offset_r,
+          (int)k_smem_offset_r,
+          (int)v_smem_offset_r,
+          (int)k_smem_offset_w,
+          (int)v_smem_offset_w);
     }
     __syncthreads();
 #endif
 
     // compute sfm*v
-    compute_sfm_v_c8<num_frags_x, num_frags_y, num_frags_z, BLOCK_SIZE, T, CacheT>(
-      &v_smem, 
-      &v_smem_offset_r, 
-      s_frag,
-      o_frag, 
-      d_frag, 
-      cache_v_scale_reg);
+    compute_sfm_v_c8<num_frags_x,
+                     num_frags_y,
+                     num_frags_z,
+                     BLOCK_SIZE,
+                     T,
+                     CacheT>(
+        &v_smem, &v_smem_offset_r, s_frag, o_frag, d_frag, cache_v_scale_reg);
     __syncthreads();
 #ifdef DEBUG_ATTN_C8
     if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-      printf("333 iter: %d, q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: %d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
-            (int)iter, (int)q_smem_offset_r, (int)k_smem_offset_r, (int)v_smem_offset_r, (int)k_smem_offset_w, (int)v_smem_offset_w);
+      printf(
+          "333 iter: %d, q_smem_offset_r: %d, k_smem_offset_r: %d, "
+          "v_smem_offset_r: %d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
+          (int)iter,
+          (int)q_smem_offset_r,
+          (int)k_smem_offset_r,
+          (int)v_smem_offset_r,
+          (int)k_smem_offset_w,
+          (int)v_smem_offset_w);
     }
     __syncthreads();
 #endif
-    produce_v_blockwise_c8<SharedMemFillMode::kNoFill, NUM_WARPS, BLOCK_SIZE, num_frags_y, num_frags_z, NUM_WARP_Q>(
-      v_smem,
-      &v_smem_offset_w,
-      cache_v,
-      block_table_now,
-      kv_head_idx,
-      kv_n_stride,
-      kv_h_stride,
-      kv_d_stride,
-      kv_idx_base,
-      chunk_end,
-      const_v_offset
-    );
+    produce_v_blockwise_c8<SharedMemFillMode::kNoFill,
+                           NUM_WARPS,
+                           BLOCK_SIZE,
+                           num_frags_y,
+                           num_frags_z,
+                           NUM_WARP_Q>(v_smem,
+                                       &v_smem_offset_w,
+                                       cache_v,
+                                       block_table_now,
+                                       kv_head_idx,
+                                       kv_n_stride,
+                                       kv_h_stride,
+                                       kv_d_stride,
+                                       kv_idx_base,
+                                       chunk_end,
+                                       const_v_offset);
     commit_group();
 #ifdef DEBUG_ATTN_C8
     if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-      printf("444 iter: %d, q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: %d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
-            (int)iter, (int)q_smem_offset_r, (int)k_smem_offset_r, (int)v_smem_offset_r, (int)k_smem_offset_w, (int)v_smem_offset_w);
+      printf(
+          "444 iter: %d, q_smem_offset_r: %d, k_smem_offset_r: %d, "
+          "v_smem_offset_r: %d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
+          (int)iter,
+          (int)q_smem_offset_r,
+          (int)k_smem_offset_r,
+          (int)v_smem_offset_r,
+          (int)k_smem_offset_w,
+          (int)v_smem_offset_w);
     }
     __syncthreads();
 #endif
@@ -1267,33 +1403,37 @@ __global__ void multi_query_append_attention_c8_kernel(
   // write o
   // [num_frags_x, 16, num_frags_y, 16]
   if constexpr (partition_kv) {
-    write_o_reg_gmem_shift_smooth_quant<GROUP_SIZE, num_frags_x, num_frags_y, partition_kv>(
-      o_frag,
-      &qo_smem,
-      o_base_ptr_T,
-      shift_bias,
-      smooth_weight,
-      q_base_seq_id_this_block,
-      q_head_idx,
-      in_scale,
-      q_len,
-      partition_kv ? q_n_stride * num_chunks : q_n_stride, 
-      HEAD_DIM
-    );
+    write_o_reg_gmem_shift_smooth_quant<GROUP_SIZE,
+                                        num_frags_x,
+                                        num_frags_y,
+                                        partition_kv>(
+        o_frag,
+        &qo_smem,
+        o_base_ptr_T,
+        shift_bias,
+        smooth_weight,
+        q_base_seq_id_this_block,
+        q_head_idx,
+        in_scale,
+        q_len,
+        partition_kv ? q_n_stride * num_chunks : q_n_stride,
+        HEAD_DIM);
   } else {
-    write_o_reg_gmem_shift_smooth_quant<GROUP_SIZE, num_frags_x, num_frags_y, partition_kv>(
-      o_frag,
-      &qo_smem,
-      o_base_ptr_int8,
-      shift_bias,
-      smooth_weight,
-      q_base_seq_id_this_block,
-      q_head_idx,
-      in_scale,
-      q_len,
-      partition_kv ? q_n_stride * num_chunks : q_n_stride, 
-      HEAD_DIM
-    );
+    write_o_reg_gmem_shift_smooth_quant<GROUP_SIZE,
+                                        num_frags_x,
+                                        num_frags_y,
+                                        partition_kv>(
+        o_frag,
+        &qo_smem,
+        o_base_ptr_int8,
+        shift_bias,
+        smooth_weight,
+        q_base_seq_id_this_block,
+        q_head_idx,
+        in_scale,
+        q_len,
+        partition_kv ? q_n_stride * num_chunks : q_n_stride,
+        HEAD_DIM);
   }
 
 
@@ -1302,15 +1442,22 @@ __global__ void multi_query_append_attention_c8_kernel(
     for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
 #pragma unroll
       for (uint32_t j = 0; j < 2; ++j) {
-        const uint32_t qo_idx_now = q_base_seq_id_this_block + tid / 4 + j * 8 + fx * 16;
+        const uint32_t qo_idx_now =
+            q_base_seq_id_this_block + tid / 4 + j * 8 + fx * 16;
         const uint32_t qo_head_idx = q_head_idx + qo_idx_now % GROUP_SIZE;
         const uint32_t qo_idx = q_start_seq_id + qo_idx_now / GROUP_SIZE;
         if (qo_idx - q_start_seq_id < q_len) {
           uint32_t offset;
           if (ENABLE_PREFILL) {
-            offset = (qo_idx * num_chunks + chunk_idx) * q_num_heads + qo_head_idx;
+            offset =
+                (qo_idx * num_chunks + chunk_idx) * q_num_heads + qo_head_idx;
           } else {
-            offset = ((batch_id * speculate_max_draft_token_num + qo_idx_now / GROUP_SIZE) * num_chunks + chunk_idx) * q_num_heads + qo_head_idx;
+            offset = ((batch_id * speculate_max_draft_token_num +
+                       qo_idx_now / GROUP_SIZE) *
+                          num_chunks +
+                      chunk_idx) *
+                         q_num_heads +
+                     qo_head_idx;
           }
           tmp_m[offset] = m_frag[fx][j];
           tmp_d[offset] = d_frag[fx][j];
@@ -1337,7 +1484,8 @@ template <typename T,
           bool ENABLE_PREFILL = true>
 __global__ void multi_query_append_attention_c8_warp1_4_kernel(
     T *__restrict__ q,             // [token_num. num_heads, head_dim]
-    CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size, head_dim]
+    CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size,
+                                   // head_dim]
     CacheT *__restrict__ cache_v,
     const T *__restrict__ cache_k_scale,  // [num_kv_heads, head_dim]
     const T *__restrict__ cache_v_scale,  // [num_kv_heads, head_dim]
@@ -1361,7 +1509,6 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
     float *__restrict__ tmp_d,      // [token_num, num_chunks, num_heads]
     OutT *__restrict__ out,
     const int speculate_max_draft_token_num = 5) {
-  
   constexpr uint32_t num_vecs_per_head = HEAD_DIM / num_elems_per_128b<T>();
   constexpr uint32_t num_vecs_per_head_k =
       HEAD_DIM / num_elems_per_128b<CacheT>();
@@ -1443,7 +1590,7 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
   if (num_chunks_this_seq <= 1) {
     o_base_ptr_int8 = out + o_offset;
   } else {
-  // if constexpr (partition_kv) {
+    // if constexpr (partition_kv) {
     if (ENABLE_PREFILL) {
       o_base_ptr_T = tmp_workspace + batch_id * num_chunks * q_n_stride +
                      chunk_idx * q_n_stride + q_head_idx * HEAD_DIM +
@@ -1455,8 +1602,8 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
           chunk_idx * q_n_stride + q_head_idx * HEAD_DIM +
           tid % 8 * num_elems_per_128b<T>();
     }
-  // } else {
-  //   o_base_ptr_int8 = out + o_offset;
+    // } else {
+    //   o_base_ptr_int8 = out + o_offset;
   }
 #ifdef DEBUG_ATTN_C8
   if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
@@ -1891,19 +2038,21 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
   // write o
   // [num_frags_x, 16, num_frags_y, 16]
   if (num_chunks_this_seq <= 1) {
-    write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE, num_frags_x, num_frags_y, false>(
-      o_frag,
-      &qo_smem,
-      o_base_ptr_int8,
-      shift_bias,
-      smooth_weight,
-      q_base_seq_id_this_block,
-      q_head_idx,
-      in_scale,
-      q_len,
-      q_n_stride, 
-      HEAD_DIM
-    );
+    write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
+                                                    num_frags_x,
+                                                    num_frags_y,
+                                                    false>(
+        o_frag,
+        &qo_smem,
+        o_base_ptr_int8,
+        shift_bias,
+        smooth_weight,
+        q_base_seq_id_this_block,
+        q_head_idx,
+        in_scale,
+        q_len,
+        q_n_stride,
+        HEAD_DIM);
   } else {
     write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
                                                     num_frags_x,
@@ -1920,22 +2069,22 @@ __global__ void multi_query_append_attention_c8_warp1_4_kernel(
         q_len,
         q_n_stride * num_chunks,
         HEAD_DIM);
-  // } else {
-  //   write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
-  //                                                   num_frags_x,
-  //                                                   num_frags_y,
-  //                                                   partition_kv>(
-  //       o_frag,
-  //       &qo_smem,
-  //       o_base_ptr_int8,
-  //       shift_bias,
-  //       smooth_weight,
-  //       q_base_seq_id_this_block,
-  //       q_head_idx,
-  //       in_scale,
-  //       q_len,
-  //       partition_kv ? q_n_stride * num_chunks : q_n_stride,
-  //       HEAD_DIM);
+    // } else {
+    //   write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
+    //                                                   num_frags_x,
+    //                                                   num_frags_y,
+    //                                                   partition_kv>(
+    //       o_frag,
+    //       &qo_smem,
+    //       o_base_ptr_int8,
+    //       shift_bias,
+    //       smooth_weight,
+    //       q_base_seq_id_this_block,
+    //       q_head_idx,
+    //       in_scale,
+    //       q_len,
+    //       partition_kv ? q_n_stride * num_chunks : q_n_stride,
+    //       HEAD_DIM);
   }
 #ifdef DEBUG_ATTN_C8
   __syncthreads();
@@ -2864,8 +3013,8 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
           chunk_idx * q_n_stride + q_head_idx * HEAD_DIM +
           tid % 8 * num_elems_per_128b<T>();
     }
-  // } else {
-  //   o_base_ptr_int8 = out + o_offset;
+    // } else {
+    //   o_base_ptr_int8 = out + o_offset;
   }
 #ifdef DEBUG_ATTN_C4
   if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
@@ -3339,19 +3488,21 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
   // write o
   // [num_frags_x, 16, num_frags_y, 16]
   if (num_chunks_this_seq <= 1) {
-    write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE, num_frags_x, num_frags_y, false>(
-      o_frag,
-      &qo_smem,
-      o_base_ptr_int8,
-      shift_bias,
-      smooth_weight,
-      q_base_seq_id_this_block,
-      q_head_idx,
-      in_scale,
-      q_len,
-      q_n_stride, 
-      HEAD_DIM
-    );
+    write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
+                                                    num_frags_x,
+                                                    num_frags_y,
+                                                    false>(
+        o_frag,
+        &qo_smem,
+        o_base_ptr_int8,
+        shift_bias,
+        smooth_weight,
+        q_base_seq_id_this_block,
+        q_head_idx,
+        in_scale,
+        q_len,
+        q_n_stride,
+        HEAD_DIM);
   } else {
     write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
                                                     num_frags_x,
@@ -3368,22 +3519,22 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
         q_len,
         q_n_stride * num_chunks,
         HEAD_DIM);
-  // } else {
-  //   write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
-  //                                                   num_frags_x,
-  //                                                   num_frags_y,
-  //                                                   partition_kv>(
-  //       o_frag,
-  //       &qo_smem,
-  //       o_base_ptr_int8,
-  //       shift_bias,
-  //       smooth_weight,
-  //       q_base_seq_id_this_block,
-  //       q_head_idx,
-  //       in_scale,
-  //       q_len,
-  //       partition_kv ? q_n_stride * num_chunks : q_n_stride,
-  //       HEAD_DIM);
+    // } else {
+    //   write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
+    //                                                   num_frags_x,
+    //                                                   num_frags_y,
+    //                                                   partition_kv>(
+    //       o_frag,
+    //       &qo_smem,
+    //       o_base_ptr_int8,
+    //       shift_bias,
+    //       smooth_weight,
+    //       q_base_seq_id_this_block,
+    //       q_head_idx,
+    //       in_scale,
+    //       q_len,
+    //       partition_kv ? q_n_stride * num_chunks : q_n_stride,
+    //       HEAD_DIM);
   }
 
   if (num_chunks_this_seq > 1) {
@@ -3741,21 +3892,21 @@ template <typename T,
           typename OutT,
           bool ENABLE_PREFILL = true>
 void MultiQueryAppendAttention(
-    const AppendAttnMetaData& meta_data,
-    const paddle::Tensor& qkv,
-    const paddle::Tensor& cache_k,
-    const paddle::Tensor& cache_v,
-    const paddle::optional<paddle::Tensor>& attn_mask,
-    const paddle::optional<paddle::Tensor>& shift_bias,
-    const paddle::optional<paddle::Tensor>& smooth_weight,
-    const paddle::Tensor& seq_lens_q,
-    const paddle::Tensor& seq_lens_kv,
-    const paddle::Tensor& seq_lens_encoder,
-    const paddle::Tensor& padding_offsets,
-    const paddle::Tensor& cum_offsets,
-    const paddle::Tensor& block_table,
-    const paddle::Tensor& batch_ids,
-    const paddle::Tensor& tile_ids_per_batch,
+    const AppendAttnMetaData &meta_data,
+    const paddle::Tensor &qkv,
+    const paddle::Tensor &cache_k,
+    const paddle::Tensor &cache_v,
+    const paddle::optional<paddle::Tensor> &attn_mask,
+    const paddle::optional<paddle::Tensor> &shift_bias,
+    const paddle::optional<paddle::Tensor> &smooth_weight,
+    const paddle::Tensor &seq_lens_q,
+    const paddle::Tensor &seq_lens_kv,
+    const paddle::Tensor &seq_lens_encoder,
+    const paddle::Tensor &padding_offsets,
+    const paddle::Tensor &cum_offsets,
+    const paddle::Tensor &block_table,
+    const paddle::Tensor &batch_ids,
+    const paddle::Tensor &tile_ids_per_batch,
     const int num_blocks_x_cpu,
     const int max_seq_len,
     const int max_dec_len,
@@ -3764,8 +3915,8 @@ void MultiQueryAppendAttention(
     const int encoder_max_partition_size,
     const int speculate_max_draft_token_num,
     const bool is_decoder,
-    cudaStream_t& stream,
-    paddle::Tensor* out) {
+    cudaStream_t &stream,
+    paddle::Tensor *out) {
   using NV_TYPE = typename cascade_attn_type_traits<T>::type;
   using OUT_NV_TYPE = typename cascade_attn_type_traits<OutT>::type;
 
@@ -3781,7 +3932,7 @@ void MultiQueryAppendAttention(
   constexpr uint32_t num_frags_y = HEAD_DIM / 16;
   constexpr uint32_t num_qrow_per_block = NUM_WARP_Q * num_frags_x * 16;
 
-  auto* allocator = paddle::GetAllocator(qkv.place());
+  auto *allocator = paddle::GetAllocator(qkv.place());
 
   const float scale = 1.f / sqrt(HEAD_DIM);
 
@@ -3844,13 +3995,15 @@ void MultiQueryAppendAttention(
       }
 
       nosplit_kv_kernel<<<grids, blocks, smem_size, stream>>>(
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_k.data<T>())),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_v.data<T>())),
-          shift_bias ? reinterpret_cast<NV_TYPE*>(
-                        const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-          smooth_weight ? reinterpret_cast<NV_TYPE*>(
-                        const_cast<T*>(smooth_weight.get().data<T>())) : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(qkv.data<T>())),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_k.data<T>())),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_v.data<T>())),
+          shift_bias ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(shift_bias.get().data<T>()))
+                     : nullptr,
+          smooth_weight ? reinterpret_cast<NV_TYPE *>(
+                              const_cast<T *>(smooth_weight.get().data<T>()))
+                        : nullptr,
           seq_lens_q.data<int>(),
           seq_lens_kv.data<int>(),
           batch_ids.data<int>(),
@@ -3866,7 +4019,7 @@ void MultiQueryAppendAttention(
           nullptr,
           nullptr,
           nullptr,
-          reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+          reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
           speculate_max_draft_token_num);
 
     } else {
@@ -3897,13 +4050,15 @@ void MultiQueryAppendAttention(
       }
 
       split_kv_kernel<<<grids, blocks, smem_size, stream>>>(
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_k.data<T>())),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_v.data<T>())),
-          shift_bias ? reinterpret_cast<NV_TYPE*>(
-                        const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-          smooth_weight ? reinterpret_cast<NV_TYPE*>(
-                            const_cast<T*>(smooth_weight.get().data<T>())) : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(qkv.data<T>())),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_k.data<T>())),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_v.data<T>())),
+          shift_bias ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(shift_bias.get().data<T>()))
+                     : nullptr,
+          smooth_weight ? reinterpret_cast<NV_TYPE *>(
+                              const_cast<T *>(smooth_weight.get().data<T>()))
+                        : nullptr,
           seq_lens_q.data<int>(),
           seq_lens_kv.data<int>(),
           batch_ids.data<int>(),
@@ -3916,10 +4071,10 @@ void MultiQueryAppendAttention(
           scale,
           in_scale,
           chunk_size,
-          reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-          static_cast<float*>(tmp_m->ptr()),
-          static_cast<float*>(tmp_d->ptr()),
-          reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+          reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+          static_cast<float *>(tmp_m->ptr()),
+          static_cast<float *>(tmp_d->ptr()),
+          reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
           speculate_max_draft_token_num);
       // merge
       constexpr int vec_size = num_elems_per_128b<NV_TYPE>();
@@ -3935,18 +4090,20 @@ void MultiQueryAppendAttention(
                                           OUT_NV_TYPE,
                                           ENABLE_PREFILL>
             <<<grids_merge, blocks_merge, 0, stream>>>(
-                reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-                static_cast<float*>(tmp_m->ptr()),
-                static_cast<float*>(tmp_d->ptr()),
+                reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+                static_cast<float *>(tmp_m->ptr()),
+                static_cast<float *>(tmp_d->ptr()),
                 seq_lens_q.data<int>(),
                 seq_lens_kv.data<int>(),
                 seq_lens_encoder.data<int>(),
                 cum_offsets.data<int>(),
-                shift_bias ? reinterpret_cast<NV_TYPE*>(
-                                const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-                smooth_weight ? reinterpret_cast<NV_TYPE*>(const_cast<T*>(
-                                smooth_weight.get().data<T>())) : nullptr,
-                reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+                shift_bias ? reinterpret_cast<NV_TYPE *>(
+                                 const_cast<T *>(shift_bias.get().data<T>()))
+                           : nullptr,
+                smooth_weight ? reinterpret_cast<NV_TYPE *>(const_cast<T *>(
+                                    smooth_weight.get().data<T>()))
+                              : nullptr,
+                reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
                 in_scale,
                 max_seq_len,
                 num_chunks,
@@ -3966,18 +4123,20 @@ void MultiQueryAppendAttention(
                                      OUT_NV_TYPE,
                                      ENABLE_PREFILL>
             <<<grids_merge, blocks_merge, 0, stream>>>(
-                reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-                static_cast<float*>(tmp_m->ptr()),
-                static_cast<float*>(tmp_d->ptr()),
+                reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+                static_cast<float *>(tmp_m->ptr()),
+                static_cast<float *>(tmp_d->ptr()),
                 seq_lens_q.data<int>(),
                 seq_lens_kv.data<int>(),
                 seq_lens_encoder.data<int>(),
                 padding_offsets.data<int>(),
-                shift_bias ? reinterpret_cast<NV_TYPE*>(
-                                const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-                smooth_weight ? reinterpret_cast<NV_TYPE*>(const_cast<T*>(
-                                smooth_weight.get().data<T>())) : nullptr,
-                reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+                shift_bias ? reinterpret_cast<NV_TYPE *>(
+                                 const_cast<T *>(shift_bias.get().data<T>()))
+                           : nullptr,
+                smooth_weight ? reinterpret_cast<NV_TYPE *>(const_cast<T *>(
+                                    smooth_weight.get().data<T>()))
+                              : nullptr,
+                reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
                 in_scale,
                 max_seq_len,
                 num_chunks,
@@ -4051,13 +4210,15 @@ void MultiQueryAppendAttention(
       }
 
       nosplit_kv_kernel<<<grids, blocks, smem_size, stream>>>(
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_k.data<T>())),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_v.data<T>())),
-          shift_bias ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-          smooth_weight ? reinterpret_cast<NV_TYPE*>(
-                              const_cast<T*>(smooth_weight.get().data<T>())) : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(qkv.data<T>())),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_k.data<T>())),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_v.data<T>())),
+          shift_bias ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(shift_bias.get().data<T>()))
+                     : nullptr,
+          smooth_weight ? reinterpret_cast<NV_TYPE *>(
+                              const_cast<T *>(smooth_weight.get().data<T>()))
+                        : nullptr,
           seq_lens_q.data<int>(),
           seq_lens_kv.data<int>(),
           batch_ids.data<int>(),
@@ -4073,7 +4234,7 @@ void MultiQueryAppendAttention(
           nullptr,
           nullptr,
           nullptr,
-          reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+          reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
           speculate_max_draft_token_num);
     } else {
       phi::Allocator::AllocationPtr tmp_workspace, tmp_m, tmp_d;
@@ -4115,13 +4276,15 @@ void MultiQueryAppendAttention(
         }
       }
       split_kv_kernel<<<grids, blocks, smem_size, stream>>>(
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_k.data<T>())),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_v.data<T>())),
-          shift_bias ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-          smooth_weight ? reinterpret_cast<NV_TYPE*>(
-                            const_cast<T*>(smooth_weight.get().data<T>())) : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(qkv.data<T>())),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_k.data<T>())),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_v.data<T>())),
+          shift_bias ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(shift_bias.get().data<T>()))
+                     : nullptr,
+          smooth_weight ? reinterpret_cast<NV_TYPE *>(
+                              const_cast<T *>(smooth_weight.get().data<T>()))
+                        : nullptr,
           seq_lens_q.data<int>(),
           seq_lens_kv.data<int>(),
           batch_ids.data<int>(),
@@ -4134,10 +4297,10 @@ void MultiQueryAppendAttention(
           scale,
           in_scale,
           chunk_size,
-          reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-          static_cast<float*>(tmp_m->ptr()),
-          static_cast<float*>(tmp_d->ptr()),
-          reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+          reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+          static_cast<float *>(tmp_m->ptr()),
+          static_cast<float *>(tmp_d->ptr()),
+          reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
           speculate_max_draft_token_num);
 
       // merge
@@ -4154,18 +4317,20 @@ void MultiQueryAppendAttention(
                                           OUT_NV_TYPE,
                                           ENABLE_PREFILL>
             <<<grids_merge, blocks_merge, 0, stream>>>(
-                reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-                static_cast<float*>(tmp_m->ptr()),
-                static_cast<float*>(tmp_d->ptr()),
+                reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+                static_cast<float *>(tmp_m->ptr()),
+                static_cast<float *>(tmp_d->ptr()),
                 seq_lens_q.data<int>(),
                 seq_lens_kv.data<int>(),
                 seq_lens_encoder.data<int>(),
                 cum_offsets.data<int>(),
-                shift_bias ? reinterpret_cast<NV_TYPE*>(
-                                 const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-                smooth_weight ? reinterpret_cast<NV_TYPE*>(const_cast<T*>(
-                                    smooth_weight.get().data<T>())) : nullptr,
-                reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+                shift_bias ? reinterpret_cast<NV_TYPE *>(
+                                 const_cast<T *>(shift_bias.get().data<T>()))
+                           : nullptr,
+                smooth_weight ? reinterpret_cast<NV_TYPE *>(const_cast<T *>(
+                                    smooth_weight.get().data<T>()))
+                              : nullptr,
+                reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
                 in_scale,
                 max_seq_len,
                 num_chunks,
@@ -4185,18 +4350,20 @@ void MultiQueryAppendAttention(
                                      OUT_NV_TYPE,
                                      ENABLE_PREFILL>
             <<<grids_merge, blocks_merge, 0, stream>>>(
-                reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-                static_cast<float*>(tmp_m->ptr()),
-                static_cast<float*>(tmp_d->ptr()),
+                reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+                static_cast<float *>(tmp_m->ptr()),
+                static_cast<float *>(tmp_d->ptr()),
                 seq_lens_q.data<int>(),
                 seq_lens_kv.data<int>(),
                 seq_lens_encoder.data<int>(),
                 padding_offsets.data<int>(),
-                shift_bias ? reinterpret_cast<NV_TYPE*>(
-                                 const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-                smooth_weight ? reinterpret_cast<NV_TYPE*>(const_cast<T*>(
-                                    smooth_weight.get().data<T>())) : nullptr,
-                reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+                shift_bias ? reinterpret_cast<NV_TYPE *>(
+                                 const_cast<T *>(shift_bias.get().data<T>()))
+                           : nullptr,
+                smooth_weight ? reinterpret_cast<NV_TYPE *>(const_cast<T *>(
+                                    smooth_weight.get().data<T>()))
+                              : nullptr,
+                reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
                 in_scale,
                 max_seq_len,
                 num_chunks,
@@ -4220,23 +4387,23 @@ template <typename T,
           typename OutT = T,
           bool ENABLE_PREFILL = true>
 void MultiQueryAppendC8Attention(
-    const AppendAttnMetaData& meta_data,
-    const paddle::Tensor& qkv,
-    const paddle::Tensor& cache_k,
-    const paddle::Tensor& cache_v,
-    const paddle::optional<paddle::Tensor>& attn_mask,
-    const paddle::Tensor& cache_k_scale,
-    const paddle::Tensor& cache_v_scale,
-    const paddle::optional<paddle::Tensor>& shift_bias,
-    const paddle::optional<paddle::Tensor>& smooth_weight,
-    const paddle::Tensor& seq_lens_q,
-    const paddle::Tensor& seq_lens_kv,
-    const paddle::Tensor& seq_lens_encoder,
-    const paddle::Tensor& padding_offsets,
-    const paddle::Tensor& cum_offsets,
-    const paddle::Tensor& block_table,
-    const paddle::Tensor& batch_ids,
-    const paddle::Tensor& tile_ids_per_batch,
+    const AppendAttnMetaData &meta_data,
+    const paddle::Tensor &qkv,
+    const paddle::Tensor &cache_k,
+    const paddle::Tensor &cache_v,
+    const paddle::optional<paddle::Tensor> &attn_mask,
+    const paddle::Tensor &cache_k_scale,
+    const paddle::Tensor &cache_v_scale,
+    const paddle::optional<paddle::Tensor> &shift_bias,
+    const paddle::optional<paddle::Tensor> &smooth_weight,
+    const paddle::Tensor &seq_lens_q,
+    const paddle::Tensor &seq_lens_kv,
+    const paddle::Tensor &seq_lens_encoder,
+    const paddle::Tensor &padding_offsets,
+    const paddle::Tensor &cum_offsets,
+    const paddle::Tensor &block_table,
+    const paddle::Tensor &batch_ids,
+    const paddle::Tensor &tile_ids_per_batch,
     const int num_blocks_x_cpu,
     const int max_seq_len,
     const int max_dec_len,
@@ -4245,8 +4412,8 @@ void MultiQueryAppendC8Attention(
     const int encoder_max_partition_size,
     const int speculate_max_draft_token_num,
     const bool is_decoder,
-    cudaStream_t& stream,
-    paddle::Tensor* out) {
+    cudaStream_t &stream,
+    paddle::Tensor *out) {
   using NV_TYPE = typename cascade_attn_type_traits<T>::type;
   using OUT_NV_TYPE = typename cascade_attn_type_traits<OutT>::type;
 
@@ -4262,7 +4429,7 @@ void MultiQueryAppendC8Attention(
   constexpr uint32_t num_frags_y = HEAD_DIM / 16;
   constexpr uint32_t num_qrow_per_block = NUM_WARP_Q * num_frags_x * 16;
 
-  auto* allocator = paddle::GetAllocator(qkv.place());
+  auto *allocator = paddle::GetAllocator(qkv.place());
 
   const float scale = 1.f / sqrt(HEAD_DIM);
 
@@ -4327,15 +4494,17 @@ void MultiQueryAppendC8Attention(
       }
 
       nosplit_kv_kernel<<<grids, blocks, smem_size, stream>>>(
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
-          const_cast<uint8_t*>(cache_k.data<uint8_t>()),
-          const_cast<uint8_t*>(cache_v.data<uint8_t>()),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_k_scale.data<T>())),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_v_scale.data<T>())),
-          shift_bias ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-          smooth_weight ? reinterpret_cast<NV_TYPE*>(
-                              const_cast<T*>(smooth_weight.get().data<T>())) : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(qkv.data<T>())),
+          const_cast<uint8_t *>(cache_k.data<uint8_t>()),
+          const_cast<uint8_t *>(cache_v.data<uint8_t>()),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_k_scale.data<T>())),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_v_scale.data<T>())),
+          shift_bias ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(shift_bias.get().data<T>()))
+                     : nullptr,
+          smooth_weight ? reinterpret_cast<NV_TYPE *>(
+                              const_cast<T *>(smooth_weight.get().data<T>()))
+                        : nullptr,
           seq_lens_q.data<int>(),
           seq_lens_kv.data<int>(),
           batch_ids.data<int>(),
@@ -4351,7 +4520,7 @@ void MultiQueryAppendC8Attention(
           nullptr,
           nullptr,
           nullptr,
-          reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+          reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
           speculate_max_draft_token_num);
     } else {
       phi::Allocator::AllocationPtr tmp_workspace, tmp_m, tmp_d;
@@ -4380,15 +4549,17 @@ void MultiQueryAppendC8Attention(
                                 num_chunks * num_heads));
       }
       split_kv_kernel<<<grids, blocks, smem_size, stream>>>(
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
-          const_cast<uint8_t*>(cache_k.data<uint8_t>()),
-          const_cast<uint8_t*>(cache_v.data<uint8_t>()),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_k_scale.data<T>())),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_v_scale.data<T>())),
-          shift_bias ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-          smooth_weight ? reinterpret_cast<NV_TYPE*>(
-                              const_cast<T*>(smooth_weight.get().data<T>())) : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(qkv.data<T>())),
+          const_cast<uint8_t *>(cache_k.data<uint8_t>()),
+          const_cast<uint8_t *>(cache_v.data<uint8_t>()),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_k_scale.data<T>())),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_v_scale.data<T>())),
+          shift_bias ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(shift_bias.get().data<T>()))
+                     : nullptr,
+          smooth_weight ? reinterpret_cast<NV_TYPE *>(
+                              const_cast<T *>(smooth_weight.get().data<T>()))
+                        : nullptr,
           seq_lens_q.data<int>(),
           seq_lens_kv.data<int>(),
           batch_ids.data<int>(),
@@ -4401,10 +4572,10 @@ void MultiQueryAppendC8Attention(
           scale,
           in_scale,
           chunk_size,
-          reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-          static_cast<float*>(tmp_m->ptr()),
-          static_cast<float*>(tmp_d->ptr()),
-          reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+          reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+          static_cast<float *>(tmp_m->ptr()),
+          static_cast<float *>(tmp_d->ptr()),
+          reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
           speculate_max_draft_token_num);
       // merge
       constexpr int vec_size = num_elems_per_128b<NV_TYPE>();
@@ -4420,18 +4591,20 @@ void MultiQueryAppendC8Attention(
                                           OUT_NV_TYPE,
                                           ENABLE_PREFILL>
             <<<grids_merge, blocks_merge, 0, stream>>>(
-                reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-                static_cast<float*>(tmp_m->ptr()),
-                static_cast<float*>(tmp_d->ptr()),
+                reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+                static_cast<float *>(tmp_m->ptr()),
+                static_cast<float *>(tmp_d->ptr()),
                 seq_lens_q.data<int>(),
                 seq_lens_kv.data<int>(),
                 seq_lens_encoder.data<int>(),
                 cum_offsets.data<int>(),
-                shift_bias ? reinterpret_cast<NV_TYPE*>(
-                                 const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-                smooth_weight ? reinterpret_cast<NV_TYPE*>(const_cast<T*>(
-                                    smooth_weight.get().data<T>())) : nullptr,
-                reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+                shift_bias ? reinterpret_cast<NV_TYPE *>(
+                                 const_cast<T *>(shift_bias.get().data<T>()))
+                           : nullptr,
+                smooth_weight ? reinterpret_cast<NV_TYPE *>(const_cast<T *>(
+                                    smooth_weight.get().data<T>()))
+                              : nullptr,
+                reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
                 in_scale,
                 max_seq_len,
                 num_chunks,
@@ -4451,18 +4624,20 @@ void MultiQueryAppendC8Attention(
                                      OUT_NV_TYPE,
                                      ENABLE_PREFILL>
             <<<grids_merge, blocks_merge, 0, stream>>>(
-                reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-                static_cast<float*>(tmp_m->ptr()),
-                static_cast<float*>(tmp_d->ptr()),
+                reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+                static_cast<float *>(tmp_m->ptr()),
+                static_cast<float *>(tmp_d->ptr()),
                 seq_lens_q.data<int>(),
                 seq_lens_kv.data<int>(),
                 seq_lens_encoder.data<int>(),
                 padding_offsets.data<int>(),
-                shift_bias ? reinterpret_cast<NV_TYPE*>(
-                                 const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-                smooth_weight ? reinterpret_cast<NV_TYPE*>(const_cast<T*>(
-                                    smooth_weight.get().data<T>())) : nullptr,
-                reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+                shift_bias ? reinterpret_cast<NV_TYPE *>(
+                                 const_cast<T *>(shift_bias.get().data<T>()))
+                           : nullptr,
+                smooth_weight ? reinterpret_cast<NV_TYPE *>(const_cast<T *>(
+                                    smooth_weight.get().data<T>()))
+                              : nullptr,
+                reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
                 in_scale,
                 max_seq_len,
                 num_chunks,
@@ -4535,15 +4710,17 @@ void MultiQueryAppendC8Attention(
       }
 
       nosplit_kv_kernel<<<grids, blocks, smem_size, stream>>>(
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
-          const_cast<uint8_t*>(cache_k.data<uint8_t>()),
-          const_cast<uint8_t*>(cache_v.data<uint8_t>()),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_k_scale.data<T>())),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_v_scale.data<T>())),
-          shift_bias ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-          smooth_weight ? reinterpret_cast<NV_TYPE*>(
-                              const_cast<T*>(smooth_weight.get().data<T>())) : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(qkv.data<T>())),
+          const_cast<uint8_t *>(cache_k.data<uint8_t>()),
+          const_cast<uint8_t *>(cache_v.data<uint8_t>()),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_k_scale.data<T>())),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_v_scale.data<T>())),
+          shift_bias ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(shift_bias.get().data<T>()))
+                     : nullptr,
+          smooth_weight ? reinterpret_cast<NV_TYPE *>(
+                              const_cast<T *>(smooth_weight.get().data<T>()))
+                        : nullptr,
           seq_lens_q.data<int>(),
           seq_lens_kv.data<int>(),
           batch_ids.data<int>(),
@@ -4559,7 +4736,7 @@ void MultiQueryAppendC8Attention(
           nullptr,
           nullptr,
           nullptr,
-          reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+          reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
           speculate_max_draft_token_num);
     } else {
       phi::Allocator::AllocationPtr tmp_workspace, tmp_m, tmp_d;
@@ -4601,15 +4778,17 @@ void MultiQueryAppendC8Attention(
         }
       }
       split_kv_kernel<<<grids, blocks, smem_size, stream>>>(
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
-          const_cast<uint8_t*>(cache_k.data<uint8_t>()),
-          const_cast<uint8_t*>(cache_v.data<uint8_t>()),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_k_scale.data<T>())),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_v_scale.data<T>())),
-          shift_bias ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-          smooth_weight ? reinterpret_cast<NV_TYPE*>(
-                              const_cast<T*>(smooth_weight.get().data<T>())) : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(qkv.data<T>())),
+          const_cast<uint8_t *>(cache_k.data<uint8_t>()),
+          const_cast<uint8_t *>(cache_v.data<uint8_t>()),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_k_scale.data<T>())),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_v_scale.data<T>())),
+          shift_bias ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(shift_bias.get().data<T>()))
+                     : nullptr,
+          smooth_weight ? reinterpret_cast<NV_TYPE *>(
+                              const_cast<T *>(smooth_weight.get().data<T>()))
+                        : nullptr,
           seq_lens_q.data<int>(),
           seq_lens_kv.data<int>(),
           batch_ids.data<int>(),
@@ -4622,10 +4801,10 @@ void MultiQueryAppendC8Attention(
           scale,
           in_scale,
           chunk_size,
-          reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-          static_cast<float*>(tmp_m->ptr()),
-          static_cast<float*>(tmp_d->ptr()),
-          reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+          reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+          static_cast<float *>(tmp_m->ptr()),
+          static_cast<float *>(tmp_d->ptr()),
+          reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
           speculate_max_draft_token_num);
       // merge
       constexpr int vec_size = num_elems_per_128b<NV_TYPE>();
@@ -4636,18 +4815,20 @@ void MultiQueryAppendC8Attention(
         dim3 blocks_merge(blockx, blocky);
         merge_multi_chunks_decoder_kernel<NV_TYPE, vec_size, blocky, HEAD_DIM>
             <<<grids_merge, blocks_merge, 0, stream>>>(
-                reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-                static_cast<float*>(tmp_m->ptr()),
-                static_cast<float*>(tmp_d->ptr()),
+                reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+                static_cast<float *>(tmp_m->ptr()),
+                static_cast<float *>(tmp_d->ptr()),
                 seq_lens_q.data<int>(),
                 seq_lens_kv.data<int>(),
                 seq_lens_encoder.data<int>(),
                 cum_offsets.data<int>(),
-                shift_bias ? reinterpret_cast<NV_TYPE*>(
-                                 const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-                smooth_weight ? reinterpret_cast<NV_TYPE*>(const_cast<T*>(
-                                    smooth_weight.get().data<T>())) : nullptr,
-                reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+                shift_bias ? reinterpret_cast<NV_TYPE *>(
+                                 const_cast<T *>(shift_bias.get().data<T>()))
+                           : nullptr,
+                smooth_weight ? reinterpret_cast<NV_TYPE *>(const_cast<T *>(
+                                    smooth_weight.get().data<T>()))
+                              : nullptr,
+                reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
                 in_scale,
                 max_seq_len,
                 num_chunks,
@@ -4667,18 +4848,20 @@ void MultiQueryAppendC8Attention(
                                      OUT_NV_TYPE,
                                      ENABLE_PREFILL>
             <<<grids_merge, blocks_merge, 0, stream>>>(
-                reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-                static_cast<float*>(tmp_m->ptr()),
-                static_cast<float*>(tmp_d->ptr()),
+                reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+                static_cast<float *>(tmp_m->ptr()),
+                static_cast<float *>(tmp_d->ptr()),
                 seq_lens_q.data<int>(),
                 seq_lens_kv.data<int>(),
                 seq_lens_encoder.data<int>(),
                 padding_offsets.data<int>(),
-                shift_bias ? reinterpret_cast<NV_TYPE*>(
-                                 const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-                smooth_weight ? reinterpret_cast<NV_TYPE*>(const_cast<T*>(
-                                    smooth_weight.get().data<T>())) : nullptr,
-                reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+                shift_bias ? reinterpret_cast<NV_TYPE *>(
+                                 const_cast<T *>(shift_bias.get().data<T>()))
+                           : nullptr,
+                smooth_weight ? reinterpret_cast<NV_TYPE *>(const_cast<T *>(
+                                    smooth_weight.get().data<T>()))
+                              : nullptr,
+                reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
                 in_scale,
                 max_seq_len,
                 num_chunks,
@@ -4702,25 +4885,25 @@ template <typename T,
           typename OutT = T,
           bool ENABLE_PREFILL = true>
 void MultiQueryAppendC4Attention(
-    const AppendAttnMetaData& meta_data,
-    const paddle::Tensor& qkv,
-    const paddle::Tensor& cache_k,
-    const paddle::Tensor& cache_v,
-    const paddle::optional<paddle::Tensor>& attn_mask,
-    const paddle::Tensor& cache_k_scale,
-    const paddle::Tensor& cache_v_scale,
-    const paddle::optional<paddle::Tensor>& cache_k_zp,
-    const paddle::optional<paddle::Tensor>& cache_v_zp,
-    const paddle::optional<paddle::Tensor>& shift_bias,
-    const paddle::optional<paddle::Tensor>& smooth_weight,
-    const paddle::Tensor& seq_lens_q,
-    const paddle::Tensor& seq_lens_kv,
-    const paddle::Tensor& seq_lens_encoder,
-    const paddle::Tensor& padding_offsets,
-    const paddle::Tensor& cum_offsets,
-    const paddle::Tensor& block_table,
-    const paddle::Tensor& batch_ids,
-    const paddle::Tensor& tile_ids_per_batch,
+    const AppendAttnMetaData &meta_data,
+    const paddle::Tensor &qkv,
+    const paddle::Tensor &cache_k,
+    const paddle::Tensor &cache_v,
+    const paddle::optional<paddle::Tensor> &attn_mask,
+    const paddle::Tensor &cache_k_scale,
+    const paddle::Tensor &cache_v_scale,
+    const paddle::optional<paddle::Tensor> &cache_k_zp,
+    const paddle::optional<paddle::Tensor> &cache_v_zp,
+    const paddle::optional<paddle::Tensor> &shift_bias,
+    const paddle::optional<paddle::Tensor> &smooth_weight,
+    const paddle::Tensor &seq_lens_q,
+    const paddle::Tensor &seq_lens_kv,
+    const paddle::Tensor &seq_lens_encoder,
+    const paddle::Tensor &padding_offsets,
+    const paddle::Tensor &cum_offsets,
+    const paddle::Tensor &block_table,
+    const paddle::Tensor &batch_ids,
+    const paddle::Tensor &tile_ids_per_batch,
     const int num_blocks_x_cpu,
     const int max_seq_len,
     const int max_dec_len,
@@ -4729,8 +4912,8 @@ void MultiQueryAppendC4Attention(
     const int encoder_max_partition_size,
     const int speculate_max_draft_token_num,
     const bool is_decoder,
-    cudaStream_t& stream,
-    paddle::Tensor* out) {
+    cudaStream_t &stream,
+    paddle::Tensor *out) {
   using NV_TYPE = typename cascade_attn_type_traits<T>::type;
   using OUT_NV_TYPE = typename cascade_attn_type_traits<OutT>::type;
 
@@ -4746,7 +4929,7 @@ void MultiQueryAppendC4Attention(
   constexpr uint32_t num_frags_y = HEAD_DIM / 16;
   constexpr uint32_t num_qrow_per_block = NUM_WARP_Q * num_frags_x * 16;
 
-  auto* allocator = paddle::GetAllocator(qkv.place());
+  auto *allocator = paddle::GetAllocator(qkv.place());
 
   const float scale = 1.f / sqrt(HEAD_DIM);
 
@@ -4822,19 +5005,23 @@ void MultiQueryAppendC4Attention(
                              smem_size);
       }
       nosplit_kv_kernel<<<grids, blocks, smem_size, stream>>>(
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
-          const_cast<uint8_t*>(cache_k.data<uint8_t>()),
-          const_cast<uint8_t*>(cache_v.data<uint8_t>()),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_k_scale.data<T>())),
-          cache_k_zp ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(cache_k_zp.get().data<T>())) : nullptr,
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_v_scale.data<T>())),
-          cache_v_zp ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(cache_v_zp.get().data<T>())) : nullptr,
-          shift_bias ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-          smooth_weight ? reinterpret_cast<NV_TYPE*>(
-                              const_cast<T*>(smooth_weight.get().data<T>())) : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(qkv.data<T>())),
+          const_cast<uint8_t *>(cache_k.data<uint8_t>()),
+          const_cast<uint8_t *>(cache_v.data<uint8_t>()),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_k_scale.data<T>())),
+          cache_k_zp ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(cache_k_zp.get().data<T>()))
+                     : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_v_scale.data<T>())),
+          cache_v_zp ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(cache_v_zp.get().data<T>()))
+                     : nullptr,
+          shift_bias ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(shift_bias.get().data<T>()))
+                     : nullptr,
+          smooth_weight ? reinterpret_cast<NV_TYPE *>(
+                              const_cast<T *>(smooth_weight.get().data<T>()))
+                        : nullptr,
           seq_lens_q.data<int>(),
           seq_lens_kv.data<int>(),
           batch_ids.data<int>(),
@@ -4850,7 +5037,7 @@ void MultiQueryAppendC4Attention(
           nullptr,
           nullptr,
           nullptr,
-          reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+          reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
           speculate_max_draft_token_num);
     } else {
       phi::Allocator::AllocationPtr tmp_workspace, tmp_m, tmp_d;
@@ -4879,19 +5066,23 @@ void MultiQueryAppendC4Attention(
                                 num_chunks * num_heads));
       }
       split_kv_kernel<<<grids, blocks, smem_size, stream>>>(
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
-          const_cast<uint8_t*>(cache_k.data<uint8_t>()),
-          const_cast<uint8_t*>(cache_v.data<uint8_t>()),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_k_scale.data<T>())),
-          cache_k_zp ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(cache_k_zp.get().data<T>())) : nullptr,
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_v_scale.data<T>())),
-          cache_v_zp ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(cache_v_zp.get().data<T>())) : nullptr,
-          shift_bias ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-          smooth_weight ? reinterpret_cast<NV_TYPE*>(
-                              const_cast<T*>(smooth_weight.get().data<T>())) : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(qkv.data<T>())),
+          const_cast<uint8_t *>(cache_k.data<uint8_t>()),
+          const_cast<uint8_t *>(cache_v.data<uint8_t>()),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_k_scale.data<T>())),
+          cache_k_zp ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(cache_k_zp.get().data<T>()))
+                     : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_v_scale.data<T>())),
+          cache_v_zp ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(cache_v_zp.get().data<T>()))
+                     : nullptr,
+          shift_bias ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(shift_bias.get().data<T>()))
+                     : nullptr,
+          smooth_weight ? reinterpret_cast<NV_TYPE *>(
+                              const_cast<T *>(smooth_weight.get().data<T>()))
+                        : nullptr,
           seq_lens_q.data<int>(),
           seq_lens_kv.data<int>(),
           batch_ids.data<int>(),
@@ -4904,10 +5095,10 @@ void MultiQueryAppendC4Attention(
           scale,
           in_scale,
           chunk_size,
-          reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-          static_cast<float*>(tmp_m->ptr()),
-          static_cast<float*>(tmp_d->ptr()),
-          reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+          reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+          static_cast<float *>(tmp_m->ptr()),
+          static_cast<float *>(tmp_d->ptr()),
+          reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
           speculate_max_draft_token_num);
       // merge
       constexpr int vec_size = num_elems_per_128b<NV_TYPE>();
@@ -4923,18 +5114,20 @@ void MultiQueryAppendC4Attention(
                                           OUT_NV_TYPE,
                                           ENABLE_PREFILL>
             <<<grids_merge, blocks_merge, 0, stream>>>(
-                reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-                static_cast<float*>(tmp_m->ptr()),
-                static_cast<float*>(tmp_d->ptr()),
+                reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+                static_cast<float *>(tmp_m->ptr()),
+                static_cast<float *>(tmp_d->ptr()),
                 seq_lens_q.data<int>(),
                 seq_lens_kv.data<int>(),
                 seq_lens_encoder.data<int>(),
                 cum_offsets.data<int>(),
-                shift_bias ? reinterpret_cast<NV_TYPE*>(
-                                 const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-                smooth_weight ? reinterpret_cast<NV_TYPE*>(const_cast<T*>(
-                                    smooth_weight.get().data<T>())) : nullptr,
-                reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+                shift_bias ? reinterpret_cast<NV_TYPE *>(
+                                 const_cast<T *>(shift_bias.get().data<T>()))
+                           : nullptr,
+                smooth_weight ? reinterpret_cast<NV_TYPE *>(const_cast<T *>(
+                                    smooth_weight.get().data<T>()))
+                              : nullptr,
+                reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
                 in_scale,
                 max_seq_len,
                 num_chunks,
@@ -4954,18 +5147,20 @@ void MultiQueryAppendC4Attention(
                                      OUT_NV_TYPE,
                                      ENABLE_PREFILL>
             <<<grids_merge, blocks_merge, 0, stream>>>(
-                reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-                static_cast<float*>(tmp_m->ptr()),
-                static_cast<float*>(tmp_d->ptr()),
+                reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+                static_cast<float *>(tmp_m->ptr()),
+                static_cast<float *>(tmp_d->ptr()),
                 seq_lens_q.data<int>(),
                 seq_lens_kv.data<int>(),
                 seq_lens_encoder.data<int>(),
                 padding_offsets.data<int>(),
-                shift_bias ? reinterpret_cast<NV_TYPE*>(
-                                 const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-                smooth_weight ? reinterpret_cast<NV_TYPE*>(const_cast<T*>(
-                                    smooth_weight.get().data<T>())) : nullptr,
-                reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+                shift_bias ? reinterpret_cast<NV_TYPE *>(
+                                 const_cast<T *>(shift_bias.get().data<T>()))
+                           : nullptr,
+                smooth_weight ? reinterpret_cast<NV_TYPE *>(const_cast<T *>(
+                                    smooth_weight.get().data<T>()))
+                              : nullptr,
+                reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
                 in_scale,
                 max_seq_len,
                 num_chunks,
@@ -5048,19 +5243,23 @@ void MultiQueryAppendC4Attention(
                              smem_size);
       }
       nosplit_kv_kernel<<<grids, blocks, smem_size, stream>>>(
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
-          const_cast<uint8_t*>(cache_k.data<uint8_t>()),
-          const_cast<uint8_t*>(cache_v.data<uint8_t>()),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_k_scale.data<T>())),
-          cache_k_zp ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(cache_k_zp.get().data<T>())) : nullptr,
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_v_scale.data<T>())),
-          cache_v_zp ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(cache_v_zp.get().data<T>())) : nullptr,
-          shift_bias ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-          smooth_weight ? reinterpret_cast<NV_TYPE*>(
-                              const_cast<T*>(smooth_weight.get().data<T>())) : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(qkv.data<T>())),
+          const_cast<uint8_t *>(cache_k.data<uint8_t>()),
+          const_cast<uint8_t *>(cache_v.data<uint8_t>()),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_k_scale.data<T>())),
+          cache_k_zp ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(cache_k_zp.get().data<T>()))
+                     : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_v_scale.data<T>())),
+          cache_v_zp ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(cache_v_zp.get().data<T>()))
+                     : nullptr,
+          shift_bias ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(shift_bias.get().data<T>()))
+                     : nullptr,
+          smooth_weight ? reinterpret_cast<NV_TYPE *>(
+                              const_cast<T *>(smooth_weight.get().data<T>()))
+                        : nullptr,
           seq_lens_q.data<int>(),
           seq_lens_kv.data<int>(),
           batch_ids.data<int>(),
@@ -5076,7 +5275,7 @@ void MultiQueryAppendC4Attention(
           nullptr,
           nullptr,
           nullptr,
-          reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+          reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
           speculate_max_draft_token_num);
     } else {
       phi::Allocator::AllocationPtr tmp_workspace, tmp_m, tmp_d;
@@ -5118,19 +5317,23 @@ void MultiQueryAppendC4Attention(
         }
       }
       split_kv_kernel<<<grids, blocks, smem_size, stream>>>(
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(qkv.data<T>())),
-          const_cast<uint8_t*>(cache_k.data<uint8_t>()),
-          const_cast<uint8_t*>(cache_v.data<uint8_t>()),
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_k_scale.data<T>())),
-          cache_k_zp ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(cache_k_zp.get().data<T>())) : nullptr,
-          reinterpret_cast<NV_TYPE*>(const_cast<T*>(cache_v_scale.data<T>())),
-          cache_v_zp ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(cache_v_zp.get().data<T>())) : nullptr,
-          shift_bias ? reinterpret_cast<NV_TYPE*>(
-                           const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-          smooth_weight ? reinterpret_cast<NV_TYPE*>(
-                              const_cast<T*>(smooth_weight.get().data<T>())) : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(qkv.data<T>())),
+          const_cast<uint8_t *>(cache_k.data<uint8_t>()),
+          const_cast<uint8_t *>(cache_v.data<uint8_t>()),
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_k_scale.data<T>())),
+          cache_k_zp ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(cache_k_zp.get().data<T>()))
+                     : nullptr,
+          reinterpret_cast<NV_TYPE *>(const_cast<T *>(cache_v_scale.data<T>())),
+          cache_v_zp ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(cache_v_zp.get().data<T>()))
+                     : nullptr,
+          shift_bias ? reinterpret_cast<NV_TYPE *>(
+                           const_cast<T *>(shift_bias.get().data<T>()))
+                     : nullptr,
+          smooth_weight ? reinterpret_cast<NV_TYPE *>(
+                              const_cast<T *>(smooth_weight.get().data<T>()))
+                        : nullptr,
           seq_lens_q.data<int>(),
           seq_lens_kv.data<int>(),
           batch_ids.data<int>(),
@@ -5143,10 +5346,10 @@ void MultiQueryAppendC4Attention(
           scale,
           in_scale,
           chunk_size,
-          reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-          static_cast<float*>(tmp_m->ptr()),
-          static_cast<float*>(tmp_d->ptr()),
-          reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+          reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+          static_cast<float *>(tmp_m->ptr()),
+          static_cast<float *>(tmp_d->ptr()),
+          reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
           speculate_max_draft_token_num);
       // merge
       constexpr int vec_size = num_elems_per_128b<NV_TYPE>();
@@ -5162,18 +5365,20 @@ void MultiQueryAppendC4Attention(
                                           OUT_NV_TYPE,
                                           ENABLE_PREFILL>
             <<<grids_merge, blocks_merge, 0, stream>>>(
-                reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-                static_cast<float*>(tmp_m->ptr()),
-                static_cast<float*>(tmp_d->ptr()),
+                reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+                static_cast<float *>(tmp_m->ptr()),
+                static_cast<float *>(tmp_d->ptr()),
                 seq_lens_q.data<int>(),
                 seq_lens_kv.data<int>(),
                 seq_lens_encoder.data<int>(),
                 cum_offsets.data<int>(),
-                shift_bias ? reinterpret_cast<NV_TYPE*>(
-                                 const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-                smooth_weight ? reinterpret_cast<NV_TYPE*>(const_cast<T*>(
-                                    smooth_weight.get().data<T>())) : nullptr,
-                reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+                shift_bias ? reinterpret_cast<NV_TYPE *>(
+                                 const_cast<T *>(shift_bias.get().data<T>()))
+                           : nullptr,
+                smooth_weight ? reinterpret_cast<NV_TYPE *>(const_cast<T *>(
+                                    smooth_weight.get().data<T>()))
+                              : nullptr,
+                reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
                 in_scale,
                 max_seq_len,
                 num_chunks,
@@ -5193,18 +5398,20 @@ void MultiQueryAppendC4Attention(
                                      OUT_NV_TYPE,
                                      ENABLE_PREFILL>
             <<<grids_merge, blocks_merge, 0, stream>>>(
-                reinterpret_cast<NV_TYPE*>(tmp_workspace->ptr()),
-                static_cast<float*>(tmp_m->ptr()),
-                static_cast<float*>(tmp_d->ptr()),
+                reinterpret_cast<NV_TYPE *>(tmp_workspace->ptr()),
+                static_cast<float *>(tmp_m->ptr()),
+                static_cast<float *>(tmp_d->ptr()),
                 seq_lens_q.data<int>(),
                 seq_lens_kv.data<int>(),
                 seq_lens_encoder.data<int>(),
                 padding_offsets.data<int>(),
-                shift_bias ? reinterpret_cast<NV_TYPE*>(
-                                 const_cast<T*>(shift_bias.get().data<T>())) : nullptr,
-                smooth_weight ? reinterpret_cast<NV_TYPE*>(const_cast<T*>(
-                                    smooth_weight.get().data<T>())) : nullptr,
-                reinterpret_cast<OUT_NV_TYPE*>(out->data<OutT>()),
+                shift_bias ? reinterpret_cast<NV_TYPE *>(
+                                 const_cast<T *>(shift_bias.get().data<T>()))
+                           : nullptr,
+                smooth_weight ? reinterpret_cast<NV_TYPE *>(const_cast<T *>(
+                                    smooth_weight.get().data<T>()))
+                              : nullptr,
+                reinterpret_cast<OUT_NV_TYPE *>(out->data<OutT>()),
                 in_scale,
                 max_seq_len,
                 num_chunks,

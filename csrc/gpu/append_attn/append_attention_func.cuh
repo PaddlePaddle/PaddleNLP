@@ -1,11 +1,11 @@
 // Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -1120,9 +1120,9 @@ __device__ __forceinline__ void mask_s(const uint32_t qo_idx_base,
                          kv_idx = kv_idx_base + fz * 16 + 2 * (tx % 4) +
                                   8 * (reg_id / 4) + reg_id % 2;
           const bool out_of_boundary =
-              (causal ? (kv_idx > kv_len + q_idx - qo_len ||
-                         (kv_idx >= chunk_end))
-                      : kv_idx >= chunk_end);
+              (causal
+                   ? (kv_idx > kv_len + q_idx - qo_len || (kv_idx >= chunk_end))
+                   : kv_idx >= chunk_end);
           if constexpr (std::is_same<T, half>::value) {
             s_frag[fx][fz][reg_id] =
                 out_of_boundary ? -5e4f : s_frag[fx][fz][reg_id];
@@ -1135,9 +1135,9 @@ __device__ __forceinline__ void mask_s(const uint32_t qo_idx_base,
                          kv_idx = kv_idx_base + fz * 16 + 2 * (tx % 4) +
                                   8 * (reg_id / 4) + reg_id % 2;
           const bool out_of_boundary =
-              (causal ? (kv_idx > kv_len + q_idx - qo_len ||
-                         (kv_idx >= chunk_end))
-                      : kv_idx >= chunk_end);
+              (causal
+                   ? (kv_idx > kv_len + q_idx - qo_len || (kv_idx >= chunk_end))
+                   : kv_idx >= chunk_end);
 #ifdef DEBUG_ATTN_C4
           if (threadIdx.x == PRINT_TID && threadIdx.y == PRINT_WID &&
               blockIdx.z == 0 && blockIdx.x == 0 &&
@@ -1964,7 +1964,7 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
   AlignedVector<OutT, VEC_SIZE> out_vec;
   // [num_warps * num_frags_x * 16, num_frags_y * 16]
   if (ty == 0) {
-  // [num_frags_x * 16, num_frags_y * 16]
+    // [num_frags_x * 16, num_frags_y * 16]
 #pragma unroll
     for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
 #pragma unroll
@@ -2053,7 +2053,6 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
 
       if (n_offset < qo_upper_bound) {
         if constexpr (!partition_kv) {
-
           if (in_scale > 0.0) {
             if (shift_bias) {
               Load<T, VEC_SIZE>(shift_bias + shift_smooth_offset,
@@ -2063,8 +2062,8 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
             }
           }
           Load<T, VEC_SIZE>(
-                reinterpret_cast<T*>(o_smem->base + o_smem_offset_w),
-                &ori_out_vec);
+              reinterpret_cast<T*>(o_smem->base + o_smem_offset_w),
+              &ori_out_vec);
 
 #pragma unroll
           for (int i = 0; i < VEC_SIZE; ++i) {
@@ -2108,7 +2107,7 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
     }
     o_smem_offset_w =
         o_smem->advance_offset_by_row<16, num_vecs_per_head>(o_smem_offset_w) -
-                      2 * num_frags_y;
+        2 * num_frags_y;
     // }
   }
 }
@@ -2147,52 +2146,84 @@ __device__ __forceinline__ void write_o_reg_gmem_shift_smooth_quant(
       // 每个fy放16个数，vec size为8(f16/bf16)，所以y轴为2fy
       uint32_t o_frag_f16[4];
       vec_cast<T, float, 8>((T*)o_frag_f16, o_frag[fx][fy]);
-      uint32_t o_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_head>( // num_vecs_per_head = num_frags_y * 16 / 8 = num_frags_y * 2
-          (ty * num_frags_x + fx) * 16 + tx / 4, fy * 2);
+      uint32_t o_smem_offset_w = smem_t::get_permuted_offset<
+          num_vecs_per_head>(  // num_vecs_per_head = num_frags_y * 16 / 8 =
+                               // num_frags_y * 2
+          (ty * num_frags_x + fx) * 16 + tx / 4,
+          fy * 2);
       ((uint32_t*)(o_smem->base + o_smem_offset_w))[tx % 4] = o_frag_f16[0];
-      ((uint32_t*)(o_smem->base + o_smem_offset_w + 8 * num_vecs_per_head))[tx % 4] =
-          o_frag_f16[1];
-      ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1)))[tx % 4] = o_frag_f16[2]; // 2fy，异或1往右移一位
-      ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1) + 8 * num_vecs_per_head))[tx % 4] =
-          o_frag_f16[3];
+      ((uint32_t*)(o_smem->base + o_smem_offset_w +
+                   8 * num_vecs_per_head))[tx % 4] = o_frag_f16[1];
+      ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1)))[tx % 4] =
+          o_frag_f16[2];  // 2fy，异或1往右移一位
+      ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1) +
+                   8 * num_vecs_per_head))[tx % 4] = o_frag_f16[3];
     }
   }
   __syncthreads();
 
   // smem连续存储到gmem上， [num_frags_x * 16, num_frags_y * 16]
-  uint32_t o_smem_offset_w =
-      smem_t::get_permuted_offset<num_vecs_per_head>(ty * num_frags_x * 16 + tx / 8, tx % 8); // 每个warp一次搬4行，每次搬64个数
+  uint32_t o_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_head>(
+      ty * num_frags_x * 16 + tx / 8,
+      tx % 8);  // 每个warp一次搬4行，每次搬64个数
 
   const uint32_t tx_offset = tx / 8;
   // o_idx_base += (tx / 8) / group_size;
-  // o_ptr_base += ((tx / 8) / group_size) * qo_n_stride + ((tx / 8) % group_size) * qo_h_stride;
-  // uint32_t q_head_idx_now_base = q_head_idx_base + (tx / 8) % group_size;
+  // o_ptr_base += ((tx / 8) / group_size) * qo_n_stride + ((tx / 8) %
+  // group_size) * qo_h_stride; uint32_t q_head_idx_now_base = q_head_idx_base +
+  // (tx / 8) % group_size;
 #pragma unroll
   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
     const uint32_t base_offset = o_idx_base + fx * 16 + tx_offset;
 #pragma unroll
-    for (uint32_t j = 0; j < 4; ++j) { // 4 * 4 = 16
+    for (uint32_t j = 0; j < 4; ++j) {  // 4 * 4 = 16
       const uint32_t offset_now = base_offset + j * 4;
       const uint32_t n_offset = offset_now / group_size;
       const uint32_t h_offset = offset_now % group_size;
-      OutT* o_ptr = o_ptr_base + n_offset * qo_n_stride + h_offset * qo_h_stride;
-      uint32_t shift_smooth_offset = (q_head_idx_base + h_offset) * head_dim + tx % 8 * num_elems_per_128b<T>();
+      OutT* o_ptr =
+          o_ptr_base + n_offset * qo_n_stride + h_offset * qo_h_stride;
+      uint32_t shift_smooth_offset = (q_head_idx_base + h_offset) * head_dim +
+                                     tx % 8 * num_elems_per_128b<T>();
 #pragma unroll
-      for (uint32_t fyo = 0; fyo < num_frags_y / 4; ++fyo) { // num_frags_y * 16 / (8[tid] * num_elems_per_128b<T>()[vec_per_thread])
+      for (uint32_t fyo = 0; fyo < num_frags_y / 4;
+           ++fyo) {  // num_frags_y * 16 / (8[tid] *
+                     // num_elems_per_128b<T>()[vec_per_thread])
         if (n_offset < qo_upper_bound) {
           if (!partition_kv && in_scale > 0.0) {
             if (shift_bias) {
-              Load<T, VEC_SIZE>(shift_bias + shift_smooth_offset, &shift_bias_vec);
-              Load<T, VEC_SIZE>(smooth_weight + shift_smooth_offset, &smooth_weight_vec);
+              Load<T, VEC_SIZE>(shift_bias + shift_smooth_offset,
+                                &shift_bias_vec);
+              Load<T, VEC_SIZE>(smooth_weight + shift_smooth_offset,
+                                &smooth_weight_vec);
             }
-            Load<T, VEC_SIZE>(reinterpret_cast<T*>(o_smem->base + o_smem_offset_w), &ori_out_vec);
+            Load<T, VEC_SIZE>(
+                reinterpret_cast<T*>(o_smem->base + o_smem_offset_w),
+                &ori_out_vec);
 #pragma unroll
             for (int i = 0; i < VEC_SIZE; ++i) {
-              StoreFunc<T, VEC_SIZE, OutT>()(ori_out_vec, shift_bias_vec, smooth_weight_vec, out_vec, in_scale, i);
+              StoreFunc<T, VEC_SIZE, OutT>()(ori_out_vec,
+                                             shift_bias_vec,
+                                             smooth_weight_vec,
+                                             out_vec,
+                                             in_scale,
+                                             i);
 #ifdef DEBUG_ATTN_C4
-              if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-                printf("write_o fx: %d, j: %d, fyo: %d, shift_bias[%d] = %f, smooth_weight[%d] = %f, ori_out[%d] = %f, out_vec[%d]: %f\n",
-                       (int)fx, (int)j, (int)fyo, i, (float)shift_bias_vec[i], i, (float)smooth_weight_vec[i], i, (float)ori_out_vec[i], (float)out_vec[i]);
+              if (threadIdx.x == PRINT_TID && threadIdx.y == 0 &&
+                  blockIdx.z == 0) {
+                printf(
+                    "write_o fx: %d, j: %d, fyo: %d, shift_bias[%d] = %f, "
+                    "smooth_weight[%d] = %f, ori_out[%d] = %f, out_vec[%d]: "
+                    "%f\n",
+                    (int)fx,
+                    (int)j,
+                    (int)fyo,
+                    i,
+                    (float)shift_bias_vec[i],
+                    i,
+                    (float)smooth_weight_vec[i],
+                    i,
+                    (float)ori_out_vec[i],
+                    (float)out_vec[i]);
               }
               __syncthreads();
 #endif
@@ -2204,10 +2235,12 @@ __device__ __forceinline__ void write_o_reg_gmem_shift_smooth_quant(
         }
         o_ptr += 8 * num_elems_per_128b<T>();
         shift_smooth_offset += 8 * num_elems_per_128b<T>();
-        o_smem_offset_w = o_smem->advance_offset_by_column<8>(o_smem_offset_w, fyo);
+        o_smem_offset_w =
+            o_smem->advance_offset_by_column<8>(o_smem_offset_w, fyo);
       }
-      o_smem_offset_w = o_smem->advance_offset_by_row<4, num_vecs_per_head>(o_smem_offset_w) -
-                        2 * num_frags_y;
+      o_smem_offset_w =
+          o_smem->advance_offset_by_row<4, num_vecs_per_head>(o_smem_offset_w) -
+          2 * num_frags_y;
     }
   }
 }
