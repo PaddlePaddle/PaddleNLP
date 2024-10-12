@@ -699,7 +699,7 @@ class AddAuxiliaryLoss(paddle.autograd.PyLayer):
 
     @staticmethod
     def forward(ctx, x, loss):
-        assert loss.numel() == 1
+        assert paddle.numel(loss) == 1
         ctx.dtype = loss.dtype
         ctx.required_aux_loss = not loss.stop_gradient
         return x
@@ -750,7 +750,8 @@ class DeepseekV2MoE(nn.Layer):
                 y[flat_topk_idx == i] = expert(hidden_states[flat_topk_idx == i])
         y = (y.reshape([*topk_weight.shape, -1]) * topk_weight.unsqueeze(-1)).sum(axis=1)
         y = paddle.cast(y, hidden_states.dtype).reshape([*orig_shape])
-        y = AddAuxiliaryLoss.apply(y, aux_loss)
+        if self.training and self.gate.alpha > 0.0:
+            y = AddAuxiliaryLoss.apply(y, aux_loss)
         if self.config.n_shared_experts is not None:
             y = y + self.shared_experts(identity)
         return y
