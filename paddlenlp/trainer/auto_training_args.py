@@ -24,6 +24,12 @@ class AutoTrainingArguments(TrainingArguments):
     """
     Training Arguments for auto_parallel.
     """
+    fused_linear:bool = field(
+        default=True,
+        metadata={
+            "help": "Enable fused linear op, which will fuse matmul and bias add together."
+        },
+    )
 
     fused_linear_param_grad_add: bool = field(
         default=False,
@@ -41,10 +47,14 @@ class AutoTrainingArguments(TrainingArguments):
             "help": "Enable eliminate_transpose pass, which should replace transpose with reshape when sequence parallel is enabled."
         },
     )
-
+    
     def __post_init__(self):
         super().__post_init__()
         assert self.enable_auto_parallel
+        fused_passes = self.strategy.fused_passes
+        if self.fused_linear:
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("fused_gemm_epilogue_pass")
 
         if self.fused_linear_param_grad_add:
             fused_passes = self.strategy.fused_passes
