@@ -71,12 +71,6 @@ class PreTrainingArguments(AutoTrainingArguments):
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
-    enable_linear_fused_grad_add: bool = field(
-        default=False,
-        metadata={
-            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
-        },
-    )
     job_schedule_profiler_start: int = field(
         default=-1,
         metadata={"help": "The step to start job_schedule_profiler."},
