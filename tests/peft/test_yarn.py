@@ -23,7 +23,7 @@ from parameterized import parameterized_class
 
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
-from .testing_utils import LLMTest, argv_context_guard, load_test_config
+from ..llm.testing_utils import LLMTest, argv_context_guard, load_test_config
 
 all_inputs = [
     # llama-7b
