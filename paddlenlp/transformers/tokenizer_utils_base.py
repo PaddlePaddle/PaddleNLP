@@ -14,8 +14,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import copy
+import inspect
 import io
 import json
 import os
@@ -2795,14 +2795,28 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         required_input = encoded_inputs[self.model_input_names[0]]
         if required_input and not isinstance(required_input[0], (list, tuple)):
-            encoded_inputs = self._pad(
-                encoded_inputs,
-                max_length=max_length,
-                padding_strategy=padding_strategy,
-                pad_to_multiple_of=pad_to_multiple_of,
-                padding_side=padding_side,
-                return_attention_mask=return_attention_mask,
-            )
+            # some tokenizers might not have the padding_side attribute
+            if "padding_side" in set(inspect.signature(self._pad).parameters.keys()):
+                encoded_inputs = self._pad(
+                    encoded_inputs,
+                    max_length=max_length,
+                    padding_strategy=padding_strategy,
+                    pad_to_multiple_of=pad_to_multiple_of,
+                    padding_side=padding_side,
+                    return_attention_mask=return_attention_mask,
+                )
+            else:
+                original_padding_side = self.padding_side
+                self.padding_side = padding_side
+                encoded_inputs = self._pad(
+                    encoded_inputs,
+                    max_length=max_length,
+                    padding_strategy=padding_strategy,
+                    pad_to_multiple_of=pad_to_multiple_of,
+                    return_attention_mask=return_attention_mask,
+                )
+                self.padding_side = original_padding_side
+
             return BatchEncoding(encoded_inputs, tensor_type=return_tensors)
 
         batch_size = len(required_input)
