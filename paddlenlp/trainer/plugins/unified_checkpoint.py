@@ -49,7 +49,13 @@ from paddlenlp.transformers.utils import (
 )
 from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
 from paddlenlp.utils.env import (
+    ASYMETRY_QUANT_SCALE_MAX,
+    ASYMETRY_QUANT_SCALE_MIN,
+    BETA1_KEYNAME,
+    BETA2_KEYNAME,
     LORA_WEIGHTS_NAME,
+    MOMENT1_KEYNAME,
+    MOMENT2_KEYNAME,
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_MASTER_WEIGHTS_NAME,
     PADDLE_OPTIMIZER_INDEX_NAME,
@@ -67,6 +73,7 @@ from paddlenlp.utils.env import (
     SAFE_PEFT_WEIGHTS_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
+    SYMETRY_QUANT_SCALE,
 )
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.nested import nested_copy, nested_copy_place
@@ -171,8 +178,8 @@ class UnifiedCheckpointHandler:
             opt_keys = state_dict.keys()
             all_bits, quant_bits = paddle.to_tensor(0.0), paddle.to_tensor(0.0)
             for k in opt_keys:
-                momentum1 = k.endswith("moment1_0")
-                momentum2 = k.endswith("moment2_0")
+                momentum1 = k.endswith(MOMENT1_KEYNAME)
+                momentum2 = k.endswith(MOMENT2_KEYNAME)
                 k_size = state_dict[k].size
                 if momentum1 or momentum2:
                     all_bits += k_size * 4
@@ -183,14 +190,14 @@ class UnifiedCheckpointHandler:
                     # m1: wint8, 1/(sqrt(m2)+eps): wint8
                     if momentum2:
                         # m1: m1_quant_weight, m2: ratio
-                        m1_key = k.split("/")[0] + "/moment1_0"
+                        m1_key = k.split("/")[0] + "/" + MOMENT1_KEYNAME
                         ratio = cal_ratio(state_dict[m1_key], state_dict[k])
                         m1_quant, codebook = qdq_weight(state_dict[m1_key], quant_bit=8)
                         quant_weight, mins, maxs = asymmetry_qdq_weight(ratio, quant_bit=8)
                         state_dict[m1_key] = m1_quant
-                        codebook_dict[m1_key + "_codebook"] = codebook
-                        codebook_dict[k + "_min_codebook"] = mins
-                        codebook_dict[k + "_max_codebook"] = maxs
+                        codebook_dict[m1_key + SYMETRY_QUANT_SCALE] = codebook
+                        codebook_dict[k + ASYMETRY_QUANT_SCALE_MIN] = mins
+                        codebook_dict[k + ASYMETRY_QUANT_SCALE_MAX] = maxs
                     elif not momentum1:
                         quant_weight = state_dict[k]
                 elif ckpt_quant_stage == "O2":
@@ -199,15 +206,16 @@ class UnifiedCheckpointHandler:
                         if len(state_dict[k].shape) < 2:
                             continue
                         # m1: m1_quant_weight, m2: ratio
-                        m1_key = k.split("/")[0] + "/moment1_0"
+                        m1_key = k.split("/")[0] + "/" + MOMENT1_KEYNAME
                         ratio = cal_ratio(state_dict[m1_key], state_dict[k])
-                        m1_quant, m1_mins = group_wise_quant_dequant(state_dict[m1_key], quant_bits=4, symetry=True)
+                        m1_quant, m1_codebook = group_wise_quant_dequant(
+                            state_dict[m1_key], quant_bits=4, symetry=True
+                        )
                         quant_weight, r_mins, r_maxs = group_wise_quant_dequant(ratio, quant_bits=4)
                         quant_weight = merge_int4(m1_quant, quant_weight)
-                        codebook_dict[m1_key + "_min_codebook"] = m1_mins
-                        # codebook_dict[m1_key + '_max_codebook'] = m1_maxs
-                        codebook_dict[k + "_min_codebook"] = r_mins
-                        codebook_dict[k + "_max_codebook"] = r_maxs
+                        codebook_dict[m1_key + SYMETRY_QUANT_SCALE] = m1_codebook
+                        codebook_dict[k + ASYMETRY_QUANT_SCALE_MIN] = r_mins
+                        codebook_dict[k + ASYMETRY_QUANT_SCALE_MAX] = r_maxs
                         del_key.append(m1_key)
                     elif not momentum1:
                         quant_weight = state_dict[k]
@@ -2220,10 +2228,10 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
                     current_block = []
                     current_block_size = 0
 
-                current_block.append(key + "/moment1_0")
-                current_block.append(key + "/moment2_0")
-                current_block.append(key + "/beta1_pow_acc_0")
-                current_block.append(key + "/beta2_pow_acc_0")
+                current_block.append(key + "/" + MOMENT1_KEYNAME)
+                current_block.append(key + "/" + MOMENT2_KEYNAME)
+                current_block.append(key + "/" + BETA1_KEYNAME)
+                current_block.append(key + "/" + BETA2_KEYNAME)
                 current_block_size += weight_size
                 total_size += weight_size
 

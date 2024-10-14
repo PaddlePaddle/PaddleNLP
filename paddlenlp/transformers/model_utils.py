@@ -54,8 +54,12 @@ from paddle.utils.download import is_url as is_remote_url
 from tqdm.auto import tqdm
 
 from paddlenlp.utils.env import (
+    ASYMETRY_QUANT_SCALE_MAX,
+    ASYMETRY_QUANT_SCALE_MIN,
     CONFIG_NAME,
     LEGACY_CONFIG_NAME,
+    MOMENT1_KEYNAME,
+    MOMENT2_KEYNAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PYTORCH_WEIGHTS_INDEX_NAME,
@@ -64,6 +68,7 @@ from paddlenlp.utils.env import (
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
+    SYMETRY_QUANT_SCALE,
 )
 from paddlenlp.utils.log import logger
 
@@ -376,9 +381,8 @@ def load_state_dict(
                         weight = weight._copy_to(paddle.framework._current_expected_place(), False)
                     state_dict[key] = weight
                 for key in f.keys():
-                    if key.endswith("_codebook"):
+                    if key.endswith(SYMETRY_QUANT_SCALE):
                         scale = f.get_tensor(key)
-                        # np.save('tmp.npy', scale)
                         with device_guard():
                             scale = paddle.Tensor(scale, zero_copy=True)
                         scale_dict[key] = scale
@@ -398,11 +402,11 @@ def load_state_dict(
                     # set eps
                     eps = 1e-8
                     for quant_key in state_dict.keys():
-                        is_moment1 = "moment1_0" in quant_key
-                        is_moment2 = "moment2_0" in quant_key
+                        is_moment1 = MOMENT1_KEYNAME in quant_key
+                        is_moment2 = MOMENT2_KEYNAME in quant_key
                         if is_moment1:
                             # dequant m1
-                            scale_key = quant_key + "_codebook"
+                            scale_key = quant_key + SYMETRY_QUANT_SCALE
                             weight = state_dict[quant_key]
                             scales = scale_dict[scale_key]
                             weight, _ = qdq_weight(
@@ -418,8 +422,8 @@ def load_state_dict(
                         elif is_moment2:
                             # dequant ratio
                             weight = state_dict[quant_key]
-                            min_scale_key = quant_key + "_min_codebook"
-                            max_scale_key = quant_key + "_max_codebook"
+                            min_scale_key = quant_key + ASYMETRY_QUANT_SCALE_MIN
+                            max_scale_key = quant_key + ASYMETRY_QUANT_SCALE_MAX
                             mins, maxs = scale_dict[min_scale_key], scale_dict[max_scale_key]
                             weight, _ = asymmetry_qdq_weight(
                                 weight,
@@ -446,16 +450,14 @@ def load_state_dict(
                         weight = state_dict[quant_key]
                         m1_quant, ratio_quant = split_int8(weight.numpy())
                         # dequant ratio
-                        ratio_min_scale_key = quant_key + "_min_codebook"
-                        ratio_max_scale_key = quant_key + "_max_codebook"
-                        m1_min_scale_key = quant_key[: -len("moment2_0")] + "moment1_0_min_codebook"
-                        # m1_max_scale_key = quant_key[: -len("moment2_0")] + "moment1_0_max_codebook"
-                        # m1_mins, m1_maxs = scale_dict[m1_min_scale_key], scale_dict[m1_max_scale_key]
-                        m1_mins = scale_dict[m1_min_scale_key]
+                        ratio_min_scale_key = quant_key + ASYMETRY_QUANT_SCALE_MIN
+                        ratio_max_scale_key = quant_key + ASYMETRY_QUANT_SCALE_MAX
+                        m1_scale_key = quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME + SYMETRY_QUANT_SCALE
+                        m1_codebook = scale_dict[m1_scale_key]
                         ratio_mins, ratio_maxs = scale_dict[ratio_min_scale_key], scale_dict[ratio_max_scale_key]
                         m1_weight = group_wise_quant_dequant(
                             m1_quant,
-                            mins=m1_mins,
+                            mins=m1_codebook,
                             maxs=None,
                             quant_bits=4,
                             quant=False,
@@ -481,7 +483,7 @@ def load_state_dict(
 
                         ratio_weight = paddle.square(1.0 / ratio_weight - eps)
                         state_dict[quant_key] = ratio_weight
-                        m1_state_dict[quant_key[: -len("moment2_0")] + "moment1_0"] = m1_weight
+                        m1_state_dict[quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME] = m1_weight
 
                     state_dict.update(m1_state_dict)
 
