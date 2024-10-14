@@ -26,6 +26,10 @@ from inspect import isclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, NewType, Optional, Tuple, Union, get_type_hints
 
+from omegaconf import DictConfig, OmegaConf
+
+from ..utils.log import logger
+
 DataClass = NewType("DataClass", Any)
 DataClassType = NewType("DataClassType", Any)
 
@@ -285,6 +289,27 @@ class PdArgumentParser(ArgumentParser):
         Alternative helper method that does not use `argparse` at all, instead uses a dict and populating the dataclass
         types.
         """
+
+        def to_regular_dict(obj):
+            if isinstance(obj, DictConfig):
+                obj = OmegaConf.to_container(obj, resolve=True)
+            if isinstance(obj, dict):
+                return {k: to_regular_dict(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [to_regular_dict(v) for v in obj]
+            return obj
+
+        args_for_json = to_regular_dict(args)
+
+        json_filename = args_for_json.get("args_output_to_local")
+        if json_filename:
+            try:
+                with open(json_filename, "w") as json_file:
+                    json.dump(args_for_json, json_file, indent=4)
+            except Exception as e:
+                logger(f"Failed to write args output JSON file: {e}")
+                # Optionally handle the error or log it, then continue
+
         outputs = []
         for dtype in self.dataclass_types:
             keys = {f.name for f in dataclasses.fields(dtype) if f.init}
