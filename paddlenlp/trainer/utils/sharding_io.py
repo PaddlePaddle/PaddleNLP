@@ -257,7 +257,7 @@ class ShardingIO:
             optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
             assert optimizer
             if len(param2rank) == 0:
-                logger.warning(f"The param2rank is empty. Force reshard would be performed.")
+                logger.warning("The param2rank is empty. Force reshard would be performed.")
                 return True
             assert len(param2rank) == len(optimizer._param2rank)
             for (k, v) in param2rank.items():
