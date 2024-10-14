@@ -1,7 +1,7 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
-# you smay not use this file except in compliance with the License.
+# you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .argparser import *
-from .auto_training_args import *
-from .compression_args import *
-from .plugins.timer import *
-from .trainer import *
-from .trainer_callback import *
-from .trainer_compress import *
-from .trainer_seq2seq import *
-from .trainer_utils import *
-from .training_args import *
-from .training_args_seq2seq import *
+export device="0,1,3,4"
+export CUDA_VISIBLE_DEVICES=${device}
+
+model_path=${1-"/path/to/model"}
+
+python -m paddle.distributed.launch \
+    --gpus ${device} \
+    split_weights.py \
+    --model_path ${model_path} \
+    --output_path ${model_path}/tp4 \

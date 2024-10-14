@@ -33,6 +33,15 @@ namespace sampling {
 
 using namespace cub;
 
+#define DISPATCH_COMPUTE_CAP_NUM_THREADS(compute_capacity, BLOCK_THREADS, ...) \
+  if (compute_capacity.first >= 8) {                                           \
+    constexpr uint32_t BLOCK_THREADS = 1024;                                   \
+    __VA_ARGS__                                                                \
+  } else {                                                                     \
+    constexpr uint32_t BLOCK_THREADS = 512;                                    \
+    __VA_ARGS__                                                                \
+  }
+
 constexpr BlockScanAlgorithm SCAN_ALGO = BLOCK_SCAN_WARP_SCANS;
 constexpr BlockReduceAlgorithm REDUCE_ALGO = BLOCK_REDUCE_WARP_REDUCTIONS;
 
@@ -277,17 +286,12 @@ template <uint32_t BLOCK_THREADS,
 __global__ void TopPSamplingFromProbKernel(DType* probs,
                                            DType* uniform_samples,
                                            IdType* output,
-                                           bool* success,
-                                           IdType* row_indices,
-                                           float* top_p_arr,
                                            float* top_p_val,
                                            uint32_t d,
                                            uint32_t max_top_p_rounds) {
   const uint32_t batch_size = gridDim.x;
   const uint32_t bx = blockIdx.x, tx = threadIdx.x;
-  float top_p = (top_p_arr == nullptr) ? top_p_val[bx] : top_p_arr[bx];
-
-  const uint32_t row_idx = row_indices == nullptr ? bx : row_indices[bx];
+  float top_p =  top_p_val[bx];
 
   extern __shared__ __align__(alignof(SamplingTempStorage<DType,
                                                           BLOCK_THREADS,
@@ -313,7 +317,7 @@ __global__ void TopPSamplingFromProbKernel(DType* probs,
     for (uint32_t i = 0; i < ceil_div(d, BLOCK_THREADS * VEC_SIZE); ++i) {
       probs_vec.fill(DType(0));
       if ((i * BLOCK_THREADS + tx) * VEC_SIZE < d) {
-        probs_vec.load(probs + row_idx * d +
+        probs_vec.load(probs + bx * d +
                        (i * BLOCK_THREADS + tx) * VEC_SIZE);
       }
 
@@ -330,58 +334,51 @@ __global__ void TopPSamplingFromProbKernel(DType* probs,
     }
     __syncthreads();
     sampled_id = temp_storage.data.sampled_id;
-    pivot = max(pivot, probs[row_idx * d + sampled_id]);
+    pivot = max(pivot, probs[bx * d + sampled_id]);
 
-    DType aggregate_gt_pivot = DType(0);
+    Pair<DType> aggregate_gt_pivot{DType(0), 0};
     for (uint32_t i = 0; i < ceil_div(d, BLOCK_THREADS * VEC_SIZE); ++i) {
       probs_vec.fill(DType(0));
       if ((i * BLOCK_THREADS + tx) * VEC_SIZE < d) {
-        probs_vec.load(probs + row_idx * d +
-                       (i * BLOCK_THREADS + tx) * VEC_SIZE);
+        probs_vec.load(probs + bx * d + (i * BLOCK_THREADS + tx) * VEC_SIZE);
       }
 
-      DType probs_gt_pivot[VEC_SIZE];
+      Pair<DType> probs_gt_pivot[VEC_SIZE];
 #pragma unroll
       for (uint32_t j = 0; j < VEC_SIZE; ++j) {
-        probs_gt_pivot[j] = (probs_vec[j] > pivot) ? probs_vec[j] : DType(0);
+        probs_gt_pivot[j] = {(probs_vec[j] > pivot) ? probs_vec[j] : DType(0),
+                             (probs_vec[j] > pivot && (i * BLOCK_THREADS + tx) * VEC_SIZE + j < d)};
       }
 
-      aggregate_gt_pivot +=
-          BlockReduce<DType, BLOCK_THREADS>(temp_storage.block_prim.reduce)
-              .Sum<VEC_SIZE>(probs_gt_pivot);
+      aggregate_gt_pivot += BlockReduce<Pair<DType>, BLOCK_THREADS, REDUCE_ALGORITHM>(
+                                temp_storage.block_prim.reduce_pair)
+                                .Sum<VEC_SIZE>(probs_gt_pivot);
       if (tx == 0) {
-        temp_storage.data.block_aggregate.value = aggregate_gt_pivot;
+        temp_storage.data.block_aggregate.pair = aggregate_gt_pivot;
       }
       __syncthreads();
     }
-    q = temp_storage.data.block_aggregate.value;
-    if (float(q) < top_p) {
+    q = temp_storage.data.block_aggregate.pair.value;
+    if (float(q) > 0 && float(q) < top_p) {
+      // top_p is not 0
       break;
+    } else {
+      // top_p is 0, use top_k, k=1
+      if (temp_storage.data.block_aggregate.pair.count < 1) {
+        break;
+      }
     }
   }
   __syncthreads();
   if (tx == 0) {
     output[bx] = sampled_id;
-    if (float(q) >= top_p) {
-      // failed to sample within MAX_TOP_P_ROUNDS
-      if (success != nullptr) {
-        success[bx] = false;
-      }
-    } else {
-      if (success != nullptr) {
-        success[bx] = true;
-      }
-    }
   }
 }
-
 
 template <typename T, typename IdType>
 cudaError_t TopPSamplingFromProb(T* probs,
                                  T* uniform_samples,
                                  IdType* output,
-                                 bool* success,
-                                 T* top_p_arr,
                                  uint32_t batch_size,
                                  const T* top_p_val,
                                  uint32_t d,
@@ -395,13 +392,9 @@ cudaError_t TopPSamplingFromProb(T* probs,
       sizeof(SamplingTempStorage<T, BLOCK_THREADS, SCAN_ALGO, REDUCE_ALGO>);
   dim3 nblks(batch_size);
   dim3 nthrs(BLOCK_THREADS);
-  IdType* row_indices_placeholder = nullptr;
   void* args[] = {&probs,
                   &uniform_samples,
                   &output,
-                  &success,
-                  &row_indices_placeholder,
-                  &top_p_arr,
                   &top_p_val,
                   &d,
                   &max_top_p_rounds};
