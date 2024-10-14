@@ -38,10 +38,7 @@ from paddlenlp.transformers.model_utils import (
     asymmetry_qdq_weight,
     faster_set_state_dict,
     get_parameter_dtype,
-    group_wise_quant_dequant,
     load_state_dict,
-    merge_int4,
-    qdq_weight,
     unwrap_model,
 )
 from paddlenlp.transformers.utils import (
@@ -85,6 +82,12 @@ if is_safetensors_available():
         from paddlenlp.utils.safetensors import fast_safe_open as safe_open
         from paddlenlp.utils.safetensors import fast_load_file as load_file
 
+from paddlenlp.utils.checkpoint_quantization_utils import (
+    group_wise_quant_dequant,
+    merge_int4,
+    qdq_weight,
+)
+
 from .shared_memory_utils import (
     _read_state_dict_from_shm,
     _traverse_copy_to_shm,
@@ -119,6 +122,7 @@ class UnifiedCheckpointOption(ExplicitEnum):
 
     SKIP_SAVE_MODEL_WEIGHT = "skip_save_model_weight"
     MASTER_WEIGHT_COMPATIBLE = "master_weight_compatible"
+    REMOVE_MASTER_WEIGHT = "remove_master_weight"
     ASYNC_SAVE = "async_save"
     IGNORE_MERGE_OPTIMIZER = "ignore_merge_optimizer"
 
@@ -763,6 +767,11 @@ class UnifiedCheckpointHandler:
             static_name, type_name = generate_base_static_name(key)
             new_name = static2struct_name_mappings[static_name] + "/" + type_name
             optim_state_dict[new_name] = optim_state_dict.pop(key)
+
+        if UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value in self.args.unified_checkpoint_config:
+            logger.info("Skip master weight saving.")
+            master_weights = None
+
         if master_weights is not None:
             for key in list(master_weights.keys()):
                 master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
@@ -1122,14 +1131,6 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         state_dict_master_weight = load_resolved_archive_file(
             resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weights=True
         )
-    else:
-        state_dict_master_weight = {}
-        logger.info("No master weights found, converting model weights to master weights.")
-        for key, value in model_state_dict.items():
-            state_dict_master_weight[key] = value.astype(paddle.float32)
-        logger.info("converting model weights to master weights done.")
-        has_master_weights = True
-        returned_optim_state_dict["master_weights"] = {}
 
     # rename optimizer param
     for key in list(state_dict_optim.keys()):
@@ -1189,7 +1190,8 @@ def unified_optimizer_into_shards(
         new_name = static2struct_name_mappings[static_name] + "/" + type_name
         optim_state_dict[new_name] = optim_state_dict.pop(key)
 
-    if model.config.remove_mw:
+    if UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value in args.unified_checkpoint_config:
+        logger.info("Skip master weight saving.")
         master_weights = None
 
     if master_weights is not None:
@@ -2492,7 +2494,10 @@ def select_model_weight_index(args, model, resume_from_checkpoint, safe_serializ
 def update_master_weight_status(args, optimizer, has_master_weight, safe_serialization):
     if is_need_master_weight(optimizer, is_fp16_or_bp16=(args.fp16 or args.bf16)):
         if not has_master_weight:
-            if UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value in args.unified_checkpoint_config:
+            if (
+                UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value in args.unified_checkpoint_config
+                or UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value in args.unified_checkpoint_config
+            ):
                 index_filename_master_weights = (
                     PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
                 )

@@ -1623,6 +1623,7 @@ class TrainingArguments:
                     if x not in [
                         "skip_save_model_weight",
                         "master_weight_compatible",
+                        "remove_master_weight",
                         "async_save",
                         "enable_all_options",
                         "ignore_merge_optimizer",
