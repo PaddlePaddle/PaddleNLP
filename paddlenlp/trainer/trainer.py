@@ -207,12 +207,15 @@ def _get_align_mode_scale():
     return max(data_parallel_world_size, 1) * max(sharding_parallel_world_size, 1)
 
 def _maybe_scale_loss_in_align_mode(loss):
+    # In align mode, we scale the grad in dp/sharding group in advance
     if in_auto_parallel_align_mode():
         return loss / _get_align_mode_scale()
     else:
         return loss
 
 def _maybe_unscale_loss_in_align_mode(loss):
+    # In align mode, we scale the grad in dp/sharding group in advance
+    # Here we unscale the detached loss to show the actual loss
     if in_auto_parallel_align_mode():
         return loss * _get_align_mode_scale()
     else:
