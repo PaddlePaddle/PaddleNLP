@@ -35,7 +35,6 @@ from paddlenlp.transformers.model_utils import (
     PretrainedModel,
     _add_variant,
     _load_state_dict_into_model,
-    asymmetry_qdq_weight,
     faster_set_state_dict,
     get_parameter_dtype,
     load_state_dict,
@@ -49,8 +48,8 @@ from paddlenlp.transformers.utils import (
 )
 from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
 from paddlenlp.utils.env import (
-    ASYMETRY_QUANT_SCALE_MAX,
-    ASYMETRY_QUANT_SCALE_MIN,
+    ASYMMETRY_QUANT_SCALE_MAX,
+    ASYMMETRY_QUANT_SCALE_MIN,
     BETA1_KEYNAME,
     BETA2_KEYNAME,
     LORA_WEIGHTS_NAME,
@@ -73,7 +72,7 @@ from paddlenlp.utils.env import (
     SAFE_PEFT_WEIGHTS_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
-    SYMETRY_QUANT_SCALE,
+    SYMMETRY_QUANT_SCALE,
 )
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.nested import nested_copy, nested_copy_place
@@ -90,6 +89,8 @@ if is_safetensors_available():
         from paddlenlp.utils.safetensors import fast_load_file as load_file
 
 from paddlenlp.utils.checkpoint_quantization_utils import (
+    asymmetry_qdq_weight,
+    cal_ratio,
     group_wise_quant_dequant,
     merge_int4,
     qdq_weight,
@@ -132,10 +133,6 @@ class UnifiedCheckpointOption(ExplicitEnum):
     REMOVE_MASTER_WEIGHT = "remove_master_weight"
     ASYNC_SAVE = "async_save"
     IGNORE_MERGE_OPTIMIZER = "ignore_merge_optimizer"
-
-
-def cal_ratio(m, v, eps=1e-8):
-    return 1 / (np.sqrt(v) + eps)
 
 
 class UnifiedCheckpointHandler:
@@ -195,9 +192,9 @@ class UnifiedCheckpointHandler:
                         m1_quant, codebook = qdq_weight(state_dict[m1_key], quant_bit=8)
                         quant_weight, mins, maxs = asymmetry_qdq_weight(ratio, quant_bit=8)
                         state_dict[m1_key] = m1_quant
-                        codebook_dict[m1_key + SYMETRY_QUANT_SCALE] = codebook
-                        codebook_dict[k + ASYMETRY_QUANT_SCALE_MIN] = mins
-                        codebook_dict[k + ASYMETRY_QUANT_SCALE_MAX] = maxs
+                        codebook_dict[m1_key + SYMMETRY_QUANT_SCALE] = codebook
+                        codebook_dict[k + ASYMMETRY_QUANT_SCALE_MIN] = mins
+                        codebook_dict[k + ASYMMETRY_QUANT_SCALE_MAX] = maxs
                     elif not momentum1:
                         quant_weight = state_dict[k]
                 elif ckpt_quant_stage == "O2":
@@ -213,9 +210,9 @@ class UnifiedCheckpointHandler:
                         )
                         quant_weight, r_mins, r_maxs = group_wise_quant_dequant(ratio, quant_bits=4)
                         quant_weight = merge_int4(m1_quant, quant_weight)
-                        codebook_dict[m1_key + SYMETRY_QUANT_SCALE] = m1_codebook
-                        codebook_dict[k + ASYMETRY_QUANT_SCALE_MIN] = r_mins
-                        codebook_dict[k + ASYMETRY_QUANT_SCALE_MAX] = r_maxs
+                        codebook_dict[m1_key + SYMMETRY_QUANT_SCALE] = m1_codebook
+                        codebook_dict[k + ASYMMETRY_QUANT_SCALE_MIN] = r_mins
+                        codebook_dict[k + ASYMMETRY_QUANT_SCALE_MAX] = r_maxs
                         del_key.append(m1_key)
                     elif not momentum1:
                         quant_weight = state_dict[k]
@@ -2515,8 +2512,12 @@ def update_master_weight_status(args, optimizer, has_master_weight, safe_seriali
                     "the model weight will be loaded as master weight."
                 )
             else:
-                has_master_weight = False
-                index_filename_master_weights = None
+                raise ValueError(
+                    "Can't find a valid unified master weight checkpoint,"
+                    f"add '{UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value}'"
+                    f" or '{UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value}' into 'unified_checkpoint_config' to "
+                    "load model checkpoint as master weight"
+                )
         else:
             has_master_weight = True
             index_filename_master_weights = (

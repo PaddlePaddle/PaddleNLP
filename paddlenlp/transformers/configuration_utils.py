@@ -271,7 +271,6 @@ class LlmMetaConfig:
     ]
     checkpoint_compression = [
         ("ckpt_quant_stage", str, "O0", "checkpoint quantization stage."),
-        ("remove_mw", bool, False, "whether remove master weight during checkpoint saving."),
     ]
 
     @classmethod

@@ -17,6 +17,12 @@ import numpy as np
 import paddle
 
 
+# cal adam update ratio
+def cal_ratio(m, v, eps=1e-8):
+    return 1 / (np.sqrt(v) + eps)
+
+
+# group-wise quantization (support symmetry, asymmetry)
 def group_wise_quant_dequant(
     inputs,
     mins=None,
@@ -109,6 +115,7 @@ def group_wise_quant_dequant(
         return dequant_tensor
 
 
+# merge 2 signed int4 to 1 int8
 def merge_int4(x, y):
     int4_high = x << 4
     int4_low = y & 0x0F
@@ -116,25 +123,20 @@ def merge_int4(x, y):
     return final.astype("int8")
 
 
+# split an int8 to 2 int4 elems
 def split_int8(final):
-    # offset = 2 ** 4
-    # x, y = z // offset, z % offset
-    # return x, y
-    # 获取 int4_high 和 int4_low
     int4_high = final >> 4
     int4_low = final & 0x0F
 
-    # 还原 high 和 low
-    # 对 int4_high 进行符号扩展还原 high
     int4_high = np.where(int4_high > 8, int4_high - 16, int4_high)
 
-    # 转换为 Paddle tensor
     high_tensor = paddle.Tensor(int4_high, zero_copy=True)
     low_tensor = paddle.Tensor(int4_low, zero_copy=True)
 
     return high_tensor, low_tensor
 
 
+# channel-wise min max scales calculation
 def cal_abs_min_max_channel(inputs, quant_axis=1):
     reduce_axis = tuple([i for i in range(len(inputs.shape)) if i != quant_axis])
     abs_max_values = np.max(inputs, axis=reduce_axis)
@@ -148,6 +150,7 @@ def cal_abs_min_max_channel(inputs, quant_axis=1):
     return abs_max_values, abs_min_values
 
 
+# channel-wise asymmetry quantization
 def asymmetry_qdq_weight(
     x, quant_bit=8, quant_axis=-1, mins=None, maxs=None, dequant=False, rank=-1, world_size=1, peek=False
 ):
@@ -186,6 +189,7 @@ def asymmetry_qdq_weight(
             return qdq_x.astype(paddle.float32), scales
 
 
+# channel-wise abs max calculation
 def cal_abs_max_channel(inputs, quant_axis=1):
     reduce_axis = tuple([i for i in range(len(inputs.shape)) if i != quant_axis])
     abs_max_values = np.max(np.abs(inputs), axis=reduce_axis)
@@ -195,6 +199,7 @@ def cal_abs_max_channel(inputs, quant_axis=1):
     return abs_max_values
 
 
+# channel-wise symmetry quantization
 def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-1, world_size=1, peek=False):
     if scales is None:
         scales = cal_abs_max_channel(x)

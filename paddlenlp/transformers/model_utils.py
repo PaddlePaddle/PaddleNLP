@@ -54,8 +54,8 @@ from paddle.utils.download import is_url as is_remote_url
 from tqdm.auto import tqdm
 
 from paddlenlp.utils.env import (
-    ASYMETRY_QUANT_SCALE_MAX,
-    ASYMETRY_QUANT_SCALE_MIN,
+    ASYMMETRY_QUANT_SCALE_MAX,
+    ASYMMETRY_QUANT_SCALE_MIN,
     CONFIG_NAME,
     LEGACY_CONFIG_NAME,
     MOMENT1_KEYNAME,
@@ -68,7 +68,7 @@ from paddlenlp.utils.env import (
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
-    SYMETRY_QUANT_SCALE,
+    SYMMETRY_QUANT_SCALE,
 )
 from paddlenlp.utils.log import logger
 
@@ -380,7 +380,7 @@ def load_state_dict(
                         weight = weight._copy_to(paddle.framework._current_expected_place(), False)
                     state_dict[key] = weight
                 for key in f.keys():
-                    if key.endswith(SYMETRY_QUANT_SCALE):
+                    if key.endswith(SYMMETRY_QUANT_SCALE):
                         scale = f.get_tensor(key)
                         with device_guard():
                             scale = paddle.Tensor(scale, zero_copy=True)
@@ -405,7 +405,7 @@ def load_state_dict(
                         is_moment2 = MOMENT2_KEYNAME in quant_key
                         if is_moment1:
                             # dequant m1
-                            scale_key = quant_key + SYMETRY_QUANT_SCALE
+                            scale_key = quant_key + SYMMETRY_QUANT_SCALE
                             weight = state_dict[quant_key]
                             scales = scale_dict[scale_key]
                             weight, _ = qdq_weight(
@@ -421,8 +421,8 @@ def load_state_dict(
                         elif is_moment2:
                             # dequant ratio
                             weight = state_dict[quant_key]
-                            min_scale_key = quant_key + ASYMETRY_QUANT_SCALE_MIN
-                            max_scale_key = quant_key + ASYMETRY_QUANT_SCALE_MAX
+                            min_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MIN
+                            max_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MAX
                             mins, maxs = scale_dict[min_scale_key], scale_dict[max_scale_key]
                             weight, _ = asymmetry_qdq_weight(
                                 weight,
@@ -449,9 +449,9 @@ def load_state_dict(
                         weight = state_dict[quant_key]
                         m1_quant, ratio_quant = split_int8(weight.numpy())
                         # dequant ratio
-                        ratio_min_scale_key = quant_key + ASYMETRY_QUANT_SCALE_MIN
-                        ratio_max_scale_key = quant_key + ASYMETRY_QUANT_SCALE_MAX
-                        m1_scale_key = quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME + SYMETRY_QUANT_SCALE
+                        ratio_min_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MIN
+                        ratio_max_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MAX
+                        m1_scale_key = quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME + SYMMETRY_QUANT_SCALE
                         m1_codebook = scale_dict[m1_scale_key]
                         ratio_mins, ratio_maxs = scale_dict[ratio_min_scale_key], scale_dict[ratio_max_scale_key]
                         m1_weight = group_wise_quant_dequant(
@@ -475,10 +475,6 @@ def load_state_dict(
                             world_size=world_size,
                             use_pd=True,
                         )
-                        # cal m2
-                        # all_positive = paddle.all(ratio_weight > 0)
-                        # if not all_positive:
-                        #    logger.info(f"{quant_key}'s ratio not all positive, {ratio_weight}, {ratio_weight.mean().item()}, {ratio_weight.max().item()}, {ratio_weight.min().item()}")
 
                         ratio_weight = paddle.square(1.0 / ratio_weight - eps)
                         state_dict[quant_key] = ratio_weight
