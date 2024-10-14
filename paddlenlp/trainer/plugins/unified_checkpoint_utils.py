@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Unified Checkpoint Utility Functions"""
 
+import copy
 import os
 
 import numpy as np
@@ -19,16 +21,22 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
+try:
+    from paddle.base import core
+except:
+    core = None
+
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.trainer.trainer_utils import ExplicitEnum
 from paddlenlp.trainer.utils.helper import distributed_isfile
-from paddlenlp.transformers.model_utils import PretrainedModel
+from paddlenlp.transformers.model_utils import PretrainedModel, get_parameter_dtype
 from paddlenlp.transformers.utils import dtype_byte_size
 from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
 from paddlenlp.utils.env import (
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_PEFT_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
+    PAST_KEY_VALUES_FILE_NAME,
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
@@ -67,9 +75,6 @@ class UnifiedCheckpointOption(ExplicitEnum):
     MASTER_WEIGHT_COMPATIBLE = "master_weight_compatible"
     ASYNC_SAVE = "async_save"
     IGNORE_MERGE_OPTIMIZER = "ignore_merge_optimizer"
-
-
-"""master weights related functions"""
 
 
 def unwrap_optimizer(optimizer):
@@ -206,7 +211,7 @@ def get_expected_state_dict(model_to_save):
     return state_dict
 
 
-def get_expected_keys(sharded_metadata, model, optimizer):
+def get_expected_keys(args, sharded_metadata, model, optimizer, is_master_weights=False):
     hcg = fleet.get_hybrid_communicate_group()
     sharding_group = hcg.get_sharding_parallel_group()
     sharding_rank = sharding_group.rank
@@ -214,11 +219,23 @@ def get_expected_keys(sharded_metadata, model, optimizer):
     if in_sharding_parallel_model:
         params2rank = optimizer._param2rank
 
+    model_state_dict = get_expected_state_dict(model)
     struct2static_name_mappings = {k: v.name for k, v in get_expected_state_dict(model).items()}
 
     expected_keys = []
     for key in list(sharded_metadata["all_optimizer_keys"]):
         key_name = key.split("/")[0]
+        if (
+            is_master_weights
+            and key_name in model_state_dict
+            and model_state_dict[key_name].dtype == core.VarDesc.VarType.FP32
+        ):
+            continue
+
+        if args.use_expert_parallel and args.data_parallel_rank > 0:
+            if key_name in model_state_dict and not getattr(model_state_dict[key_name], "no_sync", False):
+                continue
+
         static_name = struct2static_name_mappings.get(key_name, None)
 
         if in_sharding_parallel_model:
@@ -281,10 +298,13 @@ def generate_base_static_name(vname):
         vname = vname.split("_" + FP32_MASTER + "_")
         return vname[0], vname[1]
     else:
-        vname = vname.split(".")
-        a = vname[0] + "." + vname[1][:3]
-        b = vname[1][4:]
-        return a, b
+        # Directly deal with type names, for example: moe_gate_1_moment1_0.
+        type_names = optimizer_scalar_name + optimizer_non_scaler_name
+        for name in type_names:
+            if name in vname:
+                a = vname.split(name)[0][:-1]
+                b = name
+                return a, b
 
 
 def merge_large_tensor_parallel(tensor, tp_group, tp_action, dst_rank, is_dst):
@@ -321,7 +341,9 @@ def merge_large_tensor_parallel(tensor, tp_group, tp_action, dst_rank, is_dst):
 def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
+    dp_group = hcg.get_data_parallel_group()
     tp_rank = tp_group.rank
+    dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
 
     # filter actions for pipeline mode
     if hcg.get_pipe_parallel_group().nranks > 1:
@@ -339,6 +361,9 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
                 continue
             key = filter_keys[i]
             tensor = state_dict[key]
+            # When using expert parallel, there's no need to save tensors with `no_sync=False` when dp_rank > 0.
+            if dp_rank > 0 and not getattr(tensor, "no_sync", False):
+                continue
             if key in tp_actions:
                 # Get tensor size
                 tensor_bytes = tensor.numel().item() * dtype_byte_size(tensor.dtype) * tp_group.nranks
@@ -362,16 +387,24 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
 
     if len(tp_actions) > 0:
         for x in tp_actions.keys():
-            logger.warning(f"key <{x}> need to merge tensor parallel but we can't find in model state.")
+            logger.debug(f"key <{x}> need to merge tensor parallel but we can't find in model state.")
 
     return state_dict_to_save
 
 
-def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys):
+def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys, model_state_dict=None):
     # Core function for UC
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
+    dp_group = hcg.get_data_parallel_group()
     tp_rank = tp_group.rank
+    dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
+
+    no_sync_kname = []
+    if model_state_dict is not None:
+        for k, v in model_state_dict.items():
+            if getattr(v, "no_sync", False):
+                no_sync_kname.append(k)
 
     state_dict_to_save = {}
     max_key_len = max([len(_) for _ in all_filter_keys])
@@ -383,6 +416,9 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys)
             # get base model key
             model_key = filter_keys[i].split("/")[0]
             tensor = state_dict[filter_keys[i]]
+            # When using expert parallel, there's no need to save tensors with `no_sync=False` when dp_rank > 0.
+            if dp_rank > 0 and model_key not in no_sync_kname:
+                continue
             if model_key in tp_actions:
                 # for example: beta1, beta2
                 if tensor.numel().item() == 1:
@@ -425,7 +461,7 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
     if tp_size <= 1:
         return [list(state_dict.keys())]
 
-    filter_tensor_list = [[] for i in range(tp_size)]
+    filter_tensor_list = [[] for _ in range(tp_size)]
 
     if tp_rank == 0:
         tensor_bytes_dict = {}
@@ -475,26 +511,29 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
 
 def get_sharded_file_name(args, file_name, is_optimizer=False):
     if not is_optimizer:
+        sd_degree = args.sharding_parallel_degree if args.sharding_parallel_degree > 1 else 1
+        size = sd_degree if args.use_expert_parallel else args.dataset_world_size
         shard_file = file_name.replace(
             ".pdparams",
-            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.pdparams",
+            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//size:05d}.pdparams",
         )
         shard_file = shard_file.replace(
             ".safetensors",
-            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//args.dataset_world_size:05d}.safetensors",
+            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//size:05d}.safetensors",
         )
     else:
         hcg = fleet.get_hybrid_communicate_group()
         dp_group = hcg.get_data_parallel_group()
+        size = dp_group.nranks if not args.use_expert_parallel else 1
         shard_file = file_name.replace(
-            ".pdparams", f"-{args.logical_process_index + 1:05d}-of-{args.world_size//dp_group.nranks:05d}.pdparams"
+            ".pdparams", f"-{args.logical_process_index + 1:05d}-of-{args.world_size//size:05d}.pdparams"
         )
         shard_file = shard_file.replace(
             ".safetensors",
-            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//dp_group.nranks:05d}.safetensors",
+            f"-{args.logical_process_index + 1:05d}-of-{args.world_size//size:05d}.safetensors",
         )
         shard_file = shard_file.replace(
-            ".pdopt", f"-{args.logical_process_index + 1:05d}-of-{args.world_size//dp_group.nranks:05d}.pdopt"
+            ".pdopt", f"-{args.logical_process_index + 1:05d}-of-{args.world_size//size:05d}.pdopt"
         )
     return shard_file
 
@@ -520,7 +559,7 @@ def get_sharded_index(
     return None
 
 
-def gather_sharded_object(index_file, total_size, is_optimizer=False):
+def gather_sharded_object(index_file, total_size, is_optimizer=False, use_expert_parallel=False):
 
     index_file_list, total_size_list = [], []
 
@@ -554,6 +593,17 @@ def gather_sharded_object(index_file, total_size, is_optimizer=False):
     if len(index_file_list) == 0 and len(total_size_list) == 0:
         index_file_list = [index_file]
         total_size_list = [total_size]
+
+    if use_expert_parallel:
+        data_group = hcg.get_data_parallel_group()
+        if data_group.nranks > 1:
+            data_index_file_list = []
+            data_total_size_list = []
+            dist.all_gather_object(data_index_file_list, index_file_list, data_group)
+            dist.all_gather_object(data_total_size_list, total_size_list, data_group)
+            index_file_list = flatten_list(data_index_file_list)
+            total_size_list = flatten_list(data_total_size_list)
+
     if is_optimizer:
         sharding_group = hcg.get_sharding_parallel_group()
         if sharding_group.nranks > 1:
@@ -570,11 +620,14 @@ def gather_sharded_object(index_file, total_size, is_optimizer=False):
 def rename_shard_file(args, shard_file, file_name):
     """rename shard file when using expert_parallel."""
     assert args.use_expert_parallel, "only expert_parallel need to use this function"
+
     shard_file_list = []
+
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
     pp_group = hcg.get_pipe_parallel_group()
     data_group = hcg.get_data_parallel_group()
+
     if tp_group.nranks > 1:
         dist.all_gather_object(shard_file_list, shard_file, tp_group)
     if pp_group.nranks > 1:
@@ -589,6 +642,7 @@ def rename_shard_file(args, shard_file, file_name):
             data_shard_file_list, shard_file_list if len(shard_file_list) > 0 else shard_file, data_group
         )
         shard_file_list = flatten_list(data_shard_file_list)
+
     new_index = shard_file_list.index(shard_file)
     sd_degree = args.sharding_parallel_degree if args.sharding_parallel_degree > 1 else 1
     shard_file = file_name.replace(
@@ -600,3 +654,31 @@ def rename_shard_file(args, shard_file, file_name):
         f"-{new_index + 1:05d}-of-{args.world_size//sd_degree:05d}.safetensors",
     )
     return shard_file
+
+
+def save_config(model_to_save):
+    dtype = get_parameter_dtype(model_to_save)
+    model_to_save.config.dtype = str(dtype).split(".")[1]
+    config_to_save = copy.deepcopy(model_to_save.config)
+
+    if config_to_save.tensor_parallel_degree > 1:
+        # do we need to change?
+        config_to_save.tensor_parallel_degree = 1
+
+    return config_to_save
+
+
+def save_prefix_past_key_value(model_to_save, save_directory):
+    past_key_value = model_to_save.prefix_encoder(model_to_save.prefix_tokens.unsqueeze(0).expand([1, -1]))
+    past_key_value = past_key_value.reshape(
+        [
+            model_to_save.prefix_config.num_prefix_tokens,
+            2,
+            model_to_save.prefix_config.num_hidden_layers,
+            model_to_save.num_heads,
+            model_to_save.head_dim,
+        ]
+    )
+    past_key_value = paddle.transpose(past_key_value, perm=[2, 1, 3, 0, 4]).cpu().numpy()
+    model_to_save.prefix_config.save_pretrained(save_directory)
+    np.save(os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME), past_key_value)
