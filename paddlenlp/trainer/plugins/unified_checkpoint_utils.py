@@ -565,3 +565,38 @@ def gather_sharded_object(index_file, total_size, is_optimizer=False):
             total_size_list = flatten_list(sharding_total_size_list)
 
     return index_file_list, total_size_list
+
+
+def rename_shard_file(args, shard_file, file_name):
+    """rename shard file when using expert_parallel."""
+    assert args.use_expert_parallel, "only expert_parallel need to use this function"
+    shard_file_list = []
+    hcg = fleet.get_hybrid_communicate_group()
+    tp_group = hcg.get_model_parallel_group()
+    pp_group = hcg.get_pipe_parallel_group()
+    data_group = hcg.get_data_parallel_group()
+    if tp_group.nranks > 1:
+        dist.all_gather_object(shard_file_list, shard_file, tp_group)
+    if pp_group.nranks > 1:
+        pp_shard_file_list = []
+        dist.all_gather_object(
+            pp_shard_file_list, shard_file_list if len(shard_file_list) > 0 else shard_file, pp_group
+        )
+        shard_file_list = flatten_list(pp_shard_file_list)
+    if data_group.nranks > 1:
+        data_shard_file_list = []
+        dist.all_gather_object(
+            data_shard_file_list, shard_file_list if len(shard_file_list) > 0 else shard_file, data_group
+        )
+        shard_file_list = flatten_list(data_shard_file_list)
+    new_index = shard_file_list.index(shard_file)
+    sd_degree = args.sharding_parallel_degree if args.sharding_parallel_degree > 1 else 1
+    shard_file = file_name.replace(
+        ".pdparams",
+        f"-{new_index + 1:05d}-of-{args.world_size//sd_degree:05d}.pdparams",
+    )
+    shard_file = shard_file.replace(
+        ".safetensors",
+        f"-{new_index + 1:05d}-of-{args.world_size//sd_degree:05d}.safetensors",
+    )
+    return shard_file
