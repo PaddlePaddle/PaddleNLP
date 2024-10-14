@@ -291,7 +291,10 @@ class ForcedEOSTokenLogitsProcessor(LogitsProcessor):
 
 
 def TopKProcess(probs: paddle.Tensor, top_k: int, min_tokens_to_keep: int):
-    top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
+    top_k = paddle.minimum(
+        paddle.maximum(paddle.to_tensor(top_k), paddle.to_tensor(min_tokens_to_keep)),
+        paddle.to_tensor(probs.shape[-1]),
+    )
     # Remove all tokens with a probability less than the last token of the top-k
     # cast to float16 to support generation & d2s
     if probs.dtype == paddle.bfloat16:

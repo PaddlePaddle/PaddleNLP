@@ -20,6 +20,7 @@ import contextlib
 import json
 import math
 import os
+import sys
 import types
 import warnings
 from dataclasses import asdict, dataclass, field
@@ -37,6 +38,17 @@ from .trainer_utils import (
     SchedulerType,
     ShardingOption,
 )
+
+try:
+    from paddle.distributed import in_auto_parallel_align_mode
+except Exception:
+
+    def in_auto_parallel_align_mode():
+        """
+        hack for paddlenlp develop branch.
+        """
+        return False
+
 
 __all__ = [
     "default_logdir",
@@ -271,7 +283,7 @@ class TrainingArguments:
               enable_stage1_broadcast_overlap, overlap stage1 V1 broadcast with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap forward compute and no other sync could be called during the training for broadcast overlap.
               enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap.
               disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.
-              enable_release_graHEADds, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
+              enable_release_grads, reduce peak memory usage by releasing gradients after each iteration. The creation of gradients will be postponed until backward propagation of the next iteration.
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
@@ -343,18 +355,25 @@ class TrainingArguments:
             The list of integrations to report the results and logs to.
             Supported platforms are `"visualdl"`/`"wandb"`/`"tensorboard"`.
             `"none"` for no integrations.
+        ddp_find_unused_parameters (`bool`, *optional*):
+            When using distributed training, the value of the flag `find_unused_parameters` passed to
+            `paddle.DataParallel`. Will default to `False` if recompute is used, `True` otherwise.
         wandb_api_key (`str`, *optional*):
             Weights & Biases (WandB) API key(s) for authentication with the WandB service.
         resume_from_checkpoint (`str`, *optional*):
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
+        auto_parallel_resume_form_hybrid_parallel (`bool`, *optional*):
+            Wether hybrid paralle checkpoints be loaded in auto parallel mode.
         flatten_param_grads (`bool`, *optional*):
             Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
         skip_profile_timer (`bool`, *optional*):
             Whether skip profile timer, timer will record time usage of forward/ backward/ step, etc.
         distributed_dataloader (`bool`, *optional*):
             Whether to use distributed dataloader. Default is `False`.
+        release_grads (`bool`, *optional*):
+            Whether to release gradients during training. Default is `False`.
     """
 
     output_dir: str = field(
@@ -541,6 +560,17 @@ class TrainingArguments:
             )
         },
     )
+    sharding_comm_buffer_size_MB: int = field(
+        default=-1,
+        metadata={
+            "help": (
+                "Set the size of the fuse gradient in sharding communication. This option only takes effect when "
+                "the sharding option is turned on.The default value is -1, which means that the gradient size of "
+                "all communication fuses follows the default configuration, which is 256MB. "
+            )
+        },
+    )
+
     save_sharded_model: bool = field(
         default=False,
         metadata={
@@ -760,6 +790,15 @@ class TrainingArguments:
     report_to: Optional[List[str]] = field(
         default=None, metadata={"help": "The list of integrations to report the results and logs to."}
     )
+    ddp_find_unused_parameters: Optional[bool] = field(
+        default=None,
+        metadata={
+            "help": (
+                "When using distributed training, the value of the flag `find_unused_parameters` passed to "
+                "`DataParallel`."
+            )
+        },
+    )
     wandb_api_key: Optional[str] = field(
         default=None,
         metadata={"help": "Weights & Biases (WandB) API key(s) for authentication with the WandB service."},
@@ -767,6 +806,10 @@ class TrainingArguments:
     resume_from_checkpoint: Optional[str] = field(
         default=None,
         metadata={"help": "The path to a folder with a valid checkpoint for your model."},
+    )
+    auto_parallel_resume_form_hybrid_parallel: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Wether hybrid paralle checkpoints be loaded in auto parallel mode."},
     )
     skip_memory_metrics: bool = field(
         default=True, metadata={"help": "Whether or not to skip adding of memory profiler reports to metrics."}
@@ -832,8 +875,21 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Enable MoE (Mixture of Experts) expert parallel training"},
     )
+    release_grads: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to release gradients during training. Default is `False`."}
+    )
+    skip_data_intervals: Optional[List[List[int]]] = field(
+        default=None,
+        metadata={"help": "The intervals to skip, pass start global step and end global step at each interval"},
+    )
 
     def __post_init__(self):
+        if in_auto_parallel_align_mode():
+            self.max_grad_norm = 0.0
+            os.environ["FLAGS_max_inplace_grad_add"] = "65536"
+            os.environ["FLAGS_embedding_deterministic"] = "1"
+            os.environ["FLAGS_cudnn_deterministic"] = "1"
+
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size() > 1:
             self.local_rank = env_local_rank
@@ -935,6 +991,7 @@ class TrainingArguments:
         if self.sharding_degree > 0:
             warnings.warn("`sharding_degree` is deprecated, please use `sharding_parallel_degree`")
             self.sharding_parallel_degree = max(self.sharding_degree, self.sharding_parallel_degree)
+        self.data_parallel_degree = 1
 
         delattr(self, "sharding_degree")
 
@@ -1097,7 +1154,7 @@ class TrainingArguments:
                         "dp_comm_overlap": enable_dp_comm_overlap,
                         "sharding_comm_overlap": enable_sharding_comm_overlap,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
-                        "release_gradients": "enable_release_grads" in pipeline_parallel_config,
+                        "release_gradients": "enable_release_grads" in pipeline_parallel_config or self.release_grads,
                         "overlap_p2p_comm": "enable_overlap_p2p_comm" in pipeline_parallel_config,
                         "clear_every_step_cache": "enable_clear_every_step_cache" in pipeline_parallel_config,
                         "use_batch_p2p_comm": "disable_batch_p2p_comm" not in pipeline_parallel_config,
@@ -1166,15 +1223,23 @@ class TrainingArguments:
                         # sync_param_name = [""] matches any parameter name.
                         # If sync_param, sync_grad and sync_moment are not set, the default value in Paddle is :
                         # sync_param = True, sync_grad = False, sync_moment = False, sync_param_name = ["embedding", "layer_norm", ".b_"].
+
+                        if sync_param or sync_grad or sync_moment:
+                            logger.info("setting sync_param_name")
+                            strategy.sync_param_name = [""]
+
                         if sync_param:
+                            logger.info("setting sync_param")
                             strategy.hybrid_configs["mp_configs"].sync_param = True
-                            strategy.hybrid_configs["mp_configs"].sync_param_name = [""]
+
                         if sync_grad:
+                            logger.info("setting sync_grad")
                             strategy.hybrid_configs["mp_configs"].sync_grad = True
-                            strategy.hybrid_configs["mp_configs"].sync_grad_name = [""]
+
                         if sync_moment:
+                            logger.info("setting sync_moment")
                             strategy.hybrid_configs["mp_configs"].sync_moment = True
-                            strategy.hybrid_configs["mp_configs"].sync_moment_name = [""]
+
                     except:
                         warnings.warn(
                             "The enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
@@ -1261,6 +1326,11 @@ class TrainingArguments:
                             )
 
                     try:
+                        if self.sharding_comm_buffer_size_MB > 0:
+                            strategy.hybrid_configs["sharding_configs"].comm_buffer_size_MB = int(
+                                self.sharding_comm_buffer_size_MB
+                            )
+
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
 
@@ -1413,6 +1483,7 @@ class TrainingArguments:
                 pipeline.accumulate_steps = self.gradient_accumulation_steps
                 pipeline.micro_batch_size = self.per_device_train_batch_size
                 pipeline.schedule_mode = self.pipeline_schedule_mode
+                pipeline.pp_degree = self.pipeline_parallel_degree
 
                 logger.info(f"PP configs:{strategy.pipeline}, use master_grad: {self.amp_master_grad}")
 
@@ -1556,31 +1627,35 @@ class TrainingArguments:
             self.unified_checkpoint = False
 
         if self.unified_checkpoint:
-            if self.ignore_save_lr_and_optim:
-                self.unified_checkpoint_config = ""
-                logger.info("Setting unified_checkpoint_config to empty for using ignore_save_lr_and_optim.")
-            else:
-                unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
-                for x in unified_checkpoint_config:
-                    if len(x) > 0:
-                        if x not in [
-                            "skip_save_model_weight",
-                            "master_weight_compatible",
-                            "async_save",
-                            "enable_all_options",
-                        ]:
-                            raise ValueError(
-                                f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
-                                + "master_weight_compatible, async_save, enable_all_options."
-                            )
-                if "enable_all_options" in unified_checkpoint_config:
-                    self.unified_checkpoint_config = [
+            unified_checkpoint_config = set(self.unified_checkpoint_config.split(" "))
+            if sys.platform.startswith("win") and "async_save" in self.unified_checkpoint_config:
+                raise ValueError("Currently do not support asynchronous saving for Windows system!")
+            if (
+                "skip_save_model_weight" in self.unified_checkpoint_config
+                and "ignore_merge_optimizer" in self.unified_checkpoint_config
+            ):
+                raise ValueError("`skip_save_model_weight` and `ignore_merge_optimizer` cannot both be True.")
+            for x in unified_checkpoint_config:
+                if len(x) > 0:
+                    if x not in [
                         "skip_save_model_weight",
                         "master_weight_compatible",
-                        # "async_save",
-                    ]
-                else:
-                    self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
+                        "async_save",
+                        "enable_all_options",
+                        "ignore_merge_optimizer",
+                    ]:
+                        raise ValueError(
+                            f"Found unknown unified_checkpoint config {x}, accpet config is skip_save_model_weight, "
+                            + "master_weight_compatible, async_save, enable_all_options, ignore_merge_optimizer."
+                        )
+            if "enable_all_options" in unified_checkpoint_config:
+                self.unified_checkpoint_config = [
+                    "skip_save_model_weight",
+                    "master_weight_compatible",
+                    # "async_save",
+                ]
+            else:
+                self.unified_checkpoint_config = self.unified_checkpoint_config.split(" ")
 
         if self.report_to is None:
             logger.info(

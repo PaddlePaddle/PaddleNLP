@@ -55,6 +55,7 @@ from paddlenlp.transformers.model_utils import PretrainedModel, register_base_mo
 from .. import linear_utils
 from ..linear_utils import Linear
 from ..segment_parallel_utils import ReshardLayer
+from ..utils import caculate_llm_flops
 from .configuration import (
     GEMMA_PRETRAINED_INIT_CONFIGURATION,
     GEMMA_PRETRAINED_RESOURCE_FILES_MAP,
@@ -1074,6 +1075,39 @@ class GemmaModel(GemmaPretrainedModel):
 
         self.gradient_checkpointing = False
 
+    def get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return caculate_llm_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=False,
+        )
+
+    def get_hardware_flops(self, batch_size=1, seq_length=None, recompute=False, **kwargs):
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return caculate_llm_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=recompute,
+            recompute_granularity=self.config.recompute_granularity,
+        )
+
     def get_input_embeddings(self):
         return self.embed_tokens
 
@@ -1524,9 +1558,7 @@ class GemmaForCausalLM(GemmaPretrainedModel):
 
         # if labels is None，means we need full output, instead of tensor_parallel_output
         # tensor_parallel_output is togather with ParallelCrossEntropy
-        tensor_parallel_output = (
-            self.config.tensor_parallel_output and labels is not None and self.config.tensor_parallel_degree > 1
-        )
+        tensor_parallel_output = self.config.tensor_parallel_output and self.config.tensor_parallel_degree > 1
 
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 

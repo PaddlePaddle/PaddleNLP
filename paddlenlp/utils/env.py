@@ -65,11 +65,15 @@ DOWNLOAD_SERVER = "http://paddlepaddle.org.cn/paddlehub"
 FAILED_STATUS = -1
 SUCCESS_STATUS = 0
 
+SPECIAL_TOKENS_MAP_NAME = "special_tokens_map.json"
+ADDED_TOKENS_NAME = "added_tokens.json"
 LEGACY_CONFIG_NAME = "model_config.json"
 CONFIG_NAME = "config.json"
 TOKENIZER_CONFIG_NAME = "tokenizer_config.json"
 CHAT_TEMPLATE_CONFIG_NAME = "chat_template.json"
 GENERATION_CONFIG_NAME = "generation_config.json"
+# Fast tokenizers (provided by HuggingFace tokenizer's library) can be saved in a single file
+FULL_TOKENIZER_NAME = "tokenizer.json"
 
 
 LORA_CONFIG_NAME = "lora_config.json"

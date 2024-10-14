@@ -3,7 +3,7 @@ sentencepiece
 regex
 torch>=1.5
 transformers
-tool_helpers
+fast_dataindex
 sacremoses
 pydantic==1.10.9
 modelscope

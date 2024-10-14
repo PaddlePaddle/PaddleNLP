@@ -38,9 +38,10 @@ from paddlenlp.transformers.model_utils import (
 )
 from paddlenlp.transformers.utils import paddlenlp_load
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import get_env_device
 
 from . import reshard as reshard_util
-from .reshard import SHARDING_STRATEGY_V1, pp_reshard
+from .reshard import SHARDING_STRATEGY_V1, SHARDING_STRATEGY_V2, pp_reshard
 
 # Name of the files used for checkpointing
 TRAINING_ARGS_NAME = "training_args.bin"
@@ -51,6 +52,22 @@ SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
 MODEL_META_NAME = "model_meta.json"
 SHARDING_META_NAME = "shard_meta.json"
+
+
+def to_device(tensor, place=None):
+    if place is None:
+        place = get_env_device()
+
+    if isinstance(place, str):
+        place = paddle.device._convert_to_place(place)
+
+    if not tensor.place._equals(place):
+        new_t = tensor._copy_to(place, True)
+        dst_tensor = tensor.value().get_tensor()
+        src_tensor = new_t.value().get_tensor()
+        dst_tensor._share_data_with(src_tensor)
+
+    return tensor
 
 
 def filter_sharded_params(state_dict, optimizer, sharding_group):
@@ -83,6 +100,9 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
         for (k, v) in state_dict.items():
             if v.name in filtered_parameters:
                 filtered_state_dict[k] = v
+            elif v.name not in [p.name for p in parameters]:
+                if sharding_rank == 0:
+                    filtered_state_dict[k] = v
     return filtered_state_dict
 
 
@@ -204,9 +224,20 @@ class ShardingIO:
         path = os.path.join(checkpoint, optimizer_name)
         logger.info(f"load optimizer state from {path}")
         if os.path.isfile(path):
-            return paddlenlp_load(path, map_location="cpu")
+            return self._modify_ckpt_for_compatibility(paddlenlp_load(path, map_location="cpu"))
         logger.info(f"{path} not exists")
         return None
+
+    def _modify_ckpt_for_compatibility(self, ckpt):
+        master_weights = ckpt.get("master_weights", None)
+        if master_weights:
+            for k, v in master_weights.items():
+                assert isinstance(v, paddle.Tensor), v
+                if not v.name.startswith(k):
+                    new_name = k + "_fp32_master_0"
+                    logger.info(f"Modify master weights {v.name} -> {new_name}")
+                    v.name = new_name
+        return ckpt
 
     def _need_reshard(self, checkpoint):
         if self._need_reshard_pp(checkpoint):
@@ -225,6 +256,9 @@ class ShardingIO:
             param2rank = sharding_meta["param2rank"]
             optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
             assert optimizer
+            if len(param2rank) == 0:
+                logger.warning("The param2rank is empty. Force reshard would be performed.")
+                return True
             assert len(param2rank) == len(optimizer._param2rank)
             for (k, v) in param2rank.items():
                 assert k in optimizer._param2rank
@@ -253,10 +287,6 @@ class ShardingIO:
     def load_optimizer_state_with_reshard(self, checkpoint, base_opt_name, model_wrapped):
         """load state_dict of multiple shard from_checkpoint, Only load model state dict."""
 
-        if not self._need_reshard(checkpoint):
-            logger.info("do not need reshard")
-            return self._load_optimizer_state_of_one_shard(checkpoint, base_opt_name, self.args.optimizer_name_suffix)
-        logger.info("reshard optimizer state")
         parallel_config = self._load_distributed_strategy(checkpoint)
         sharding_meta = self._load_sharding_meta(checkpoint, 0)
         pp_degree = parallel_config["pp_degree"]
@@ -276,6 +306,26 @@ class ShardingIO:
         cur_sharding_degree = self.args.sharding_parallel_degree
         cur_sharding_strategy = reshard_util.get_sharding_strategy(self.optimizer)
 
+        if not self._need_reshard(checkpoint):
+            one_shard_opt_state_dict = self._load_optimizer_state_of_one_shard(
+                checkpoint, base_opt_name, self.args.optimizer_name_suffix
+            )
+
+            if sharding_strategy == SHARDING_STRATEGY_V2 and cur_sharding_strategy == SHARDING_STRATEGY_V2:
+                is_matched = reshard_util.sharding_v2.is_matched_optimizer_state_dict(
+                    one_shard_opt_state_dict, self.optimizer, model_wrapped
+                )
+            else:
+                is_matched = True
+
+            if is_matched:
+                logger.info("do not need reshard")
+                return one_shard_opt_state_dict
+        else:
+            one_shard_opt_state_dict = None
+
+        logger.info("reshard optimizer state")
+
         def load_model_slices():
             model_state = reshard_util.NodeModelState()
             for j in range(self.args.pipeline_parallel_rank, pp_degree, cur_pp_degree):
@@ -283,9 +333,14 @@ class ShardingIO:
                 assert "structure_name_mapping" in cur_sharding_meta
                 structure_name_map = cur_sharding_meta["structure_name_mapping"]
                 for i in range(self.args.sharding_parallel_rank, sharding_degree, cur_sharding_degree):
-                    tmp = self._load_optimizer_state_of_one_shard(
-                        checkpoint, base_opt_name, self.args.sharded_name_suffix(i, j)
-                    )
+                    sharded_name_suffix = self.args.sharded_name_suffix(i, j)
+                    if one_shard_opt_state_dict is None:
+                        tmp = self._load_optimizer_state_of_one_shard(checkpoint, base_opt_name, sharded_name_suffix)
+                    else:
+                        assert (
+                            self.args.optimizer_name_suffix == sharded_name_suffix
+                        ), f"{self.args.optimizer_name_suffix} vs {sharded_name_suffix}"
+                        tmp = one_shard_opt_state_dict
                     node_model_state_tmp = reshard_util.NodeModelState()
                     node_model_state_tmp.add_opts(tmp)
                     node_model_state_tmp.pack_keys(structure_name_map)
@@ -425,7 +480,7 @@ class ShardingIO:
         # cast to before
         for (k, v) in tmp.items():
             name = v.name
-            master_weights[k] = paddle.cast(v.cuda(), paddle.bfloat16).cpu()
+            master_weights[k] = paddle.cast(to_device(v), paddle.bfloat16).cpu()
             master_weights[k].name = name
 
         structure_name_map = {k: v.name for (k, v) in self.model.state_dict().items()}
@@ -456,7 +511,9 @@ class ShardingIO:
         for key, param in model_state_dict.items():
             if param.name in master_weights:
                 assert param.shape == master_weights[param.name].shape
-                paddle.assign(paddle.cast(master_weights[param.name].cuda(), paddle.bfloat16), model_state_dict[key])
+                paddle.assign(
+                    paddle.cast(to_device(master_weights[param.name]), paddle.bfloat16), model_state_dict[key]
+                )
             elif key in state_dict:
                 logger.info(f"key: {key} is in state_dict, but not in master_weights")
                 paddle.assign(state_dict[key], model_state_dict[key])
@@ -552,7 +609,8 @@ class ShardingIO:
         param_meta = {}
         for k, v in model.state_dict().items():
             structure_name_mapping[k] = v.name
-            param_meta[k] = (v.shape, int(v.dtype))
+            is_distributed = getattr(v, "is_distributed", False)
+            param_meta[k] = (v.shape, int(v.dtype), is_distributed)
 
         sharding_metas = {}
         sharding_meta = {}

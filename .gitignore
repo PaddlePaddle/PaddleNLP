@@ -124,3 +124,8 @@ FETCH_HEAD
 # vscode
 .vscode
 ./ppdiffusers/ppdiffusers/version.py
+
+# third party
+csrc/third_party/
+dataset/
+output/

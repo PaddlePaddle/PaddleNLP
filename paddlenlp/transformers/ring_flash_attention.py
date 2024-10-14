@@ -20,17 +20,6 @@ import paddle.nn.functional as F
 from paddle import _C_ops
 from paddle.autograd.py_layer import PyLayer
 
-try:
-    from paddlenlp_ops import flash_attn_bwd
-except (ImportError, ModuleNotFoundError):
-    from paddlenlp.utils.log import logger
-
-    logger.warning(
-        "if you run ring_flash_attention.py, please ensure you install "
-        "the paddlenlp_ops by following the instructions "
-        "provided at https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
-    )
-
 
 class RingCommunicator:
     def __init__(self, group, local_key, local_value):
@@ -232,6 +221,17 @@ def balanced_ring_flash_attention_bwd_func(
 
     if attn_mask is not None:
         attn_masks_list = paddle.split(attn_mask, num_or_sections=cp_size * 2, axis=3)
+
+    try:
+        from paddlenlp_ops import flash_attn_bwd
+    except (ImportError, ModuleNotFoundError):
+        from paddlenlp.utils.log import logger
+
+        logger.warning(
+            "if you run ring_flash_attention.py, please ensure you install "
+            "the paddlenlp_ops by following the instructions "
+            "provided at https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
+        )
 
     for step in range(cp_size):
         block_k, block_v = kv_comm_buffer.get_buffers()

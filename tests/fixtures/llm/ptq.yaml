@@ -34,6 +34,7 @@ inference-predict:
 inference-to-static:
   default:
     dtype: float16
+    max_length: 20
 
 
 inference-infer:

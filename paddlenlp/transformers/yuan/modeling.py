@@ -12,15 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Paddle Yuan model"""
+"""Modeling class for Yuan2.0 model"""
 
 import copy
 import math
 from functools import partial
 from typing import List, Optional, Tuple, Union
 
+import numpy as np
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
+import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
@@ -34,7 +36,6 @@ from ...transformers.model_outputs import (
 )
 from ...transformers.model_utils import PretrainedModel
 from ...utils.log import logger
-from ...utils.tools import get_env_device
 from ..activations import ACT2FN
 from .configuration import YuanConfig
 
@@ -46,16 +47,11 @@ try:
 except:
     pass
 
-try:
-    if get_env_device() == "npu":
-        import os
-
-        for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
-            if lib.endswith(".so"):
-                paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(lib)
-    from paddle.nn.functional.flash_attention import flash_attn_unpadded
-except:
-    flash_attention = None
+__all__ = [
+    "YuanModel",
+    "YuanPretrainedModel",
+    "YuanForCausalLM",
+]
 
 
 class YuanRMSNorm(nn.Layer):
@@ -193,23 +189,19 @@ class LocalizedFiltering(paddle.nn.Layer):
 
 
 # Copied from transformers.models.bart.modeling_bart._make_causal_mask
-def _make_causal_mask(
-    input_ids_shape: paddle.shape, dtype: paddle.dtype, device: paddle.device, past_key_values_length: int = 0
-):
+def _make_causal_mask(input_ids_shape: paddle.shape, dtype: paddle.dtype, past_key_values_length: int = 0):
     """
     Make causal mask used for bi-directional self-attention.
     """
     bsz, tgt_len = input_ids_shape
-    mask = paddle.full((tgt_len, tgt_len), paddle.to_tensor(paddle.finfo(dtype).min, device=device), device=device)
-    mask_cond = paddle.arange(mask.size(-1), device=device)
+    mask = paddle.full((tgt_len, tgt_len), paddle.to_tensor(paddle.finfo(dtype).min))
+    mask_cond = paddle.arange(mask.size(-1))
     mask_cond = paddle.add(mask_cond, 1)
     mask_cond_reshaped = paddle.reshape(mask_cond, [mask.size(-1), 1])
     mask = paddle.where(mask_cond < mask_cond_reshaped, paddle.zeros_like(mask), mask)
     mask = paddle.cast(mask, dtype)
     if past_key_values_length > 0:
-        mask = paddle.concat(
-            [paddle.zeros([tgt_len, past_key_values_length], dtype=dtype, device=device), mask], zeros=-1
-        )
+        mask = paddle.concat([paddle.zeros([tgt_len, past_key_values_length], dtype=dtype), mask], zeros=-1)
     return mask[None, None, :, :].expand(bsz, 1, tgt_len, tgt_len + past_key_values_length)
 
 
@@ -249,7 +241,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
 
 class YuanPretrainedModel(PretrainedModel):
     config_class = YuanConfig
-    base_model_prefix = "model"
+    base_model_prefix = "yuan"
     supports_gradient_checkpointing = True
     _no_split_modules = ["YuanDecoderLayer"]
     _skip_keys_device_placement = "past_key_values"
@@ -274,6 +266,11 @@ class YuanPretrainedModel(PretrainedModel):
                 [f"layers.{layer_index}.mlp.up_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.input_layernorm.weight"],
                 [f"layers.{layer_index}.post_attention_layernorm.weight"],
+                [f"layers.{layer_index}.self_attn.lf_gate.conv1.bias"],
+                [f"layers.{layer_index}.self_attn.lf_gate.conv1.weight"],
+                [f"layers.{layer_index}.self_attn.lf_gate.conv2.bias"],
+                [f"layers.{layer_index}.self_attn.lf_gate.conv2.weight"],
+                [f"layers.{layer_index}.self_attn.lf_gate.output_layernorm.weight"],
             ]
             model_mappings.extend(layer_mappings)
 
@@ -315,22 +312,15 @@ class YuanPretrainedModel(PretrainedModel):
                 base_actions.pop("lm_head.weight")
                 base_actions.pop("embed_tokens.weight")
             # Column Linear
-            if config.use_flash_attention:
-                base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
-            else:
-                base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
-                # if we have enough num_key_value_heads to split, then split it.
-                if config.num_attention_heads % config.tensor_parallel_degree == 0:
-                    base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
-                    base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
 
-            if config.use_flash_attention:
-                base_actions["layers.0.mlp.gate_up_fused_proj.weight"] = partial(
-                    fn, is_column=True, is_naive_2fuse=True
-                )
-            else:
-                base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
+            # if we have enough num_key_value_heads to split, then split it.
+            if config.num_attention_heads % config.tensor_parallel_degree == 0:
+                base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
+                base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
+
+            base_actions["layers.0.mlp.gate_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.mlp.up_proj.weight"] = partial(fn, is_column=True)
 
             for key, action in base_actions.items():
                 if "layers.0." in key:
@@ -343,6 +333,67 @@ class YuanPretrainedModel(PretrainedModel):
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
         return mappings
+
+    @classmethod
+    def _get_fuse_or_split_param_mappings(cls, config: YuanConfig, is_fuse=False):
+        def convert_qk_keys_fn(fused_params, tensor_parallel_degree):
+            concat_fn = np.concatenate
+            split_fn = np.split
+            if isinstance(fused_params, paddle.Tensor):
+                concat_fn = paddle.concat
+                split_fn = paddle.split
+
+            q_weight, k_weight = split_fn(fused_params, 2, axis=-1)
+
+            hidden_size = q_weight.shape[-1]
+            step = 1
+            if tensor_parallel_degree > 1:
+                assert hidden_size // tensor_parallel_degree, "hidden_size must be divisible by tensor_parallel_degree"
+                step = hidden_size // tensor_parallel_degree
+
+            q_slices = [q_weight[:, i : i + step] for i in range(0, hidden_size, step)]
+            k_slices = [k_weight[:, i : i + step] for i in range(0, hidden_size, step)]
+            q1 = concat_fn(q_slices[0::2], -1)
+            q2 = concat_fn(k_slices[0::2], -1)
+            k1 = concat_fn(q_slices[1::2], -1)
+            k2 = concat_fn(k_slices[1::2], -1)
+
+            return concat_fn([q1, q2], -1), concat_fn([k1, k2], -1)
+
+        def fuse_qk_keys_fn(fuse_params):
+            concat_fn = np.concatenate
+            if isinstance(fuse_params[0], paddle.Tensor):
+                concat_fn = paddle.concat
+            return concat_fn(fuse_params, axis=-1)
+
+        # last key is fused key, other keys are to be fused.
+
+        final_actions = {}
+        if config.tensor_parallel_degree <= 1:
+            return final_actions
+
+        if is_fuse:
+            fuse_qk_keys = (
+                "layers.0.self_attn.q_proj.weight",  # base param key
+                "layers.0.self_attn.k_proj.weight",  # base param key
+                "layers.0.self_attn.qk_proj.weight",  # new param key
+            )
+
+            for i in range(config.num_hidden_layers):
+                keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in fuse_qk_keys])
+                final_actions[keys] = partial(fuse_qk_keys_fn)
+        else:
+            split_qk_keys = (
+                "layers.0.self_attn.q_proj.weight",  # new param key
+                "layers.0.self_attn.k_proj.weight",  # new param key
+                "layers.0.self_attn.qk_proj.weight",  # base param key
+            )
+
+            for i in range(config.num_hidden_layers):
+                keys = tuple([key.replace("layers.0.", f"layers.{i}.") for key in split_qk_keys])
+                final_actions[keys] = partial(convert_qk_keys_fn, tensor_parallel_degree=config.tensor_parallel_degree)
+
+        return final_actions
 
     def _init_weights(self, layer):
         """Initialization hook"""
@@ -619,32 +670,18 @@ class YuanAttention(nn.Layer):
             key_states = key_states.transpose([0, 2, 1, *range(3, len(key_states.shape))])
             value_states = value_states.transpose([0, 2, 1, *range(3, len(value_states.shape))])
 
-            batch_size, seqlen_q = query_states.shape[0], query_states.shape[1]
-            seqlen_k = key_states.shape[1]
+            batch_size = query_states.shape[0]
 
-            # q, k, v = [rearrange(x, "b s ... -> (b s) ...") for x in [query_states, key_states, value_states]]
-            b, s = query_states.shape[:2]
-            new_shape = (b * s,) + query_states.shape[2:]
-            q = paddle.reshape(query_states, new_shape)
-            k = paddle.reshape(key_states, new_shape)
-            v = paddle.reshape(value_states, new_shape)
-
-            cu_seqlens_q = paddle.arange(0, (batch_size + 1) * seqlen_q, step=seqlen_q, dtype="int32")
-
-            if self.training:
-                assert seqlen_k == seqlen_q
-                cu_seqlens_k = cu_seqlens_q
-                is_causal = self.causal_mask
-            else:
-                is_causal = seqlen_q == seqlen_k
-                cu_seqlens_k = paddle.arange(0, (batch_size + 1) * seqlen_k, step=seqlen_k, dtype="int32")
-                self.dropout = 0
-            output = flash_attn_unpadded(
-                q, k, v, cu_seqlens_q, cu_seqlens_k, seqlen_q, seqlen_k, self.dropout, causal=is_causal
+            output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                is_causal=attention_mask is None,
             )
             # attn_output = rearrange(output[0], '(b s) ... -> b s ...', b=batch_size)
             seq_length = output[0].shape[0] // batch_size
-            new_shape = (batch_size, seq_length) + output[0].shape[1:]
+            new_shape = (batch_size, seq_length) + tuple(output[0].shape[1:])
             attn_output = paddle.reshape(output[0], new_shape)
         else:
             attn_weights = paddle.matmul(
@@ -662,7 +699,9 @@ class YuanAttention(nn.Layer):
                         f"Attention mask should be of size {(bsz, 1, q_len, kv_seq_len)}, but is {attention_mask.shape}"
                     )
                 attn_weights = attn_weights + attention_mask
-                attn_weights = paddle.maximum(attn_weights, paddle.to_tensor(paddle.finfo(attn_weights.dtype).min))
+                attn_weights = paddle.maximum(
+                    attn_weights, paddle.to_tensor(paddle.finfo(attn_weights.dtype).min, attn_weights.dtype)
+                )
 
             # upcast attention to fp32
             attn_weights = paddle.cast(
@@ -800,14 +839,13 @@ class YuanModel(YuanPretrainedModel):
             combined_attention_mask = _make_causal_mask(
                 input_shape,
                 inputs_embeds.dtype,
-                device=inputs_embeds.place(),
                 past_key_values_length=past_key_values_length,
             )
 
         if attention_mask is not None:
             # [bsz, seq_len] -> [bsz, 1, tgt_seq_len, src_seq_len]
             expanded_attn_mask = _expand_mask(attention_mask, inputs_embeds.dtype, tgt_len=input_shape[-1])
-            expanded_attn_mask = paddle.to_tensor(expanded_attn_mask, place=inputs_embeds.place())
+            expanded_attn_mask = paddle.to_tensor(expanded_attn_mask)
             combined_attention_mask = (
                 expanded_attn_mask if combined_attention_mask is None else expanded_attn_mask + combined_attention_mask
             )
@@ -819,7 +857,7 @@ class YuanModel(YuanPretrainedModel):
     ):
 
         micro_batch_size, seq_length = input_id.shape
-        attention_mask = paddle.tril(paddle.ones((micro_batch_size, seq_length, seq_length)))
+        attention_mask = paddle.tril(paddle.ones((micro_batch_size, seq_length, seq_length), dtype=self.config.dtype))
         attention_mask = paddle.reshape(attention_mask, (micro_batch_size, 1, seq_length, seq_length))
 
         position_ids = paddle.arange(seq_length, dtype=paddle.int64)
@@ -868,8 +906,6 @@ class YuanModel(YuanPretrainedModel):
         output_attentions: bool,
         past_key_value: Tensor,
         use_cache: bool,
-        alibi=None,
-        attn_mask_startend_row_indices=None,
     ):
         def create_custom_forward(module):
             def custom_forward(*inputs):
@@ -880,13 +916,11 @@ class YuanModel(YuanPretrainedModel):
         hidden_states = recompute(
             create_custom_forward(layer_module),
             hidden_states,
-            position_ids,
             attention_mask,
-            output_attentions,
+            position_ids,
             past_key_value,
+            output_attentions,
             use_cache,
-            alibi,
-            attn_mask_startend_row_indices,
             use_reentrant=self.config.recompute_use_reentrant,
         )
 
@@ -955,9 +989,7 @@ class YuanModel(YuanPretrainedModel):
 
         else:
             if attention_mask is None:
-                attention_mask = paddle.ones(
-                    (batch_size, seq_length_with_past), dtype=paddle.bool, device=inputs_embeds.place()
-                )
+                attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
             attention_mask = self._prepare_decoder_attention_mask(
                 attention_mask, (batch_size, seq_length), inputs_embeds, past_key_values_length
             )
@@ -992,13 +1024,11 @@ class YuanModel(YuanPretrainedModel):
                 layer_outputs = self.recompute_training_full(
                     decoder_layer,
                     hidden_states,
-                    position_ids,
-                    attention_mask,
-                    output_attentions,
-                    past_key_value,
-                    use_cache,
-                    alibi=None,
-                    attn_mask_startend_row_indices=None,
+                    position_ids=position_ids,
+                    attention_mask=attention_mask,
+                    output_attentions=output_attentions,
+                    past_key_value=past_key_value,
+                    use_cache=use_cache,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -1039,7 +1069,7 @@ class YuanForCausalLM(YuanPretrainedModel):
         self.eod_token = config.eod_token
         self.sep_token = config.sep_token
         self.use_loss_mask = config.use_loss_mask
-        self.model = YuanModel(config)
+        self.yuan = YuanModel(config)
         if config.sequence_parallel:
             ColumnParallelLinear = ColumnSequenceParallelLinear
         else:
@@ -1058,10 +1088,10 @@ class YuanForCausalLM(YuanPretrainedModel):
         self._post_init()
 
     def get_input_embeddings(self):
-        return self.model.embed_tokens
+        return self.yuan.embed_tokens
 
     def set_input_embeddings(self, value):
-        self.model.embed_tokens = value
+        self.yuan.embed_tokens = value
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -1070,17 +1100,17 @@ class YuanForCausalLM(YuanPretrainedModel):
         self.lm_head = new_embeddings
 
     def set_decoder(self, decoder):
-        self.model = decoder
+        self.yuan = decoder
 
     def get_decoder(self):
-        return self.model
+        return self.yuan
 
     def get_loss_mask(self, input_ids, labels, eod_token, sep_token):
         micro_batch_size, seq_length = input_ids.shape
 
-        loss_mask = paddle.ones(input_ids.shape, dtype=paddle.float, device=input_ids.place())
+        loss_mask = paddle.ones(input_ids.shape, dtype=paddle.float32)
 
-        position_ids = paddle.arange(seq_length, dtype=paddle.int64, device=input_ids.place())
+        position_ids = paddle.arange(seq_length, dtype=paddle.int64)
         position_ids = position_ids.unsqueeze(0).expand_as(input_ids)
 
         """modify loss_mask to only calculate the loss of the answer (separated with [SEP])"""
@@ -1161,9 +1191,9 @@ class YuanForCausalLM(YuanPretrainedModel):
         Example:
 
         ```python
-        >>> from transformers import AutoTokenizer, LlamaForCausalLM
+        >>> from transformers import AutoTokenizer, YuanForCausalLM
 
-        >>> model = LlamaForCausalLM.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
+        >>> model = YuanForCausalLM.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
         >>> tokenizer = AutoTokenizer.from_pretrained(PATH_TO_CONVERTED_TOKENIZER)
 
         >>> prompt = "Hey, are you consciours? Can you talk to me?"
@@ -1181,7 +1211,7 @@ class YuanForCausalLM(YuanPretrainedModel):
         )
 
         return_dict = True
-        outputs = self.model(
+        outputs = self.yuan(
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
