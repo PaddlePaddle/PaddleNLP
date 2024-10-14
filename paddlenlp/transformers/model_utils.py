@@ -77,7 +77,6 @@ from ..utils import device_guard
 from ..utils.checkpoint_quantization_utils import (
     asymmetry_qdq_weight,
     group_wise_quant_dequant,
-    merge_int4,
     qdq_weight,
     split_int8,
 )

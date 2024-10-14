@@ -15,7 +15,6 @@
 
 import numpy as np
 import paddle
-from paddle import Tensor
 
 
 def group_wise_quant_dequant(
@@ -231,5 +230,3 @@ def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-
                 )
             # fp32 , int8, int, fp32 or fp64
             return qdq_x.astype(paddle.float32), scales
-
-
