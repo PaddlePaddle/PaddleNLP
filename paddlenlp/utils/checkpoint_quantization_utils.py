@@ -15,6 +15,14 @@
 
 import numpy as np
 import paddle
+import paddle.distributed as dist
+
+from paddlenlp.utils.env import (
+    ASYMMETRY_QUANT_SCALE_MAX,
+    ASYMMETRY_QUANT_SCALE_MIN,
+    SYMMETRY_QUANT_SCALE,
+)
+from paddlenlp.utils.log import logger
 
 
 def quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage):

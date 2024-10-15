@@ -48,8 +48,6 @@ from paddlenlp.transformers.utils import (
 )
 from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
 from paddlenlp.utils.env import (
-    ASYMMETRY_QUANT_SCALE_MAX,
-    ASYMMETRY_QUANT_SCALE_MIN,
     BETA1_KEYNAME,
     BETA2_KEYNAME,
     LORA_WEIGHTS_NAME,
@@ -72,7 +70,6 @@ from paddlenlp.utils.env import (
     SAFE_PEFT_WEIGHTS_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
-    SYMMETRY_QUANT_SCALE,
 )
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.nested import nested_copy, nested_copy_place
@@ -88,14 +85,7 @@ if is_safetensors_available():
         from paddlenlp.utils.safetensors import fast_safe_open as safe_open
         from paddlenlp.utils.safetensors import fast_load_file as load_file
 
-from paddlenlp.utils.checkpoint_quantization_utils import (
-    asymmetry_qdq_weight,
-    cal_ratio,
-    group_wise_quant_dequant,
-    merge_int4,
-    qdq_weight,
-    quant_unified_optimizer,
-)
+from paddlenlp.utils.checkpoint_quantization_utils import quant_unified_optimizer
 
 from .shared_memory_utils import (
     _read_state_dict_from_shm,
