@@ -1,15 +1,19 @@
-import numpy as np
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import paddle
 import paddle.distributed as dist
-from paddlenlp.utils.log import logger
-
-from paddlenlp.utils.env import (
-    ASYMMETRY_QUANT_SCALE_MAX,
-    ASYMMETRY_QUANT_SCALE_MIN,
-    SYMMETRY_QUANT_SCALE,
-    MOMENT1_KEYNAME,
-    MOMENT2_KEYNAME,
-)
 
 from paddlenlp.utils.checkpoint_quantization_utils import (
     asymmetry_qdq_weight,
@@ -18,6 +22,14 @@ from paddlenlp.utils.checkpoint_quantization_utils import (
     merge_int4,
     qdq_weight,
 )
+from paddlenlp.utils.env import (
+    ASYMMETRY_QUANT_SCALE_MAX,
+    ASYMMETRY_QUANT_SCALE_MIN,
+    MOMENT1_KEYNAME,
+    MOMENT2_KEYNAME,
+    SYMMETRY_QUANT_SCALE,
+)
+from paddlenlp.utils.log import logger
 
 
 def quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage):
@@ -93,4 +105,3 @@ def quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage):
         logger.info(f"quant ratio (w/ Master Weight): {(all_bits.item() - quant_bits_mw.item()) / all_bits.item()}")
 
     return state_dict
-
