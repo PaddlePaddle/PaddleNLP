@@ -31,5 +31,14 @@
     "use_flash_attention": false,
     "unified_checkpoint": true,
     "pissa": false,
-    "use_shift_sparse_attention": true
+    "use_ssa": true,
+    "use_long_sequence_strategies": true,
+    "long_sequence_strategy_name": "LinearScalingRotaryEmbedding",
+    "long_sequence_strategy_type": "embedding_strategies",
+    "long_sequence_init_args": {
+        "dim": 12288,
+        "max_position_embeddings": 8192,
+        "rope_scaling_type": "linear",
+        "rope_scaling_factor": 2
+    }
   }

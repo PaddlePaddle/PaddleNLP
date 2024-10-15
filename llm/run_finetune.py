@@ -155,10 +155,14 @@ def main():
         model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
     if model_args.fuse_attention_ffn is not None:
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
-
+    
     model_config.seq_length = data_args.max_length
 
     logger.info(f"Final model config: {model_config}")
+
+    if training_args.use_ssa:
+        model_config.use_ssa = training_args.use_ssa
+        model_config.group_size_ratio = training_args.group_size_ratio
 
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:

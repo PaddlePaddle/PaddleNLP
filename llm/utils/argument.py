@@ -54,9 +54,14 @@ class TrainingArguments(TrainingArguments):
         default="",
         metadata={"help": "Configs to unify hybrid parallel checkpoint.\n"},
     )
-    use_shift_sparse_attention: bool = field(
+    use_ssa: bool = field(
         default=False,
         metadata={"help": "Whether to use ShiftSparseAttention."},
+    )
+
+    group_size_ratio: float = field(
+        default = 0.25,
+        metadata={"help": "Control the group size in sparse attention"}
     )
 
     def __post_init__(self):
