@@ -21,7 +21,7 @@ git clone 代码到本地，即可开始。
     # 到达运行目录
 ```
 ### 2.2 数据准备
-我们支持的精调数据格式是每行包含一个字典的 json 文件，每个字典包含以下字段：
+我们支持的偏好数据格式是每行包含一个字典的 json 文件，每个字典包含以下字段：
 
 - `src` : `str, List(str)`, 用户对话内容。
 - `tgt` : `str, List(str)`, 系统回复内容。
@@ -44,7 +44,7 @@ git clone 代码到本地，即可开始。
 ...
 ```
 
-为了方便测试，我们将[ultrafeedback_binarized demo](https://huggingface.co/datasets/HuggingFaceH4/ultrafeedback_binarized)数据集处理成广告生成数据集，使用方式如下：
+为了方便测试，我们将[ultrafeedback_binarized demo](https://huggingface.co/datasets/HuggingFaceH4/ultrafeedback_binarized)数据集处理成对应的数据集格式，使用方式如下：
 
 ```bash
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
@@ -133,7 +133,7 @@ orpo([ORPO](https://arxiv.org/abs/2403.07691)),
 simpo([SimPO](https://arxiv.org/abs/2405.14734)),默认为 `sigmoid`。
 - `pref_loss_ratio`: DPO 损失比率，默认为 1.0。
 - `sft_loss_ratio`: SFT 损失比率，默认为 0.0。
-- `dpop_lambda`: dpop_lambda，默认为 50，详情可见文档[DPOP](https://arxiv.org/pdf/2402.13228)
+- `dpop_lambda`: dpop_lambda，默认为 50，详情可见论文[DPOP](https://arxiv.org/pdf/2402.13228)
 
 ## 4. DPO 数据流介绍
 在 DPO 的数据流中，我们首先将原始的数据集进行预处理，然后构造 DPO 的数据序列，并构造 attention_mask。序列包括提示（问题），chosen（偏好回答）和 rejected（拒绝回答）。
@@ -146,10 +146,10 @@ simpo([SimPO](https://arxiv.org/abs/2405.14734)),默认为 `sigmoid`。
      </font>
 </div>
 
-序列构造完成后我们需要将多个序列构造为一个序列，并进行 padding（零填充）操作，使每个构造后的序列长度相同。
+序列构造完成后我们需要将多个序列构造为一个序列，并填充写填充上 pad tokens，使每个构造后的序列长度相同。
 
 <div align="center">
-    <img width="500" alt="llm" src="https://github.com/user-attachments/assets/3342da5a-a3e2-4fe2-8f94-04867b45e3a4">
+    <img width="500" alt="llm" src="https://github.com/user-attachments/assets/3185440c-b290-4d3b-8665-ec5bda1cda23">
 </div>
 <div align="center">
     <font size ="1">
