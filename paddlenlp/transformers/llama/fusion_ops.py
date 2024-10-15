@@ -221,6 +221,24 @@ def fusion_flash_attention(
                 attention_mask is None,
                 True,
             )[0]
+        elif get_env_device() == "intel_hpu":
+            if config.context_parallel_degree > 1:
+                raise ValueError("Context parallel is not implemented for intel_hpu")
+            scaling_factor = query_states.shape[3] ** -0.5
+            attention_mask = attention_mask.astype("bfloat16")
+            attn_output = paddle.incubate.nn.functional.fused_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attention_mask,
+                scaling_factor,
+                0.0,
+                False,
+                attention_mask is None,
+                None,
+                False,
+            )
+            attn_output = paddle.transpose(attn_output, [0, 2, 1, 3])
         else:
             if config.context_parallel_degree > 1:
                 attn_output = RingFlashAttention.apply(

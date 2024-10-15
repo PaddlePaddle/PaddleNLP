@@ -1697,7 +1697,11 @@ class LlamaModel(LlamaPretrainedModel):
 
         is_casual = False
 
-        if attn_mask_startend_row_indices is None and self.config.use_flash_attention and get_env_device() != "gcu":
+        if (
+            attn_mask_startend_row_indices is None
+            and self.config.use_flash_attention
+            and get_env_device() not in ["gcu", "intel_hpu"]
+        ):
             if self.config.use_flash_attention_for_generation or use_casual_mask:
                 is_casual = True
             else:
