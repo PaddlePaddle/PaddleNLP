@@ -189,6 +189,7 @@ class UnifiedCheckpointHandler:
                         ),
                     )
                     self._process_model_weight.start()
+                process = self._process_model_weight
             elif state_dict_type == "master_weight":
                 if self._shm_master_weight is None:
                     self._meta_dict_master_weight, buffer_size = create_meta_dict(state_dict)
@@ -215,6 +216,7 @@ class UnifiedCheckpointHandler:
                         ),
                     )
                     self._process_master_weight.start()
+                process = self._process_master_weight
             elif state_dict_type == "optimizer_weight":
                 if self._shm_optimizer_weight is None:
                     self._meta_dict_optim, buffer_size = create_meta_dict(state_dict)
@@ -239,11 +241,14 @@ class UnifiedCheckpointHandler:
                         ),
                     )
                     self._process_optimizer_weight.start()
+                process = self._process_optimizer_weight
 
             while True:  # wait until no process is saving.
                 flag_value = shared_save_flag[0]
                 if flag_value == 0:
                     break
+                if not process.is_alive():
+                    raise RuntimeError(f"The process that saves {state_dict_type} has been killed unexpectedly.")
                 time.sleep(0.5)
                 logger.info(f"Wait for the previous save process to finish saving {state_dict_type}")
             # only save model weight or save master weight, we enter this loop.
@@ -278,7 +283,6 @@ class UnifiedCheckpointHandler:
                 state_dict = _read_state_dict_from_shm(meta_dict, shm)  # numpy array
                 safe_save_file(state_dict, path, {"format": "np"})
                 del state_dict
-                os.makedirs(signal_path, exist_ok=True)
                 saved_signal_path = os.path.join(signal_path, f".{state_dict_type}.done.{global_rank}")
                 paddle.save(global_rank, saved_signal_path)
                 with lock:
@@ -771,14 +775,20 @@ class UnifiedCheckpointHandler:
 
         if self._shared_save_model_flag is not None:
             while self._shared_save_model_flag[0] > 0:  # async process is saving
+                if not self._process_model_weight.is_alive():
+                    raise RuntimeError("The process that saves model_weight has been killed unexpectedly.")
                 time.sleep(0.5)
             self._shared_save_model_flag[0] = -1
         if self._shared_save_master_weight_flag is not None:
             while self._shared_save_master_weight_flag[0] > 0:
+                if not self._process_master_weight.is_alive():
+                    raise RuntimeError("The process that saves master_weight has been killed unexpectedly.")
                 time.sleep(0.5)
             self._shared_save_master_weight_flag[0] = -1
         if self._shared_save_optimizer_flag is not None:
             while self._shared_save_optimizer_flag[0] > 0:
+                if not self._process_optimizer_weight.is_alive():
+                    raise RuntimeError("The process that saves optimizer_weight has been killed unexpectedly.")
                 time.sleep(0.5)
             self._shared_save_optimizer_flag[0] = -1
 
@@ -795,7 +805,8 @@ class UnifiedCheckpointHandler:
             self._shm_optimizer_weight.unlink()
             self._shm_optimizer_weight = None
 
-        dist.barrier()
+        if paddle.distributed.get_world_size() > 1:
+            dist.barrier()
 
 
 def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, safe_serialization=False):
