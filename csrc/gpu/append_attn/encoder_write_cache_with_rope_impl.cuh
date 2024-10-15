@@ -1659,7 +1659,7 @@ void CascadeAppendWriteCacheKVC8QKV(
   constexpr uint32_t num_frags_y = HEAD_DIM / 16;
   constexpr uint32_t num_row_per_block = num_warps * num_frags_z * 16;
 
-  dim3 grids(num_blocks_x_cpu, 1, num_heads);
+  dim3 grids(num_blocks_x_cpu, 1, kv_num_heads);
   dim3 blocks(32, num_warps);
 
   const uint32_t smem_size = (BLOCK_SIZE * HEAD_DIM) * sizeof(T) * 2;
@@ -1728,7 +1728,7 @@ void CascadeAppendWriteCacheKVC4QKV(
   constexpr uint32_t num_frags_y = HEAD_DIM / 16;
   constexpr uint32_t num_row_per_block = num_warps * num_frags_z * 16;
 
-  dim3 grids(num_blocks_x_cpu, 1, num_heads);
+  dim3 grids(num_blocks_x_cpu, 1, kv_num_heads);
   dim3 blocks(32, num_warps);
 
   const uint32_t smem_size =
