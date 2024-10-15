@@ -624,11 +624,11 @@ __global__ void GQANeoxVariableLengthRotaryKernel(
 
 template <typename T, int VecSize = 1>
 __global__ void cache_kernel(
-    const T *__restrict__ qkv,  // [num_tokens, num_heads + 2 * gqa_group_size,
-                                // head_size]
-    T *__restrict__ key_cache,  // [num_blocks, gqa_group_size, block_size,
-                                // head_size]
-    T *__restrict__ value_cache,  // [num_blocks, gqa_group_size, block_size,
+    const T *__restrict__ qkv,    // [num_tokens, num_heads + 2 * kv_num_heads,
+                                  // head_size]
+    T *__restrict__ key_cache,    // [num_blocks, kv_num_heads, block_size,
+                                  // head_size]
+    T *__restrict__ value_cache,  // [num_blocks, kv_num_heads, block_size,
                                   // head_size]
     const int *__restrict__ block_tables,      // [bsz, max_blocks_per_seq]
     const int *__restrict__ padding_offsets,   // [num_tokens]
@@ -640,12 +640,12 @@ __global__ void cache_kernel(
     const int head_size,
     const int block_size,
     const uint32_t elem_cnt,
-    const int gqa_group_size) {
+    const int kv_num_heads) {
   using LoadT = AlignedVector<T, VecSize>;
   LoadT src_vec;
 
   uint32_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
-  const uint32_t hidden_size = gqa_group_size * head_size;
+  const uint32_t hidden_size = kv_num_heads * head_size;
   const uint32_t offset = 2 * hidden_size;
   for (uint32_t linear_index = global_thread_idx * VecSize,
                 step = gridDim.x * blockDim.x * VecSize;
@@ -670,11 +670,11 @@ __global__ void cache_kernel(
     const uint32_t block_idx = block_table_now[ori_seq_id / block_size];
     const uint32_t block_offset = ori_seq_id % block_size;
 
-    const uint32_t tgt_idx =
-        block_idx * gqa_group_size * block_size * head_size +
-        hi * block_size * head_size + block_offset * head_size + h_bias;
+    const uint32_t tgt_idx = block_idx * kv_num_heads * block_size * head_size +
+                             hi * block_size * head_size +
+                             block_offset * head_size + h_bias;
     const uint32_t ori_idx =
-        token_idx * (num_heads + 2 * gqa_group_size) * head_size +
+        token_idx * (num_heads + 2 * kv_num_heads) * head_size +
         num_heads * head_size + qkv_id * hidden_size + hi * head_size + h_bias;
     Load<T, VecSize>(&qkv[ori_idx], &src_vec);
     if (qkv_id == 0) {
@@ -1584,7 +1584,7 @@ void CascadeAppendWriteCacheKVQKV(
     const AppendAttnMetaData &meta_data,
     const paddle::Tensor
         &qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
-               // gqa_group_size, head_dim] if GQA)
+               // kv_num_heads, head_dim] if GQA)
     const paddle::Tensor &block_table,
     const paddle::Tensor &padding_offsets,
     const paddle::Tensor &seq_lens_encoder,

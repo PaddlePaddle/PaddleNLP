@@ -17,7 +17,7 @@ template void EncoderWriteCacheWithRopeKernel<paddle::bfloat16, int>(
     const AppendAttnMetaData& meta_data,
     const paddle::Tensor&
         qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
-              // gqa_group_size, head_dim] if GQA)
+              // kv_num_heads, head_dim] if GQA)
     const paddle::Tensor& seq_lens_this_time,
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& seq_lens_decoder,

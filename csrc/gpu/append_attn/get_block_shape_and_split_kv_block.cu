@@ -27,7 +27,7 @@ __global__ void split_q_block(const int* __restrict__ seq_lens_q,
                               int* __restrict__ num_blocks_x,
                               const int bsz,
                               const int num_rows_per_block,
-                              const int gqa_group_size) {
+                              const int group_size) {
   if (threadIdx.x == 0) {
     int gridx = 0;
     int index = 0;
@@ -37,7 +37,7 @@ __global__ void split_q_block(const int* __restrict__ seq_lens_q,
         seq_len = 0;
       }
       const int loop_times =
-          div_up(seq_len * gqa_group_size, num_rows_per_block);
+          div_up(seq_len * group_size, num_rows_per_block);
       for (uint32_t tile_id = 0; tile_id < loop_times; tile_id++) {
         batch_ids[index] = bid;
         tile_ids_per_batch[index++] = tile_id;
@@ -84,14 +84,14 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
     const paddle::Tensor& cum_offsets,
     const int encoder_block_shape_q,
     const int decoder_block_shape_q,
-    const int gqa_group_size,
+    const int group_size,
     const int block_size) {
   auto stream = seq_lens_encoder.stream();
   int bsz = cum_offsets.shape()[0];
 
   // decoder
   const uint32_t decoder_max_tile_size_per_bs_q =
-      div_up((1 * gqa_group_size), decoder_block_shape_q);
+      div_up((1 * group_size), decoder_block_shape_q);
   auto decoder_batch_ids =
       GetEmptyTensor({bsz * decoder_max_tile_size_per_bs_q},
                      paddle::DataType::INT32,
@@ -109,7 +109,7 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
                                       decoder_num_blocks_x.data<int>(),
                                       bsz,
                                       decoder_block_shape_q,
-                                      gqa_group_size);
+                                      group_size);
   auto decoder_num_blocks_x_cpu =
       decoder_num_blocks_x.copy_to(paddle::CPUPlace(), false);
 
@@ -141,7 +141,7 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
 
   // encoder
   const uint32_t encoder_max_tile_size_per_bs_q = div_up(
-      (max_enc_len_this_time_data * gqa_group_size), encoder_block_shape_q);
+      (max_enc_len_this_time_data * group_size), encoder_block_shape_q);
   auto encoder_batch_ids =
       GetEmptyTensor({bsz * encoder_max_tile_size_per_bs_q},
                      paddle::DataType::INT32,
@@ -159,7 +159,7 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
                                       encoder_num_blocks_x.data<int>(),
                                       bsz,
                                       encoder_block_shape_q,
-                                      gqa_group_size);
+                                      group_size);
   auto encoder_num_blocks_x_cpu =
       encoder_num_blocks_x.copy_to(paddle::CPUPlace(), false);
 
@@ -247,7 +247,7 @@ PD_BUILD_OP(get_block_shape_and_split_kv_block)
               "decoder_num_blocks"})
     .Attrs({"encoder_block_shape_q: int",
             "decoder_block_shape_q: int",
-            "gqa_group_size: int",
+            "group_size: int",
             "block_size: int"})
     .SetKernelFn(PD_KERNEL(GetBlockShapeAndSplitKVBlock))
     .SetInferShapeFn(PD_INFER_SHAPE(GetBlockShapeAndSplitKVBlockInferShape))

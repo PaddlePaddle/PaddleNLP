@@ -20,11 +20,11 @@
 
 template <typename T, int VecSize = 1>
 __global__ void append_decode_cache_T_rope_kernel(
-    const T* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size,
+    const T* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * kv_num_heads,
                                       // head_size]
-    T* __restrict__ key_cache,    // [num_blocks, gqa_group_size, block_size,
+    T* __restrict__ key_cache,    // [num_blocks, kv_num_heads, block_size,
                                   // head_size // 2]
-    T* __restrict__ value_cache,  // [num_blocks, gqa_group_size, block_size,
+    T* __restrict__ value_cache,  // [num_blocks, kv_num_heads, block_size,
                                   // head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
@@ -40,7 +40,7 @@ __global__ void append_decode_cache_T_rope_kernel(
     const int head_size,
     const int block_size,
     const uint32_t elem_cnt,
-    const int gqa_group_size) {
+    const int kv_num_heads) {
   using LoadT = AlignedVector<T, VecSize>;
   using LoadBiasT = AlignedVector<T, VecSize>;
   using LoadKVT = AlignedVector<T, VecSize>;
@@ -53,7 +53,7 @@ __global__ void append_decode_cache_T_rope_kernel(
   LoadEmbT sin_emb_vec;
 
   int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
-  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * head_size;
+  const int64_t hidden_size = (num_heads + 2 * kv_num_heads) * head_size;
   // const int64_t offset = 2 * hidden_size;
   const int half_head_size = head_size / 2;
   for (int32_t linear_index = global_thread_idx * VecSize,
@@ -79,7 +79,7 @@ __global__ void append_decode_cache_T_rope_kernel(
 
     const int bias_idx = hi * head_size + h_bias;
     Load<T, VecSize>(&quant_qkv[ori_idx], &src_vec);
-    if (hi < num_heads + gqa_group_size) {
+    if (hi < num_heads + kv_num_heads) {
       // q k rope
       const uint32_t emb_idx = write_seq_id * half_head_size + h_bias / 2;
       Load<float, HalfVecSize>(&cos_emb[emb_idx], &cos_emb_vec);
@@ -91,7 +91,7 @@ __global__ void append_decode_cache_T_rope_kernel(
       float input_left = static_cast<float>(src_vec[2 * i]);
       float input_right = static_cast<float>(src_vec[2 * i + 1]);
 
-      if (hi < num_heads + gqa_group_size) {
+      if (hi < num_heads + kv_num_heads) {
         const float cos_tmp = cos_emb_vec[i];
         const float sin_tmp = sin_emb_vec[i];
         out_vec[2 * i] =
@@ -108,12 +108,12 @@ __global__ void append_decode_cache_T_rope_kernel(
       Store<T, VecSize>(out_vec, &qkv_out[ori_idx]);
     } else {
       // quant + write k/v
-      const uint32_t kv_head_idx = (hi - num_heads) % gqa_group_size;
+      const uint32_t kv_head_idx = (hi - num_heads) % kv_num_heads;
       const uint32_t tgt_idx =
-          block_idx * gqa_group_size * block_size * head_size +
+          block_idx * kv_num_heads * block_size * head_size +
           kv_head_idx * block_size * head_size + block_offset * head_size +
           h_bias;
-      if (hi < num_heads + gqa_group_size) {
+      if (hi < num_heads + kv_num_heads) {
         Store<T, VecSize>(out_vec, &key_cache[tgt_idx]);
       } else {
         Store<T, VecSize>(out_vec, &value_cache[tgt_idx]);
@@ -124,11 +124,11 @@ __global__ void append_decode_cache_T_rope_kernel(
 
 template <typename T, int VecSize = 1>
 __global__ void append_decode_cache_T_rope_kernel(
-    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size,
+    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * kv_num_heads,
                                         // head_size]
-    T* __restrict__ key_cache,    // [num_blocks, gqa_group_size, block_size,
+    T* __restrict__ key_cache,    // [num_blocks, kv_num_heads, block_size,
                                   // head_size // 2]
-    T* __restrict__ value_cache,  // [num_blocks, gqa_group_size, block_size,
+    T* __restrict__ value_cache,  // [num_blocks, kv_num_heads, block_size,
                                   // head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
@@ -139,8 +139,8 @@ __global__ void append_decode_cache_T_rope_kernel(
     const float* __restrict__ cos_emb,
     const float* __restrict__ sin_emb,
     const float* __restrict__ qkv_out_scales,  // [num_head + 2 *
-                                               // gqa_group_size, dim_head]
-    const T* __restrict__ qkv_biases,  // [num_head + 2 * gqa_group_size,
+                                               // kv_num_heads, dim_head]
+    const T* __restrict__ qkv_biases,  // [num_head + 2 * kv_num_heads,
                                        // dim_head]
     const int max_seq_len,
     const int max_blocks_per_seq,
@@ -148,7 +148,7 @@ __global__ void append_decode_cache_T_rope_kernel(
     const int head_size,
     const int block_size,
     const uint32_t elem_cnt,
-    const int gqa_group_size) {
+    const int kv_num_heads) {
   using LoadT = AlignedVector<int, VecSize>;
   using LoadBiasT = AlignedVector<T, VecSize>;
   using LoadOutScaleT = AlignedVector<float, VecSize>;
@@ -163,7 +163,7 @@ __global__ void append_decode_cache_T_rope_kernel(
   LoadEmbT sin_emb_vec;
 
   int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
-  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * head_size;
+  const int64_t hidden_size = (num_heads + 2 * kv_num_heads) * head_size;
   // const int64_t offset = 2 * hidden_size;
   const int half_head_size = head_size / 2;
   for (int32_t linear_index = global_thread_idx * VecSize,
@@ -193,7 +193,7 @@ __global__ void append_decode_cache_T_rope_kernel(
       Load<T, VecSize>(&qkv_biases[bias_idx], &bias_vec);
     }
     Load<float, VecSize>(&qkv_out_scales[bias_idx], &out_scale_vec);
-    if (hi < num_heads + gqa_group_size) {
+    if (hi < num_heads + kv_num_heads) {
       // q k rope
       const uint32_t emb_idx = write_seq_id * half_head_size + h_bias / 2;
       Load<float, HalfVecSize>(&cos_emb[emb_idx], &cos_emb_vec);
@@ -210,7 +210,7 @@ __global__ void append_decode_cache_T_rope_kernel(
       input_right = qkv_biases ? input_right * out_scale_vec[2 * i + 1] +
                                      static_cast<float>(bias_vec[2 * i + 1])
                                : input_right * out_scale_vec[2 * i + 1];
-      if (hi < num_heads + gqa_group_size) {
+      if (hi < num_heads + kv_num_heads) {
         const float cos_tmp = cos_emb_vec[i];
         const float sin_tmp = sin_emb_vec[i];
         bias_vec[2 * i] =
@@ -227,12 +227,12 @@ __global__ void append_decode_cache_T_rope_kernel(
       Store<T, VecSize>(bias_vec, &qkv_out[ori_idx]);
     } else {
       // quant + write k/v
-      const uint32_t kv_head_idx = (hi - num_heads) % gqa_group_size;
+      const uint32_t kv_head_idx = (hi - num_heads) % kv_num_heads;
       const uint32_t tgt_idx =
-          block_idx * gqa_group_size * block_size * head_size +
+          block_idx * kv_num_heads * block_size * head_size +
           kv_head_idx * block_size * head_size + block_offset * head_size +
           h_bias;
-      if (hi < num_heads + gqa_group_size) {
+      if (hi < num_heads + kv_num_heads) {
         Store<T, VecSize>(bias_vec, &key_cache[tgt_idx]);
       } else {
         Store<T, VecSize>(bias_vec, &value_cache[tgt_idx]);
@@ -243,11 +243,11 @@ __global__ void append_decode_cache_T_rope_kernel(
 
 template <typename T, int VecSize = 1>
 __global__ void append_decode_cache_T_neox_rope_kernel(
-    const T* __restrict__ qkv,    // [bsz, num_heads + 2 * gqa_group_size,
+    const T* __restrict__ qkv,    // [bsz, num_heads + 2 * kv_num_heads,
                                   // head_size]
-    T* __restrict__ key_cache,    // [num_blocks, gqa_group_size, block_size,
+    T* __restrict__ key_cache,    // [num_blocks, kv_num_heads, block_size,
                                   // head_size // 2]
-    T* __restrict__ value_cache,  // [num_blocks, gqa_group_size, block_size,
+    T* __restrict__ value_cache,  // [num_blocks, kv_num_heads, block_size,
                                   // head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
@@ -263,7 +263,7 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
     const int head_size,
     const int block_size,
     const uint32_t elem_cnt,
-    const int gqa_group_size) {
+    const int kv_num_heads) {
   using LoadT = AlignedVector<T, VecSize>;
   using LoadBiasT = AlignedVector<T, VecSize>;
   using LoadKVT = AlignedVector<T, VecSize>;
@@ -278,7 +278,7 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
 
   int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
   const int half_head_size = head_size / 2;
-  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * head_size;
+  const int64_t hidden_size = (num_heads + 2 * kv_num_heads) * head_size;
   const int64_t half_hidden_size = hidden_size / 2;
   // const int64_t offset = 2 * hidden_size;
 
@@ -307,7 +307,7 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
     Load<T, VecSize>(&qkv[ori_idx_left], &left_vec);
     Load<T, VecSize>(&qkv[ori_idx_right], &right_vec);
 
-    if (hi < num_heads + gqa_group_size) {
+    if (hi < num_heads + kv_num_heads) {
       // q k rope
       const uint32_t emb_idx = write_seq_id * head_size + h_bias;
       Load<float, VecSize>(&cos_emb[emb_idx], &cos_emb_vec);
@@ -318,7 +318,7 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
       // rope
       float input_left = static_cast<float>(left_vec[i]);
       float input_right = static_cast<float>(right_vec[i]);
-      if (hi < num_heads + gqa_group_size) {
+      if (hi < num_heads + kv_num_heads) {
         const float cos_tmp = cos_emb_vec[i];
         const float sin_tmp = sin_emb_vec[i];
         left_bias_vec[i] =
@@ -336,13 +336,13 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
       Store<T, VecSize>(right_bias_vec, &qkv_out[ori_idx_right]);
     } else {
       // write k/v
-      const uint32_t kv_head_idx = (hi - num_heads) % gqa_group_size;
+      const uint32_t kv_head_idx = (hi - num_heads) % kv_num_heads;
       const uint32_t tgt_idx_left =
-          block_idx * gqa_group_size * block_size * head_size +
+          block_idx * kv_num_heads * block_size * head_size +
           kv_head_idx * block_size * head_size + block_offset * head_size +
           h_bias;
       const uint32_t tgt_idx_right = tgt_idx_left + half_head_size;
-      if (hi < num_heads + gqa_group_size) {
+      if (hi < num_heads + kv_num_heads) {
         Store<T, VecSize>(left_bias_vec, &key_cache[tgt_idx_left]);
         Store<T, VecSize>(right_bias_vec, &key_cache[tgt_idx_right]);
       } else {
@@ -355,11 +355,11 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
 
 template <typename T, int VecSize = 1>
 __global__ void append_decode_cache_T_neox_rope_kernel(
-    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size,
+    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * kv_num_heads,
                                         // head_size]
-    T* __restrict__ key_cache,    // [num_blocks, gqa_group_size, block_size,
+    T* __restrict__ key_cache,    // [num_blocks, kv_num_heads, block_size,
                                   // head_size // 2]
-    T* __restrict__ value_cache,  // [num_blocks, gqa_group_size, block_size,
+    T* __restrict__ value_cache,  // [num_blocks, kv_num_heads, block_size,
                                   // head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
@@ -370,8 +370,8 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
     const float* __restrict__ cos_emb,
     const float* __restrict__ sin_emb,
     const float* __restrict__ qkv_out_scales,  // [num_head + 2 *
-                                               // gqa_group_size, dim_head]
-    const T* __restrict__ qkv_biases,  // [num_head + 2 * gqa_group_size,
+                                               // kv_num_heads, dim_head]
+    const T* __restrict__ qkv_biases,  // [num_head + 2 * kv_num_heads,
                                        // dim_head]
     const int max_seq_len,
     const int max_blocks_per_seq,
@@ -379,7 +379,7 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
     const int head_size,
     const int block_size,
     const uint32_t elem_cnt,
-    const int gqa_group_size) {
+    const int kv_num_heads) {
   using LoadT = AlignedVector<int, VecSize>;
   using LoadBiasT = AlignedVector<T, VecSize>;
   using LoadOutScaleT = AlignedVector<float, VecSize>;
@@ -399,7 +399,7 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
 
   int64_t global_thread_idx = blockDim.x * blockIdx.x + threadIdx.x;
   const int half_head_size = head_size / 2;
-  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * head_size;
+  const int64_t hidden_size = (num_heads + 2 * kv_num_heads) * head_size;
   const int64_t half_hidden_size = hidden_size / 2;
 
   for (int32_t linear_index = global_thread_idx * VecSize,
@@ -440,7 +440,7 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
     Load<float, VecSize>(&qkv_out_scales[bias_idx_left], &left_out_scale_vec);
     Load<float, VecSize>(&qkv_out_scales[bias_idx_right], &right_out_scale_vec);
 
-    if (hi < num_heads + gqa_group_size) {
+    if (hi < num_heads + kv_num_heads) {
       // q k rope
       const uint32_t emb_idx = write_seq_id * head_size + h_bias;
       Load<float, VecSize>(&cos_emb[emb_idx], &cos_emb_vec);
@@ -457,7 +457,7 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
       input_right = qkv_biases ? input_right * right_out_scale_vec[i] +
                                      static_cast<float>(right_bias_vec[i])
                                : input_right * right_out_scale_vec[i];
-      if (hi < num_heads + gqa_group_size) {
+      if (hi < num_heads + kv_num_heads) {
         const float cos_tmp = cos_emb_vec[i];
         const float sin_tmp = sin_emb_vec[i];
         left_bias_vec[i] =
@@ -475,13 +475,13 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
       Store<T, VecSize>(right_bias_vec, &qkv_out[ori_idx_right]);
     } else {
       // quant + write k/v
-      const uint32_t kv_head_idx = (hi - num_heads) % gqa_group_size;
+      const uint32_t kv_head_idx = (hi - num_heads) % kv_num_heads;
       const uint32_t tgt_idx_left =
-          block_idx * gqa_group_size * block_size * head_size +
+          block_idx * kv_num_heads * block_size * head_size +
           kv_head_idx * block_size * head_size + block_offset * head_size +
           h_bias;
       const uint32_t tgt_idx_right = tgt_idx_left + half_head_size;
-      if (hi < num_heads + gqa_group_size) {
+      if (hi < num_heads + kv_num_heads) {
         Store<T, VecSize>(left_bias_vec, &key_cache[tgt_idx_left]);
         Store<T, VecSize>(right_bias_vec, &key_cache[tgt_idx_right]);
       } else {
@@ -494,11 +494,11 @@ __global__ void append_decode_cache_T_neox_rope_kernel(
 
 template <typename T, int VecSize = 4, int RoundType = 0, int HeadDim = 128>
 __global__ void append_decode_cache_int8_rope_kernel(
-    const T* __restrict__ quant_qkv,    // [bsz, num_heads + 2 * gqa_group_size,
+    const T* __restrict__ quant_qkv,    // [bsz, num_heads + 2 * kv_num_heads,
                                         // head_size]
-    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ key_cache,    // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
-    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ value_cache,  // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
@@ -516,7 +516,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
     const int block_size,
     const float max_bound,
     const float min_bound,
-    const int gqa_group_size) {
+    const int kv_num_heads) {
   static_assert(HeadDim == 128, "just support HeadDim be 128 now!");
   static_assert(VecSize == 4, "just support VecSize be 4 now, 32 * 4!");
   constexpr int NUM_WARPS = 4;
@@ -529,7 +529,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
   // k : dequant + add_bias + rope + quant + write
   // v : dequant + add_bias + quant + write
   // kv在0位置全补0
-  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
+  const int64_t hidden_size = (num_heads + 2 * kv_num_heads) * HeadDim;
   constexpr int half_head_size = HeadDim / 2;
   const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
   if (seq_lens_encoder[bid] > 0) return;
@@ -580,20 +580,20 @@ __global__ void append_decode_cache_int8_rope_kernel(
       }
       Store<T, VecSize>(out_vec, &qkv_out_now[bias_idx]);
     }
-  } else if (head_idx < num_heads + 2 * gqa_group_size) {
+  } else if (head_idx < num_heads + 2 * kv_num_heads) {
     // k
     constexpr int KV_VEC_SIZE = 16 / sizeof(uint8_t);  // 16
     using LoadPadKVT = AlignedVector<uint8_t, KV_VEC_SIZE>;
-    const uint32_t kv_head_idx = (head_idx - num_heads) % gqa_group_size;
+    const uint32_t kv_head_idx = (head_idx - num_heads) % kv_num_heads;
     if (block_offset == 0) {
       // pad zero for this kv_head_idx for this block
       LoadPadKVT pad_cache_vec;
       *(reinterpret_cast<uint4*>(pad_cache_vec.val)) = make_uint4(0, 0, 0, 0);
-      if (head_idx < num_heads + gqa_group_size) {
+      if (head_idx < num_heads + kv_num_heads) {
         constexpr int num_vecs_per_head_dim = HeadDim / KV_VEC_SIZE;
         constexpr int num_token_each_time = 32 / num_vecs_per_head_dim;
         const uint32_t tgt_idx =
-            (block_idx * gqa_group_size + kv_head_idx) * block_size * HeadDim +
+            (block_idx * kv_num_heads + kv_head_idx) * block_size * HeadDim +
             lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim;
              block_i < block_size;
@@ -605,7 +605,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
         const int num_vecs_per_head_dim = block_size / KV_VEC_SIZE;
         const int num_token_each_time = 32 / num_vecs_per_head_dim;
         const uint32_t tgt_idx =
-            (block_idx * gqa_group_size + kv_head_idx) * HeadDim * block_size +
+            (block_idx * kv_num_heads + kv_head_idx) * HeadDim * block_size +
             lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim; block_i < HeadDim;
              block_i += num_token_each_time) {
@@ -635,7 +635,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
     Load<T, HALF_K_VEC_SIZE>(&qkv_now[bias_idx], &src_vec1);
     Load<T, HALF_K_VEC_SIZE>(&qkv_now[bias_idx + 8], &src_vec2);
     T scale;
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       const uint32_t emb_idx = write_seq_id * half_head_size + head_bias / 2;
       Load<float, 1>(&cos_emb[emb_idx], &cos_emb_vec1);
       Load<float, 1>(&cos_emb[emb_idx + 4], &cos_emb_vec2);
@@ -648,7 +648,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
 
     float input_left = static_cast<float>(src_vec1[0]);
     float input_right = static_cast<float>(src_vec1[1]);
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       float cos_tmp = cos_emb_vec1[0];
       float sin_tmp = sin_emb_vec1[0];
       out_vec1[0] =
@@ -662,7 +662,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
 
     input_left = static_cast<float>(src_vec2[0]);
     input_right = static_cast<float>(src_vec2[1]);
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       float cos_tmp = cos_emb_vec2[0];
       float sin_tmp = sin_emb_vec2[0];
       out_vec2[0] =
@@ -692,7 +692,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
       cache_vec[i + HALF_K_VEC_SIZE] =
           static_cast<uint8_t>(quant_value2 + 128.0f);
     }
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       // write k
       // 大分块 lane_id / 4 / 2
       // 上下 lane_id / 4 % 2
@@ -701,7 +701,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
       const int start_block_16 =
           block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 2 * 8;
       const uint32_t tgt_cache_idx =
-          block_idx * gqa_group_size * block_size * HeadDim +
+          block_idx * kv_num_heads * block_size * HeadDim +
           kv_head_idx * block_size * HeadDim + start_block_16 * HeadDim +
           lane_id / 4 / 2 * 32 + (block_offset % 16) / 8 * 16 + lane_id % 4 * 4;
       Store<uint8_t, K_VEC_SIZE>(cache_vec, &key_cache[tgt_cache_idx]);
@@ -713,7 +713,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
       // 左16还是右16
       // 小偏移
       const uint32_t base_tgt_cache_idx =
-          block_idx * gqa_group_size * HeadDim * block_size +
+          block_idx * kv_num_heads * HeadDim * block_size +
           kv_head_idx * HeadDim * block_size +
           (lane_id / 4 * 16 + lane_id % 4 * 2) * block_size +
           block_offset / 16 % 2 * 8 * block_size + block_offset / 16 / 2 * 32;
@@ -734,11 +734,11 @@ __global__ void append_decode_cache_int8_rope_kernel(
 
 template <typename T, int VecSize = 4, int RoundType = 0, int HeadDim = 128>
 __global__ void append_decode_cache_int8_rope_kernel(
-    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size,
+    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * kv_num_heads,
                                         // head_size]
-    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ key_cache,    // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
-    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ value_cache,  // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
@@ -749,8 +749,8 @@ __global__ void append_decode_cache_int8_rope_kernel(
     const float* __restrict__ cos_emb,
     const float* __restrict__ sin_emb,
     const float* __restrict__ qkv_out_scales,  // [num_head + 2 *
-                                               // gqa_group_size, dim_head]
-    const T* __restrict__ qkv_biases,  // [num_head + 2 * gqa_group_size,
+                                               // kv_num_heads, dim_head]
+    const T* __restrict__ qkv_biases,  // [num_head + 2 * kv_num_heads,
                                        // dim_head]
     const T* __restrict__ cache_k_scales,
     const T* __restrict__ cache_v_scales,
@@ -760,7 +760,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
     const int block_size,
     const float max_bound,
     const float min_bound,
-    const int gqa_group_size) {
+    const int kv_num_heads) {
   static_assert(HeadDim == 128, "just support HeadDim be 128 now!");
   static_assert(VecSize == 4, "just support VecSize be 4 now, 32 * 4!");
   constexpr int NUM_WARPS = 4;
@@ -774,7 +774,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
   // k : dequant + add_bias + rope + quant + write
   // v : dequant + add_bias + quant + write
   // kv在0位置全补0
-  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
+  const int64_t hidden_size = (num_heads + 2 * kv_num_heads) * HeadDim;
   constexpr int half_head_size = HeadDim / 2;
   const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
   if (seq_lens_encoder[bid] > 0) return;
@@ -838,21 +838,21 @@ __global__ void append_decode_cache_int8_rope_kernel(
       }
       Store<T, VecSize>(bias_vec, &qkv_out_now[bias_idx]);
     }
-  } else if (head_idx < num_heads + 2 * gqa_group_size) {
+  } else if (head_idx < num_heads + 2 * kv_num_heads) {
     // k
     constexpr int KV_VEC_SIZE = 16 / sizeof(uint8_t);  // 16
     using LoadPadKVT = AlignedVector<uint8_t, KV_VEC_SIZE>;
-    const uint32_t kv_head_idx = (head_idx - num_heads) % gqa_group_size;
+    const uint32_t kv_head_idx = (head_idx - num_heads) % kv_num_heads;
 
     if (block_offset == 0) {
       // pad zero for this kv_head_idx for this block
       LoadPadKVT pad_cache_vec;
       *(reinterpret_cast<uint4*>(pad_cache_vec.val)) = make_uint4(0, 0, 0, 0);
-      if (head_idx < num_heads + gqa_group_size) {
+      if (head_idx < num_heads + kv_num_heads) {
         constexpr int num_vecs_per_head_dim = HeadDim / KV_VEC_SIZE;
         constexpr int num_token_each_time = 32 / num_vecs_per_head_dim;
         const uint32_t tgt_idx =
-            (block_idx * gqa_group_size + kv_head_idx) * block_size * HeadDim +
+            (block_idx * kv_num_heads + kv_head_idx) * block_size * HeadDim +
             lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim;
              block_i < block_size;
@@ -864,7 +864,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
         const int num_vecs_per_head_dim = block_size / KV_VEC_SIZE;
         const int num_token_each_time = 32 / num_vecs_per_head_dim;
         const uint32_t tgt_idx =
-            (block_idx * gqa_group_size + kv_head_idx) * HeadDim * block_size +
+            (block_idx * kv_num_heads + kv_head_idx) * HeadDim * block_size +
             lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim; block_i < HeadDim;
              block_i += num_token_each_time) {
@@ -903,7 +903,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
                                  &out_scale_vec2);
 
     T scale;
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       const uint32_t emb_idx = write_seq_id * half_head_size + head_bias / 2;
       Load<float, 1>(&cos_emb[emb_idx], &cos_emb_vec1);
       Load<float, 1>(&cos_emb[emb_idx + 4], &cos_emb_vec2);
@@ -922,7 +922,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
     input_right = qkv_biases ? input_right * out_scale_vec1[1] +
                                    static_cast<float>(bias_vec1[1])
                              : input_right * out_scale_vec1[1];
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       float cos_tmp = cos_emb_vec1[0];
       float sin_tmp = sin_emb_vec1[0];
       bias_vec1[0] =
@@ -942,7 +942,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
     input_right = qkv_biases ? input_right * out_scale_vec2[1] +
                                    static_cast<float>(bias_vec2[1])
                              : input_right * out_scale_vec2[1];
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       float cos_tmp = cos_emb_vec2[0];
       float sin_tmp = sin_emb_vec2[0];
       bias_vec2[0] =
@@ -972,7 +972,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
       cache_vec[i + HALF_K_VEC_SIZE] =
           static_cast<uint8_t>(quant_value2 + 128.0f);
     }
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       // write k
       // 大分块 lane_id / 4 / 2
       // 上下 lane_id / 4 % 2
@@ -981,7 +981,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
       const int start_block_16 =
           block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 2 * 8;
       const uint32_t tgt_cache_idx =
-          block_idx * gqa_group_size * block_size * HeadDim +
+          block_idx * kv_num_heads * block_size * HeadDim +
           kv_head_idx * block_size * HeadDim + start_block_16 * HeadDim +
           lane_id / 4 / 2 * 32 + (block_offset % 16) / 8 * 16 + lane_id % 4 * 4;
       Store<uint8_t, K_VEC_SIZE>(cache_vec, &key_cache[tgt_cache_idx]);
@@ -993,7 +993,7 @@ __global__ void append_decode_cache_int8_rope_kernel(
       // 左16还是右16
       // 小偏移
       const uint32_t base_tgt_cache_idx =
-          block_idx * gqa_group_size * HeadDim * block_size +
+          block_idx * kv_num_heads * HeadDim * block_size +
           kv_head_idx * HeadDim * block_size +
           (lane_id / 4 * 16 + lane_id % 4 * 2) * block_size +
           block_offset / 16 % 2 * 8 * block_size + block_offset / 16 / 2 * 32;
@@ -1015,11 +1015,11 @@ __global__ void append_decode_cache_int8_rope_kernel(
 
 template <typename T, int VecSize = 4, int RoundType = 0, int HeadDim = 128>
 __global__ void append_decode_cache_int8_neox_rope_kernel(
-    const T* __restrict__ quant_qkv,    // [bsz, num_heads + 2 * gqa_group_size,
+    const T* __restrict__ quant_qkv,    // [bsz, num_heads + 2 * kv_num_heads,
                                         // head_size]
-    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ key_cache,    // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
-    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ value_cache,  // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
@@ -1037,7 +1037,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
     const int block_size,
     const float max_bound,
     const float min_bound,
-    const int gqa_group_size) {
+    const int kv_num_heads) {
   static_assert(HeadDim == 128, "just support HeadDim be 128 now!");
   static_assert(VecSize == 4, "just support VecSize be 4 now, 32 * 4!");
   constexpr int NUM_WARPS = 4;
@@ -1051,7 +1051,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
   // k : dequant + add_bias + rope + quant + write
   // v : dequant + add_bias + quant + write
   // kv在0位置全补0
-  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
+  const int64_t hidden_size = (num_heads + 2 * kv_num_heads) * HeadDim;
   constexpr int half_head_size = HeadDim / 2;
   const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
   if (seq_lens_encoder[bid] > 0) return;
@@ -1109,20 +1109,20 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
       Store<T, VecSize>(left_bias_vec, &qkv_out_now[bias_idx_left]);
       Store<T, VecSize>(right_bias_vec, &qkv_out_now[bias_idx_right]);
     }
-  } else if (head_idx < num_heads + 2 * gqa_group_size) {
+  } else if (head_idx < num_heads + 2 * kv_num_heads) {
     // k v
     constexpr int KV_VEC_SIZE = 16 / sizeof(uint8_t);  // 16
     using LoadPadKVT = AlignedVector<uint8_t, KV_VEC_SIZE>;
-    const uint32_t kv_head_idx = (head_idx - num_heads) % gqa_group_size;
+    const uint32_t kv_head_idx = (head_idx - num_heads) % kv_num_heads;
     if (block_offset == 0) {
       // pad zero for this kv_head_idx for this block
       LoadPadKVT pad_cache_vec;
       *(reinterpret_cast<uint4*>(pad_cache_vec.val)) = make_uint4(0, 0, 0, 0);
-      if (head_idx < num_heads + gqa_group_size) {
+      if (head_idx < num_heads + kv_num_heads) {
         constexpr int num_vecs_per_head_dim = HeadDim / KV_VEC_SIZE;
         constexpr int num_token_each_time = 32 / num_vecs_per_head_dim;
         const uint32_t tgt_idx =
-            (block_idx * gqa_group_size + kv_head_idx) * block_size * HeadDim +
+            (block_idx * kv_num_heads + kv_head_idx) * block_size * HeadDim +
             lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim;
              block_i < block_size;
@@ -1134,7 +1134,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
         const int num_vecs_per_head_dim = block_size / KV_VEC_SIZE;
         const int num_token_each_time = 32 / num_vecs_per_head_dim;
         const uint32_t tgt_idx =
-            (block_idx * gqa_group_size + kv_head_idx) * HeadDim * block_size +
+            (block_idx * kv_num_heads + kv_head_idx) * HeadDim * block_size +
             lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim; block_i < HeadDim;
              block_i += num_token_each_time) {
@@ -1143,7 +1143,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
         }
       }
     }
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       // k
       const int head_bias = lane_id / 4 * 16 + lane_id % 4 * 2;
       if (head_bias < half_head_size) {
@@ -1245,7 +1245,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
         const int left_start_block_16 =
             block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 2 * 8;
         const uint32_t left_tgt_cache_idx =
-            block_idx * gqa_group_size * block_size * HeadDim +
+            block_idx * kv_num_heads * block_size * HeadDim +
             kv_head_idx * block_size * HeadDim + left_start_block_16 * HeadDim +
             lane_id / 4 / 2 * 32 + (block_offset % 16) / 8 * 16 +
             lane_id % 4 * 4;
@@ -1255,7 +1255,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
                                          block_offset % 8 +
                                          right_lane_id / 4 % 2 * 8;
         const uint32_t right_tgt_cache_idx =
-            block_idx * gqa_group_size * block_size * HeadDim +
+            block_idx * kv_num_heads * block_size * HeadDim +
             kv_head_idx * block_size * HeadDim +
             right_start_block_16 * HeadDim + right_lane_id / 4 / 2 * 32 +
             (block_offset % 16) / 8 * 16 + right_lane_id % 4 * 4;
@@ -1311,7 +1311,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
       // 左16还是右16
       // 小偏移
       const uint32_t base_tgt_cache_idx =
-          block_idx * gqa_group_size * HeadDim * block_size +
+          block_idx * kv_num_heads * HeadDim * block_size +
           kv_head_idx * HeadDim * block_size +
           (lane_id / 4 * 16 + lane_id % 4 * 2) * block_size +
           block_offset / 16 % 2 * 8 * block_size + block_offset / 16 / 2 * 32;
@@ -1332,11 +1332,11 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
 
 template <typename T, int VecSize = 4, int RoundType = 0, int HeadDim = 128>
 __global__ void append_decode_cache_int8_neox_rope_kernel(
-    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size,
+    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * kv_num_heads,
                                         // head_size]
-    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ key_cache,    // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
-    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ value_cache,  // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
@@ -1347,8 +1347,8 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
     const float* __restrict__ cos_emb,
     const float* __restrict__ sin_emb,
     const float* __restrict__ qkv_out_scales,  // [num_head + 2 *
-                                               // gqa_group_size, dim_head]
-    const T* __restrict__ qkv_biases,  // [num_head + 2 * gqa_group_size,
+                                               // kv_num_heads, dim_head]
+    const T* __restrict__ qkv_biases,  // [num_head + 2 * kv_num_heads,
                                        // dim_head]
     const T* __restrict__ cache_k_scales,
     const T* __restrict__ cache_v_scales,
@@ -1358,7 +1358,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
     const int block_size,
     const float max_bound,
     const float min_bound,
-    const int gqa_group_size) {
+    const int kv_num_heads) {
   static_assert(HeadDim == 128, "just support HeadDim be 128 now!");
   static_assert(VecSize == 4, "just support VecSize be 4 now, 32 * 4!");
   constexpr int NUM_WARPS = 4;
@@ -1372,7 +1372,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
   // k : dequant + add_bias + rope + quant + write
   // v : dequant + add_bias + quant + write
   // kv在0位置全补0
-  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
+  const int64_t hidden_size = (num_heads + 2 * kv_num_heads) * HeadDim;
   constexpr int half_head_size = HeadDim / 2;
   const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
   if (seq_lens_encoder[bid] > 0) return;
@@ -1453,20 +1453,20 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
       Store<T, VecSize>(left_bias_vec, &qkv_out_now[bias_idx_left]);
       Store<T, VecSize>(right_bias_vec, &qkv_out_now[bias_idx_right]);
     }
-  } else if (head_idx < num_heads + 2 * gqa_group_size) {
+  } else if (head_idx < num_heads + 2 * kv_num_heads) {
     // k v
     constexpr int KV_VEC_SIZE = 16 / sizeof(uint8_t);  // 16
     using LoadPadKVT = AlignedVector<uint8_t, KV_VEC_SIZE>;
-    const uint32_t kv_head_idx = (head_idx - num_heads) % gqa_group_size;
+    const uint32_t kv_head_idx = (head_idx - num_heads) % kv_num_heads;
     if (block_offset == 0) {
       // pad zero for this kv_head_idx for this block
       LoadPadKVT pad_cache_vec;
       *(reinterpret_cast<uint4*>(pad_cache_vec.val)) = make_uint4(0, 0, 0, 0);
-      if (head_idx < num_heads + gqa_group_size) {
+      if (head_idx < num_heads + kv_num_heads) {
         constexpr int num_vecs_per_head_dim = HeadDim / KV_VEC_SIZE;
         constexpr int num_token_each_time = 32 / num_vecs_per_head_dim;
         const uint32_t tgt_idx =
-            (block_idx * gqa_group_size + kv_head_idx) * block_size * HeadDim +
+            (block_idx * kv_num_heads + kv_head_idx) * block_size * HeadDim +
             lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim;
              block_i < block_size;
@@ -1478,7 +1478,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
         const int num_vecs_per_head_dim = block_size / KV_VEC_SIZE;
         const int num_token_each_time = 32 / num_vecs_per_head_dim;
         const uint32_t tgt_idx =
-            (block_idx * gqa_group_size + kv_head_idx) * HeadDim * block_size +
+            (block_idx * kv_num_heads + kv_head_idx) * HeadDim * block_size +
             lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim; block_i < HeadDim;
              block_i += num_token_each_time) {
@@ -1487,7 +1487,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
         }
       }
     }
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       // k
       const int head_bias = lane_id / 4 * 16 + lane_id % 4 * 2;
       if (head_bias < half_head_size) {
@@ -1622,7 +1622,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
         const int left_start_block_16 =
             block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 2 * 8;
         const uint32_t left_tgt_cache_idx =
-            block_idx * gqa_group_size * block_size * HeadDim +
+            block_idx * kv_num_heads * block_size * HeadDim +
             kv_head_idx * block_size * HeadDim + left_start_block_16 * HeadDim +
             lane_id / 4 / 2 * 32 + (block_offset % 16) / 8 * 16 +
             lane_id % 4 * 4;
@@ -1632,7 +1632,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
                                          block_offset % 8 +
                                          right_lane_id / 4 % 2 * 8;
         const uint32_t right_tgt_cache_idx =
-            block_idx * gqa_group_size * block_size * HeadDim +
+            block_idx * kv_num_heads * block_size * HeadDim +
             kv_head_idx * block_size * HeadDim +
             right_start_block_16 * HeadDim + right_lane_id / 4 / 2 * 32 +
             (block_offset % 16) / 8 * 16 + right_lane_id % 4 * 4;
@@ -1721,7 +1721,7 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
       // 左16还是右16
       // 小偏移
       const uint32_t base_tgt_cache_idx =
-          block_idx * gqa_group_size * HeadDim * block_size +
+          block_idx * kv_num_heads * HeadDim * block_size +
           kv_head_idx * HeadDim * block_size +
           (lane_id / 4 * 16 + lane_id % 4 * 2) * block_size +
           block_offset / 16 % 2 * 8 * block_size + block_offset / 16 / 2 * 32;
@@ -1743,11 +1743,11 @@ __global__ void append_decode_cache_int8_neox_rope_kernel(
 
 template <typename T, int VecSize = 4, int RoundType = 0, int HeadDim = 128>
 __global__ void append_decode_cache_int4_rope_kernel(
-    const T* __restrict__ quant_qkv,    // [bsz, num_heads + 2 * gqa_group_size,
+    const T* __restrict__ quant_qkv,    // [bsz, num_heads + 2 * kv_num_heads,
                                         // head_size]
-    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ key_cache,    // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
-    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ value_cache,  // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
@@ -1767,7 +1767,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
     const int block_size,
     const float max_bound,
     const float min_bound,
-    const int gqa_group_size) {
+    const int kv_num_heads) {
   static_assert(HeadDim == 128, "just support HeadDim be 128 now!");
   static_assert(VecSize == 4, "just support VecSize be 4 now, 32 * 4!");
   constexpr int NUM_WARPS = 4;
@@ -1779,7 +1779,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
   // k : dequant + add_bias + rope + quant + write
   // v : dequant + add_bias + quant + write
   // kv在0位置全补0
-  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
+  const int64_t hidden_size = (num_heads + 2 * kv_num_heads) * HeadDim;
   constexpr int half_head_size = HeadDim / 2;
   const int half_block_size = block_size / 2;
   const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
@@ -1794,9 +1794,9 @@ __global__ void append_decode_cache_int4_rope_kernel(
   const int block_offset = write_seq_id % block_size;
   // if (layer_id == 0 && bid == 0 && head_idx == num_heads && wid == 0 &&
   // lane_id == 0) {
-  //   printf("bid: %d, start_token_idx: %d, num_heads: %d, gqa_group_size: %d,
+  //   printf("bid: %d, start_token_idx: %d, num_heads: %d, kv_num_heads: %d,
   //   head_idx: %d, block_idx: %d, block_offset: %d\n",
-  //           bid, start_token_idx, (int)num_heads, (int)gqa_group_size,
+  //           bid, start_token_idx, (int)num_heads, (int)kv_num_heads,
   //           head_idx, block_idx, block_offset);
   // }
   // __syncwarp();
@@ -1840,19 +1840,19 @@ __global__ void append_decode_cache_int4_rope_kernel(
       }
       Store<T, VecSize>(out_vec, &qkv_out_now[bias_idx]);
     }
-  } else if (head_idx < num_heads + 2 * gqa_group_size) {
+  } else if (head_idx < num_heads + 2 * kv_num_heads) {
     // k
     constexpr int KV_VEC_SIZE = 16 / sizeof(uint8_t);  // 16
     using LoadPadKVT = AlignedVector<uint8_t, KV_VEC_SIZE>;
-    const uint32_t kv_head_idx = (head_idx - num_heads) % gqa_group_size;
+    const uint32_t kv_head_idx = (head_idx - num_heads) % kv_num_heads;
     if (block_offset == 0) {
       // pad zero for this kv_head_idx for this block
       LoadPadKVT pad_cache_vec;
       *(reinterpret_cast<uint4*>(pad_cache_vec.val)) = make_uint4(0, 0, 0, 0);
-      if (head_idx < num_heads + gqa_group_size) {
+      if (head_idx < num_heads + kv_num_heads) {
         constexpr int num_vecs_per_head_dim = half_head_size / KV_VEC_SIZE;
         constexpr int num_token_each_time = 32 / num_vecs_per_head_dim;
-        const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
+        const uint32_t tgt_idx = (block_idx * kv_num_heads + kv_head_idx) *
                                      block_size * half_head_size +
                                  lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim;
@@ -1864,7 +1864,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
       } else {
         const int num_vecs_per_head_dim = half_block_size / KV_VEC_SIZE;
         const int num_token_each_time = 32 / num_vecs_per_head_dim;
-        const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
+        const uint32_t tgt_idx = (block_idx * kv_num_heads + kv_head_idx) *
                                      HeadDim * half_block_size +
                                  lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim; block_i < HeadDim;
@@ -1896,7 +1896,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
     const int bias_idx = head_idx * HeadDim + head_bias;
     Load<T, HALF_K_VEC_SIZE>(&qkv_now[bias_idx], &src_vec1);
     Load<T, HALF_K_VEC_SIZE>(&qkv_now[bias_idx + 8], &src_vec2);
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       const uint32_t emb_idx = write_seq_id * half_head_size + head_bias / 2;
       Load<float, 1>(&cos_emb[emb_idx], &cos_emb_vec1);
       Load<float, 1>(&cos_emb[emb_idx + 4], &cos_emb_vec2);
@@ -1915,7 +1915,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
 
     float input_left = static_cast<float>(src_vec1[0]);
     float input_right = static_cast<float>(src_vec1[1]);
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       float cos_tmp = cos_emb_vec1[0];
       float sin_tmp = sin_emb_vec1[0];
       out_vec1[0] =
@@ -1929,7 +1929,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
 
     input_left = static_cast<float>(src_vec2[0]);
     input_right = static_cast<float>(src_vec2[1]);
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       float cos_tmp = cos_emb_vec2[0];
       float sin_tmp = sin_emb_vec2[0];
       out_vec2[0] =
@@ -1940,7 +1940,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
       out_vec2[0] = src_vec2[0];
       out_vec2[1] = src_vec2[1];
     }
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       // quant + write k
       // 大分块 lane_id / 4 / 4
       // 上下 lane_id / 4 % 4 / 2
@@ -1950,7 +1950,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
       const int start_block_16 =
           block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 4 / 2 * 8;
       const uint32_t tgt_cache_idx =
-          block_idx * gqa_group_size * block_size * half_head_size +
+          block_idx * kv_num_heads * block_size * half_head_size +
           kv_head_idx * block_size * half_head_size +
           start_block_16 * half_head_size + lane_id / 4 / 4 * 32 +
           lane_id / 4 % 2 * 16 + lane_id % 4 * 4;
@@ -2012,7 +2012,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
       // 左16还是右16 block_offset / 16 % 2 * 16
       // 小偏移
       const uint32_t base_tgt_cache_idx =
-          block_idx * gqa_group_size * HeadDim * half_block_size +
+          block_idx * kv_num_heads * HeadDim * half_block_size +
           kv_head_idx * HeadDim * half_block_size +
           (lane_id / 4 * 16 + lane_id % 4 * 2) * half_block_size +
           block_offset / 16 % 4 / 2 * 8 * half_block_size +
@@ -2068,11 +2068,11 @@ __global__ void append_decode_cache_int4_rope_kernel(
 
 template <typename T, int VecSize = 4, int RoundType = 0, int HeadDim = 128>
 __global__ void append_decode_cache_int4_rope_kernel(
-    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size,
+    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * kv_num_heads,
                                         // head_size]
-    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ key_cache,    // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
-    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ value_cache,  // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
@@ -2083,8 +2083,8 @@ __global__ void append_decode_cache_int4_rope_kernel(
     const float* __restrict__ cos_emb,
     const float* __restrict__ sin_emb,
     const float* __restrict__ qkv_out_scales,  // [num_head + 2 *
-                                               // gqa_group_size, dim_head]
-    const T* __restrict__ qkv_biases,  // [num_head + 2 * gqa_group_size,
+                                               // kv_num_heads, dim_head]
+    const T* __restrict__ qkv_biases,  // [num_head + 2 * kv_num_heads,
                                        // dim_head]
     const T* __restrict__ cache_k_scale,
     const T* __restrict__ cache_v_scale,
@@ -2096,7 +2096,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
     const int block_size,
     const float max_bound,
     const float min_bound,
-    const int gqa_group_size) {
+    const int kv_num_heads) {
   static_assert(HeadDim == 128, "just support HeadDim be 128 now!");
   static_assert(VecSize == 4, "just support VecSize be 4 now, 32 * 4!");
   constexpr int NUM_WARPS = 4;
@@ -2108,7 +2108,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
   // k : dequant + add_bias + rope + quant + write
   // v : dequant + add_bias + quant + write
   // kv在0位置全补0
-  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
+  const int64_t hidden_size = (num_heads + 2 * kv_num_heads) * HeadDim;
   constexpr int half_head_size = HeadDim / 2;
   const int half_block_size = block_size / 2;
   const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
@@ -2123,9 +2123,9 @@ __global__ void append_decode_cache_int4_rope_kernel(
   const int block_offset = write_seq_id % block_size;
   // if (layer_id == 0 && bid == 0 && head_idx == num_heads && wid == 0 &&
   // lane_id == 0) {
-  //   printf("bid: %d, start_token_idx: %d, num_heads: %d, gqa_group_size: %d,
+  //   printf("bid: %d, start_token_idx: %d, num_heads: %d, kv_num_heads: %d,
   //   head_idx: %d, block_idx: %d, block_offset: %d\n",
-  //           bid, start_token_idx, (int)num_heads, (int)gqa_group_size,
+  //           bid, start_token_idx, (int)num_heads, (int)kv_num_heads,
   //           head_idx, block_idx, block_offset);
   // }
   // __syncwarp();
@@ -2178,19 +2178,19 @@ __global__ void append_decode_cache_int4_rope_kernel(
       }
       Store<T, VecSize>(bias_vec, &qkv_out_now[bias_idx]);
     }
-  } else if (head_idx < num_heads + 2 * gqa_group_size) {
+  } else if (head_idx < num_heads + 2 * kv_num_heads) {
     // k
     constexpr int KV_VEC_SIZE = 16 / sizeof(uint8_t);  // 16
     using LoadPadKVT = AlignedVector<uint8_t, KV_VEC_SIZE>;
-    const uint32_t kv_head_idx = (head_idx - num_heads) % gqa_group_size;
+    const uint32_t kv_head_idx = (head_idx - num_heads) % kv_num_heads;
     if (block_offset == 0) {
       // pad zero for this kv_head_idx for this block
       LoadPadKVT pad_cache_vec;
       *(reinterpret_cast<uint4*>(pad_cache_vec.val)) = make_uint4(0, 0, 0, 0);
-      if (head_idx < num_heads + gqa_group_size) {
+      if (head_idx < num_heads + kv_num_heads) {
         constexpr int num_vecs_per_head_dim = half_head_size / KV_VEC_SIZE;
         constexpr int num_token_each_time = 32 / num_vecs_per_head_dim;
-        const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
+        const uint32_t tgt_idx = (block_idx * kv_num_heads + kv_head_idx) *
                                      block_size * half_head_size +
                                  lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim;
@@ -2202,7 +2202,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
       } else {
         const int num_vecs_per_head_dim = half_block_size / KV_VEC_SIZE;
         const int num_token_each_time = 32 / num_vecs_per_head_dim;
-        const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
+        const uint32_t tgt_idx = (block_idx * kv_num_heads + kv_head_idx) *
                                      HeadDim * half_block_size +
                                  lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim; block_i < HeadDim;
@@ -2242,7 +2242,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
     Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[bias_idx], &out_scale_vec1);
     Load<float, HALF_K_VEC_SIZE>(&qkv_out_scales[bias_idx + 8],
                                  &out_scale_vec2);
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       const uint32_t emb_idx = write_seq_id * half_head_size + head_bias / 2;
       Load<float, 1>(&cos_emb[emb_idx], &cos_emb_vec1);
       Load<float, 1>(&cos_emb[emb_idx + 4], &cos_emb_vec2);
@@ -2267,7 +2267,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
     input_right = qkv_biases ? input_right * out_scale_vec1[1] +
                                    static_cast<float>(bias_vec1[1])
                              : input_right * out_scale_vec1[1];
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       float cos_tmp = cos_emb_vec1[0];
       float sin_tmp = sin_emb_vec1[0];
       bias_vec1[0] =
@@ -2287,7 +2287,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
     input_right = qkv_biases ? input_right * out_scale_vec2[1] +
                                    static_cast<float>(bias_vec2[1])
                              : input_right * out_scale_vec2[1];
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       float cos_tmp = cos_emb_vec2[0];
       float sin_tmp = sin_emb_vec2[0];
       bias_vec2[0] =
@@ -2298,7 +2298,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
       bias_vec2[0] = static_cast<T>(input_left);
       bias_vec2[1] = static_cast<T>(input_right);
     }
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       // quant + write k
       // 大分块 lane_id / 4 / 4
       // 上下 lane_id / 4 % 4 / 2
@@ -2308,7 +2308,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
       const int start_block_16 =
           block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 4 / 2 * 8;
       const uint32_t tgt_cache_idx =
-          block_idx * gqa_group_size * block_size * half_head_size +
+          block_idx * kv_num_heads * block_size * half_head_size +
           kv_head_idx * block_size * half_head_size +
           start_block_16 * half_head_size + lane_id / 4 / 4 * 32 +
           lane_id / 4 % 2 * 16 + lane_id % 4 * 4;
@@ -2377,7 +2377,7 @@ __global__ void append_decode_cache_int4_rope_kernel(
       // 左16还是右16 block_offset / 16 % 2 * 16
       // 小偏移
       const uint32_t base_tgt_cache_idx =
-          block_idx * gqa_group_size * HeadDim * half_block_size +
+          block_idx * kv_num_heads * HeadDim * half_block_size +
           kv_head_idx * HeadDim * half_block_size +
           (lane_id / 4 * 16 + lane_id % 4 * 2) * half_block_size +
           block_offset / 16 % 4 / 2 * 8 * half_block_size +
@@ -2433,11 +2433,11 @@ __global__ void append_decode_cache_int4_rope_kernel(
 
 template <typename T, int VecSize = 4, int RoundType = 0, int HeadDim = 128>
 __global__ void append_decode_cache_int4_neox_rope_kernel(
-    const T* __restrict__ quant_qkv,    // [bsz, num_heads + 2 * gqa_group_size,
+    const T* __restrict__ quant_qkv,    // [bsz, num_heads + 2 * kv_num_heads,
                                         // head_size]
-    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ key_cache,    // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
-    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ value_cache,  // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
@@ -2457,7 +2457,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
     const int block_size,
     const float max_bound,
     const float min_bound,
-    const int gqa_group_size) {
+    const int kv_num_heads) {
   static_assert(HeadDim == 128, "just support HeadDim be 128 now!");
   static_assert(VecSize == 4, "just support VecSize be 4 now, 32 * 4!");
   constexpr int NUM_WARPS = 4;
@@ -2469,7 +2469,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
   // k : dequant + add_bias + rope + quant + write
   // v : dequant + add_bias + quant + write
   // kv在0位置全补0
-  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
+  const int64_t hidden_size = (num_heads + 2 * kv_num_heads) * HeadDim;
   constexpr int half_head_size = HeadDim / 2;
   const int half_block_size = block_size / 2;
   const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
@@ -2526,19 +2526,19 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
       Store<T, VecSize>(left_out_vec, &qkv_out_now[bias_idx_left]);
       Store<T, VecSize>(right_out_vec, &qkv_out_now[bias_idx_right]);
     }
-  } else if (head_idx < num_heads + 2 * gqa_group_size) {
+  } else if (head_idx < num_heads + 2 * kv_num_heads) {
     // k
     constexpr int KV_VEC_SIZE = 16 / sizeof(uint8_t);  // 16
     using LoadPadKVT = AlignedVector<uint8_t, KV_VEC_SIZE>;
-    const uint32_t kv_head_idx = (head_idx - num_heads) % gqa_group_size;
+    const uint32_t kv_head_idx = (head_idx - num_heads) % kv_num_heads;
     if (block_offset == 0) {
       // pad zero for this kv_head_idx for this block
       LoadPadKVT pad_cache_vec;
       *(reinterpret_cast<uint4*>(pad_cache_vec.val)) = make_uint4(0, 0, 0, 0);
-      if (head_idx < num_heads + gqa_group_size) {
+      if (head_idx < num_heads + kv_num_heads) {
         constexpr int num_vecs_per_head_dim = half_head_size / KV_VEC_SIZE;
         constexpr int num_token_each_time = 32 / num_vecs_per_head_dim;
-        const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
+        const uint32_t tgt_idx = (block_idx * kv_num_heads + kv_head_idx) *
                                      block_size * half_head_size +
                                  lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim;
@@ -2550,7 +2550,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
       } else {
         const int num_vecs_per_head_dim = half_block_size / KV_VEC_SIZE;
         const int num_token_each_time = 32 / num_vecs_per_head_dim;
-        const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
+        const uint32_t tgt_idx = (block_idx * kv_num_heads + kv_head_idx) *
                                      HeadDim * half_block_size +
                                  lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim; block_i < HeadDim;
@@ -2560,7 +2560,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
         }
       }
     }
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       const int head_bias = lane_id / 4 * 16 + lane_id % 4 * 2;
       if (head_bias < half_head_size) {
         constexpr int K_VEC_SIZE = 4;
@@ -2641,7 +2641,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
         const int left_start_block_16 =
             block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 4 / 2 * 8;
         const uint32_t left_tgt_cache_idx =
-            block_idx * gqa_group_size * block_size * half_head_size +
+            block_idx * kv_num_heads * block_size * half_head_size +
             kv_head_idx * block_size * half_head_size +
             left_start_block_16 * half_head_size + lane_id / 4 / 4 * 32 +
             lane_id / 4 % 2 * 16 + lane_id % 4 * 4;
@@ -2651,7 +2651,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
                                          block_offset % 8 +
                                          right_lane_id / 4 % 4 / 2 * 8;
         const uint32_t right_tgt_cache_idx =
-            block_idx * gqa_group_size * block_size * half_head_size +
+            block_idx * kv_num_heads * block_size * half_head_size +
             kv_head_idx * block_size * half_head_size +
             right_start_block_16 * half_head_size + right_lane_id / 4 / 4 * 32 +
             right_lane_id / 4 % 2 * 16 + right_lane_id % 4 * 4;
@@ -2763,7 +2763,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
       // 左16还是右16 block_offset / 16 % 2 * 16
       // 小偏移
       const uint32_t base_tgt_cache_idx =
-          block_idx * gqa_group_size * HeadDim * half_block_size +
+          block_idx * kv_num_heads * HeadDim * half_block_size +
           kv_head_idx * HeadDim * half_block_size +
           (lane_id / 4 * 16 + lane_id % 4 * 2) * half_block_size +
           block_offset / 16 % 4 / 2 * 8 * half_block_size +
@@ -2819,11 +2819,11 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
 
 template <typename T, int VecSize = 4, int RoundType = 0, int HeadDim = 128>
 __global__ void append_decode_cache_int4_neox_rope_kernel(
-    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * gqa_group_size,
+    const int* __restrict__ quant_qkv,  // [bsz, num_heads + 2 * kv_num_heads,
                                         // head_size]
-    uint8_t* __restrict__ key_cache,    // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ key_cache,    // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
-    uint8_t* __restrict__ value_cache,  // [num_blocks, gqa_group_size,
+    uint8_t* __restrict__ value_cache,  // [num_blocks, kv_num_heads,
                                         // block_size, head_size // 2]
     T* __restrict__ qkv_out,
     const int* __restrict__ block_tables,     // [bsz, max_blocks_per_seq]
@@ -2834,8 +2834,8 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
     const float* __restrict__ cos_emb,
     const float* __restrict__ sin_emb,
     const float* __restrict__ qkv_out_scales,  // [num_head + 2 *
-                                               // gqa_group_size, dim_head]
-    const T* __restrict__ qkv_biases,  // [num_head + 2 * gqa_group_size,
+                                               // kv_num_heads, dim_head]
+    const T* __restrict__ qkv_biases,  // [num_head + 2 * kv_num_heads,
                                        // dim_head]
     const T* __restrict__ cache_k_scale,
     const T* __restrict__ cache_v_scale,
@@ -2847,7 +2847,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
     const int block_size,
     const float max_bound,
     const float min_bound,
-    const int gqa_group_size) {
+    const int kv_num_heads) {
   static_assert(HeadDim == 128, "just support HeadDim be 128 now!");
   static_assert(VecSize == 4, "just support VecSize be 4 now, 32 * 4!");
   constexpr int NUM_WARPS = 4;
@@ -2859,7 +2859,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
   // k : dequant + add_bias + rope + quant + write
   // v : dequant + add_bias + quant + write
   // kv在0位置全补0
-  const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
+  const int64_t hidden_size = (num_heads + 2 * kv_num_heads) * HeadDim;
   constexpr int half_head_size = HeadDim / 2;
   const int half_block_size = block_size / 2;
   const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
@@ -2874,9 +2874,9 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
   const int block_offset = write_seq_id % block_size;
   // if (layer_id == 0 && bid == 0 && head_idx == num_heads && wid == 0 &&
   // lane_id == 0) {
-  //   printf("bid: %d, start_token_idx: %d, num_heads: %d, gqa_group_size: %d,
+  //   printf("bid: %d, start_token_idx: %d, num_heads: %d, kv_num_heads: %d,
   //   head_idx: %d, block_idx: %d, block_offset: %d\n",
-  //           bid, start_token_idx, (int)num_heads, (int)gqa_group_size,
+  //           bid, start_token_idx, (int)num_heads, (int)kv_num_heads,
   //           head_idx, block_idx, block_offset);
   // }
   // __syncwarp();
@@ -2941,19 +2941,19 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
       Store<T, VecSize>(left_bias_vec, &qkv_out_now[bias_idx_left]);
       Store<T, VecSize>(right_bias_vec, &qkv_out_now[bias_idx_right]);
     }
-  } else if (head_idx < num_heads + 2 * gqa_group_size) {
+  } else if (head_idx < num_heads + 2 * kv_num_heads) {
     // k
     constexpr int KV_VEC_SIZE = 16 / sizeof(uint8_t);  // 16
     using LoadPadKVT = AlignedVector<uint8_t, KV_VEC_SIZE>;
-    const uint32_t kv_head_idx = (head_idx - num_heads) % gqa_group_size;
+    const uint32_t kv_head_idx = (head_idx - num_heads) % kv_num_heads;
     if (block_offset == 0) {
       // pad zero for this kv_head_idx for this block
       LoadPadKVT pad_cache_vec;
       *(reinterpret_cast<uint4*>(pad_cache_vec.val)) = make_uint4(0, 0, 0, 0);
-      if (head_idx < num_heads + gqa_group_size) {
+      if (head_idx < num_heads + kv_num_heads) {
         constexpr int num_vecs_per_head_dim = half_head_size / KV_VEC_SIZE;
         constexpr int num_token_each_time = 32 / num_vecs_per_head_dim;
-        const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
+        const uint32_t tgt_idx = (block_idx * kv_num_heads + kv_head_idx) *
                                      block_size * half_head_size +
                                  lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim;
@@ -2965,7 +2965,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
       } else {
         const int num_vecs_per_head_dim = half_block_size / KV_VEC_SIZE;
         const int num_token_each_time = 32 / num_vecs_per_head_dim;
-        const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
+        const uint32_t tgt_idx = (block_idx * kv_num_heads + kv_head_idx) *
                                      HeadDim * half_block_size +
                                  lane_id % num_vecs_per_head_dim * KV_VEC_SIZE;
         for (int block_i = lane_id / num_vecs_per_head_dim; block_i < HeadDim;
@@ -2975,7 +2975,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
         }
       }
     }
-    if (head_idx < num_heads + gqa_group_size) {
+    if (head_idx < num_heads + kv_num_heads) {
       const int head_bias = lane_id / 4 * 16 + lane_id % 4 * 2;
       if (head_bias < half_head_size) {
         constexpr int K_VEC_SIZE = 4;
@@ -3085,7 +3085,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
         const int left_start_block_16 =
             block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 4 / 2 * 8;
         const uint32_t left_tgt_cache_idx =
-            block_idx * gqa_group_size * block_size * half_head_size +
+            block_idx * kv_num_heads * block_size * half_head_size +
             kv_head_idx * block_size * half_head_size +
             left_start_block_16 * half_head_size + lane_id / 4 / 4 * 32 +
             lane_id / 4 % 2 * 16 + lane_id % 4 * 4;
@@ -3095,7 +3095,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
                                          block_offset % 8 +
                                          right_lane_id / 4 % 4 / 2 * 8;
         const uint32_t right_tgt_cache_idx =
-            block_idx * gqa_group_size * block_size * half_head_size +
+            block_idx * kv_num_heads * block_size * half_head_size +
             kv_head_idx * block_size * half_head_size +
             right_start_block_16 * half_head_size + right_lane_id / 4 / 4 * 32 +
             right_lane_id / 4 % 2 * 16 + right_lane_id % 4 * 4;
@@ -3236,7 +3236,7 @@ __global__ void append_decode_cache_int4_neox_rope_kernel(
       // 左16还是右16 block_offset / 16 % 2 * 16
       // 小偏移
       const uint32_t base_tgt_cache_idx =
-          block_idx * gqa_group_size * HeadDim * half_block_size +
+          block_idx * kv_num_heads * HeadDim * half_block_size +
           kv_head_idx * HeadDim * half_block_size +
           (lane_id / 4 * 16 + lane_id % 4 * 2) * half_block_size +
           block_offset / 16 % 4 / 2 * 8 * half_block_size +
