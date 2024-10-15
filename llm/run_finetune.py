@@ -169,7 +169,7 @@ def main():
         model_config.long_sequence_init_args = {
             "dim": int(model_config.hidden_size / model_config.num_attention_heads),
             "max_position_embeddings": data_args.scaled_max_length,  # extended context window
-            "base": 10000,
+            "base": model_config.rope_theta,
             "scaling_factor": model_args.rope_scaling_factor,
         }
         if model_args.rope_scaling_type == "yarn":
