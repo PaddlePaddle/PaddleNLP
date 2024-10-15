@@ -1345,13 +1345,18 @@ def create_predictor(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
                 model.eval()
-
             elif "chatglmv2forcausallm" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    ChatGLMv2ForCausalLMInferenceModel as Model,
-                )
-
-                model = Model.from_pretrained(
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                    from paddlenlp.experimental.transformers import (
+                        ChatGLMv2ForCausalLMBlockInferenceModel as ChatGLMv2InferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        ChatGLMv2ForCausalLMInferenceModel as ChatGLMv2InferenceModel,
+                    )
+                model = ChatGLMv2InferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
                 model.eval()
@@ -1514,19 +1519,18 @@ def create_predictor(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "chatglmv2forcausallm" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    ChatGLMv2ForCausalLMInferenceModel,
-                )
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                    from paddlenlp.experimental.transformers import (
+                        ChatGLMv2ForCausalLMBlockInferenceModel as ChatGLMv2InferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        ChatGLMv2ForCausalLMInferenceModel as ChatGLMv2InferenceModel,
+                    )
 
-                cache_kvs_shape = ChatGLMv2ForCausalLMInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
-            elif "chatglmv2forcausallm" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    ChatGLMv2ForCausalLMInferenceModel,
-                )
-
-                cache_kvs_shape = ChatGLMv2ForCausalLMInferenceModel.get_cache_kvs_shape(
+                cache_kvs_shape = ChatGLMv2InferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "chatglmforcausallm" in config.architectures[0].lower():
