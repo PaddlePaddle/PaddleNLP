@@ -106,6 +106,10 @@ def save_single_card_checkpoint(model_to_save, output_dir):
     config_to_save.architectures = [model_to_save.__class__.__name__]
     config_to_save.save_pretrained(output_dir)
 
+    # save generation config
+    if model_to_save.can_generate():
+        model_to_save.generation_config.save_pretrained(output_dir)
+
 
 def save_single_card_optimizer(model, optimizer, output_dir):
     """ "Save optimizer for non-distributed environment."""

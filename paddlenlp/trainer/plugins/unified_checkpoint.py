@@ -356,6 +356,9 @@ class UnifiedCheckpointHandler:
             config_to_save.architectures = [model_to_save.__class__.__name__]
         if self.args.should_save:
             config_to_save.save_pretrained(save_directory)
+            # save generation config
+            if model_to_save.can_generate():
+                model_to_save.generation_config.save_pretrained(save_directory)
         paddle.device.cuda.empty_cache()
 
         if strtobool(os.getenv("FLAG_LLM_PDC", "False")) and self.args.should_save:
