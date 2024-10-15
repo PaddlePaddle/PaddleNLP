@@ -85,12 +85,7 @@ def main():
     training_args.print_config(data_args, "Data")
     training_args.print_config(quant_args, "Quant")
     training_args.print_config(gen_args, "Generation")
-    if training_args.use_shift_sparse_attention:
-        if "Qwen" in model_args.model_name_or_path:
-            replace_qwen2_attn(use_flash_attn=False, use_full=False, inference=False)
-        elif "llama" in model_args.model_name_or_path:
-            replace_llama2_attn(use_flash_attn=False, use_full=False, inference=False)
-
+    
     if sum([quant_args.do_ptq, quant_args.do_qat, quant_args.do_gptq, training_args.do_train]) > 1:
         raise ValueError(
             "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
@@ -145,19 +140,6 @@ def main():
         from_aistudio=model_args.from_aistudio,
         quantization_config=quantization_config,
     )
-    orig_rope_scaling = getattr(model_config, "rope_scaling", None)
-    if orig_rope_scaling is None:
-        orig_rope_scaling = {"factor": 1}
-    orig_rope_scaling_factor = orig_rope_scaling["factor"] if "factor" in orig_rope_scaling.keys() else 1
-    orig_ctx_len = getattr(model_config, "max_position_embeddings", None)
-
-    if orig_ctx_len:
-        orig_ctx_len *= orig_rope_scaling_factor
-        if data_args.max_length > orig_ctx_len:
-            scaling_factor = float(math.ceil(data_args.max_length / orig_ctx_len))
-            model_config.rope_scaling_type = "linear"
-            model_config.rope_scaling_factor = scaling_factor
-
     LlmMetaConfig.set_llm_config(model_config, training_args)
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
@@ -367,7 +349,6 @@ def main():
             get_convert_example(model),
             tokenizer=tokenizer,
             data_args=data_args,
-            autogressive=training_args.use_shift_sparse_attention,
         )
 
     train_ds = (
@@ -561,21 +542,16 @@ def main():
     else:
         metrics = compute_metrics
 
-    if training_args.use_shift_sparse_attention:
-        data_collator = DataCollatorForLanguageModeling(
-            tokenizer=tokenizer,
-            mlm=False,
-        )
-    else:
-        data_collator = DataCollatorForSeq2Seq(
-            tokenizer=tokenizer,
-            max_length=max_length,
-            padding=padding,
-            max_label_length=max_length,
-            return_tensors="np",
-            return_attention_mask=not model_args.flash_mask,
-            pad_to_multiple_of=data_args.pad_to_multiple_of,
-        )
+
+    data_collator = DataCollatorForSeq2Seq(
+        tokenizer=tokenizer,
+        max_length=max_length,
+        padding=padding,
+        max_label_length=max_length,
+        return_tensors="np",
+        return_attention_mask=not model_args.flash_mask,
+        pad_to_multiple_of=data_args.pad_to_multiple_of,
+    )
     trainer = CausalLMTrainer(
         model=model,
         args=training_args,
