@@ -76,6 +76,28 @@ __global__ void split_kv_block(const int* __restrict__ seq_lens_decoder,
   }
 }
 
+template <int THREADBLOCK_SIZE>
+__global__ void get_max_len_kv_ernel(int* max_seq_lens_out,
+                                  const int* seq_lens_this_time,
+                                  const int* seq_lens_decoder,
+                                  const int batch_size) {
+  const int tid = threadIdx.x;
+
+  
+  typedef cub::BlockReduce<int, THREADBLOCK_SIZE> BlockReduce;
+  __shared__ typename BlockReduce::TempStorage temp_storage;
+
+  int max_len_this_thread = 0;
+  for (int i = tid; i < batch_size; i += blockDim.x) {
+    if (seq_lens_decoder[i] == 0) continue;
+    max_len_this_thread = max(seq_lens_this_time[i] + seq_lens_decoder[i], max_len_this_thread);
+  }
+  int total = BlockReduce(temp_storage).Reduce(max_len_this_thread, MaxOp<int>());
+  if (tid == 0) {
+    *max_seq_lens_out = total;
+  }
+}
+
 std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
     const paddle::Tensor& seq_lens_encoder,
     const paddle::Tensor& seq_lens_decoder,
@@ -112,6 +134,17 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
                                       group_size);
   auto decoder_num_blocks_x_cpu =
       decoder_num_blocks_x.copy_to(paddle::CPUPlace(), false);
+  
+  auto max_len_kv =
+      GetEmptyTensor({1}, paddle::DataType::INT32, seq_lens_decoder.place());
+  get_max_len_kv_ernel<128><<<1, 128, 0, stream>>>(
+    max_len_kv.data<int>(),
+    seq_lens_this_time.data<int>(),
+    seq_lens_decoder.data<int>(),
+    bsz
+  );
+  auto max_len_kv_cpu =
+      max_len_kv.copy_to(paddle::CPUPlace(), false);
 
   int max_enc_len_this_time_data = max_enc_len_this_time.data<int>()[0];
   if (max_enc_len_this_time_data <= 0) {
@@ -136,7 +169,8 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
             kv_num_blocks_x_cpu, /*cpu*/
             decoder_batch_ids,
             decoder_tile_ids_per_batch,
-            decoder_num_blocks_x_cpu /*cpu*/};
+            decoder_num_blocks_x_cpu, /*cpu*/
+            max_len_kv_cpu /*cpu*/};
   }
 
   // encoder
@@ -191,7 +225,8 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
           kv_num_blocks_x_cpu, /*cpu*/
           decoder_batch_ids,
           decoder_tile_ids_per_batch,
-          decoder_num_blocks_x_cpu /*cpu*/};
+          decoder_num_blocks_x_cpu, /*cpu*/
+          max_len_kv_cpu /*cpu*/};
 }
 
 std::vector<paddle::DataType> GetBlockShapeAndSplitKVBlockInferDtype(
@@ -201,6 +236,7 @@ std::vector<paddle::DataType> GetBlockShapeAndSplitKVBlockInferDtype(
     const paddle::DataType& seq_lens_this_time_dtype,
     const paddle::DataType& cum_offsets_dtype) {
   return {paddle::DataType::INT32,
+          paddle::DataType::INT32,
           paddle::DataType::INT32,
           paddle::DataType::INT32,
           paddle::DataType::INT32,
@@ -227,6 +263,7 @@ std::vector<std::vector<int64_t>> GetBlockShapeAndSplitKVBlockInferShape(
           {1},
           dynamic_shape,
           dynamic_shape,
+          {1},
           {1}};
 }
 
@@ -244,7 +281,8 @@ PD_BUILD_OP(get_block_shape_and_split_kv_block)
               "kv_num_blocks",
               "decoder_batch_ids",
               "decoder_tile_ids_per_batch",
-              "decoder_num_blocks"})
+              "decoder_num_blocks",
+              "max_len_kv"})
     .Attrs({"encoder_block_shape_q: int",
             "decoder_block_shape_q: int",
             "group_size: int",

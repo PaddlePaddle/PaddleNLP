@@ -1110,6 +1110,7 @@ class FusedMultiTransformerBase(Layer):
                 kwargs["decoder_batch_ids"],
                 kwargs["decoder_tile_ids_per_batch"],
                 kwargs["decoder_num_blocks"],
+                kwargs["max_len_kv"],
             ) = get_block_shape_and_split_kv_block(
                 kwargs.get("seq_lens_encoder", None),
                 kwargs.get("seq_lens_decoder", None),
@@ -2355,6 +2356,7 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
             kwargs.get("decoder_num_blocks", None),
             kwargs.get("max_enc_len_this_time", None),
             kwargs.get("max_dec_len_this_time", None),
+            kwargs.get("max_len_kv", None),
             rotary_embs,
             None,  # attn_mask
             None,  # qkv_bias
@@ -2378,7 +2380,7 @@ class FusedAppendMultiTransformer(FusedMultiTransformerBase):
             kwargs.get("encoder_max_partition_size", 32768),
             5,  # speculate_max_draft_token_num
             True,  # causal
-            True,  # enable_prefill
+            False,  # speculate_decoder
         )[0]
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
@@ -2545,6 +2547,7 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
             kwargs.get("decoder_num_blocks", None),
             kwargs.get("max_enc_len_this_time", None),
             kwargs.get("max_dec_len_this_time", None),
+            kwargs.get("max_len_kv", None),
             rotary_embs,
             None,  # attn_mask
             self.qkv_biases[i] if len(self.qkv_biases) > 0 else None,
@@ -2568,7 +2571,7 @@ class FusedAppendMultiTransformerA8W8(FusedAppendMultiTransformer, FusedMultiTra
             kwargs.get("encoder_max_partition_size", 32768),
             5,  # speculate_max_draft_token_num
             True,  # causal
-            True,  # enable_prefill
+            False,  # speculate_decoder
         )[0]
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
