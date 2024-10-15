@@ -143,6 +143,23 @@ def main():
     LlmMetaConfig.set_llm_config(model_config, training_args)
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
+    if training_args.use_ssa:
+        model_config.use_ssa = True
+        model_config.group_size_ratio = training_args.group_size_ratio
+
+        orig_ctx_len = getattr(model_config, "max_length", None)
+        if orig_ctx_len and data_args.max_length > orig_ctx_len:
+            scaling_factor = data_args.max_length / orig_ctx_len
+        model_config.use_long_sequence_strategies = True
+        model_config.long_sequence_strategy_type = "embedding_strategies"
+        model_config.long_sequence_strategy_name = "LinearScalingRotaryEmbedding"
+        model_config.long_sequence_init_args = {
+            "dim": model_config.hidden_size,
+            "max_position_embeddings": model_config.max_length,
+            "rope_scaling_type": "linear",
+            "rope_scaling_factor": scaling_factor
+        }
+
     # Config for model using dropout, such as GPT.
     if hasattr(model_config, "hidden_dropout_prob"):
         model_config.hidden_dropout_prob = model_args.hidden_dropout_prob
@@ -160,10 +177,7 @@ def main():
 
     logger.info(f"Final model config: {model_config}")
 
-    if training_args.use_ssa:
-        model_config.use_ssa = training_args.use_ssa
-        model_config.group_size_ratio = training_args.group_size_ratio
-
+    
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
