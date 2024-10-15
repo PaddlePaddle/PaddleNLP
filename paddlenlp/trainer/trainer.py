@@ -2270,13 +2270,6 @@ class Trainer:
         self._pp_data_buffer = []
 
         model.train()
-        # hack pipeline-layers
-        # since the pipeline layer will check input is valid every iter.
-        # in same case,  for example, batch size warmup, we need dynamic change gradient_accumulation_steps to implement.
-        config_backup = model.micro_batch_size, model.accumulate_steps
-        model.micro_batch_size = self.args.per_device_train_batch_size
-        model.accumulate_steps = self.args.gradient_accumulation_steps
-
         if model._dp_comm_overlap or model._sharding_comm_overlap:
             for _, buffers in model._chunk_2_comm_buffers.items():
                 for buffer in buffers:
@@ -2290,8 +2283,6 @@ class Trainer:
 
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
-
-        model.micro_batch_size, model.accumulate_steps = config_backup
 
         return loss.detach()
 
