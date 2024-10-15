@@ -544,9 +544,11 @@ llm(){
     echo "build paddlenlp_op"
     python setup_cuda.py install
 
+    sleep 5
+    
     echo ' Testing all LLMs '
     cd ${nlp_dir}
-    python -m pytest tests/llm/test_*.py -vv -n 8 --timeout=300 --alluredir=result >${log_path}/llm >>${log_path}/llm 2>&1
+    python -m pytest tests/llm/test_*.py -vv -n 4 --timeout=300 --alluredir=result >${log_path}/llm >>${log_path}/llm 2>&1
     print_info $? llm
 }
 
