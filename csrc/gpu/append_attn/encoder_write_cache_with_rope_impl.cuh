@@ -18,6 +18,8 @@
 #include "mma_tensor_op.cuh"
 #include "utils.cuh"
 
+// #define DEBUG_WRITE_C4
+
 template <typename T, int VecSize = 1>
 __global__ void VariableLengthRotaryKernel(
     const int *qkv,

@@ -425,7 +425,8 @@ std::vector<paddle::Tensor> AppendAttention(
   meta_data.token_nums = qkv_dims[0];
   meta_data.kv_num_heads = key_cache_dims[1];
   meta_data.head_dims = key_cache_dims[3];
-  const int total_num_head = qkv_dims[qkv_dims.size() - 1] / meta_data.head_dims;
+  const int total_num_head =
+      qkv_dims[qkv_dims.size() - 1] / meta_data.head_dims;
   meta_data.q_num_heads = total_num_head - 2 * meta_data.kv_num_heads;
 
   meta_data.max_blocks_per_seq = block_tables.dims()[1];

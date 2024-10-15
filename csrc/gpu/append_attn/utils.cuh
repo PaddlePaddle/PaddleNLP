@@ -15,6 +15,7 @@
 
 #include <cuda_bf16.h>
 #include <cuda_runtime.h>
+#include "mem_util.cuh"
 
 struct AppendAttnMetaData {
   int batch_size;

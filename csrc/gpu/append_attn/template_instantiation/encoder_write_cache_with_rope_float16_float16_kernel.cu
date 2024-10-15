@@ -11,9 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "encoder_write_cache_with_rope_kernel.h"
+#include "../encoder_write_cache_with_rope_kernel.h"
 
-template void EncoderWriteCacheWithRopeKernel<paddle::float16, int>(
+template void EncoderWriteCacheWithRopeKernel<paddle::float16, paddle::float16>(
     const AppendAttnMetaData& meta_data,
     const paddle::Tensor&
         qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *

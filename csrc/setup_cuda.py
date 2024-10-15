@@ -109,17 +109,10 @@ sources = [
     "./gpu/tune_cublaslt_gemm.cu",
     "./gpu/append_attention.cu",
     "./gpu/append_attn/get_block_shape_and_split_kv_block.cu",
-    "./gpu/append_attn/append_attention_bfloat16_bfloat16_kernel.cu",
-    "./gpu/append_attn/append_attention_bfloat16_int8_kernel.cu",
-    "./gpu/append_attn/append_attention_float16_float16_kernel.cu",
-    "./gpu/append_attn/append_attention_float16_int8_kernel.cu",
-    "./gpu/append_attn/encoder_write_cache_with_rope_bfloat16_bfloat16_kernel.cu",
-    "./gpu/append_attn/encoder_write_cache_with_rope_bfloat16_int_kernel.cu",
-    "./gpu/append_attn/encoder_write_cache_with_rope_float16_float16_kernel.cu",
-    "./gpu/append_attn/encoder_write_cache_with_rope_float16_int_kernel.cu",
     "./gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
     "./gpu/sample_kernels/top_p_sampling_reject.cu",
 ]
+sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
 
 cutlass_dir = "third_party/cutlass"
 nvcc_compile_args = gencode_flags

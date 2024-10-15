@@ -11,9 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "append_attention_kernel.h"
+#include "../append_attention_c4_impl.cuh"
 
-template void CascadeAppendAttentionKernel<paddle::float16, paddle::float16>(
+template void CascadeAppendAttentionC4Kernel<paddle::float16, int8_t>(
     const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,  // [token_num, num_heads, head_dim]
     const paddle::Tensor&
@@ -41,7 +41,6 @@ template void CascadeAppendAttentionKernel<paddle::float16, paddle::float16>(
     const paddle::Tensor& block_table,
     const paddle::Tensor& batch_ids,
     const paddle::Tensor& tile_ids_per_batch,
-    const std::string& cache_quant_type_str,
     const int num_blocks,
     const int block_shape_q,
     const int max_seq_len,
