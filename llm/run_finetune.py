@@ -109,6 +109,7 @@ def main():
     if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
         try:
             from paddle_xpu.layers.nn.linear import LinearConfig  # noqa: F401
+
             LinearConfig.enable_accumulate_steps_opt()
             LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
         except ImportError:
@@ -157,8 +158,6 @@ def main():
 
     if model_args.lqlora_quantize_cfg is not None:
         model_config.lqlora_quantize_cfg = model_args.lqlora_quantize_cfg
-    if model_args.lqlora_state_dict is not None:
-        model_config.lqlora_state_dict = model_args.lqlora_state_dict
 
     model_config.seq_length = data_args.max_length
 
@@ -469,7 +468,6 @@ def main():
                 do_qat=quant_args.do_qat,
                 base_model_name_or_path=model_args.model_name_or_path,
                 use_quick_lora=model_args.use_quick_lora,
-                lqlora_state_dict=model_args.lqlora_state_dict,
             )
             model = LoRAModel(model, lora_config)
         else:

@@ -19,6 +19,7 @@ from typing import List, Optional, Tuple
 import gurobipy as gp
 import numpy as np
 import paddle
+import paddle.nn as nn
 import scipy.optimize._optimize as scipy_optimize
 
 from paddlenlp.peft.lora.lqlora_utils import lowrand_quantized_sparse_decomposition
@@ -29,8 +30,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name_or_path", default=None, required=True, type=str, help="The directory of model.")
     parser.add_argument("--qconfigs", default=None, type=str, required=True, help="Quantize methods, use ',' split")
-    parser.add_argument("--budget", default=None, type=float, required=True, help="Budget")
-    parser.add_argument("--ranks", default=64, type=int, help="SVD rank")
+    parser.add_argument("--budget", default=None, type=float, required=True, help="Target bits")
+    parser.add_argument("--ranks", default=8, type=int, help="SVD rank")
     parser.add_argument("--output_path", default=None, type=str, required=True, help="The directory of saved model ")
     return parser.parse_args()
 
@@ -127,7 +128,7 @@ def get_ilp_data(args):
 
     model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path)
     for name, submodule in model.named_sublayers():
-        if "_proj" in name:
+        if isinstance(submodule, nn.Linear):
             names.append(name)
             params.append(submodule.weight)
 
@@ -156,9 +157,12 @@ def get_lqlora_quantize_cfg():
     qconfigs = ilp_data["qconfigs"]
 
     normalized_costs = costs / paddle.linalg.norm(costs) * 1000.0
+    # normalized_budget means the storage space expected to be occupied by the entire model after quantization
     normalized_budget = args.budget / GIGABYTES * num_params
     normalized_weights = weights / GIGABYTES
-    assignments_cost, assignments = compute_qconfig_assignments(
+    # The number of chunks into which the parameters are divided for optimization.
+    # This can help reduce computational complexity and memory usage by solving smaller subproblems sequentially.
+    _, assignments = compute_qconfig_assignments(
         budget=normalized_budget, costs=normalized_costs, weights=normalized_weights, num_chunks=1
     )
 

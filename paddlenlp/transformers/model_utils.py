@@ -1945,19 +1945,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             if len(resolved_archive_file) > 1:
                 resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
 
-            lqlora_state_dict = None
-            if config.lqlora_state_dict is not None:
-                print("load lqlora_state_dict from " + config.lqlora_state_dict)
-                lqlora_state_dict = paddle.load(config.lqlora_state_dict)
-
-                key_list = list(lqlora_state_dict.keys())
-                for key in key_list:
-                    print("replace:" + key)
-                    target_weight = lqlora_state_dict.pop(key)
-                    lqlora_state_dict[key] = target_weight.cpu()
-                    del target_weight
-                paddle.device.cuda.empty_cache()
-
             for shard_file in resolved_archive_file:
                 pre_tensor_parallel_split = False
                 if (
