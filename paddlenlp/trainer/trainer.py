@@ -197,6 +197,17 @@ except:
         return False
 
 
+try:
+    from paddle.framework.recall_error import LOSS_NAN_ERROR
+except ImportError:
+    LOSS_NAN_ERROR = "PaddleRecall error(102): LossNan"
+
+try:
+    from paddle.framework.recall_error import LOSS_INF_ERROR
+except ImportError:
+    LOSS_INF_ERROR = "PaddleRecall error(104): LossInf"
+
+
 __all__ = ["Trainer"]
 
 
@@ -1368,7 +1379,8 @@ class Trainer:
         loss_value = loss.item()
         if not self.args.fp16:
             if not np.isfinite(loss_value).all():
-                raise ValueError(f"Loss contains inf or nan values, its value is {loss_value}")
+                err_msg = LOSS_NAN_ERROR if np.isnan(loss_value).any() else LOSS_INF_ERROR
+                raise ValueError(f"{err_msg}. Loss contains inf or nan values, its value is {loss_value}")
         return loss_value
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
@@ -2258,13 +2270,6 @@ class Trainer:
         self._pp_data_buffer = []
 
         model.train()
-        # hack pipeline-layers
-        # since the pipeline layer will check input is valid every iter.
-        # in same case,  for example, batch size warmup, we need dynamic change gradient_accumulation_steps to implement.
-        config_backup = model.micro_batch_size, model.accumulate_steps
-        model.micro_batch_size = self.args.per_device_train_batch_size
-        model.accumulate_steps = self.args.gradient_accumulation_steps
-
         if model._dp_comm_overlap or model._sharding_comm_overlap:
             for _, buffers in model._chunk_2_comm_buffers.items():
                 for buffer in buffers:
@@ -2278,8 +2283,6 @@ class Trainer:
 
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
-
-        model.micro_batch_size, model.accumulate_steps = config_backup
 
         return loss.detach()
 
