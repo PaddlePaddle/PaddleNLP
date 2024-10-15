@@ -85,13 +85,12 @@ if is_safetensors_available():
         from paddlenlp.utils.safetensors import fast_safe_open as safe_open
         from paddlenlp.utils.safetensors import fast_load_file as load_file
 
-from paddlenlp.utils.checkpoint_quantization_utils import quant_unified_optimizer
-
 from .shared_memory_utils import (
     _read_state_dict_from_shm,
     _traverse_copy_to_shm,
     create_meta_dict,
 )
+from .unified_checkpoint_quantization import quant_unified_optimizer
 
 FP32_MASTER = "fp32_master_0"
 optimizer_scalar_name = [
@@ -186,7 +185,6 @@ class UnifiedCheckpointHandler:
                             self._lock,
                             state_dict_type,
                             self.global_rank,
-                            ckpt_quant_stage,
                         ),
                     )
                     self._process_model_weight.start()
@@ -211,7 +209,6 @@ class UnifiedCheckpointHandler:
                             if "skip_save_model_weight" in self.args.unified_checkpoint_config
                             else state_dict_type,
                             self.global_rank,
-                            ckpt_quant_stage,
                         ),
                     )
                     self._process_master_weight.start()
@@ -260,7 +257,7 @@ class UnifiedCheckpointHandler:
         lock,
         state_dict_type,
         global_rank,
-        ckpt_quant_stage,
+        ckpt_quant_stage="O0",
     ):
         shm = shared_memory.SharedMemory(name=shm_name)
         while True:
@@ -344,7 +341,6 @@ class UnifiedCheckpointHandler:
                 path=os.path.join(save_directory, shard_file),
                 is_sync=is_sync_save,
                 state_dict_type="model_weight",
-                ckpt_quant_stage=model_to_save.config.ckpt_quant_stage,
             )
             if sharded_index is not None:
                 if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
@@ -458,7 +454,6 @@ class UnifiedCheckpointHandler:
             path=os.path.join(output_dir, master_weights_name),
             is_sync=is_sync_save,
             state_dict_type="master_weight",
-            ckpt_quant_stage=model.config.ckpt_quant_stage,
         )
 
     def load_non_merge_optimizer(self, model, optimizer, resume_from_checkpoint):
@@ -551,7 +546,6 @@ class UnifiedCheckpointHandler:
                 path=os.path.join(save_directory, shard_master_weight_file),
                 is_sync=is_sync_save,
                 state_dict_type="master_weight",
-                ckpt_quant_stage=model.config.ckpt_quant_stage,
             )
 
         if sharded_optim_index is not None:
@@ -652,7 +646,6 @@ class UnifiedCheckpointHandler:
             path=os.path.join(output_dir, weight_filename),
             is_sync=True,
             state_dict_type="model_weight",
-            ckpt_quant_stage=model_to_save.config.ckpt_quant_stage,
         )
 
         if isinstance(model_to_save, PrefixModelForCausalLM):
@@ -739,7 +732,6 @@ class UnifiedCheckpointHandler:
                 path=os.path.join(output_dir, "master_weights-00001-of-00001.safetensors"),
                 is_sync=True,
                 state_dict_type="master_weight",
-                ckpt_quant_stage=model.config.ckpt_quant_stage,
             )
 
     def unlink_shared_memory(self):
@@ -2072,82 +2064,58 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
         quant = False
         if model_to_save.config.ckpt_quant_stage != "O0":
             quant = True
-        if not quant or not is_optimizer:
-            tensor_bytes_dict = {}
-            model_state_dict = get_expected_state_dict(model_to_save)
-            for (k, v) in state_dict.items():
-                model_v = model_state_dict[k.split("/")[0]] if is_optimizer else v
+        tensor_bytes_dict = {}
+        model_state_dict = get_expected_state_dict(model_to_save)
+        for (k, v) in state_dict.items():
+            weight_key = k.split("/")[0]
+            model_v = model_state_dict[weight_key] if is_optimizer else v
+            if not quant or not is_optimizer:
                 if hasattr(model_v, "is_distributed") and model_v.is_distributed:
                     tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
                 else:
                     tensor_bytes_dict[k] = v.numel().item() * dtype_byte_size(v.dtype)
+            else:
+                if weight_key not in tensor_bytes_dict:
+                    tensor_bytes_dict[weight_key] = 0
 
-            filter_tensor_list = []
-            current_block = []
-            current_block_size = 0
-            total_size = 0
-
-            max_shard_size = (sum(tensor_bytes_dict.values()) + tp_size - 1) // tp_size
-
-            for index, (key, weight_size) in enumerate(tensor_bytes_dict.items()):
-                # If this weight is going to tip up over the maximal size, we split.
-                # if current_block_size + weight_size > max_shard_size:
-                if total_size + weight_size > max_shard_size * (len(filter_tensor_list) + 1) or (
-                    len(tensor_bytes_dict) - index < (tp_size - len(filter_tensor_list))
-                ):
-                    # fix if the first param is large than max_shard_size
-                    if len(current_block) > 0:
-                        filter_tensor_list.append(current_block)
-                    current_block = []
-                    current_block_size = 0
-
-                current_block.append(key)
-                current_block_size += weight_size
-                total_size += weight_size
-
-            filter_tensor_list.append(current_block)
-            if len(filter_tensor_list) < tp_size:
-                filter_tensor_list.extend([[] for i in range(tp_size - len(filter_tensor_list))])
-        else:
-            tensor_bytes_dict = {}
-            model_state_dict = get_expected_state_dict(model_to_save)
-            for (k, v) in state_dict.items():
-                weight_key = k.split("/")[0]
-                model_v = model_state_dict[weight_key] if is_optimizer else v
                 if hasattr(model_v, "is_distributed") and model_v.is_distributed:
-                    tensor_bytes_dict[weight_key] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
+                    tensor_bytes_dict[weight_key] += v.numel().item() * tp_size * dtype_byte_size(v.dtype)
                 else:
-                    tensor_bytes_dict[weight_key] = v.numel().item() * dtype_byte_size(v.dtype)
+                    tensor_bytes_dict[weight_key] += v.numel().item() * dtype_byte_size(v.dtype)
 
-            filter_tensor_list = []
-            current_block = []
-            current_block_size = 0
-            total_size = 0
+        filter_tensor_list = []
+        current_block = []
+        current_block_size = 0
+        total_size = 0
 
-            max_shard_size = (sum(tensor_bytes_dict.values()) + tp_size - 1) // tp_size
+        max_shard_size = (sum(tensor_bytes_dict.values()) + tp_size - 1) // tp_size
 
-            for index, (key, weight_size) in enumerate(tensor_bytes_dict.items()):
-                # If this weight is going to tip up over the maximal size, we split.
-                # if current_block_size + weight_size > max_shard_size:
-                if total_size + weight_size > max_shard_size * (len(filter_tensor_list) + 1) or (
-                    len(tensor_bytes_dict) - index < (tp_size - len(filter_tensor_list))
-                ):
-                    # fix if the first param is large than max_shard_size
-                    if len(current_block) > 0:
-                        filter_tensor_list.append(current_block)
-                    current_block = []
-                    current_block_size = 0
+        for index, (key, weight_size) in enumerate(tensor_bytes_dict.items()):
+            # If this weight is going to tip up over the maximal size, we split.
+            # if current_block_size + weight_size > max_shard_size:
+            if total_size + weight_size > max_shard_size * (len(filter_tensor_list) + 1) or (
+                len(tensor_bytes_dict) - index < (tp_size - len(filter_tensor_list))
+            ):
+                # fix if the first param is large than max_shard_size
+                if len(current_block) > 0:
+                    filter_tensor_list.append(current_block)
+                current_block = []
+                current_block_size = 0
 
+            if not quant or not is_optimizer:
+                current_block.append(key)
+            else:
                 current_block.append(key + "/" + MOMENT1_KEYNAME)
                 current_block.append(key + "/" + MOMENT2_KEYNAME)
                 current_block.append(key + "/" + BETA1_KEYNAME)
                 current_block.append(key + "/" + BETA2_KEYNAME)
-                current_block_size += weight_size
-                total_size += weight_size
 
-            filter_tensor_list.append(current_block)
-            if len(filter_tensor_list) < tp_size:
-                filter_tensor_list.extend([[] for i in range(tp_size - len(filter_tensor_list))])
+            current_block_size += weight_size
+            total_size += weight_size
+
+        filter_tensor_list.append(current_block)
+        if len(filter_tensor_list) < tp_size:
+            filter_tensor_list.extend([[] for i in range(tp_size - len(filter_tensor_list))])
 
     dist.broadcast_object_list(
         filter_tensor_list,

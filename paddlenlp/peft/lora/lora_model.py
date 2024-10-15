@@ -265,7 +265,6 @@ class LoRAModel(nn.Layer):
                     shard_file,
                     tp_actions if pre_tensor_parallel_split else None,
                     expected_keys,
-                    ckpt_quant_stage=model.config.ckpt_quant_stage,
                 )
                 error_msgs += _load_state_dict_into_model(lora_model.model, state_dict, "")
                 del state_dict
