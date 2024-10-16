@@ -279,8 +279,6 @@ void SpeculateVerifyAndUpdate(const paddle::Tensor& accept_tokens,
 
     constexpr int BlockSize = 512;
 
-    auto not_need_stop_gpu = not_need_stop.copy_to(stop_flags.place(), false);
-
     curandState_t* dev_curand_states;
     cudaMalloc(&dev_curand_states, sizeof(curandState_t) * bsz);
     setup_kernel<<<1, BlockSize, 0, accept_tokens.stream()>>>(dev_curand_states, seed, offset, bsz, true);
@@ -312,7 +310,7 @@ void SpeculateVerifyAndUpdate(const paddle::Tensor& accept_tokens,
                             const_cast<int*>(seq_lens_encoder.data<int>()),
                             const_cast<int*>(seq_lens_decoder.data<int>()),
                             const_cast<bool*>(stop_flags.data<bool>()),
-                            const_cast<bool*>(not_need_stop_gpu.data<bool>()),
+                            const_cast<bool*>(not_need_stop.data<bool>()),
                             const_cast<int64_t*>(draft_tokens.data<int64_t>()),
                             const_cast<int*>(actual_draft_token_nums.data<int>()),
                             dev_curand_states,
@@ -339,7 +337,7 @@ void SpeculateVerifyAndUpdate(const paddle::Tensor& accept_tokens,
                             const_cast<int*>(seq_lens_encoder.data<int>()),
                             const_cast<int*>(seq_lens_decoder.data<int>()),
                             const_cast<bool*>(stop_flags.data<bool>()),
-                            const_cast<bool*>(not_need_stop_gpu.data<bool>()),
+                            const_cast<bool*>(not_need_stop.data<bool>()),
                             const_cast<int64_t*>(draft_tokens.data<int64_t>()),
                             const_cast<int*>(actual_draft_token_nums.data<int>()),
                             dev_curand_states,
@@ -368,7 +366,7 @@ void SpeculateVerifyAndUpdate(const paddle::Tensor& accept_tokens,
                             const_cast<int*>(seq_lens_encoder.data<int>()),
                             const_cast<int*>(seq_lens_decoder.data<int>()),
                             const_cast<bool*>(stop_flags.data<bool>()),
-                            const_cast<bool*>(not_need_stop_gpu.data<bool>()),
+                            const_cast<bool*>(not_need_stop.data<bool>()),
                             const_cast<int64_t*>(draft_tokens.data<int64_t>()),
                             const_cast<int*>(actual_draft_token_nums.data<int>()),
                             dev_curand_states,
@@ -395,7 +393,7 @@ void SpeculateVerifyAndUpdate(const paddle::Tensor& accept_tokens,
                             const_cast<int*>(seq_lens_encoder.data<int>()),
                             const_cast<int*>(seq_lens_decoder.data<int>()),
                             const_cast<bool*>(stop_flags.data<bool>()),
-                            const_cast<bool*>(not_need_stop_gpu.data<bool>()),
+                            const_cast<bool*>(not_need_stop.data<bool>()),
                             const_cast<int64_t*>(draft_tokens.data<int64_t>()),
                             const_cast<int*>(actual_draft_token_nums.data<int>()),
                             dev_curand_states,
@@ -418,10 +416,6 @@ void SpeculateVerifyAndUpdate(const paddle::Tensor& accept_tokens,
     }
 
     cudaFree(dev_curand_states);
-
-    auto not_need_stop_cpu = not_need_stop_gpu.copy_to(not_need_stop.place(), true);
-    bool* not_need_stop_data = const_cast<bool*>(not_need_stop.data<bool>());
-    not_need_stop_data[0] = not_need_stop_cpu.data<bool>()[0];
 }
 
 PD_BUILD_OP(speculate_verify_and_update)
