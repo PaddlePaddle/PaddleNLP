@@ -31,9 +31,9 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import try_import
+
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-        ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
 except:
@@ -92,9 +92,11 @@ def seed_guard_context(name=None):
     else:
         return contextlib.nullcontext()
 
+
 def fast_layer_norm(input, weight, bias, eps):
     fast_ln_lib = try_import("fast_ln")
     return fast_ln_lib.fast_ln(input, weight, bias, eps)[0]
+
 
 class GPTLayerNorm(nn.LayerNorm):
     def __init__(self, config, normalized_shape, epsilon=1e-05, weight_attr=None, bias_attr=None, name=None):
@@ -104,7 +106,7 @@ class GPTLayerNorm(nn.LayerNorm):
         self.config = config
         self._check_normalized_shape(self._normalized_shape)
 
-    def _check_normalized_shape(self,normalized_shape):
+    def _check_normalized_shape(self, normalized_shape):
         if isinstance(normalized_shape, (list, tuple)):
             assert len(normalized_shape) == 1
 
@@ -112,6 +114,7 @@ class GPTLayerNorm(nn.LayerNorm):
         if self.config.use_fast_layer_norm:
             return fast_layer_norm(input, self.weight, self.bias, self._epsilon)
         return super().forward(input)
+
 
 def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
@@ -142,29 +145,6 @@ def _expand_2d_mask(mask, dtype, tgt_length):
 
     return expanded_mask
 
-def _shard_op_for_sequence_parallel_linear(tgt, mesh):
-    # FIXME Hack to shard op for module (linear)
-    # we only shard the second to the last op (matmul) leave the last op (elementwise_add) un-touched
-    last_op = tgt.block.ops[-2]
-    assert last_op.type in ["matmul", "matmul_v2"]
-    from paddle.distributed.auto_parallel.static.dist_context import get_default_distributed_context
-    from paddle.distributed.auto_parallel.static.dist_op import DistributedOperator
-    default_dist_ctx = get_default_distributed_context()
-    original_id = last_op.desc.original_id()
-    assert len(last_op.output_arg_names) == 1, "Output is more than one: [{}].".format(str(last_op))
-    assert original_id not in default_dist_ctx._dist_ops_for_program, "Op already has dist attribute."
-    
-    output_var_name = last_op.output_arg_names[0]
-    assert output_var_name != tgt.name, "out name: {}, output_var_name: {}".format(output_var_name, tgt.name)
-    dist_op = DistributedOperator(last_op)
-    output_tensor = dist_op.get_serial_output(output_var_name)
-    tensor_dist_attr = dist_op.dist_attr.get_output_dist_attr(output_var_name)
-    dims_mapping = [-1] * len(output_tensor.shape)
-    # NOTE explicitlly set the dims_mapping for DP since we could not distinguish with "Any" and "Replicated"
-    if auto_env.get_mesh().dp_dim is not None:
-        dims_mapping[1] = auto.static.utils.convert_to_dims_mapping([auto_env.get_mesh().dp_dim], mesh)[0]
-    tensor_dist_attr.dims_mapping = dims_mapping
-    tensor_dist_attr.mark_annotated("dims_mapping")
 
 class MultiHeadAttentionAuto(nn.Layer):
     """
@@ -536,9 +516,9 @@ class GPTDecoderLayerAuto(nn.Layer):
 
         self.linear1.weight = dist.shard_tensor(self.linear1.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(1)])
         self.linear2.weight = dist.shard_tensor(self.linear2.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(0)])
-        #fix : change nn.LayerNorm(config.hidden_size, epsilon=1e-5, bias_attr=True) to GPTLayerNorm()
-        self.norm1 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5,bias_attr=True)
-        self.norm2 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5,bias_attr=True)
+        # fix : change nn.LayerNorm(config.hidden_size, epsilon=1e-5, bias_attr=True) to GPTLayerNorm()
+        self.norm1 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5, bias_attr=True)
+        self.norm2 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5, bias_attr=True)
 
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.norm1.weight)
@@ -921,7 +901,7 @@ class GPTModelAuto(GPTPretrainedModelAuto):
         self.bias = paddle.tril(
             paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
         )
-        self.bias = dist.shard_tensor(self.bias,get_mesh(),[dist.Replicate(),dist.Replicate()])
+        self.bias = dist.shard_tensor(self.bias, get_mesh(), [dist.Replicate(), dist.Replicate()])
         self.embeddings = GPTEmbeddingsAuto(config)
 
         decoder_layers = nn.LayerList()
@@ -1162,8 +1142,7 @@ class GPTPretrainingCriterionAuto(paddle.nn.Layer):
         """
         with paddle.amp.auto_cast(False):
             if len(prediction_scores.shape) < len(masked_lm_labels.unsqueeze(2).shape):
-                prediction_scores= paddle.unsqueeze_(prediction_scores,0)
-            print(" prediction_shape label_shape ",prediction_scores.shape,masked_lm_labels.unsqueeze(2).shape)
+                prediction_scores = paddle.unsqueeze_(prediction_scores, 0)
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
             masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
             loss = paddle.mean(masked_lm_loss)
@@ -1205,7 +1184,7 @@ class GPTLMHeadAuto(nn.Layer):
     def forward(self, hidden_states, tensor_parallel_output=None):
 
         if self.config.sequence_parallel:
-            hidden_states=dist.reshard(hidden_states,get_mesh(self.ipp),[dist.Replicate(),dist.Replicate()])
+            hidden_states = dist.reshard(hidden_states, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
             hidden_states = paddle.reshape(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
 
         if tensor_parallel_output is None:

@@ -26,7 +26,11 @@ import paddle
 import paddle.distributed as dist
 
 from paddlenlp.ops import Topology
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
+from paddlenlp.trainer import (
+    AutoTrainingArguments,
+    PdArgumentParser,
+    get_last_checkpoint,
+)
 from paddlenlp.trainer.auto_trainer import AutoTrainer
 from paddlenlp.trainer.trainer_utils import IntervalStrategy, _get_distributed_seeds
 from paddlenlp.transformers import (
@@ -59,8 +63,8 @@ def add_start_docstrings(*docstr):
 
 
 @dataclass
-@add_start_docstrings(TrainingArguments.__doc__)
-class PreTrainingArguments(TrainingArguments):
+@add_start_docstrings(AutoTrainingArguments.__doc__)
+class PreTrainingArguments(AutoTrainingArguments):
     min_learning_rate: float = field(
         default=1e-5,
         metadata={"help": "Minimum learning rate deacyed to."},
@@ -69,24 +73,6 @@ class PreTrainingArguments(TrainingArguments):
         default=None,
         metadata={
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
-        },
-    )
-    enable_linear_fused_grad_add: bool = field(
-        default=False,
-        metadata={
-            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
-        },
-    )
-    fused_linear_param_grad_add: bool = field(
-        default=False,
-        metadata={
-            "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
-        },
-    )
-    use_fused_linear:bool = field(
-        default=True,
-        metadata={
-            "help": "Enable fused linear op, which will fuse matmul and bias add together."
         },
     )
     job_schedule_profiler_start: int = field(
@@ -129,19 +115,7 @@ class PreTrainingArguments(TrainingArguments):
             self.report_to = []
             self.save_strategy = IntervalStrategy.NO
             self.evaluation_strategy = IntervalStrategy.NO
-        
-        self.strategy.mp_optimization.allreduce_matmul_grad_overlapping=False
-        
-        fused_passes = self.strategy.fused_passes
-        if self.fused_linear_param_grad_add:
-            fused_passes.enable = True
-            fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
-        if self.use_fused_linear:
-            fused_passes.enable = True
-            fused_passes.fused_passes_list.append("fused_gemm_epilogue_pass")
-        if self.enable_linear_fused_grad_add:
-            fused_passes.enable = True
-            fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
+
         logger.info(self.strategy)
 
 
@@ -231,7 +205,7 @@ class ModelArguments:
         default=False,
         metadata={"help": "whether to fuse first up and gate proj in mlp block"},
     )
-    #this optional can be use in run_pretrain.py
+    # this optional can be use in run_pretrain.py
     use_fast_layer_norm: bool = field(
         default=False,
         metadata={"help": "GPT3 model, use fast layernorm"},
@@ -390,6 +364,7 @@ class PretrainingTrainer(AutoTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.is_pretraining = True
+
     def _wrap_for_dist_loader(self, train_dataloader):
         dist_loader = super()._wrap_for_dist_loader(train_dataloader)
         dist_loader._input_keys = ["input_ids", "labels"]
@@ -565,17 +540,17 @@ def main():
 
     model = model_class.from_config(config, dtype=dtype)
     criterion = criterion_class(config)
-    ###todo(bug): training_args.recompute is not working , temp set all was true
-    # training_args.recompute = True
-    print("recompute",training_args.recompute)
+
     if training_args.recompute:
+
         def fn(layer):
             if hasattr(layer, "enable_recompute") and (layer.enable_recompute is False or layer.enable_recompute == 0):
                 layer.enable_recompute = True
-                if hasattr(layer,"layerwise_recompute"):
+                if hasattr(layer, "layerwise_recompute"):
                     layer.layerwise_recompute = True
+
         model.apply(fn)
-        
+
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
