@@ -1301,11 +1301,14 @@ class GenerationMixin(object):
 
         use_top_p = config.get("use_top_p", True)
 
-        top_k_spec = paddle.static.InputSpec(shape=[1], dtype="int64") if not use_top_p else 0
+        top_k_spec = paddle.static.InputSpec(shape=[1], dtype="int64") \
+            if not use_top_p else config.get("top_k", 1)
 
-        top_p_spec = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
-        temperature = paddle.static.InputSpec(shape=[1], dtype="float32") if use_top_p else 1.0
-        dtype = config.get("dtype", None)
+        top_p_spec = paddle.static.InputSpec(shape=[1], dtype="float32") \
+            if use_top_p else config.get("top_p", 1.0)
+        temperature = paddle.static.InputSpec(shape=[1], dtype="float32") \
+            if use_top_p else config.get("temperature", 1.0)
+        dtype = config.get("dtype", paddle.get_default_dtype())
 
         logits_processors = config.get("logits_processors", None)
         model_inputs_spec = self._get_model_inputs_spec(dtype)
@@ -1321,6 +1324,30 @@ class GenerationMixin(object):
             top_k_spec,  # top_k
             top_p_spec,  # top_p
             temperature,  # temperature
+            config.get("repetition_penalty", 1.0),  # repetition_penalty
+            # num_beams
+            1,
+            # num_beam_groups
+            1,
+            # length_penalty
+            0.0,
+            # early_stopping
+            False,
+            # bos_token_id
+            config.get("bos_token_id", 1),
+            # eos_token_id
+            config.get("eos_token_id", 2),
+            # pad_token_id
+            config.get("pad_token_id", 3),
+            # decoder_start_token_id
+            None,
+            # forced_bos_token_id
+            None,
+            # forced_eos_token_id
+            None,
+            # no_repeat_ngram_size
+            None,
+            # num_return_sequences
             1,
         ]
 
