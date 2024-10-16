@@ -64,6 +64,7 @@ from paddlenlp.utils.llm_utils import (
     init_chat_template,
 )
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import get_env_device
 
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "False"
@@ -104,6 +105,15 @@ def main():
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
+
+    if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
+        try:
+            from paddle_xpu.layers.nn.linear import LinearConfig  # noqa: F401
+            LinearConfig.enable_accumulate_steps_opt()
+            LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
+        except ImportError:
+            # It's OK, not use accumulate_steps optimization
+            pass
 
     # Load model
     if training_args.fp16_opt_level == "O2":
