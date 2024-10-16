@@ -2509,7 +2509,7 @@ class Trainer:
         need_to_rotate_checkpoints = need_to_rotate_checkpoints and self.args.local_rank == 0
         if need_to_rotate_checkpoints:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
-            self._rotate_checkpoints(use_mtime=False, output_dir=run_signal_dir)
+            self._rotate_checkpoints(use_mtime=True, output_dir=run_signal_dir)
 
         if strtobool(os.getenv("FLAG_LLM_PDC", "False")) and not ("async_save" in self.args.unified_checkpoint_config):
             # save checkpoint_done file to ensure checkpoint is complete
