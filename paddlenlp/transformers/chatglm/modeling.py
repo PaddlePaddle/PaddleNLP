@@ -19,6 +19,7 @@ import re
 from functools import partial
 from typing import Any, Dict, Optional
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -413,7 +414,7 @@ class ChatGLMMLP(nn.Layer):
             self.dense_h_to_4h = nn.Linear(config.hidden_size, inner_hidden_size)
             self.dense_4h_to_h = nn.Linear(inner_hidden_size, config.hidden_size)
         # self.dropout = nn.Dropout(config.output_dropout_prob)
-        self.activation = self.geglue if self.config.activation == "geglu" else self.gelu
+        self.activation = self.geglu if self.config.activation == "geglu" else self.gelu
 
     def geglu(self, x):
         x1, x2 = paddle.chunk(x, chunks=2, axis=-1)
@@ -681,6 +682,40 @@ class ChatGLMPretrainedModel(PretrainedModel):
 
         from paddlenlp.transformers.conversion_utils import split_or_merge_func
 
+        def split_or_merge_mlp_weights(tensor_parallel_degree, tensor_parallel_rank, is_split, tensor):
+            if is_split:
+                return split_mlp_weights(tensor_parallel_degree, tensor_parallel_rank, tensor)
+            else:
+                assert (
+                    len(tensor) == tensor_parallel_degree
+                ), "The length of tensor_list must match tensor_parallel_degree"
+                return merge_mlp_weights(tensor_parallel_degree, tensor)
+
+        def split_mlp_weights(tensor_parallel_degree, tensor_parallel_rank, tensor):
+            split_size = tensor.shape[-1] // tensor_parallel_degree // 2
+            ffn_fc = tensor[..., : tensor.shape[-1] // 2]
+            gate = tensor[..., tensor.shape[-1] // 2 :]
+            ffn_fc_part = ffn_fc[..., tensor_parallel_rank * split_size : (tensor_parallel_rank + 1) * split_size]
+            gate_part = gate[..., tensor_parallel_rank * split_size : (tensor_parallel_rank + 1) * split_size]
+            return paddle.concat([ffn_fc_part, gate_part], axis=-1)
+
+        def merge_mlp_weights(tensor_parallel_degree, tensor):
+            split_size = tensor[0].shape[-1] // 2
+            merge_ffn_fc = tensor[0][..., :split_size]
+            merge_gate = tensor[0][..., split_size:]
+            is_ndarry = isinstance(tensor[0], np.ndarray)
+            for i in range(1, tensor_parallel_degree):
+                if is_ndarry:
+                    merge_ffn_fc = np.concatenate([merge_ffn_fc, tensor[i][..., :split_size]], axis=-1)
+                    merge_gate = np.concatenate([merge_gate, tensor[i][..., split_size:]], axis=-1)
+                else:
+                    merge_ffn_fc = paddle.concat([merge_ffn_fc, tensor[i][..., :split_size]], axis=-1)
+                    merge_gate = paddle.concat([merge_gate, tensor[i][..., split_size:]], axis=-1)
+            if is_ndarry:
+                return np.concatenate([merge_ffn_fc, merge_gate], axis=-1)
+            else:
+                return paddle.concat([merge_ffn_fc, merge_gate], axis=-1)
+
         fn = split_or_merge_func(
             is_split=is_split,
             tensor_parallel_degree=config.tensor_parallel_degree,
@@ -692,8 +727,12 @@ class ChatGLMPretrainedModel(PretrainedModel):
             final_actions = {}
             base_actions = {
                 # Column Linear
-                "transformer.layers.0.mlp.dense_h_to_4h.bias": partial(fn, is_column=True),
-                "transformer.layers.0.mlp.dense_h_to_4h.weight": partial(fn, is_column=True),
+                "transformer.layers.0.mlp.dense_h_to_4h.bias": partial(
+                    split_or_merge_mlp_weights, config.tensor_parallel_degree, config.tensor_parallel_rank
+                ),
+                "transformer.layers.0.mlp.dense_h_to_4h.weight": partial(
+                    split_or_merge_mlp_weights, config.tensor_parallel_degree, config.tensor_parallel_rank
+                ),
                 "transformer.layers.0.attention.query_key_value.bias": partial(fn, is_column=True),
                 "transformer.layers.0.attention.query_key_value.weight": partial(fn, is_column=True),
                 # Row Linear
