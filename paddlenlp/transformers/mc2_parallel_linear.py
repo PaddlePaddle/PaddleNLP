@@ -123,6 +123,7 @@ if is_mc2_valid():
                 gather_index=0,
                 gather_output=(not __all_gather_recomputation__),
                 comm_turn=0,
+                transpose_y=False,
             )
 
             ctx.all_gather_output = gather_out
@@ -193,13 +194,14 @@ if is_mc2_valid():
 
             grad_input, all_gather_grad_output = paddle_custom_device.npu.fused_allgather_mm(
                 grad_output,
-                weight.t(),
+                weight,
                 bias=None,
                 hcom=hcomm_info,
                 world_size=world_size,
                 gather_index=0,
                 gather_output=True,
                 comm_turn=0,
+                transpose_y=True,
             )
             grad_weight = (
                 paddle.matmul(input_, all_gather_grad_output, transpose_x=True)
