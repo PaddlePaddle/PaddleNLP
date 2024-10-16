@@ -19,7 +19,7 @@
 #include <sys/types.h>
 #include "paddle/extension.h"
 
-#define MAX_BSZ 256
+#define MAX_BSZ 512
 #define MAX_DRAFT_TOKENS 6
 
 struct msgdata {
@@ -31,14 +31,15 @@ void SpeculateSaveWithOutputMsg(const paddle::Tensor& accept_tokens,
                  const paddle::Tensor& accept_num,
                  const paddle::Tensor& not_need_stop,
                  int64_t rank_id,
-                 const int msg_queue_id) {
-    // printf("enter save output");                
+                 const int msg_queue_id) {          
     if (rank_id > 0) return;
 
     int max_draft_tokens = accept_tokens.shape()[1];
 
     auto accept_tokens_cpu = accept_tokens.copy_to(paddle::CPUPlace(), true);
     auto accept_num_cpu = accept_num.copy_to(paddle::CPUPlace(), true);
+    auto not_need_stop_cpu = not_need_stop.copy_to(paddle::CPUPlace(), true);
+
     int64_t *accept_tokens_data = accept_tokens_cpu.data<int64_t>();
     int *accept_num_data = accept_num_cpu.data<int>();
 
@@ -47,7 +48,7 @@ void SpeculateSaveWithOutputMsg(const paddle::Tensor& accept_tokens,
     static int msgid = msgget(key, IPC_CREAT | 0666);
 
     msg_sed.mtype = 1;
-    bool not_need_stop_data = not_need_stop.data<bool>()[0];
+    bool not_need_stop_data = not_need_stop_cpu.data<bool>()[0];
     msg_sed.mtext[0] = not_need_stop_data ? 1 : -1;
     int bsz = accept_tokens.shape()[0];
     msg_sed.mtext[1] = bsz;
