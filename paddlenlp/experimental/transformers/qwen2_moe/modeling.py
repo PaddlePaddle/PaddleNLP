@@ -22,8 +22,6 @@ from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
 
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
-    FusedAppendMultiTransformer,
-    FusedAppendMultiTransformerWeightOnly,
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerBase,
@@ -770,16 +768,10 @@ class Qwen2MoeBlockInferenceModel(Qwen2MoeInferenceModel):
         self.block_size = config.block_size
 
     def set_transformer_block(self, transformer_config):
-        if not self.append_attn:
-            if self.use_weight_only:
-                self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
-            else:
-                self.transformer_block = FusedBlockMultiTransformer(transformer_config)
+        if self.use_weight_only:
+            self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
         else:
-            if self.use_weight_only:
-                self.transformer_block = FusedAppendMultiTransformerWeightOnly(transformer_config)
-            else:
-                self.transformer_block = FusedAppendMultiTransformer(transformer_config)
+            self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)

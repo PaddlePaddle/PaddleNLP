@@ -37,9 +37,6 @@ from paddlenlp.experimental.model_utils import (
 )
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     AvxConfig,
-    FusedAppendMultiTransformer,
-    FusedAppendMultiTransformerA8W8,
-    FusedAppendMultiTransformerWeightOnly,
     FusedBlockMultiTransformer,
     FusedBlockMultiTransformerA8W8,
     FusedBlockMultiTransformerFP8,
@@ -1603,24 +1600,14 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         self.block_size = config.block_size
 
     def set_transformer_block(self, transformer_config):
-        if not self.append_attn:
-            if self.use_weight_only:
-                self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
-            elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
-                self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
-            elif "fp8" in self.quant_type:
-                self.transformer_block = FusedBlockMultiTransformerFP8(transformer_config)
-            else:
-                self.transformer_block = FusedBlockMultiTransformer(transformer_config)
+        if self.use_weight_only:
+            self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
+        elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
+            self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
+        elif "fp8" in self.quant_type:
+            self.transformer_block = FusedBlockMultiTransformerFP8(transformer_config)
         else:
-            if self.use_weight_only:
-                self.transformer_block = FusedAppendMultiTransformerWeightOnly(transformer_config)
-            elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
-                self.transformer_block = FusedAppendMultiTransformerA8W8(transformer_config)
-            # elif "fp8" in self.quant_type:
-            #     self.transformer_block = FusedAppendMultiTransformerFP8(transformer_config)
-            else:
-                self.transformer_block = FusedAppendMultiTransformer(transformer_config)
+            self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
     def remove_padding(self, input_ids, seq_lens_this_time):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
