@@ -555,7 +555,9 @@ void DecoderWriteCacheWithRoPEKernel(
         stream,
         use_neox_rotary_style);
   } else {
-    PD_THROW("append attention just support C16/C8/C4_zp now!");
+    PD_THROW(
+        "cache_quant_type_str should be one of [none, cache_int8, "
+        "cache_int4_zp]");
   }
 }
 

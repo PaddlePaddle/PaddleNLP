@@ -120,7 +120,7 @@ void EncoderWriteCacheWithRopeKernel(
               key_cache_out,
               value_cache_out);
         })})
-  } else if (cache_quant_type_str == "cache_int4") {
+  } else if (cache_quant_type_str == "cache_int4_zp") {
     DISPATCH_HEAD_DIM(
         head_dim, HEAD_DIM, {DISPATCH_BLOCK_SIZE(block_size, BLOCK_SIZE, {
           CascadeAppendWriteCacheKVC4QKV<T, HEAD_DIM, BLOCK_SIZE>(
@@ -147,7 +147,7 @@ void EncoderWriteCacheWithRopeKernel(
         })})
   } else {
     PD_THROW(
-        "NOT supported cache_quant_type. "
-        "Only none, cache_int8 and cache_int4 are supported. ");
+        "cache_quant_type_str should be one of [none, cache_int8, "
+        "cache_int4_zp]");
   }
 }

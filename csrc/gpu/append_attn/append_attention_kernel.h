@@ -254,7 +254,7 @@ void CascadeAppendAttentionKernel(
                                             enable_prefill,
                                             stream,
                                             out);
-  } else if (cache_quant_type_str == "cache_int4") {
+  } else if (cache_quant_type_str == "cache_int4_zp") {
     CascadeAppendAttentionC4Kernel<T, OutT>(meta_data,
                                             qkv,
                                             cache_k,
@@ -288,6 +288,8 @@ void CascadeAppendAttentionKernel(
                                             stream,
                                             out);
   } else {
-    PD_THROW("append attention just support C16/C8/C4_zp now!");
+    PD_THROW(
+        "cache_quant_type_str should be one of [none, cache_int8, "
+        "cache_int4_zp]");
   }
 }

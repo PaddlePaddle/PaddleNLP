@@ -15,33 +15,31 @@
 #include "speculate_write_cache_with_rope_kernel.h"
 #include "utils.cuh"
 
-
-
 // rope + write
 template <typename T, typename QKV_TYPE>
 void append_speculate_cache_rope(const QKV_TYPE* qkv,
-                    T* key_cache,
-                    T* value_cache,
-                    T* qkv_out,
-                    const int* block_tables,
-                    const int* padding_offsets,
-                    const int* cum_offsets,
-                    const int* seq_lens,
-                    const int* seq_lens_encoder,
-                    const float* cos_emb,
-                    const float* sin_emb,
-                    const float* qkv_out_scales,
-                    const T* qkv_biases,
-                    const int max_seq_len,
-                    const int max_blocks_per_seq,
-                    const int num_heads,
-                    const int kv_num_heads,
-                    const int dim_head,
-                    const int block_size,
-                    const int bsz,
-                    const int token_num,
-                    const cudaStream_t& stream,
-                    const bool use_neox_style) {
+                                 T* key_cache,
+                                 T* value_cache,
+                                 T* qkv_out,
+                                 const int* block_tables,
+                                 const int* padding_offsets,
+                                 const int* cum_offsets,
+                                 const int* seq_lens,
+                                 const int* seq_lens_encoder,
+                                 const float* cos_emb,
+                                 const float* sin_emb,
+                                 const float* qkv_out_scales,
+                                 const T* qkv_biases,
+                                 const int max_seq_len,
+                                 const int max_blocks_per_seq,
+                                 const int num_heads,
+                                 const int kv_num_heads,
+                                 const int dim_head,
+                                 const int block_size,
+                                 const int bsz,
+                                 const int token_num,
+                                 const cudaStream_t& stream,
+                                 const bool use_neox_style) {
   int output_inner_dim = num_heads + 2 * kv_num_heads;
 
   const uint32_t elem_nums =
@@ -54,249 +52,247 @@ void append_speculate_cache_rope(const QKV_TYPE* qkv,
   int grid_size = 1;
   GetNumBlocks(pack_num, &grid_size);
   if (use_neox_style) {
-      append_speculate_cache_neox_rope_kernel<T, PackSize><<<grid_size, threads_per_block, 0, stream>>>(
-        qkv,     // [token_num, num_heads + 2 * gqa_group_size, head_size]
-        key_cache,
-        value_cache,
-        qkv_out,
-        block_tables,
-        padding_offsets,
-        cum_offsets,
-        seq_lens,
-        cos_emb,
-        sin_emb,
-        qkv_out_scales,
-        qkv_biases, // [num_head + 2 * gqa_group_size, dim_head]
-        max_seq_len,
-        max_blocks_per_seq,
-        num_heads,
-        output_inner_dim,
-        dim_head,
-        block_size,
-        elem_nums,
-        kv_num_heads);
+    append_speculate_cache_neox_rope_kernel<T, PackSize>
+        <<<grid_size, threads_per_block, 0, stream>>>(
+            qkv,  // [token_num, num_heads + 2 * gqa_group_size, head_size]
+            key_cache,
+            value_cache,
+            qkv_out,
+            block_tables,
+            padding_offsets,
+            cum_offsets,
+            seq_lens,
+            cos_emb,
+            sin_emb,
+            qkv_out_scales,
+            qkv_biases,  // [num_head + 2 * gqa_group_size, dim_head]
+            max_seq_len,
+            max_blocks_per_seq,
+            num_heads,
+            output_inner_dim,
+            dim_head,
+            block_size,
+            elem_nums,
+            kv_num_heads);
   } else {
-      append_speculate_cache_rope_kernel<T, PackSize><<<grid_size, threads_per_block, 0, stream>>>(
-        qkv,     // [token_num, num_heads + 2 * gqa_group_size, head_size]
-        key_cache,
-        value_cache,
-        qkv_out,
-        block_tables,
-        padding_offsets,
-        cum_offsets,
-        seq_lens,
-        cos_emb,
-        sin_emb,
-        qkv_out_scales,
-        qkv_biases, // [num_head + 2 * gqa_group_size, dim_head]
-        max_seq_len,
-        max_blocks_per_seq,
-        num_heads,
-        output_inner_dim,
-        dim_head,
-        block_size,
-        elem_nums,
-        kv_num_heads);
+    append_speculate_cache_rope_kernel<T, PackSize>
+        <<<grid_size, threads_per_block, 0, stream>>>(
+            qkv,  // [token_num, num_heads + 2 * gqa_group_size, head_size]
+            key_cache,
+            value_cache,
+            qkv_out,
+            block_tables,
+            padding_offsets,
+            cum_offsets,
+            seq_lens,
+            cos_emb,
+            sin_emb,
+            qkv_out_scales,
+            qkv_biases,  // [num_head + 2 * gqa_group_size, dim_head]
+            max_seq_len,
+            max_blocks_per_seq,
+            num_heads,
+            output_inner_dim,
+            dim_head,
+            block_size,
+            elem_nums,
+            kv_num_heads);
   }
 }
 
 template <typename T, typename QKV_TYPE>
 void append_speculate_cache_int8_rope(const QKV_TYPE* qkv,
-                                   uint8_t* key_cache,
-                                   uint8_t* value_cache,
-                                   T* qkv_out,
-                                   const int* block_tables,
-                                   const int* padding_offsets,
-                                   const int* cum_offsets,
-                                   const int* seq_lens,
-                                   const int* seq_lens_encoder,
-                                   const float* cos_emb,
-                                   const float* sin_emb,
-                                   const float* qkv_out_scales,
-                                   const T* qkv_biases,
-                                   const T* cache_k_scale,
-                                   const T* cache_v_scale,
-                                   const int max_seq_len,
-                                   const int max_blocks_per_seq,
-                                   const int num_heads,
-                                   const int kv_num_heads,
-                                   const int dim_head,
-                                   const int block_size,
-                                   const int bsz,
-                                   const int token_num,
-                                   const cudaStream_t& stream,
-                                   const bool use_neox_style) {
+                                      uint8_t* key_cache,
+                                      uint8_t* value_cache,
+                                      T* qkv_out,
+                                      const int* block_tables,
+                                      const int* padding_offsets,
+                                      const int* cum_offsets,
+                                      const int* seq_lens,
+                                      const int* seq_lens_encoder,
+                                      const float* cos_emb,
+                                      const float* sin_emb,
+                                      const float* qkv_out_scales,
+                                      const T* qkv_biases,
+                                      const T* cache_k_scale,
+                                      const T* cache_v_scale,
+                                      const int max_seq_len,
+                                      const int max_blocks_per_seq,
+                                      const int num_heads,
+                                      const int kv_num_heads,
+                                      const int dim_head,
+                                      const int block_size,
+                                      const int bsz,
+                                      const int token_num,
+                                      const cudaStream_t& stream,
+                                      const bool use_neox_style) {
   constexpr int num_warps = 4;
-  const int all_warps = ((num_heads + 2 * kv_num_heads) + num_warps - 1) / num_warps * num_warps;
+  const int all_warps =
+      ((num_heads + 2 * kv_num_heads) + num_warps - 1) / num_warps * num_warps;
   dim3 grids(token_num, all_warps / num_warps);
 
-  append_clear_cache_int8_block<4><<<grids, num_warps * 32, 0, stream>>>(
-      key_cache,
-      value_cache,
-      seq_lens,
-      block_tables,
-      padding_offsets,
-      cum_offsets,
-      seq_lens_encoder,
-      max_seq_len,
-      max_blocks_per_seq,
-      num_heads, 
-      block_size,
-      kv_num_heads
-  );
+  append_clear_cache_int8_block<4>
+      <<<grids, num_warps * 32, 0, stream>>>(key_cache,
+                                             value_cache,
+                                             seq_lens,
+                                             block_tables,
+                                             padding_offsets,
+                                             cum_offsets,
+                                             seq_lens_encoder,
+                                             max_seq_len,
+                                             max_blocks_per_seq,
+                                             num_heads,
+                                             block_size,
+                                             kv_num_heads);
   if (use_neox_style) {
-    append_speculate_cache_int8_neox_rope_kernel<T, 4><<<grids, num_warps * 32, 0, stream>>>(
-      qkv,
-      key_cache,
-      value_cache,
-      qkv_out,
-      block_tables,
-      padding_offsets,
-      cum_offsets,
-      seq_lens,
-      seq_lens_encoder,
-      cos_emb,
-      sin_emb,
-      qkv_out_scales,
-      qkv_biases,
-      cache_k_scale,
-      cache_v_scale,
-      max_seq_len,
-      max_blocks_per_seq,
-      num_heads,
-      block_size,
-      127.0f,
-      -127.0f,
-      kv_num_heads
-    );
+    append_speculate_cache_int8_neox_rope_kernel<T, 4>
+        <<<grids, num_warps * 32, 0, stream>>>(qkv,
+                                               key_cache,
+                                               value_cache,
+                                               qkv_out,
+                                               block_tables,
+                                               padding_offsets,
+                                               cum_offsets,
+                                               seq_lens,
+                                               seq_lens_encoder,
+                                               cos_emb,
+                                               sin_emb,
+                                               qkv_out_scales,
+                                               qkv_biases,
+                                               cache_k_scale,
+                                               cache_v_scale,
+                                               max_seq_len,
+                                               max_blocks_per_seq,
+                                               num_heads,
+                                               block_size,
+                                               127.0f,
+                                               -127.0f,
+                                               kv_num_heads);
   } else {
-    append_speculate_cache_int8_rope_kernel<T, 4><<<grids, num_warps * 32, 0, stream>>>(
-      qkv,
-      key_cache,
-      value_cache,
-      qkv_out,
-      block_tables,
-      padding_offsets,
-      cum_offsets,
-      seq_lens,
-      seq_lens_encoder,
-      cos_emb,
-      sin_emb,
-      qkv_out_scales,
-      qkv_biases,
-      cache_k_scale,
-      cache_v_scale,
-      max_seq_len,
-      max_blocks_per_seq,
-      num_heads, 
-      block_size,
-      127.0f,
-      -127.0f,
-      kv_num_heads
-    );
+    append_speculate_cache_int8_rope_kernel<T, 4>
+        <<<grids, num_warps * 32, 0, stream>>>(qkv,
+                                               key_cache,
+                                               value_cache,
+                                               qkv_out,
+                                               block_tables,
+                                               padding_offsets,
+                                               cum_offsets,
+                                               seq_lens,
+                                               seq_lens_encoder,
+                                               cos_emb,
+                                               sin_emb,
+                                               qkv_out_scales,
+                                               qkv_biases,
+                                               cache_k_scale,
+                                               cache_v_scale,
+                                               max_seq_len,
+                                               max_blocks_per_seq,
+                                               num_heads,
+                                               block_size,
+                                               127.0f,
+                                               -127.0f,
+                                               kv_num_heads);
   }
 }
 
 template <typename T, typename QKV_TYPE>
 void append_speculate_cache_int4_rope(const QKV_TYPE* qkv,
-                                   uint8_t* key_cache,
-                                   uint8_t* value_cache,
-                                   T* qkv_out,
-                                   const int* block_tables,
-                                   const int* padding_offsets,
-                                   const int* cum_offsets,
-                                   const int* seq_lens,
-                                   const int* seq_lens_encoder,
-                                   const float* cos_emb,
-                                   const float* sin_emb,
-                                   const float* qkv_out_scales,
-                                   const T* qkv_biases,
-                                   const T* cache_k_scale,
-                                   const T* cache_v_scale,
-                                   const T* cache_k_zp,
-                                   const T* cache_v_zp,
-                                   const int max_seq_len,
-                                   const int max_blocks_per_seq,
-                                   const int num_heads,
-                                   const int kv_num_heads,
-                                   const int dim_head,
-                                   const int block_size,
-                                   const int bsz,
-                                   const int token_num,
-                                   const cudaStream_t& stream,
-                                   const bool use_neox_style) {
+                                      uint8_t* key_cache,
+                                      uint8_t* value_cache,
+                                      T* qkv_out,
+                                      const int* block_tables,
+                                      const int* padding_offsets,
+                                      const int* cum_offsets,
+                                      const int* seq_lens,
+                                      const int* seq_lens_encoder,
+                                      const float* cos_emb,
+                                      const float* sin_emb,
+                                      const float* qkv_out_scales,
+                                      const T* qkv_biases,
+                                      const T* cache_k_scale,
+                                      const T* cache_v_scale,
+                                      const T* cache_k_zp,
+                                      const T* cache_v_zp,
+                                      const int max_seq_len,
+                                      const int max_blocks_per_seq,
+                                      const int num_heads,
+                                      const int kv_num_heads,
+                                      const int dim_head,
+                                      const int block_size,
+                                      const int bsz,
+                                      const int token_num,
+                                      const cudaStream_t& stream,
+                                      const bool use_neox_style) {
   constexpr int num_warps = 4;
-  const int all_warps = ((num_heads + 2 * kv_num_heads) + num_warps - 1) / num_warps * num_warps;
+  const int all_warps =
+      ((num_heads + 2 * kv_num_heads) + num_warps - 1) / num_warps * num_warps;
   dim3 grids(token_num, all_warps / num_warps);
 
-  append_clear_cache_int4_block<4><<<grids, num_warps * 32, 0, stream>>>(
-      key_cache,
-      value_cache,
-      seq_lens,
-      block_tables,
-      padding_offsets,
-      cum_offsets,
-      seq_lens_encoder,
-      max_seq_len,
-      max_blocks_per_seq,
-      num_heads, 
-      block_size,
-      kv_num_heads
-  );
+  append_clear_cache_int4_block<4>
+      <<<grids, num_warps * 32, 0, stream>>>(key_cache,
+                                             value_cache,
+                                             seq_lens,
+                                             block_tables,
+                                             padding_offsets,
+                                             cum_offsets,
+                                             seq_lens_encoder,
+                                             max_seq_len,
+                                             max_blocks_per_seq,
+                                             num_heads,
+                                             block_size,
+                                             kv_num_heads);
   if (use_neox_style) {
-    append_speculate_cache_int4_neox_rope_kernel<T, 4><<<grids, num_warps * 32, 0, stream>>>(
-      qkv,
-      key_cache,
-      value_cache,
-      qkv_out,
-      block_tables,
-      padding_offsets,
-      cum_offsets,
-      seq_lens,
-      seq_lens_encoder,
-      cos_emb,
-      sin_emb,
-      qkv_out_scales,
-      qkv_biases,
-      cache_k_scale,
-      cache_v_scale,
-      cache_k_zp,
-      cache_v_zp,
-      max_seq_len,
-      max_blocks_per_seq,
-      num_heads, 
-      block_size,
-      7.0f,
-      -8.0f,
-      kv_num_heads
-    );
+    append_speculate_cache_int4_neox_rope_kernel<T, 4>
+        <<<grids, num_warps * 32, 0, stream>>>(qkv,
+                                               key_cache,
+                                               value_cache,
+                                               qkv_out,
+                                               block_tables,
+                                               padding_offsets,
+                                               cum_offsets,
+                                               seq_lens,
+                                               seq_lens_encoder,
+                                               cos_emb,
+                                               sin_emb,
+                                               qkv_out_scales,
+                                               qkv_biases,
+                                               cache_k_scale,
+                                               cache_v_scale,
+                                               cache_k_zp,
+                                               cache_v_zp,
+                                               max_seq_len,
+                                               max_blocks_per_seq,
+                                               num_heads,
+                                               block_size,
+                                               7.0f,
+                                               -8.0f,
+                                               kv_num_heads);
   } else {
-    append_speculate_cache_int4_rope_kernel<T, 4><<<grids, num_warps * 32, 0, stream>>>(
-      qkv,
-      key_cache,
-      value_cache,
-      qkv_out,
-      block_tables,
-      padding_offsets,
-      cum_offsets,
-      seq_lens,
-      seq_lens_encoder,
-      cos_emb,
-      sin_emb,
-      qkv_out_scales,
-      qkv_biases,
-      cache_k_scale,
-      cache_v_scale,
-      cache_k_zp,
-      cache_v_zp,
-      max_seq_len,
-      max_blocks_per_seq,
-      num_heads, 
-      block_size,
-      7.0f,
-      -8.0f,
-      kv_num_heads
-    );
+    append_speculate_cache_int4_rope_kernel<T, 4>
+        <<<grids, num_warps * 32, 0, stream>>>(qkv,
+                                               key_cache,
+                                               value_cache,
+                                               qkv_out,
+                                               block_tables,
+                                               padding_offsets,
+                                               cum_offsets,
+                                               seq_lens,
+                                               seq_lens_encoder,
+                                               cos_emb,
+                                               sin_emb,
+                                               qkv_out_scales,
+                                               qkv_biases,
+                                               cache_k_scale,
+                                               cache_v_scale,
+                                               cache_k_zp,
+                                               cache_v_zp,
+                                               max_seq_len,
+                                               max_blocks_per_seq,
+                                               num_heads,
+                                               block_size,
+                                               7.0f,
+                                               -8.0f,
+                                               kv_num_heads);
   }
 }
 template <typename T, typename QKV_TYPE>
@@ -335,7 +331,7 @@ void SpeculateWriteCacheWithRoPEKernel(
   auto dim_head = meta_data.head_dims;
   auto num_heads = meta_data.q_num_heads;
   auto kv_num_heads = meta_data.kv_num_heads;
-  
+
 
   const float* cos_emb =
       rotary_embs ? rotary_embs.get().data<float>() : nullptr;
@@ -446,7 +442,9 @@ void SpeculateWriteCacheWithRoPEKernel(
         stream,
         use_neox_rotary_style);
   } else {
-    PD_THROW("append attention just support C16/C8/C4_zp now!");
+    PD_THROW(
+        "cache_quant_type_str should be one of [none, cache_int8, "
+        "cache_int4_zp]");
   }
 }
 
@@ -475,7 +473,8 @@ template void SpeculateWriteCacheWithRoPEKernel<paddle::bfloat16, int>(
     paddle::Tensor* key_cache_out,
     paddle::Tensor* value_cache_out);
 
-template void SpeculateWriteCacheWithRoPEKernel<paddle::bfloat16, paddle::bfloat16>(
+template void
+SpeculateWriteCacheWithRoPEKernel<paddle::bfloat16, paddle::bfloat16>(
     const AppendAttnMetaData& meta_data,
     const paddle::Tensor&
         qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
@@ -525,7 +524,8 @@ template void SpeculateWriteCacheWithRoPEKernel<paddle::float16, int>(
     paddle::Tensor* key_cache_out,
     paddle::Tensor* value_cache_out);
 
-template void SpeculateWriteCacheWithRoPEKernel<paddle::float16, paddle::float16>(
+template void
+SpeculateWriteCacheWithRoPEKernel<paddle::float16, paddle::float16>(
     const AppendAttnMetaData& meta_data,
     const paddle::Tensor&
         qkv,  // [token_num, 3, num_head, head_dim] ([token_num, num_head + 2 *
