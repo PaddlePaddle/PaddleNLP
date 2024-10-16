@@ -3184,6 +3184,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         if return_attention_mask and "attention_mask" not in encoded_inputs:
             encoded_inputs["attention_mask"] = [1] * len(required_input)
 
+        if "position_ids" not in encoded_inputs:
+            encoded_inputs["position_ids"] = list(range(len(required_input)))
+
         if needs_to_be_padded:
             difference = max_length - len(required_input)
 
