@@ -687,7 +687,13 @@ class AutoTrainer(Trainer):
                 # For ckpt integrity
                 paddle.save(self.state.global_step, os.path.join(output_dir, ".checkpoint_done"))
 
-    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
+    def _save(
+        self,
+        output_dir: Optional[str] = None,
+        state_dict=None,
+        merge_tensor_parallel=False,
+        signal_dir: Optional[str] = None,
+    ):
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Saving model checkpoint to {output_dir}")
