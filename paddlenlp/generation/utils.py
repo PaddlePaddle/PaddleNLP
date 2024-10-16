@@ -510,6 +510,8 @@ class GenerationMixin(object):
     @staticmethod
     def update_scores_for_generation(scores, next_scores, length, unfinished_flag):
         # update scores
+        if not isinstance(length, int):
+            length = paddle.cast(length, scores.dtype)
 
         unfinished_scores = (scores * paddle.to_tensor(length, dtype=scores.dtype) + next_scores) / (
             paddle.to_tensor(length, dtype=scores.dtype) + 1
