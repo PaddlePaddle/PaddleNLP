@@ -3184,15 +3184,12 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         if return_attention_mask and "attention_mask" not in encoded_inputs:
             encoded_inputs["attention_mask"] = [1] * len(required_input)
 
-        if "position_ids" not in encoded_inputs:
-            encoded_inputs["position_ids"] = list(range(len(required_input)))
-
         if needs_to_be_padded:
             difference = max_length - len(required_input)
 
             if self.padding_side == "right":
                 if return_attention_mask:
-                    if len(encoded_inputs["attention_mask"].shape) > 2:
+                    if len(np.shape(encoded_inputs["attention_mask"])) > 2:
                         # attention_mask shape [1,seq_len,seq_len]
                         encoded_inputs["attention_mask"] = np.pad(
                             encoded_inputs["attention_mask"],
@@ -3229,7 +3226,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 encoded_inputs[self.model_input_names[0]] = required_input + [self.pad_token_id] * difference
             elif self.padding_side == "left":
                 if return_attention_mask:
-                    if len(encoded_inputs["attention_mask"].shape) > 2:
+                    if len(np.shape(encoded_inputs["attention_mask"])) > 2:
                         # attention_mask shape [1,seq_len,seq_len]
                         encoded_inputs["attention_mask"] = np.pad(
                             encoded_inputs["attention_mask"],
