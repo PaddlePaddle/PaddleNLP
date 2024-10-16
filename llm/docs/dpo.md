@@ -50,7 +50,7 @@ git clone 代码到本地，即可开始。
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
 tar -zxvf ultrafeedback_binarized.tar.gz
 ```
-### 2.3 全参 DPO
+### 2.3 DPO 训练
 
 ```bash
 # DPO 启动命令参考
@@ -113,8 +113,9 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo
 - `tensor_parallel_degree`: 此参数 tensor_parallel_degree 表示将一层 transformer 结构的份数，该方法对通信开销较大,但可以节约显存，建议 tensor_parallel_degree<=8, 尽量使用机器内部通信。
 - `pipeline_parallel_degree`: 表示划分流水线的大小.(假设该参数为4, 模型12层, 则每一个 pp stage 包含3层模型) 默认值-1, 表示不启用流水线并行。
 - `sharding_parallel_degree`: 分组参数切片的数据并行大小。
-- `sharding`: 是否使用 Sharding 数据并行功能，默认为 `"stage1"`。
-- `recompute`: 重计算，暂支持 full 策略。开启后可降低显存以达到增大 batch size 的目的。
+- `sharding`: 是否使用 Sharding 数据并行功能，默认为 `stage1`。
+- `recompute`: 重计算，暂支持 full 策略。开启后可降低显存以达到增大 batch size 的目的，full recompute 降低速度大约30%。
+- `recompute_granularity`: 重计算粒度，可设置为`full`或`full_attn`或`core_attn`。
 - `unified_checkpoint`: 是否使用统一的 checkpoint，默认为 `True`。
 - `autotuner_benchmark`: 是否启用 autotuner 基准测试，默认为 `False`。
 - `benchmark`: 是否开启基准测试，默认为 `False`。
@@ -146,7 +147,7 @@ simpo([SimPO](https://arxiv.org/abs/2405.14734)),默认为 `sigmoid`。
      </font>
 </div>
 
-序列构造完成后我们需要将多个序列构造为一个序列，并填充写填充上 pad tokens，使每个构造后的序列长度相同。
+序列构造完成后我们需要将多个序列构造为一个合并序列，并填充上 pad tokens，使每个构造后的合并序列长度相同。
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/user-attachments/assets/3185440c-b290-4d3b-8665-ec5bda1cda23">
