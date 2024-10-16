@@ -150,16 +150,25 @@ def apply_rotary_pos_emb(x: paddle.Tensor, rope_cache: paddle.Tensor) -> paddle.
     return paddle.concat((x_out2, x_pass.cast(x_out2.dtype)), axis=-1)
 
 
+class LayerNorm(nn.LayerNorm):
+    def __init__(self, config):
+        self.config = config
+        super().__init__(config.hidde_size, epsilon=config.layernorm_epsilon)
+
+
 class RMSNorm(nn.Layer):
-    def __init__(self, hidden_size, config: ChatGLMv2Config, epsilon=None):
+    def __init__(self, config: ChatGLMv2Config):
         super().__init__()
-        self.hidden_size = hidden_size
+        self.hidden_size = config.hidden_size
         self.weight = paddle.create_parameter(
             shape=[self.hidden_size],
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(1.0),
         )
-        self.epsilon = 1e-5 if epsilon is None else epsilon
+        self.epsilon = 1e-5 if config.layernorm_epsilon is None else config.layernorm_epsilon
+
+        if config.sequence_parallel:
+            mark_as_sequence_parallel_parameter(self.weight)
 
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.weight)
@@ -487,18 +496,16 @@ class GLMBlock(nn.Layer):
         self.config = config
         self.fp32_residual_connection = config.fp32_residual_connection
 
-        LayerNormFunc = RMSNorm if config.rmsnorm else nn.LayerNorm
+        LayerNormFunc = RMSNorm if config.rmsnorm else LayerNorm
         # Layernorm on the input data.
-        self.input_layernorm = LayerNormFunc(config.hidden_size, epsilon=config.layernorm_epsilon, config=config)
+        self.input_layernorm = LayerNormFunc(config)
 
         # Self attention.
         self.self_attention = SelfAttention(config, layer_number)
         self.hidden_dropout = config.hidden_dropout
 
         # Layernorm on the attention output
-        self.post_attention_layernorm = LayerNormFunc(
-            config.hidden_size, epsilon=config.layernorm_epsilon, config=config
-        )
+        self.post_attention_layernorm = LayerNormFunc(config)
 
         # MLP
         self.mlp = MLP(config)
@@ -585,9 +592,9 @@ class GLMTransformer(nn.Layer):
         self.layers = nn.LayerList([build_layer(i + 1) for i in range(self.num_hidden_layers)])
 
         if self.post_layer_norm:
-            LayerNormFunc = RMSNorm if config.rmsnorm else nn.LayerNorm
+            LayerNormFunc = RMSNorm if config.rmsnorm else LayerNorm
             # Final layer norm before output.
-            self.final_layernorm = LayerNormFunc(config.hidden_size, epsilon=config.layernorm_epsilon, config=config)
+            self.final_layernorm = LayerNormFunc(config)
 
     def _get_layer(self, layer_number):
         return self.layers[layer_number]
