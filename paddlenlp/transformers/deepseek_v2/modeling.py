@@ -64,7 +64,7 @@ from ..model_outputs import (
     SequenceClassifierOutputWithPast,
 )
 from ..model_utils import PretrainedModel, register_base_model
-from ..moe_gate import BaseGate
+from ..moe_gate import TopKGate
 from ..moe_layer import MoELayer
 from .configuration import DeepseekV2Config
 
@@ -604,7 +604,7 @@ class DeepseekV2MLP(nn.Layer):
         return down_proj
 
 
-class MoEGate(BaseGate):
+class MoEGate(TopKGate):
     def __init__(self, config: DeepseekV2Config):
         super().__init__(
             num_experts=config.n_routed_experts,
