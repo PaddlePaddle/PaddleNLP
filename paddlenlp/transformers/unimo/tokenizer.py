@@ -442,7 +442,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
         assert max_seq_len > max_title_len + max_target_len, (
             "`max_seq_len` must be greater than the sum of `max_target_len` "
             "and `max_title_len`. But received `max_seq_len` is {}, "
-            "`max_target_len` is {}, `max_title_len` is {}.".format(max_seq_len, max_title_len, max_target_len)
+            "`max_title_len` is {}, `max_target_len` is {}.".format(max_seq_len, max_title_len, max_target_len)
         )
         assert target is None or not add_start_token_for_decoding, (
             "`add_start_token_for_decoding` only works when `target` is "
