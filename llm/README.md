@@ -115,15 +115,15 @@ PaddleNLP 支持多个主流大模型的 SFT、LoRA、Prefix Tuning 等精调策
 样例数据：
 
 ```text
-{"src": "类型#裙*颜色#蓝色*风格#清新*图案#蝴蝶结", "tgt": "裙身处采用立体蝴蝶结装饰辅以蓝色条带点缀，令衣身造型饱满富有层次的同时为其注入一丝甜美气息。将女孩清新娇俏的一面衬托而出。"}
+{"src": "Give three tips for staying healthy.", "tgt": "1.Eat a balanced diet and make sure to include plenty of fruits and vegetables. \n2. Exercise regularly to keep your body active and strong. \n3. Get enough sleep and maintain a consistent sleep schedule."}
 ...
 ```
 
-为了方便测试，我们也提供了广告生成数据集可以直接使用：
+为了方便测试，我们也提供了[tatsu-lab/alpaca](https://huggingface.co/datasets/tatsu-lab/alpaca)demo 数据集可以直接使用：
 
 ```shell
-wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
-tar -zxvf AdvertiseGen.tar.gz
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/alpaca_demo.gz
+tar -xvf alpaca_demo.gz
 ```
 
 #### 2.2 全参精调：SFT
