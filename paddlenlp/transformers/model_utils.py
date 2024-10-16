@@ -1010,6 +1010,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 Override the default `paddle.dtype` and load the model under this dtype.
         """
         dtype = kwargs.pop("dtype", None)
+        fp16_level = kwargs.pop("fp16_level", None)
 
         if dtype is None:
             if config.dtype is not None:
@@ -1017,8 +1018,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             else:
                 dtype = paddle.get_default_dtype()
 
-        with dtype_guard(dtype):
-            model = cls(config, **kwargs)
+        if fp16_level is None or fp16_level == "O1":
+            with dtype_guard(dtype):
+                model = cls(config, **kwargs)
+        else:
+            with paddle.amp.auto_cast(True, level=fp16_level, dtype=dtype):
+                model = cls(config, **kwargs)
 
         return model
 
