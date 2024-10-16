@@ -147,7 +147,9 @@ def fusion_rms_norm(hidden_states, weight, variance_epsilon, use_fast_ln=False):
     elif get_env_device() == "gcu":
         return core.eager._run_custom_op("rms_norm_gcu", hidden_states, weight, variance_epsilon)[0]
     elif get_env_device() == "intel_hpu":
-        return paddle.incubate.nn.functional.fused_rms_norm(hidden_states, weight, None, variance_epsilon, 2)[0]
+        return paddle.incubate.nn.functional.fused_rms_norm(
+            hidden_states, weight, None, variance_epsilon, hidden_states.dim() - 1
+        )[0]
     elif get_env_device() == "xpu":
         try:
             import paddle_xpu_nn  # noqa: F821
