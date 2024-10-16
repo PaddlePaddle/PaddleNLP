@@ -29,6 +29,16 @@ from paddle.base.framework import _current_expected_place as _get_device
 from paddle.base.framework import in_dygraph_mode
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
+from paddlenlp_ops import (
+    speculate_clear_accept_nums,
+    speculate_get_output_padding_offset,
+    speculate_get_padding_offset,
+    speculate_get_seq_lens_output,
+    speculate_save_output,
+    speculate_set_value_by_flags_and_idx,
+    speculate_verify_and_update,
+    top_p_candidates,
+)
 
 from paddlenlp.experimental.model_utils import (
     ActScalesLoader,
@@ -73,19 +83,6 @@ from paddlenlp.transformers.model_utils import (
 )
 from paddlenlp.utils.download import resolve_file_path
 from paddlenlp.utils.log import logger
-from paddlenlp_ops import (
-    set_value_by_flags_and_idx_v2,
-    get_token_penalty_multi_scores_v2,
-    speculate_verify_and_update,
-    speculate_save_output,
-    speculate_clear_accept_nums,
-    speculate_set_value_by_flags_and_idx,
-    speculate_get_padding_offset,
-    speculate_get_seq_lens_output,
-    speculate_get_output_padding_offset,
-    top_p_candidates,
-)
-
 
 __all__ = [
     "LlamaInferenceModel",
@@ -1688,11 +1685,12 @@ class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
         elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
-            self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
+            self.transformer_block = FusedSpeculateMultiTransformerA8W8(transformer_config)
         elif "fp8" in self.quant_type:
             self.transformer_block = FusedBlockMultiTransformerFP8(transformer_config)
         else:
             self.transformer_block = FusedSpeculateMultiTransformer(transformer_config)
+        print("self.transformer_block: ", self.transformer_block)
 
     def remove_padding(self, input_ids, draft_tokens, seq_lens_this_time, seq_lens_encoder):
         """
@@ -1706,7 +1704,6 @@ class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
         )
         return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
 
-
     def forward(
         self,
         input_ids=None,
@@ -1718,9 +1715,8 @@ class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
         output_hidden_states=None,
         return_dict=False,
         draft_tokens=None,
-        output_padding_offset=None,
+        # output_padding_offset=None,
         **kwargs,
-
     ):
         seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
         seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
@@ -1728,13 +1724,17 @@ class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
         ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
             input_ids, draft_tokens, seq_lens_this_time, seq_lens_encoder
         )
+        print("ids_remove_padding: ", ids_remove_padding)
+        print("seq_lens_this_time: ", seq_lens_this_time)
         kwargs["cu_seqlens_q"] = cu_seqlens_q
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
 
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
         inputs_embeds = self.embed_tokens(ids_remove_padding)
-
+        print("seq_lens_encoder: ", seq_lens_encoder)
+        print("seq_lens_decoder: ", seq_lens_decoder)
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
                 input_ids=input_ids,
@@ -2248,7 +2248,6 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
         )
         return output_padding_offset, output_cum_offsets
 
-
     def forward(
         self,
         input_ids,
@@ -2319,41 +2318,16 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
             temperature,
             model_kwargs,
         ):
-            step_idx = model_kwargs["step_idx"]
-
-            set_value_by_flags_and_idx_v2(
-                model_kwargs["pre_ids"],
-                model_kwargs["input_ids"],
-                model_kwargs["seq_lens_this_time"],
-                model_kwargs["seq_lens_encoder"],
-                model_kwargs["seq_lens_decoder"],
-                step_idx,
-                model_kwargs["stop_flags"],
-            )
-
             logits = paddle.cast(outputs, paddle.float32)
 
-            # pre-process distribution
-
-            logits = get_token_penalty_multi_scores_v2(
-                model_kwargs["pre_ids"],
-                logits,
-                penalty_score,
-                frequency_score,
-                presence_score,
-                temperature,
-                model_kwargs["bad_tokens"],
-                step_idx,
-                model_kwargs["min_dec_len"],
-                eos_token_id,
-            )
+            # TODO(Wanglongzhi2001): get_token_penalty_multi_scores_v2 don't support seqlen > 1
 
             # sample
             probs = F.softmax(logits)
             verify_scores, verify_tokens, actual_candidate_len = top_p_candidates(
                 probs, top_p, model_kwargs["output_padding_offset"], self.max_candidate_len, self.max_seq_len
             )  # [token_num, max_candidate_len]
-
+            print("verify_tokens: ", verify_tokens)
             ###################################
             ### Speculate Verify And Update ###
             ###################################
@@ -2376,13 +2350,18 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
                 actual_candidate_len,
                 model_kwargs["actual_draft_token_num"],
                 top_p,
-                model_kwargs["max_length"],
+                self.max_seq_len,
                 self.verify_window,
                 True,  # enable_topp
             )
+            print("accept_tokens: ", model_kwargs["accept_tokens"])
+            print("accept_num: ", model_kwargs["accept_num"])
             # Streaming output
             speculate_save_output(
-                model_kwargs["accept_tokens"], model_kwargs["accept_num"], model_kwargs["not_need_stop"], self.rank
+                model_kwargs["accept_tokens"],
+                model_kwargs["accept_num"],
+                model_kwargs["not_need_stop"],
+                self.config.tensor_parallel_rank,
             )
 
             # If seq_lens_decoder is 0 (means stop), accept_num should be set to 0
@@ -2416,6 +2395,7 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
         )
 
         return top_p
+
 
 class LlamaForMiniGPT4InferenceModel(LlamaForCausalLMInferenceModel):
     """
