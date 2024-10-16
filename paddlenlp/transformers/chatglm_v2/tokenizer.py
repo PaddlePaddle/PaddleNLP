@@ -237,16 +237,6 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
             token_ids_0 = token_ids_0 + token_ids_1 + [self.get_command("<eos>")]
         return token_ids_0
 
-    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
-        # encode system
-        result = super().encode_chat_inputs(conversations, context_data=context_data)
-        if "system" in result:
-            result["system"] = self.get_prefix_tokens() + result["system"]
-        else:
-            result["conversations"][0][0] = self.get_prefix_tokens() + result["conversations"][0][0]
-
-        return result
-
     def _pad(
         self,
         encoded_inputs: Union[Dict, BatchEncoding],
@@ -293,3 +283,13 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
         )
 
         return encoded_inputs
+
+    def encode_chat_inputs(self, conversations: List[List[str, str]], context_data: Dict[str, Any] = {}):
+        # encode system
+        result = super().encode_chat_inputs(conversations, context_data=context_data)
+        if "system" in result:
+            result["system"] = self.get_prefix_tokens() + result["system"]
+        else:
+            result["conversations"][0][0] = self.get_prefix_tokens() + result["conversations"][0][0]
+
+        return result
