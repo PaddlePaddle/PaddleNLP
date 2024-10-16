@@ -5,7 +5,7 @@ seqeval
 dill<0.3.5
 multiprocess<=0.70.12.2
 datasets >= 2.0.0
-tqdm
+tqdm>=4.42.0,<=4.64.0
 paddlefsl
 sentencepiece
 huggingface_hub>=0.19.2
