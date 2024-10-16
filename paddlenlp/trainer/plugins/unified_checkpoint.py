@@ -53,7 +53,11 @@ from paddlenlp.transformers.utils import (
 )
 from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
 from paddlenlp.utils.env import (
+    BETA1_KEYNAME,
+    BETA2_KEYNAME,
     LORA_WEIGHTS_NAME,
+    MOMENT1_KEYNAME,
+    MOMENT2_KEYNAME,
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_MASTER_WEIGHTS_NAME,
     PADDLE_OPTIMIZER_INDEX_NAME,
@@ -91,6 +95,7 @@ from .shared_memory_utils import (
     _traverse_copy_to_shm,
     create_meta_dict,
 )
+from .unified_checkpoint_quantization import quant_unified_optimizer
 
 FP32_MASTER = "fp32_master_0"
 optimizer_scalar_name = [
@@ -120,6 +125,7 @@ class UnifiedCheckpointOption(ExplicitEnum):
 
     SKIP_SAVE_MODEL_WEIGHT = "skip_save_model_weight"
     MASTER_WEIGHT_COMPATIBLE = "master_weight_compatible"
+    REMOVE_MASTER_WEIGHT = "remove_master_weight"
     ASYNC_SAVE = "async_save"
     IGNORE_MERGE_OPTIMIZER = "ignore_merge_optimizer"
 
@@ -154,11 +160,15 @@ class UnifiedCheckpointHandler:
             self._shared_save_master_weight_flag = multiprocessing.Array("i", 1)
             self._shared_save_optimizer_flag = multiprocessing.Array("i", 1)
 
-    def _file_save_async_or_sync(self, state_dict, path, is_sync=True, state_dict_type="model_weight"):
+    def _file_save_async_or_sync(
+        self, state_dict, path, is_sync=True, state_dict_type="model_weight", ckpt_quant_stage="O0"
+    ):
         if is_sync:
             for k in list(state_dict.keys()):
                 if isinstance(state_dict[k], paddle.Tensor):
                     state_dict[k] = state_dict.pop(k).cpu().numpy()
+
+            state_dict = quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage)
             safe_save_file(state_dict, path, metadata={"format": "np"})
         else:
             if state_dict_type == "model_weight":
@@ -226,6 +236,7 @@ class UnifiedCheckpointHandler:
                             self._lock,
                             state_dict_type,
                             self.global_rank,
+                            ckpt_quant_stage,
                         ),
                     )
                     self._process_optimizer_weight.start()
@@ -251,6 +262,7 @@ class UnifiedCheckpointHandler:
         lock,
         state_dict_type,
         global_rank,
+        ckpt_quant_stage="O0",
     ):
         shm = shared_memory.SharedMemory(name=shm_name)
         while True:
@@ -263,6 +275,9 @@ class UnifiedCheckpointHandler:
                 path = shared_save_path[:].decode("utf-8").rstrip("\x00")
                 logger.info(f"Start to async save {path}")
                 state_dict = _read_state_dict_from_shm(meta_dict, shm)  # numpy array
+                state_dict = quant_unified_optimizer(
+                    state_dict, state_dict_type, ckpt_quant_stage
+                )  # ckpt quantization
                 safe_save_file(state_dict, path, {"format": "np"})
                 del state_dict
                 saved_signal_path = os.path.join(os.path.dirname(path), f".{state_dict_type}.done.{global_rank}")
@@ -364,7 +379,6 @@ class UnifiedCheckpointHandler:
             if model_to_save.can_generate():
                 model_to_save.generation_config.save_pretrained(save_directory)
         paddle.device.cuda.empty_cache()
-
         if strtobool(os.getenv("FLAG_LLM_PDC", "False")) and self.args.should_save:
             world_size = paddle.distributed.get_world_size()
             save_info = {
@@ -461,6 +475,7 @@ class UnifiedCheckpointHandler:
             path=os.path.join(output_dir, optimizer_name),
             is_sync=is_sync_save,
             state_dict_type="optimizer_weight",
+            ckpt_quant_stage=model.config.ckpt_quant_stage,
         )
         self._file_save_async_or_sync(
             master_weights,
@@ -554,6 +569,7 @@ class UnifiedCheckpointHandler:
             path=os.path.join(save_directory, shard_optim_file),
             is_sync=is_sync_save,
             state_dict_type="optimizer_weight",
+            ckpt_quant_stage=model.config.ckpt_quant_stage,
         )
         if master_weight_state_dict is not None:
             self._file_save_async_or_sync(
@@ -657,7 +673,10 @@ class UnifiedCheckpointHandler:
 
         # save checkpoint
         self._file_save_async_or_sync(
-            state_dict, path=os.path.join(output_dir, weight_filename), is_sync=True, state_dict_type="model_weight"
+            state_dict,
+            path=os.path.join(output_dir, weight_filename),
+            is_sync=True,
+            state_dict_type="model_weight",
         )
 
         if isinstance(model_to_save, PrefixModelForCausalLM):
@@ -697,6 +716,11 @@ class UnifiedCheckpointHandler:
             static_name, type_name = generate_base_static_name(key)
             new_name = static2struct_name_mappings[static_name] + "/" + type_name
             optim_state_dict[new_name] = optim_state_dict.pop(key)
+
+        if UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value in self.args.unified_checkpoint_config:
+            logger.info("Skip master weight saving.")
+            master_weights = None
+
         if master_weights is not None:
             for key in list(master_weights.keys()):
                 master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
@@ -739,6 +763,7 @@ class UnifiedCheckpointHandler:
             path=os.path.join(output_dir, "optimizer-00001-of-00001.safetensors"),
             is_sync=True,
             state_dict_type="optimizer_weight",
+            ckpt_quant_stage=model.config.ckpt_quant_stage,
         )
         if master_weights is not None:
             self._file_save_async_or_sync(
@@ -846,7 +871,11 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
                 tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
         # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
         state_dict = load_state_dict(
-            shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys, device="expected"
+            shard_file,
+            tp_actions if pre_tensor_parallel_split else None,
+            expected_keys,
+            device="expected",
+            ckpt_quant_stage=model.config.ckpt_quant_stage,
         )
 
         if not pre_tensor_parallel_split:
@@ -1036,10 +1065,22 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
                         tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)
 
                     # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-                    state_dict = load_state_dict(shard_file, tp_actions, expected_keys, device="expected")
+                    state_dict = load_state_dict(
+                        shard_file,
+                        tp_actions,
+                        expected_keys,
+                        device="expected",
+                        ckpt_quant_stage=model.config.ckpt_quant_stage,
+                    )
                 else:
                     # for pipeline model, we don't need to use tp_actions
-                    state_dict = load_state_dict(shard_file, None, expected_keys, device="expected")
+                    state_dict = load_state_dict(
+                        shard_file,
+                        None,
+                        expected_keys,
+                        device="expected",
+                        ckpt_quant_stage=model.config.ckpt_quant_stage,
+                    )
 
             returned_state_dict.update(state_dict)
             # force memory release
@@ -1052,6 +1093,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         state_dict_master_weight = load_resolved_archive_file(
             resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weights=True
         )
+
     # rename optimizer param
     for key in list(state_dict_optim.keys()):
         key_name = key.split("/")
@@ -1117,6 +1159,11 @@ def unified_optimizer_into_shards(
         static_name, type_name = generate_base_static_name(key)
         new_name = static2struct_name_mappings[static_name] + "/" + type_name
         optim_state_dict[new_name] = optim_state_dict.pop(key)
+
+    if UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value in args.unified_checkpoint_config:
+        logger.info("Skip master weight saving.")
+        master_weights = None
+
     if master_weights is not None:
         for key in list(master_weights.keys()):
             master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
@@ -1800,7 +1847,9 @@ def load_single_card_checkpoint(args, model, resume_from_checkpoint: str):
     if len(missing_keys) > 0:
         raise ValueError(f"Missing keys: {missing_keys}")
 
-    state_dict = load_state_dict(resolved_archive_file[0], None, expected_keys)
+    state_dict = load_state_dict(
+        resolved_archive_file[0], None, expected_keys, ckpt_quant_stage=model.config.ckpt_quant_stage
+    )
     error_msgs = _load_state_dict_into_model(model, state_dict, "")
     del state_dict
     gc.collect()
@@ -1830,9 +1879,13 @@ def load_single_card_optimizer(args, model, optimizer, resume_from_checkpoint: s
         )
         expected_keys_mw = sharded_metadata_mw["all_optimizer_keys"]
 
-    state_dict_optim = load_state_dict(resolved_archive_file[0], None, expected_keys)
+    state_dict_optim = load_state_dict(
+        resolved_archive_file[0], None, expected_keys, ckpt_quant_stage=model.config.ckpt_quant_stage
+    )
     if has_master_weights:
-        state_dict_optim_mw = load_state_dict(resolved_archive_file_mw[0], None, expected_keys_mw)
+        state_dict_optim_mw = load_state_dict(
+            resolved_archive_file_mw[0], None, expected_keys_mw, ckpt_quant_stage=model.config.ckpt_quant_stage
+        )
 
     for key in list(state_dict_optim.keys()):
         key_name = key.split("/")
@@ -2158,14 +2211,27 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
     filter_tensor_list = [[] for i in range(tp_size)]
 
     if tp_rank == 0:
+        quant = False
+        if model_to_save.config.ckpt_quant_stage != "O0":
+            quant = True
         tensor_bytes_dict = {}
         model_state_dict = get_expected_state_dict(model_to_save)
         for (k, v) in state_dict.items():
-            model_v = model_state_dict[k.split("/")[0]] if is_optimizer else v
-            if hasattr(model_v, "is_distributed") and model_v.is_distributed:
-                tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
+            weight_key = k.split("/")[0]
+            model_v = model_state_dict[weight_key] if is_optimizer else v
+            if not quant or not is_optimizer:
+                if hasattr(model_v, "is_distributed") and model_v.is_distributed:
+                    tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
+                else:
+                    tensor_bytes_dict[k] = v.numel().item() * dtype_byte_size(v.dtype)
             else:
-                tensor_bytes_dict[k] = v.numel().item() * dtype_byte_size(v.dtype)
+                if weight_key not in tensor_bytes_dict:
+                    tensor_bytes_dict[weight_key] = 0
+
+                if hasattr(model_v, "is_distributed") and model_v.is_distributed:
+                    tensor_bytes_dict[weight_key] += v.numel().item() * tp_size * dtype_byte_size(v.dtype)
+                else:
+                    tensor_bytes_dict[weight_key] += v.numel().item() * dtype_byte_size(v.dtype)
 
         filter_tensor_list = []
         current_block = []
@@ -2186,7 +2252,14 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
                 current_block = []
                 current_block_size = 0
 
-            current_block.append(key)
+            if not quant or not is_optimizer:
+                current_block.append(key)
+            else:
+                current_block.append(key + "/" + MOMENT1_KEYNAME)
+                current_block.append(key + "/" + MOMENT2_KEYNAME)
+                current_block.append(key + "/" + BETA1_KEYNAME)
+                current_block.append(key + "/" + BETA2_KEYNAME)
+
             current_block_size += weight_size
             total_size += weight_size
 
@@ -2485,7 +2558,10 @@ def select_model_weight_index(args, model, resume_from_checkpoint, safe_serializ
 def update_master_weight_status(args, optimizer, has_master_weight, safe_serialization):
     if is_need_master_weight(optimizer, is_fp16_or_bp16=(args.fp16 or args.bf16)):
         if not has_master_weight:
-            if UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value in args.unified_checkpoint_config:
+            if (
+                UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value in args.unified_checkpoint_config
+                or UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value in args.unified_checkpoint_config
+            ):
                 index_filename_master_weights = (
                     PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
                 )
@@ -2497,7 +2573,8 @@ def update_master_weight_status(args, optimizer, has_master_weight, safe_seriali
             else:
                 raise ValueError(
                     "Can't find a valid unified master weight checkpoint,"
-                    f"add '{UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value}' into 'unified_checkpoint_config' to "
+                    f"add '{UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value}'"
+                    f" or '{UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value}' into 'unified_checkpoint_config' to "
                     "load model checkpoint as master weight"
                 )
         else:

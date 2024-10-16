@@ -262,7 +262,9 @@ class LoRAModel(nn.Layer):
                     pre_tensor_parallel_split = True
                     tp_actions = lora_model._get_tensor_parallel_convert_actions(loaded_keys, is_split=True)
                 state_dict = load_state_dict(
-                    shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys
+                    shard_file,
+                    tp_actions if pre_tensor_parallel_split else None,
+                    expected_keys,
                 )
                 error_msgs += _load_state_dict_into_model(lora_model.model, state_dict, "")
                 del state_dict
