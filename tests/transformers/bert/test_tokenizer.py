@@ -24,6 +24,7 @@ from paddlenlp.transformers.bert.tokenizer import (
     _is_punctuation,
     _is_whitespace,
 )
+from paddlenlp.transformers.bert.tokenizer_fast import BertTokenizerFast
 
 from ...testing_utils import slow
 from ...transformers.test_tokenizer_common import (
@@ -35,6 +36,7 @@ from ...transformers.test_tokenizer_common import (
 class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = BertTokenizer
+    rust_tokenizer_class = BertTokenizerFast
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = False
@@ -206,6 +208,7 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
                 tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
+                tokenizer_r = self.rust_tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 sentence = f"A, naïve {tokenizer.mask_token} AllenNLP sentence."
                 tokens = tokenizer.encode(
@@ -254,6 +257,21 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 )
                 self.assertEqual([e[0] for e in expected_results], tokens["offset_mapping"])
 
+                tokens = tokenizer_r.encode_plus(
+                    sentence,
+                    return_attention_mask=False,
+                    return_token_type_ids=False,
+                    return_offsets_mapping=True,
+                    add_special_tokens=True,
+                )
+
+                do_lower_case = tokenizer_r.do_lower_case if hasattr(tokenizer_r, "do_lower_case") else False
+
+                self.assertEqual(
+                    [e[1] for e in expected_results], tokenizer_r.convert_ids_to_tokens(tokens["input_ids"])
+                )
+                self.assertEqual([e[0] for e in expected_results], tokens["offset_mapping"])
+
     def test_change_tokenize_chinese_chars(self):
         list_of_commun_chinese_char = ["的", "人", "有"]
         text_with_chinese_char = "".join(list_of_commun_chinese_char)
@@ -262,16 +280,22 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 if pretrained_name == "squeezebert-uncased":
                     continue
                 kwargs["tokenize_chinese_chars"] = True
-                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
+                tokenizer_p = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
+                tokenizer_r = self.rust_tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
-                ids_without_spe_char_p = tokenizer.encode(
+                ids_without_spe_char_p = tokenizer_p.encode(
+                    text_with_chinese_char, return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
+                ids_without_spe_char_r = tokenizer_r.encode(
                     text_with_chinese_char, return_token_type_ids=None, add_special_tokens=False
                 )["input_ids"]
 
-                tokens_without_spe_char_p = tokenizer.convert_ids_to_tokens(ids_without_spe_char_p)
+                tokens_without_spe_char_p = tokenizer_p.convert_ids_to_tokens(ids_without_spe_char_p)
+                tokens_without_spe_char_r = tokenizer_r.convert_ids_to_tokens(ids_without_spe_char_r)
 
                 # it is expected that each Chinese character is not preceded by "##"
                 self.assertListEqual(tokens_without_spe_char_p, list_of_commun_chinese_char)
+                self.assertListEqual(tokens_without_spe_char_r, list_of_commun_chinese_char)
 
                 # not yet supported in bert tokenizer
                 """

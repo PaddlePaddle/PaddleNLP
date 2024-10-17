@@ -750,7 +750,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
                 Additional keyword arguments passed along to the trainer from the 🤗 Tokenizers library.
 
         Returns:
-            [`PreTrainedTokenizerFast`]: A new tokenizer of the same type as the original one, trained on
+            [`PretrainedTokenizerFast`]: A new tokenizer of the same type as the original one, trained on
             `text_iterator`.
 
         """
