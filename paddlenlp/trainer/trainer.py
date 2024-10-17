@@ -2292,7 +2292,6 @@ class Trainer:
         self,
         output_dir: Optional[str] = None,
         merge_tensor_parallel: Optional[bool] = False,
-        signal_dir: Optional[str] = None,
     ):
         """
         Will save the model, so you can reload it using `from_pretrained()`.
@@ -2303,7 +2302,9 @@ class Trainer:
         if output_dir is None:
             output_dir = self.args.output_dir
 
-        if signal_dir is None:
+        if PREFIX_CHECKPOINT_DIR in output_dir:
+            signal_dir = os.path.join(self.args.output_signal_dir, os.path.split(output_dir)[-1])
+        else:
             signal_dir = self.args.output_signal_dir
 
         if ShardingOption.FULL_SHARD in self.args.sharding:
@@ -2370,11 +2371,11 @@ class Trainer:
         signal_dir = os.path.join(run_signal_dir, checkpoint_folder)
 
         if isinstance(self.model, LoRAModel) and (self.model.quantized or self.args.pipeline_parallel_degree > 1):
-            self.save_model(output_dir, False, signal_dir)
+            self.save_model(output_dir)
         elif isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
-            self.save_model(output_dir, True, signal_dir)
+            self.save_model(output_dir, True)
         else:
-            self.save_model(output_dir, False, signal_dir)
+            self.save_model(output_dir)
 
         # only save model state dict, ignore optimizer and scheduler
         if not self.args.ignore_save_lr_and_optim:
