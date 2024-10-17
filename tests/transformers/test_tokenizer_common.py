@@ -27,6 +27,8 @@ from itertools import takewhile
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+import numpy as np
+
 from paddlenlp.transformers import PretrainedTokenizer
 from paddlenlp.transformers.tokenizer_utils import AddedToken, Trie
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
@@ -1486,6 +1488,56 @@ class TokenizerTesterMixin:
                     self.assertListEqual(padded_features["attention_mask"], [[1, 1, 1, 1, 1, 0], [1, 1, 0, 0, 0, 0]])
                 else:
                     self.assertListEqual(padded_features["attention_mask"], [[1, 1, 1, 1, 1, 0], [0, 0, 0, 1, 1, 0]])
+
+    def test_padding_with_attention_mask_3D(self):
+        tokenizers = self.get_tokenizers()
+        for tokenizer in tokenizers:
+            with self.subTest(f"{tokenizer.__class__.__name__}"):
+                if tokenizer.pad_token is None:
+                    self.skipTest("No padding token.")
+                if "attention_mask" not in tokenizer.model_input_names:
+                    self.skipTest("This model does not use attention mask.")
+
+                features = [
+                    {"input_ids": [1, 2, 3, 4, 5, 6], "attention_mask": [np.triu([1, 1, 1, 1, 1, 0]).tolist()]},
+                    {"input_ids": [1, 2, 3], "attention_mask": [np.triu([1, 1, 0]).tolist()]},
+                ]
+
+                padded_features = tokenizer.pad(features)
+                if tokenizer.padding_side == "right":
+                    self.assertListEqual(
+                        padded_features["attention_mask"],
+                        [[np.triu([1, 1, 1, 1, 1, 0]).tolist()], [np.triu([1, 1, 0, 0, 0, 0]).tolist()]],
+                    )
+                else:
+                    self.assertListEqual(
+                        padded_features["attention_mask"],
+                        [[np.triu([1, 1, 1, 1, 1, 0]).tolist()], [np.triu([0, 0, 0, 1, 1, 0]).tolist()]],
+                    )
+
+    def test_padding_with_attn_mask_startend_row_indices(self):
+        tokenizers = self.get_tokenizers()
+        for tokenizer in tokenizers:
+            with self.subTest(f"{tokenizer.__class__.__name__}"):
+                if tokenizer.pad_token is None:
+                    self.skipTest("No padding token.")
+                if "attn_mask_startend_row_indices" not in tokenizer.model_input_names:
+                    self.skipTest("This model does not use attn_mask_startend_row_indices.")
+
+                features = [
+                    {"input_ids": [1, 2, 3, 4, 5, 6], "attn_mask_startend_row_indices": [5, 5, 5, 5, 5, 0]},
+                    {"input_ids": [1, 2, 3], "attn_mask_startend_row_indices": [2, 2, 0]},
+                ]
+
+                padded_features = tokenizer.pad(features)
+                if tokenizer.padding_side == "right":
+                    self.assertListEqual(
+                        padded_features["attn_mask_startend_row_indices"], [[[5, 5, 5, 5, 5, 0]], [[2, 2, 0, 0, 0, 0]]]
+                    )
+                else:
+                    self.assertListEqual(
+                        padded_features["attn_mask_startend_row_indices"], [[[5, 5, 5, 5, 5, 0]], [[0, 0, 0, 5, 5, 3]]]
+                    )
 
     def test_encode_plus_with_padding(self):
         tokenizers = self.get_tokenizers(do_lower_case=False)

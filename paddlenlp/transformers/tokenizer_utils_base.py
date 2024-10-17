@@ -3196,7 +3196,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                             pad_width=[(0, 0), (0, difference), (0, difference)],
                             mode="constant",
                             constant_values=0,
-                        )
+                        ).tolist()
                     else:
                         encoded_inputs["attention_mask"] = encoded_inputs["attention_mask"] + [0] * difference
                 if "attn_mask_startend_row_indices" in encoded_inputs:
@@ -3207,7 +3207,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                             np.zeros([1, difference], dtype=np.int32),
                         ],
                         axis=-1,
-                    )
+                    ).tolist()
                 if "token_type_ids" in encoded_inputs:
                     encoded_inputs["token_type_ids"] = (
                         encoded_inputs["token_type_ids"] + [self.pad_token_type_id] * difference
@@ -3233,7 +3233,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                             pad_width=[(0, 0), (difference, 0), (difference, 0)],
                             mode="constant",
                             constant_values=0,
-                        )
+                        ).tolist()
                     else:
                         encoded_inputs["attention_mask"] = [0] * difference + encoded_inputs["attention_mask"]
                 if "attn_mask_startend_row_indices" in encoded_inputs:
@@ -3244,7 +3244,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                             np.array([encoded_inputs["attn_mask_startend_row_indices"]], dtype=np.int32) + difference,
                         ],
                         axis=-1,
-                    )
+                    ).tolist()
                 if "token_type_ids" in encoded_inputs:
                     encoded_inputs["token_type_ids"] = [self.pad_token_type_id] * difference + encoded_inputs[
                         "token_type_ids"
@@ -3262,7 +3262,14 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
             else:
                 raise ValueError("Invalid padding strategy:" + str(self.padding_side))
+        else:
+            if "attn_mask_startend_row_indices" in encoded_inputs:
+                if len(np.shape(encoded_inputs["attn_mask_startend_row_indices"])) == 1:
+                    encoded_inputs["attn_mask_startend_row_indices"] = [
+                        encoded_inputs["attn_mask_startend_row_indices"]
+                    ]
 
+        assert len(np.shape(encoded_inputs["attn_mask_startend_row_indices"])) == 2
         return encoded_inputs
 
     def convert_tokens_to_string(self, tokens: List[str]) -> str:
