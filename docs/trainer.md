@@ -725,6 +725,11 @@ Trainer 是一个简单，但功能完整的 Paddle 训练和评估模块，并�
                            async_save, enable asynchronous saving checkpoints to disk.
                            enable_all_options, enable all unified checkpoint optimization configs.
 
+  --enable_optimizer_timer
+                       是否开启Optimzier的timer 统计。（可选，默认为False，不开启）
+                       Whether to enable Optimzier's timer profiler.
+                       (optional, default is False, not enabled)
+
   --skip_memory_metrics
                        是否跳过内存profiler检测。（可选，默认为True，跳过）
                        Whether or not to skip adding of memory profiler reports
