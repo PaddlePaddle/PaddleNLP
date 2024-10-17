@@ -91,15 +91,11 @@ class DPOConfig:
 
     beta: float = field(default=0.1, metadata={"help": "the beta parameter for DPO loss"})
     simpo_gamma: float = field(default=0.5, metadata={"help": "the gamma parameter for SimPO loss"})
-    normalize_logps: bool = field(
-        default=True,
-        metadata={"help": "Apply logprobs normalization."},
-    )
     label_smoothing: float = field(default=0.0, metadata={"help": "label_smoothing ratio"})
     loss_type: str = field(default="sigmoid", metadata={"help": "DPO loss type"})
     pref_loss_ratio: float = field(default=1.0, metadata={"help": "DPO loss ratio"})
     sft_loss_ratio: float = field(default=0.0, metadata={"help": "SFT loss ratio"})
-    dpop_lambda: float = field(default=50, metadata={"help": "SFT loss ratio"})
+    dpop_lambda: float = field(default=50, metadata={"help": "dpop_lambda"})
     ref_model_update_steps: int = field(default=-1, metadata={"help": "Update ref model state dict "})
     reference_free: bool = field(default=False, metadata={"help": "No reference model."})
     lora: bool = field(default=False, metadata={"help": "Use LoRA model."})

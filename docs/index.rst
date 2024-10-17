@@ -57,6 +57,7 @@
    大模型统一存储文档 <llm/docs/unified_checkpoint.md>
    混合并行训练教程 <llm/docs/llm_trainer.rst>
    模型权重转换教程 <llm/docs/torch2paddle.md>
+   大模型DPO文档 <llm/docs/dpo.md>
 
 .. toctree::
    :maxdepth: 1

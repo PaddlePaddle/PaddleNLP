@@ -6,7 +6,7 @@
     "gradient_accumulation_steps": 2,
     "per_device_eval_batch_size": 8,
     "eval_accumulation_steps":16,
-    "num_train_epochs": 3,
+    "num_train_epochs": 1,
     "learning_rate": 3e-05,
     "warmup_steps": 30,
     "logging_steps": 1,

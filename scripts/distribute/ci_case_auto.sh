@@ -38,6 +38,7 @@ function is_a100() {
 
 IS_A100=$(is_a100)
 
+# NOTE: Please place the new tests as much as possible after the existing tests
 function llama_case_list_auto() {
     llama_dygraph_auto_bs8_fp32_DP2
     llama_dygraph_auto_bs8_fp32_DP2-MP2
@@ -52,8 +53,9 @@ function llama_case_list_auto() {
     # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2
     # llama_static_auto_recompute_bs16_fp32_DP2-MP2-PP2-VPP2-Sharding2_stage2
     # llama_static_auto_recompute_bs16_fp16_DP2-MP2-PP2-VPP2-Sharding2_stage2
-    llama_pir_auto_fuse_ffn_attention_qkv_MP2
+    
     llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
+    llama_pir_auto_fuse_ffn_attention_qkv_MP2
     llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP
     llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP
@@ -1163,6 +1165,7 @@ function llama_pir_auto_fuse_ffn_attention_qkv_MP2() {
         loss_base=10.27925682
     fi
     check_result $FUNCNAME ${loss_base} ${auto_loss} ${ips_base} ${auto_ips} ${mem_base} ${auto_mem}
+    export FLAGS_enable_fused_ffn_qkv_pass=0
     echo "=========== $FUNCNAME run  end ==========="
 }
 
