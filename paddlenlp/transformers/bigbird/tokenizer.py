@@ -21,7 +21,7 @@ import sentencepiece as spm
 
 from paddlenlp.data.vocab import Vocab
 
-from ..albert_english.tokenizer import AlbertEnglishTokenizer
+from ..albert.tokenizer import AlbertEnglishTokenizer
 
 __all__ = ["BigBirdTokenizer"]
 

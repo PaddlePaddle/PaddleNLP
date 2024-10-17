@@ -16,8 +16,10 @@
 import os
 import unittest
 
-from paddlenlp.transformers.albert_chinese.tokenizer import AlbertChineseTokenizer
-from paddlenlp.transformers.albert_english.tokenizer import AlbertEnglishTokenizer
+from paddlenlp.transformers.albert.tokenizer import (
+    AlbertChineseTokenizer,
+    AlbertEnglishTokenizer,
+)
 from paddlenlp.transformers.bert.tokenizer import BasicTokenizer, WordpieceTokenizer
 
 from ...testing_utils import get_tests_dir, slow

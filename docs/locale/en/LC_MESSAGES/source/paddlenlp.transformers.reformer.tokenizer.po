@@ -22,7 +22,7 @@ msgid "tokenizer"
 msgstr ""
 
 #: of paddlenlp.transformers.reformer.tokenizer.ReformerTokenizer:1
-msgid "基类：:class:`paddlenlp.transformers.albert_english.tokenizer.AlbertEnglishTokenizer`"
+msgid "基类：:class:`paddlenlp.transformers.albert.tokenizer.AlbertEnglishTokenizer`"
 msgstr ""
 
 #: of paddlenlp.transformers.reformer.tokenizer.ReformerTokenizer:1
