@@ -73,19 +73,16 @@ void find_candidate_pred_tokens(const int64_t *input_ids,
             auto sum_token_num = sum(seq_lens_this_time, batch_idx);
             int left_min_token_num = real_batch_size - batch_idx;
 
-            // printf("threshold %d\n", threshold);
-
             if (sum_token_num + max_draft_tokens + left_min_token_num > threshold) {
                 int tmp_max_draft_tokens = threshold - sum_token_num - left_min_token_num;
                 max_draft_tokens = tmp_max_draft_tokens < max_draft_tokens ? tmp_max_draft_tokens : max_draft_tokens;
             }
-            // printf("sum_token_num + left_min_token_num %d \n", sum_token_num + left_min_token_num);
+
             if (sum_token_num + left_min_token_num >= threshold - 1) {
                 continue;
             }
         }
 
-        // printf("finish preprocess\n");
 
         for (int ngram_size = max_ngram_size; ngram_size > 0; --ngram_size) {
             // Extract the last n tokens as our search ngram
@@ -113,8 +110,6 @@ void find_candidate_pred_tokens(const int64_t *input_ids,
                     }
                 }
                 if (match) {
-                    // printf("batch %d match\n", batch_idx);
-                    // Find a valid continuation
                     int64_t start_idx = i + ngram_size;
                     int64_t end_idx = std::min(start_idx + max_draft_tokens, cur_input_ids_len);
                     if (start_idx >= end_idx)

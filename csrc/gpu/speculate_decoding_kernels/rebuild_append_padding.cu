@@ -55,7 +55,6 @@ std::vector<paddle::Tensor> LaunchRebuildAppendPadding(const paddle::Tensor& inp
                                                     const paddle::Tensor& output_padding_offset,
                                                     int max_seq_len,
                                                     int dim_embed) {
-    printf("you got into here");
     typedef PDTraits<D> traits_;
     typedef typename traits_::DataType DataType_;
     typedef typename traits_::data_t data_t;

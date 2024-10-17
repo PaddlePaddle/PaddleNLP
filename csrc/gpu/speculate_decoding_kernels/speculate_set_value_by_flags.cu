@@ -31,11 +31,9 @@ __global__ void speculate_set_value_by_flag_and_id(int64_t *pre_ids_all,
         const int seq_len_dec = seq_lens_decoder[tid];
         const int seq_len_enc = seq_lens_encoder[tid];
         if (seq_len_dec == 0 && seq_len_enc == 0) return; // stoped
-        // printf("step_idx[tid] %d\n", step_idx[tid]);
         if (step_idx[tid] >= 0) {
             for (int i = 0; i < accept_num[tid]; i++) {
                 pre_ids_all_now[step_idx[tid] - i] = accept_tokens_now[accept_num[tid] - 1 - i];
-                // printf("pre_ids_all_now[step_idx[tid] - i] %d \n", pre_ids_all_now[step_idx[tid] - i]);
             }
         }
     }
@@ -49,7 +47,6 @@ void SpeculateSetValueByFlagsAndIdx(const paddle::Tensor& pre_ids_all,
                            const paddle::Tensor& seq_lens_encoder,
                            const paddle::Tensor& seq_lens_decoder,
                            const paddle::Tensor& step_idx ) {
-    // printf("enter set value \n");
     auto cu_stream = stop_flags.stream();
     std::vector<int64_t> pre_ids_all_shape = pre_ids_all.shape();
     

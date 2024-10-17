@@ -28,7 +28,6 @@ __global__ void speculate_clear_accept_nums_kernel(
 void SpeculateClearAcceptNums(const paddle::Tensor& accept_num,
                    const paddle::Tensor& seq_lens_decoder
                    ) {
-    // printf("enter clear \n");
     const int max_bsz = seq_lens_decoder.shape()[0];
     speculate_clear_accept_nums_kernel<<<1, 1024, 0, accept_num.stream()>>>(const_cast<int*>(accept_num.data<int>()),
                                                                             seq_lens_decoder.data<int>(), max_bsz);
