@@ -132,12 +132,13 @@ class PredictorArgument:
         },
     )
 
-    @property
-    def total_max_length(self):
+    total_max_length: int = field(
+        default=8192, metadata={"help": "Super parameter. Maximum sequence length(encoder+decoder)."}
+    )
+
+    def __post_init__(self):
         if self.device == "npu":
-            return self.src_length + self.max_length
-        else:
-            return 8192  # Maximum sequence length.
+            self.total_max_length = self.src_length + self.max_length
 
 
 @dataclass
@@ -1346,6 +1347,7 @@ def create_predictor(
                 )
                 model.eval()
             elif "chatglmv2forcausallm" in config.architectures[0].lower():
+                predictor_args.total_max_length = config.seq_length
                 if predictor_args.block_attn:
                     config.block_size = predictor_args.block_size
                     config.max_seq_len = predictor_args.total_max_length
@@ -1519,6 +1521,7 @@ def create_predictor(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "chatglmv2forcausallm" in config.architectures[0].lower():
+                predictor_args.total_max_length = config.seq_length
                 if predictor_args.block_attn:
                     config.block_size = predictor_args.block_size
                     config.max_seq_len = predictor_args.total_max_length
