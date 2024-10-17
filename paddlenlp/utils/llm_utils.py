@@ -781,7 +781,7 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
     logger.info("Finish read result message")
 
 
-def get_rotary_position_embedding(position_ids, head_dim, rope_theta=10000.0, rope_scaling: dict = None):
+def get_rotary_position_embedding(position_ids, head_dim, rope_type, rope_theta=10000.0, rope_scaling: dict = None):
     """
     Pre-calculate rotary position embedding for position_ids.
 
@@ -793,6 +793,32 @@ def get_rotary_position_embedding(position_ids, head_dim, rope_theta=10000.0, ro
         rot_emb: [2, 1, S, 1, D], cos + sin
     """
     bsz, max_seq_len = position_ids.shape[:2]
+
+    if rope_type == "chatglm2":
+        theta = 1.0 / (10000 ** (paddle.arange(0, head_dim // 2, 2, dtype="float32") / (head_dim // 2)))
+        seq_idx = paddle.arange(0, max_seq_len, dtype="float32")
+        idx_theta = paddle.outer(seq_idx, theta).astype(paddle.get_default_dtype())
+
+        rotary_pos_emb = paddle.stack([paddle.cos(idx_theta), paddle.sin(idx_theta)], axis=-1)
+        rotary_pos_emb = rotary_pos_emb.astype("float16")
+        rotary_pos_emb = rotary_pos_emb[position_ids]
+        rotary_pos_emb = rotary_pos_emb[:, :max_seq_len, :, :]
+
+        ones = paddle.ones([bsz, max_seq_len, head_dim // 4], dtype="float16")
+        zeros = paddle.zeros([bsz, max_seq_len, head_dim // 4], dtype="float16")
+        # make it to be [2, batch, seq_len, rotary_dim]
+        rotary_pos_emb = rotary_pos_emb.transpose([3, 0, 1, 2])
+        # The following code is for consistency with PaddleNLP/csrc/generation/encode_rotary_qk.cu, so boring.
+        cos = rotary_pos_emb[0]
+        sin = rotary_pos_emb[1]
+        cos = paddle.concat([cos, ones], axis=-1)
+        sin = paddle.concat([sin, zeros], axis=-1)
+        rotary_pos_emb = paddle.stack([cos, sin], axis=0)
+        rotary_pos_emb = (
+            rotary_pos_emb.unsqueeze(-1).tile([1, 1, 1, 1, 2]).reshape([2, bsz, max_seq_len, head_dim])
+        )
+        return paddle.cast(rotary_pos_emb, "float32")
+
     rot_emb = paddle.zeros((2, bsz, max_seq_len, 1, head_dim), dtype="float32")
     inv_freq = rope_theta ** (-paddle.arange(0, head_dim, 2, dtype="float32") / head_dim)
 
