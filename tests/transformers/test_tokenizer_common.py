@@ -1510,9 +1510,11 @@ class TokenizerTesterMixin:
                         [[np.triu([1, 1, 1, 1, 1, 0]).tolist()], [np.triu([1, 1, 0, 0, 0, 0]).tolist()]],
                     )
                 else:
+                    attention_mask2 = np.triu([0, 0, 0, 1, 1, 0])
+                    attention_mask2[:3] = 0
                     self.assertListEqual(
                         padded_features["attention_mask"],
-                        [[np.triu([1, 1, 1, 1, 1, 0]).tolist()], [np.triu([0, 0, 0, 1, 1, 0]).tolist()]],
+                        [[np.triu([1, 1, 1, 1, 1, 0]).tolist()], [attention_mask2.tolist()]],
                     )
 
     def test_padding_with_attn_mask_startend_row_indices(self):
