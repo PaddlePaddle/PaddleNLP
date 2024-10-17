@@ -20,7 +20,7 @@ from shutil import copyfile
 
 import sentencepiece as spm
 
-from .. import PretrainedTokenizer, BertTokenizer, AddedToken
+from .. import AddedToken, BertTokenizer, PretrainedTokenizer
 
 __all__ = ["AlbertTokenizer"]
 

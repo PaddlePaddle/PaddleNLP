@@ -43,9 +43,7 @@ if TYPE_CHECKING:
 else:
     TOKENIZER_MAPPING_NAMES = OrderedDict(
         [
-            ("albert", "AlbertTokenizer"),
-            ("albert_chinese", "AlbertChineseTokenizer"),
-            ("albert_english", "AlbertEnglishTokenizer"),
+            ("albert", (("AlbertTokenizer", "AlbertChineseTokenizer", "AlbertEnglishTokenizer"),)),
             ("bart", "BartTokenizer"),
             ("bert", "BertTokenizer"),
             ("blenderbot", "BlenderbotTokenizer"),
@@ -74,8 +72,7 @@ else:
             ),
             ("luke", "LukeTokenizer"),
             ("mamba", "MambaTokenizer"),
-            ("mbart", "MBartTokenizer"),
-            ("mbart50", "MBart50Tokenizer"),
+            ("mbart", (("MBartTokenizer", "MBart50Tokenizer"),)),
             ("mobilebert", "MobileBertTokenizer"),
             ("mpnet", "MPNetTokenizer"),
             ("nezha", "NeZhaTokenizer"),
@@ -141,7 +138,22 @@ def tokenizer_class_from_name(class_name: str):
         return PretrainedTokenizerFast
 
     for module_name, tokenizers in TOKENIZER_MAPPING_NAMES.items():
-        if class_name in tokenizers:
+        all_tokenizers = []
+        if isinstance(tokenizers, tuple):
+            if len(tokenizers) == 2:
+                tokenizer_slow, tokenizer_fast = tokenizers
+            else:
+                tokenizer_slow = tokenizers[0]
+                tokenizer_fast = None
+            if isinstance(tokenizer_slow, tuple):
+                all_tokenizers.extend(tokenizer_slow)
+            else:
+                all_tokenizers.append(tokenizer_slow)
+            if tokenizer_fast is not None:
+                all_tokenizers.append(tokenizer_fast)
+        else:
+            all_tokenizers.append(tokenizers)
+        if class_name in all_tokenizers:
             module_name = model_type_to_module_name(module_name)
             try:
                 module = importlib.import_module(f".{module_name}", "paddlenlp.transformers")
