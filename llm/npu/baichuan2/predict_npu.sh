@@ -1,26 +1,26 @@
-# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
-#
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+# 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-#
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
+# 
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .bloom import *
-from .chatglm import *
-from .chatglm_v2 import *
-from .chatglm_v3 import *
-from .fused_transformer_layers import *
-from .gpt import *
-from .llama import *
-from .mixtral import *
-from .opt import *
-from .qwen import *
-from .qwen2 import *
-from .qwen2_moe import *
+set -x
+
+model_path=${1:-"./output/sft_tf16_baichuan_N1C8/inference"}
+
+source /usr/local/Ascend/ascend-toolkit/set_env.sh
+source /usr/local/Ascend/atb/set_env.sh
+model_path=`realpath $model_path`
+
+cd ../../
+export PYTHONPATH=../:$PYTHONPATH
+python predict/predictor.py  --model_name_or_path ${model_path} --inference_model --dtype "float16" --mode "static" --block_attn --device npu
+cd -
