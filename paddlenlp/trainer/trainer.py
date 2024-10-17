@@ -16,6 +16,11 @@
 # This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer.py
 
+#####################################
+from paddleapex import Tracer
+checker = Tracer()
+#####################################
+
 import collections
 import contextlib
 import inspect
@@ -969,6 +974,11 @@ class Trainer:
 
             step = -1
             for step, inputs in enumerate(epoch_iterator):
+
+                #####################################
+                checker.start_in_training(step, self.args.gradient_accumulation_steps)
+                #####################################
+
                 if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
                     inputs = split_inputs_sequence_dim(inputs)
                 if self.args.use_hybrid_parallel and self.args.context_parallel_degree > 1:
@@ -1203,6 +1213,10 @@ class Trainer:
 
                 if self.args.ignore_data_skip:
                     self.timers and self.timers("read-data").start()
+
+                #####################################
+                checker.stop_in_training()
+                #####################################
 
             if step < 0:
                 logger.warning(
