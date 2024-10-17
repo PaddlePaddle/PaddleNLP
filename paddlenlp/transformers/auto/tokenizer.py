@@ -143,13 +143,11 @@ def tokenizer_class_from_name(class_name: str):
     for module_name, tokenizers in TOKENIZER_MAPPING_NAMES.items():
         if class_name in tokenizers:
             module_name = model_type_to_module_name(module_name)
-            print(f"module_name: {module_name}")
             try:
                 module = importlib.import_module(f".{module_name}", "paddlenlp.transformers")
                 return getattr(module, class_name)
             except AttributeError:
                 try:
-                    print(f"module: {module}")
                     module = importlib.import_module(f".{module_name}.tokenizer", "paddlenlp.transformers")
 
                     return getattr(module, class_name)
