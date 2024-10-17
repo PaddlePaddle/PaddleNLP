@@ -408,6 +408,8 @@ def main():
 
     # Detecting last checkpoint.
     last_checkpoint = None
+    node_rank = paddle.distributed.fleet.rank() // 8
+    training_args.output_dir = os.path.join("/home/dist/baidu_test", f"node_{node_rank}", training_args.output_dir)
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
         # if last_checkpoint is None and len(
