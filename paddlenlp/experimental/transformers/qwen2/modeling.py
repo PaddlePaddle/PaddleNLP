@@ -450,7 +450,7 @@ class Qwen2InferenceModel(Qwen2PretrainedModel):
                     weight_scales_loader = EmptyWeightScale(
                         weight_scale_map_dict,
                         num_of_layers=self.config.num_hidden_layers,
-                        num_head=self.num_attention_heads,
+                        num_heads=self.num_attention_heads,
                         dim_head=self.hidden_size // self.num_attention_heads,
                         ffn_hidden_size=self.intermediate_size,
                         num_key_value_heads=self.num_key_value_heads,
