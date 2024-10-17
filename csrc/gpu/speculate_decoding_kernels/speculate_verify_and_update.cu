@@ -100,7 +100,7 @@ __global__ void speculate_verify_and_update_kernel(int64_t* accept_tokens,
 
         if (stop_flags[bid]) {
             stop_flag_now_int = 1;
-        } else { // 这里prefill阶段也会进入，但是因为draft tokens会置零，因此会直接到最后的采样阶段
+        } else { // Here the prefill stage also goes in, but since the draft tokens are zero in prefill stage, it goes straight to the final sampling stage.
             auto* verify_tokens_now = verify_tokens + start_token_id * max_candidate_len;
             auto* draft_tokens_now = draft_tokens + bid * max_draft_tokens;
             auto* actual_candidate_len_now = actual_candidate_len + start_token_id;
@@ -175,11 +175,7 @@ __global__ void speculate_verify_and_update_kernel(int64_t* accept_tokens,
                     }
                 }
             }
-            // Wang: 这里是大模型补一个的逻辑？
-            // sampling阶段
-            // 第一种，draft_token[i+1]被拒绝，需要从verify_tokens_now[i]中选一个
-            // 第二种，i == seq_lens_this_time[bid]-1, 也是从verify_tokens_now[i]中选一个
-            // 但是停止的情况不算
+
             if (!stop_flag_now_int) {
                 int64_t accept_token;
                 const float* verify_scores_now = verify_scores + start_token_id * max_candidate_len;
@@ -207,10 +203,8 @@ __global__ void speculate_verify_and_update_kernel(int64_t* accept_tokens,
 
             seq_lens_decoder[bid] += accept_num_now;
 
-            //Wang: so actual_draft_token_nums 是动态调整过后的实际每轮生成的 draft token数目
-            // Wang: 下面是动态更新 draft token 数目的逻辑
-            if (seq_lens_this_time[bid] > 1 &&
-                    seq_lens_encoder[bid] == 0) { // 对于append模式，需要根据接收与否确定是否要降低下次draft token的数量
+            // For append mode, determine whether to reduce the number of draft tokens depending on whether they are received or not.
+            if (seq_lens_this_time[bid] > 1 && seq_lens_encoder[bid] == 0) {
                 auto current_actual_draft_token_num = actual_draft_token_nums[bid];
                 if (accept_num_now - 1 == current_actual_draft_token_num) {
                     if (current_actual_draft_token_num + 2 <= max_draft_tokens - 1) {

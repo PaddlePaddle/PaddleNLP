@@ -58,6 +58,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
     FusedSpeculateMultiTransformer,
+    FusedSpeculateMultiTransformerA8W8,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationAvxInferenceModel,
@@ -1681,7 +1682,6 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
 @register_base_model
 class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
     def set_transformer_block(self, transformer_config):
-        # TODO(Wanglongzhi2001): check whether support quant for speculate decoding
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
         elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
@@ -1690,12 +1690,21 @@ class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
             self.transformer_block = FusedBlockMultiTransformerFP8(transformer_config)
         else:
             self.transformer_block = FusedSpeculateMultiTransformer(transformer_config)
-        print("self.transformer_block: ", self.transformer_block)
 
     def remove_padding(self, input_ids, draft_tokens, seq_lens_this_time, seq_lens_encoder):
         """
-        remove_padding的重载，使用speculate_get_padding_offset算子，与基类的区别在于decoder为append场景
-        投机采样解码阶段每个 batch 的实际 draft tokens 数目可能不同，所以需要一个适配投机采样的decoder阶段的 remove_padding
+        The overloading of remove_padding, using the speculate_get_padding_offset operator, 
+        differs from the base class in that the decoder is the append scenario. The actual 
+        number of draft tokens for each batch in the speculative sampling decoding stage may 
+        be different, so we need a remove_padding adapted to the speculative sampling decoder stage.
+
+        Args:
+            input_ids (Tensor): the input sequence IDs tensor.
+            draft_tokens (Tensor): the draft tokens tensor.
+            seq_lens_this_time (Tensor): the sequence lengths of this time step.
+            seq_lens_encoder (Tensor): the sequence lengths of encoder stage.
+        Returns:
+            Tuple[Tensor]: the removed padding IDs, padding offsets, cumulative offsets, 
         """
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
@@ -1715,7 +1724,6 @@ class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
         output_hidden_states=None,
         return_dict=False,
         draft_tokens=None,
-        # output_padding_offset=None,
         **kwargs,
     ):
         seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
@@ -1724,8 +1732,6 @@ class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
         ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
             input_ids, draft_tokens, seq_lens_this_time, seq_lens_encoder
         )
-        print("ids_remove_padding: ", ids_remove_padding)
-        print("seq_lens_this_time: ", seq_lens_this_time)
         kwargs["cu_seqlens_q"] = cu_seqlens_q
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
@@ -1733,8 +1739,6 @@ class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
 
         seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
         inputs_embeds = self.embed_tokens(ids_remove_padding)
-        print("seq_lens_encoder: ", seq_lens_encoder)
-        print("seq_lens_decoder: ", seq_lens_decoder)
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
                 input_ids=input_ids,
@@ -2235,10 +2239,10 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
 
         return model_inputs
 
-    # 与对input的变长处理一致，只不过需要把prefill阶段的token_num设置为1，无法复用输入的，因此重新生成
     def get_output_padding_offset(self, seq_lens_this_time, seq_lens_encoder, seq_lens_decoder):
         """
-        get_output_padding_offset
+        In the senerio of speculate decoding, the length of output token after rebuild_padding is no longer bsz.
+        So we need to calculate the output_padding_offset after rebuild_padding.
         """
         seq_lens_output = speculate_get_seq_lens_output(seq_lens_this_time, seq_lens_encoder, seq_lens_decoder)
         out_token_num = paddle.sum(seq_lens_output)
@@ -2327,10 +2331,8 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
             verify_scores, verify_tokens, actual_candidate_len = top_p_candidates(
                 probs, top_p, model_kwargs["output_padding_offset"], self.max_candidate_len, self.max_seq_len
             )  # [token_num, max_candidate_len]
-            print("verify_tokens: ", verify_tokens)
-            ###################################
-            ### Speculate Verify And Update ###
-            ###################################
+
+            # Speculate Verify And Update
             speculate_verify_and_update(
                 model_kwargs["accept_tokens"],
                 model_kwargs["accept_num"],
@@ -2339,8 +2341,8 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
                 model_kwargs["seq_lens_decoder"],
                 model_kwargs["stop_flags"],
                 model_kwargs["not_need_stop"],
-                model_kwargs["draft_tokens"],  # 既是输入又是输出，需要把接收的最后1个token写入到第0个位置
-                model_kwargs["seq_lens_this_time"],  # 输入
+                model_kwargs["draft_tokens"],  # Both input and output, need to write the last 1 token accepted to position 0.
+                model_kwargs["seq_lens_this_time"],
                 verify_tokens,
                 verify_scores,
                 model_kwargs["max_dec_len"],
@@ -2354,9 +2356,9 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
                 self.verify_window,
                 True,  # enable_topp
             )
-            print("accept_tokens: ", model_kwargs["accept_tokens"])
-            print("accept_num: ", model_kwargs["accept_num"])
-            # Streaming output
+
+            # Since the output token length is not bsz anymore, we need to change the token_num 
+            # in the msg queue and write accept_num tokens into the msg queue.
             speculate_save_output(
                 model_kwargs["accept_tokens"],
                 model_kwargs["accept_num"],

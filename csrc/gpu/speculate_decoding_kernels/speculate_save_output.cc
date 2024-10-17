@@ -71,7 +71,7 @@ void SpeculateSaveWithOutputMsg(const paddle::Tensor& accept_tokens,
         }
     }
     if ((msgsnd(msgid, &msg_sed, (MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2) * 4, 0)) == -1) {
-    //   printf("full msg buffer\n");
+        printf("full msg buffer\n");
     }
     return;
 }

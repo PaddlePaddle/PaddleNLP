@@ -1191,9 +1191,11 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
     @paddle.no_grad()
     def predict(self, input_texts: list[str], return_tokens=False):
         self._preprocess(input_texts)
+
+        # Parameters such as seq_lens_encoder have been set in the preprocessor function, 
+        # then we use them to init the proposer's args
         self.init_proposer_args()
 
-        # logger.info(f'prompt tokens: {self.model_inputs["input_ids"].tolist()}')
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
         done_event = mp.Event()
@@ -1240,11 +1242,8 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
 
     def _preprocess(self, input_text: list[str]):
         super()._preprocess(input_text)
-        # # TODO(Wanglongzhi2001): 内部这里写的有问题？直接.cpu 就行
-        # self.model_inputs["input_ids_cpu"] = self.model_inputs["input_ids"].cpu()
 
         for bid in range(self.config.batch_size):
-            # speculate_update_input_ids_cpu(self.model_inputs["input_ids_cpu"], self.model_inputs["seq_lens_this_time"], input_ids[bid], bid, self.args.max_seq_len)
             self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
                 self.model_inputs["seq_lens_this_time"][bid] - 1
             ]  # get the last token before padding of this batch
@@ -1263,9 +1262,6 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
         if self.config.speculate_method == "inference_with_reference":
             self.proposer.input_ids_cpu = self.model_inputs["input_ids"].cpu()
             self.proposer.input_ids_len = self.model_inputs["seq_lens_encoder"].astype("int64").cpu()
-            # self.model_inputs["input_ids_cpu"] = paddle.full(
-            #     shape=[self.config.batch_size, self.config.max_length], fill_value=1, dtype="int64"
-            # ).cpu()
 
 
 class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
@@ -1300,23 +1296,11 @@ class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
         )
         if self.config.speculate_method == "inference_with_reference":
             self.proposer.input_ids_cpu = self.model_inputs["input_ids"].cpu()
-            # self.model_inputs["input_ids_cpu"] = paddle.full(
-            #     shape=[self.config.batch_size, self.config.max_length], fill_value=1, dtype="int64"
-            # ).cpu()
-
-    # if self.config.speculate_method == "inference_with_reference":
-    # ngram_match in inference_with_reference run on cpu, so we need to put input_ids on cpu
-    # self.model_inputs["input_ids_cpu"] = paddle.full(
-    #     shape=[self.config.batch_size, self.config.max_length], fill_value=1, dtype="int64"
-    # ).cpu()
 
     def _preprocess(self, input_text: list[str]):
         super()._preprocess(input_text)
-        # # TODO(Wanglongzhi2001): 内部这里写的有问题？直接.cpu 就行
-        # self.model_inputs["input_ids_cpu"] = self.model_inputs["input_ids"].cpu()
 
         for bid in range(self.config.batch_size):
-            # speculate_update_input_ids_cpu(self.model_inputs["input_ids_cpu"], self.model_inputs["seq_lens_this_time"], input_ids[bid], bid, self.args.max_seq_len)
             self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
                 self.model_inputs["seq_lens_this_time"][bid] - 1
             ]  # get the last token before padding of this batch
@@ -1324,6 +1308,9 @@ class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
     def predict(self, input_texts: list[str], return_tokens=False):
         s_time = time.time()
         self._preprocess(input_texts)
+
+        # Parameters such as seq_lens_encoder have been set in the preprocessor function, 
+        # then we use them to init the proposer's args
         self.init_proposer_args()
         logger.info(f"preprocess spend {time.time()  -  s_time}")
 
@@ -1359,6 +1346,7 @@ class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
                     real_batch_size=self.batch_size,
                     seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
                 )
+            # 2. run target model
             self.predictor.run()
         logger.info(f"running spend {time.time()  -  s_time}")
 
@@ -1388,24 +1376,12 @@ def get_ptq_multicards_num(directory):
     return count
 
 
-def check_predictor_args(predictor_args: PredictorArgument):
-    if predictor_args.speculate_method is not None:
-        if predictor_args.block_attn:
-            raise ValueError(
-                "speculate_decoding not use block attention, "
-                "if you want to use speculate_decoding, please set block_attn=False"
-            )
-        assert predictor_args.speculate_max_draft_tokens > 0 and predictor_args.speculate_max_ngram_size > 0
-
-
 def create_predictor(
     predictor_args: PredictorArgument,
     model_args: ModelArgument,
     tensor_parallel_degree: int = 1,
     tensor_parallel_rank: int = 0,
 ):
-    check_predictor_args(predictor_args)
-
     tokenizer = AutoTokenizer.from_pretrained(
         predictor_args.model_name_or_path,
     )
