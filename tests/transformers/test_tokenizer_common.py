@@ -1531,12 +1531,18 @@ class TokenizerTesterMixin:
 
                 padded_features = tokenizer.pad(features)
                 if tokenizer.padding_side == "right":
-                    self.assertListEqual(
-                        padded_features["attn_mask_startend_row_indices"], [[[5, 5, 5, 5, 5, 0]], [[2, 2, 0, 0, 0, 0]]]
+                    assert np.array_equal(
+                        padded_features["attn_mask_startend_row_indices"][0], np.array([[5, 5, 5, 5, 5, 0]], np.int32)
+                    )
+                    assert np.array_equal(
+                        padded_features["attn_mask_startend_row_indices"][1], np.array([[2, 2, 0, 0, 0, 0]], np.int32)
                     )
                 else:
-                    self.assertListEqual(
-                        padded_features["attn_mask_startend_row_indices"], [[[5, 5, 5, 5, 5, 0]], [[0, 0, 0, 5, 5, 3]]]
+                    assert np.array_equal(
+                        padded_features["attn_mask_startend_row_indices"][0], np.array([[5, 5, 5, 5, 5, 0]], np.int32)
+                    )
+                    assert np.array_equal(
+                        padded_features["attn_mask_startend_row_indices"][1], np.array([[0, 0, 0, 5, 5, 3]], np.int32)
                     )
 
     def test_encode_plus_with_padding(self):
