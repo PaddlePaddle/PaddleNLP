@@ -1577,7 +1577,8 @@ void MultiQueryAppendC8Attention(
                                                        num_frags_x,
                                                        num_frags_z,
                                                        num_frags_y,
-                                                       OUT_NV_TYPE>;
+                                                       OUT_NV_TYPE,
+                                                       ENABLE_PREFILL>;
     if (smem_size >= 48 * 1024) {
       cudaFuncSetAttribute(split_kv_kernel,
                            cudaFuncAttributeMaxDynamicSharedMemorySize,

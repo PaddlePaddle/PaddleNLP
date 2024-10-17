@@ -1094,6 +1094,7 @@ class FusedMultiTransformerBase(Layer):
             kwargs["decoder_block_shape_q"] = 16
             kwargs["max_partition_size"] = 32768
             kwargs["encoder_max_partition_size"] = 32768
+            kwargs["speculate_max_draft_token_num"] = 5
 
             from paddlenlp_ops import get_block_shape_and_split_kv_block
 
@@ -1118,6 +1119,7 @@ class FusedMultiTransformerBase(Layer):
                 kwargs.get("decoder_block_shape_q", 16),
                 self.num_heads // self.kv_num_heads,
                 kwargs.get("block_size", 64),
+                kwargs["speculate_max_draft_token_num"],
             )
 
         residual_input = src
@@ -2256,7 +2258,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 kwargs.get("decoder_block_shape_q", 16),
                 kwargs.get("max_partition_size", 32768),
                 kwargs.get("encoder_max_partition_size", 32768),
-                5,  # speculate_max_draft_token_num
+                kwargs["speculate_max_draft_token_num"],  # speculate_max_draft_token_num
                 True,  # causal
                 False,  # speculate_decoder
             )[0]
@@ -2438,7 +2440,7 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
                 kwargs.get("decoder_block_shape_q", 16),
                 kwargs.get("max_partition_size", 32768),
                 kwargs.get("encoder_max_partition_size", 32768),
-                5,  # speculate_max_draft_token_num
+                kwargs["speculate_max_draft_token_num"],  # speculate_max_draft_token_num
                 True,  # causal
                 False,  # speculate_decoder
             )[0]
