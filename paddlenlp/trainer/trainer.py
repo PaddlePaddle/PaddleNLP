@@ -581,7 +581,9 @@ class Trainer:
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
             uc_async_save = self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config
-            resume_from_checkpoint = get_last_checkpoint(self.args.output_dir, uc_async_save)
+            resume_from_checkpoint = get_last_checkpoint(
+                self.args.output_dir, signal_folder=self.args.output_signal_dir, uc_async_save=uc_async_save
+            )
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
@@ -2509,7 +2511,7 @@ class Trainer:
         need_to_rotate_checkpoints = need_to_rotate_checkpoints and self.args.local_rank == 0
         if need_to_rotate_checkpoints:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
-            self._rotate_checkpoints(use_mtime=False, output_dir=run_signal_dir)
+            self._rotate_checkpoints(use_mtime=True, output_dir=run_signal_dir)
 
         if strtobool(os.getenv("FLAG_LLM_PDC", "False")) and not ("async_save" in self.args.unified_checkpoint_config):
             # save checkpoint_done file to ensure checkpoint is complete

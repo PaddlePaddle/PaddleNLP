@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from sentencepiece import SentencePieceProcessor
 
@@ -243,6 +243,7 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
         max_length: Optional[int] = None,
         padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_attention_mask: Optional[bool] = None,
     ) -> dict:
         """
@@ -256,17 +257,22 @@ class ChatGLMv2Tokenizer(PretrainedTokenizer):
                 - PaddingStrategy.LONGEST Pad to the longest sequence in the batch
                 - PaddingStrategy.MAX_LENGTH: Pad to the max length (default)
                 - PaddingStrategy.DO_NOT_PAD: Do not pad
-                The tokenizer padding sides are defined in self.padding_side:
+                The tokenizer padding sides are defined in `padding_side` argument:
+
                     - 'left': pads on the left of the sequences
                     - 'right': pads on the right of the sequences
             pad_to_multiple_of: (optional) Integer if set will pad the sequence to a multiple of the provided value.
                 This is especially useful to enable the use of Tensor Core on NVIDIA hardware with compute capability
-                `>= 7.5` (Volta).
+                >= 7.5 (Volta).
+            padding_side: (optional) The side on which the model should have padding applied.
+                Should be selected between ['right', 'left'].
+                Default value is picked from the class attribute of the same name.
             return_attention_mask:
                 (optional) Set to False to avoid returning attention mask (default: set to model specifics)
         """
         # Load from model defaults
-        assert self.padding_side == "left"
+        padding_side = padding_side if padding_side is not None else self.padding_side
+        assert padding_side == "left"
 
         required_input = encoded_inputs[self.model_input_names[0]]
         seq_length = len(required_input)
