@@ -67,8 +67,10 @@ elif get_env_device() == "xpu":
         from paddle_xpu.layers.nn import Linear as XPULinear
         from paddle_xpu.layers.nn import RowParallelLinear as XPURowParallelLinear
         from paddle_xpu.layers.nn.sequence_parallel import (
-            XPUColumnSequenceParallelLinear,
-            XPURowSequenceParallelLinear,
+            ColumnSequenceParallelLinear as XPUColumnSequenceParallelLinear,
+        )
+        from paddle_xpu.layers.nn.sequence_parallel import (
+            RowSequenceParallelLinear as XPURowSequenceParallelLinear,
         )
 
         Linear = XPULinear
