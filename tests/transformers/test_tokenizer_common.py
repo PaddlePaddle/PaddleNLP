@@ -1505,16 +1505,24 @@ class TokenizerTesterMixin:
 
                 padded_features = tokenizer.pad(features)
                 if tokenizer.padding_side == "right":
-                    self.assertListEqual(
-                        padded_features["attention_mask"],
-                        [[np.triu([1, 1, 1, 1, 1, 0]).tolist()], [np.triu([1, 1, 0, 0, 0, 0]).tolist()]],
+                    assert np.array_equal(
+                        np.array(padded_features["attention_mask"][0])[0],
+                        np.triu([1, 1, 1, 1, 1, 0]),
+                    )
+                    assert np.array_equal(
+                        np.array(padded_features["attention_mask"][1])[0],
+                        np.triu([1, 1, 0, 0, 0, 0]),
                     )
                 else:
                     attention_mask2 = np.triu([0, 0, 0, 1, 1, 0])
                     attention_mask2[:3] = 0
-                    self.assertListEqual(
-                        padded_features["attention_mask"],
-                        [[np.triu([1, 1, 1, 1, 1, 0]).tolist()], [attention_mask2.tolist()]],
+                    assert np.array_equal(
+                        np.array(padded_features["attention_mask"][0])[0],
+                        np.triu([1, 1, 1, 1, 1, 0]),
+                    )
+                    assert np.array_equal(
+                        np.array(padded_features["attention_mask"][1])[0],
+                        attention_mask2,
                     )
 
     def test_padding_with_attn_mask_startend_row_indices(self):
