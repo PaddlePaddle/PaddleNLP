@@ -36,6 +36,8 @@ union Pack {
   T elem[N];
 };
 
+constexpr int kBlockSize = 256;
+
 __global__ __launch_bounds__(kBlockSize) void fused_get_rotary_embedding_neox(const int64_t* position_ids,
                                                                               const int32_t bsz,
                                                                               const int32_t max_seq_length,
@@ -162,7 +164,7 @@ std::vector<paddle::Tensor> GetRoPE(const paddle::Tensor& input_ids,
     assert(head_dim % 2 == 0); 
     const int32_t elem_cnt = batch_size * max_seq_length * head_dim / 2; 
     int32_t grid_size = 1; 
-    GetNumBlocks(elem_cnt, &grid_size); 
+    GetNumBlocks<kBlockSize>(elem_cnt, &grid_size);
     if (use_neox) {
       fused_get_rotary_embedding_neox<<<grid_size, kBlockSize, 0, cu_stream>>> (
           position_ids.data<int64_t>(),
