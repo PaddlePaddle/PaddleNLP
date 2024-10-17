@@ -17,12 +17,6 @@
 #include "mem_util.cuh"
 #include "mma_tensor_op.cuh"
 #include "utils.cuh"
-// #define DEBUG_ATTN_C4
-// #define DEBUG_ATTN_C8
-
-#define PRINT_TID 0
-#define PRINT_WID 0
-// #define DEBUG_ATTN
 
 template <typename T>
 __forceinline__ __device__ float fixed_expf(float x1, float x2) {
@@ -66,10 +60,6 @@ struct prefill_softmax_state_t {
       m = -3.38953e38f;
     }
   }
-
-  // __device__ __forceinline__ prefill_softmax_state_t() {
-  //   init();
-  // }
 
   __device__ __forceinline__ void merge(
       const AlignedVector<T, vec_size>& other_o, float other_m, float other_d) {
@@ -141,17 +131,12 @@ __device__ __forceinline__ void load_q_global_smem_multi_warps(
       smem_t::get_permuted_offset<num_vecs_per_head>(ty * 4 + tx / 8,
                                                      tx % 8);  // 4 * 64
 
-  // q_idx_base += (tx / 8) / group_size;
-  // q_ptr_base += ((tx / 8) / group_size) * qo_n_stride + ((tx / 8) %
-  // group_size) * qo_h_stride;
   const uint32_t tx_offset = tx / 8;
 #pragma unroll
   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-    // num_frags_x * 16 * head_dim
-    // load 4 row per warp
+
     const uint32_t base_offset = q_idx_base + fx * 16 + tx_offset;
 #pragma unroll
-    // for (uint32_t j = 0; j < 4; ++j) {
     const int j = ty;
     const uint32_t offset_now = base_offset + j * 4;
     const uint32_t n_offset = offset_now / group_size;
@@ -159,8 +144,7 @@ __device__ __forceinline__ void load_q_global_smem_multi_warps(
     T* q_ptr = q_ptr_base + n_offset * qo_n_stride + h_offset * qo_h_stride;
 #pragma unroll
     for (uint32_t fyo = 0; fyo < num_frags_y / 4;
-         ++fyo) {  // (num_frags_y * 16) / (8 *  num_elems_per_128b<T>())
-      // load q from gmem to smem
+         ++fyo) {
       q_smem->load_128b_async<SharedMemFillMode::kNoFill>(
           q_smem_offset_w, q_ptr, n_offset < qo_upper_bound);
       q_smem_offset_w =
@@ -169,8 +153,7 @@ __device__ __forceinline__ void load_q_global_smem_multi_warps(
     }
     q_smem_offset_w =
         q_smem->advance_offset_by_row<16, num_vecs_per_head>(q_smem_offset_w) -
-        2 * num_frags_y;  // num_frags_y / 4 * 8
-    // }
+        2 * num_frags_y;
   }
 }
 
@@ -194,13 +177,9 @@ __device__ __forceinline__ void load_q_global_smem(
       smem_t::get_permuted_offset<num_vecs_per_head>(
           ty * num_frags_x * 16 + tx / 8, tx % 8);  // 4 * 64
 
-  // q_idx_base += (tx / 8) / group_size;
-  // q_ptr_base += ((tx / 8) / group_size) * qo_n_stride + ((tx / 8) %
-  // group_size) * qo_h_stride;
   const uint32_t tx_offset = tx / 8;
 #pragma unroll
   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-    // NUM_WARP_Q * num_frags_x * 16 * head_dim
     const uint32_t base_offset = q_idx_base + fx * 16 + tx_offset;
 #pragma unroll
     for (uint32_t j = 0; j < 4; ++j) {
@@ -210,8 +189,7 @@ __device__ __forceinline__ void load_q_global_smem(
       T* q_ptr = q_ptr_base + n_offset * qo_n_stride + h_offset * qo_h_stride;
 #pragma unroll
       for (uint32_t fyo = 0; fyo < num_frags_y / 4;
-           ++fyo) {  // (num_frags_y * 16) / (8 *  num_elems_per_128b<T>())
-        // load q from gmem to smem
+           ++fyo) {
         q_smem->load_128b_async<SharedMemFillMode::kNoFill>(
             q_smem_offset_w, q_ptr, n_offset < qo_upper_bound);
         q_smem_offset_w =
@@ -238,7 +216,7 @@ __device__ __forceinline__ void q_smem_inplace_multiply_sm_scale_multi_warps(
 
 #pragma unroll
   for (uint32_t i = 0; i < num_frags_x * 16 * head_dim / 1024;
-       ++i) {  // 32 * 8 * 4 all warp
+       ++i) {
     const int offset = i * 1024 + ty * 256 + tx * 8;
     Load<T, vec_size>(reinterpret_cast<T*>(q_smem->base) + offset, &tmp_vec);
 #pragma unroll
@@ -304,11 +282,10 @@ __device__ __forceinline__ void produce_kv_blockwise(
   uint32_t kv_idx = kv_idx_base + ty * 4 + tx / 8;  // kv_idx used to check
 #pragma unroll
   for (uint32_t i = 0; i < NUM_WARP_KV * num_frags_z * 4 / num_warps;
-       ++i) {  // m num_frags_z * 16 / (num_warps * 4)
-               // 16 rows each time
+       ++i) {
 #pragma unroll
     for (uint32_t j = 0; j < num_frags_y / 4;
-         ++j) {  // k num_frags_y * 16 / 8 / num_elems_per_128b<T>()
+         ++j) {
       smem.load_128b_async<fill_mode>(*smem_offset, *gptr, kv_idx < kv_len);
       *smem_offset = smem.advance_offset_by_column<8>(*smem_offset, j);
       *gptr += 8 * num_elems_per_128b<T>();
@@ -343,14 +320,13 @@ __device__ __forceinline__ void produce_v_blockwise_c8(
     const uint32_t kv_idx_base,
     const uint32_t kv_len,
     const uint32_t const_v_offset) {
-  // [num_frags_y * 16, num_frags_z * 16]
   constexpr uint32_t num_vecs_per_blocksize =
       block_size / num_elems_per_128b<CacheT>();  // 8
   constexpr uint32_t NUM_WARP_KV = num_warps / NUM_WARP_Q;
   const uint32_t tx = threadIdx.x, ty = threadIdx.y;
   uint32_t kv_idx =
       kv_idx_base +
-      tx % 4 * num_elems_per_128b<CacheT>();  // kv_idx used to check
+      tx % 4 * num_elems_per_128b<CacheT>();
   if constexpr (NUM_WARP_Q == 4) {
     int block_id = __ldg(&block_table_now[kv_idx / block_size]);
     if (block_id < 0) block_id = 0;
@@ -360,16 +336,12 @@ __device__ __forceinline__ void produce_v_blockwise_c8(
          ++i) {  // m (num_frags_y * 16 / (num_warps * 8))
 #pragma unroll
       for (uint32_t j = 0; j < num_frags_z / 4;
-           ++j) {  // k num_frags_z * 16 / 4 / num_elems_per_128b<CacheT>()
-        // smem.load_128b_async<fill_mode>(*smem_offset, *gptr, kv_idx <
-        // kv_len);
+           ++j) { 
         smem.load_128b_async<fill_mode>(*smem_offset, cache_v_now, true);
         *smem_offset = smem.advance_offset_by_column<4, num_vecs_per_blocksize>(
             *smem_offset, j);
         cache_v_now += 4 * num_elems_per_128b<CacheT>();
-        // kv_idx += 4 * num_elems_per_128b<CacheT>();
       }
-      // kv_idx -= num_frags_z * num_elems_per_128b<CacheT>();
       *smem_offset =
           smem.advance_offset_by_row<num_warps * 8, num_vecs_per_blocksize>(
               *smem_offset) -
@@ -377,7 +349,6 @@ __device__ __forceinline__ void produce_v_blockwise_c8(
       cache_v_now += num_warps * 8 * kv_d_stride -
                      num_frags_z * num_elems_per_128b<CacheT>();
     }
-    // *gptr -= num_frags_y * 16 * kv_d_stride;
     *smem_offset -= num_frags_y * 16 * num_vecs_per_blocksize;
   } else {
 #pragma unroll
@@ -385,43 +356,13 @@ __device__ __forceinline__ void produce_v_blockwise_c8(
       int block_id = __ldg(&block_table_now[kv_idx / block_size]);
       if (block_id < 0) block_id = 0;
       CacheT* cache_v_now = cache_v + block_id * kv_n_stride + const_v_offset;
-#ifdef DEBUG_ATTN_C8
-      if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-          blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
-        printf(
-            "kv_i: %d, kv_idx: %d, tid: %d, block_id: %d, v_smem_offset_w: %d, "
-            "cache_v_now: %f, cache_v_now_p: %p\n",
-            (int)kv_i,
-            (int)kv_idx,
-            (int)threadIdx.x,
-            (int)block_id,
-            (int)*smem_offset,
-            (float)(*cache_v_now),
-            cache_v_now);
-      }
-      __syncthreads();
-#endif
+
 #pragma unroll
       for (uint32_t i = 0; i < num_frags_y * 2 / num_warps;
            ++i) {  // m (num_frags_y * 16 / (num_warps * 8))
 #pragma unroll
         for (uint32_t j = 0; j < 2 * num_frags_z / 4;
-             ++j) {  // k num_frags_z * 16 / 4 / num_elems_per_128b<CacheT>()
-#ifdef DEBUG_ATTN_C8
-          if ((threadIdx.x == PRINT_TID) && threadIdx.y == 0 &&
-              blockIdx.z == 0 && blockIdx.x == gridDim.x - 1 &&
-              blockIdx.y == gridDim.y - 1) {
-            printf(
-                "i: %d, j: %d, v_smem_offset_w: %d, cache_v_now: %f, "
-                "cache_v_now_p: %p\n",
-                (int)i,
-                (int)j,
-                (int)(*smem_offset),
-                (float)(*cache_v_now),
-                cache_v_now);
-          }
-          __syncthreads();
-#endif
+             ++j) {
           smem.load_128b_async<fill_mode>(*smem_offset, cache_v_now, true);
           *smem_offset =
               smem.advance_offset_by_column<4, num_vecs_per_blocksize>(
@@ -462,13 +403,12 @@ __device__ __forceinline__ void produce_k_blockwise_c8(
     const uint32_t kv_idx_base,
     const uint32_t kv_len,
     const uint32_t const_k_offset) {
-  // [num_frags_z * 16, num_frags_y * 16]
   constexpr uint32_t head_dim = num_frags_y * 16;
   constexpr uint32_t num_vecs_per_head =
       head_dim / num_elems_per_128b<CacheT>();  // 8
   constexpr uint32_t NUM_WARP_KV = num_warps / NUM_WARP_Q;
   const uint32_t tx = threadIdx.x, ty = threadIdx.y;
-  uint32_t kv_idx = kv_idx_base + ty * 4 + tx / 8;  // kv_idx used to check
+  uint32_t kv_idx = kv_idx_base + ty * 4 + tx / 8;
   if constexpr (NUM_WARP_Q == 4) {
     int block_id = __ldg(&block_table_now[kv_idx / block_size]);
     if (block_id < 0) block_id = 0;
@@ -494,7 +434,6 @@ __device__ __forceinline__ void produce_k_blockwise_c8(
       cache_k_now += num_warps * 4 * kv_b_stride -
                      num_frags_y * num_elems_per_128b<CacheT>();
     }
-    // *gptr -= num_frags_z * 16 * kv_b_stride;
     *smem_offset -= num_frags_z * 16 * num_vecs_per_head;
   } else {
 #pragma unroll
@@ -507,9 +446,7 @@ __device__ __forceinline__ void produce_k_blockwise_c8(
            ++i) {  // m num_frags_z * 16 / (num_warps * 4)
 #pragma unroll
         for (uint32_t j = 0; j < num_frags_y / 8;
-             ++j) {  // k num_frags_y * 16 / 8 / num_elems_per_128b<CacheT>()
-          // smem.load_128b_async<fill_mode>(*smem_offset, *gptr, kv_idx <
-          // kv_len);
+             ++j) {
           smem.load_128b_async<fill_mode>(*smem_offset, cache_k_now, true);
           *smem_offset = smem.advance_offset_by_column<8, num_vecs_per_head>(
               *smem_offset, j);
@@ -559,29 +496,11 @@ __device__ __forceinline__ void produce_v_blockwise_c4(
     int block_id = __ldg(&block_table_now[(kv_idx) / block_size]);
     if (block_id < 0) block_id = 0;
     CacheT* cache_v_now = cache_v + block_id * kv_n_stride + const_v_offset;
-#ifdef DEBUG_ATTN_C4
-    if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-        blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
-      printf(
-          "kv_i: %d, kv_idx: %d, tid: %d, block_id: %d, v_smem_offset_w: %d, "
-          "cache_v_now: %f, cache_v_now_p: %p\n",
-          (int)kv_i,
-          (int)kv_idx,
-          (int)threadIdx.x,
-          (int)block_id,
-          (int)*smem_offset,
-          (float)(*cache_v_now),
-          cache_v_now);
-    }
-    __syncthreads();
-#endif
 #pragma unroll
     for (uint32_t i = 0; i < num_frags_y / num_warps; ++i) {  // m
 #pragma unroll
       for (uint32_t j = 0; j < num_frags_z / 4;
-           ++j) {  // k num_frags_z * 16 / 2 / 2 / num_elems_per_128b<CacheT>()
-        // smem.load_128b_async<fill_mode>(*smem_offset, *gptr, kv_idx <
-        // kv_len);
+           ++j) {
         smem.load_128b_async<fill_mode>(*smem_offset, cache_v_now, true);
         *smem_offset = smem.advance_offset_by_column<2, num_vecs_per_blocksize>(
             *smem_offset, j);
@@ -598,7 +517,6 @@ __device__ __forceinline__ void produce_v_blockwise_c4(
     }
     kv_idx += block_size;
   }
-  // *gptr -= num_frags_y * 16 * kv_d_stride;
   *smem_offset -= NUM_WARP_KV * num_frags_y * 16 * num_vecs_per_blocksize;
 }
 
@@ -639,9 +557,7 @@ __device__ __forceinline__ void produce_k_blockwise_c4(
          ++i) {  // m num_frags_z * 16 / (num_warps * 8)
 #pragma unroll
       for (uint32_t j = 0; j < num_frags_y / 8;
-           ++j) {  // k num_frags_y * 16 / 2 / 4 / num_elems_per_128b<CacheT>()
-        // smem.load_128b_async<fill_mode>(*smem_offset, *gptr, kv_idx <
-        // kv_len);
+           ++j) {
         smem.load_128b_async<fill_mode>(*smem_offset, cache_k_now, true);
         *smem_offset = smem.advance_offset_by_column<4, num_vecs_per_head>(
             *smem_offset, j);
@@ -778,8 +694,6 @@ __device__ __forceinline__ void compute_qk(smem_t* q_smem,
                                            smem_t* k_smem,
                                            uint32_t* k_smem_offset_r,
                                            float (*s_frag)[num_frags_z][8]) {
-  // q [num_warps_q, num_frags_x, 16, head_dim], k [num_warps_kv, num_frags_z,
-  // 16, head_dim]
   constexpr uint32_t head_dim = num_frags_y * 16;
   constexpr uint32_t num_vecs_per_head = head_dim / num_elems_per_128b<T>();
   uint32_t a_frag[num_frags_x][4], b_frag[4];
@@ -833,8 +747,6 @@ __device__ __forceinline__ void compute_qk_c4(smem_t* q_smem,
                                               float (*s_frag)[num_frags_z][8],
                                               T (*cache_k_scale_frag)[4],
                                               T (*cache_k_zp_frag)[4]) {
-  // q [num_warps_q, num_frags_x, 16, head_dim], k [num_warps_kv, num_frags_z,
-  // 16, head_dim]
   constexpr uint32_t head_dim = num_frags_y * 16;
   constexpr uint32_t num_vecs_per_head_q = head_dim / num_elems_per_128b<T>();
   constexpr uint32_t num_vecs_per_head_k =
@@ -850,26 +762,6 @@ __device__ __forceinline__ void compute_qk_c4(smem_t* q_smem,
 #pragma unroll
       for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
         q_smem->ldmatrix_m8n8x4(*q_smem_offset_r, a_frag[fx][fy]);
-#ifdef DEBUG_ATTN_C4
-        if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-          printf("q_smem_offset_r: %d\n", (int)*q_smem_offset_r);
-          T* a_frag_t = reinterpret_cast<T*>(a_frag[fx][fy]);
-          for (int k = 0; k < 8; k++) {
-            printf(
-                "compute_qk_c4 fx: %d, ky: %d, fy: %d, a_frag[%d][%d][%d]: %f "
-                " ",
-                (int)fx,
-                (int)ky,
-                (int)fy,
-                (int)fx,
-                (int)fy,
-                (int)k,
-                (float)a_frag_t[k]);
-          }
-          printf("\n");
-        }
-        __syncthreads();
-#endif
         *q_smem_offset_r =
             q_smem->advance_offset_by_row<16, num_vecs_per_head_q>(
                 *q_smem_offset_r);
@@ -887,33 +779,11 @@ __device__ __forceinline__ void compute_qk_c4(smem_t* q_smem,
           *k_smem_offset_r);
 #pragma unroll
       for (uint32_t fy = 0; fy < 4; ++fy) {
-        // dequant b_frag[fy] -> b_frag_dq
         T* b_frag_dq_T = reinterpret_cast<T*>(b_frag_dq);
         convert_int4(b_frag_dq_T, b_frag[fy]);
-        // scale zp
 #pragma unroll
         for (uint32_t b_i = 0; b_i < 8; ++b_i) {
           const int b_offset = b_i % 4;
-#ifdef DEBUG_ATTN_C4
-          if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-            printf("compute_qk_c4, fz: %d, ky: %d, fy: %d\n",
-                   (int)fz,
-                   (int)ky,
-                   (int)fy);
-            printf(
-                "compute_qk_c4 b_frag_dq_T[%d]: %f, cache_k_zp_frag[%d][%d]: "
-                "%f, cache_k_scale_frag[%d][%d]: %f\n",
-                (int)b_i,
-                (float)b_frag_dq_T[b_i],
-                int(ky * 4 + fy),
-                (int)b_offset,
-                (float)cache_k_zp_frag[ky * 4 + fy][b_offset],
-                int(ky * 4 + fy),
-                (int)b_offset,
-                (float)cache_k_scale_frag[ky * 4 + fy][b_offset]);
-          }
-          __syncthreads();
-#endif
           b_frag_dq_T[b_i] =
               (b_frag_dq_T[b_i] - cache_k_zp_frag[ky * 4 + fy][b_offset]) *
               cache_k_scale_frag[ky * 4 + fy][b_offset];
@@ -935,27 +805,9 @@ __device__ __forceinline__ void compute_qk_c4(smem_t* q_smem,
                            *k_smem_offset_r, ky) -
                        num_frags_z * 16 * num_vecs_per_head_k;
   }
-#ifdef DEBUG_ATTN_C4
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-    for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-      for (uint32_t fz = 0; fz < num_frags_z; ++fz) {
-        for (int k = 0; k < 8; k++) {
-          printf("s_frag[%d][%d][%d]: %f  ",
-                 (int)fx,
-                 (int)fz,
-                 (int)k,
-                 s_frag[fx][fz][k]);
-        }
-        printf("\n");
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
   // advance by col
   *q_smem_offset_r -= num_frags_y * 2;
-  *k_smem_offset_r -= num_frags_y / 4 * 2;  // !!!, check if recover correctly
+  *k_smem_offset_r -= num_frags_y / 4 * 2;
 }
 
 template <uint32_t num_frags_x,
@@ -969,8 +821,6 @@ __device__ __forceinline__ void compute_qk_c8(smem_t* q_smem,
                                               uint32_t* k_smem_offset_r,
                                               const T cache_k_scale,
                                               float (*s_frag)[num_frags_z][8]) {
-  // q [num_warps_q, num_frags_x, 16, head_dim], k [num_warps_kv, num_frags_z,
-  // 16, head_dim]
   constexpr uint32_t head_dim = num_frags_y * 16;
   constexpr uint32_t num_vecs_per_head_q = head_dim / num_elems_per_128b<T>();
   constexpr uint32_t num_vecs_per_head_k =
@@ -986,27 +836,6 @@ __device__ __forceinline__ void compute_qk_c8(smem_t* q_smem,
 #pragma unroll
       for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
         q_smem->ldmatrix_m8n8x4(*q_smem_offset_r, a_frag[fx][fy]);
-#ifdef DEBUG_ATTN_C8
-        if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-            blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
-          printf("q_smem_offset_r: %d\n", (int)*q_smem_offset_r);
-          T* a_frag_t = reinterpret_cast<T*>(a_frag[fx][fy]);
-          for (int k = 0; k < 8; k++) {
-            printf(
-                "compute_qk_c8 fx: %d, ky: %d, fy: %d, a_frag[%d][%d][%d]: %f "
-                " ",
-                (int)fx,
-                (int)ky,
-                (int)fy,
-                (int)fx,
-                (int)fy,
-                (int)k,
-                (float)a_frag_t[k]);
-          }
-          printf("\n");
-        }
-        __syncthreads();
-#endif
 
         *q_smem_offset_r =
             q_smem->advance_offset_by_row<16, num_vecs_per_head_q>(
@@ -1025,27 +854,12 @@ __device__ __forceinline__ void compute_qk_c8(smem_t* q_smem,
           *k_smem_offset_r);
 #pragma unroll
       for (uint32_t fy = 0; fy < 2; ++fy) {
-        // dequant b_frag[fy] -> b_frag_dq
         T* b_frag_dq_T = reinterpret_cast<T*>(b_frag_dq);
         convert_int8(b_frag_dq_T, b_frag[fy * 2]);
         convert_int8(b_frag_dq_T + 4, b_frag[fy * 2 + 1]);
         // scale zp
 #pragma unroll
         for (uint32_t b_i = 0; b_i < 8; ++b_i) {
-#ifdef DEBUG_ATTN_C8
-          if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-              blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
-            printf("compute_qk_c8, fz: %d, ky: %d, fy: %d\n",
-                   (int)fz,
-                   (int)ky,
-                   (int)fy);
-            printf("compute_qk_c8 b_frag_dq_T[%d]: %f, cache_k_scale: %f\n",
-                   (int)b_i,
-                   (float)b_frag_dq_T[b_i],
-                   (float)cache_k_scale);
-          }
-          __syncthreads();
-#endif
 
           b_frag_dq_T[b_i] *= cache_k_scale;
         }
@@ -1065,29 +879,8 @@ __device__ __forceinline__ void compute_qk_c8(smem_t* q_smem,
                            *k_smem_offset_r, ky) -
                        num_frags_z * 16 * num_vecs_per_head_k;
   }
-#ifdef DEBUG_ATTN_C8
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-      blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
-    for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-      for (uint32_t fz = 0; fz < num_frags_z; ++fz) {
-        for (int k = 0; k < 8; k++) {
-          printf("s_frag[%d][%d][%d]: %f  ",
-                 (int)fx,
-                 (int)fz,
-                 (int)k,
-                 s_frag[fx][fz][k]);
-        }
-        printf("\n");
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
-
-  // advance by col
   *q_smem_offset_r -= num_frags_y * 2;
-  *k_smem_offset_r -= num_frags_y / 2 * 2;  // !!!, check if recover correctly
+  *k_smem_offset_r -= num_frags_y / 2 * 2;
 }
 
 template <typename T,
@@ -1129,7 +922,7 @@ __device__ __forceinline__ void mask_s(const uint32_t qo_idx_base,
             s_frag[fx][fz][reg_id] =
                 out_of_boundary ? -3.0e+30f : s_frag[fx][fz][reg_id];
           }
-        } else {  // 共享前缀decoder加速，不增加q_idx，每位置q_idx相同
+        } else {
           const uint32_t q_idx = qo_idx_base,
                          kv_idx = kv_idx_base + fz * 16 + 2 * (tx % 4) +
                                   8 * (reg_id / 4) + reg_id % 2;
@@ -1137,22 +930,6 @@ __device__ __forceinline__ void mask_s(const uint32_t qo_idx_base,
               (causal
                    ? (kv_idx > kv_len + q_idx - qo_len || (kv_idx >= chunk_end))
                    : kv_idx >= chunk_end);
-#ifdef DEBUG_ATTN_C4
-          if (threadIdx.x == PRINT_TID && threadIdx.y == PRINT_WID &&
-              blockIdx.z == 0 && blockIdx.x == 0 &&
-              blockIdx.y == gridDim.y - 1 && fx == 0 && fz == 3 &&
-              reg_id == 4) {
-            printf(
-                "q_idx: %d, kv_idx: %d, kv_len: %d, qo_len: %d, chunk_end: "
-                "%d\n",
-                (int)q_idx,
-                (int)kv_idx,
-                (int)kv_len,
-                (int)qo_len,
-                (int)chunk_end);
-          }
-          __syncthreads();
-#endif
           if constexpr (std::is_same<T, half>::value) {
             s_frag[fx][fz][reg_id] =
                 out_of_boundary ? -5e4f : s_frag[fx][fz][reg_id];
@@ -1172,12 +949,10 @@ __device__ __forceinline__ void update_mdo_states(
     float (*o_frag)[num_frags_y][8],
     float (*m)[2],
     float (*d)[2]) {
-  // [num_warps * num_frags_x * 16, num_frags_z * 16]
 #pragma unroll
   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-    // 16 * （num_frags_z * 16）
 #pragma unroll
-    for (uint32_t j = 0; j < 2; ++j) {  // 2行
+    for (uint32_t j = 0; j < 2; ++j) {
       float m_prev = m[fx][j];
 #pragma unroll
       for (uint32_t fz = 0; fz < num_frags_z; ++fz) {
@@ -1226,28 +1001,8 @@ __device__ __forceinline__ void compute_sfm_v_c4(
     float (*d)[2],
     T (*cache_v_scale_frag)[2],
     T (*cache_v_zp_frag)[2]) {
-  // [num_frags_x, 16, num_frags_z, 16] [num_frags_y, 16, num_frags_z, 16] ->
-  // [num_frags_x, 16, num_frags_y, 16]
   constexpr uint32_t num_vecs_per_blocksize =
       block_size / 2 / num_elems_per_128b<CacheT>();
-#ifdef DEBUG_ATTN_C4
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-    for (int i = 0; i < num_frags_x; i++) {
-      for (int j = 0; j < num_frags_z; j++) {
-        for (int k = 0; k < 8; k++) {
-          printf("compute_sfm_v_c4 s_frag[%d][%d][%d]: %f  ",
-                 i,
-                 j,
-                 k,
-                 s_frag[i][j][k]);
-        }
-        printf("\n");
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
 
   T s_frag_f16[num_frags_x][num_frags_z][8];
   uint32_t b_frag[4], b_frag_dq[4];
@@ -1277,31 +1032,12 @@ __device__ __forceinline__ void compute_sfm_v_c4(
               *v_smem_offset_r);
 #pragma unroll
       for (uint32_t fz = 0; fz < 4; ++fz) {
-        // dequant b_frag -> b_frag_dq
         T* b_frag_dq_T = reinterpret_cast<T*>(b_frag_dq);
         convert_int4(b_frag_dq_T, b_frag[fz]);
         // scale zp
 #pragma unroll
         for (uint32_t b_i = 0; b_i < 8; ++b_i) {
           const int b_offset = b_i / 4;
-#ifdef DEBUG_ATTN_C4
-          if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-            printf(
-                "compute_sfm_v_c4, kz: %d, fz: %d, b_frag_dq_T[%d]: %f, "
-                "cache_v_zp_frag[%d][%d]: %f, cache_v_scale_frag[%d][%d]: %f\n",
-                (int)kz,
-                (int)fz,
-                (int)b_i,
-                (float)b_frag_dq_T[b_i],
-                int(fy),
-                (int)b_offset,
-                (float)cache_v_zp_frag[fy][b_offset],
-                int(fy),
-                (int)b_offset,
-                (float)cache_v_scale_frag[fy][b_offset]);
-          }
-          __syncthreads();
-#endif
           b_frag_dq_T[b_i] =
               (b_frag_dq_T[b_i] - cache_v_zp_frag[fy][b_offset]) *
               cache_v_scale_frag[fy][b_offset];
@@ -1312,20 +1048,6 @@ __device__ __forceinline__ void compute_sfm_v_c4(
               o_frag[fx][fy],
               (uint32_t*)(s_frag_f16[fx][kz * 4 + fz]),
               b_frag_dq);
-#ifdef DEBUG_ATTN_C4
-          if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-            printf("compute_sfm_v_c4 o_frag\n");
-            for (int k = 0; k < 8; k++) {
-              printf("compute_sfm_v_c4 o_frag[%d][%d][%d]: %f  ",
-                     (int)fx,
-                     (int)fy,
-                     (int)k,
-                     o_frag[fx][fy][k]);
-            }
-            printf("\n");
-          }
-          __syncthreads();
-#endif
         }
       }
     }
@@ -1334,26 +1056,6 @@ __device__ __forceinline__ void compute_sfm_v_c4(
             *v_smem_offset_r, kz) -
         num_frags_y * 16 * num_vecs_per_blocksize;
   }
-#ifdef DEBUG_ATTN_C4
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-    printf("res o_frag\n");
-    for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-      for (uint32_t fy = 0; fy < num_frags_y; ++fy) {
-        for (int k = 0; k < 8; k++) {
-          printf("compute_sfm_v_c4 o_frag[%d][%d][%d]: %f  ",
-                 (int)fx,
-                 (int)fy,
-                 (int)k,
-                 o_frag[fx][fy][k]);
-        }
-        printf("\n");
-      }
-      printf("\n");
-    }
-    printf("\n");
-  }
-  __syncthreads();
-#endif
   *v_smem_offset_r -= num_frags_z / 4 * 2;
 }
 
@@ -1370,51 +1072,8 @@ __device__ __forceinline__ void compute_sfm_v_c8(
     float (*o_frag)[num_frags_y][8],
     float (*d)[2],
     T cache_v_scale) {
-  // [num_frags_x, 16, num_frags_z, 16] [num_frags_y, 16, num_frags_z, 16] ->
-  // [num_frags_x, 16, num_frags_y, 16]
   constexpr uint32_t num_vecs_per_blocksize =
       block_size / num_elems_per_128b<CacheT>();
-#ifdef DEBUG_ATTN_C8
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-      blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
-    for (int i = 0; i < num_frags_x; i++) {
-      for (int j = 0; j < num_frags_y; j++) {
-        for (int k = 0; k < 8; k++) {
-          printf("after_update compute_sfm_v_c8 o_frag[%d][%d][%d]: %f\n",
-                 i,
-                 j,
-                 k,
-                 o_frag[i][j][k]);
-        }
-        printf("\n");
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-
-  if ((threadIdx.x == 0 || threadIdx.x == 1 || threadIdx.x == 2 ||
-       threadIdx.x == 3) &&
-      threadIdx.y == 0 && blockIdx.z == 0 && blockIdx.x == gridDim.x - 1 &&
-      blockIdx.y == gridDim.y - 1) {
-    for (int i = 0; i < num_frags_x; i++) {
-      for (int j = 0; j < num_frags_z; j++) {
-        for (int k = 0; k < 8; k++) {
-          printf("compute_sfm_v_c8 tid: %d, s_frag[%d][%d][%d]: %f\n",
-                 (int)threadIdx.x,
-                 i,
-                 j,
-                 k,
-                 s_frag[i][j][k]);
-        }
-        printf("\n");
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
-
   T s_frag_f16[num_frags_x][num_frags_z][8];
   uint32_t b_frag[4], b_frag_dq[4];
 #pragma unroll
@@ -1438,22 +1097,11 @@ __device__ __forceinline__ void compute_sfm_v_c8(
 #pragma unroll
     for (uint32_t fy = 0; fy < num_frags_y; ++fy) {
       v_smem->ldmatrix_m8n8x4(*v_smem_offset_r, b_frag);
-#ifdef DEBUG_ATTN_C8
-      if ((threadIdx.x == PRINT_TID) && threadIdx.y == 0 && blockIdx.z == 0 &&
-          blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
-        printf("kz: %d, fy: %d, v_smem_offset_r: %d\n",
-               (int)kz,
-               (int)fy,
-               (int)*v_smem_offset_r);
-      }
-      __syncthreads();
-#endif
       *v_smem_offset_r =
           v_smem->advance_offset_by_row<16, num_vecs_per_blocksize>(
               *v_smem_offset_r);
 #pragma unroll
       for (uint32_t fz = 0; fz < 2; ++fz) {
-        // dequant b_frag -> b_frag_dq
         T* b_frag_dq_T = reinterpret_cast<T*>(b_frag_dq);
         convert_int8(b_frag_dq_T, b_frag[fz * 2]);
         convert_int8(b_frag_dq_T + 4, b_frag[fz * 2 + 1]);
@@ -1461,30 +1109,6 @@ __device__ __forceinline__ void compute_sfm_v_c8(
 #pragma unroll
         for (uint32_t b_i = 0; b_i < 8; ++b_i) {
           b_frag_dq_T[b_i] *= cache_v_scale;
-#ifdef DEBUG_ATTN_C8
-          // if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0
-          // && blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
-          if ((threadIdx.x == 16 || threadIdx.x == 17 || threadIdx.x == 18 ||
-               threadIdx.x == 19) &&
-              threadIdx.y == 0 && blockIdx.z == 0 &&
-              blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
-            uint8_t* b_frag_dq_uint8 =
-                reinterpret_cast<uint8_t*>(&b_frag[fz * 2]);
-            printf(
-                "compute_sfm_v_c8, tid: %d, kz: %d, fz: %d, "
-                "b_frag_dq_uint8[%d]: %d, b_frag_dq_T[%d]: %f, cache_v_scale: "
-                "%f\n",
-                (int)threadIdx.x,
-                (int)kz,
-                (int)fz,
-                (int)b_i,
-                (int)b_frag_dq_uint8[b_i],
-                (int)b_i,
-                (float)b_frag_dq_T[b_i],
-                (float)cache_v_scale);
-          }
-          __syncthreads();
-#endif
         }
 #pragma unroll
         for (uint32_t fx = 0; fx < num_frags_x; ++fx) {  // m: num_frags_x * 16
@@ -1492,44 +1116,15 @@ __device__ __forceinline__ void compute_sfm_v_c8(
               o_frag[fx][fy],
               (uint32_t*)(s_frag_f16[fx][kz * 2 + fz]),
               b_frag_dq);
-#ifdef DEBUG_ATTN_C8
-          if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-              blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
-            printf("compute_sfm_v_c8 o_frag\n");
-            for (int k = 0; k < 8; k++) {
-              printf("compute_sfm_v_c8 o_frag[%d][%d][%d]: %f  ",
-                     (int)fx,
-                     (int)fy,
-                     (int)k,
-                     o_frag[fx][fy][k]);
-            }
-            printf("\n");
-          }
-          __syncthreads();
-#endif
+
         }
       }
     }
-#ifdef DEBUG_ATTN_C8
-    if ((threadIdx.x == PRINT_TID) && threadIdx.y == 0 && blockIdx.z == 0 &&
-        blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
-      printf(
-          "111 kz: %d, v_smem_offset_r: %d\n", (int)kz, (int)*v_smem_offset_r);
-    }
-    __syncthreads();
-#endif
+
     *v_smem_offset_r =
         v_smem->advance_offset_by_column<2, num_vecs_per_blocksize>(
             *v_smem_offset_r, kz) -
         num_frags_y * 16 * num_vecs_per_blocksize;
-#ifdef DEBUG_ATTN_C8
-    if ((threadIdx.x == PRINT_TID) && threadIdx.y == 0 && blockIdx.z == 0 &&
-        blockIdx.x == gridDim.x - 1 && blockIdx.y == gridDim.y - 1) {
-      printf(
-          "222 kz: %d, v_smem_offset_r: %d\n", (int)kz, (int)*v_smem_offset_r);
-    }
-    __syncthreads();
-#endif
   }
   *v_smem_offset_r -= num_frags_z / 2 * 2;
 }
@@ -1547,8 +1142,6 @@ __device__ __forceinline__ void compute_sfm_v_c8_iter_sq_bvec(
     float (*o_frag)[num_frags_y][8],
     float (*d)[2],
     T cache_v_scale) {
-  // [num_frags_x, 16, num_frags_z, 16] [num_frags_y, 16, num_frags_z, 16] ->
-  // [num_frags_x, 16, num_frags_y, 16]
   constexpr uint32_t num_vecs_per_blocksize =
       block_size / num_elems_per_128b<CacheT>();
 
@@ -1611,8 +1204,6 @@ __device__ __forceinline__ void compute_sfm_v(smem_t* v_smem,
                                               float (*s_frag)[num_frags_z][8],
                                               float (*o_frag)[num_frags_y][8],
                                               float (*d)[2]) {
-  // [num_frags_x, 16, num_frags_z, 16] [num_frags_z, 16, num_frags_y, 16] ->
-  // [num_frags_x, 16, num_frags_y, 16]
   constexpr uint32_t head_dim = num_frags_y * 16;
   constexpr uint32_t num_vecs_per_head = head_dim / num_elems_per_128b<T>();
 
@@ -1624,25 +1215,6 @@ __device__ __forceinline__ void compute_sfm_v(smem_t* v_smem,
       vec_cast<T, float, 8>(s_frag_f16[fx][fz], s_frag[fx][fz]);
     }
   }
-#ifdef DEBUG_ATTN
-  if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 &&
-      blockIdx.z == 0) {
-    for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-      for (uint32_t fz = 0; fz < num_frags_z; ++fz) {
-        for (int i = 0; i < 8; ++i) {
-          printf("fx: %d, fz: %d, s_frag_f16[%d][%d][%d]: %f\n",
-                 (int)fx,
-                 (int)fz,
-                 (int)fx,
-                 (int)fz,
-                 (int)i,
-                 (float)s_frag_f16[fx][fz][i]);
-        }
-      }
-    }
-  }
-  __syncthreads();
-#endif
 
 #pragma unroll
   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
@@ -1654,42 +1226,15 @@ __device__ __forceinline__ void compute_sfm_v(smem_t* v_smem,
 
 #pragma unroll
   for (uint32_t fz = 0; fz < num_frags_z;
-       ++fz) {  // k: num_warps_kv * num_frags_z * 16
+       ++fz) {
 #pragma unroll
-    for (uint32_t fy = 0; fy < num_frags_y; ++fy) {  // n: num_frags_y * 16
-      // [num_warps * num_frags_z * 16, num_frags_y * 16]
+    for (uint32_t fy = 0; fy < num_frags_y; ++fy) {
       uint32_t b_frag[4];
       v_smem->ldmatrix_m8n8x4_trans(*v_smem_offset_r, b_frag);
-#ifdef DEBUG_ATTN
-      if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 &&
-          blockIdx.z == 0) {
-        T* b_frag_T = reinterpret_cast<T*>(b_frag);
-        for (int i = 0; i < 8; ++i) {
-          printf("bbb fz: %d, fy: %d, b_frag[%d]: %f\n",
-                 (int)fz,
-                 (int)fy,
-                 (int)i,
-                 (float)b_frag_T[i]);
-        }
-      }
-      __syncthreads();
-#endif
 #pragma unroll
       for (uint32_t fx = 0; fx < num_frags_x; ++fx) {  // m: num_frags_x * 16
         mma_sync_m16n16k16_row_col_f16f16f32<T>(
             o_frag[fx][fy], (uint32_t*)(s_frag_f16[fx][fz]), b_frag);
-#ifdef DEBUG_ATTN
-        if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 &&
-            blockIdx.z == 0) {
-          for (int i = 0; i < 8; ++i) {
-            printf("ooo fx: %d, fy: %d, o_frag[%d]: %f\n",
-                   (int)fx,
-                   (int)fy,
-                   (int)i,
-                   (float)o_frag[fx][fy][i]);
-          }
-        }
-#endif
       }
       *v_smem_offset_r =
           v_smem->advance_offset_by_column<2>(*v_smem_offset_r, fy);
@@ -1749,8 +1294,8 @@ __device__ __forceinline__ void merge_res_multi_warps(
     for (uint32_t fy = 0; fy < num_frags_y; ++fy) {
       const int offset =
           tidx * num_frags_x * num_frags_y * 8 + fx * num_frags_y * 8 + fy * 8;
-      *(b128_t*)(&o_smem[offset]) = *(b128_t*)&o_frag[fx][fy];         // !!!
-      *(b128_t*)(&o_smem[offset + 4]) = *(b128_t*)&o_frag[fx][fy][4];  // !!!
+      *(b128_t*)(&o_smem[offset]) = *(b128_t*)&o_frag[fx][fy];
+      *(b128_t*)(&o_smem[offset + 4]) = *(b128_t*)&o_frag[fx][fy][4];
     }
   }
   if (tx % 4 == 0) {
@@ -1831,20 +1376,17 @@ __device__ __forceinline__ void write_o_reg_gmem_kv_multi_warps(
     for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
 #pragma unroll
       for (uint32_t fy = 0; fy < num_frags_y; ++fy) {
-        // 16 * 16
-        // 每个fy放16个数，vec size为8(f16/bf16)，所以y轴为2fy
         uint32_t o_frag_f16[4];
         vec_cast<T, float, 8>((T*)o_frag_f16, o_frag[fx][fy]);
         uint32_t o_smem_offset_w = smem_t::get_permuted_offset<
-            num_vecs_per_head>(  // num_vecs_per_head = num_frags_y * 16 / 8 =
-                                 // num_frags_y * 2
+            num_vecs_per_head>(
             fx * 16 + tx / 4,
             fy * 2);
         ((uint32_t*)(o_smem->base + o_smem_offset_w))[tx % 4] = o_frag_f16[0];
         ((uint32_t*)(o_smem->base + o_smem_offset_w +
                      8 * num_vecs_per_head))[tx % 4] = o_frag_f16[1];
         ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1)))[tx % 4] =
-            o_frag_f16[2];  // 2fy，异或1往右移一位
+            o_frag_f16[2];
         ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1) +
                      8 * num_vecs_per_head))[tx % 4] = o_frag_f16[3];
       }
@@ -1852,9 +1394,8 @@ __device__ __forceinline__ void write_o_reg_gmem_kv_multi_warps(
   }
   __syncthreads();
 
-  // smem连续存储到gmem上， [num_frags_x * 16, num_frags_y * 16]
   uint32_t o_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_head>(
-      ty * 4 + tx / 8, tx % 8);  // 每个warp一次搬4行，每次搬64个数
+      ty * 4 + tx / 8, tx % 8);
 
   o_idx_base += (tx / 8) / group_size;
   o_ptr_base += ((tx / 8) / group_size) * qo_n_stride +
@@ -1869,8 +1410,7 @@ __device__ __forceinline__ void write_o_reg_gmem_kv_multi_warps(
                ((fx * 16 + j * 4) % group_size) * qo_h_stride;
 #pragma unroll
     for (uint32_t fyo = 0; fyo < num_frags_y / 4;
-         ++fyo) {  // num_frags_y * 16 / (8[tid] *
-                   // num_elems_per_128b<T>()[vec_per_thread])
+         ++fyo) {
       if (o_idx < qo_upper_bound) {
         // need write
         o_smem->store_128b(o_smem_offset_w, o_ptr);
@@ -1882,7 +1422,6 @@ __device__ __forceinline__ void write_o_reg_gmem_kv_multi_warps(
     o_smem_offset_w =
         o_smem->advance_offset_by_row<16, num_vecs_per_head>(o_smem_offset_w) -
         2 * num_frags_y;
-    // }
   }
 }
 
@@ -1897,7 +1436,7 @@ struct StoreFunc {
       const float in_scale,
       const int i) {
     out_vec[i] = static_cast<OutT>(ori_out_vec[i]);
-    printf("Fatal!!! Unimplemented StoreFunc for cascade append attention\n");
+    printf("Fatal! Unimplemented StoreFunc for cascade append attention\n");
   }
 };
 
@@ -1968,53 +1507,28 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
     for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
 #pragma unroll
       for (uint32_t fy = 0; fy < num_frags_y; ++fy) {
-        // 16 * 16
-        // 每个fy放16个数，vec size为8(f16/bf16)，所以y轴为2fy
         uint32_t o_frag_f16[4];
         vec_cast<T, float, 8>((T*)o_frag_f16, o_frag[fx][fy]);
         uint32_t o_smem_offset_w = smem_t::get_permuted_offset<
-            num_vecs_per_head>(  // num_vecs_per_head = num_frags_y * 16 / 8 =
-                                 // num_frags_y * 2
+            num_vecs_per_head>(
             fx * 16 + tx / 4,
             fy * 2);
         ((uint32_t*)(o_smem->base + o_smem_offset_w))[tx % 4] = o_frag_f16[0];
         ((uint32_t*)(o_smem->base + o_smem_offset_w +
                      8 * num_vecs_per_head))[tx % 4] = o_frag_f16[1];
         ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1)))[tx % 4] =
-            o_frag_f16[2];  // 2fy，异或1往右移一位
+            o_frag_f16[2];
         ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1) +
                      8 * num_vecs_per_head))[tx % 4] = o_frag_f16[3];
       }
     }
   }
   __syncthreads();
-#ifdef DEBUG_ATTN
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-      blockIdx.x == gridDim.x - 1) {
-    printf("o_smem\n");
-    T* o_smem_t = reinterpret_cast<T*>(o_smem->base);
-    for (uint32_t i = 0; i < num_frags_x * 16; ++i) {
-      for (uint32_t j = 0; j < num_frags_y * 16; ++j) {
-        printf("o_smem[%d][%d] = %f  ",
-               (int)i,
-               (int)j,
-               (float)o_smem_t[i * num_frags_y * 16 + j]);
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
 
-  // smem连续存储到gmem上， [num_frags_x * 16, num_frags_y * 16]
   uint32_t o_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_head>(
-      ty * 4 + tx / 8, tx % 8);  // 每个warp一次搬4行，每次搬64个数
+      ty * 4 + tx / 8, tx % 8); 
 
   const uint32_t tx_offset = tx / 8;
-  // o_idx_base += (tx / 8) / group_size;
-  // o_ptr_base += ((tx / 8) / group_size) * qo_n_stride + ((tx / 8) %
-  // group_size) * qo_h_stride; uint32_t q_head_idx_now_base = q_head_idx_base +
-  // (tx / 8) % group_size;
 #pragma unroll
   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
     const uint32_t base_offset = o_idx_base + fx * 16 + tx_offset;
@@ -2023,33 +1537,14 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
     const uint32_t offset_now = base_offset + j * 4;
     const uint32_t n_offset = offset_now / group_size;
     const uint32_t h_offset = offset_now % group_size;
-#ifdef DEBUG_ATTN
-    __syncthreads();
-    if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-        blockIdx.x == gridDim.x - 1) {
-      printf("o_smem\n");
-      T* o_smem_t = reinterpret_cast<T*>(o_smem->base);
-      for (uint32_t i = 0; i < num_frags_x * 16; ++i) {
-        for (uint32_t j = 0; j < num_frags_y * 16; ++j) {
-          printf("o_smem[%d][%d] = %f  ",
-                 (int)i,
-                 (int)j,
-                 (float)o_smem_t[i * num_frags_y * 16 + j]);
-        }
-        printf("index:%d \n", n_offset * qo_n_stride + h_offset * qo_h_stride);
-      }
-    }
-    __syncthreads();
-#endif
+
     OutT* o_ptr = o_ptr_base + n_offset * qo_n_stride + h_offset * qo_h_stride;
 
     uint32_t shift_smooth_offset = (q_head_idx_base + h_offset) * head_dim +
                                    tx % 8 * num_elems_per_128b<T>();
 #pragma unroll
     for (uint32_t fyo = 0; fyo < num_frags_y / 4;
-         ++fyo) {  // num_frags_y * 16 / (8[tid] *
-                   // num_elems_per_128b<T>()[vec_per_thread])
-
+         ++fyo) {
       if (n_offset < qo_upper_bound) {
         if constexpr (!partition_kv) {
           if (in_scale > 0.0) {
@@ -2072,27 +1567,6 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
                                            out_vec,
                                            in_scale,
                                            i);
-#ifdef DEBUG_ATTN
-            __syncthreads();
-            if (threadIdx.x == PRINT_TID && threadIdx.y == 0 &&
-                blockIdx.z == 0 && blockIdx.x == gridDim.x - 1 &&
-                blockIdx.y == 0) {
-              printf(
-                  "write_o fx: %d, j: %d, fyo: %d, in_scale: %f, i: %d, "
-                  "shift_bias = %f, smooth_weight = %f, ori_out = %f, out_vec: "
-                  "%f\n",
-                  (int)fx,
-                  (int)j,
-                  (int)fyo,
-                  (float)in_scale,
-                  (int)i,
-                  (float)shift_bias_vec[i],
-                  (float)smooth_weight_vec[i],
-                  (float)ori_out_vec[i],
-                  (float)out_vec[i]);
-            }
-            __syncthreads();
-#endif
           }
           Store<OutT, VEC_SIZE>(out_vec, o_ptr);
         } else {
@@ -2107,7 +1581,6 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
     o_smem_offset_w =
         o_smem->advance_offset_by_row<16, num_vecs_per_head>(o_smem_offset_w) -
         2 * num_frags_y;
-    // }
   }
 }
 
@@ -2137,40 +1610,32 @@ __device__ __forceinline__ void write_o_reg_gmem_shift_smooth_quant(
   AlignedVector<T, VEC_SIZE> shift_bias_vec;
   AlignedVector<T, VEC_SIZE> smooth_weight_vec;
   AlignedVector<OutT, VEC_SIZE> out_vec;
-  // [num_warps * num_frags_x * 16, num_frags_y * 16]
 #pragma unroll
   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
 #pragma unroll
     for (uint32_t fy = 0; fy < num_frags_y; ++fy) {
-      // 每个fy放16个数，vec size为8(f16/bf16)，所以y轴为2fy
       uint32_t o_frag_f16[4];
       vec_cast<T, float, 8>((T*)o_frag_f16, o_frag[fx][fy]);
       uint32_t o_smem_offset_w = smem_t::get_permuted_offset<
-          num_vecs_per_head>(  // num_vecs_per_head = num_frags_y * 16 / 8 =
-                               // num_frags_y * 2
+          num_vecs_per_head>(
           (ty * num_frags_x + fx) * 16 + tx / 4,
           fy * 2);
       ((uint32_t*)(o_smem->base + o_smem_offset_w))[tx % 4] = o_frag_f16[0];
       ((uint32_t*)(o_smem->base + o_smem_offset_w +
                    8 * num_vecs_per_head))[tx % 4] = o_frag_f16[1];
       ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1)))[tx % 4] =
-          o_frag_f16[2];  // 2fy，异或1往右移一位
+          o_frag_f16[2];
       ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1) +
                    8 * num_vecs_per_head))[tx % 4] = o_frag_f16[3];
     }
   }
   __syncthreads();
 
-  // smem连续存储到gmem上， [num_frags_x * 16, num_frags_y * 16]
   uint32_t o_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_head>(
       ty * num_frags_x * 16 + tx / 8,
-      tx % 8);  // 每个warp一次搬4行，每次搬64个数
+      tx % 8);
 
   const uint32_t tx_offset = tx / 8;
-  // o_idx_base += (tx / 8) / group_size;
-  // o_ptr_base += ((tx / 8) / group_size) * qo_n_stride + ((tx / 8) %
-  // group_size) * qo_h_stride; uint32_t q_head_idx_now_base = q_head_idx_base +
-  // (tx / 8) % group_size;
 #pragma unroll
   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
     const uint32_t base_offset = o_idx_base + fx * 16 + tx_offset;
@@ -2185,8 +1650,7 @@ __device__ __forceinline__ void write_o_reg_gmem_shift_smooth_quant(
                                      tx % 8 * num_elems_per_128b<T>();
 #pragma unroll
       for (uint32_t fyo = 0; fyo < num_frags_y / 4;
-           ++fyo) {  // num_frags_y * 16 / (8[tid] *
-                     // num_elems_per_128b<T>()[vec_per_thread])
+           ++fyo) {
         if (n_offset < qo_upper_bound) {
           if (!partition_kv && in_scale > 0.0) {
             if (shift_bias) {
@@ -2206,26 +1670,6 @@ __device__ __forceinline__ void write_o_reg_gmem_shift_smooth_quant(
                                              out_vec,
                                              in_scale,
                                              i);
-#ifdef DEBUG_ATTN_C4
-              if (threadIdx.x == PRINT_TID && threadIdx.y == 0 &&
-                  blockIdx.z == 0) {
-                printf(
-                    "write_o fx: %d, j: %d, fyo: %d, shift_bias[%d] = %f, "
-                    "smooth_weight[%d] = %f, ori_out[%d] = %f, out_vec[%d]: "
-                    "%f\n",
-                    (int)fx,
-                    (int)j,
-                    (int)fyo,
-                    i,
-                    (float)shift_bias_vec[i],
-                    i,
-                    (float)smooth_weight_vec[i],
-                    i,
-                    (float)ori_out_vec[i],
-                    (float)out_vec[i]);
-              }
-              __syncthreads();
-#endif
             }
             Store<OutT, VEC_SIZE>(out_vec, o_ptr);
           } else {
@@ -2260,34 +1704,30 @@ __device__ __forceinline__ void write_o_reg_gmem(
   constexpr uint32_t num_vecs_per_head = head_dim / num_elems_per_128b<T>();
   const uint32_t tx = threadIdx.x, ty = threadIdx.y;
 
-  // [num_warps * num_frags_x * 16, num_frags_y * 16]
 #pragma unroll
   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
 #pragma unroll
     for (uint32_t fy = 0; fy < num_frags_y; ++fy) {
-      // 每个fy放16个数，vec size为8(f16/bf16)，所以y轴为2fy
       uint32_t o_frag_f16[4];
       vec_cast<T, float, 8>((T*)o_frag_f16, o_frag[fx][fy]);
       uint32_t o_smem_offset_w = smem_t::get_permuted_offset<
-          num_vecs_per_head>(  // num_vecs_per_head = num_frags_y * 16 / 8 =
-                               // num_frags_y * 2
+          num_vecs_per_head>(
           (ty * num_frags_x + fx) * 16 + tx / 4,
           fy * 2);
       ((uint32_t*)(o_smem->base + o_smem_offset_w))[tx % 4] = o_frag_f16[0];
       ((uint32_t*)(o_smem->base + o_smem_offset_w +
                    8 * num_vecs_per_head))[tx % 4] = o_frag_f16[1];
       ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1)))[tx % 4] =
-          o_frag_f16[2];  // 2fy，异或1往右移一位
+          o_frag_f16[2];
       ((uint32_t*)(o_smem->base + (o_smem_offset_w ^ 0x1) +
                    8 * num_vecs_per_head))[tx % 4] = o_frag_f16[3];
     }
   }
   __syncthreads();
 
-  // smem连续存储到gmem上， [num_frags_x * 16, num_frags_y * 16]
   uint32_t o_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_head>(
       ty * num_frags_x * 16 + tx / 8,
-      tx % 8);  // 每个warp一次搬4行，每次搬64个数
+      tx % 8);
 
   o_idx_base += (tx / 8) / group_size;
   o_ptr_base += ((tx / 8) / group_size) * qo_n_stride +
@@ -2301,10 +1741,8 @@ __device__ __forceinline__ void write_o_reg_gmem(
                  ((fx * 16 + j * 4) % group_size) * qo_h_stride;
 #pragma unroll
       for (uint32_t fyo = 0; fyo < num_frags_y / 4;
-           ++fyo) {  // num_frags_y * 16 / (8[tid] *
-                     // num_elems_per_128b<T>()[vec_per_thread])
+           ++fyo) {  
         if (o_idx < qo_upper_bound) {
-          // need write
           o_smem->store_128b(o_smem_offset_w, o_ptr);
         }
         o_ptr += 8 * num_elems_per_128b<T>();
@@ -2425,9 +1863,6 @@ __device__ __forceinline__ void merge_block_res(float (*o_frag)[num_frags_y][8],
                                                 float (*d)[2],
                                                 const uint32_t wid,
                                                 const uint32_t tid) {
-  // o [num_warps, 32, num_frags_x, num_frags_y, 8] -> [32, num_frags_x,
-  // num_frags_y, 8] md [num_warps, num_frags_x, 2, 32, 2] -> [num_frags_x, 2,
-  // 32, 2]
   float2* smem_md = reinterpret_cast<float2*>(md_smem);
 #pragma unroll
   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
@@ -2474,7 +1909,6 @@ __device__ __forceinline__ void merge_block_res(float (*o_frag)[num_frags_y][8],
   for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
 #pragma unroll
     for (uint32_t fy = 0; fy < num_frags_y; ++fy) {
-      // num_warps * 32 * 8 each time
       AlignedVector<float, 8> o_new;
 #pragma
       for (uint32_t o_id = 0; o_id < 8; ++o_id) {
@@ -2511,8 +1945,6 @@ __device__ __forceinline__ void merge_block_res_v2(
     float (*d)[2],
     const uint32_t wid,
     const uint32_t tid) {
-  // o: [num_warps, num_frags_x, num_frags_y, warp_size(32), 8]
-  // md: [num_warps, num_frags_x, 2, warp_size(32), 2 (m/d)]
   float2* smem_md = reinterpret_cast<float2*>(
       md_smem + num_frags_x * num_frags_y * 1024);  // 4 * 32 * 8
 #pragma unroll
@@ -2670,15 +2102,12 @@ __global__ void merge_multi_chunks_decoder_kernel(
   }
 #pragma unroll 2
   for (int i = ty; i < num_chunks_this_seq; i += bdy) {
-    // uint32_t offset = (start_token_idx * num_chunks + i) * num_heads + hid;
     uint32_t offset = (bid * num_chunks + i) * num_heads + hid;
     float m_prev = m;
     float d_prev = d;
     const float m_now = multi_m[offset];
     const float d_now = multi_d[offset];
     m = max(m_prev, m_now);
-    // offset = (start_token_idx * num_chunks * num_heads + i * num_heads + hid)
-    // * head_dim + vid * vec_size;
     offset = (bid * num_chunks * num_heads + i * num_heads + hid) * head_dim +
              vid * vec_size;
     Load<T, vec_size>(&multi_out[offset], &load_vec);
@@ -2719,11 +2148,6 @@ __global__ void merge_multi_chunks_decoder_kernel(
     }
 #pragma unroll
     for (int i = 0; i < vec_size; ++i) {
-      // float quant_value  = 127.0f * static_cast<float>((st.o[i] +
-      // shift_bias_vec[i]) * smooth_weight_vec[i]) * in_scale; quant_value =
-      // rintf(quant_value); quant_value = quant_value > 127.0f ? 127.0f :
-      // quant_value; quant_value = quant_value < -127.0f ? -127.0f :
-      // quant_value; out_vec[i] = static_cast<int8_t>(quant_value);
       StoreFunc<T, vec_size, OutT>()(
           st.o, shift_bias_vec, smooth_weight_vec, out_vec, in_scale, i);
     }
@@ -2760,7 +2184,6 @@ __global__ void merge_multi_chunks_v2_kernel(
     const int token_num,
     const int speculate_max_draft_token_num = 5) {
   const int vid = threadIdx.x, ty = threadIdx.y;
-  // const int qid = blockIdx.x, hid = blockIdx.y;
   const int hid = blockIdx.y;
   __shared__ T smem[bdy * HEAD_DIM];
   __shared__ float md_smem[bdy * 2];
@@ -2875,12 +2298,6 @@ __global__ void merge_multi_chunks_v2_kernel(
       }
 #pragma unroll
       for (int i = 0; i < vec_size; ++i) {
-        // float quant_value  = 127.0f * static_cast<float>((st.o[i] +
-        // shift_bias_vec[i]) * smooth_weight_vec[i]) * in_scale; quant_value =
-        // rintf(quant_value); quant_value = quant_value > 127.0f ? 127.0f :
-        // quant_value; quant_value = quant_value < -127.0f ? -127.0f :
-        // quant_value; out_vec[i] = static_cast<int8_t>(quant_value);
-
         StoreFunc<T, vec_size, OutT>()(
             st.o, shift_bias_vec, smooth_weight_vec, out_vec, in_scale, i);
       }

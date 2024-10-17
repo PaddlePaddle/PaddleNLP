@@ -561,6 +561,7 @@ void DecoderWriteCacheWithRoPEKernel(
   }
 }
 
+
 template void DecoderWriteCacheWithRoPEKernel<paddle::bfloat16, int>(
     const AppendAttnMetaData& meta_data,
     const paddle::Tensor&
