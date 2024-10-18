@@ -22,7 +22,6 @@ def cal_ratio(m, v, eps=1e-8):
     return 1 / (np.sqrt(v) + eps)
 
 
-# group-wise quantization (support symmetry, asymmetry)
 def group_wise_quant_dequant(
     inputs,
     mins=None,
@@ -33,15 +32,40 @@ def group_wise_quant_dequant(
     rank=-1,
     world_size=1,
     use_pd=False,
-    symetry=False,
+    symmetry=False,
 ):
+    """
+    group-wise quantization (support symmetry, asymmetry).
+    Args:
+        inputs (`paddle.Tensor`):
+            The tensor to quantize.
+        mins (`paddle.Tensor`):
+            Min scales tensor in asymmetry quantization.
+        maxs (`paddle.Tensor`):
+            Max scales tensor in asymmetry quantization, or Abs max tensor in symmetry quantization.
+        quant_bits (`int`):
+            Quantization bits.
+        group_size (`int`):
+            Group size of group-wise quantization.
+        quant (`bool`):
+            True when quantization, False in dequantization.
+        rank (`int`):
+            Model parallel rank.
+        world_size (`int`):
+            Model parallel world size.
+        use_pd (`bool`):
+            Whether to use paddle caculation. If False will use numpy.
+        symmetry (`bool`):
+            Whether to use symmetry quantization.
+    """
+
     qmax = (1 << (quant_bits)) - 1
     qmin = 0
     shape = inputs.shape
 
     if quant:
         inputs_processed = inputs.reshape([shape[0] // group_size, group_size, shape[1]])
-        if symetry:
+        if symmetry:
             bnt = (1 << (quant_bits - 1)) - 1
             scales = np.max(np.abs(inputs_processed), axis=1)
             new_scales = np.repeat(scales, repeats=group_size, axis=0)
@@ -60,7 +84,7 @@ def group_wise_quant_dequant(
         quant_tensor = np.nan_to_num(quant_tensor)
         return quant_tensor.astype("uint8"), mins, maxs
     else:
-        if symetry:
+        if symmetry:
             scales = mins
             bnt = (1 << (quant_bits - 1)) - 1
             if use_pd:
@@ -150,10 +174,32 @@ def cal_abs_min_max_channel(inputs, quant_axis=1):
     return abs_max_values, abs_min_values
 
 
-# channel-wise asymmetry quantization
 def asymmetry_qdq_weight(
-    x, quant_bit=8, quant_axis=-1, mins=None, maxs=None, dequant=False, rank=-1, world_size=1, peek=False
+    x, quant_bit=8, quant_axis=-1, mins=None, maxs=None, dequant=False, rank=-1, world_size=1, use_pd=False
 ):
+    """
+    channel-wise asymmetry quantization
+    Args:
+        x (`paddle.Tensor`):
+            The tensor to quantize.
+        quant_bits (`int`):
+            Quantization bits.
+        quant_axis (`int`):
+            Scales caculation axis.
+        mins (`paddle.Tensor`):
+            Min scales tensor in asymmetry quantization.
+        maxs (`paddle.Tensor`):
+            Max scales tensor in asymmetry quantization.
+        dequant (`bool`):
+            True when dequantization, False in quantization.
+        rank (`int`):
+            Model parallel rank.
+        world_size (`int`):
+            Model parallel world size.
+        use_pd (`bool`):
+            Whether to use paddle caculation. If False will use numpy.
+    """
+
     if mins is None:
         maxs, mins = cal_abs_min_max_channel(x)
     bnt = (1 << (quant_bit)) - 1
@@ -165,7 +211,7 @@ def asymmetry_qdq_weight(
     else:
         quant_x = x
         # dequant
-        if not peek:
+        if not use_pd:
             if len(scales.shape) == 0 or quant_x.shape[-1] == scales.shape[-1]:
                 qdq_x = (quant_x / bnt * scales) + mins
             else:
@@ -199,8 +245,28 @@ def cal_abs_max_channel(inputs, quant_axis=1):
     return abs_max_values
 
 
-# channel-wise symmetry quantization
-def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-1, world_size=1, peek=False):
+def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-1, world_size=1, use_pd=False):
+    """
+    channel-wise symmetry quantization
+    Args:
+        x (`paddle.Tensor`):
+            The tensor to quantize.
+        quant_bits (`int`):
+            Quantization bits.
+        quant_axis (`int`):
+            Scales caculation axis.
+        scales (`paddle.Tensor`):
+            Abs max scales tensor in symmetry quantization.
+        dequant (`bool`):
+            True when dequantization, False in quantization.
+        rank (`int`):
+            Model parallel rank.
+        world_size (`int`):
+            Model parallel world size.
+        use_pd (`bool`):
+            Whether to use paddle caculation. If False will use numpy.
+    """
+
     if scales is None:
         scales = cal_abs_max_channel(x)
     bnt = (1 << (quant_bit - 1)) - 1
@@ -211,7 +277,7 @@ def qdq_weight(x, quant_bit=8, quant_axis=-1, scales=None, dequant=False, rank=-
     else:
         quant_x = x
         # dequant
-        if not peek:
+        if not use_pd:
             if len(scales.shape) == 0 or quant_x.shape[-1] == scales.shape[-1]:
                 qdq_x = quant_x / bnt * scales
             else:

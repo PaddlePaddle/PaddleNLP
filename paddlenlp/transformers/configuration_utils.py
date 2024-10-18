@@ -269,9 +269,6 @@ class LlmMetaConfig:
         ),
         ("recompute_use_reentrant", bool, False, "recompute_use_reentrant"),
     ]
-    checkpoint_compression = [
-        ("ckpt_quant_stage", str, "O0", "checkpoint quantization stage."),
-    ]
 
     @classmethod
     def _get_defaults(cls):
@@ -280,7 +277,6 @@ class LlmMetaConfig:
             cls.op_fusion_attributes,
             cls.hybrid_parallel_attributes,
             cls.recompute_attributes,
-            cls.checkpoint_compression,
         ]:
             for attr in attrs:
                 # return dict of key and default values
@@ -294,7 +290,6 @@ class LlmMetaConfig:
             cls.op_fusion_attributes,
             cls.hybrid_parallel_attributes,
             cls.recompute_attributes,
-            cls.checkpoint_compression,
         ]:
             for attr in attrs:
                 # return dict of key and default values

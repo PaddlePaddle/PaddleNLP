@@ -14,6 +14,7 @@
 
 import paddle
 import paddle.distributed as dist
+from paddle.distributed import fleet
 
 from paddlenlp.utils.checkpoint_quantization_utils import (
     asymmetry_qdq_weight,
@@ -72,7 +73,7 @@ def quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage):
                     # m1: m1_quant_weight, m2: ratio
                     m1_key = k.split("/")[0] + "/" + MOMENT1_KEYNAME
                     ratio = cal_ratio(state_dict[m1_key], state_dict[k])
-                    m1_quant, m1_codebook = group_wise_quant_dequant(state_dict[m1_key], quant_bits=4, symetry=True)
+                    m1_quant, m1_codebook = group_wise_quant_dequant(state_dict[m1_key], quant_bits=4, symmetry=True)
                     quant_weight, r_mins, r_maxs = group_wise_quant_dequant(ratio, quant_bits=4)
                     quant_weight = merge_int4(m1_quant, quant_weight)
                     codebook_dict[m1_key + SYMMETRY_QUANT_SCALE] = m1_codebook
