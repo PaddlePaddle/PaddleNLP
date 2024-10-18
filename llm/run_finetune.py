@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import datetime
 import json
+import logging
 import os
 import sys
 from functools import partial
@@ -22,9 +24,10 @@ from utils.argument import (
     GenerateArgument,
     ModelArgument,
     QuantArgument,
+    ReftArgument,
     TrainingArguments,
 )
-from utils.data import get_convert_example
+from utils.data import convert_example_for_reft, get_convert_example
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import (
@@ -40,6 +43,14 @@ from paddlenlp.peft import (
     PrefixModelForCausalLM,
     VeRAConfig,
     VeRAModel,
+)
+from paddlenlp.peft.reft import (
+    ReFTConfig,
+    ReftDataCollator,
+    ReFTModel,
+    ReFTTrainer,
+    do_predict,
+    intervention_mapping,
 )
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
@@ -73,11 +84,13 @@ flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
 
 
 def main():
-    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
+    parser = PdArgumentParser(
+        (GenerateArgument, QuantArgument, ModelArgument, ReftArgument, DataArgument, TrainingArguments)
+    )
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+        gen_args, quant_args, model_args, reft_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        gen_args, quant_args, model_args, reft_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -109,6 +122,7 @@ def main():
     if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
         try:
             from paddle_xpu.layers.nn.linear import LinearConfig  # noqa: F401
+
             LinearConfig.enable_accumulate_steps_opt()
             LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
         except ImportError:
@@ -207,6 +221,17 @@ def main():
         )
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
+    if model_args.reft:
+        # reft requires padding side right
+        tokenizer.padding_side = "right"
+        # 默认使用eos_token_id
+        # tokenizer.pad_token_id = tokenizer.unk_token_id
+        layers = reft_args.layers
+        if reft_args.layers != "all":
+            layers = [int(l) for l in layers.split(";")]
+        else:
+            layers = [l for l in range(model_config.num_hidden_layers)]
+        logging.info("Using reft with layers: ", layers)
     # init chat_template for tokenizer
     init_chat_template(tokenizer, model_args.model_name_or_path, data_args.chat_template)
 
@@ -232,7 +257,7 @@ def main():
             )[0]
         else:
             train_ds = None
-        if training_args.do_eval:
+        if training_args.do_eval or model_args.reft:
             dev_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
@@ -344,6 +369,14 @@ def main():
         from utils.data import convert_example_common
 
         trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
+    elif model_args.reft:
+        trans_func = partial(
+            convert_example_for_reft,
+            tokenizer=tokenizer,
+            data_args=data_args,
+            positions=reft_args.position,
+            num_interventions=len(layers),
+        )
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
 
@@ -471,6 +504,37 @@ def main():
 
         model.print_trainable_parameters()
 
+    if model_args.reft:
+        intervention_dtype = dtype
+        intervention_params = {
+            "embed_dim": model_config.hidden_size,
+            "low_rank_dimension": reft_args.rank,
+            "dropout": reft_args.dropout,
+            "dtype": intervention_dtype,
+            "act_fn": reft_args.act_fn,
+            "device": "gpu",
+            "add_bias": reft_args.add_bias,
+        }
+        representations = [
+            {
+                "layer": l,
+                "component": "block_output",
+                "low_rank_dimension": reft_args.rank,
+                "intervention": intervention_mapping[reft_args.intervention_type](**intervention_params),
+            }
+            for l in layers
+        ]
+        reft_config = ReFTConfig(
+            representations=representations, intervention_params=intervention_params, position=reft_args.position
+        )
+        # get reft model
+        reft_model = ReFTModel(reft_config, model)
+        # disable origianl model gradients
+        reft_model.disable_model_gradients()
+        # reft_model = get_reft_model(model, reft_config, set_device=False)
+        reft_model.print_trainable_parameters()
+        reft_model.model.train()
+
     def compute_metrics_do_generation(eval_preds):
         rouge1 = Rouge1()
         rouge2 = Rouge2()
@@ -538,30 +602,57 @@ def main():
     else:
         metrics = compute_metrics
 
-    trainer = CausalLMTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_ds,
-        eval_dataset=dev_ds,
-        tokenizer=tokenizer,
-        compute_metrics=metrics,
-        data_collator=DataCollatorForSeq2Seq(
+    if model_args.reft:
+        data_collator_fn = DataCollatorForSeq2Seq(
+            tokenizer=tokenizer, model=model, label_pad_token_id=-100, padding="longest"
+        )
+        data_collator = ReftDataCollator(data_collator=data_collator_fn)
+        trainer = ReFTTrainer(
+            model=reft_model,
             tokenizer=tokenizer,
-            max_length=max_length,
-            padding=padding,
-            max_label_length=max_length,
-            return_tensors="np",
-            return_attention_mask=not model_args.flash_mask,
-            pad_to_multiple_of=data_args.pad_to_multiple_of,
-        ),
-        do_generation=data_args.eval_with_do_generation,
-        callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
-        gen_args=gen_args,
-        data_args=data_args,
-    )
+            args=training_args,
+            train_dataset=train_ds,
+            data_collator=data_collator,
+            eval_dataset=None,
+            compute_metrics=None,
+        )
+        trainer.train()
+        run_name = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        reft_model.save(f"{training_args.output_dir}/{run_name}")
+        # 预测
+        print(dev_ds[0])
+        do_predict(
+            intervenable=reft_model,
+            tokenizer=tokenizer,
+            eval_dataset=dev_ds,
+            batch_size=training_args.per_device_eval_batch_size,
+            predict_path=f"{training_args.output_dir}/pred_result.json",
+        )
+    else:
+        trainer = CausalLMTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=train_ds,
+            eval_dataset=dev_ds,
+            tokenizer=tokenizer,
+            compute_metrics=metrics,
+            data_collator=DataCollatorForSeq2Seq(
+                tokenizer=tokenizer,
+                max_length=max_length,
+                padding=padding,
+                max_label_length=max_length,
+                return_tensors="np",
+                return_attention_mask=not model_args.flash_mask,
+                pad_to_multiple_of=data_args.pad_to_multiple_of,
+            ),
+            do_generation=data_args.eval_with_do_generation,
+            callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
+            gen_args=gen_args,
+            data_args=data_args,
+        )
 
     # Train
-    if training_args.do_train:
+    if training_args.do_train and not model_args.reft:
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:
             checkpoint = training_args.resume_from_checkpoint
