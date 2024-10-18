@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 else:
     TOKENIZER_MAPPING_NAMES = OrderedDict(
         [
-            ("albert", (("AlbertTokenizer", "AlbertChineseTokenizer", "AlbertEnglishTokenizer"),)),
+            ("albert", (("AlbertTokenizer", "AlbertChineseTokenizer", "AlbertEnglishTokenizer"), None)),
             ("bart", "BartTokenizer"),
             ("bert", "BertTokenizer"),
             ("blenderbot", "BlenderbotTokenizer"),
@@ -72,7 +72,7 @@ else:
             ),
             ("luke", "LukeTokenizer"),
             ("mamba", "MambaTokenizer"),
-            ("mbart", (("MBartTokenizer", "MBart50Tokenizer"),)),
+            ("mbart", (("MBartTokenizer", "MBart50Tokenizer"), None)),
             ("mobilebert", "MobileBertTokenizer"),
             ("mpnet", "MPNetTokenizer"),
             ("nezha", "NeZhaTokenizer"),
@@ -140,11 +140,7 @@ def tokenizer_class_from_name(class_name: str):
     for module_name, tokenizers in TOKENIZER_MAPPING_NAMES.items():
         all_tokenizers = []
         if isinstance(tokenizers, tuple):
-            if len(tokenizers) == 2:
-                tokenizer_slow, tokenizer_fast = tokenizers
-            else:
-                tokenizer_slow = tokenizers[0]
-                tokenizer_fast = None
+            (tokenizer_slow, tokenizer_fast) = tokenizers
             if isinstance(tokenizer_slow, tuple):
                 all_tokenizers.extend(tokenizer_slow)
             else:
@@ -409,18 +405,20 @@ class AutoTokenizer:
         if model_type is not None:
             tokenizer_class_py = TOKENIZER_MAPPING[type(config)]
             if isinstance(tokenizer_class_py, (list, tuple)):
-                if len(tokenizer_class_py) == 2:
-                    tokenizer_class_fast = tokenizer_class_py[1]
-                    tokenizer_class_py = tokenizer_class_py[0]
-                else:
-                    tokenizer_class_fast = None
+                (tokenizer_class_py, tokenizer_class_fast) = tokenizer_class_py
             else:
                 tokenizer_class_fast = None
             if tokenizer_class_fast and (use_fast or tokenizer_class_py is None):
                 return tokenizer_class_fast.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
             else:
                 if tokenizer_class_py is not None:
-                    return tokenizer_class_py.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+                    if isinstance(tokenizer_class_py, str):
+                        return tokenizer_class_py.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+                    else:
+                        # Use the first tokenizer class in the list
+                        return tokenizer_class_py[0].from_pretrained(
+                            pretrained_model_name_or_path, *model_args, **kwargs
+                        )
                 else:
                     raise ValueError(
                         "This tokenizer cannot be instantiated. Please make sure you have `sentencepiece` installed "
