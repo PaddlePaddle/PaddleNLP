@@ -20,7 +20,7 @@ from uvicorn.config import LOGGING_CONFIG
 
 from paddlenlp.utils.import_utils import is_package_available
 
-# check whether the package is avaliable and give friendly description.
+# check whether the package is available and give friendly description.
 if not is_package_available("typer"):
     raise ModuleNotFoundError(
         "paddlenlp-cli tools is not installed correctly, you can use the following command"
@@ -110,7 +110,7 @@ def download(
     >>> paddlenlp download -c ./my-models -f bert \n
 
     Args:\n
-        model_name (str): pretarined model name, you can checkout all of model from source code. \n
+        model_name (str): pretrained model name, you can checkout all of model from source code. \n
         cache_dir (str, optional): the cache_dir. Defaults to "./models".
     """
     if not os.path.isabs(cache_dir):
@@ -241,7 +241,7 @@ def install(
 
 
 def main():
-    """the PaddleNLPCLI entry"""
+    """the PaddleNLP CLI entry"""
     app()
 
 
