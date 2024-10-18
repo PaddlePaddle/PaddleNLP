@@ -447,6 +447,7 @@ class TrainingArguments:
         },
     )
     logging_dir: Optional[str] = field(default=None, metadata={"help": "VisualDL log dir."})
+    output_signal_dir: Optional[str] = field(default=None, metadata={"help": "Asynchronous saving signal dir."})
     logging_strategy: IntervalStrategy = field(
         default="steps",
         metadata={"help": "The logging strategy to use."},
@@ -914,6 +915,10 @@ class TrainingArguments:
             self.logging_dir = os.path.join(self.output_dir, default_logdir())
         if self.logging_dir is not None:
             self.logging_dir = os.path.expanduser(self.logging_dir)
+        if self.output_signal_dir is None and self.output_dir is not None:
+            self.output_signal_dir = self.output_dir
+        if self.output_signal_dir is not None:
+            self.output_signal_dir = os.path.expanduser(self.output_signal_dir)
 
         if self.disable_tqdm is None:
             self.disable_tqdm = False  # logger.getEffectiveLevel() > logging.WARN
