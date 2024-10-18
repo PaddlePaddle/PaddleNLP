@@ -153,6 +153,19 @@ std::vector<paddle::Tensor> RebuildAppendPadding(const paddle::Tensor& input,
 }
 
 
+std::vector<std::vector<int64_t>> RebuildAppendPaddingInferShape(
+    const std::vector<int64_t>& input_shape,
+    const std::vector<int64_t>& cum_offsets_shape,
+    const std::vector<int64_t>& seq_len_decoder_shape,
+    const std::vector<int64_t>& seq_len_encoder_shape,
+    const std::vector<int64_t>& output_padding_offset_shape) {
+  int64_t dim_embed = input_shape[1];
+  std::vector<int64_t> dynamic_shape = {-1, dim_embed};
+
+  return {dynamic_shape};
+}
+
+
 std::vector<paddle::DataType> RebuildAppendPaddingInferDtype(const paddle::DataType& input_dtype, 
                                                             const paddle::DataType& cum_offsets_dtype,
                                                             const paddle::DataType& seq_len_decoder_dtype,
@@ -166,4 +179,5 @@ PD_BUILD_OP(rebuild_append_padding)
     .Outputs({"output"})
     .Attrs({"max_seq_len: int", "dim_embed: int"})
     .SetKernelFn(PD_KERNEL(RebuildAppendPadding))
+    .SetInferShapeFn(PD_INFER_SHAPE(RebuildAppendPaddingInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(RebuildAppendPaddingInferDtype));
