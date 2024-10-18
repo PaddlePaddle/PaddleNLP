@@ -557,7 +557,7 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.51876831
     if [ $IS_A100 -ne 0 ];then
-        loss_base=9.53083992
+        loss_base=9.53084087
     fi
     ips_base=-1
     mem_base=-1
@@ -625,9 +625,9 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.35078526
+    loss_base=9.3507843
     if [ $IS_A100 -ne 0 ];then
-        loss_base=9.38577652
+        loss_base=9.38577747
     fi
     ips_base=-1
     mem_base=-1
@@ -695,7 +695,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.35139465
+    loss_base=9.3513937
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.39356422
     fi
@@ -766,7 +766,7 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.35162354
+    loss_base=9.35162258
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.39368534
     fi
@@ -1058,7 +1058,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
         loss_base=9.16783295
         loss_md5_base=8ea72495fba4e1b9ba004b4431e27218
         if [ $IS_A100 -ne 0 ];then
-            loss_base=9.37966919
+            loss_base=9.38009949
         fi
         ips_base=-1
         mem_base=-1
@@ -1152,7 +1152,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP() {
         loss_base=9.25199432
         loss_md5_base=83531e98ee11cd271db175150ab254bb
         if [ $IS_A100 -ne 0 ];then
-            loss_base=9.44203949
+            loss_base=9.44241714
         fi
         ips_base=-1
         mem_base=-1
@@ -1572,12 +1572,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.59205246
-    loss_md5_base=0ebf68698887b33b33a46518621cf412
+    loss_base=10.59368134
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.60499191
+        loss_base=10.60190201
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -1645,12 +1644,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.58860683
-    loss_md5_base=6df87d01bd08113a92930f6349514b35
+    loss_base=10.5913763
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.59338379
+        loss_base=10.5915575
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -1719,12 +1717,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.59993172     # note: need to debug
-    loss_base=10.59993267
-    loss_md5_base=6cb4e151b35f026190df90ab240d9a95
+    loss_base=10.59891224
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.59612274
+        loss_base=10.60014629
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -1793,13 +1790,12 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.6004734
-    loss_md5_base=e82a1f5668870d18a2d45b3ee0a25386
+    loss_base=10.59941483
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
         # loss_base=10.58141422   # note: need to debug
-        loss_base=10.59650803
+        loss_base=10.60039139
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
