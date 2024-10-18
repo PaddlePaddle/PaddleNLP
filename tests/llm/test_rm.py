@@ -33,7 +33,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
 
     def setUp(self) -> None:
         LLMTest.setUp(self)
-        sys.path.insert(0,"./llm/alignment/rm/flashmask")
+        sys.path.insert(0, "./llm/alignment/rm/flashmask")
 
     def tearDown(self) -> None:
         LLMTest.tearDown(self)
