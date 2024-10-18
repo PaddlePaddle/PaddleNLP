@@ -14,7 +14,6 @@
 
 import paddle
 import paddle.distributed as dist
-from paddle.distributed import fleet
 
 from paddlenlp.utils.checkpoint_quantization_utils import (
     asymmetry_qdq_weight,

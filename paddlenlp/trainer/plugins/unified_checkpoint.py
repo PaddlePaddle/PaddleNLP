@@ -75,7 +75,6 @@ from paddlenlp.utils.env import (
     SAFE_PEFT_WEIGHTS_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
-    SYMMETRY_QUANT_SCALE,
 )
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.nested import nested_copy, nested_copy_place
@@ -461,7 +460,7 @@ class UnifiedCheckpointHandler:
             new_name = static2struct_name_mappings[static_name] + "/" + type_name
             optim_state_dict[new_name] = optim_state_dict.pop(key)
 
-        if UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value in args.unified_checkpoint_config:
+        if UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value in self.args.unified_checkpoint_config:
             logger.info("Skip master weight saving.")
             master_weights = None
 
@@ -536,7 +535,6 @@ class UnifiedCheckpointHandler:
         if has_master_weights:
             master_weights = load_file(master_weights_path)
 
-        scale_dict = {}
         # rename and move to paddle.Tensor
         for key in list(optimizer_state_dict.keys()):
             key_name = key.split("/")
@@ -1096,7 +1094,9 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         if len(resolved_archive_file_mw) > 1:
             resolved_archive_file_mw = tqdm(resolved_archive_file_mw, desc="Loading master weights shards")
 
-    def load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, is_master_weights=False):
+    def load_resolved_archive_file(
+        resolved_archive_file, sharded_metadata, expected_keys, is_master_weights=False, ckpt_quant_stage="O0"
+    ):
         returned_state_dict = {}
         # load optimizer
         for shard_file in resolved_archive_file:
@@ -1124,7 +1124,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
                         tp_actions,
                         expected_keys,
                         device="expected",
-                        ckpt_quant_stage=self.args.ckpt_quant_stage,
+                        ckpt_quant_stage=ckpt_quant_stage,
                     )
                 else:
                     # for pipeline model, we don't need to use tp_actions
@@ -1133,7 +1133,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
                         None,
                         expected_keys,
                         device="expected",
-                        ckpt_quant_stage=self.args.ckpt_quant_stage,
+                        ckpt_quant_stage=ckpt_quant_stage,
                     )
 
             returned_state_dict.update(state_dict)
@@ -1142,7 +1142,9 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             gc.collect()
         return returned_state_dict
 
-    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys)
+    state_dict_optim = load_resolved_archive_file(
+        resolved_archive_file, sharded_metadata, expected_keys, ckpt_quant_stage=args.ckpt_quant_stage
+    )
     if has_master_weights:
         state_dict_master_weight = load_resolved_archive_file(
             resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weights=True
@@ -1289,8 +1291,8 @@ def unified_optimizer_into_shards(
         use_expert_parallel=args.use_expert_parallel,
     )
     sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
-    if self.args.ckpt_quant_stage in ["O1", "O2"]:
-        sharded_optim_index["ckpt_quant_stage"] = self.args.ckpt_quant_stage
+    if args.ckpt_quant_stage in ["O1", "O2"]:
+        sharded_optim_index["ckpt_quant_stage"] = args.ckpt_quant_stage
 
     if master_weights is not None:
         index_master_weight_filelist, total_master_weight_size_list = gather_sharded_object(
@@ -1939,7 +1941,7 @@ def load_single_card_optimizer(args, model, optimizer, resume_from_checkpoint: s
     )
     if has_master_weights:
         state_dict_optim_mw = load_state_dict(
-            resolved_archive_file_mw[0], None, expected_keys_mw, ckpt_quant_stage=self.args.ckpt_quant_stage
+            resolved_archive_file_mw[0], None, expected_keys_mw, ckpt_quant_stage=args.ckpt_quant_stage
         )
 
     for key in list(state_dict_optim.keys()):

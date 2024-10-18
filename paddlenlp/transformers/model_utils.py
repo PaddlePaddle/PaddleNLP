@@ -394,97 +394,99 @@ def load_state_dict(
                 for k in list(state_dict.keys()):
                     with device_guard():
                         state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
-            rank, world_size = -1, 1
-            if paddle.distributed.get_world_size() > 1:
-                hcg = fleet.get_hybrid_communicate_group()
-                tp_group = hcg.get_model_parallel_group()
-                rank, world_size = tp_group.rank, tp_group.nranks
 
-            if ckpt_quant_stage == "O1":
-                # set eps
-                eps = 1e-8
-                for quant_key in state_dict.keys():
-                    is_moment1 = MOMENT1_KEYNAME in quant_key
-                    is_moment2 = MOMENT2_KEYNAME in quant_key
-                    if is_moment1:
-                        # dequant m1
-                        scale_key = quant_key + SYMMETRY_QUANT_SCALE
+            if quant:
+                rank, world_size = -1, 1
+                if paddle.distributed.get_world_size() > 1:
+                    hcg = fleet.get_hybrid_communicate_group()
+                    tp_group = hcg.get_model_parallel_group()
+                    rank, world_size = tp_group.rank, tp_group.nranks
+
+                if ckpt_quant_stage == "O1":
+                    # set eps
+                    eps = 1e-8
+                    for quant_key in state_dict.keys():
+                        is_moment1 = MOMENT1_KEYNAME in quant_key
+                        is_moment2 = MOMENT2_KEYNAME in quant_key
+                        if is_moment1:
+                            # dequant m1
+                            scale_key = quant_key + SYMMETRY_QUANT_SCALE
+                            weight = state_dict[quant_key]
+                            scales = scale_dict[scale_key]
+                            weight, _ = qdq_weight(
+                                weight,
+                                scales=scales,
+                                quant_bit=8,
+                                dequant=True,
+                                rank=rank,
+                                world_size=world_size,
+                                use_pd=True,
+                            )
+                            state_dict[quant_key] = weight
+                        elif is_moment2:
+                            # dequant ratio
+                            weight = state_dict[quant_key]
+                            min_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MIN
+                            max_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MAX
+                            mins, maxs = scale_dict[min_scale_key], scale_dict[max_scale_key]
+                            weight, _ = asymmetry_qdq_weight(
+                                weight,
+                                mins=mins,
+                                maxs=maxs,
+                                quant_bit=8,
+                                dequant=True,
+                                rank=rank,
+                                world_size=world_size,
+                                use_pd=True,
+                            )
+                            # cal m2
+                            weight = paddle.square(1.0 / weight - eps)
+                            state_dict[quant_key] = weight
+                elif ckpt_quant_stage == "O2":
+                    # set eps
+                    eps = 1e-8
+                    m1_state_dict = {}
+                    for quant_key in state_dict.keys():
+                        if state_dict[quant_key].dtype != paddle.int8:
+                            logger.info(f"{quant_key} skip.")
+                            continue
+                        # split int8
                         weight = state_dict[quant_key]
-                        scales = scale_dict[scale_key]
-                        weight, _ = qdq_weight(
-                            weight,
-                            scales=scales,
-                            quant_bit=8,
-                            dequant=True,
-                            rank=rank,
-                            world_size=world_size,
-                            use_pd=True,
-                        )
-                        state_dict[quant_key] = weight
-                    elif is_moment2:
+                        m1_quant, ratio_quant = split_int8(weight.numpy())
                         # dequant ratio
-                        weight = state_dict[quant_key]
-                        min_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MIN
-                        max_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MAX
-                        mins, maxs = scale_dict[min_scale_key], scale_dict[max_scale_key]
-                        weight, _ = asymmetry_qdq_weight(
-                            weight,
-                            mins=mins,
-                            maxs=maxs,
-                            quant_bit=8,
-                            dequant=True,
+                        ratio_min_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MIN
+                        ratio_max_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MAX
+                        m1_scale_key = quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME + SYMMETRY_QUANT_SCALE
+                        m1_codebook = scale_dict[m1_scale_key]
+                        ratio_mins, ratio_maxs = scale_dict[ratio_min_scale_key], scale_dict[ratio_max_scale_key]
+                        m1_weight = group_wise_quant_dequant(
+                            m1_quant,
+                            mins=m1_codebook,
+                            maxs=None,
+                            quant_bits=4,
+                            quant=False,
+                            rank=rank,
+                            world_size=world_size,
+                            use_pd=True,
+                            symmetry=True,
+                        )
+                        ratio_weight = group_wise_quant_dequant(
+                            ratio_quant,
+                            mins=ratio_mins,
+                            maxs=ratio_maxs,
+                            quant_bits=4,
+                            quant=False,
                             rank=rank,
                             world_size=world_size,
                             use_pd=True,
                         )
-                        # cal m2
-                        weight = paddle.square(1.0 / weight - eps)
-                        state_dict[quant_key] = weight
-            elif ckpt_quant_stage == "O2":
-                # set eps
-                eps = 1e-8
-                m1_state_dict = {}
-                for quant_key in state_dict.keys():
-                    if state_dict[quant_key].dtype != paddle.int8:
-                        logger.info(f"{quant_key} skip.")
-                        continue
-                    # split int8
-                    weight = state_dict[quant_key]
-                    m1_quant, ratio_quant = split_int8(weight.numpy())
-                    # dequant ratio
-                    ratio_min_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MIN
-                    ratio_max_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MAX
-                    m1_scale_key = quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME + SYMMETRY_QUANT_SCALE
-                    m1_codebook = scale_dict[m1_scale_key]
-                    ratio_mins, ratio_maxs = scale_dict[ratio_min_scale_key], scale_dict[ratio_max_scale_key]
-                    m1_weight = group_wise_quant_dequant(
-                        m1_quant,
-                        mins=m1_codebook,
-                        maxs=None,
-                        quant_bits=4,
-                        quant=False,
-                        rank=rank,
-                        world_size=world_size,
-                        use_pd=True,
-                        symmetry=True,
-                    )
-                    ratio_weight = group_wise_quant_dequant(
-                        ratio_quant,
-                        mins=ratio_mins,
-                        maxs=ratio_maxs,
-                        quant_bits=4,
-                        quant=False,
-                        rank=rank,
-                        world_size=world_size,
-                        use_pd=True,
-                    )
 
-                    ratio_weight = paddle.square(1.0 / ratio_weight - eps)
-                    state_dict[quant_key] = ratio_weight
-                    m1_state_dict[quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME] = m1_weight
-                    state_dict.update(m1_state_dict)
+                        ratio_weight = paddle.square(1.0 / ratio_weight - eps)
+                        state_dict[quant_key] = ratio_weight
+                        m1_state_dict[quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME] = m1_weight
+                        state_dict.update(m1_state_dict)
 
-            return state_dict
+                return state_dict
 
     state_dict = paddlenlp_load(checkpoint_file, map_location="cpu")
     return state_dict
