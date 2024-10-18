@@ -511,13 +511,14 @@ class UnifiedCheckpointHandler:
             state_dict_type="optimizer_weight",
             ckpt_quant_stage=self.args.ckpt_quant_stage,
         )
-        self._file_save_async_or_sync(
-            master_weights,
-            path=os.path.join(output_dir, master_weights_name),
-            signal_path=signal_dir,
-            is_sync=is_sync_save,
-            state_dict_type="master_weight",
-        )
+        if master_weights is not None:
+            self._file_save_async_or_sync(
+                master_weights,
+                path=os.path.join(output_dir, master_weights_name),
+                signal_path=signal_dir,
+                is_sync=is_sync_save,
+                state_dict_type="master_weight",
+            )
 
     def load_non_merge_optimizer(self, model, optimizer, resume_from_checkpoint):
         # init and get optimizer LR_Scheduler

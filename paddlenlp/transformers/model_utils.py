@@ -486,7 +486,7 @@ def load_state_dict(
                         m1_state_dict[quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME] = m1_weight
                         state_dict.update(m1_state_dict)
 
-                return state_dict
+            return state_dict
 
     state_dict = paddlenlp_load(checkpoint_file, map_location="cpu")
     return state_dict
