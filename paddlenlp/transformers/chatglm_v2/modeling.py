@@ -147,7 +147,7 @@ def apply_rotary_pos_emb(x: paddle.Tensor, rope_cache: paddle.Tensor) -> paddle.
         -1,
     )
     x_out2 = x_out2.flatten(3)
-    return paddle.concat((x_out2, x_pass), axis=-1)
+    return paddle.concat((x_out2, x_pass.cast(x_out2.dtype)), axis=-1)
 
 
 class RMSNorm(nn.Layer):

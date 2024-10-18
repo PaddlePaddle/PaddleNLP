@@ -447,6 +447,7 @@ class TrainingArguments:
         },
     )
     logging_dir: Optional[str] = field(default=None, metadata={"help": "VisualDL log dir."})
+    output_signal_dir: Optional[str] = field(default=None, metadata={"help": "Asynchronous saving signal dir."})
     logging_strategy: IntervalStrategy = field(
         default="steps",
         metadata={"help": "The logging strategy to use."},
@@ -914,6 +915,10 @@ class TrainingArguments:
             self.logging_dir = os.path.join(self.output_dir, default_logdir())
         if self.logging_dir is not None:
             self.logging_dir = os.path.expanduser(self.logging_dir)
+        if self.output_signal_dir is None and self.output_dir is not None:
+            self.output_signal_dir = self.output_dir
+        if self.output_signal_dir is not None:
+            self.output_signal_dir = os.path.expanduser(self.output_signal_dir)
 
         if self.disable_tqdm is None:
             self.disable_tqdm = False  # logger.getEffectiveLevel() > logging.WARN
@@ -1120,6 +1125,7 @@ class TrainingArguments:
                                 "enable_clear_every_step_cache",
                                 "enable_overlap_p2p_comm",
                                 "disable_batch_p2p_comm",
+                                "best_unbalanced_scheduler",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -1158,6 +1164,7 @@ class TrainingArguments:
                         "overlap_p2p_comm": "enable_overlap_p2p_comm" in pipeline_parallel_config,
                         "clear_every_step_cache": "enable_clear_every_step_cache" in pipeline_parallel_config,
                         "use_batch_p2p_comm": "disable_batch_p2p_comm" not in pipeline_parallel_config,
+                        "best_unbalanced_scheduler": "best_unbalanced_scheduler" in pipeline_parallel_config,
                     }
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
