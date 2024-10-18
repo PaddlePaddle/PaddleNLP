@@ -45,12 +45,12 @@ from paddlenlp.peft import (
     VeRAModel,
 )
 from paddlenlp.peft.reft import (
-    LoreftIntervention,
     ReFTConfig,
     ReftDataCollator,
     ReFTModel,
     ReFTTrainer,
     do_predict,
+    intervention_mapping,
 )
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
@@ -520,7 +520,7 @@ def main():
                 "layer": l,
                 "component": "block_output",
                 "low_rank_dimension": reft_args.rank,
-                "intervention": LoreftIntervention(**intervention_params),
+                "intervention": intervention_mapping[reft_args.intervention_type](**intervention_params),
             }
             for l in layers
         ]

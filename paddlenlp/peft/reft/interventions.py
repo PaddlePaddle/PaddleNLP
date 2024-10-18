@@ -145,3 +145,6 @@ class TinyIntervention(nn.Layer):
         self.param_B.set_value(state_dict["param_B"])
         self.param_a.set_value(state_dict["param_a"])
         self.param_b.set_value(state_dict["param_b"])
+
+
+intervention_mapping = {"LoreftIntervention": LoreftIntervention, "TinyIntervention": TinyIntervention}
