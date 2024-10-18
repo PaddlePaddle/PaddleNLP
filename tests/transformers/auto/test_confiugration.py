@@ -21,6 +21,9 @@ import tempfile
 import unittest
 
 from paddlenlp.transformers import AutoConfig
+from paddlenlp.transformers.auto.configuration import CONFIG_MAPPING
+from paddlenlp.transformers.bert.configuration import BertConfig
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.utils.env import CONFIG_NAME
 
 
@@ -85,6 +88,34 @@ class AutoConfigTest(unittest.TestCase):
             # but it can load it as the PretrainedConfig class
             auto_config = AutoConfig.from_pretrained(tempdir)
             self.assertEqual(auto_config.hidden_size, number)
+
+    def test_new_config_registration(self):
+        class CustomConfig(PretrainedConfig):
+            model_type = "custom"
+
+            def __init__(self, attribute=1, **kwargs):
+                self.attribute = attribute
+                super().__init__(**kwargs)
+
+        try:
+            AutoConfig.register("custom", CustomConfig)
+            # Wrong model type will raise an error
+            with self.assertRaises(ValueError):
+                AutoConfig.register("model", CustomConfig)
+            # Trying to register something existing in the PaddleNLP library will raise an error
+            with self.assertRaises(ValueError):
+                AutoConfig.register("bert", BertConfig)
+
+            # Now that the config is registered, it can be used as any other config with the auto-API
+            config = CustomConfig()
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                config.save_pretrained(tmp_dir)
+                new_config = AutoConfig.from_pretrained(tmp_dir)
+                self.assertIsInstance(new_config, CustomConfig)
+
+        finally:
+            if "custom" in CONFIG_MAPPING._extra_content:
+                del CONFIG_MAPPING._extra_content["custom"]
 
     def test_from_pretrained_cache_dir(self):
         model_id = "__internal_testing__/tiny-random-bert"
