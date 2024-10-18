@@ -191,7 +191,7 @@ class FusedOffloadAdamW(paddle.optimizer.AdamW):
                 cpu_fp32_param = param_and_grad[0].cpu().cast(paddle.float32)
                 cpu_fp32_grad = param_and_grad[1].cpu().cast(paddle.float32)
 
-                _, _, _, _, _, _ = _C_ops.adamw_(
+                _, _, _, _, _, *_ = _C_ops.adamw_(
                     cpu_fp32_param,
                     cpu_fp32_grad,
                     lr.cpu(),
