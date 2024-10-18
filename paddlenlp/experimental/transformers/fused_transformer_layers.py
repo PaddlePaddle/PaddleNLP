@@ -40,7 +40,6 @@ if not is_paddlenlp_ops_available():
         "The paddlenlp_ops package is not installed. you can read the docs and install it by hand, "
         "you can refer to: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
     )
-from paddlenlp_ops import rebuild_padding_v2
 
 if core.is_compiled_with_cuda():
     if os.getenv("FLAGS_CUTLASS_FP8_GEMM", "False") == "True":
@@ -58,7 +57,9 @@ if core.is_compiled_with_cuda():
             gemm_dequant,
             qkv_transpose_split,
             quant_int8,
+            rebuild_append_padding,
             rebuild_padding,
+            rebuild_padding_v2,
             transpose_remove_padding,
             write_cache_kv,
         )
@@ -3116,3 +3117,50 @@ class FusedBlockMultiTransformerFP8(Layer):
 
         out = self.post_process(**kwargs)
         return out, caches
+
+
+class FusedSpeculateMultiTransformer(FusedAppendMultiTransformer):
+    def post_process(self, **kwargs):
+        embed_dim = self.config.embed_dim
+        multi_block_output = kwargs.get("multi_block_output", None)
+        cum_offsets = kwargs.get("cum_offsets", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        max_input_length = kwargs.get("max_input_length", -1)
+        output_padding_offset = kwargs.get("output_padding_offset", None)
+        out = rebuild_append_padding(
+            multi_block_output,
+            cum_offsets,
+            seq_lens_decoder,
+            seq_lens_encoder,
+            output_padding_offset,
+            max_input_length,
+            embed_dim,
+        )
+        return out
+
+
+class FusedSpeculateMultiTransformerA8W8(FusedAppendMultiTransformerA8W8):
+    def __init__(self, config: FusedMultiTransformerConfig):
+        super().__init__(config)
+
+    def post_process(self, **kwargs):
+        logger.info("use FusedSpeculateMultiTransformerA8W8")
+        embed_dim = self.config.embed_dim
+        multi_block_output = kwargs.get("multi_block_output", None)
+        cum_offsets = kwargs.get("cum_offsets", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        max_input_length = kwargs.get("max_input_length", -1)
+        output_padding_offset = kwargs.get("output_padding_offset", None)
+
+        out = rebuild_append_padding(
+            multi_block_output,
+            cum_offsets,
+            seq_lens_decoder,
+            seq_lens_encoder,
+            output_padding_offset,
+            max_input_length,
+            embed_dim,
+        )
+        return out

@@ -27,6 +27,7 @@ import paddle.incubate.multiprocessing as mp
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode, use_pir_api
 from paddle.distributed import fleet
 
+from llm.speculate_decoding.proposer import InferenceWithReferenceProposer
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
@@ -48,6 +49,7 @@ from paddlenlp.utils.log import logger
 
 # Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
 MAX_BSZ = 512
+MAX_DRAFT_TOKENS = 6
 
 
 @dataclass
@@ -131,6 +133,22 @@ class PredictorArgument:
             "If is none string, it will not use chat_template.json."
         },
     )
+
+    speculate_method: str = field(
+        default=None,
+        metadata={
+            "help": "speculate method, it should be one of ['None', 'autoregressive', 'inference_with_reference']"
+        },
+    )
+    speculate_max_draft_tokens: int = field(
+        default=1,
+        metadata={"help": "the max length of draft tokens for speculate method."},
+    )
+    speculate_max_ngram_size: int = field(default=1, metadata={"help": "the max ngram size of speculate method."})
+    speculate_verify_window: int = field(
+        default=2, metadata={"help": "the max length of verify window for speculate method."}
+    )
+    speculate_max_candidate_len: int = field(default=5, metadata={"help": "the max length of candidate tokens."})
 
     @property
     def total_max_length(self):
@@ -1144,6 +1162,204 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
                 return outputs
 
 
+class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
+    def __init__(
+        self,
+        config: PredictorArgument,
+        model: PretrainedModel = None,
+        tokenizer: PretrainedTokenizer = None,
+    ):
+        DygraphBlockInferencePredictor.__init__(self, config, model, tokenizer)
+
+        # init speculate components
+        if config.speculate_method == "inference_with_reference":
+            self.proposer = InferenceWithReferenceProposer(
+                config.speculate_max_draft_tokens,
+                config.speculate_max_ngram_size,
+                config.batch_size,
+                config.max_length,
+            )
+        else:
+            self.proposer = None
+
+    @paddle.no_grad()
+    def predict(self, input_texts: list[str], return_tokens=False):
+        self._preprocess(input_texts)
+
+        # Parameters such as seq_lens_encoder have been set in the preprocessor function, 
+        # then we use them to init the proposer's args
+        self.init_proposer_args()
+
+        result_queue = mp.Queue()
+        tensor_queue = mp.Queue()
+        done_event = mp.Event()
+        read_res_process = mp.Process(
+            target=llm_utils.speculate_read_res, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
+        )
+        if self.tensor_parallel_rank == 0:
+            read_res_process.start()
+
+        output_tensor = paddle.full(
+            shape=[MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2, 1], fill_value=2, dtype="int64"
+        ).cpu()
+        tensor_queue.put(output_tensor)
+        if self.tensor_parallel_rank == 0:
+            done_event.wait()
+        s_time = time.time()
+
+        while self.model_inputs["not_need_stop"]:
+            # 1. run proposer
+            if self.proposer is not None:
+                self.proposer.run(
+                    self.model_inputs,
+                    real_batch_size=self.batch_size,
+                    seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
+                )
+            # 2. run target model
+            self._infer(self.model_inputs)
+        logger.info(f"running spend {time.time()  -  s_time}")
+
+        if self.tensor_parallel_rank == 0:
+            outputs = []
+            output_tokens = []
+            while len(outputs) < self.batch_size:
+                result = result_queue.get(timeout=1)
+                outputs.append(result[-1])
+                output_tokens.append(result[-2])
+
+            read_res_process.terminate()
+
+            if return_tokens:
+                return outputs, output_tokens
+            else:
+                return outputs
+
+    def _preprocess(self, input_text: list[str]):
+        super()._preprocess(input_text)
+
+        for bid in range(self.config.batch_size):
+            self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
+                self.model_inputs["seq_lens_this_time"][bid] - 1
+            ]  # get the last token before padding of this batch
+
+    def init_proposer_args(self):
+        self.model_inputs["accept_tokens"] = paddle.full(
+            shape=[self.config.batch_size, self.config.speculate_max_draft_tokens + 1], fill_value=0, dtype="int64"
+        )
+        self.model_inputs["accept_num"] = paddle.full(shape=[self.config.batch_size], fill_value=0, dtype="int32")
+        self.model_inputs["draft_tokens"] = paddle.full(
+            shape=[self.config.batch_size, self.config.speculate_max_draft_tokens + 1], fill_value=0, dtype="int64"
+        )
+        self.model_inputs["actual_draft_token_num"] = paddle.full(
+            shape=[self.config.batch_size], fill_value=self.config.speculate_max_draft_tokens, dtype="int32"
+        )
+        if self.config.speculate_method == "inference_with_reference":
+            self.proposer.input_ids_cpu = self.model_inputs["input_ids"].cpu()
+            self.proposer.input_ids_len = self.model_inputs["seq_lens_encoder"].astype("int64").cpu()
+
+
+class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
+    def __init__(
+        self,
+        config: PredictorArgument,
+        cache_kvs_shape: list[list[int]],
+        tokenizer: PretrainedTokenizer = None,
+    ):
+        StaticBlockInferencePredictor.__init__(self, config, cache_kvs_shape, tokenizer)
+        # init speculate components
+        if config.speculate_method == "inference_with_reference":
+            self.proposer = InferenceWithReferenceProposer(
+                config.speculate_max_draft_tokens,
+                config.speculate_max_ngram_size,
+                config.batch_size,
+                config.max_length,
+            )
+        else:
+            self.proposer = None
+
+    def init_proposer_args(self):
+        self.model_inputs["accept_tokens"] = paddle.full(
+            shape=[self.config.batch_size, self.config.speculate_max_draft_tokens + 1], fill_value=0, dtype="int64"
+        )
+        self.model_inputs["accept_num"] = paddle.full(shape=[self.config.batch_size], fill_value=0, dtype="int32")
+        self.model_inputs["draft_tokens"] = paddle.full(
+            shape=[self.config.batch_size, self.config.speculate_max_draft_tokens + 1], fill_value=0, dtype="int64"
+        )
+        self.model_inputs["actual_draft_token_num"] = paddle.full(
+            shape=[self.config.batch_size], fill_value=self.config.speculate_max_draft_tokens, dtype="int32"
+        )
+        if self.config.speculate_method == "inference_with_reference":
+            self.proposer.input_ids_cpu = self.model_inputs["input_ids"].cpu()
+
+    def _preprocess(self, input_text: list[str]):
+        super()._preprocess(input_text)
+
+        for bid in range(self.config.batch_size):
+            self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
+                self.model_inputs["seq_lens_this_time"][bid] - 1
+            ]  # get the last token before padding of this batch
+
+    def predict(self, input_texts: list[str], return_tokens=False):
+        s_time = time.time()
+        self._preprocess(input_texts)
+
+        # Parameters such as seq_lens_encoder have been set in the preprocessor function, 
+        # then we use them to init the proposer's args
+        self.init_proposer_args()
+        logger.info(f"preprocess spend {time.time()  -  s_time}")
+
+        for name in self.predictor.get_input_names():
+            input_tensor = self.predictor.get_input_handle(name)
+            if "pre_caches" in name:
+                input_tensor.share_external_data(self.prefix_cache[name])
+            else:
+                input_tensor.share_external_data(self.model_inputs[name])
+
+        result_queue = mp.Queue()
+        tensor_queue = mp.Queue()
+        done_event = mp.Event()
+
+        read_res_process = mp.Process(
+            target=llm_utils.speculate_read_res, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
+        )
+
+        if self.tensor_parallel_rank == 0:
+            read_res_process.start()
+        output_tensor = paddle.full(
+            shape=[MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2, 1], fill_value=2, dtype="int64"
+        ).cpu()
+        tensor_queue.put(output_tensor)
+        if self.tensor_parallel_rank == 0:
+            done_event.wait()
+        s_time = time.time()
+        while self.model_inputs["not_need_stop"]:
+            # 1. run proposer
+            if self.proposer is not None:
+                self.proposer.run(
+                    self.model_inputs,
+                    real_batch_size=self.batch_size,
+                    seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
+                )
+            # 2. run target model
+            self.predictor.run()
+        logger.info(f"running spend {time.time()  -  s_time}")
+
+        if self.tensor_parallel_rank == 0:
+            outputs = []
+            output_tokens = []
+            while len(outputs) < self.batch_size:
+                result = result_queue.get(timeout=1)
+                outputs.append(result[-1])
+                output_tokens.append(result[-2])
+
+            read_res_process.terminate()
+
+            if return_tokens:
+                return outputs, output_tokens
+            else:
+                return outputs
+
+
 def get_ptq_multicards_num(directory):
     count = 0
     if os.path.exists(directory):
@@ -1245,6 +1461,8 @@ def create_predictor(
             config.cachekv_int8_type = predictor_args.cachekv_int8_type
             config.use_fake_parameter = predictor_args.use_fake_parameter
             config.single_card_ptq = True
+            config.speculate_method = predictor_args.speculate_method
+
             if config.quantization_config.quant_type is not None:
                 predictor_args.quant_type = config.quantization_config.quant_type
                 config.quant_type = config.quantization_config.quant_type
@@ -1268,6 +1486,25 @@ def create_predictor(
                     config.block_size = predictor_args.block_size
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
+                    )
+
+                    model = LlamaInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
+                    )
+                elif predictor_args.speculate_method is not None:
+                    config.max_seq_len = predictor_args.total_max_length
+                    config.block_size = predictor_args.block_size
+                    config.speculate_max_draft_tokens = predictor_args.speculate_max_draft_tokens
+                    config.speculate_max_ngram_size = predictor_args.speculate_max_ngram_size
+                    config.speculate_verify_window = predictor_args.speculate_verify_window
+                    config.speculate_max_candidate_len = predictor_args.speculate_max_candidate_len
+                    config.append_attn = True
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForCausalLMSpeculateInferenceModel as LlamaInferenceModel,
                     )
 
                     model = LlamaInferenceModel.from_pretrained(
@@ -1470,11 +1707,14 @@ def create_predictor(
                 raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt, qwen]")
             if predictor_args.block_attn:
                 predictor = DygraphBlockInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
+            elif predictor_args.speculate_method is not None:
+                predictor = DygraphSpeculateInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
             else:
                 predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
 
         elif predictor_args.mode == "static":
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
+            config.speculate_method = predictor_args.speculate_method
 
             if config.quantization_config.quant_type is not None:
                 if "c8" in config.quantization_config.quant_type:
@@ -1486,6 +1726,17 @@ def create_predictor(
                     config.max_seq_len = predictor_args.total_max_length
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
+                    )
+                elif predictor_args.speculate_method is not None:
+                    config.max_seq_len = predictor_args.total_max_length
+                    config.block_size = predictor_args.block_size
+                    config.speculate_max_draft_tokens = predictor_args.speculate_max_draft_tokens
+                    config.speculate_max_ngram_size = predictor_args.speculate_max_ngram_size
+                    config.speculate_verify_window = predictor_args.speculate_verify_window
+                    config.speculate_max_candidate_len = predictor_args.speculate_max_candidate_len
+                    config.append_attn = True
+                    from paddlenlp.experimental.transformers import (
+                        LlamaForCausalLMSpeculateInferenceModel as LlamaInferenceModel,
                     )
                 elif predictor_args.avx_model and predictor_args.device == "cpu":
                     from paddlenlp.experimental.transformers import (
@@ -1601,6 +1852,8 @@ def create_predictor(
                 raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt, qwen]")
             if predictor_args.block_attn:
                 predictor = StaticBlockInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
+            elif predictor_args.speculate_method is not None:
+                predictor = StaticSpeculateInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
             else:
                 predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
         else:
