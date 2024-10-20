@@ -20,7 +20,6 @@ testpaths = [
     "tests/experimental",
     "tests/generation",
     "tests/layers",
-    "tests/llm",
     "tests/metrics",
     "tests/ops",
     "tests/trainer",
