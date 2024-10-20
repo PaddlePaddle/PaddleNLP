@@ -21,7 +21,7 @@ from paddle.utils.cpp_extension import CUDAExtension, setup
 
 def clone_git_repo(version, repo_url, destination_path):
     try:
-        subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path], check=True)
+        subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path, "--depth=1"], check=True)
         return True
     except subprocess.CalledProcessError as e:
         print(f"Git clone {repo_url} operation failed with the following error: {e}")
@@ -30,6 +30,15 @@ def clone_git_repo(version, repo_url, destination_path):
             "If the problem persists, please refer to the README file for instructions on how to manually download and install the necessary components."
         )
         return False
+
+
+def find_end_files(directory, end_str):
+    gen_files = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(end_str):
+                gen_files.append(os.path.join(root, file))
+    return gen_files
 
 
 def get_sm_version():
@@ -98,15 +107,22 @@ sources = [
     "./gpu/dequant_int8.cu",
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
+    "./gpu/sample_kernels/top_p_sampling_reject.cu",
 ]
 
-cutlass_dir = "gpu/cutlass_kernels/cutlass"
+cutlass_dir = "third_party/cutlass"
 nvcc_compile_args = gencode_flags
 
 if not os.path.exists(cutlass_dir) or not os.listdir(cutlass_dir):
     if not os.path.exists(cutlass_dir):
         os.makedirs(cutlass_dir)
     clone_git_repo("v3.5.0", "https://github.com/NVIDIA/cutlass.git", cutlass_dir)
+
+json_dir = "third_party/nlohmann_json"
+if not os.path.exists(json_dir) or not os.listdir(json_dir):
+    if not os.path.exists(json_dir):
+        os.makedirs(json_dir)
+    clone_git_repo("v3.11.3", "https://github.com/nlohmann/json.git", json_dir)
 
 nvcc_compile_args += [
     "-O3",
@@ -116,12 +132,27 @@ nvcc_compile_args += [
     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
     "-U__CUDA_NO_BFLOAT162_OPERATORS__",
     "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+    "-Igpu",
     "-Igpu/cutlass_kernels",
-    "-Igpu/cutlass_kernels/cutlass/include",
+    "-Igpu/fp8_gemm_with_cutlass",
+    "-Igpu/cutlass_kernels/fp8_gemm_fused/autogen",
+    "-Ithird_party/cutlass/include",
+    "-Ithird_party/nlohmann_json/single_include",
+    "-Igpu/sample_kernels",
 ]
+
 cc = get_sm_version()
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
+
+if cc >= 89:
+    sources += find_end_files("gpu/cutlass_kernels/fp8_gemm_fused/autogen", ".cu")
+    sources += [
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
+        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.cu",
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
+        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_dual_gemm_scale_bias_act.cu",
+    ]
 
 setup(
     name="paddlenlp_ops",

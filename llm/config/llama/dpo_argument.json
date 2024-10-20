@@ -24,16 +24,17 @@
     "disable_tqdm": true,
     "load_best_model_at_end": true,
     "tensor_parallel_degree": 8,
-    "sharding_parallel_degree": 1,
     "sharding": "stage1",
     "use_flash_attention": true,
     "flash_mask":true,
     "recompute": false,
     "recompute_granularity": "full",
-    "dpo_beta": 0.1,
+    "beta": 0.1,
     "benchmark": false,
-    "dpo_loss_type": "sigmoid",
-    "dpo_label_smoothing": 0.0,
+    "loss_type": "sigmoid",
+    "label_smoothing": 0.0,
     "unified_checkpoint": true,
-    "autotuner_benchmark":false
+    "autotuner_benchmark":false,
+    "lazy": false,
+    "seed":42
   }

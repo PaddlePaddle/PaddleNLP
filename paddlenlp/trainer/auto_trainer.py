@@ -71,6 +71,7 @@ class AutoTrainer(Trainer):
 
         self.global_mesh = fleet.auto.get_mesh()
         self.comm_group_in_pp = fleet.get_hybrid_communicate_group().get_pipe_parallel_group()
+        self._in_pir_mode = paddle.base.framework.get_flags("FLAGS_enable_pir_api")["FLAGS_enable_pir_api"]
 
     def _nested_gather(self, tensors):
         """
@@ -126,7 +127,12 @@ class AutoTrainer(Trainer):
         if self.args.to_static:
             unified_strategy = dist.Strategy()
             unified_strategy._from_legacy_strategy(self.args.strategy)
-            model = dist.to_static(model, dist_loader, self.criterion, self.optimizer, strategy=unified_strategy)
+            # dist.to_static() obtains the input spec information through next(dataloader), but this has side effects
+            # on the passed-in dataloader, altering the state of the sampler of the dataloader. In some cases, once
+            # the state of the sampler is changed, it cannot be reverted. Therefore, a temporary dataloader is
+            # constructed here to avoid side effects on the dataloader used for actual training.
+            temp_loader = self._wrap_for_dist_loader(self.get_train_dataloader())
+            model = dist.to_static(model, temp_loader, self.criterion, self.optimizer, strategy=unified_strategy)
 
         self.model_wrapped = model
         return model, dist_loader
@@ -162,6 +168,9 @@ class AutoTrainer(Trainer):
             return [inputs]
 
         if self.args.to_static and self.args.pipeline_parallel_degree > 1:
+            return [inputs]
+
+        if self.args.to_static and self._in_pir_mode and self.args.gradient_accumulation_steps > 1:
             return [inputs]
 
         local_batches = [{} for i in range(self.args.gradient_accumulation_steps)]
@@ -345,7 +354,11 @@ class AutoTrainer(Trainer):
                     with _exec_mode_guard("dynamic"):
                         tr_loss += tr_loss_step
 
-                    disable_accumulation = self.args.pipeline_parallel_degree > 1 and self.args.to_static
+                    disable_accumulation = False
+                    if self.args.pipeline_parallel_degree > 1 and self.args.to_static:
+                        disable_accumulation = True
+                    if self.args.to_static and self._in_pir_mode and self.args.gradient_accumulation_steps > 1:
+                        disable_accumulation = True
                     # disable_accumulation = self.args.to_static
 
                     if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
@@ -674,7 +687,12 @@ class AutoTrainer(Trainer):
                 # For ckpt integrity
                 paddle.save(self.state.global_step, os.path.join(output_dir, ".checkpoint_done"))
 
-    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
+    def _save(
+        self,
+        output_dir: Optional[str] = None,
+        state_dict=None,
+        merge_tensor_parallel=False,
+    ):
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Saving model checkpoint to {output_dir}")
@@ -767,5 +785,8 @@ class AutoTrainer(Trainer):
                     raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}")
                 self._load_ckpt_func(state_dict, ckpt_path)
 
+            if self.args.to_static:
+                self.model_wrapped.set_state_dict(model_state_dict)
+                self.model_wrapped.set_state_dict(optim_state_dict)
             # release memory
             del state_dict

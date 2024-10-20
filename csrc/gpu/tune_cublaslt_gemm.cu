@@ -18,6 +18,7 @@ limitations under the License. */
 
 #include <algorithm>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <list>
@@ -104,6 +105,13 @@ static inline bool time_compare_algo_para(const algoSelect_t& algo_para_a,
   return (algo_para_a.time < algo_para_b.time);
 }
 
+// 获取当前 GPU 的剩余显存大小（以字节为单位）
+size_t get_remaining_memory() {
+  size_t free, total;
+  CUDA_CHECK(cudaMemGetInfo(&free, &total));
+  return free;
+}
+
 template <typename InT, typename OutT, typename ScaleT = OutT>
 static void TestMatmulRun(cublasLtHandle_t ltHandle,
                           cublasLtMatmulDesc_t matmulDesc,
@@ -121,13 +129,13 @@ static void TestMatmulRun(cublasLtHandle_t ltHandle,
   cublasLtMatmulHeuristicResult_t heurResult;
   cublasStatus_t algoStatus = cublasLtMatmulAlgoCheck(
       ltHandle, matmulDesc, A_desc, B_desc, C_desc, C_desc, &algo, &heurResult);
-  if (algoStatus == CUBLAS_STATUS_SUCCESS) {
+
+  auto remainingMemorySize = 0.95 * get_remaining_memory();
+  if (algoStatus == CUBLAS_STATUS_SUCCESS &&
+      remainingMemorySize > heurResult.workspaceSize) {
     ScaleT alpha = static_cast<ScaleT>(1), beta = static_cast<ScaleT>(0);
-    paddle::Tensor workspace =
-        paddle::empty({static_cast<int64_t>(heurResult.workspaceSize)},
-                      paddle::DataType::UINT8,
-                      paddle::GPUPlace());
-    void* workspace_ptr = workspace.data<uint8_t>();
+    void* workSpace;
+    CUDA_CHECK(cudaMalloc(&workSpace, heurResult.workspaceSize));
     CUDA_CHECK(cudaEventRecord(startEvent, stream));
     int repeats = 100;
     for (int loop = 0; loop < repeats; loop++) {
@@ -144,7 +152,7 @@ static void TestMatmulRun(cublasLtHandle_t ltHandle,
                                                  C,
                                                  C_desc,
                                                  &algo,
-                                                 workspace_ptr,
+                                                 workSpace,
                                                  heurResult.workspaceSize,
                                                  stream);
       if (currStatus != CUBLAS_STATUS_SUCCESS) {
@@ -166,9 +174,15 @@ static void TestMatmulRun(cublasLtHandle_t ltHandle,
       perfResults.workspaceSize = heurResult.workspaceSize;
       perfResults.wavesCount = heurResult.wavesCount;
     }
+    CUDA_CHECK(cudaFree(workSpace));
   } else {
-    std::cerr << "not enough workspace! current workspace is "
-              << heurResult.workspaceSize;
+    std::cerr << "Not enough workspace! Required "
+              << static_cast<double>(heurResult.workspaceSize) / 1024.0 /
+                     1024.0 / 1024.0
+              << " GiB" << ", But remaining "
+              << static_cast<double>(remainingMemorySize) / 1024.0 / 1024.0 /
+                     1024.0
+              << " GiB" << std::endl;
     perfResults.status = CUBLAS_STATUS_NOT_SUPPORTED;  // Not enough workspace
   }
 }
@@ -443,7 +457,7 @@ void FindAlgo(const cublasLtHandle_t& ltHandle,
     if (perfResults[i].status != CUBLAS_STATUS_SUCCESS) {
       std::clog << "algo " << algos[i].algoId << " tile " << algos[i].tile
                 << " stages " << algos[i].stages << " splitK_val "
-                << algos[i].splitK_val;
+                << algos[i].splitK_val << std::endl;
       algos[i].time = std::numeric_limits<float>::max();
       std::cerr << " TestMatmulRun with status " << perfResults[i].status
                 << std::endl;
@@ -513,22 +527,20 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(const CUBLASLTContext& dev_ctx,
                                                 bool is_test,
                                                 bool is_read_from_file,
                                                 const std::string& path) {
-  paddle::Tensor A = paddle::empty({static_cast<int64_t>(AVec.size())},
-                                   paddle::DataType::INT8,
-                                   paddle::GPUPlace());
-  paddle::Tensor B = paddle::empty({static_cast<int64_t>(BVec.size())},
-                                   paddle::DataType::INT8,
-                                   paddle::GPUPlace());
-  paddle::Tensor C = paddle::empty({static_cast<int64_t>(CVec.size())},
-                                   paddle::DataType::INT32,
-                                   paddle::GPUPlace());
+  int8_t* A_dev;
+  int8_t* B_dev;
+  int32_t* C_dev;
+  char* workSpace;
 
-  int8_t* A_dev = A.data<int8_t>();
-  int8_t* B_dev = B.data<int8_t>();
-  int32_t* C_dev = C.data<int32_t>();
+  CUDA_CHECK(cudaMalloc((void**)&A_dev, AVec.size() * sizeof(int8_t)));
+  CUDA_CHECK(cudaMalloc((void**)&B_dev, BVec.size() * sizeof(int8_t)));
+  CUDA_CHECK(cudaMalloc((void**)&C_dev, m * n * sizeof(int32_t)));
+  CUDA_CHECK(
+      cudaMemcpy(A_dev, AVec.data(), AVec.size(), cudaMemcpyHostToDevice));
+  CUDA_CHECK(
+      cudaMemcpy(B_dev, BVec.data(), BVec.size(), cudaMemcpyHostToDevice));
 
   // init data structure
-
   cublasLtMatmulDesc_t matmul_desc;
   cublasLtMatrixLayout_t A_desc;
   cublasLtMatrixLayout_t B_desc;
@@ -639,11 +651,8 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(const CUBLASLTContext& dev_ctx,
     using_default_config();
   }
 
-  paddle::Tensor workspace =
-      paddle::empty({static_cast<int64_t>(work_space_size)},
-                    paddle::DataType::UINT8,
-                    paddle::GPUPlace());
-  void* workspace_ptr = workspace.data<uint8_t>();
+  CUDA_CHECK(cudaMalloc((void**)&workSpace, work_space_size));
+
   CUDA_CHECK(cublasLtMatmulAlgoInit(dev_ctx.handle,
                                     cudaComputeType,
                                     CUDA_R_32I,
@@ -692,7 +701,7 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(const CUBLASLTContext& dev_ctx,
                               C_desc,
                               &algo,
                               //  nullptr,
-                              workspace_ptr,
+                              workSpace,
                               // 0,
                               work_space_size,
                               0));
@@ -701,68 +710,65 @@ void GEMMInt8<int8_t, int32_t, CUBLASLTContext>(const CUBLASLTContext& dev_ctx,
   CUDA_CHECK(cudaDeviceSynchronize());
   auto end = std::chrono::high_resolution_clock::now();
   double time = diffTime(start, end);
+  auto now = std::chrono::system_clock::now();
+  std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+  std::tm now_tm = *std::localtime(&now_time_t);
+
   std::cout << "GEMM with cublaslt imma1 int8 spend " << time / repeats
-            << " ms in " << m << ", " << k << ", " << n << std::endl;
+            << " ms in " << m << ", " << k << ", " << n
+            << ", current time: " << std::put_time(&now_tm, "%H:%M:%S")
+            << std::endl;
+  CUDA_CHECK(cudaFree(A_dev));
+  CUDA_CHECK(cudaFree(B_dev));
+  CUDA_CHECK(cudaFree(C_dev));
+  CUDA_CHECK(cudaFree(workSpace));
 }
 
-void TuneCublasltGemm(const paddle::Tensor& M,
-                      const paddle::Tensor& K,
+void TuneCublasltGemm(const paddle::Tensor& K,
                       const paddle::Tensor& N,
+                      const int M_start,
+                      const int M_end,
                       const std::string& dtype,
-                      bool is_test,
-                      bool is_read_from_file,
+                      const bool is_test,
+                      const bool is_read_from_file,
                       const std::string& path) {
-  // Ensure that M, K, and N are all one-dimensional Tensors. is_test !=
-  // is_read_from_file
-  assert(M.dims().size() == 1 && K.dims().size() == 1 && N.dims().size() == 1);
+  assert(M_end >= M_start);
+  assert(M_start >= 1);
+  assert(K.dims().size() == 1 && N.dims().size() == 1);
   assert(is_test != is_read_from_file);
 
-  auto M_cpu = M.copy_to(paddle::CPUPlace(), false);
   auto K_cpu = K.copy_to(paddle::CPUPlace(), false);
   auto N_cpu = N.copy_to(paddle::CPUPlace(), false);
-  int64_t* M_data = M_cpu.data<int64_t>();
   int64_t* K_data = K_cpu.data<int64_t>();
   int64_t* N_data = N_cpu.data<int64_t>();
 
-  int M_size = M.numel();
   int K_size = K.numel();
   int N_size = N.numel();
   assert(K_size == N_size);
 
-  int m_data = (int)M_data[0];
-  assert(m_data > 0 && 4 <= 8192);
-
   std::vector<int> mm;
-
-  int m = 1, step = 1;
-  while (m <= m_data) {
+  int m = M_start, step = 1;
+  while (m <= M_end) {
+    // update step
+    if (m >= 8192) {
+      step = 4096;
+    } else if (m >= 1024) {
+      step = 1024;
+    } else if (m >= 512) {
+      step = 128;
+    } else if (m >= 256) {
+      step = 64;
+    } else if (m >= 64) {
+      step = 32;
+    } else if (m >= 16) {
+      step = 16;
+    } else if (m >= 4) {
+      step = 4;
+    } else {
+      step = 1;
+    }
     mm.push_back(m);
     m += step;
-
-    // update step
-    switch (m) {
-      case 4:
-        step = 4;
-        break;
-      case 16:
-        step = 16;
-        break;
-      case 64:
-        step = 32;
-        break;
-      case 256:
-        step = 64;
-        break;
-      case 512:
-        step = 128;
-        break;
-      case 1024:
-        step = 1024;
-        break;
-      case 8192:
-        step = 4096;
-        break;
-    }
   }
 
   for (int j = 0; j < mm.size(); j++) {
@@ -788,16 +794,18 @@ void TuneCublasltGemm(const paddle::Tensor& M,
                  path);
       } else {
         // other dtype
-        std::cout << "Not currently supported" << std::endl;
+        throw std::runtime_error(dtype + "not currently supported");
       }
     }
   }
 }
 
 PD_BUILD_OP(tune_cublaslt_gemm)
-    .Inputs({"M", "K", "N"})
+    .Inputs({"K", "N"})
     .Outputs({})
-    .Attrs({"dtype: std::string",
+    .Attrs({"M_start: int",
+            "M_end: int",
+            "dtype: std::string",
             "is_test: bool",
             "is_read_from_file: bool",
             "path: std::string"})

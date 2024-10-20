@@ -461,7 +461,7 @@ def get_alibi_slopes(num_heads):
         extra_base = 2 ** (-(2 ** -(math.log2(2 * closest_power_of_2) - 3)))
         num_remaining_heads = min(closest_power_of_2, num_heads - closest_power_of_2)
         extra_powers = np.arange(1, 1 + 2 * num_remaining_heads, 2)
-        slopes = np.concatante([slopes, np.power(extra_base, extra_powers)], axis=0)
+        slopes = np.concatenate([slopes, np.power(extra_base, extra_powers)], axis=0)
 
     return slopes.astype("float32")
 
@@ -750,14 +750,14 @@ def get_model_max_position_embeddings(config: PretrainedConfig) -> Optional[int]
     return None
 
 
-def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue):
+def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue, done_event: mp.Event):
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
     paddle.device.set_device("cpu")
     paddle.disable_static()
     outputs = []
     output_tensor = tensor_queue.get(timeout=1)
-
+    done_event.set()
     logger.info("Start read result message")
     logger.info(f"Current path is {os.getcwd()}")
 

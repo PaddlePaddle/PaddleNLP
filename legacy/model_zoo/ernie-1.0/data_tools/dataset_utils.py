@@ -94,9 +94,11 @@ class BlendableDataset(paddle.io.Dataset):
         while True:
             try:
                 try:
-                    from tool_helpers import helpers
+                    from fast_dataindex import helpers
                 except Exception:
-                    print_rank_0(" > missing tool_helpers, pip install tool_helpers please, try to compile locally.")
+                    print_rank_0(
+                        " > missing fast_dataindex, pip install fast_dataindex please, try to compile locally."
+                    )
                     import data_tools.helpers as helpers
                 break
             except Exception:
@@ -785,9 +787,9 @@ def get_samples_mapping(
         print_rank_0(" > building sapmles index mapping for {} ...".format(name))
         # First compile and then import.
         try:
-            from tool_helpers import helpers
+            from fast_dataindex import helpers
         except ModuleNotFoundError:
-            print_rank_0(" > missing tool_helpers, pip install tool_helpers please, try to compile locally.")
+            print_rank_0(" > missing fast_dataindex, pip install fast_dataindex please, try to compile locally.")
             if local_rank == 0:
                 compile_helper()
             import data_tools.helpers as helpers

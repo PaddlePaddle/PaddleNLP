@@ -18,13 +18,17 @@ from datetime import datetime
 
 PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
 
-
-__version__ = "3.0.0b0.post"
+# this version is used for develop and test.
+# release version will be added fixed version by setup.py.
+__version__ = "3.0.0b2.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 else:
     formatted_date = datetime.now().date().strftime("%Y%m%d")
     __version__ = __version__.replace(".post", ".post{}".format(formatted_date))
+
+# the next line will be replaced by setup.py for release version.
+# [VERSION_INFO]
 
 if "datasets" in sys.modules.keys():
     from paddlenlp.utils.log import logger
