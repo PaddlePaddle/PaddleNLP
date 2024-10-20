@@ -202,6 +202,7 @@ def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_out
         logits = paddle.matmul(x, y, transpose_y=transpose_y)
         return logits
 
+
 def shift(qkv, bsz, q_len, group_size, num_heads, head_dim):
     if qkv.shape != [bsz, num_heads, q_len, head_dim]:
         raise ValueError("qkv shape does not match expected shape")
@@ -210,14 +211,13 @@ def shift(qkv, bsz, q_len, group_size, num_heads, head_dim):
     shift_amount = -group_size // 2
 
     # Roll the qkv tensor along the sequence length axis
-    qkv[:, :, num_heads // 2:] = qkv[:, :, num_heads // 2:].roll(shift_amount, dims=1)
+    qkv[:, :, num_heads // 2:] = qkv[:, :, num_heads // 2:].roll(shift_amount, axis=1)
 
     # Transpose and reshape the tensor to the desired shape
     qkv = qkv.transpose([0, 2, 1, 3]).reshape([bsz * (q_len // group_size), num_heads, group_size, head_dim])
 
     return qkv
-
-
+  
 
 def scaled_dot_product_attention(
     query_states,
@@ -231,11 +231,13 @@ def scaled_dot_product_attention(
     sequence_parallel=False,
     reshard_layer=None,
     npu_is_casual=False,
+    use_ssa=False,
+    group_size_ratio=None
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
+    if config.use_flash_attention and flash_attention and use_ssa == False:
 
-    if config.use_flash_attention and flash_attention:
         return fusion_ops.fusion_flash_attention(
             query_states,
             config,
@@ -252,7 +254,6 @@ def scaled_dot_product_attention(
 
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
         # Torch Flash Attention input [ bz, nhead, seqlen, head_dim]
-
     else:
         if config.context_parallel_degree > 1:
             raise ValueError("Context parallel requires `use_flash_attention=True`")
@@ -263,7 +264,7 @@ def scaled_dot_product_attention(
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
-        if config.use_ssa and config.group_size_ratio:
+        if use_ssa and group_size_ratio is not None:
             # Calculate the group size based on the sequence length and the group size ratio
             group_size = int(q_len * config.group_size_ratio)
 
@@ -276,6 +277,26 @@ def scaled_dot_product_attention(
             query_states = shift(query_states, bsz, q_len, group_size, num_heads, head_dim)
             key_states = shift(key_states, bsz, q_len, group_size, num_heads, head_dim)
             value_states = shift(value_states, bsz, q_len, group_size, num_heads, head_dim)
+        
+        if config.use_flash_attention and flash_attention and use_ssa:
+            # [bs*num_group, nhead, group_size, head_dim] ->  [ bz*num_group, grou_size, nhead, head_dim]
+            query_states = paddle.transpose(query_states, [0, 2, 1, 3])
+            key_states = paddle.transpose(key_states, [0, 2, 1, 3])
+            value_states = paddle.transpose(value_states, [0, 2, 1, 3])
+            attn_output, attn_weights = fusion_ops.fusion_flash_attention(
+                query_states,
+                key_states,
+                value_states,
+                attention_mask,
+                output_attentions,
+                alibi,
+                attn_mask_startend_row_indices,
+            )
+            # [bsz*num_groups, group_size, hidden_size]
+            attn_output = attn_output.reshape(bsz, q_len, num_heads, head_dim)
+            attn_output[:, :, num_heads // 2:] = attn_output[:, :, num_heads // 2:].roll(group_size // 2, axis=1)
+            return attn_output, attn_weights
+
         # matmul and devide by sqrt(head_dim)
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
         # then add alibi bias
@@ -284,12 +305,12 @@ def scaled_dot_product_attention(
             attn_weights = attn_weights + alibi
 
         if paddle.in_dynamic_mode():
-            if config.use_ssa and attn_weights.shape != [bsz * num_group, num_heads, group_size, group_size]:
+            if use_ssa and attn_weights.shape != [bsz * num_group, num_heads, group_size, group_size]:
                 raise ValueError(
                     f"Attention weights should be of shape {(bsz * num_group, num_heads, group_size, group_size)}, but is"
                     f" {attn_weights.shape}"
                 )
-            elif not config.use_ssa and attn_weights.shape != [bsz,num_heads, q_len, kv_seq_len]:
+            elif not use_ssa and attn_weights.shape != [bsz,num_heads, q_len, kv_seq_len]:
                 raise ValueError(
                     f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
                     f" {attn_weights.shape}"
@@ -305,8 +326,8 @@ def scaled_dot_product_attention(
         if attention_mask is None:
             attention_mask = get_triangle_upper_mask(attn_weights)
 
-        if config.use_ssa:
-            attention_mask = attention_mask[:, :, :group_size, :group_size].repeat_interleave(num_group, 0)
+        if use_ssa:
+            attention_mask = paddle.tile(paddle.cast(attention_mask[:, :, :group_size, :group_size], dtype="float32"), [num_group, 1, 1, 1])
             if attention_mask.shape != [bsz * num_group, 1, group_size, group_size]:
                 raise ValueError(
                     f"Attention mask should be of size {(bsz * num_group, 1, group_size, group_size)}, but is {attention_mask.shape}"
@@ -328,7 +349,7 @@ def scaled_dot_product_attention(
         attn_output = paddle.matmul(attn_weights, value_states)
         attn_output = attn_output.transpose([0, 2, 1, 3])
 
-        if config.use_ssa:
+        if use_ssa:
             # shift back
             attn_output = attn_output.reshape([bsz, q_len, num_heads, head_dim])
             attn_output[:, :, num_heads // 2:] = attn_output[:, :, num_heads // 2:].roll(group_size // 2, axis=1)
@@ -436,7 +457,7 @@ class LlamaRMSNorm(nn.Layer):
 
 def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
     """
-    This is the equivalent of paddle.repeat_interleave(hidden_states, n_rep, axis=1). The hidden states go from (batch,
+    This is the equivalent of   paddle.repeat_interleave(hidden_states, n_rep, axis=1). The hidden states go from (batch,
     num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, head_dim)
     """
     batch, slen, num_key_value_heads, head_dim = hidden_states.shape
@@ -925,7 +946,6 @@ class LlamaAttention(nn.Layer):
     ) -> Tuple[paddle.Tensor, Optional[paddle.Tensor], Optional[Tuple[paddle.Tensor]]]:
         """Input shape: Batch x Time x Channel"""
         # [bs, seq_len, num_head * head_dim] -> [seq_len / n, bs, num_head * head_dim] (n is model parallelism)
-
         if self.fuse_attention_qkv:
             mix_layer = self.qkv_proj(hidden_states)
             # NOTE for GQA attention fusion (compatible with MHA and MQA):
@@ -1126,6 +1146,8 @@ class LlamaAttention(nn.Layer):
                 sequence_parallel=self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
                 use_reentrant=self.config.recompute_use_reentrant,
+                use_ssa=self.config.use_ssa,
+                group_size_ratio=self.config.group_size_ratio
             )
         else:
             outputs = self.attn_func(
@@ -1140,6 +1162,8 @@ class LlamaAttention(nn.Layer):
                 sequence_parallel=self.sequence_parallel,
                 reshard_layer=self.reshard_layer,
                 npu_is_casual=npu_is_casual,
+                use_ssa=self.config.use_ssa,
+                group_size_ratio=self.config.group_size_ratio
             )
         if output_attentions:
             attn_output, attn_weights = outputs

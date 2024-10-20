@@ -56,12 +56,11 @@ class TrainingArguments(TrainingArguments):
     )
     use_ssa: bool = field(
         default=False,
-        metadata={"help": "Whether to use ShiftSparseAttention."},
+        metadata={"help": "Whether to use SSA."},
     )
-
     group_size_ratio: float = field(
-        default = 0.25,
-        metadata={"help": "Control the group size in sparse attention"}
+        default=0.25,
+        metadata={"help": "The ratio of group size."},
     )
 
     def __post_init__(self):

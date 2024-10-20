@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
-import math
 import os
 import sys
 from functools import partial
@@ -25,10 +24,9 @@ from utils.argument import (
     QuantArgument,
     TrainingArguments,
 )
-from utils.attention_forward_replace import replace_llama2_attn, replace_qwen2_attn
 from utils.data import get_convert_example
 
-from paddlenlp.data import DataCollatorForLanguageModeling, DataCollatorForSeq2Seq
+from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import (
     ZeroPaddingIterableDataset,
     ZeroPaddingMapDataset,
@@ -85,7 +83,7 @@ def main():
     training_args.print_config(data_args, "Data")
     training_args.print_config(quant_args, "Quant")
     training_args.print_config(gen_args, "Generation")
-    
+
     if sum([quant_args.do_ptq, quant_args.do_qat, quant_args.do_gptq, training_args.do_train]) > 1:
         raise ValueError(
             "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
@@ -127,38 +125,42 @@ def main():
             raise ValueError("Please specific dtype: --fp16 or --bf16")
     else:
         dtype = "float32"
+
     quantization_config = dict(
         weight_quantize_algo=model_args.weight_quantize_algo,
         weight_blocksize=model_args.weight_blocksize,
         weight_double_quant=model_args.weight_double_quant,
         weight_double_quant_block_size=model_args.weight_double_quant_block_size,
     )
-
     model_config = AutoConfig.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
         from_aistudio=model_args.from_aistudio,
         quantization_config=quantization_config,
     )
+
     LlmMetaConfig.set_llm_config(model_config, training_args)
-    model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     if training_args.use_ssa:
+        assert training_args.group_size_ratio is not None, "group_size_ratio must be specified when use_ssa is True"
         model_config.use_ssa = True
         model_config.group_size_ratio = training_args.group_size_ratio
-
-        orig_ctx_len = getattr(model_config, "max_length", None)
+        
+        orig_ctx_len = getattr(model_config, "max_position_embeddings", None)
         if orig_ctx_len and data_args.max_length > orig_ctx_len:
             scaling_factor = data_args.max_length / orig_ctx_len
+        model_config.rope_scaling_factor = scaling_factor
         model_config.use_long_sequence_strategies = True
         model_config.long_sequence_strategy_type = "embedding_strategies"
         model_config.long_sequence_strategy_name = "LinearScalingRotaryEmbedding"
         model_config.long_sequence_init_args = {
-            "dim": model_config.hidden_size,
-            "max_position_embeddings": model_config.max_length,
-            "rope_scaling_type": "linear",
-            "rope_scaling_factor": scaling_factor
+            "dim": model_config.hidden_size // model_config.num_attention_heads,
+            "max_position_embeddings": model_config.max_position_embeddings,
+            "scaling_factor": scaling_factor,
+            "base": 10000.0
         }
+
+    model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     # Config for model using dropout, such as GPT.
     if hasattr(model_config, "hidden_dropout_prob"):
@@ -172,12 +174,11 @@ def main():
         model_config.fuse_attention_qkv = model_args.fuse_attention_qkv
     if model_args.fuse_attention_ffn is not None:
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
-    
+
     model_config.seq_length = data_args.max_length
 
     logger.info(f"Final model config: {model_config}")
 
-    
     model_class = AutoModelForCausalLM
     if training_args.pipeline_parallel_degree > 1:
         if data_args.eval_with_do_generation and training_args.do_eval:
@@ -235,6 +236,7 @@ def main():
 
     if isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
+
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
     elif (
@@ -363,11 +365,7 @@ def main():
 
         trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
     else:
-        trans_func = partial(
-            get_convert_example(model),
-            tokenizer=tokenizer,
-            data_args=data_args,
-        )
+        trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
 
     train_ds = (
         train_ds.map(
@@ -560,16 +558,6 @@ def main():
     else:
         metrics = compute_metrics
 
-
-    data_collator = DataCollatorForSeq2Seq(
-        tokenizer=tokenizer,
-        max_length=max_length,
-        padding=padding,
-        max_label_length=max_length,
-        return_tensors="np",
-        return_attention_mask=not model_args.flash_mask,
-        pad_to_multiple_of=data_args.pad_to_multiple_of,
-    )
     trainer = CausalLMTrainer(
         model=model,
         args=training_args,
@@ -577,7 +565,15 @@ def main():
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
         compute_metrics=metrics,
-        data_collator=data_collator,
+        data_collator=DataCollatorForSeq2Seq(
+            tokenizer=tokenizer,
+            max_length=max_length,
+            padding=padding,
+            max_label_length=max_length,
+            return_tensors="np",
+            return_attention_mask=not model_args.flash_mask,
+            pad_to_multiple_of=data_args.pad_to_multiple_of,
+        ),
         do_generation=data_args.eval_with_do_generation,
         callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
         gen_args=gen_args,
