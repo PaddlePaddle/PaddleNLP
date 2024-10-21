@@ -116,3 +116,13 @@ def nested_copy_place(inputs, place=None, blocking=False):
     if isinstance(inputs, paddle.Tensor):
         inputs = inputs if inputs.place == place else inputs._copy_to(place, blocking)
     return inputs
+
+
+def flatten_list(nested_list):
+    flattened_list = []
+    for item in nested_list:
+        if isinstance(item, list):
+            flattened_list.extend(flatten_list(item))
+        else:
+            flattened_list.append(item)
+    return flattened_list
