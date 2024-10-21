@@ -49,6 +49,7 @@ MAPPING_NAMES = OrderedDict(
         ("BlenderbotSmall", "blenderbot_small"),
         ("Blenderbot", "blenderbot"),
         ("ChatGLMv2", "chatglm_v2"),
+        ("ChatGLMv3", "chatglm_v3"),
         ("ChatGLM", "chatglm"),
         ("ChineseCLIP", "chineseclip"),
         ("ChineseBert", "chinesebert"),
