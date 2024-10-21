@@ -292,7 +292,7 @@ class UnifiedCheckpointHandler:
                 logger.info(f"Start to async save {path}")
                 state_dict = _read_state_dict_from_shm(meta_dict, shm)  # numpy array
                 state_dict = quant_unified_optimizer(
-                    state_dict, state_dict_type, ckpt_quant_stage
+                    state_dict, state_dict_type, ckpt_quant_stage, async_save=True
                 )  # ckpt quantization
                 safe_save_file(state_dict, path, {"format": "np"})
                 del state_dict
@@ -520,7 +520,7 @@ class UnifiedCheckpointHandler:
                 state_dict_type="master_weight",
             )
 
-    def load_non_merge_optimizer(self, model, optimizer, resume_from_checkpoint):
+    def load_non_merge_optimizer(self, model, optimizer, resume_from_checkpoint, ckpt_quant_stage="O0"):
         # init and get optimizer LR_Scheduler
         returned_optim_state_dict = nested_copy(optimizer.state_dict())
 
@@ -528,19 +528,25 @@ class UnifiedCheckpointHandler:
         master_weights_name = _add_variant(SAFE_MASTER_WEIGHTS_NAME, self.args.optimizer_name_suffix)
         optimizer_path = os.path.join(resume_from_checkpoint, optimizer_name)
         master_weights_path = os.path.join(resume_from_checkpoint, master_weights_name)
-        has_master_weights = True if os.path.isfile(master_weights_path) else False
+        # no quantization & no master weight represent O1 AMP strategy.
+        is_amp_o1 = True if not os.path.isfile(master_weights_path) and ckpt_quant_stage == "O0" else False
 
         model_state_dict = get_expected_state_dict(model)
         struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}  # get optimizer param mappings
         optimizer_state_dict = load_state_dict(optimizer_path, ckpt_quant_stage=self.args.ckpt_quant_stage)
-        if has_master_weights:
+
+        master_weights = {}
+
+        # normal AMP O2
+        if not is_amp_o1 and os.path.isfile(master_weights_path):
             master_weights = load_file(master_weights_path)
 
         # rename and move to paddle.Tensor
         for key in list(optimizer_state_dict.keys()):
             key_name = key.split("/")
+            model_weight_key = key_name[0]
             static_name = struct2static_name_mappings[key_name[0]]
-            if has_master_weights:
+            if not is_amp_o1:
                 if model_state_dict[key_name[0]].dtype != core.VarDesc.VarType.FP32:
                     key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
                 else:
@@ -551,7 +557,13 @@ class UnifiedCheckpointHandler:
             returned_optim_state_dict[key_name] = optimizer_state_dict.pop(key)
             returned_optim_state_dict[key_name].name = key_name
 
-        if has_master_weights:
+            # master weight cast (only in AMP O2 + remove_master_weight)
+            if not is_amp_o1 and not os.path.isfile(master_weights_path):
+                master_weights[model_weight_key] = paddle.cast(
+                    model_state_dict[model_weight_key], dtype=paddle.float32
+                )
+
+        if not is_amp_o1:
             returned_optim_state_dict["master_weights"] = {}
             for key in list(master_weights.keys()):
                 static_name = struct2static_name_mappings[key]
@@ -664,6 +676,7 @@ class UnifiedCheckpointHandler:
                     model,
                     optimizer,
                     resume_from_checkpoint,
+                    ckpt_quant_stage=args.ckpt_quant_stage,
                 )
                 return returned_optim_state_dict
             else:
@@ -1292,7 +1305,8 @@ def unified_optimizer_into_shards(
         use_expert_parallel=args.use_expert_parallel,
     )
     sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
-    if args.ckpt_quant_stage in ["O1", "O2"]:
+    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
+    if local_rank == 0 and args.ckpt_quant_stage in ["O1", "O2"]:
         sharded_optim_index["ckpt_quant_stage"] = args.ckpt_quant_stage
 
     if master_weights is not None:
@@ -2269,6 +2283,7 @@ def filter_params(model_to_save, state_dict, args, is_optimizer=False):
         return [list(state_dict.keys())]
 
     filter_tensor_list = [[] for i in range(tp_size)]
+    is_master_weights = False
 
     if tp_rank == 0:
         quant = False
@@ -2277,6 +2292,10 @@ def filter_params(model_to_save, state_dict, args, is_optimizer=False):
         tensor_bytes_dict = {}
         model_state_dict = get_expected_state_dict(model_to_save)
         for (k, v) in state_dict.items():
+            # master weight has same key as model weight
+            if not is_master_weights and k in model_state_dict:
+                is_master_weights = True
+
             weight_key = k.split("/")[0]
             model_v = model_state_dict[weight_key] if is_optimizer else v
             if not quant or not is_optimizer:
@@ -2312,7 +2331,7 @@ def filter_params(model_to_save, state_dict, args, is_optimizer=False):
                 current_block = []
                 current_block_size = 0
 
-            if not quant or not is_optimizer:
+            if not quant or not is_optimizer or is_master_weights:
                 current_block.append(key)
             else:
                 current_block.append(key + "/" + MOMENT1_KEYNAME)

@@ -32,7 +32,7 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 
 
-def quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage):
+def quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage, async_save=False):
     quant = False
     if ckpt_quant_stage != "O0":
         quant = True
@@ -40,12 +40,13 @@ def quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage):
     if quant and state_dict_type == "optimizer_weight":
         codebook_dict = {}
         opt_keys = state_dict.keys()
-        all_bits, quant_bits = paddle.to_tensor(0.0), paddle.to_tensor(0.0)
+        if not async_save:
+            all_bits, quant_bits = paddle.to_tensor(0.0), paddle.to_tensor(0.0)
         for k in opt_keys:
             momentum1 = k.endswith(MOMENT1_KEYNAME)
             momentum2 = k.endswith(MOMENT2_KEYNAME)
             k_size = state_dict[k].size
-            if momentum1 or momentum2:
+            if not async_save and (momentum1 or momentum2):
                 all_bits += k_size * 4
 
             quant_weight = None
@@ -90,18 +91,21 @@ def quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage):
 
         state_dict.update(codebook_dict)
 
-        if paddle.distributed.get_world_size() > 1:
-            dist.all_reduce(all_bits)
-            dist.all_reduce(quant_bits)
+        if not async_save:
+            if paddle.distributed.get_world_size() > 1:
+                dist.all_reduce(all_bits)
+                dist.all_reduce(quant_bits)
 
-        model_numel = all_bits / 4
-        all_bits = model_numel * 7.0
-        quant_bits_mw = quant_bits + model_numel * 6.0
-        quant_bits = quant_bits + model_numel * 2.0
-        logger.info(
-            f"all bits: {all_bits.item()}, quant bits: {quant_bits.item()}, quant bits mw: {quant_bits_mw.item()}"
-        )
-        logger.info(f"quant ratio (w/o Master Weight): {(all_bits.item() - quant_bits.item()) / all_bits.item()}")
-        logger.info(f"quant ratio (w/ Master Weight): {(all_bits.item() - quant_bits_mw.item()) / all_bits.item()}")
+            model_numel = all_bits / 4
+            all_bits = model_numel * 7.0
+            quant_bits_mw = quant_bits + model_numel * 6.0
+            quant_bits = quant_bits + model_numel * 2.0
+            logger.info(
+                f"all bits: {all_bits.item()}, quant bits: {quant_bits.item()}, quant bits mw: {quant_bits_mw.item()}"
+            )
+            logger.info(f"quant ratio (w/o Master Weight): {(all_bits.item() - quant_bits.item()) / all_bits.item()}")
+            logger.info(
+                f"quant ratio (w/ Master Weight): {(all_bits.item() - quant_bits_mw.item()) / all_bits.item()}"
+            )
 
     return state_dict
