@@ -128,13 +128,13 @@ def main():
             raise ValueError("Please specific dtype: --fp16 or --bf16")
     else:
         dtype = "float32"
+
     quantization_config = dict(
         weight_quantize_algo=model_args.weight_quantize_algo,
         weight_blocksize=model_args.weight_blocksize,
         weight_double_quant=model_args.weight_double_quant,
         weight_double_quant_block_size=model_args.weight_double_quant_block_size,
     )
-
     model_config = AutoConfig.from_pretrained(
         model_args.model_name_or_path,
         dtype=dtype,
@@ -143,6 +143,26 @@ def main():
     )
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
+
+    if training_args.use_ssa:
+        assert training_args.group_size_ratio is not None, "group_size_ratio must be specified when use_ssa is True"
+        model_config.use_ssa = True
+        model_config.group_size_ratio = training_args.group_size_ratio
+        
+        orig_ctx_len = getattr(model_config, "max_position_embeddings", None)
+        if orig_ctx_len and data_args.max_length > orig_ctx_len:
+            scaling_factor = data_args.max_length / orig_ctx_len
+        model_config.rope_scaling_factor = scaling_factor
+        model_config.use_long_sequence_strategies = True
+        model_config.long_sequence_strategy_type = "embedding_strategies"
+        model_config.long_sequence_strategy_name = "LinearScalingRotaryEmbedding"
+        model_config.long_sequence_init_args = {
+            "dim": model_config.hidden_size // model_config.num_attention_heads,
+            "max_position_embeddings": model_config.max_position_embeddings,
+            "scaling_factor": scaling_factor,
+            "base": 10000.0
+        }
+
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     # Config for model using dropout, such as GPT.

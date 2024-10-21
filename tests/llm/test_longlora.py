@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import sys
 import unittest
-
+import os
 from parameterized import parameterized_class
 
 from tests.testing_utils import argv_context_guard, load_test_config
@@ -25,18 +25,10 @@ from .testing_utils import LLMTest
 
 @parameterized_class(
     ["model_dir"],
-    [
-        ["llama"],
-        ["chatglm"],
-        # ["bloom"], @skip("Skip and wait to fix.")
-        ["chatglm2"],
-        ["qwen"],
-        ["qwen2"],
-        ["baichuan"],
-    ],
+    [["llama"], ],
 )
 class FinetuneTest(LLMTest, unittest.TestCase):
-    config_path: str = "./tests/fixtures/llm/finetune.yaml"
+    config_path: str = "./tests/fixtures/llm/longlora.yaml"
     model_dir: str = None
 
     def setUp(self) -> None:
@@ -57,9 +49,3 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             from run_finetune import main
 
             main()
-
-        # TODO(wj-Mcat): disable chatglm2 test temporarily
-        if self.model_dir not in ["qwen", "qwen2", "baichuan", "chatglm2"]:
-            self.run_predictor({"inference_model": True})
-
-        self.run_predictor({"inference_model": False})

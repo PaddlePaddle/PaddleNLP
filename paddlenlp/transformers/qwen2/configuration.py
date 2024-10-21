@@ -106,6 +106,10 @@ class Qwen2Config(PretrainedConfig):
         rms_norm_eps=1e-6,
         use_cache=True,
         tie_word_embeddings=False,
+        long_sequence_strategy_type=None,
+        long_sequence_strategy_name=None,
+        long_sequence_init_args=None,
+        use_long_sequence_strategies=False,
         rope_theta=10000.0,
         pad_token_id=0,
         bos_token_id=151643,
@@ -148,6 +152,11 @@ class Qwen2Config(PretrainedConfig):
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
+
+        self.long_sequence_strategy_type = long_sequence_strategy_type
+        self.long_sequence_strategy_name = long_sequence_strategy_name
+        self.long_sequence_init_args = long_sequence_init_args
+        self.use_long_sequence_strategies = use_long_sequence_strategies
 
         super().__init__(
             pad_token_id=pad_token_id,
