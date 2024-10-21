@@ -14,29 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import namedtuple
-from contextlib import contextmanager
-from typing import Any, List, Tuple
+from typing import Any, Tuple
 
 import paddle
 import paddle.distributed as dist
-import paddle.nn.functional as F
 from paddle import Tensor, nn
-from paddle.distributed import fleet
 from paddle.distributed.communication import stream
 from paddle.distributed.communication.group import Group
-from paddle.distributed.fleet.utils import recompute
 
 from ..utils.log import logger
-
-GateOutput = namedtuple(
-    "GateOutput",
-    [
-        "aux",
-        "z",
-        "logits",
-    ],
-)
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
@@ -176,12 +162,9 @@ class MoELayer(nn.Layer):
         self,
         gate: nn.Layer,
         capacity: int,
-        experts: List[nn.Layer],
-        layer_idx,
+        experts: nn.LayerList,
         group: Group = None,
-        recompute=False,
         all_to_all_dropout=0.0,
-        moe_num_experts=2,
     ):
         super().__init__()
         self.gate = gate
@@ -201,7 +184,8 @@ class MoELayer(nn.Layer):
 
         for p in self.gate.parameters():
             p.is_gate = True
-        if type(experts) == nn.LayerList:
+
+        if isinstance(experts, nn.LayerList):
             self.experts = experts
         else:
             logger.info(f"using fused experts, type={type(experts)}")
@@ -225,10 +209,7 @@ class MoELayer(nn.Layer):
     def forward(self, input):
         true_experts = self.experts[self.rank * self.num_local_experts : (self.rank + 1) * self.num_local_experts]
         if input.ndim == 3:
-            orig_shape = input.shape
             reshaped_input = input.reshape([-1, input.shape[-1]])
-        else:
-            orig_shape = None
         assert len(input.shape) == 2, f"input Tensor must have dimensions: (s)equence, (d)im, got:{input.shape}"
 
         # Implement Algorithm 2 from GShard paper.
