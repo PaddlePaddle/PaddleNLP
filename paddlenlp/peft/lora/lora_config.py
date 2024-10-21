@@ -76,6 +76,10 @@ class LoRAConfig:
     do_qat: bool = field(default=False, metadata={"help": "Whether the lora model would do quant-aware training"})
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
     pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
+    loraga: bool = field(default=False, metadata={"help": "Whether to use LoRA-GA:https://arxiv.org/pdf/2407.05000"})
+    loraga_init_bsz: int = field(default=1, metadata={"help": "The batch size for lora ga"})
+    loraga_init_iters: int = field(default=4, metadata={"help": "The number of init iterations for lora ga"})
+    loraga_stable_gamma: int = field(default=32, metadata={"help": "Lora Ga stable gamma"})
     lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+"})
     base_model_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "The name of the base model to use."}

@@ -873,3 +873,77 @@ def get_eos_token_id(
 
     eos_token_ids_dict = {str(item): item for item in eos_token_ids}
     return list(eos_token_ids_dict.values())
+
+
+def estimate_gradient(model, train_ds, data_collator, world_size=1, batch_size=1, iters=4, tokenizer=None):
+    """Estimate the gradient of the model on the given dataset"""
+
+    logger.info("Estimating gradient for LoraGA")
+    model.train()
+    named_grads = {}
+    dataloader = DataLoader(train_ds, collate_fn=data_collator, batch_size=batch_size, shuffle=False)
+    num_batch = 0
+    for batch in dataloader:
+        num_batch += 1
+        batch = {k: paddle.to_tensor(v) for k, v in batch.items()}
+        loss, logits = model(**batch)
+        loss.backward()
+
+        # Record gradients
+        for grad_name, param in model.named_parameters():
+            # if param.stop_gradient is False:
+            if param.stop_gradient is False and param.grad is not None:
+                if grad_name not in named_grads:
+                    named_grads[grad_name] = param.grad.clone()
+                else:
+                    named_grads[grad_name] += param.grad
+
+                param.clear_gradient()
+        if num_batch == iters:
+            break
+
+    for grad_name, param in named_grads.items():
+        named_grads[grad_name] /= num_batch
+
+    paddle.device.cuda.empty_cache()
+    return named_grads
+
+
+def loraga_reinit(model, named_grads, stable_gamma, **kwargs):
+    """Re-initialize the weights of the model using the estimated gradients"""
+    from tqdm import tqdm
+
+    for name, module in tqdm(
+        model.named_sublayers(),
+        desc="Reinitializing Lora",
+        total=len(list(model.named_sublayers())),
+    ):
+        from paddlenlp.peft.lora.lora_layers import LoRALinear
+
+        if isinstance(module, LoRALinear):
+            loraga_reinit_modules(name, module, named_grads, stable_gamma, **kwargs)
+
+
+def loraga_reinit_modules(name, module, named_grads, stable_gamma, **kwargs):
+    with paddle.no_grad():
+        lora_r = module.r
+        grad_name = ".".join(name.split(".")[1:]) + ".weight"
+        grads = named_grads[grad_name]
+
+        U, S, V = paddle.linalg.svd_lowrank(grads.cuda().astype("float32"), q=4 * lora_r, niter=4)
+
+        V = V.T
+        A = U[:, lora_r : 2 * lora_r]
+        B = V[:lora_r, :]
+        m, n = grads.shape  # m: feature_out, n: feature_in
+        # If stable_gamma is not -1, scale the matrices A and B by the square root of the stable_gamma
+        if stable_gamma != -1:
+            A = A * m**0.25 / stable_gamma**0.5
+            B = B * m**0.25 / stable_gamma**0.5
+        else:
+            A = A / module.scaling
+            B = B / module.scaling
+        module.lora_A.set_value(A.astype(module.lora_A.dtype))
+        module.lora_B.set_value(B.astype(module.lora_B.dtype))
+        offset = module.lora_A @ module.lora_B
+        module.weight.data -= module.scaling * offset
