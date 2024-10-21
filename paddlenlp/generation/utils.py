@@ -1361,6 +1361,9 @@ class GenerationMixin(object):
                 "you should not specify InputSpec for top_k and top_p parameters, one of InputSpec is expected"
             )
 
+        # avoid D2H sync of topk attribute
+        top_k = paddle.empty([top_k]).shape[0]
+
         batch_size, cur_len = input_ids.shape
         # used for compute on gpu, avoid memcpy D2H
         cur_len_gpu = paddle.full([1], cur_len, dtype="int64")
@@ -1411,10 +1414,15 @@ class GenerationMixin(object):
                 _, next_tokens = paddle.tensor.top_p_sampling(probs, top_ps_tensor)
             else:
                 probs = TopKProcess(probs, top_k, min_tokens_to_keep)
-                if top_k == 1:
-                    next_tokens = paddle.unsqueeze_(paddle.argmax(probs, axis=-1), -1)
-                else:
-                    next_tokens = paddle.multinomial(probs)
+                # if top_k == 1: # if-clause will introduce cuda D2H sync, just skip this condition is ok
+                #     next_tokens = paddle.unsqueeze_(paddle.argmax(probs, axis=-1), -1)
+                # else:
+                #     next_tokens = paddle.multinomial(probs) # will introduce cuda sync
+
+                # do Gumbel-Max trick sampling manually here to avoid sync introduced by paddle.multinomial
+                noise = paddle.rand(shape=probs.shape, dtype=probs.dtype)
+                noisy_probs = paddle.log(probs) - paddle.clip(paddle.log(-paddle.log(noise)), max=100) # clip to avoid underflow
+                next_tokens = paddle.unsqueeze(paddle.argmax(noisy_probs, axis=-1), -1)
 
             next_scores = paddle.index_sample(origin_probs, next_tokens)
             scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
