@@ -21,8 +21,25 @@ import sys
 from typing import Optional, Type
 
 import pip
+from packaging import version
 
 from paddlenlp.utils.log import logger
+
+__all__ = [
+    "is_paddle_cuda_available",
+    "is_paddle_available",
+    "is_psutil_available",
+    "is_package_available",
+    "is_fast_tokenizer_available",
+    "is_transformers_available",
+    "is_torch_available",
+    "install_package",
+    "uninstall_package",
+    "import_module",
+    "is_paddle_bf16_cpu_available",
+    "is_paddle_bf16_gpu_available",
+    "is_sentencepiece_available",
+]
 
 
 def is_datasets_available():
@@ -41,11 +58,54 @@ def is_paddle_cuda_available() -> bool:
 
 
 def is_paddle_available() -> bool:
-    """check if `torch` package is installed
+    """check if `paddle` package is installed
     Returns:
-        bool: if `torch` is available
+        bool: if `paddle` is available
     """
     return is_package_available("paddle")
+
+
+def is_paddle_bf16_cpu_available():
+    if not is_paddle_available():
+        return False
+
+    import paddle
+
+    curr_version = version.parse(version.parse(paddle.__version__).base_version)
+    if curr_version < version.parse("2.3") and curr_version != version.parse("0.0.0"):
+        return False
+
+    try:
+        # multiple levels of AttributeError depending on the paddle version so do them all in one check
+        _ = paddle.amp.autocast
+    except AttributeError:
+        return False
+
+    return True
+
+
+def is_paddle_bf16_gpu_available():
+    if not is_paddle_available():
+        return False
+
+    import paddle
+
+    curr_version = version.parse(version.parse(paddle.__version__).base_version)
+    if curr_version < version.parse("2.3") and curr_version != version.parse("0.0.0"):
+        return False
+
+    if paddle.is_compiled_with_cuda() and paddle.version.cuda() is not None:
+        # paddle.device.get_device()
+        if paddle.device.cuda.get_device_properties("gpu:0").major < 8:
+            return False
+        if int(paddle.version.cuda().split(".")[0]) < 11:
+            return False
+        if not hasattr(paddle.amp, "autocast"):
+            return False
+    else:
+        return False
+
+    return True
 
 
 def is_psutil_available():
@@ -54,6 +114,10 @@ def is_psutil_available():
 
 def is_tiktoken_available():
     return importlib.util.find_spec("tiktoken") is not None
+
+
+def is_sentencepiece_available():
+    return importlib.util.find_spec("sentencepiece") is not None
 
 
 def is_torch_available() -> bool:
