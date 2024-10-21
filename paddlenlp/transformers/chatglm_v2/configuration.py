@@ -72,6 +72,7 @@ class ChatGLMv2Config(PretrainedConfig):
         self.hidden_dropout = hidden_dropout
         self.attention_dropout = attention_dropout
         self.layernorm_epsilon = layernorm_epsilon
+        self.rope_type = 'chatglm2'
         self.use_cache = use_cache
         self.rmsnorm = rmsnorm
         self.apply_residual_connection_post_layernorm = apply_residual_connection_post_layernorm
