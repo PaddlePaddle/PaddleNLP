@@ -781,6 +781,42 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
     logger.info("Finish read result message")
 
 
+def speculate_read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue, done_event: mp.Event):
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+    paddle.device.set_device("cpu")
+    paddle.disable_static()
+    outputs = []
+    for _ in range(MAX_BSZ):
+        outputs.append([])
+    output_tensor = tensor_queue.get(timeout=1)
+    done_event.set()
+    logger.info("Start speculate read result message")
+    logger.info(f"Current path is {os.getcwd()}")
+
+    from paddlenlp_ops import speculate_get_output
+
+    while True:
+        speculate_get_output(output_tensor, 0, True)
+        if int(output_tensor[0, 0]) == -2:  # read none
+            continue
+        bsz = int(output_tensor[1])
+        accept_num = output_tensor[2 : bsz + 2].numpy()
+        for bi in range(bsz):
+            output_numpy = output_tensor[
+                2 + MAX_BSZ + bi * MAX_DRAFT_TOKENS : 2 + MAX_BSZ + bi * MAX_DRAFT_TOKENS + int(accept_num[bi]), 0
+            ].numpy()
+            output_numpy[output_numpy == -1] = tokenizer.eos_token_id
+            outputs[bi].extend(output_numpy.tolist())
+        if int(output_tensor[0, 0]) == -1:
+            break
+
+    seqs = tokenizer.batch_decode(outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+    for i, (out, seq) in enumerate(zip(outputs, seqs)):
+        result_queue.put([i, out, seq])
+
+    logger.info("Finish read result message")
+
+
 def get_rotary_position_embedding(position_ids, head_dim, rope_theta=10000.0, rope_scaling: dict = None):
     """
     Pre-calculate rotary position embedding for position_ids.
