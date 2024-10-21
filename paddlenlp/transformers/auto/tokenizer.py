@@ -107,13 +107,14 @@ else:
             ("tinybert", "TinyBertTokenizer"),
             ("unified_transformer", "UnifiedTransformerTokenizer"),
             ("unimo", "UNIMOTokenizer"),
-            ("gpt", "GPTChineseTokenizer"),
+            ("gpt", (("GPTTokenizer", "GPTChineseTokenizer"), None)),
             ("gau_alpha", "GAUAlphaTokenizer"),
             ("artist", "ArtistTokenizer"),
             ("chineseclip", "ChineseCLIPTokenizer"),
             ("ernie_vil", "ErnieViLTokenizer"),
             ("glm", "GLMGPT2Tokenizer"),
             ("qwen", "QWenTokenizer"),
+            ("qwen2", "Qwen2Tokenizer"),
             ("yuan", "YuanTokenizer"),
         ]
     )
