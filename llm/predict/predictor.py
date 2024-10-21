@@ -1248,6 +1248,7 @@ def create_predictor(
             config.tensor_parallel_rank = tensor_parallel_rank
             config.model_name_or_path = predictor_args.model_name_or_path
             config.quant_type = predictor_args.quant_type
+            config.append_attn = predictor_args.append_attn
             config.cachekv_int8_type = predictor_args.cachekv_int8_type
             config.use_fake_parameter = predictor_args.use_fake_parameter
             config.single_card_ptq = not predictor_args.use_fake_parameter
@@ -1272,7 +1273,6 @@ def create_predictor(
                 elif predictor_args.block_attn:
                     config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
-                    config.append_attn = predictor_args.append_attn
                     from paddlenlp.experimental.transformers import (
                         LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
                     )
@@ -1312,7 +1312,6 @@ def create_predictor(
                 if predictor_args.block_attn:
                     config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
-                    config.append_attn = predictor_args.append_attn
                     from paddlenlp.experimental.transformers import (
                         MixtralForCausalLMBlockInferenceModel as MixtralInferenceModel,
                     )
@@ -1382,7 +1381,6 @@ def create_predictor(
 
                     config.block_size = predictor_args.block_size
                     config.max_seq_len = predictor_args.total_max_length
-                    config.append_attn = predictor_args.append_attn
                 else:
                     from paddlenlp.experimental.transformers import (
                         BloomForCausalLMInferenceModel as BloomInferenceModel,
@@ -1411,7 +1409,6 @@ def create_predictor(
                 if predictor_args.block_attn:
                     config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
-                    config.append_attn = predictor_args.append_attn
                     from paddlenlp.experimental.transformers import (
                         Qwen2MoeForCausalLMBlockInferenceModel as Qwen2MoeInferenceModel,
                     )
@@ -1438,7 +1435,6 @@ def create_predictor(
                 if predictor_args.block_attn:
                     config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
-                    config.append_attn = predictor_args.append_attn
                     from paddlenlp.experimental.transformers import (
                         Qwen2ForCausalLMBlockInferenceModel as Qwen2InferenceModel,
                     )
@@ -1486,6 +1482,7 @@ def create_predictor(
 
         elif predictor_args.mode == "static":
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
+            config.append_attn = predictor_args.append_attn
 
             if config.quantization_config.quant_type is not None:
                 if "c8" in config.quantization_config.quant_type:
@@ -1695,8 +1692,8 @@ def benchmark(predictor, predictor_args, model_args):
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 10
-    test_time = 100
+    warmup_time = 5
+    test_time = 20
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):
