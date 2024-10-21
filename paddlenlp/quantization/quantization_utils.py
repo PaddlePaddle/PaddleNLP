@@ -35,9 +35,19 @@ except:
     qlora_weight_quantize = None
 
 
-def replace_with_quantization_linear(model, quantization_config, name_prefix="", llm_int8_threshold=6.0):
+def replace_with_quantization_linear(
+    model, quantization_config, name_prefix="", llm_int8_threshold=6.0, lqlora_quantize_cfg=None
+):
     quantization_linear_list = []
     for name, child in model.named_children():
+        if lqlora_quantize_cfg is None:
+            weight_quantize_algo = quantization_config.weight_quantize_algo
+        else:
+            key = name_prefix + name
+            if key not in lqlora_quantize_cfg.keys():
+                weight_quantize_algo = quantization_config.weight_quantize_algo
+            else:
+                weight_quantize_algo = lqlora_quantize_cfg[key]
         if isinstance(child, nn.Linear):
             if child.bias is None:
                 bias_attr = False
@@ -47,7 +57,7 @@ def replace_with_quantization_linear(model, quantization_config, name_prefix="",
             model._sub_layers[name] = QuantizationLinear(
                 child.weight.shape[0],
                 child.weight.shape[1],
-                quantization_config.weight_quantize_algo,
+                weight_quantize_algo,
                 child._dtype,
                 bias_attr=bias_attr,
                 llm_int8_threshold=llm_int8_threshold,
@@ -65,7 +75,7 @@ def replace_with_quantization_linear(model, quantization_config, name_prefix="",
             model._sub_layers[name] = ColumnParallelQuantizationLinear(
                 child.weight.shape[0],
                 child.weight.shape[1] * child.world_size,
-                quantization_config.weight_quantize_algo,
+                weight_quantize_algo,
                 child._dtype,
                 bias_attr=bias_attr,
                 gather_output=child.gather_output,
@@ -81,7 +91,7 @@ def replace_with_quantization_linear(model, quantization_config, name_prefix="",
             model._sub_layers[name] = RowParallelQuantizationLinear(
                 child.weight.shape[0] * child.world_size,
                 child.weight.shape[1],
-                quantization_config.weight_quantize_algo,
+                weight_quantize_algo,
                 child._dtype,
                 bias_attr=bias_attr,
                 input_is_parallel=child.input_is_parallel,
@@ -91,7 +101,7 @@ def replace_with_quantization_linear(model, quantization_config, name_prefix="",
             quantization_linear_list.append(name_prefix + name)
         else:
             quantization_linear_list += replace_with_quantization_linear(
-                child, quantization_config, name_prefix + name + ".", llm_int8_threshold
+                child, quantization_config, name_prefix + name + ".", llm_int8_threshold, lqlora_quantize_cfg
             )
 
     gc.collect()
@@ -167,6 +177,38 @@ def convert_to_quantize_state_dict(state_dict, quantization_linear_list, quantiz
         raise NotImplementedError(
             f"Please check the quantization_config.weight_quantize_algo: {quantization_config.weight_quantize_algo}"
         )
+
+
+def _convert_to_quantize_state_dict_lqlora(
+    state_dict, weight_quantize_algo, quantization_config, dtype, lqlora_quantize_cfg
+):
+    quantization_linear_list = [
+        key for key in lqlora_quantize_cfg.keys() if lqlora_quantize_cfg[key] == weight_quantize_algo
+    ]
+    if weight_quantize_algo == "weight_only_int8":
+        state_dict = convert_to_quantize_state_dict_with_check(
+            state_dict, quantization_linear_list, "weight_only_int8", dtype
+        )
+    elif weight_quantize_algo in ["nf4", "fp4"]:
+        weight_quantize_algo_bak = quantization_config.weight_quantize_algo
+        quantization_config.weight_quantize_algo = weight_quantize_algo
+        state_dict = convert_to_quantize_state_dict_without_check(
+            state_dict, quantization_linear_list, quantization_config, dtype
+        )
+        quantization_config.weight_quantize_algo = weight_quantize_algo_bak
+    else:
+        raise NotImplementedError(
+            f"Please check the quantization_config.weight_quantize_algo: {quantization_config.weight_quantize_algo}"
+        )
+    return state_dict
+
+
+def convert_to_quantize_state_dict_lqlora(state_dict, quantization_config, dtype, lqlora_quantize_cfg):
+    for weight_quantize_algo in ["weight_only_int8", "nf4", "fp4"]:
+        state_dict = _convert_to_quantize_state_dict_lqlora(
+            state_dict, weight_quantize_algo, quantization_config, dtype, lqlora_quantize_cfg
+        )
+    return state_dict
 
 
 def update_loaded_state_dict_keys(state_dict, quantization_linear_list, quantization_config):
