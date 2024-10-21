@@ -72,9 +72,7 @@ class LlamaTokenizer(PretrainedTokenizer):
         self.add_bos_token = add_bos_token
         self.add_eos_token = add_eos_token
         self.decode_with_prefix_space = decode_with_prefix_space
-        # self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
-        self.sp_model = self.get_spm_processor(kwargs.pop("from_slow", False))
-        self.sp_model.Load(vocab_file)
+        self.sp_model = self.get_spm_processor(kwargs.pop("from_slow", True))
 
     @property
     def vocab_size(self):
@@ -101,7 +99,7 @@ class LlamaTokenizer(PretrainedTokenizer):
     def eos_token_id(self) -> Optional[int]:
         return self.sp_model.eos_id()
 
-    def get_spm_processor(self, from_slow=False):
+    def get_spm_processor(self, from_slow=True):
         tokenizer = spm.SentencePieceProcessor(**self.sp_model_kwargs)
         if from_slow:  # no dependency on protobuf
             tokenizer.Load(self.vocab_file)

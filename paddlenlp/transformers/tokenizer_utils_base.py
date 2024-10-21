@@ -1600,7 +1600,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         from_hf_hub=False,
         **kwargs,
     ):
-        from_slow = kwargs.get("from_slow", False)
+        if cls.__name__.endswith("Fast"):
+            from_slow = kwargs.get("from_slow", False)
+        else:
+            from_slow = kwargs.get("from_slow", True)
         has_tokenizer_file = resolved_vocab_files.get("tokenizer_file", None) is not None
         if (from_slow or not has_tokenizer_file) and cls.slow_tokenizer_class is not None:
             slow_tokenizer = (cls.slow_tokenizer_class)._from_pretrained(
