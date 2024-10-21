@@ -42,7 +42,7 @@ from paddlenlp.transformers import (
     PretrainedModel,
     PretrainedTokenizer,
 )
-from paddlenlp.utils import llm_utils
+from paddlenlp.trl import llm_utils
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
