@@ -13,6 +13,7 @@
 // limitations under the License.
 #include "../append_attention_c4_impl.cuh"
 
+
 template void CascadeAppendAttentionC4Kernel<paddle::float16, paddle::float16>(
     const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,  // [token_num, num_heads, head_dim]

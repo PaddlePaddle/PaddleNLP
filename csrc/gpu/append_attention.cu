@@ -376,7 +376,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          true,
+          !speculate_decoder,
           !speculate_decoder,
           exec_stream,
           &fmha_out);
@@ -411,7 +411,7 @@ std::vector<paddle::Tensor> AppendAttentionKernel(
           encoder_max_partition_size,
           speculate_max_draft_token_num,
           causal,
-          true,
+          !speculate_decoder,
           !speculate_decoder,
           exec_stream,
           &fmha_out);

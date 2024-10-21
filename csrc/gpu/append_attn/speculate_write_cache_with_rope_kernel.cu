@@ -524,6 +524,7 @@ template void SpeculateWriteCacheWithRoPEKernel<paddle::float16, int>(
     paddle::Tensor* key_cache_out,
     paddle::Tensor* value_cache_out);
 
+
 template void
 SpeculateWriteCacheWithRoPEKernel<paddle::float16, paddle::float16>(
     const AppendAttnMetaData& meta_data,

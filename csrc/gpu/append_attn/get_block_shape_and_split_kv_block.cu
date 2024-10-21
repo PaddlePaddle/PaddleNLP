@@ -107,13 +107,14 @@ std::vector<paddle::Tensor> GetBlockShapeAndSplitKVBlock(
     const int encoder_block_shape_q,
     const int decoder_block_shape_q,
     const int group_size,
-    const int block_size) {
+    const int block_size,
+    const int decoder_step_token_num) {
   auto stream = seq_lens_encoder.stream();
   int bsz = cum_offsets.shape()[0];
 
   // decoder
   const uint32_t decoder_max_tile_size_per_bs_q =
-      div_up((1 * group_size), decoder_block_shape_q);
+      div_up((decoder_step_token_num * group_size), decoder_block_shape_q);
   auto decoder_batch_ids =
       GetEmptyTensor({bsz * decoder_max_tile_size_per_bs_q},
                      paddle::DataType::INT32,
@@ -286,7 +287,8 @@ PD_BUILD_OP(get_block_shape_and_split_kv_block)
     .Attrs({"encoder_block_shape_q: int",
             "decoder_block_shape_q: int",
             "group_size: int",
-            "block_size: int"})
+            "block_size: int",
+            "decoder_step_token_num: int"})
     .SetKernelFn(PD_KERNEL(GetBlockShapeAndSplitKVBlock))
     .SetInferShapeFn(PD_INFER_SHAPE(GetBlockShapeAndSplitKVBlockInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(GetBlockShapeAndSplitKVBlockInferDtype));

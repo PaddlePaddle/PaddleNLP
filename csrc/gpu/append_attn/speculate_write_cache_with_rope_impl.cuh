@@ -372,9 +372,6 @@ __global__ void append_speculate_cache_neox_rope_kernel(
     }
     const int block_offset = write_seq_id % block_size;
 
-    // const int write_q_idx = token_id * output_inner_dim * head_size + hi *
-    // head_size + h_bias;
-
     const int bias_idx_left = hi * head_size + h_bias;
     const int bias_idx_right = bias_idx_left + half_head_size;
     const int ori_idx_left = token_id * hidden_size + hi * head_size + h_bias;
@@ -492,13 +489,8 @@ __global__ void append_speculate_cache_int8_rope_kernel(
   const int start_token_idx = bid * max_seq_len - cum_offsets[bid];
   const int head_idx = blockIdx.y * NUM_WARPS + wid;
   int q_head_idx, k_head_idx, v_idx;
-  // q : dequant + add_bias + rope + write
-  // k : dequant + add_bias + rope + quant + write
-  // v : dequant + add_bias + quant + write
-  // kv在0位置全补0
   const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
   constexpr int half_head_size = HeadDim / 2;
-  // const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
   if (seq_lens_encoder[bid] > 0) return;
   const int write_seq_id = seq_lens[bid] + token_id - start_token_idx;
   if (write_seq_id == 0) return;
@@ -566,36 +558,6 @@ __global__ void append_speculate_cache_int8_rope_kernel(
     constexpr int KV_VEC_SIZE = 16 / sizeof(uint8_t);  // 16
     using LoadPadKVT = AlignedVector<uint8_t, KV_VEC_SIZE>;
     const uint32_t kv_head_idx = (head_idx - num_heads) % gqa_group_size;
-    // if (block_offset == 0) {
-    //   // pad zero for this kv_head_idx for this block
-    //   LoadPadKVT pad_cache_vec;
-    //   *(reinterpret_cast<uint4*>(pad_cache_vec.val)) = make_uint4(0, 0, 0,
-    //   0); if (head_idx < num_heads + gqa_group_size) {
-    //     constexpr int num_vecs_per_head_dim = HeadDim / KV_VEC_SIZE;
-    //     constexpr int num_token_each_time = 32 / num_vecs_per_head_dim;
-    //     const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
-    //     block_size * HeadDim
-    //                               + lane_id % num_vecs_per_head_dim *
-    //                               KV_VEC_SIZE;
-    //     for (int block_i = lane_id / num_vecs_per_head_dim; block_i <
-    //     block_size; block_i += num_token_each_time) {
-    //       Store<uint8_t, KV_VEC_SIZE>(pad_cache_vec, &key_cache[tgt_idx +
-    //       block_i * HeadDim]);
-    //     }
-    //   } else {
-    //     const int num_vecs_per_head_dim = block_size / KV_VEC_SIZE;
-    //     const int num_token_each_time = 32 / num_vecs_per_head_dim;
-    //     const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
-    //     HeadDim * block_size
-    //                               + lane_id % num_vecs_per_head_dim *
-    //                               KV_VEC_SIZE;
-    //     for (int block_i = lane_id / num_vecs_per_head_dim; block_i <
-    //     HeadDim; block_i += num_token_each_time) {
-    //       Store<uint8_t, KV_VEC_SIZE>(pad_cache_vec, &value_cache[tgt_idx +
-    //       block_i * block_size]);
-    //     }
-    //   }
-    // }
 
     constexpr int K_VEC_SIZE = 4;
     constexpr int HALF_K_VEC_SIZE = 2;
@@ -699,11 +661,6 @@ __global__ void append_speculate_cache_int8_rope_kernel(
           static_cast<uint8_t>(quant_value2 + 128.0f);
     }
     if (head_idx < num_heads + gqa_group_size) {
-      // write k
-      // 大分块 lane_id / 4 / 2
-      // 上下 lane_id / 4 % 2
-      // 左16还是右16 (block_offset % 16) / 8
-      // 小偏移 lane_id % 4 * 2
       const int start_block_16 =
           block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 2 * 8;
       const uint32_t tgt_cache_idx =
@@ -712,12 +669,6 @@ __global__ void append_speculate_cache_int8_rope_kernel(
           lane_id / 4 / 2 * 32 + (block_offset % 16) / 8 * 16 + lane_id % 4 * 4;
       Store<uint8_t, K_VEC_SIZE>(cache_vec, &key_cache[tgt_cache_idx]);
     } else {
-      // write v transpose
-      // 大分块 block_offset / 16 / 2 * 32
-      // 大上下 lane_id / 4 * 16 * block_size + lane_id % 4 * 2
-      // 小上下 block_offset / 16 % 2 * block_size
-      // 左16还是右16
-      // 小偏移
       const uint32_t base_tgt_cache_idx =
           block_idx * gqa_group_size * HeadDim * block_size +
           kv_head_idx * HeadDim * block_size +
@@ -784,13 +735,9 @@ __global__ void append_speculate_cache_int8_neox_rope_kernel(
   const int start_token_idx = bid * max_seq_len - cum_offsets[bid];
   const int head_idx = blockIdx.y * NUM_WARPS + wid;
   int q_head_idx, k_head_idx, v_idx;
-  // q : dequant + add_bias + rope + write
-  // k : dequant + add_bias + rope + quant + write
-  // v : dequant + add_bias + quant + write
-  // kv在0位置全补0
+
   const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
   constexpr int half_head_size = HeadDim / 2;
-  // const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
   if (seq_lens_encoder[bid] > 0) return;
   const int write_seq_id = seq_lens[bid] + token_id - start_token_idx;
   if (write_seq_id == 0) return;
@@ -997,11 +944,7 @@ __global__ void append_speculate_cache_int8_neox_rope_kernel(
           right_cache_vec[i + HALF_K_VEC_SIZE] =
               static_cast<uint8_t>(quant_value2 + 128.0f);
         }
-        // write k
-        // 大分块 lane_id / 4 / 2
-        // 上下 lane_id / 4 % 2
-        // 左16还是右16 (block_offset % 16) / 8
-        // 小偏移 lane_id % 4 * 2
+
         const int left_start_block_16 =
             block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 2 * 8;
         const uint32_t left_tgt_cache_idx =
@@ -1104,12 +1047,6 @@ __global__ void append_speculate_cache_int8_neox_rope_kernel(
             static_cast<uint8_t>(quant_value2 + 128.0f);
       }
 
-      // write v transpose
-      // 大分块 block_offset / 16 / 2 * 32
-      // 大上下 lane_id / 4 * 16 * block_size + lane_id % 4 * 2
-      // 小上下 block_offset / 16 % 2 * block_size
-      // 左16还是右16
-      // 小偏移
       const uint32_t base_tgt_cache_idx =
           block_idx * gqa_group_size * HeadDim * block_size +
           kv_head_idx * HeadDim * block_size +
@@ -1179,15 +1116,9 @@ __global__ void append_speculate_cache_int4_rope_kernel(
   const int start_token_idx = bid * max_seq_len - cum_offsets[bid];
   const int head_idx = blockIdx.y * NUM_WARPS + wid;
 
-  // const int bid = blockIdx.x, head_idx = blockIdx.y * NUM_WARPS + wid;
-  // q : dequant + add_bias + rope + write
-  // k : dequant + add_bias + rope + quant + write
-  // v : dequant + add_bias + quant + write
-  // kv在0位置全补0
   const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
   constexpr int half_head_size = HeadDim / 2;
   const int half_block_size = block_size / 2;
-  // const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
   if (seq_lens_encoder[bid] > 0) return;
   const int write_seq_id = seq_lens[bid] + token_id - start_token_idx;
   if (write_seq_id == 0) return;
@@ -1198,14 +1129,6 @@ __global__ void append_speculate_cache_int4_rope_kernel(
   const int block_idx = __ldg(&block_table_now[write_seq_id / block_size]);
 
   const int block_offset = write_seq_id % block_size;
-  // if (layer_id == 0 && bid == 0 && head_idx == num_heads && wid == 0 &&
-  // lane_id == 0) {
-  //   printf("bid: %d, start_token_idx: %d, num_heads: %d, gqa_group_size: %d,
-  //   head_idx: %d, block_idx: %d, block_offset: %d\n",
-  //           bid, start_token_idx, (int)num_heads, (int)gqa_group_size,
-  //           head_idx, block_idx, block_offset);
-  // }
-  // __syncwarp();
 
   if (head_idx < num_heads) {
     // q
@@ -1256,36 +1179,6 @@ __global__ void append_speculate_cache_int4_rope_kernel(
     constexpr int KV_VEC_SIZE = 16 / sizeof(uint8_t);  // 16
     using LoadPadKVT = AlignedVector<uint8_t, KV_VEC_SIZE>;
     const uint32_t kv_head_idx = (head_idx - num_heads) % gqa_group_size;
-    // if (block_offset == 0) {
-    //   // pad zero for this kv_head_idx for this block
-    //   LoadPadKVT pad_cache_vec;
-    //   *(reinterpret_cast<uint4*>(pad_cache_vec.val)) = make_uint4(0, 0, 0,
-    //   0); if (head_idx < num_heads + gqa_group_size) {
-    //     constexpr int num_vecs_per_head_dim = half_head_size / KV_VEC_SIZE;
-    //     constexpr int num_token_each_time = 32 / num_vecs_per_head_dim;
-    //     const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
-    //     block_size * half_head_size
-    //                               + lane_id % num_vecs_per_head_dim *
-    //                               KV_VEC_SIZE;
-    //     for (int block_i = lane_id / num_vecs_per_head_dim; block_i <
-    //     block_size; block_i += num_token_each_time) {
-    //       Store<uint8_t, KV_VEC_SIZE>(pad_cache_vec, &key_cache[tgt_idx +
-    //       block_i * half_head_size]);
-    //     }
-    //   } else {
-    //     const int num_vecs_per_head_dim = half_block_size / KV_VEC_SIZE;
-    //     const int num_token_each_time = 32 / num_vecs_per_head_dim;
-    //     const uint32_t tgt_idx = (block_idx * gqa_group_size + kv_head_idx) *
-    //     HeadDim * half_block_size
-    //                               + lane_id % num_vecs_per_head_dim *
-    //                               KV_VEC_SIZE;
-    //     for (int block_i = lane_id / num_vecs_per_head_dim; block_i <
-    //     HeadDim; block_i += num_token_each_time) {
-    //       Store<uint8_t, KV_VEC_SIZE>(pad_cache_vec, &value_cache[tgt_idx +
-    //       block_i * half_block_size]);
-    //     }
-    //   }
-    // }
 
     constexpr int K_VEC_SIZE = 4;
     constexpr int HALF_K_VEC_SIZE = 2;
@@ -1369,11 +1262,6 @@ __global__ void append_speculate_cache_int4_rope_kernel(
       bias_vec2[1] = static_cast<T>(input_right);
     }
     if (head_idx < num_heads + gqa_group_size) {
-      // quant + write k
-      // 大分块 lane_id / 4 / 4
-      // 上下 lane_id / 4 % 4 / 2
-      // 左16还是右16 lane_id / 4 % 2
-      // 小偏移 lane_id % 4 * 2
       LoadKVResT cache_vec;
       const int start_block_16 =
           block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 4 / 2 * 8;
@@ -1383,13 +1271,6 @@ __global__ void append_speculate_cache_int4_rope_kernel(
           start_block_16 * half_head_size + lane_id / 4 / 4 * 32 +
           lane_id / 4 % 2 * 16 + lane_id % 4 * 4;
       Load<uint8_t, K_VEC_SIZE>(&key_cache[tgt_cache_idx], &cache_vec);
-      // if (layer_id == 0 && bid == 0 && head_idx == num_heads && wid == 0) {
-      //   for (int i = 0; i < 4; i++) {
-      //     printf("lane_id: %d, before cache_vec[%d]: %d, tgt_cache_idx:
-      //     %d\n", (int)lane_id, i, (int)cache_vec[i], (int)tgt_cache_idx);
-      //   }
-      // }
-      // __syncwarp();
 #pragma unroll
       for (uint32_t i = 0; i < HALF_K_VEC_SIZE; i++) {
         float quant_value =
@@ -1434,22 +1315,9 @@ __global__ void append_speculate_cache_int4_rope_kernel(
               ((uint_quant_value << 4) | (ano_uint_quant_value));
         }
       }
-      // if (layer_id == 0 && bid == 0 && head_idx == num_heads && wid == 0) {
-      //   for (int i = 0; i < 4; i++) {
-      //     printf("lane_id: %d, after cache_vec[%d]: %d, tgt_cache_idx: %d\n",
-      //     (int)lane_id, i, (int)cache_vec[i], (int)tgt_cache_idx);
-      //   }
-      // }
-      // __syncwarp();
       Store<uint8_t, K_VEC_SIZE>(cache_vec, &key_cache[tgt_cache_idx]);
     } else {
-      // quant + write v
-      // write v transpose
-      // 大分块 block_offset / 16 / 4 * 32
-      // 大上下 lane_id / 4 * 16 * block_size + lane_id % 4 * 2
-      // 小上下 block_offset / 16 % 4 / 2 * block_size
-      // 左16还是右16 block_offset / 16 % 2 * 16
-      // 小偏移
+
       const uint32_t base_tgt_cache_idx =
           block_idx * gqa_group_size * HeadDim * half_block_size +
           kv_head_idx * HeadDim * half_block_size +
@@ -1554,15 +1422,9 @@ __global__ void append_speculate_cache_int4_neox_rope_kernel(
   const int start_token_idx = bid * max_seq_len - cum_offsets[bid];
   const int head_idx = blockIdx.y * NUM_WARPS + wid;
 
-  // const int bid = blockIdx.x, head_idx = blockIdx.y * NUM_WARPS + wid;
-  // q : dequant + add_bias + rope + write
-  // k : dequant + add_bias + rope + quant + write
-  // v : dequant + add_bias + quant + write
-  // kv在0位置全补0
   const int64_t hidden_size = (num_heads + 2 * gqa_group_size) * HeadDim;
   constexpr int half_head_size = HeadDim / 2;
   const int half_block_size = block_size / 2;
-  // const int start_token_idx = bid * max_seq_len - __ldg(&cum_offsets[bid]);
   if (seq_lens_encoder[bid] > 0) return;
   const int write_seq_id = seq_lens[bid] + token_id - start_token_idx;
   if (write_seq_id == 0) return;
@@ -1573,14 +1435,6 @@ __global__ void append_speculate_cache_int4_neox_rope_kernel(
   const int block_idx = __ldg(&block_table_now[write_seq_id / block_size]);
 
   const int block_offset = write_seq_id % block_size;
-  // if (layer_id == 0 && bid == 0 && head_idx == num_heads && wid == 0 &&
-  // lane_id == 0) {
-  //   printf("bid: %d, start_token_idx: %d, num_heads: %d, gqa_group_size: %d,
-  //   head_idx: %d, block_idx: %d, block_offset: %d\n",
-  //           bid, start_token_idx, (int)num_heads, (int)gqa_group_size,
-  //           head_idx, block_idx, block_offset);
-  // }
-  // __syncwarp();
 
   if (head_idx < num_heads) {
     // q
@@ -1609,11 +1463,9 @@ __global__ void append_speculate_cache_int4_neox_rope_kernel(
       Load<InT, VecSize>(&qkv_now[bias_idx_right], &right_vec);
 
       if (qkv_biases) {
-        // Load<T, VecSize>(&qkv_biases[bias_idx], &bias_vec);
         Load<T, VecSize>(&qkv_biases[bias_idx_left], &left_bias_vec);
         Load<T, VecSize>(&qkv_biases[bias_idx_right], &right_bias_vec);
       }
-      // Load<float, VecSize>(&qkv_out_scales[bias_idx], &out_scale_vec);
       if (qkv_out_scales) {
         Load<float, VecSize>(&qkv_out_scales[bias_idx_left],
                              &left_out_scale_vec);
@@ -1753,11 +1605,6 @@ __global__ void append_speculate_cache_int4_neox_rope_kernel(
               static_cast<T>(input_right * cos_tmp + input_left * sin_tmp);
           // quant + write k
         }
-
-        // 大分块 lane_id / 4 / 4
-        // 上下 lane_id / 4 % 4 / 2
-        // 左16还是右16 lane_id / 4 % 2
-        // 小偏移 lane_id % 4 * 2
         LoadKVResT left_cache_vec, right_cache_vec;
         const int left_start_block_16 =
             block_offset / 16 * 16 + block_offset % 8 + lane_id / 4 % 4 / 2 * 8;
@@ -1905,13 +1752,6 @@ __global__ void append_speculate_cache_int4_neox_rope_kernel(
       bias_vec2[0] = static_cast<T>(input_left);
       bias_vec2[1] = static_cast<T>(input_right);
 
-      // quant + write v
-      // write v transpose
-      // 大分块 block_offset / 16 / 4 * 32
-      // 大上下 lane_id / 4 * 16 * block_size + lane_id % 4 * 2
-      // 小上下 block_offset / 16 % 4 / 2 * block_size
-      // 左16还是右16 block_offset / 16 % 2 * 16
-      // 小偏移
       const uint32_t base_tgt_cache_idx =
           block_idx * gqa_group_size * HeadDim * half_block_size +
           kv_head_idx * HeadDim * half_block_size +

@@ -16,8 +16,6 @@
 #include "append_attention_func.cuh"
 #include "append_attention_kernel.h"
 
-// #define DEBUG_ATTN_C4
-
 template <typename T,
           typename CacheT,
           bool partition_kv,
@@ -34,7 +32,7 @@ template <typename T,
           typename OutT = T,
           bool ENABLE_PREFILL = true>
 __global__ void multi_query_append_attention_c4_kernel(
-    T *__restrict__ q,             // [token_num. num_heads, head_dim]
+    T *__restrict__ q,             // [token_num, (num_heads + 2* kv_num_head) * head_dim]
     CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size,
                                    // head_dim]
     CacheT *__restrict__ cache_v,
@@ -76,19 +74,6 @@ __global__ void multi_query_append_attention_c4_kernel(
   const uint32_t tid = threadIdx.x, wid = threadIdx.y;
   const uint32_t num_chunks = gridDim.y;
   const uint32_t chunk_idx = blockIdx.y;
-#ifdef DEBUG_ATTN_C4
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
-    printf(
-        "num_vecs_per_head: %d, num_vecs_per_head_k: %d, "
-        "num_vecs_per_blocksize: %d, inv_k_stride: %d, inv_v_stride: %d\n",
-        (int)num_vecs_per_head,
-        (int)num_vecs_per_head_k,
-        (int)num_vecs_per_blocksize,
-        (int)inv_k_stride,
-        (int)inv_v_stride);
-  }
-  __syncthreads();
-#endif
 
   const uint32_t batch_id = batch_ids[btid];
   const uint32_t tile_id = tile_ids_per_batch[btid];
@@ -105,7 +90,7 @@ __global__ void multi_query_append_attention_c4_kernel(
       min(q_len, div_up((tile_id + 1) * num_rows_per_block, GROUP_SIZE));
   uint32_t kv_len = seq_lens_kv[batch_id];
   if (ENABLE_PREFILL) {
-    kv_len += q_len;  // !!!
+    kv_len += q_len;
     if (kv_len <= 0) {
       return;
     }
@@ -131,13 +116,10 @@ __global__ void multi_query_append_attention_c4_kernel(
   float m_frag[num_frags_x][2];
   float d_frag[num_frags_x][2];
 
-  // load kv scale/zp
-  // TODO(load kv scale and zp to smem)
   const T *cache_k_scale_now = cache_k_scale + kv_head_idx * HEAD_DIM;
   const T *cache_k_zp_now = cache_k_zero_point + kv_head_idx * HEAD_DIM;
   const T *cache_v_scale_now = cache_v_scale + kv_head_idx * HEAD_DIM;
   const T *cache_v_zp_now = cache_v_zero_point + kv_head_idx * HEAD_DIM;
-  // constexpr uint32_t HEAD_DIM_PAD = div_up(HEAD_DIM, 4) * 4;
   T *cache_k_scale_smem = reinterpret_cast<T *>(
       smem + NUM_WARPS * num_frags_x * 16 * HEAD_DIM * sizeof(T) +
       num_frags_z * 16 * HEAD_DIM / 2 * sizeof(CacheT) * 2);
@@ -171,19 +153,7 @@ __global__ void multi_query_append_attention_c4_kernel(
                             q_head_idx * HEAD_DIM +
                             tid % 8 * num_elems_per_128b<T>();
   T *q_base_ptr = q + q_offset;
-#ifdef DEBUG_ATTN_C4
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
-    printf(
-        "q_base_seq_id_this_block: %d, q_start_seq_id: %d, q_offset: %d, "
-        "q_ori_n_stride: %d, q_base: %f\n",
-        (int)q_base_seq_id_this_block,
-        (int)q_start_seq_id,
-        (int)q_offset,
-        (int)q_ori_n_stride,
-        (float)*q_base_ptr);
-  }
-  __syncthreads();
-#endif
+
   T *o_base_ptr_T = nullptr;
   OutT *o_base_ptr_int8 = nullptr;
   if constexpr (partition_kv) {
@@ -203,13 +173,8 @@ __global__ void multi_query_append_attention_c4_kernel(
   }
   smem_t qo_smem(smem);
 
-  /*
-    1 ｜ 3
-    ——————
-    2 ｜ 4
-  */
   uint32_t q_smem_offset_r = smem_t::get_permuted_offset<num_vecs_per_head>(
-      wid * num_frags_x * 16 + tid % 16, tid / 16);  // 16 * 16
+      wid * num_frags_x * 16 + tid % 16, tid / 16);
   load_q_global_smem<GROUP_SIZE, num_frags_x, num_frags_y, HEAD_DIM, T>(
       q_base_ptr,
       &qo_smem,
@@ -223,22 +188,6 @@ __global__ void multi_query_append_attention_c4_kernel(
 
   q_smem_inplace_multiply_sm_scale<num_frags_x, num_frags_y, T>(&qo_smem,
                                                                 scale);
-#ifdef DEBUG_ATTN_C4
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
-    printf("after scale\n");
-    T *q_smem_t = reinterpret_cast<T *>(qo_smem.base);
-    for (uint32_t i = 0; i < 4 * num_frags_x * 16; ++i) {
-      for (uint32_t j = 0; j < num_frags_y * 16; ++j) {
-        printf("q_smem[%d][%d] = %f  ",
-               (int)i,
-               (int)j,
-               (float)q_smem_t[i * num_frags_y * 16 + j]);
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
 
   T cache_k_scale_frag[num_frags_y][4];
   T cache_k_zp_frag[num_frags_y][4];
@@ -263,7 +212,7 @@ __global__ void multi_query_append_attention_c4_kernel(
           tid % 4 + 4);
 #pragma unroll
     for (uint32_t zp_i = 0; zp_i < 4; ++zp_i) {
-      cache_k_zp_frag[fy][zp_i] += magic_number;  // 128 + 8
+      cache_k_zp_frag[fy][zp_i] += magic_number;  // 128 + 8 
     }
   }
   T cache_v_scale_frag[num_frags_y][2];
@@ -300,38 +249,11 @@ __global__ void multi_query_append_attention_c4_kernel(
                          chunk_start)))
               : chunk_len) /
       (num_frags_z * 16);
-#ifdef DEBUG_ATTN
-  if (tid == 0 && wid == 0) {
-    printf(
-        "batch_id: %d, tile_id: %d, chunk_size: %d, q_len: %d, kv_len: %d, "
-        "chunk_start: %d, chunk_end: %d, num_iterations: %d, "
-        "mask_check_iteration: %d\n",
-        (int)batch_id,
-        (int)tile_id,
-        (int)chunk_size,
-        (int)q_len,
-        (int)kv_len,
-        (int)chunk_start,
-        (int)chunk_end,
-        (int)num_iterations,
-        (int)mask_check_iteration);
-  }
-  __syncthreads();
-#endif
 
-  /*
-    1 ｜ 2
-    ——————
-    3 ｜ 4
-  */
   uint32_t k_smem_offset_r =
       smem_t::get_permuted_offset<num_vecs_per_head_k, inv_k_stride>(
           8 * (tid / 16) + tid % 8, (tid % 16) / 8);
-  /*
-    1 ｜ 2
-    ——————
-    3 ｜ 4
-  */
+
   uint32_t v_smem_offset_r =
       smem_t::get_permuted_offset<num_vecs_per_blocksize, inv_v_stride>(
           8 * (tid / 16) + tid % 8, (tid % 16) / 8);
@@ -340,34 +262,18 @@ __global__ void multi_query_append_attention_c4_kernel(
       smem_t::get_permuted_offset<num_vecs_per_head_k, inv_k_stride>(
           wid * 8 + tid / 4,
           tid %
-              4);  // 4 * 128 / 8 = 64B, 128 nums, just fot head_dim >= 128 !!!
+              4);
   uint32_t v_smem_offset_w =
       smem_t::get_permuted_offset<num_vecs_per_blocksize, inv_v_stride>(
           wid * 16 + tid / 2, tid % 2);  // 2 * 128 / 8 = 32B, 64 nums
 
   uint32_t kv_idx_base = chunk_start;
-  // int block_id = __ldg(&block_table_now[kv_idx_base / BLOCK_SIZE]);
   const uint32_t const_k_offset = kv_head_idx * kv_h_stride +
                                   (wid * 8 + tid / 4) * kv_b_stride +
                                   tid % 4 * num_elems_per_128b<CacheT>();
   const uint32_t const_v_offset = kv_head_idx * kv_h_stride +
                                   (wid * 16 + tid / 2) * kv_d_stride +
                                   tid % 2 * num_elems_per_128b<CacheT>();
-  // CacheT *cache_k_now = cache_k + block_id * kv_n_stride + const_k_offset;
-  // CacheT *cache_v_now = cache_v + block_id * kv_n_stride + const_v_offset;
-#ifdef DEBUG_ATTN_C4
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-    printf(
-        "752 ori q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: "
-        "%d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
-        (int)q_smem_offset_r,
-        (int)k_smem_offset_r,
-        (int)v_smem_offset_r,
-        (int)k_smem_offset_w,
-        (int)v_smem_offset_w);
-  }
-  __syncthreads();
-#endif
 
   produce_k_blockwise_c4<SharedMemFillMode::kNoFill,
                          NUM_WARPS,
@@ -376,7 +282,6 @@ __global__ void multi_query_append_attention_c4_kernel(
                          num_frags_z,
                          NUM_WARP_Q>(k_smem,
                                      &k_smem_offset_w,
-                                     // &cache_k_now,
                                      cache_k,
                                      block_table_now,
                                      kv_head_idx,
@@ -394,7 +299,6 @@ __global__ void multi_query_append_attention_c4_kernel(
                          num_frags_z,
                          NUM_WARP_Q>(v_smem,
                                      &v_smem_offset_w,
-                                     // &cache_v_now,
                                      cache_v,
                                      block_table_now,
                                      kv_head_idx,
@@ -405,42 +309,12 @@ __global__ void multi_query_append_attention_c4_kernel(
                                      chunk_end,
                                      const_v_offset);
   commit_group();
-#ifdef DEBUG_ATTN_C4
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-    printf(
-        "782 ori q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: "
-        "%d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
-        (int)q_smem_offset_r,
-        (int)k_smem_offset_r,
-        (int)v_smem_offset_r,
-        (int)k_smem_offset_w,
-        (int)v_smem_offset_w);
-  }
-  __syncthreads();
-#endif
 
 #pragma unroll 1
   for (uint32_t iter = 0; iter < num_iterations; ++iter) {
     wait_group<1>();
     __syncthreads();
-#ifdef DEBUG_ATTN_C4
-    if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0 &&
-        blockIdx.x == gridDim.x - 1) {
-      printf("cache_k_smem\n");
-      uint8_t *k_smem_t = reinterpret_cast<uint8_t *>(k_smem.base);
-      for (uint32_t i = 0; i < num_frags_z * 16; ++i) {
-        for (uint32_t j = 0; j < num_frags_y * 16 / 2; ++j) {
-          printf("k_smem[%d][%d] = %d  ",
-                 (int)i,
-                 (int)j,
-                 (int)k_smem_t[i * num_frags_y * 16 / 2 + j]);
-        }
-        printf("\n");
-      }
-    }
-    __syncthreads();
-#endif
-    // s = qk
+
     compute_qk_c4<num_frags_x, num_frags_y, num_frags_z, T, CacheT>(
         &qo_smem,
         &q_smem_offset_r,
@@ -449,21 +323,7 @@ __global__ void multi_query_append_attention_c4_kernel(
         s_frag,
         cache_k_scale_frag,
         cache_k_zp_frag);
-#ifdef DEBUG_ATTN_C4
-    if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-      printf(
-          "111 iter: %d, q_smem_offset_r: %d, k_smem_offset_r: %d, "
-          "v_smem_offset_r: %d, k_smem_offset_w: %d, v_smem_offset_w: %d\n",
-          (int)iter,
-          (int)q_smem_offset_r,
-          (int)k_smem_offset_r,
-          (int)v_smem_offset_r,
-          (int)k_smem_offset_w,
-          (int)v_smem_offset_w);
-    }
-    __syncthreads();
-#endif
-    // mask according to kv_idx and q_idx
+
     if (iter >= mask_check_iteration) {
       mask_s<T,
              partition_kv,
@@ -479,49 +339,10 @@ __global__ void multi_query_append_attention_c4_kernel(
                           chunk_end,
                           s_frag);
     }
-#ifdef DEBUG_ATTN_C4
-    if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-        blockIdx.x == gridDim.x - 1) {
-      for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-        for (uint32_t fz = 0; fz < num_frags_z; ++fz) {
-          for (int k = 0; k < 8; k++) {
-            printf("mask_s s_frag[%d][%d][%d]: %f  ",
-                   (int)fx,
-                   (int)fz,
-                   (int)k,
-                   s_frag[fx][fz][k]);
-          }
-          printf("\n");
-        }
-        printf("\n");
-      }
-    }
-    __syncthreads();
-#endif
 
-    // update m,d
     update_mdo_states<num_frags_x, num_frags_y, num_frags_z>(
         s_frag, o_frag, m_frag, d_frag);
     __syncthreads();
-#ifdef DEBUG_ATTN_C4
-    if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-        blockIdx.x == gridDim.x - 1) {
-      for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-        for (uint32_t fz = 0; fz < num_frags_z; ++fz) {
-          for (int k = 0; k < 8; k++) {
-            printf("update_mdo_states s_frag[%d][%d][%d]: %f  ",
-                   (int)fx,
-                   (int)fz,
-                   (int)k,
-                   s_frag[fx][fz][k]);
-          }
-          printf("\n");
-        }
-        printf("\n");
-      }
-    }
-    __syncthreads();
-#endif
 
     kv_idx_base += num_frags_z * 16;
     produce_k_blockwise_c4<SharedMemFillMode::kNoFill,
@@ -531,7 +352,6 @@ __global__ void multi_query_append_attention_c4_kernel(
                            num_frags_z,
                            NUM_WARP_Q>(k_smem,
                                        &k_smem_offset_w,
-                                       // &cache_k_now,
                                        cache_k,
                                        block_table_now,
                                        kv_head_idx,
@@ -544,25 +364,7 @@ __global__ void multi_query_append_attention_c4_kernel(
     commit_group();
     wait_group<1>();
     __syncthreads();
-#ifdef DEBUG_ATTN_C4
-    if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0 &&
-        blockIdx.x == gridDim.x - 1) {
-      printf("cache_v_smem\n");
-      uint8_t *v_smem_t = reinterpret_cast<uint8_t *>(v_smem.base);
-      for (uint32_t i = 0; i < num_frags_y * 16; ++i) {
-        for (uint32_t j = 0; j < num_frags_z * 16 / 2; ++j) {
-          printf("v_smem[%d][%d] = %d  ",
-                 (int)(iter * 128 + i),
-                 (int)j,
-                 (int)v_smem_t[i * num_frags_z * 16 / 2 + j]);
-        }
-        printf("\n");
-      }
-    }
-    __syncthreads();
-#endif
 
-    // compute sfm*v
     compute_sfm_v_c4<num_frags_x,
                      num_frags_y,
                      num_frags_z,
@@ -584,7 +386,6 @@ __global__ void multi_query_append_attention_c4_kernel(
                            num_frags_z,
                            NUM_WARP_Q>(v_smem,
                                        &v_smem_offset_w,
-                                       // &cache_v_now,
                                        cache_v,
                                        block_table_now,
                                        kv_head_idx,
@@ -598,34 +399,11 @@ __global__ void multi_query_append_attention_c4_kernel(
   }
   wait_group<0>();
   __syncthreads();
-#ifdef DEBUG_ATTN_C4
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-      blockIdx.x == gridDim.x - 1) {
-    printf("tmp res\n");
-    for (uint32_t i = 0; i < num_frags_x; ++i) {
-      printf("m1: %f, m2: %f\n", m_frag[i][0], m_frag[i][1]);
-      printf("d1: %f, d2: %f\n", d_frag[i][0], d_frag[i][1]);
-      for (uint32_t j = 0; j < num_frags_y; ++j) {
-        for (int r_id = 0; r_id < 8; r_id++) {
-          printf("o_frag[%d][%d][%d]: %f ",
-                 (int)i,
-                 (int)j,
-                 r_id,
-                 o_frag[i][j][r_id]);
-        }
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
 
   if constexpr (!partition_kv) {
     normalize_d<num_frags_x, num_frags_y>(o_frag, d_frag);
   }
 
-  // write o
-  // [num_frags_x, 16, num_frags_y, 16]
   if constexpr (partition_kv) {
     write_o_reg_gmem_shift_smooth_quant<GROUP_SIZE,
                                         num_frags_x,
@@ -706,7 +484,7 @@ template <typename T,
           typename OutT = T,
           bool ENABLE_PREFILL = true>
 __global__ void multi_query_append_attention_c4_warp1_4_kernel(
-    T *__restrict__ q,             // [token_num. num_heads, head_dim]
+    T *__restrict__ q,             // [token_num, (num_heads + 2* kv_num_head) * head_dim]
     CacheT *__restrict__ cache_k,  // [max_block_num, num_heads, block_size,
                                    // head_dim]
     CacheT *__restrict__ cache_v,
@@ -734,8 +512,6 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
     float *__restrict__ tmp_d,      // [token_num, num_chunks, num_heads]
     OutT *__restrict__ out,
     const int speculate_max_draft_token_num = 5) {
-  // q_len <= 32, num_frags_x = 1/2, num_frags_z = 4 / 4 * 1/2/4, num_frags_y =
-  // HEAD_DIM / 16
   constexpr uint32_t num_vecs_per_head = HEAD_DIM / num_elems_per_128b<T>();
   constexpr uint32_t num_vecs_per_head_k =
       HEAD_DIM / 2 / num_elems_per_128b<CacheT>();
@@ -752,19 +528,6 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
   const uint32_t tid = threadIdx.x, wid = threadIdx.y;
   const uint32_t num_chunks = gridDim.y;
   const uint32_t chunk_idx = blockIdx.y;
-#ifdef DEBUG_ATTN_C4
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
-    printf(
-        "num_vecs_per_head: %d, num_vecs_per_head_k: %d, "
-        "num_vecs_per_blocksize: %d, inv_k_stride: %d, inv_v_stride: %d\n",
-        (int)num_vecs_per_head,
-        (int)num_vecs_per_head_k,
-        (int)num_vecs_per_blocksize,
-        (int)inv_k_stride,
-        (int)inv_v_stride);
-  }
-  __syncthreads();
-#endif
 
   const uint32_t batch_id = batch_ids[btid];
   const uint32_t tile_id = tile_ids_per_batch[btid];
@@ -779,7 +542,7 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
       min(q_len, div_up((tile_id + 1) * num_rows_per_block, GROUP_SIZE));
   uint32_t kv_len = seq_lens_kv[batch_id];
   if (ENABLE_PREFILL) {
-    kv_len += q_len;  // !!!
+    kv_len += q_len;
     if (kv_len <= 0) {
       return;
     }
@@ -840,19 +603,7 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
                             q_head_idx * HEAD_DIM +
                             tid % 8 * num_elems_per_128b<T>();
   T *q_base_ptr = q + q_offset;
-#ifdef DEBUG_ATTN_C4
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
-    printf(
-        "q_base_seq_id_this_block: %d, q_start_seq_id: %d, q_offset: %d, "
-        "q_ori_n_stride: %d, q_base: %f\n",
-        (int)q_base_seq_id_this_block,
-        (int)q_start_seq_id,
-        (int)q_offset,
-        (int)q_ori_n_stride,
-        (float)*q_base_ptr);
-  }
-  __syncthreads();
-#endif
+
   T *o_base_ptr_T = nullptr;
   OutT *o_base_ptr_int8 = nullptr;
   if (num_chunks_this_seq <= 1) {
@@ -869,31 +620,12 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
           chunk_idx * q_n_stride + q_head_idx * HEAD_DIM +
           tid % 8 * num_elems_per_128b<T>();
     }
-    // } else {
-    //   o_base_ptr_int8 = out + o_offset;
   }
-#ifdef DEBUG_ATTN_C4
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
-    printf(
-        "q_base_seq_id_this_block: %d, q_base_seq_id_this_block: %d, q_offset: "
-        "%d, o_offset: %d\n",
-        (int)q_base_seq_id_this_block,
-        (int)q_base_seq_id_this_block,
-        (int)q_offset,
-        (int)o_offset);
-  }
-  __syncthreads();
-#endif
 
   smem_t qo_smem(smem);
 
-  /*
-    1 ｜ 3
-    ——————
-    2 ｜ 4
-  */
   uint32_t q_smem_offset_r = smem_t::get_permuted_offset<num_vecs_per_head>(
-      tid % 16, tid / 16);  // 16 * 16
+      tid % 16, tid / 16);
   load_q_global_smem_multi_warps<GROUP_SIZE,
                                  num_frags_x,
                                  num_frags_y,
@@ -907,49 +639,9 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
   commit_group();
   wait_group<0>();
   __syncthreads();
-#ifdef DEBUG_ATTN_C4
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
-    printf("before scale\n");
-    T *q_smem_t = reinterpret_cast<T *>(qo_smem.base);
-    for (uint32_t i = 0; i < num_frags_x * 16; ++i) {
-      for (uint32_t j = 0; j < num_frags_y * 16; ++j) {
-        if (blockIdx.z == 0) {
-          printf("q_smem[%d][%d] = %f  ",
-                 (int)i,
-                 (int)(j),
-                 (float)q_smem_t[i * num_frags_y * 16 + j]);
-        } else {
-          int res = q_smem_t[i * num_frags_y * 16 + j] + static_cast<T>(1.f);
-        }
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
 
   q_smem_inplace_multiply_sm_scale_multi_warps<num_frags_x, num_frags_y, T>(
       &qo_smem, scale);
-#ifdef DEBUG_ATTN_C4
-  if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0) {
-    printf("after scale\n");
-    T *q_smem_t = reinterpret_cast<T *>(qo_smem.base);
-    for (uint32_t i = 0; i < num_frags_x * 16; ++i) {
-      for (uint32_t j = 0; j < num_frags_y * 16; ++j) {
-        if (blockIdx.z == 0) {
-          printf("q_smem[%d][%d] = %f  ",
-                 (int)i,
-                 (int)(j),
-                 (float)q_smem_t[i * num_frags_y * 16 + j]);
-        } else {
-          int res = q_smem_t[i * num_frags_y * 16 + j] + static_cast<T>(1.f);
-        }
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
 
   T cache_k_scale_frag[num_frags_y][4];
   T cache_k_zp_frag[num_frags_y][4];
@@ -974,7 +666,7 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
           tid % 4 + 4);
 #pragma unroll
     for (uint32_t zp_i = 0; zp_i < 4; ++zp_i) {
-      cache_k_zp_frag[fy][zp_i] += magic_number;  // 128 + 8
+      cache_k_zp_frag[fy][zp_i] += magic_number;
     }
   }
   T cache_v_scale_frag[num_frags_y][2];
@@ -989,10 +681,6 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
         cache_v_zero_point_smem[fy * 16 + tid / 4 + 8] + magic_number;
   }
 
-  // smem_t k_smem(smem + (num_frags_x + wid * num_frags_z) * 16 * HEAD_DIM *
-  // sizeof(T)),
-  //        v_smem(smem + (num_frags_x + (NUM_WARP_KV + wid) * num_frags_z) * 16
-  //        * HEAD_DIM * sizeof(T));
   smem_t k_smem(smem + num_frags_x * 16 * HEAD_DIM * sizeof(T)),
       v_smem(smem + num_frags_x * 16 * HEAD_DIM * sizeof(T) +
              NUM_WARP_KV * num_frags_z * 16 * HEAD_DIM / 2 * sizeof(CacheT));
@@ -1014,37 +702,11 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
                          chunk_start)))
               : chunk_len) /
       (NUM_WARP_KV * num_frags_z * 16);
-#ifdef DEBUG_ATTN_C4
-  if (tid == 0 && wid == 0 && kv_head_idx == 0) {
-    printf(
-        "batch_id: %d, tile_id: %d, chunk_size: %d, q_len: %d, kv_len: %d, "
-        "chunk_start: %d, chunk_end: %d, num_iterations: %d, "
-        "mask_check_iteration: %d\n",
-        (int)batch_id,
-        (int)tile_id,
-        (int)chunk_size,
-        (int)q_len,
-        (int)kv_len,
-        (int)chunk_start,
-        (int)chunk_end,
-        (int)num_iterations,
-        (int)mask_check_iteration);
-  }
-  __syncthreads();
-#endif
-  /*
-    1 ｜ 2
-    ——————
-    3 ｜ 4
-  */
+
   uint32_t k_smem_offset_r =
       smem_t::get_permuted_offset<num_vecs_per_head_k, inv_k_stride>(
           wid * num_frags_z * 16 + 8 * (tid / 16) + tid % 8, (tid % 16) / 8);
-  /*
-    1 ｜ 2
-    ——————
-    3 ｜ 4   transpose
-  */
+
   uint32_t v_smem_offset_r =
       smem_t::get_permuted_offset<num_vecs_per_blocksize, inv_v_stride>(
           wid * num_frags_y * 16 + 8 * (tid / 16) + tid % 8, (tid % 16) / 8);
@@ -1053,46 +715,19 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
       smem_t::get_permuted_offset<num_vecs_per_head_k, inv_k_stride>(
           wid * 8 + tid / 4,
           tid %
-              4);  // 4 * 128 / 8 = 64B, 128 nums, just fot head_dim >= 128 !!!
+              4);
   uint32_t v_smem_offset_w =
       smem_t::get_permuted_offset<num_vecs_per_blocksize, inv_v_stride>(
-          wid * 16 + tid / 2, tid % 2);  // 2 * 128 / 8 = 32B, 64 nums
+          wid * 16 + tid / 2, tid % 2);
 
-  // uint32_t kv_idx_base = chunk_start;
-  // int block_id = __ldg(&block_table_now[kv_idx_base / BLOCK_SIZE]);
-  // const uint32_t const_offset = kv_head_idx * kv_h_stride + (wid * 4 + tid /
-  // 8) * kv_b_stride + tid % 8 * num_elems_per_128b<T>();
   uint32_t kv_idx_base = chunk_start;
-  // int block_id = __ldg(&block_table_now[kv_idx_base / BLOCK_SIZE]);
   const uint32_t const_k_offset = kv_head_idx * kv_h_stride +
                                   (wid * 8 + tid / 4) * kv_b_stride +
                                   tid % 4 * num_elems_per_128b<CacheT>();
   const uint32_t const_v_offset = kv_head_idx * kv_h_stride +
                                   (wid * 16 + tid / 2) * kv_d_stride +
                                   tid % 2 * num_elems_per_128b<CacheT>();
-  // T *cache_k_now = cache_k + block_id * kv_n_stride + const_k_offset;
-  // T *cache_v_now = cache_v + block_id * kv_n_stride + const_v_offset;
 
-#ifdef DEBUG_ATTN_C4
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0) {
-    printf(
-        "ori q_smem_offset_r: %d, k_smem_offset_r: %d, v_smem_offset_r: %d, "
-        "k_smem_offset_w: %d, v_smem_offset_w: %d, cache_k: %f, cache_k_p: %p, "
-        "const_k_offset: %d, const_v_offset: %d\n",
-        (int)q_smem_offset_r,
-        (int)k_smem_offset_r,
-        (int)v_smem_offset_r,
-        (int)k_smem_offset_w,
-        (int)v_smem_offset_w,
-        (float)(*cache_k),
-        cache_k,
-        (int)const_k_offset,
-        (int)const_v_offset);
-  }
-  __syncthreads();
-#endif
-
-  // load BLOCK_SIZE * HEAD_DIM each time
   produce_k_blockwise_c4<SharedMemFillMode::kNoFill,
                          NUM_WARPS,
                          BLOCK_SIZE,
@@ -1131,24 +766,6 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
   for (uint32_t iter = 0; iter < num_iterations; ++iter) {
     wait_group<1>();
     __syncthreads();
-#ifdef DEBUG_ATTN_C4
-    if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0 &&
-        blockIdx.x == gridDim.x - 1) {
-      printf("cache_k_smem\n");
-      uint8_t *k_smem_t = reinterpret_cast<uint8_t *>(k_smem.base);
-      for (uint32_t i = 0; i < NUM_WARP_KV * num_frags_z * 16; ++i) {
-        for (uint32_t j = 0; j < num_frags_y * 16 / 2; ++j) {
-          printf("k_smem[%d][%d] = %d  ",
-                 (int)i,
-                 (int)j,
-                 (int)k_smem_t[i * num_frags_y * 16 / 2 + j]);
-        }
-        printf("\n");
-      }
-    }
-    __syncthreads();
-#endif
-    // s = qk
     compute_qk_c4<num_frags_x, num_frags_y, num_frags_z, T, CacheT>(
         &qo_smem,
         &q_smem_offset_r,
@@ -1157,10 +774,7 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
         s_frag,
         cache_k_scale_frag,
         cache_k_zp_frag);
-    // mask according to kv_idx and q_idx
     if (iter >= mask_check_iteration) {
-      // if (q_len > 1 && iter >= mask_check_iteration) { // not need mask in
-      // decoder, v will be filled with 0
       mask_s<T,
              partition_kv,
              CAUSAL,
@@ -1175,49 +789,10 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
                           chunk_end,
                           s_frag);
     }
-#ifdef DEBUG_ATTN_C4
-    if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-        blockIdx.x == gridDim.x - 1) {
-      for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-        for (uint32_t fz = 0; fz < num_frags_z; ++fz) {
-          for (int k = 0; k < 8; k++) {
-            printf("mask_s s_frag[%d][%d][%d]: %f  ",
-                   (int)fx,
-                   (int)fz,
-                   (int)k,
-                   s_frag[fx][fz][k]);
-          }
-          printf("\n");
-        }
-        printf("\n");
-      }
-    }
-    __syncthreads();
-#endif
 
-    // update m,d
     update_mdo_states<num_frags_x, num_frags_y, num_frags_z>(
         s_frag, o_frag, m_frag, d_frag);
     __syncthreads();
-#ifdef DEBUG_ATTN_C4
-    if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-        blockIdx.x == gridDim.x - 1) {
-      for (uint32_t fx = 0; fx < num_frags_x; ++fx) {
-        for (uint32_t fz = 0; fz < num_frags_z; ++fz) {
-          for (int k = 0; k < 8; k++) {
-            printf("update_mdo_states s_frag[%d][%d][%d]: %f  ",
-                   (int)fx,
-                   (int)fz,
-                   (int)k,
-                   s_frag[fx][fz][k]);
-          }
-          printf("\n");
-        }
-        printf("\n");
-      }
-    }
-    __syncthreads();
-#endif
 
     kv_idx_base += NUM_WARP_KV * num_frags_z * 16;
     produce_k_blockwise_c4<SharedMemFillMode::kNoFill,
@@ -1239,23 +814,7 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
     commit_group();
     wait_group<1>();
     __syncthreads();
-#ifdef DEBUG_ATTN_C4
-    if (tid == PRINT_TID && wid == 0 && blockIdx.z == 0 &&
-        blockIdx.x == gridDim.x - 1) {
-      printf("cache_v_smem\n");
-      uint8_t *v_smem_t = reinterpret_cast<uint8_t *>(v_smem.base);
-      for (uint32_t i = 0; i < NUM_WARP_KV * num_frags_y * 16; ++i) {
-        for (uint32_t j = 0; j < num_frags_z * 16 / 2; ++j) {
-          printf("v_smem[%d][%d] = %d  ",
-                 (int)i,
-                 (int)j,
-                 (int)v_smem_t[i * num_frags_z * 16 / 2 + j]);
-        }
-        printf("\n");
-      }
-    }
-    __syncthreads();
-#endif
+
     // compute sfm*v
     compute_sfm_v_c4<num_frags_x,
                      num_frags_y,
@@ -1291,51 +850,9 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
   }
   wait_group<0>();
   __syncthreads();
-#ifdef DEBUG_ATTN_C4
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-      blockIdx.x == gridDim.x - 1) {
-    printf("before merge z\n");
-    for (uint32_t i = 0; i < num_frags_x; ++i) {
-      printf("m1: %f, m2: %f\n", m_frag[i][0], m_frag[i][1]);
-      printf("d1: %f, d2: %f\n", d_frag[i][0], d_frag[i][1]);
-      for (uint32_t j = 0; j < num_frags_y; ++j) {
-        for (int r_id = 0; r_id < 8; r_id++) {
-          printf("o_frag[%d][%d][%d]: %f ",
-                 (int)i,
-                 (int)j,
-                 r_id,
-                 o_frag[i][j][r_id]);
-        }
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
 
   merge_block_res_v2<num_frags_x, num_frags_y, T>(
       o_frag, reinterpret_cast<float *>(smem), m_frag, d_frag, wid, tid);
-#ifdef DEBUG_ATTN_C4
-  if (threadIdx.x == PRINT_TID && threadIdx.y == 0 && blockIdx.z == 0 &&
-      blockIdx.x == gridDim.x - 1) {
-    printf("after merge z\n");
-    for (uint32_t i = 0; i < num_frags_x; ++i) {
-      printf("m1: %f, m2: %f\n", m_frag[i][0], m_frag[i][1]);
-      printf("d1: %f, d2: %f\n", d_frag[i][0], d_frag[i][1]);
-      for (uint32_t j = 0; j < num_frags_y; ++j) {
-        for (int r_id = 0; r_id < 8; r_id++) {
-          printf("o_frag[%d][%d][%d]: %f ",
-                 (int)i,
-                 (int)j,
-                 r_id,
-                 o_frag[i][j][r_id]);
-        }
-      }
-      printf("\n");
-    }
-  }
-  __syncthreads();
-#endif
 
   if (num_chunks_this_seq <= 1) {
     normalize_d<num_frags_x, num_frags_y>(o_frag, d_frag);
@@ -1375,22 +892,6 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
         q_len,
         q_n_stride * num_chunks,
         HEAD_DIM);
-    // } else {
-    //   write_o_reg_gmem_multi_warps_shift_smooth_quant<GROUP_SIZE,
-    //                                                   num_frags_x,
-    //                                                   num_frags_y,
-    //                                                   partition_kv>(
-    //       o_frag,
-    //       &qo_smem,
-    //       o_base_ptr_int8,
-    //       shift_bias,
-    //       smooth_weight,
-    //       q_base_seq_id_this_block,
-    //       q_head_idx,
-    //       in_scale,
-    //       q_len,
-    //       partition_kv ? q_n_stride * num_chunks : q_n_stride,
-    //       HEAD_DIM);
   }
 
   if (num_chunks_this_seq > 1) {
@@ -1403,24 +904,6 @@ __global__ void multi_query_append_attention_c4_warp1_4_kernel(
               q_base_seq_id_this_block + tid / 4 + j * 8 + fx * 16;
           const uint32_t qo_head_idx = q_head_idx + qo_idx_now % GROUP_SIZE;
           const uint32_t qo_idx = q_start_seq_id + qo_idx_now / GROUP_SIZE;
-#ifdef DEBUG_ATTN_C4
-          if (batch_id == 0) {
-            printf(
-                "bid: %d, tid: %d, wid: %d, q_base_seq_id_this_block: %d, "
-                "qo_idx_now: %d, qo_idx: %d, q_start_seq_id: %d, q_len: %d, m: "
-                "%f, d: %f\n",
-                (int)batch_id,
-                (int)tid,
-                (int)wid,
-                (int)q_base_seq_id_this_block,
-                (int)qo_idx_now,
-                (int)qo_idx,
-                (int)q_start_seq_id,
-                (int)q_len,
-                (float)m_frag[fx][j],
-                (float)d_frag[fx][j]);
-          }
-#endif
           if (qo_idx - q_start_seq_id < q_len) {
             uint32_t offset;
             if (ENABLE_PREFILL) {
@@ -1493,7 +976,7 @@ void MultiQueryAppendC4Attention(
 
   constexpr uint32_t num_warps = 4;
   constexpr uint32_t NUM_WARP_KV = num_warps / NUM_WARP_Q;
-  constexpr uint32_t num_frags_x = BLOCK_SHAPE_Q / (16 * NUM_WARP_Q);  // 1 or 2
+  constexpr uint32_t num_frags_x = BLOCK_SHAPE_Q / (16 * NUM_WARP_Q);
   constexpr uint32_t num_frags_y = HEAD_DIM / 16;
   constexpr uint32_t num_qrow_per_block = NUM_WARP_Q * num_frags_x * 16;
 
@@ -1502,8 +985,7 @@ void MultiQueryAppendC4Attention(
   const float scale = 1.f / sqrt(HEAD_DIM);
 
   if constexpr (NUM_WARP_Q == 4) {
-    constexpr uint32_t num_frags_z = BLOCK_SIZE / 16;  // !!!
-    // constexpr uint32_t num_frags_z = 8; // 128 per iter, 4 is better?
+    constexpr uint32_t num_frags_z = BLOCK_SIZE / 16;
     constexpr uint32_t smem_size =
         num_warps * num_frags_x * 16 * HEAD_DIM * sizeof(T) +
         num_frags_z * 16 * HEAD_DIM / 2 * sizeof(uint8_t) * 2 +
@@ -1524,11 +1006,9 @@ void MultiQueryAppendC4Attention(
                                                num_frags_y,
                                                OUT_NV_TYPE,
                                                ENABLE_PREFILL>;
-    // if (smem_size >= 48 * 1024) {
     cudaFuncSetAttribute(split_kv_kernel,
                          cudaFuncAttributeMaxDynamicSharedMemorySize,
                          smem_size);
-    // }
     const int dev_id = 0;
     int sm_count;
     int act_blocks_per_sm;
@@ -1673,7 +1153,7 @@ void MultiQueryAppendC4Attention(
       if (is_decoder) {
         constexpr int blockx = HEAD_DIM / vec_size;
         constexpr int blocky = (128 + blockx - 1) / blockx;
-        dim3 grids_merge(bsz, num_heads);  // 128k is too large
+        dim3 grids_merge(bsz, num_heads);
         dim3 blocks_merge(blockx, blocky);
         merge_multi_chunks_decoder_kernel<NV_TYPE,
                                           vec_size,
@@ -1706,7 +1186,7 @@ void MultiQueryAppendC4Attention(
         constexpr int blockx = HEAD_DIM / vec_size;
         constexpr int blocky = (128 + blockx - 1) / blockx;
         dim3 grids_merge(min(sm_count * 4, token_num),
-                         num_heads);  // 128k is too large
+                         num_heads);
         dim3 blocks_merge(blockx, blocky);
         merge_multi_chunks_v2_kernel<NV_TYPE,
                                      vec_size,
@@ -1740,7 +1220,7 @@ void MultiQueryAppendC4Attention(
       }
     }
   } else {
-    constexpr uint32_t num_frags_z = BLOCK_SIZE / 16 / NUM_WARP_KV * 4;  // !!!
+    constexpr uint32_t num_frags_z = BLOCK_SIZE / 16 / NUM_WARP_KV * 4;
     constexpr uint32_t smem_size =
         num_frags_x * 16 * HEAD_DIM * sizeof(T) +
         NUM_WARP_KV * num_frags_z * 16 * HEAD_DIM / 2 * sizeof(uint8_t) * 2 +
@@ -1786,7 +1266,6 @@ void MultiQueryAppendC4Attention(
     }
     const int num_chunks = div_up(max_dec_len, chunk_size);
     dim3 grids(num_blocks_x_cpu, num_chunks, kv_num_heads);
-    // dim3 grids(num_blocks_x_cpu, num_chunks, 1);
     dim3 blocks(32, num_warps);
     if (num_chunks <= 1) {
       auto nosplit_kv_kernel =
@@ -1924,7 +1403,7 @@ void MultiQueryAppendC4Attention(
       if (is_decoder) {
         constexpr int blockx = HEAD_DIM / vec_size;
         constexpr int blocky = (128 + blockx - 1) / blockx;
-        dim3 grids_merge(bsz, num_heads);  // 128k is too large
+        dim3 grids_merge(bsz, num_heads);
         dim3 blocks_merge(blockx, blocky);
         merge_multi_chunks_decoder_kernel<NV_TYPE,
                                           vec_size,
@@ -1957,7 +1436,7 @@ void MultiQueryAppendC4Attention(
         constexpr int blockx = HEAD_DIM / vec_size;
         constexpr int blocky = (128 + blockx - 1) / blockx;
         dim3 grids_merge(min(sm_count * 4, token_num),
-                         num_heads);  // 128k is too large
+                         num_heads);
         dim3 blocks_merge(blockx, blocky);
         merge_multi_chunks_v2_kernel<NV_TYPE,
                                      vec_size,
@@ -1996,7 +1475,7 @@ void MultiQueryAppendC4Attention(
 template <typename T, typename OutT>
 void CascadeAppendAttentionC4Kernel(
     const AppendAttnMetaData& meta_data,
-    const paddle::Tensor& qkv,  // [token_num, num_heads, head_dim]
+    const paddle::Tensor& qkv,  // [token_num, (num_heads + 2* kv_num_head) * head_dim]
     const paddle::Tensor&
         cache_k,  // [max_block_num, num_heads, block_size, head_dim]
     const paddle::Tensor&

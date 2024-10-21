@@ -13,6 +13,7 @@
 // limitations under the License.
 #include "../append_attention_c8_impl.cuh"
 
+
 template void
 CascadeAppendAttentionC8Kernel<paddle::bfloat16, paddle::bfloat16>(
     const AppendAttnMetaData& meta_data,

@@ -18,8 +18,6 @@
 #include "mma_tensor_op.cuh"
 #include "utils.cuh"
 
-// #define DEBUG_WRITE_C4
-
 template <typename T, int VecSize = 1>
 __global__ void VariableLengthRotaryKernel(
     const int *qkv,
@@ -409,7 +407,7 @@ __global__ void GQAVariableLengthRotaryKernel(
 template <typename T, int VecSize = 1>
 __global__ void GQAVariableLengthRotaryKernel(
     const T *qkv,
-    const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
+    const float *cos_emb,
     const float *sin_emb,
     const int *padding_offsets,
     const int *seq_lens,
@@ -444,7 +442,6 @@ __global__ void GQAVariableLengthRotaryKernel(
     const int ori_seq_id = ori_token_idx % seq_len + seq_lens_decoder[ori_bi];
 
     const int64_t emb_idx = ori_seq_id * half_lastdim + h_bias / 2;
-    // [token_num, q_num_head + 2 * kv_num_head, last_dim]
     const int64_t base_idx =
         token_idx * (q_num_head + 2 * kv_num_head) * last_dim + hi * last_dim +
         h_bias;
@@ -560,7 +557,7 @@ __global__ void GQANeoxVariableLengthRotaryKernel(
 template <typename T, int VecSize = 1>
 __global__ void GQANeoxVariableLengthRotaryKernel(
     const T *qkv,
-    const float *cos_emb,  // [1, 1, seq_len, dim_head / 2]
+    const float *cos_emb,
     const float *sin_emb,
     const int *padding_offsets,
     const int *seq_lens,
@@ -711,7 +708,7 @@ __global__ void append_write_cache_kv_c8_qkv(
     const int kv_num_heads) {
   constexpr uint32_t num_vecs_per_head = HEAD_DIM / num_elems_per_128b<T>();
   constexpr uint32_t pad_len = BLOCK_SIZE;
-  const uint32_t btid = blockIdx.x, kv_head_idx = blockIdx.z;  // !!!
+  const uint32_t btid = blockIdx.x, kv_head_idx = blockIdx.z;
   const T cache_k_scale = cache_k_scales[kv_head_idx];
   const T cache_v_scale = cache_v_scales[kv_head_idx];
   const uint32_t tid = threadIdx.x, wid = threadIdx.y;
@@ -731,12 +728,10 @@ __global__ void append_write_cache_kv_c8_qkv(
   const uint32_t bf_pad_len = start_len % pad_len;
   const uint32_t start_len_pad = start_len - bf_pad_len;
   const uint32_t end_len = start_len + seq_len_this_time;
-  // const uint32_t end_len_pad_16 = div_up(end_len, num_rows_per_block) *
-  // num_rows_per_block;
+
   const uint32_t tile_start = start_len_pad + tile_id * num_rows_per_block;
   uint32_t chunk_start = tile_start + wid * num_frags_z * 16 + tid / 8;
 
-  // 前 start_len % pad_len 部分不搬，
   const uint32_t start_token_idx =
       batch_id * max_seq_len - cum_offsets[batch_id];
   const uint32_t kv_batch_stride = (num_heads + 2 * kv_num_heads) * HEAD_DIM;
@@ -749,19 +744,10 @@ __global__ void append_write_cache_kv_c8_qkv(
 
   uint32_t kv_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_head>(
       wid * num_frags_z * 16 + tid / 8, tid % 8);  // 4 * 8 per warp
-  /*
-    1 ｜ 2
-    ——————
-    3 ｜ 4
-  */
+
   uint32_t k_smem_offset_r = smem_t::get_permuted_offset<num_vecs_per_head>(
       wid * num_frags_z * 16 + 8 * (tid / 16) + tid % 8, (tid % 16) / 8);
 
-  /*
-    1 ｜ 3
-    ——————
-    2 ｜ 4   transpose
-  */
   constexpr uint32_t num_frags_v = num_frags_y / NUM_WARPS;
   uint32_t v_smem_offset_r = smem_t::get_permuted_offset<num_vecs_per_head>(
       tid % 16, wid * num_frags_v * 2 + tid / 16);
@@ -886,7 +872,7 @@ __global__ void append_write_cache_kv_c8_qkv(
                          tid % 4 * 4;  // 4 * int8 = 8 * int4 = 32bit
   const uint32_t num_frags_z_v = num_frags_z * NUM_WARPS;
 #pragma unroll
-  for (uint32_t fy = 0; fy < num_frags_v; ++fy) {  // !!!
+  for (uint32_t fy = 0; fy < num_frags_v; ++fy) {
     uint32_t v_write_idx_now_v = v_write_idx + fy * 16 * write_d_stride;
 #pragma unroll
     for (uint32_t fz = 0; fz < num_frags_z_v; ++fz) {
@@ -972,7 +958,7 @@ __global__ void append_write_cache_kv_c4_qkv(
     const int kv_num_heads) {
   constexpr uint32_t num_vecs_per_head = HEAD_DIM / num_elems_per_128b<T>();
   constexpr uint32_t pad_len = BLOCK_SIZE;
-  const uint32_t btid = blockIdx.x, kv_head_idx = blockIdx.z;  // !!!
+  const uint32_t btid = blockIdx.x, kv_head_idx = blockIdx.z;
   const uint32_t tid = threadIdx.x, wid = threadIdx.y;
   const uint32_t batch_id = batch_ids[btid];
   const uint32_t tile_id = tile_ids[btid];
@@ -990,12 +976,9 @@ __global__ void append_write_cache_kv_c4_qkv(
   const uint32_t bf_pad_len = start_len % pad_len;
   const uint32_t start_len_pad = start_len - bf_pad_len;
   const uint32_t end_len = start_len + seq_len_this_time;
-  // const uint32_t end_len_pad_16 = div_up(end_len, num_rows_per_block) *
-  // num_rows_per_block;
   const uint32_t tile_start = start_len_pad + tile_id * num_rows_per_block;
   uint32_t chunk_start = tile_start + wid * num_frags_z * 16 + tid / 8;
 
-  // 前 start_len % pad_len 部分不搬，
   const uint32_t start_token_idx =
       batch_id * max_seq_len - cum_offsets[batch_id];
   const uint32_t kv_batch_stride = (num_heads + 2 * kv_num_heads) * HEAD_DIM;
@@ -1023,19 +1006,10 @@ __global__ void append_write_cache_kv_c4_qkv(
 
   uint32_t kv_smem_offset_w = smem_t::get_permuted_offset<num_vecs_per_head>(
       wid * num_frags_z * 16 + tid / 8, tid % 8);  // 4 * 8 per warp
-  /*
-    1 ｜ 2
-    ——————
-    3 ｜ 4
-  */
+
   uint32_t k_smem_offset_r = smem_t::get_permuted_offset<num_vecs_per_head>(
       wid * num_frags_z * 16 + 8 * (tid / 16) + tid % 8, (tid % 16) / 8);
 
-  /*
-    1 ｜ 3
-    ——————
-    2 ｜ 4   transpose
-  */
   constexpr uint32_t num_frags_v = num_frags_y / NUM_WARPS;
   uint32_t v_smem_offset_r = smem_t::get_permuted_offset<num_vecs_per_head>(
       tid % 16,
@@ -1060,12 +1034,12 @@ __global__ void append_write_cache_kv_c4_qkv(
            ++fy) {  // (num_frags_y * 16) / (8 *  num_elems_per_128b<T>())
         if (chunk_start >= start_len && chunk_start < end_len) {
           k_smem
-              .load_128b_async<SharedMemFillMode::kNoFill>(  // can be kNoFill?
+              .load_128b_async<SharedMemFillMode::kNoFill>(
                   kv_smem_offset_w,
                   qkv_input + k_read_idx,
                   chunk_start < end_len);
           v_smem
-              .load_128b_async<SharedMemFillMode::kNoFill>(  // can be kNoFill?
+              .load_128b_async<SharedMemFillMode::kNoFill>(
                   kv_smem_offset_w,
                   qkv_input + v_read_idx,
                   chunk_start < end_len);
@@ -1088,27 +1062,6 @@ __global__ void append_write_cache_kv_c4_qkv(
   commit_group();
   wait_group<0>();
   __syncthreads();
-#ifdef DEBUG_WRITE_C4
-  if (tid == 28 && wid == 1 && kv_head_idx == 0) {
-    printf("k\n");
-    for (uint32_t i = 0; i < BLOCK_SIZE; ++i) {
-      for (uint32_t j = 0; j < HEAD_DIM; ++j) {
-        printf("%f  ", (float)k_smem_ori[i * HEAD_DIM + j]);
-      }
-      printf("\n");
-    }
-    printf("k end\n");
-    printf("v\n");
-    for (uint32_t i = 0; i < BLOCK_SIZE; ++i) {
-      for (uint32_t j = 0; j < HEAD_DIM; ++j) {
-        printf("%f  ", (float)v_smem_ori[i * HEAD_DIM + j]);
-      }
-      printf("\n");
-    }
-    printf("v end\n");
-  }
-  __syncthreads();
-#endif
 
   // mask, quant, store
   T cache_k_scale_frag[num_frags_y][4];
@@ -1161,36 +1114,9 @@ __global__ void append_write_cache_kv_c4_qkv(
       k_smem.ldmatrix_m8n8x4(k_smem_offset_r, kv_frag);
       // quant
       T *k_frag_T = reinterpret_cast<T *>(kv_frag);
-      // bf_pad_len为0表示新块写入，每个块第一次写入的时候不或，前后补0
       if (bf_pad_len != 0) {
         Load<uint8_t, 4>(cache_k + k_write_idx_now, &cache_vec);
       }
-
-#ifdef DEBUG_WRITE_C4
-      if (tid == 28 && wid == 1 && kv_head_idx == 0) {
-#pragma unroll
-        for (uint32_t t_id = 0; t_id < 8; ++t_id) {
-          printf(
-              "fy: %d, k_smem_offset_r: %d, k_write_idx_now: %d, load "
-              "k_frag_T[%d] = %f, cache_vec[%d] = %f, "
-              "cache_k_scale_frag[%d][%d] = %f, cache_k_zp_frag[%d][%d] = %f\n",
-              (int)fy,
-              (int)k_smem_offset_r,
-              (int)k_write_idx_now,
-              (int)t_id,
-              (float)k_frag_T[t_id],
-              (int)t_id % 4,
-              (float)cache_vec[tid % 4],
-              (int)fy,
-              (int)tid % 4,
-              (float)cache_k_scale_frag[fy][tid % 4],
-              (int)fy,
-              (int)tid % 4,
-              (float)cache_k_zp_frag[fy][tid % 4]);
-        }
-      }
-      __syncthreads();
-#endif
 
 #pragma unroll
       for (uint32_t v_id = 0; v_id < 4; ++v_id) {
@@ -1226,19 +1152,6 @@ __global__ void append_write_cache_kv_c4_qkv(
               (uint_quant_value2 << 4) | (uint_quant_value1 & 0x0F);
         }
       }
-#ifdef DEBUG_WRITE_C4
-      if (tid == 0 && wid == 0) {
-#pragma unroll
-        for (uint32_t t_id = 0; t_id < 4; ++t_id) {
-          printf("fy: %d, k_write_idx_now: %d, cache_vec[%d] = %f\n",
-                 (int)fy,
-                 (int)k_write_idx_now,
-                 (int)t_id,
-                 (float)cache_vec[t_id]);
-        }
-      }
-      __syncthreads();
-#endif
       // store
       Store<uint8_t, 4>(cache_vec, cache_k + k_write_idx_now);
       k_smem_offset_r = k_smem.advance_offset_by_column<2>(k_smem_offset_r, fy);
@@ -1255,21 +1168,8 @@ __global__ void append_write_cache_kv_c4_qkv(
                          (wid * num_frags_v * 16 + tid / 4) * write_d_stride +
                          tid % 4 * 4;  // 4 * int8 = 8 * int4 = 32bit
   const uint32_t num_frags_z_v = num_frags_z * NUM_WARPS;
-#ifdef DEBUG_WRITE_C4
-  if (tid == 28 && wid == 1 && kv_head_idx == 0) {
-    printf(
-        "chunk_start_v: %d, v_write_idx: %d, num_frags_v: %d, num_frags_z_v: "
-        "%d, v_smem_offset_r: %d\n",
-        (int)chunk_start_v,
-        (int)v_write_idx,
-        int(num_frags_v),
-        (int)num_frags_z_v,
-        (int)v_smem_offset_r);
-  }
-  __syncthreads();
-#endif
 #pragma unroll
-  for (uint32_t fy = 0; fy < num_frags_v; ++fy) {  // !!!
+  for (uint32_t fy = 0; fy < num_frags_v; ++fy) {
     uint32_t v_write_idx_now_v = v_write_idx + fy * 16 * write_d_stride;
 #pragma unroll
     for (uint32_t fz = 0; fz < num_frags_z_v; ++fz) {
@@ -1277,31 +1177,10 @@ __global__ void append_write_cache_kv_c4_qkv(
                                  (fz % 4) / 2 * 8 * write_d_stride +
                                  fz / 4 * 32 + fz % 2 * 16;
       // load
-#ifdef DEBUG_WRITE_C4
-      if (tid == 28 && wid == 1 && kv_head_idx == 0) {
-        printf("fy: %d, fz: %d, v_smem_offset_r: %d\n",
-               (int)fy,
-               (int)fz,
-               (int)v_smem_offset_r);
-      }
-      __syncthreads();
-#endif
       v_smem.ldmatrix_m8n8x4_trans(v_smem_offset_r, kv_frag);
       // quant
       T *v_frag_T = reinterpret_cast<T *>(kv_frag);
-#ifdef DEBUG_WRITE_C4
-      if (tid == 28 && wid == 1 && kv_head_idx == 0) {
-        printf("fy: %d, fz: %d, v_write_idx_now: %d\n",
-               (int)fy,
-               (int)fz,
-               (int)v_write_idx_now);
-        for (int tii = 0; tii < 8; ++tii) {
-          printf("kv_frag[%d]: %f ", (int)tii, (float)kv_frag[tii]);
-        }
-        printf("\n");
-      }
-      __syncthreads();
-#endif
+
       if (bf_pad_len != 0) {
         Load<uint8_t, 4>(cache_v + v_write_idx_now, &cache_vec);
       }
@@ -1330,25 +1209,7 @@ __global__ void append_write_cache_kv_c4_qkv(
           uint_quant_value1 = 0;
           uint_quant_value2 = 0;
         }
-#ifdef DEBUG_WRITE_C4
-        if (tid == 28 && wid == 1 && kv_head_idx == 0) {
-          printf(
-              "v_frag_T[%d]: %f, v_frag_T[%d]: %f, cache_v_scale_frag[%d][0]: "
-              "%f, cache_v_scale_frag[%d][1]: %f, uint_quant_value1: %d, "
-              "uint_quant_value2: %d\n",
-              (int)v_id,
-              (float)v_frag_T[v_id],
-              (int)(v_id + 4),
-              (float)v_frag_T[v_id + 4],
-              (int)(wid * num_frags_v + fy),
-              (float)cache_v_scale_frag[wid * num_frags_v + fy][0],
-              (int)(wid * num_frags_v + fy),
-              (float)cache_v_scale_frag[wid * num_frags_v + fy][1],
-              (int)uint_quant_value1,
-              (int)uint_quant_value1);
-        }
-        __syncthreads();
-#endif
+
         if (bf_pad_len != 0) {
           cache_vec[v_id] |=
               (uint_quant_value2 << 4) | (uint_quant_value1 & 0x0F);
@@ -1389,7 +1250,7 @@ void rotary_qk_variable(
     bool use_neox_style = false) {
   int64_t elem_nums =
       qkv_out_scales ? token_num * 3 * head_num * dim_head
-                     : token_num * 2 * head_num * dim_head;  // for all q k v
+                     : token_num * 2 * head_num * dim_head;
   if (use_neox_style) {
     elem_nums /= 2;
   }
@@ -1601,7 +1462,7 @@ void CascadeAppendWriteCacheKVQKV(
   auto block_size = meta_data.block_size;
 
   const uint32_t elem_nums =
-      num_tokens * 2 * kv_num_heads * head_dim;  // just k and v
+      num_tokens * 2 * kv_num_heads * head_dim;
   constexpr int PackSize = 16 / sizeof(T);
   const int pack_num = elem_nums / PackSize;
   const int blocksize = 128;
@@ -1669,10 +1530,8 @@ void CascadeAppendWriteCacheKVC8QKV(
                                                 HEAD_DIM,
                                                 BLOCK_SIZE,
                                                 num_warps>;
-  // if (smem_size >= 48 * 1024) {
   cudaFuncSetAttribute(
       kernel_fn, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
-  // }
   kernel_fn<<<grids, blocks, 0, stream>>>(cache_k_out->data<uint8_t>(),
                                           cache_v_out->data<uint8_t>(),
                                           qkv.data<T>(),
@@ -1733,7 +1592,6 @@ void CascadeAppendWriteCacheKVC4QKV(
 
   const uint32_t smem_size =
       (BLOCK_SIZE * HEAD_DIM) * sizeof(T) * 2 + HEAD_DIM * 4 * sizeof(T);
-  // VLOG(1) << "smem_size: " << smem_size / 1024 << "KB";
   auto kernel_fn = append_write_cache_kv_c4_qkv<T,
                                                 num_frags_y,
                                                 num_frags_z,
