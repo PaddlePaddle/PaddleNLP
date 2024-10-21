@@ -256,7 +256,7 @@ def _check_checkpoint_files(folder_path, world_size, ignore_save_lr_and_optim, s
         return a
 
 
-def get_last_checkpoint(folder, uc_async_save=False):
+def get_last_checkpoint(folder, signal_folder=None, uc_async_save=False):
     content = os.listdir(folder)
     checkpoints = [
         path
@@ -265,6 +265,9 @@ def get_last_checkpoint(folder, uc_async_save=False):
     ]
     if len(checkpoints) == 0:
         return
+
+    if uc_async_save:
+        assert signal_folder is not None
 
     if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
         for i in sorted(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0]), reverse=True):
@@ -275,11 +278,12 @@ def get_last_checkpoint(folder, uc_async_save=False):
                     return current_path
             else:
                 saving_info = paddle.load(distributed_file(os.path.join(current_path, ".saving_info")))
+                current_signal_path = os.path.join(signal_folder, i)
                 pre_world_size = saving_info.get("world_size", 1)
                 ignore_save_lr_and_optim = saving_info.get("ignore_save_lr_and_optim", False)
                 skip_save_model_weight = saving_info.get("skip_save_model_weight", False)
                 if _check_checkpoint_files(
-                    current_path, pre_world_size, ignore_save_lr_and_optim, skip_save_model_weight
+                    current_signal_path, pre_world_size, ignore_save_lr_and_optim, skip_save_model_weight
                 ):
                     return current_path
         return
