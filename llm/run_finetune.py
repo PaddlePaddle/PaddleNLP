@@ -109,6 +109,7 @@ def main():
     if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
         try:
             from paddle_xpu.layers.nn.linear import LinearConfig  # noqa: F401
+
             LinearConfig.enable_accumulate_steps_opt()
             LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
         except ImportError:
@@ -480,11 +481,6 @@ def main():
             )
         model.print_trainable_parameters()
 
-        if model_args.loraga:
-            from paddlenlp.utils.llm_utils import loraga_reinit
-
-            loraga_reinit(model, named_grads, stable_gamma=model_args.loraga_stable_gamma)
-
     if model_args.lora:
         if training_args.sharding_parallel_degree > 1:
             assert (
@@ -509,7 +505,10 @@ def main():
             model = LoRAModel(model, lora_config)
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
+        if model_args.loraga:
+            from paddlenlp.utils.llm_utils import loraga_reinit
 
+            loraga_reinit(model, named_grads, stable_gamma=model_args.loraga_stable_gamma)
         model.print_trainable_parameters()
 
     def compute_metrics_do_generation(eval_preds):
