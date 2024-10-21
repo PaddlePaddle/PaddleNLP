@@ -876,6 +876,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                         ffn_hidden_size=self.intermediate_size,
                         num_key_value_heads=self.num_key_value_heads,
                         mp_size=self.config.tensor_parallel_degree,
+                        concat_qkv=True,
+                        concat_ffn1=True,
                     )
                 self.transformer_block.weight_scales = weight_scales_loader.scale
                 self.transformer_block.act_scales = act_scale_loader.scale
@@ -1097,16 +1099,24 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                                 dtype=paddle.get_default_dtype(),
                             )
                     self.transformer_block.linear_shifts[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.shift_bias".format(idx)])
+                        paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.shift_bias".format(idx)]).astype(
+                            paddle.get_default_dtype()
+                        )
                     )
                     self.transformer_block.linear_smooths[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.smooth_weight".format(idx)])
+                        paddle.to_tensor(
+                            state_dict["llama.layers.{}.self_attn.o_proj.smooth_weight".format(idx)]
+                        ).astype(paddle.get_default_dtype())
                     )
                     self.transformer_block.ffn2_shifts[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.shift_bias".format(idx)])
+                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.shift_bias".format(idx)]).astype(
+                            paddle.get_default_dtype()
+                        )
                     )
                     self.transformer_block.ffn2_smooths[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.smooth_weight".format(idx)])
+                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.smooth_weight".format(idx)]).astype(
+                            paddle.get_default_dtype()
+                        )
                     )
 
                 if self.shift:
