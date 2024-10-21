@@ -94,6 +94,9 @@ from .convbert.tokenizer import *
 from .ctrl.modeling import *
 from .ctrl.tokenizer import *
 from .ctrl.configuration import *
+from .deepseek_v2.modeling import *
+from .deepseek_v2.tokenizer_fast import *
+from .deepseek_v2.configuration import *
 from .dpt.modeling import *
 from .dpt.configuration import *
 from .dpt.image_processing import *
