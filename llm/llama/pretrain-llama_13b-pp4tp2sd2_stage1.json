@@ -42,5 +42,6 @@
     "distributed_dataloader": 0,
     "recompute_granularity": "full",
     "save_total_limit": 2,
-    "eval_accumulation_steps": 16
+    "eval_accumulation_steps": 16,
+    "seed": 0
   }
