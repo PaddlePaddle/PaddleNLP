@@ -233,46 +233,38 @@ class LlamaMLPAuto(nn.Layer):
         self.ipp = ipp
         self.config = config
 
-        self.placements1 = (
-            [dist.Replicate(), dist.Shard(1)]
-            if self.config.tensor_parallel_degree > 1
-            else [dist.Replicate(), dist.Replicate()]
-        )
-
-        self.placements2 = (
-            [dist.Replicate(), dist.Shard(0)]
-            if self.config.tensor_parallel_degree > 1
-            else [dist.Replicate(), dist.Replicate()]
-        )
-
         if config.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
             self.gate_up_fused_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
-            self.gate_up_fused_proj.weight = dist.shard_tensor(
-                self.gate_up_fused_proj.weight,
-                get_mesh(self.ipp),
-                self.placements1,
-            )
+            if config.tensor_parallel_degree > 1:
+                self.gate_up_fused_proj.weight = dist.shard_tensor(
+                    self.gate_up_fused_proj.weight,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(1)],
+                )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-            self.gate_proj.weight = dist.shard_tensor(
-                self.gate_proj.weight,
-                get_mesh(self.ipp),
-                self.placements1,
-            )
+            if config.tensor_parallel_degree > 1:
+                self.gate_proj.weight = dist.shard_tensor(
+                    self.gate_proj.weight,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(1)],
+                )
 
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-            self.up_proj.weight = dist.shard_tensor(
-                self.up_proj.weight,
-                get_mesh(self.ipp),
-                self.placements1,
-            )
+            if config.tensor_parallel_degree > 1:
+                self.up_proj.weight = dist.shard_tensor(
+                    self.up_proj.weight,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(1)],
+                )
 
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
-        self.down_proj.weight = dist.shard_tensor(
-            self.down_proj.weight,
-            get_mesh(self.ipp),
-            self.placements2,
-        )
+        if config.tensor_parallel_degree > 1:
+            self.down_proj.weight = dist.shard_tensor(
+                self.down_proj.weight,
+                get_mesh(self.ipp),
+                [dist.Replicate(), dist.Shard(0)],
+            )
 
     def forward(self, x):
         if self.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
@@ -313,18 +305,6 @@ class LlamaAttentionAuto(nn.Layer):
         self.recompute_granularity = config.recompute_granularity
         self.ipp = ipp
 
-        self.placements1 = (
-            [dist.Replicate(), dist.Shard(1)]
-            if self.config.tensor_parallel_degree > 1
-            else [dist.Replicate(), dist.Replicate()]
-        )
-
-        self.placements2 = (
-            [dist.Replicate(), dist.Shard(0)]
-            if self.config.tensor_parallel_degree > 1
-            else [dist.Replicate(), dist.Replicate()]
-        )
-
         self.use_fused_rope = config.use_fused_rope
         if self.use_fused_rope:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
@@ -340,11 +320,12 @@ class LlamaAttentionAuto(nn.Layer):
                 self.hidden_size + 2 * self.config.num_key_value_heads * self.head_dim,
                 bias_attr=False,
             )
-            self.qkv_proj.weight = dist.shard_tensor(
-                self.qkv_proj.weight,
-                get_mesh(self.ipp),
-                self.placements1,
-            )
+            if config.tensor_parallel_degree > 1:
+                self.qkv_proj.weight = dist.shard_tensor(
+                    self.qkv_proj.weight,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(1)],
+                )
 
         else:
             self.q_proj = nn.Linear(
@@ -352,44 +333,48 @@ class LlamaAttentionAuto(nn.Layer):
                 self.hidden_size,
                 bias_attr=False,
             )
-            self.q_proj.weight = dist.shard_tensor(
-                self.q_proj.weight,
-                get_mesh(self.ipp),
-                self.placements1,
-            )
+            if config.tensor_parallel_degree > 1:
+                self.q_proj.weight = dist.shard_tensor(
+                    self.q_proj.weight,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(1)],
+                )
 
             self.k_proj = nn.Linear(
                 self.hidden_size,
                 self.config.num_key_value_heads * self.head_dim,
                 bias_attr=False,
             )
-            self.k_proj.weight = dist.shard_tensor(
-                self.k_proj.weight,
-                get_mesh(self.ipp),
-                self.placements1,
-            )
+            if config.tensor_parallel_degree > 1:
+                self.k_proj.weight = dist.shard_tensor(
+                    self.k_proj.weight,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(1)],
+                )
 
             self.v_proj = nn.Linear(
                 self.hidden_size,
                 self.config.num_key_value_heads * self.head_dim,
                 bias_attr=False,
             )
-            self.v_proj.weight = dist.shard_tensor(
-                self.v_proj.weight,
-                get_mesh(self.ipp),
-                self.placements1,
-            )
+            if config.tensor_parallel_degree > 1:
+                self.v_proj.weight = dist.shard_tensor(
+                    self.v_proj.weight,
+                    get_mesh(self.ipp),
+                    [dist.Replicate(), dist.Shard(1)],
+                )
 
         self.o_proj = nn.Linear(
             self.hidden_size,
             self.hidden_size,
             bias_attr=False,
         )
-        self.o_proj.weight = dist.shard_tensor(
-            self.o_proj.weight,
-            get_mesh(self.ipp),
-            self.placements2,
-        )
+        if config.tensor_parallel_degree > 1:
+            self.o_proj.weight = dist.shard_tensor(
+                self.o_proj.weight,
+                get_mesh(self.ipp),
+                [dist.Replicate(), dist.Shard(0)],
+            )
 
         if config.rope:
             self._init_rope()
@@ -883,6 +868,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             self.vocab_size,
             self.hidden_size,
         )
+
         if config.tensor_parallel_degree > 1:
             self.embed_tokens.weight = dist.shard_tensor(
                 self.embed_tokens.weight,
