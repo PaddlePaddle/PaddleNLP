@@ -17,7 +17,7 @@ import os
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional, Union
 
-from .lokr_envs import LOKR_CONFIG_NAME
+from ...utils.env import LOKR_CONFIG_NAME
 
 
 @dataclass
