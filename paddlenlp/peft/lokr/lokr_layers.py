@@ -114,6 +114,7 @@ class LoKrLinear(nn.Linear):
         assert paddle.sum(paddle.isnan(adapter_weight)) == 0, "weight is nan"
         # Freezing the pre-trained weight matrix
         self.weight.stop_gradient = True
+        self.disable_lokr = False
 
     def get_adapter_weight(self, orig_weight=None):
         weight = make_kron(
