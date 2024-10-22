@@ -562,6 +562,8 @@ def main():
         gen_args=gen_args,
         data_args=data_args,
     )
+    trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
+    trainer.set_optimizer_grouped_parameters(trainable_parameters)
 
     # Train
     if training_args.do_train:
