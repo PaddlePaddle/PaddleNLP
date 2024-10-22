@@ -57,8 +57,8 @@ from paddlenlp.transformers import (
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
+from paddlenlp.trl import SFTTrainer
 from paddlenlp.trl.llm_utils import (
-    SFTTrainer,
     ZeroPaddingIterDatasetCallback,
     compute_metrics,
     get_lora_target_modules,
