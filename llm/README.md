@@ -15,18 +15,21 @@
 
 ## 🛠️ 支持模型列表 🛠️
 
-| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Torch convert |
+| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO | RLHF | Quantization | Torch convert |
 |----------------------------------------|----------|-----|------|---------------|-----|------|--------------|---------------|
 | [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅   | ✅    | ✅            | ✅             |
 | [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧   | 🚧           | ✅             |
-| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | 🚧  | 🚧   | 🚧           | 🚧            |
+| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | ✅   | 🚧   | 🚧           | 🚧            |
 | [Mistral](./config/mistral)            | ❌        | ✅   | ✅    | ✅             | ✅   | 🚧   | 🚧           | ✅             |
 | [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧   | ✅            | ✅             |
 | [ChatGLM-6B](./config/chatglm)         | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ❌             |
-| [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ✅             |
+| [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅    | ✅             | ✅   | 🚧   | ✅            | ✅             |
 | [Bloom](./config/bloom)                | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ✅             |
 | [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧  | 🚧   | 🚧           | ✅             |
 | [OPT](./config/opt)                    | 🚧       | ✅   | ✅    | 🚧            | 🚧  | 🚧   | 🚧           | ✅             |
+| [Gemma](./config/gemma)                | 🚧       | ✅   |🚧     | 🚧            | ✅  | 🚧   | 🚧           | 🚧             |
+| [Yuan](./config/yuan)                  | ✅       | ✅   |✅     | 🚧            | ✅  | 🚧   | 🚧           | 🚧             |
+
 
 - ✅: Supported
 - 🚧: In Progress
@@ -193,6 +196,7 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 # DPO 启动命令参考
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
+更多 DPO 技术细节和使用说明详见[DPO 文档](./docs/dpo.md)。
 
 #### 3.2 RLHF
 
