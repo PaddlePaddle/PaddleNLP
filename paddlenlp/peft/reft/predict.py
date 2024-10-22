@@ -22,7 +22,7 @@ from tqdm import tqdm
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.transformers import AutoTokenizer
 
-from .reft_trainer import ReftDataCollator
+from .modeling_utils import ReftDataCollator
 
 device = "gpu" if paddle.is_compiled_with_cuda() else "cpu"
 
@@ -94,7 +94,7 @@ def do_predict(
                     "input_ids": inputs["input_ids"],
                     "attention_mask": inputs["attention_mask"],
                 },
-                "unit_locations": {"sources->base": (None, intervention_locations)},
+                "unit_locations": intervention_locations,
                 "intervene_on_prompt": True,
                 "eos_token_id": tokenizer.eos_token_id,
                 "early_stopping": True,

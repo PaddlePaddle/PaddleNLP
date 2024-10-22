@@ -54,10 +54,7 @@ class LoreftIntervention(nn.Layer):
             kwargs["low_rank_dimension"],
             weight_attr=ParamAttr(initializer=nn.initializer.Orthogonal()),
         )
-        if "dtype" in kwargs:
-            self.learned_source = self.learned_source.astype(kwargs["dtype"])
-        else:
-            self.learned_source = self.learned_source.astype(paddle.bfloat16)
+        self.learned_source = self.learned_source.astype(kwargs["dtype"])
         self.dropout = nn.Dropout(kwargs["dropout"] if "dropout" in kwargs else 0.0)
         self.act_fn = (
             ACT2FN["linear"] if "act_fn" not in kwargs or kwargs["act_fn"] is None else ACT2FN[kwargs["act_fn"]]

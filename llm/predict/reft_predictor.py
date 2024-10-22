@@ -15,18 +15,15 @@
 import argparse
 import json
 import os
-import sys
 from functools import partial
 from types import SimpleNamespace
 
 import paddle
+from utils.data import convert_example_for_reft
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.peft.reft import ReFTModel, do_predict
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
-
-sys.path.append("/home/ldn/baidu/pyreft/paddle-version/mypr/0705/reft-pr/simple-reft/PaddleNLP/llm")
-from utils.data import convert_example_for_reft
 
 device = "gpu" if paddle.is_compiled_with_cuda() else "cpu"
 
@@ -62,7 +59,7 @@ def reft_predict(predictor_args):
     dev_ds = dev_ds.map(partial(trans_func, is_test=True, zero_padding=False, flash_mask=False))
 
     model = AutoModelForCausalLM.from_pretrained(predictor_args.model_name_or_path, dtype=paddle.bfloat16)
-    reft_model = ReFTModel.load(predictor_args.reft_path, model)
+    reft_model = ReFTModel.from_pretrained(predictor_args.reft_path, model)
     do_predict(
         intervenable=reft_model,
         tokenizer=tokenizer,
@@ -85,7 +82,10 @@ def get_pred_parser():
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+def main():
     predictor_args = get_pred_parser()
-    print(predictor_args)
     reft_predict(predictor_args)
+
+
+if __name__ == "__main__":
+    main()

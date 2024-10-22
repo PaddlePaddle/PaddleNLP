@@ -17,7 +17,7 @@ import json
 import logging
 import os
 import types
-from typing import Dict, Optional
+from typing import List, Optional
 
 import paddle
 from paddle import nn
@@ -29,7 +29,6 @@ from .modeling_utils import (
     do_intervention,
     gather_neurons,
     get_module_hook,
-    get_type_from_string,
     scatter_neurons,
 )
 from .reft_config import ReFTConfig
@@ -71,34 +70,26 @@ class ReFTModel(nn.Layer):
 
     def forward(
         self,
-        base,
-        unit_locations: Optional[Dict] = None,
-        labels: Optional[paddle.Tensor] = None,
-        output_original_output: Optional[bool] = False,
+        **base,
     ):
+        unit_locations = base["intervention_locations"].transpose([1, 0, 2]).tolist()
         self._reset_hook_count()
-        # if no intervention, return base
-        if unit_locations is None and len(self.interventions) == 0:
-            return self.model(**base), None
-
-        base_outputs = None
-        if output_original_output:
-            base_outputs = self.model(**base, labels=labels)
         try:
             # intervene, register hook after decoder block
             set_handlers_to_remove = self._wait_for_forward_with_intervention(unit_locations)
             # run intervened forward
-            counterfactual_outputs = self.model(**base, labels=labels)
+            del base["intervention_locations"]
+            counterfactual_outputs = self.model(**base)
             set_handlers_to_remove.remove()
         except Exception as e:
             raise e
         self._reset_hook_count()
-        return base_outputs, counterfactual_outputs
+        return counterfactual_outputs
 
     def generate(
         self,
         base,
-        unit_locations: Optional[Dict] = None,
+        unit_locations: Optional[List] = None,
         intervene_on_prompt: bool = False,
         output_original_output: Optional[bool] = False,
         **kwargs,
@@ -127,11 +118,9 @@ class ReFTModel(nn.Layer):
         self,
         unit_locations,
     ):
-        # torch.autograd.set_detect_anomaly(True)
         all_set_handlers = HandlerList([])
-        unit_locations_base = unit_locations["sources->base"][1]
         for key_id, key in enumerate(self.sorted_keys):
-            set_handlers = self._intervention_setter(key, unit_locations_base[key_id])
+            set_handlers = self._intervention_setter(key, unit_locations[key_id])
             all_set_handlers.extend(set_handlers)
         return all_set_handlers
 
@@ -241,12 +230,8 @@ class ReFTModel(nn.Layer):
 
         return original_output
 
-    def save(self, save_directory):
-        """
-        Save interventions to disk or hub
-        """
+    def save_pretrained(self, save_directory, **kwargs):
         create_directory(save_directory)
-
         saving_config = copy.deepcopy(self.config)
         saving_config.sorted_keys = self.sorted_keys
         saving_config.intervention_types = []
@@ -263,34 +248,19 @@ class ReFTModel(nn.Layer):
                 os.path.join(save_directory, binary_filename),
             )
 
-        ReFTConfig.save_config(
-            saving_config,
-            save_directory=save_directory,
-        )
+        saving_config.save_pretrained(save_directory)
 
     @staticmethod
-    def load(
+    def from_pretrained(
         load_directory,
         model,
     ):
         """
         Load interventions from disk
         """
-        saved_config = ReFTConfig.load_config(
+        reft_config = ReFTConfig.from_pretrained(
             load_directory=load_directory,
         )
-        for representation, intervention_type in zip(
-            saved_config["representations"], saved_config["intervention_types"]
-        ):
-            representation["intervention"] = get_type_from_string(intervention_type)(
-                **saved_config["intervention_params"]
-            )
-
-        reft_config = ReFTConfig(
-            representations=saved_config["representations"],
-            intervention_params=saved_config["intervention_params"],
-        )
-
         intervenable = ReFTModel(reft_config, model)
         intervenable.disable_model_gradients()
 
@@ -301,50 +271,6 @@ class ReFTModel(nn.Layer):
             saved_state_dict = paddle.load(os.path.join(load_directory, binary_filename))
             intervention.load_state_dict(saved_state_dict)
         return intervenable
-
-    def save_intervention(self, save_directory, include_model=True):
-        """
-        Instead of saving the metadata with artifacts, it only saves artifacts such as
-        trainable weights. This is not a static method, and returns nothing.
-        """
-        create_directory(save_directory)
-
-        # save binary files
-        for k, v in self.interventions.items():
-            intervention = v[0]
-            binary_filename = f"intkey_{k}.bin"
-            # save intervention binary file
-            paddle.save(
-                intervention.state_dict(),
-                os.path.join(save_directory, binary_filename),
-            )
-
-        # save model's trainable parameters as well
-        if include_model:
-            model_state_dict = {}
-            model_binary_filename = "paddle_model.bin"
-            for n, p in self.model.named_parameters():
-                if not p.stop_gradient:
-                    model_state_dict[n] = p
-            paddle.save(model_state_dict, os.path.join(save_directory, model_binary_filename))
-
-    def load_intervention(self, load_directory, include_model=True):
-        """
-        Instead of creating an new object, this function loads existing weights onto
-        the current object. This is not a static method, and returns nothing.
-        """
-        # load binary files
-        for i, (k, v) in enumerate(self.interventions.items()):
-            intervention = v[0]
-            binary_filename = f"intkey_{k}.bin"
-            saved_state_dict = paddle.load(os.path.join(load_directory, binary_filename))
-            intervention.load_state_dict(saved_state_dict)
-
-        # load model's trainable parameters as well
-        if include_model:
-            model_binary_filename = "pypaddle_model.bin"
-            saved_model_state_dict = paddle.load(os.path.join(load_directory, model_binary_filename))
-            self.model.load_state_dict(saved_model_state_dict, strict=False)
 
     def train(self):
         self.model.train()

@@ -15,6 +15,8 @@ import importlib
 import logging
 import os
 import random
+from dataclasses import dataclass
+from typing import Dict, Sequence
 
 import numpy as np
 import paddle
@@ -157,3 +159,17 @@ def set_seed(seed: int):
 def count_parameters(model):
     """Count parameters of a model that require gradients"""
     return int(sum(p.numel() for p in model.parameters() if not p.stop_gradient))
+
+
+@dataclass
+class ReftDataCollator(object):
+    """Collate examples for ReFT."""
+
+    def __init__(self, data_collator):
+        self.data_collator = data_collator
+
+    def __call__(self, instances: Sequence[Dict]) -> Dict[str, paddle.Tensor]:
+        batch_inputs = self.data_collator(instances)
+        max_seq_length = batch_inputs["input_ids"].shape[-1]
+        batch_inputs["intervention_locations"] = batch_inputs["intervention_locations"][..., :max_seq_length]
+        return batch_inputs

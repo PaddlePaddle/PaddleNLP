@@ -12,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
-import paddle
 
 from .lora import LoRAConfig, LoRAModel
 from .prefix import PrefixConfig, PrefixModelForCausalLM
+from .reft import ReFTModel
 from .vera import VeRAConfig, VeRAModel

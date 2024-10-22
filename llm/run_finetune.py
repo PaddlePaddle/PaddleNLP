@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import datetime
 import json
 import logging
 import os
@@ -48,8 +47,6 @@ from paddlenlp.peft.reft import (
     ReFTConfig,
     ReftDataCollator,
     ReFTModel,
-    ReFTTrainer,
-    do_predict,
     intervention_mapping,
 )
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
@@ -224,14 +221,12 @@ def main():
     if model_args.reft:
         # reft requires padding side right
         tokenizer.padding_side = "right"
-        # 默认使用eos_token_id
-        # tokenizer.pad_token_id = tokenizer.unk_token_id
         layers = reft_args.layers
         if reft_args.layers != "all":
             layers = [int(l) for l in layers.split(";")]
         else:
             layers = [l for l in range(model_config.num_hidden_layers)]
-        logging.info("Using reft with layers: ", layers)
+        logging.info("Using ReFT with layers: ", layers)
     # init chat_template for tokenizer
     init_chat_template(tokenizer, model_args.model_name_or_path, data_args.chat_template)
 
@@ -257,7 +252,7 @@ def main():
             )[0]
         else:
             train_ds = None
-        if training_args.do_eval or model_args.reft:
+        if training_args.do_eval:
             dev_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
@@ -528,12 +523,10 @@ def main():
             representations=representations, intervention_params=intervention_params, position=reft_args.position
         )
         # get reft model
-        reft_model = ReFTModel(reft_config, model)
+        model = ReFTModel(reft_config, model)
         # disable origianl model gradients
-        reft_model.disable_model_gradients()
-        # reft_model = get_reft_model(model, reft_config, set_device=False)
-        reft_model.print_trainable_parameters()
-        reft_model.model.train()
+        model.disable_model_gradients()
+        model.print_trainable_parameters()
 
     def compute_metrics_do_generation(eval_preds):
         rouge1 = Rouge1()
@@ -602,57 +595,32 @@ def main():
     else:
         metrics = compute_metrics
 
-    if model_args.reft:
-        data_collator_fn = DataCollatorForSeq2Seq(
-            tokenizer=tokenizer, model=model, label_pad_token_id=-100, padding="longest"
-        )
-        data_collator = ReftDataCollator(data_collator=data_collator_fn)
-        trainer = ReFTTrainer(
-            model=reft_model,
-            tokenizer=tokenizer,
-            args=training_args,
-            train_dataset=train_ds,
-            data_collator=data_collator,
-            eval_dataset=None,
-            compute_metrics=None,
-        )
-        trainer.train()
-        run_name = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        reft_model.save(f"{training_args.output_dir}/{run_name}")
-        # 预测
-        print(dev_ds[0])
-        do_predict(
-            intervenable=reft_model,
-            tokenizer=tokenizer,
-            eval_dataset=dev_ds,
-            batch_size=training_args.per_device_eval_batch_size,
-            predict_path=f"{training_args.output_dir}/pred_result.json",
-        )
-    else:
-        trainer = CausalLMTrainer(
-            model=model,
-            args=training_args,
-            train_dataset=train_ds,
-            eval_dataset=dev_ds,
-            tokenizer=tokenizer,
-            compute_metrics=metrics,
-            data_collator=DataCollatorForSeq2Seq(
-                tokenizer=tokenizer,
-                max_length=max_length,
-                padding=padding,
-                max_label_length=max_length,
-                return_tensors="np",
-                return_attention_mask=not model_args.flash_mask,
-                pad_to_multiple_of=data_args.pad_to_multiple_of,
-            ),
-            do_generation=data_args.eval_with_do_generation,
-            callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
-            gen_args=gen_args,
-            data_args=data_args,
-        )
+    data_collator_fn = DataCollatorForSeq2Seq(
+        tokenizer=tokenizer,
+        max_length=max_length,
+        padding=padding,
+        max_label_length=max_length,
+        return_tensors="np",
+        return_attention_mask=not model_args.flash_mask,
+        pad_to_multiple_of=data_args.pad_to_multiple_of,
+    )
+
+    trainer = CausalLMTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_ds,
+        eval_dataset=dev_ds,
+        tokenizer=tokenizer,
+        compute_metrics=metrics,
+        data_collator=data_collator_fn if not model_args.reft else ReftDataCollator(data_collator=data_collator_fn),
+        do_generation=data_args.eval_with_do_generation,
+        callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
+        gen_args=gen_args,
+        data_args=data_args,
+    )
 
     # Train
-    if training_args.do_train and not model_args.reft:
+    if training_args.do_train:
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:
             checkpoint = training_args.resume_from_checkpoint

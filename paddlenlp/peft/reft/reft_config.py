@@ -15,6 +15,8 @@
 import json
 import os
 
+from .modeling_utils import get_type_from_string
+
 
 class ReFTConfig:
     def __init__(
@@ -51,12 +53,21 @@ class ReFTConfig:
         }
 
     @staticmethod
-    def load_config(load_directory):
-        config_dict = json.load(open(os.path.join(load_directory, "config.json"), "r"))
-        return config_dict
+    def from_pretrained(load_directory):
+        saved_config = json.load(open(os.path.join(load_directory, "config.json"), "r"))
+        for representation, intervention_type in zip(
+            saved_config["representations"], saved_config["intervention_types"]
+        ):
+            representation["intervention"] = get_type_from_string(intervention_type)(
+                **saved_config["intervention_params"]
+            )
+        reft_config = ReFTConfig(
+            representations=saved_config["representations"],
+            intervention_params=saved_config["intervention_params"],
+        )
+        return reft_config
 
-    @staticmethod
-    def save_config(config, save_directory):
+    def save_pretrained(self, save_directory):
         config_dict = {}
         config_dict["representations"] = [
             {
@@ -64,13 +75,11 @@ class ReFTConfig:
                 "component": repr["component"],
                 "low_rank_dimension": repr["low_rank_dimension"],
             }
-            for repr in config.representations
+            for repr in self.representations
         ]
 
-        config_dict["intervention_params"] = config.intervention_params
-        config_dict["intervention_types"] = [
-            repr(intervention_type) for intervention_type in config.intervention_types
-        ]
-        config_dict["position"] = config.position
+        config_dict["intervention_params"] = self.intervention_params
+        config_dict["intervention_types"] = [repr(intervention_type) for intervention_type in self.intervention_types]
+        config_dict["position"] = self.position
         with open(os.path.join(save_directory, "config.json"), "w") as f:
             json.dump(config_dict, f, indent=4)

@@ -176,3 +176,17 @@ python merge_lora_params.py \
 - `sharding_parallel_degree`: 表示分组参数切片的数据并行大小. 默认值1, 表示不启用分组参数切片的数据并行。
 - `sharding`:是否使用 Paddle 的 Sharding 数据并行功能，用户的参数。支持 sharding `stage1`, `stage2` or `stage3`。其中`stage2``stage3`可以和`offload`组合使用。
 </div>
+
+
+
+<summary>&emsp; 表征微调(ReFT)参数（ReftArgument） </summary><div>
+
+- `model_name_or_path`: 预训练模型名称或者本地的模型路径，用于热启模型和分词器，默认为 None。每个模型**支持模型权重**详见各模型目录。
+- `layers`: 干预模型的那些层，默认为 all, 干预所有层。
+- `position`: 干预哪些位置的 token，默认为 f7, 干预前7个 token。
+- `intervention_type`: 干预网络的类型，默认为 LoReftIntervention。
+- `rank`: 干预网络的低秩，默认为 8。
+- `act_fn`: 干预网络中的激活函数，默认为 linear。
+- `add_bias`: 干预网络中是否添加偏置，默认为 False。
+- `dropout`:  干预网络中的 Dropout rate，默认为 0.00。
+</div>

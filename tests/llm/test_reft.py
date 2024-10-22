@@ -59,6 +59,14 @@ class ReftTest(LLMTest, unittest.TestCase):
 
             main()
 
+        perdict_params = {
+            "model_name_or_path": reft_config["model_name_or_path"],
+            "reft_path": self.output_dir,
+            "dataset_name_or_path": self.data_dir,
+            "batch_size": 8,
+        }
+        self.run_reft_predictor(perdict_params)
+
 
 if __name__ == "__main__":
     unittest.main()

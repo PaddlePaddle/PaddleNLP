@@ -108,3 +108,10 @@ class LLMTest:
 
         for predict_item, infer_item in zip(predict_result, infer_result):
             self.assertEqual(predict_item, infer_item)
+
+    def run_reft_predictor(self, predict_config=None):
+        predict_config["output_file"] = os.path.join(self.output_dir, "predict.json")
+        with argv_context_guard(predict_config):
+            from predict.reft_predictor import main
+
+            main()

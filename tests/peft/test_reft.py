@@ -14,27 +14,22 @@
 
 
 import os
-import sys
 import unittest
 from functools import partial
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 
 import paddle
 
-from paddlenlp.datasets import load_dataset
-
-sys.path.append("/home/ldn/baidu/pyreft/paddle-version/mypr/0705/reft-pr/simple-reft/PaddleNLP")
-from types import SimpleNamespace
-
 from llm.utils.data import convert_example_for_reft
 from paddlenlp.data import DataCollatorForSeq2Seq
+from paddlenlp.datasets import load_dataset
 from paddlenlp.peft.reft import (
     LoreftIntervention,
     LowRankRotateLayer,
     ReFTConfig,
     ReftDataCollator,
     ReFTModel,
-    ReFTTrainer,
     TinyIntervention,
     do_predict,
 )
@@ -44,6 +39,7 @@ from paddlenlp.peft.reft.modeling_utils import (
     set_seed,
 )
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+from paddlenlp.utils.llm_utils import CausalLMTrainer
 
 
 class TestReftDataCollator(unittest.TestCase):
@@ -321,19 +317,21 @@ class TestReFTModelPredict(unittest.TestCase):
             tokenizer=tokenizer, model=model, label_pad_token_id=-100, padding="longest"
         )
         data_collator = ReftDataCollator(data_collator=data_collator_fn)
-        trainer = ReFTTrainer(
+        trainer = CausalLMTrainer(
             model=reft_model,
             tokenizer=tokenizer,
-            # args=training_args,
             train_dataset=train_ds,
             data_collator=data_collator,
             eval_dataset=None,
             compute_metrics=None,
+            gen_args=None,
+            data_args=None,
+            do_generation=False,
         )
         trainer.train()
 
         with TemporaryDirectory() as tempdir:
-            reft_model.save(tempdir)
+            reft_model.save_pretrained(tempdir)
             # 预测
             do_predict(
                 intervenable=reft_model,
