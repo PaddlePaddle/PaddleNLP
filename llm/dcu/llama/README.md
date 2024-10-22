@@ -115,11 +115,28 @@ bash run_lora.sh
 bash run_sft.sh
 ```
 ## 3.预训练：
-权重链接
+### 权重链接
 
 13B:[https://huggingface.co/meta-llama/Llama-2-7b](https://huggingface.co/meta-llama/Llama-2-7b)
 
 7B:[https://huggingface.co/meta-llama/Llama-2-13b](https://huggingface.co/meta-llama/Llama-2-13b)
+### 数据准备
+数据详细制作流程可参考[此处](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/tools/preprocess/README.md)，例：OpenWebText2预训练数据制作参考[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/data/OpenWebText2.html)
+
+为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
+
+```
+cd PaddleNLP/llm/
+mkdir data && cd data
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.bin
+wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k.idx
+cd .. && tree data 
+data
+├── llama_openwebtext_100k.bin
+└── llama_openwebtext_100k.idx
+```
+
+### 运行脚本
 
 该训练脚本可以单节点也可多节点运行，每节点8张DCU-K100AI-64G。
 
