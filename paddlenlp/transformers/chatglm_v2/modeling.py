@@ -27,6 +27,7 @@ from paddle.distributed.fleet.utils import recompute
 from paddle.utils import map_structure
 
 from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
+from paddlenlp.utils.log import logger
 
 from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, linear_utils, register_base_model
@@ -345,6 +346,35 @@ class SelfAttention(nn.Layer):
             ],
             axis=-1,
         )
+        # quer_state, key_state, val_state are used by flash attention
+
+        query_states, key_states, value_states = query_layer, key_layer, value_layer
+        q_length, batch_size, _ = query_layer.shape
+        query_states = query_states.reshape(
+            [
+                batch_size,
+                q_length,
+                self.num_attention_heads_per_partition,
+                self.hidden_size_per_attention_head,
+            ]
+        )
+        key_states = key_states.reshape(
+            [
+                batch_size,
+                q_length,
+                self.num_multi_query_groups_per_partition,
+                self.hidden_size_per_attention_head,
+            ]
+        )
+        value_states = value_states.reshape(
+            [
+                batch_size,
+                q_length,
+                self.num_multi_query_groups_per_partition,
+                self.hidden_size_per_attention_head,
+            ]
+        )
+
         if self.sequence_parallel:
             query_layer = query_layer.reshape(
                 [self.seq_length, -1, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
@@ -391,6 +421,31 @@ class SelfAttention(nn.Layer):
         value_layer = value_layer.reshape(
             value_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
         )
+        # =================================
+        # flash attention computation
+        # =================================
+        version = paddle.version.full_version
+        version_check = True
+        if self.config.use_flash_attention and version != "0.0.0" and version <= "2.5.2":
+            logger.warning(
+                "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
+            )
+            version_check = False
+        if self.config.use_flash_attention and version_check:
+            attention_mask = attention_mask
+            attn_output = F.scaled_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attn_mask=attention_mask,
+                dropout_p=self.config.attention_dropout,
+                training=self.training,
+                is_causal=False,
+            )
+            # reshape the output to [seq_length, batch_size, hidden_size]
+            attn_output = attn_output.reshape([q_length, batch_size, -1])
+            output = self.dense(attn_output)
+            return output, kv_cache
 
         # ==================================
         # core attention computation
