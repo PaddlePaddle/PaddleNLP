@@ -1546,10 +1546,10 @@ function llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4() {
                 >>${log_path}/$FUNCNAME 2>&1
             
             loss=$(grep "global_step: 10," "$case_log_dir/workerlog.0" | grep -oP '(?<=loss: )\d+(\.\d+)?' | awk -F ',' '{print $1}')
-            if [ "$pp_mode" == "FThenB" ]; then
-                loss1=loss
+            if [ "$pp_mode" == "1F1B" ]; then
+                loss1=($loss)
             else
-                loss2=loss
+                loss2=($loss)
             fi
             echo "result: $pp_mode loss=$loss"
         done
