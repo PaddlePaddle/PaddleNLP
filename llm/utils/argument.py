@@ -235,8 +235,7 @@ class ModelArgument:
     use_long_sequence_strategies: bool = field(
         default=False, metadata={"help": "Whether to use long sequence strategy"}
     )
-    rope_scaling_type: str = field(default=None, metadata={"help": "Rope extension strategy"})
-    rope_scaling_factor: float = field(default=None, metadata={"help": "Rope extension scaling factor"})
+    rope_scaling_factor: float = field(default=1.0, metadata={"help": "Rope extension scaling factor"})
     strategy_type: str = field(default=None, metadata={"help": "Long sequence strategy type"})
     strategy_name: str = field(default=None, metadata={"help": "Long sequence strategy name"})
 

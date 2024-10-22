@@ -167,7 +167,6 @@ def main():
         model_config.use_long_sequence_strategies = True
         model_config.long_sequence_strategy_type = model_args.strategy_type
         model_config.long_sequence_strategy_name = model_args.strategy_name
-        model_config.rope_scaling_type = model_args.rope_scaling_type
         model_config.rope_scaling_factor = model_args.rope_scaling_factor
         model_config.long_sequence_init_args = {
             "dim": int(model_config.hidden_size / model_config.num_attention_heads),
@@ -175,7 +174,7 @@ def main():
             "base": model_config.rope_theta,
             "scaling_factor": model_args.rope_scaling_factor,
         }
-        if model_args.rope_scaling_type == "yarn":
+        if model_args.strategy_name == "YaRNScalingRotaryEmbedding":
             model_config.long_sequence_init_args["original_max_position_embeddings"] = data_args.max_length
 
     logger.info(f"Final model config: {model_config}")
@@ -372,15 +371,6 @@ def main():
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
 
-    if data_args.zero_padding:
-        if (
-            model.base_model_prefix not in ["llama", "bloom", "chatglm", "chatglm_v2", "qwen", "mistral"]
-            and training_args.pipeline_parallel_degree < 1
-        ):
-            raise NotImplementedError(
-                "Zero Padding data stream is only implemented for LLaMA, Bloom, ChatGLM, QWen and Mistral so far."
-            )
-
     train_ds = (
         train_ds.map(
             partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
@@ -402,7 +392,18 @@ def main():
             "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
         )
         eval_zero_padding = False
-    dev_ds = dev_ds.map(partial(trans_func)) if dev_ds is not None else None
+    dev_ds = (
+        dev_ds.map(
+            partial(
+                trans_func,
+                is_test=data_args.eval_with_do_generation,
+                zero_padding=eval_zero_padding,
+                flash_mask=model_args.flash_mask,
+            )
+        )
+        if dev_ds is not None
+        else None
+    )
     if data_args.zero_padding:
         if data_args.lazy:
             intoken_dataset = ZeroPaddingIterableDataset
