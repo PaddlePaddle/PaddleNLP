@@ -65,19 +65,15 @@ docker run -it \
 (3). 安装paddle
 ```
 # paddlepaddle『飞桨』深度学习框架，提供运算基础能力
-python -m pip install paddlepaddle-dcu==3.0.0b1 -i https://www.paddlepaddle.org.cn/packages/stable/dcu/
+python -m pip install paddlepaddle-dcu==3.0.0b2 -i https://www.paddlepaddle.org.cn/packages/stable/dcu/
 ```
 
 (4). 克隆PaddleNLP仓库代码，并安装依赖
 ```
-# 安装paddlenlp
-# 第一种方式安装
-pip3 install --upgrade paddlenlp==3.0.0b0 http://mirrors.aliyun.com/pypi/simple/ 
-
-# 第二种方式，使用paddlenlp develop分支
+# 用paddlenlp develop分支
 git clone https://github.com/PaddlePaddle/PaddleNLP.git
-pip3 install ./PaddleNLP 使用develop版本
 cd PaddleNLP/llm # 到达运行目录
+pip install -r ../requirements.txt
 ```
 (5). 安装 paddlenlp_ops
 ```
@@ -115,11 +111,6 @@ bash run_lora.sh
 bash run_sft.sh
 ```
 ## 3.预训练：
-### 权重链接
-
-13B:[https://huggingface.co/meta-llama/Llama-2-7b](https://huggingface.co/meta-llama/Llama-2-7b)
-
-7B:[https://huggingface.co/meta-llama/Llama-2-13b](https://huggingface.co/meta-llama/Llama-2-13b)
 ### 数据准备
 数据详细制作流程可参考[此处](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/tools/preprocess/README.md)，例：OpenWebText2预训练数据制作参考[此处](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/data/OpenWebText2.html)
 
