@@ -872,6 +872,16 @@ class TrainingArguments:
         default=False,
         metadata={"help": "whether to run distributed training in auto parallel mode"},
     )
+    program_runtimes: List[int] = field(
+        default_factory=lambda: [61, 72, 71, 34, 3],
+        metadata={
+            "help": "The program runtime of 5 types of jobs including default forward, backward_b, backward_w, loss, communication."
+        },
+    )
+    memory_limit_times: float = field(
+        default=-1,
+        metadata={"help": "The memory limit times of the pipeline parallel. Only used for zbv pipeline parallel."},
+    )
     use_expert_parallel: Optional[bool] = field(
         default=False,
         metadata={"help": "Enable MoE (Mixture of Experts) expert parallel training"},
