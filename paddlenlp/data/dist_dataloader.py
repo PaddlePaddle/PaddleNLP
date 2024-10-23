@@ -196,7 +196,7 @@ class DistDataLoader(paddle.io.DataLoader):
             data = nested_broadcast_tensor(data, src=self.mp_src_rank, group=self.mp_group)
         if dst_pp_group is not None:
             data = nested_broadcast_tensor(data, src=dst_pp_group.ranks[0], group=dst_pp_group)
-        # for pp1 - pp_{n-1}, Paddle need to recevie empty dict for pipeline parallel.
+        # for pp1 - pp_{n-1}, Paddle need to receive empty dict for pipeline parallel.
         if data is None:
             data = {}
 

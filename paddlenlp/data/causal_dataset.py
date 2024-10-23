@@ -91,7 +91,7 @@ def get_datasets_weights_and_num_samples(data_prefix, train_val_test_num_samples
     assert weight_sum > 0.0
     weights = [weight / weight_sum for weight in weights]
 
-    # Add 0.5% (the 1.005 factor) so in case the bleding dataset does
+    # Add 0.5% (the 1.005 factor) so in case the blending dataset does
     # not uniformly distribute the number of samples, we still have
     # samples left to feed to the network.
     # (NOTE, yujun06): This is a workaround to avoid issues with indexing in the blending dataset. Therefore, we need to add 20 samples to each dataset.
@@ -349,7 +349,7 @@ class GPTDataset(paddle.io.Dataset):
             paddle.distributed.barrier()
 
     def __len__(self):
-        # -1 is due to data structure used to retieve the index:
+        # -1 is due to data structure used to retrieve the index:
         #    sample i --> [sample_idx[i], sample_idx[i+1])
         return self.sample_idx.shape[0] - 1
 
@@ -475,7 +475,7 @@ def _build_index_mappings(
     # if build_indices and paddle.distributed.get_rank() == 0:
 
     print(
-        f"searching for causual dataset, build_indices={build_indices}, share_folder {share_folder}, check_rank_flag {check_rank_flag}",
+        f"searching for causal dataset, build_indices={build_indices}, share_folder {share_folder}, check_rank_flag {check_rank_flag}",
         flush=True,
     )
     if check_rank_flag:
@@ -500,7 +500,7 @@ def _build_index_mappings(
                 num_samples_per_epoch + 1
             ), "last epoch number of samples exceeded max value."
             # If we have less than 80% of the samples for the last epoch,
-            # seperate out the epoch and treat it differently.
+            # separate out the epoch and treat it differently.
             # Note: the 80% number is just based on common sense and can
             # be adjusted if needed.
             separate_last_epoch = last_epoch_num_samples < int(0.80 * num_samples_per_epoch)
@@ -530,7 +530,7 @@ def _build_index_mappings(
             doc_idx = _build_doc_idx(documents, num_epochs, np_rng, separate_last_epoch)
             np.save(idx_path["doc"], doc_idx, allow_pickle=True)
             print_rank_0(
-                " > elasped time to build and save doc-idx mapping "
+                " > elapsed time to build and save doc-idx mapping "
                 "(seconds): {:4f}".format(time.time() - start_time)
             )
             # sample-idx.
@@ -545,12 +545,12 @@ def _build_index_mappings(
             sample_idx = helpers.build_sample_idx(sizes, doc_idx, seq_length, num_epochs, tokens_per_epoch)
             np.save(idx_path["sample"], sample_idx, allow_pickle=True)
             print_rank_0(
-                " > elasped time to build and save sample-idx mapping "
+                " > elapsed time to build and save sample-idx mapping "
                 "(seconds): {:4f}".format(time.time() - start_time)
             )
             # shuffle-idx.
             start_time = time.time()
-            # -1 is due to data structure used to retieve the index:
+            # -1 is due to data structure used to retrieve the index:
             #    sample i --> [sample_idx[i], sample_idx[i+1])
             if separate_last_epoch:
                 num_samples_ = num_samples_from_epochs_minus_one
@@ -559,7 +559,7 @@ def _build_index_mappings(
             shuffle_idx = _build_shuffle_idx(num_samples_, sample_idx.shape[0] - 1, np_rng)
             np.save(idx_path["shuffle"], shuffle_idx, allow_pickle=True)
             print_rank_0(
-                " > elasped time to build and save shuffle-idx mapping"
+                " > elapsed time to build and save shuffle-idx mapping"
                 " (seconds): {:4f}".format(time.time() - start_time)
             )
         except OSError:
@@ -610,7 +610,7 @@ def _num_tokens(documents, sizes):
 
 
 def _num_epochs(tokens_per_epoch, seq_length, num_samples):
-    """Based on number of samples and sequence lenght, calculate how many
+    """Based on number of samples and sequence length, calculate how many
     epochs will be needed."""
     num_epochs = 0
     total_tokens = 0
@@ -625,7 +625,7 @@ def _num_epochs(tokens_per_epoch, seq_length, num_samples):
 
 
 def _build_doc_idx(documents, num_epochs, np_rng, separate_last_epoch):
-    """Build an array with length = number-of-epochs * number-of-dcuments.
+    """Build an array with length = number-of-epochs * number-of-documents.
     Each index is mapped to a corresponding document."""
     if not separate_last_epoch or num_epochs == 1:
         doc_idx = np.mgrid[0:num_epochs, 0 : len(documents)][1]
@@ -654,7 +654,7 @@ def _build_sample_idx(sizes, doc_idx, seq_length, num_epochs, tokens_per_epoch):
     sample_index = 0
     # Index into doc_idx.
     doc_idx_index = 0
-    # Begining offset for each document.
+    # Beginning offset for each document.
     doc_offset = 0
     # Start with first document and no offset.
     sample_idx[sample_index][0] = doc_idx_index

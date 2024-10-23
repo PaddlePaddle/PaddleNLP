@@ -86,7 +86,7 @@ class WordSubstitute(BaseAugment):
         if isinstance(aug_type, str):
             self.type = aug_type
             if aug_type in ["antonym", "embedding", "synonym", "homonym", "custom"]:
-                self.dict = self._load_substitue_dict(aug_type)
+                self.dict = self._load_substitute_dict(aug_type)
             elif aug_type in ["mlm"]:
                 self.mlm_model = AutoModelForMaskedLM.from_pretrained(self.model_name)
                 self.mlm_tokenizer = AutoTokenizer.from_pretrained(self.model_name)
@@ -102,7 +102,7 @@ class WordSubstitute(BaseAugment):
             # Merge dictionaries from different sources
             for t in aug_type:
                 if t in ["antonym", "embedding", "synonym", "homonym", "custom"]:
-                    t_dict = self._load_substitue_dict(t)
+                    t_dict = self._load_substitute_dict(t)
                     for k in t_dict:
                         if k in self.dict:
                             self.dict[k] = list(set(self.dict[k] + t_dict[k]))
@@ -151,7 +151,7 @@ class WordSubstitute(BaseAugment):
             tfidf.append(tf * idf)
         return np.array(tfidf)
 
-    def _load_substitue_dict(self, source_type):
+    def _load_substitute_dict(self, source_type):
         """Load substitution dictionary"""
         if source_type in ["antonym", "embedding", "synonym", "homonym"]:
             fullname = self._load_file("word_" + source_type)
@@ -162,12 +162,12 @@ class WordSubstitute(BaseAugment):
 
         if os.path.exists(fullname):
             with open(fullname, "r", encoding="utf-8") as f:
-                substitue_dict = json.load(f)
+                substitute_dict = json.load(f)
             f.close()
         else:
             raise ValueError("The {} should exist.".format(fullname))
 
-        return substitue_dict
+        return substitute_dict
 
     def _generate_sequence(self, output_seq_tokens, aug_tokens):
         """Genearte the sequences according to the mapping list"""
