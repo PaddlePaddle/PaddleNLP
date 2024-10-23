@@ -1,0 +1,40 @@
+{
+  "activation_function": "gelu_new",
+  "architectures": [
+    "GPTJForCausalLM"
+  ],
+  "attn_pdrop": 0.0,
+  "bos_token_id": 50256,
+  "embd_pdrop": 0.0,
+  "eos_token_id": 50256,
+  "gradient_checkpointing": false,
+  "initializer_range": 0.02,
+  "layer_norm_epsilon": 1e-05,
+  "model_type": "gptj",
+  "n_embd": 4096,
+  "n_head": 16,
+  "n_inner": null,
+  "n_layer": 28,
+  "n_positions": 2048,
+  "resid_pdrop": 0.0,
+  "rotary": true,
+  "rotary_dim": 64,
+  "scale_attn_weights": true,
+  "summary_activation": null,
+  "summary_first_dropout": 0.1,
+  "summary_proj_to_labels": true,
+  "summary_type": "cls_index",
+  "summary_use_proj": true,
+  "task_specific_params": {
+    "text-generation": {
+      "do_sample": true,
+      "max_length": 50,
+      "temperature": 1.0
+    }
+  },
+  "tie_word_embeddings": false,
+  "tokenizer_class": "GPT2Tokenizer",
+  "transformers_version": "4.18.0.dev0",
+  "use_cache": true,
+  "vocab_size": 50400
+}
