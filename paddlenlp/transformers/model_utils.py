@@ -42,6 +42,7 @@ from huggingface_hub import (
 )
 from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
+from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel.parallel_layers import (
     PipelineLayer,
     SharedLayerDesc,
@@ -53,8 +54,12 @@ from paddle.utils.download import is_url as is_remote_url
 from tqdm.auto import tqdm
 
 from paddlenlp.utils.env import (
+    ASYMMETRY_QUANT_SCALE_MAX,
+    ASYMMETRY_QUANT_SCALE_MIN,
     CONFIG_NAME,
     LEGACY_CONFIG_NAME,
+    MOMENT1_KEYNAME,
+    MOMENT2_KEYNAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
     PYTORCH_WEIGHTS_INDEX_NAME,
@@ -63,11 +68,18 @@ from paddlenlp.utils.env import (
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
+    SYMMETRY_QUANT_SCALE,
 )
 from paddlenlp.utils.log import logger
 
 from ..generation import GenerationConfig, GenerationMixin
 from ..utils import device_guard
+from ..utils.checkpoint_quantization_utils import (
+    asymmetry_qdq_weight,
+    group_wise_quant_dequant,
+    qdq_weight,
+    split_int8,
+)
 from ..utils.download import resolve_file_path
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
@@ -320,11 +332,19 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 
 
 def load_state_dict(
-    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None, device="cpu"
+    checkpoint_file: Union[str, os.PathLike],
+    tensor_parallel_split_mapping=None,
+    fliter_dict_keys=None,
+    device="cpu",
+    ckpt_quant_stage="O0",
 ):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
     """
+    quant = False
+    if ckpt_quant_stage != "O0":
+        quant = "optimizer" in checkpoint_file
+
     if tensor_parallel_split_mapping is None:
         tensor_parallel_split_mapping = {}
 
@@ -344,9 +364,13 @@ def load_state_dict(
             raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
         if metadata.get("format", "np") == "np":
             state_dict = {}
+            scale_dict = {}
             with safe_open(checkpoint_file, framework="np") as f:
                 for key in f.keys():
-                    if fliter_dict_keys is not None and key not in fliter_dict_keys:
+                    # non merge ckpt loading dont have filter key.
+                    if key.endswith(SYMMETRY_QUANT_SCALE) or (
+                        fliter_dict_keys is not None and key not in fliter_dict_keys
+                    ):
                         continue
                     py_safe_slice_ = f.get_slice(key)
                     if key in tensor_parallel_split_mapping:
@@ -358,11 +382,109 @@ def load_state_dict(
                             weight = paddle.Tensor(weight, zero_copy=True)
                         weight = weight._copy_to(paddle.framework._current_expected_place(), False)
                     state_dict[key] = weight
+                for key in f.keys():
+                    if key.endswith(SYMMETRY_QUANT_SCALE):
+                        scale = f.get_tensor(key)
+                        with device_guard():
+                            scale = paddle.Tensor(scale, zero_copy=True)
+                        scale = scale._copy_to(paddle.framework._current_expected_place(), False)
+                        scale_dict[key] = scale
 
             if device == "cpu":
                 for k in list(state_dict.keys()):
                     with device_guard():
                         state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+
+            if quant:
+                rank, world_size = -1, 1
+                if paddle.distributed.get_world_size() > 1:
+                    hcg = fleet.get_hybrid_communicate_group()
+                    tp_group = hcg.get_model_parallel_group()
+                    rank, world_size = tp_group.rank, tp_group.nranks
+
+                if ckpt_quant_stage == "O1":
+                    # set eps
+                    eps = 1e-8
+                    for quant_key in state_dict.keys():
+                        is_moment1 = MOMENT1_KEYNAME in quant_key
+                        is_moment2 = MOMENT2_KEYNAME in quant_key
+                        if is_moment1:
+                            # dequant m1
+                            scale_key = quant_key + SYMMETRY_QUANT_SCALE
+                            weight = state_dict[quant_key]
+                            scales = scale_dict[scale_key]
+                            weight, _ = qdq_weight(
+                                weight,
+                                scales=scales,
+                                quant_bit=8,
+                                dequant=True,
+                                rank=rank,
+                                world_size=world_size,
+                                use_pd=True,
+                            )
+                            state_dict[quant_key] = weight
+                        elif is_moment2:
+                            # dequant ratio
+                            weight = state_dict[quant_key]
+                            min_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MIN
+                            max_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MAX
+                            mins, maxs = scale_dict[min_scale_key], scale_dict[max_scale_key]
+                            weight, _ = asymmetry_qdq_weight(
+                                weight,
+                                mins=mins,
+                                maxs=maxs,
+                                quant_bit=8,
+                                dequant=True,
+                                rank=rank,
+                                world_size=world_size,
+                                use_pd=True,
+                            )
+                            # cal m2
+                            weight = paddle.square(1.0 / weight - eps)
+                            state_dict[quant_key] = weight
+                elif ckpt_quant_stage == "O2":
+                    # set eps
+                    eps = 1e-8
+                    m1_state_dict = {}
+                    for quant_key in state_dict.keys():
+                        if state_dict[quant_key].dtype != paddle.int8:
+                            logger.info(f"{quant_key} skip.")
+                            continue
+                        # split int8
+                        weight = state_dict[quant_key]
+                        m1_quant, ratio_quant = split_int8(weight.numpy())
+                        # dequant ratio
+                        ratio_min_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MIN
+                        ratio_max_scale_key = quant_key + ASYMMETRY_QUANT_SCALE_MAX
+                        m1_scale_key = quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME + SYMMETRY_QUANT_SCALE
+                        m1_codebook = scale_dict[m1_scale_key]
+                        ratio_mins, ratio_maxs = scale_dict[ratio_min_scale_key], scale_dict[ratio_max_scale_key]
+                        m1_weight = group_wise_quant_dequant(
+                            m1_quant,
+                            mins=m1_codebook,
+                            maxs=None,
+                            quant_bits=4,
+                            quant=False,
+                            rank=rank,
+                            world_size=world_size,
+                            use_pd=True,
+                            symmetry=True,
+                        )
+                        ratio_weight = group_wise_quant_dequant(
+                            ratio_quant,
+                            mins=ratio_mins,
+                            maxs=ratio_maxs,
+                            quant_bits=4,
+                            quant=False,
+                            rank=rank,
+                            world_size=world_size,
+                            use_pd=True,
+                        )
+
+                        ratio_weight = paddle.square(1.0 / ratio_weight - eps)
+                        state_dict[quant_key] = ratio_weight
+                        m1_state_dict[quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME] = m1_weight
+                        state_dict.update(m1_state_dict)
 
             return state_dict
 
@@ -1965,7 +2087,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     filter_dict_keys = None
 
                 state_dict = load_state_dict(
-                    shard_file, tp_actions if pre_tensor_parallel_split else None, filter_dict_keys
+                    shard_file,
+                    tp_actions if pre_tensor_parallel_split else None,
+                    filter_dict_keys,
                 )
 
                 # convert for fusing or splitting weights
