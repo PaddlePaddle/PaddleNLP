@@ -14,53 +14,34 @@
 
 #include "helper.h"
 
-__device__ bool speculate_free_and_dispatch_block(const int &qid, int *need_block_list, const int &need_block_len) {
-    bool res = false;
-    for (int i = 0; i < need_block_len; i++) {
-        if (qid == need_block_list[i]) {
-            res = true;
-            need_block_list[i] = -1;
-            break;
-        }
-    }
-    return res;
-}
 
 __global__ void speculate_free_and_dispatch_block(bool *stop_flags,
-        int *seq_lens_this_time,
-        int *seq_lens_decoder,
-        int *block_tables,
-        int *encoder_block_lens,
-        bool *is_block_step,
-        int *step_block_list, // [bsz]
-        int *step_len,
-        int *recover_block_list,
-        int *recover_len,
-        int *need_block_list,
-        int *need_block_len,
-        int *used_list_len,
-        int *free_list,
-        int *free_list_len,
-        int64_t *first_token_ids,
-        const int bsz,
-        const int block_size,
-        const int block_num_per_seq,
-        const int max_decoder_block_num,
-        const int max_draft_tokens) {
+                                                  int *seq_lens_this_time,
+                                                  int *seq_lens_decoder,
+                                                  int *block_tables,
+                                                  int *encoder_block_lens,
+                                                  bool *is_block_step,
+                                                  int *step_block_list, // [bsz]
+                                                  int *step_len,
+                                                  int *recover_block_list,
+                                                  int *recover_len,
+                                                  int *need_block_list,
+                                                  int *need_block_len,
+                                                  int *used_list_len,
+                                                  int *free_list,
+                                                  int *free_list_len,
+                                                  const int bsz,
+                                                  const int block_size,
+                                                  const int block_num_per_seq,
+                                                  const int max_decoder_block_num,
+                                                  const int max_draft_tokens) {
     typedef cub::BlockReduce<cub::KeyValuePair<int, int>, 256> BlockReduce;
     __shared__ typename BlockReduce::TempStorage temp_storage;
-    __shared__ bool step_max_block_flag;
-    __shared__ int in_need_block_list_len;
     const int tid = threadIdx.x;
     if (tid < bsz) {
-        if (tid == 0) {
-            step_max_block_flag = false;
-            in_need_block_list_len = 0;
-        }
         int *block_table_now = block_tables + tid * block_num_per_seq;
         if (stop_flags[tid] && !is_block_step[tid]) {
             // 回收block块
-            first_token_ids[tid] = -1;
             const int encoder_block_len = encoder_block_lens[tid];
             const int decoder_used_len = used_list_len[tid];
             if (decoder_used_len > 0) {
@@ -99,66 +80,55 @@ __global__ void speculate_free_and_dispatch_block(bool *stop_flags,
 #endif
         // 调度block，根据used_list_len从大到小回收block，直到满足need_block_len，已解码到最后一个block的query不参与调度（马上就结束）
         const int used_block_num =
-                tid < bsz && !is_block_step[tid] && (step_max_block_flag || used_list_len[tid] != max_decoder_block_num)
+                tid < bsz && !is_block_step[tid]
                 ? used_list_len[tid]
                 : 0;
         cub::KeyValuePair<int, int> kv_pair = {tid, used_block_num};
         kv_pair = BlockReduce(temp_storage).Reduce(kv_pair, cub::ArgMax());
 
         if (tid == 0) {
-            if (kv_pair.value == 0) {
-                step_max_block_flag = true;
-            } else {
-                const int encoder_block_len = encoder_block_lens[kv_pair.key];
+            const int encoder_block_len = encoder_block_lens[kv_pair.key];
 #ifdef DEBUG_STEP
-                printf("max_id: %d, max_num: %d, encoder_block_len: %d\n",
-                        kv_pair.key,
-                        kv_pair.value,
-                        encoder_block_len);
+            printf("max_id: %d, max_num: %d, encoder_block_len: %d\n",
+                    kv_pair.key,
+                    kv_pair.value,
+                    encoder_block_len);
 #endif
-                int *block_table_now = block_tables + kv_pair.key * block_num_per_seq;
-                for (int i = 0; i < kv_pair.value; i++) {
-                    free_list[free_list_len[0] + i] = block_table_now[encoder_block_len + i];
-                    block_table_now[encoder_block_len + i] = -1;
-                }
-                step_block_list[step_len[0]] = kv_pair.key;
-                if (speculate_free_and_dispatch_block(
-                            kv_pair.key, need_block_list, need_block_len[0] + in_need_block_list_len)) {
-                    need_block_len[0] -= 1;
-                    in_need_block_list_len += 1;
-                }
-                step_len[0] += 1;
-                free_list_len[0] += kv_pair.value;
-                stop_flags[kv_pair.key] = true;
-                is_block_step[kv_pair.key] = true;
-                seq_lens_this_time[kv_pair.key] = 0;
-                seq_lens_decoder[kv_pair.key] = 0;
+            int *block_table_now = block_tables + kv_pair.key * block_num_per_seq;
+            for (int i = 0; i < kv_pair.value; i++) {
+                free_list[free_list_len[0] + i] = block_table_now[encoder_block_len + i];
+                block_table_now[encoder_block_len + i] = -1;
             }
+            step_block_list[step_len[0]] = kv_pair.key;
+            step_len[0] += 1;
+            free_list_len[0] += kv_pair.value;
+            stop_flags[kv_pair.key] = true;
+            is_block_step[kv_pair.key] = true;
+            seq_lens_this_time[kv_pair.key] = 0;
+            seq_lens_decoder[kv_pair.key] = 0;
         }
         __syncthreads();
     }
 
     // 为需要block的位置分配block，每个位置分配一个block
-    if (tid < need_block_len[0] + in_need_block_list_len) {
+    if (tid < need_block_len[0]) {
         const int need_block_id = need_block_list[tid];
-        if (need_block_id != -1) {
-            if (!stop_flags[need_block_id]) {
-                // 如果需要的位置正好是上一步中被释放的位置，不做处理
-                used_list_len[need_block_id] += 1;
-                const int ori_free_list_len = atomicSub(free_list_len, 1);
-                int *block_table_now = block_tables + need_block_id * block_num_per_seq;
+        if (!stop_flags[need_block_id]) {
+            // 如果需要的位置正好是上一步中被释放的位置，不做处理
+            used_list_len[need_block_id] += 1;
+            const int ori_free_list_len = atomicSub(free_list_len, 1);
+            int *block_table_now = block_tables + need_block_id * block_num_per_seq;
 #ifdef DEBUG_STEP
-                printf("need_block_id %d\n", need_block_id);
-                printf("ori_free_list_len %d\n", ori_free_list_len);
-                printf("max_draft_tokens %d\n", max_draft_tokens);
-                printf("seq_lens_decoder[need_block_id] %d\n", seq_lens_decoder[need_block_id]);
-                printf("free_list[ori_free_list_len - 1] %d\n", free_list[ori_free_list_len - 1]);
+            printf("need_block_id %d\n", need_block_id);
+            printf("ori_free_list_len %d\n", ori_free_list_len);
+            printf("max_draft_tokens %d\n", max_draft_tokens);
+            printf("seq_lens_decoder[need_block_id] %d\n", seq_lens_decoder[need_block_id]);
+            printf("free_list[ori_free_list_len - 1] %d\n", free_list[ori_free_list_len - 1]);
 #endif
-                block_table_now[(seq_lens_decoder[need_block_id] + max_draft_tokens + 1) / block_size] =
-                        free_list[ori_free_list_len - 1];
-            }
-            need_block_list[tid] = -1;
+            block_table_now[(seq_lens_decoder[need_block_id] + max_draft_tokens + 1) / block_size] =
+                    free_list[ori_free_list_len - 1];
         }
+        need_block_list[tid] = -1;
     }
     __syncthreads();
 
@@ -166,32 +136,29 @@ __global__ void speculate_free_and_dispatch_block(bool *stop_flags,
     if (tid == 0) {
         int ori_free_list_len = free_list_len[0];
         int ori_step_len = step_len[0];
-        int ori_step_block_id = step_block_list[ori_step_len - 1];
-        int tmp_used_len = used_list_len[ori_step_block_id];
-        // 比之前调度时多分配一个block，防止马上恢复刚调度的query(比如回收的seq_id在need_block_list中）
-        const int max_decoder_block_num_this_seq = max_decoder_block_num - encoder_block_lens[ori_step_block_id];
-        int used_len =
-                tmp_used_len + 1 < max_decoder_block_num_this_seq ? tmp_used_len + 1 : max_decoder_block_num_this_seq;
-        while (ori_step_len > 0 && ori_free_list_len >= used_len) {
+        if (ori_step_len > 0) {
+            int ori_step_block_id = step_block_list[ori_step_len - 1];
+            int tmp_used_len = used_list_len[ori_step_block_id];
+            // 比之前调度时多分配一个block，防止马上恢复刚调度的query(比如回收的seq_id在need_block_list中）
+            int used_len = tmp_used_len < max_decoder_block_num ? tmp_used_len + 1 : tmp_used_len;
+            while (ori_step_len > 0 && ori_free_list_len >= used_len) {
 #ifdef DEBUG_STEP
-            printf("recover seq_id: %d, free_list_len: %d, used_list_len: %d\n",
-                    ori_step_block_id,
-                    ori_free_list_len,
-                    used_len);
+                printf("recover seq_id: %d, free_list_len: %d, used_list_len: %d\n", 
+                        ori_step_block_id, ori_free_list_len, used_len);
 #endif
-            recover_block_list[recover_len[0]] = ori_step_block_id;
-            is_block_step[ori_step_block_id] = false;
-            used_list_len[ori_step_block_id] = used_len;
-            ori_free_list_len -= used_len;
-            step_block_list[ori_step_len - 1] = -1;
-            step_len[0] -= 1;
-            recover_len[0] += 1;
-            ori_step_len = step_len[0];
-            if (ori_step_len > 0) {
-                ori_step_block_id = step_block_list[ori_step_len - 1];
-                tmp_used_len = used_list_len[ori_step_block_id];
-                used_len = tmp_used_len + 1 < max_decoder_block_num_this_seq ? tmp_used_len + 1
-                                                                             : max_decoder_block_num_this_seq;
+                recover_block_list[recover_len[0]] = ori_step_block_id;
+                is_block_step[ori_step_block_id] = false;
+                used_list_len[ori_step_block_id] = used_len;
+                ori_free_list_len -= used_len;
+                step_block_list[ori_step_len - 1] = -1;
+                step_len[0] -= 1;
+                recover_len[0] += 1;
+                ori_step_len = step_len[0];
+                if (ori_step_len > 0) {
+                    ori_step_block_id = step_block_list[ori_step_len - 1];
+                    tmp_used_len = used_list_len[ori_step_block_id];
+                    used_len = tmp_used_len < max_decoder_block_num ? tmp_used_len + 1 : tmp_used_len;
+                }
             }
         }
         need_block_len[0] = 0;
@@ -200,26 +167,26 @@ __global__ void speculate_free_and_dispatch_block(bool *stop_flags,
 
 // 根据上一步计算出的可以复原的query_id进行状态恢复
 __global__ void speculate_recover_block(int *recover_block_list, // [bsz]
-        int *recover_len,
-        bool *stop_flags,
-        int *seq_lens_this_time,
-        int *ori_seq_lens_encoder,
-        int *seq_lens_encoder,
-        int *seq_lens_decoder,
-        int *block_tables,
-        int *free_list,
-        int *free_list_len,
-        int64_t *input_ids,
-        int64_t *pre_ids,
-        int64_t *step_idx,
-        int *encoder_block_lens,
-        int *used_list_len,
-        const int64_t *next_tokens,
-        const int64_t *first_token_ids,
-        const int bsz,
-        const int block_num_per_seq,
-        const int length,
-        const int pre_id_length) {
+                                        int *recover_len,
+                                        bool *stop_flags,
+                                        int *seq_lens_this_time,
+                                        int *ori_seq_lens_encoder,
+                                        int *seq_lens_encoder,
+                                        int *seq_lens_decoder,
+                                        int *block_tables,
+                                        int *free_list,
+                                        int *free_list_len,
+                                        int64_t *input_ids,
+                                        int64_t *pre_ids,
+                                        int64_t *step_idx,
+                                        int *encoder_block_lens,
+                                        int *used_list_len,
+                                        const int64_t *next_tokens,
+                                        const int bsz,
+                                        const int block_num_per_seq,
+                                        const int length,
+                                        const int pre_id_length,
+                                        const int64_t first_token_ids) {
     const int bid = blockIdx.x;
     const int tid = threadIdx.x;
     __shared__ int ori_free_list_len;
@@ -238,7 +205,7 @@ __global__ void speculate_recover_block(int *recover_block_list, // [bsz]
             seq_lens_encoder[recover_id] = seq_len;
             stop_flags[recover_id] = false;
             input_ids_now[ori_seq_len_encoder + step_idx_now - 1] = next_tokens[recover_id]; // next tokens
-            input_ids_now[0] = first_token_ids[recover_id];                                  // set first prompt token
+            input_ids_now[0] = first_token_ids; // set first prompt token
             const int ori_free_list_len_tid0 = atomicSub(free_list_len, decoder_used_len);
             ori_free_list_len = ori_free_list_len_tid0;
 #ifdef DEBUG_STEP
@@ -289,9 +256,9 @@ void SpeculateStepPaddle(const paddle::Tensor &stop_flags,
         const paddle::Tensor &pre_ids,
         const paddle::Tensor &step_idx,
         const paddle::Tensor &next_tokens,
-        const paddle::Tensor &first_token_ids,
         const int block_size,
         const int encoder_decoder_block_num,
+        const int64_t first_token_ids,
         const int max_draft_tokens) {
     auto cu_stream = seq_lens_this_time.stream();
     const int bsz = seq_lens_this_time.shape()[0];
@@ -308,7 +275,8 @@ void SpeculateStepPaddle(const paddle::Tensor &stop_flags,
             length,
             max_decoder_block_num);
 #endif
-    speculate_free_and_dispatch_block<<<1, BlockSize, 0, cu_stream>>>(const_cast<bool *>(stop_flags.data<bool>()),
+    speculate_free_and_dispatch_block<<<1, BlockSize, 0, cu_stream>>>(
+            const_cast<bool *>(stop_flags.data<bool>()),
             const_cast<int *>(seq_lens_this_time.data<int>()),
             const_cast<int *>(seq_lens_decoder.data<int>()),
             const_cast<int *>(block_tables.data<int>()),
@@ -323,7 +291,6 @@ void SpeculateStepPaddle(const paddle::Tensor &stop_flags,
             const_cast<int *>(used_list_len.data<int>()),
             const_cast<int *>(free_list.data<int>()),
             const_cast<int *>(free_list_len.data<int>()),
-            const_cast<int64_t *>(first_token_ids.data<int64_t>()),
             bsz,
             block_size,
             block_num_per_seq,
@@ -355,11 +322,11 @@ void SpeculateStepPaddle(const paddle::Tensor &stop_flags,
                 const_cast<int *>(encoder_block_lens.data<int>()),
                 const_cast<int *>(used_list_len.data<int>()),
                 next_tokens.data<int64_t>(),
-                first_token_ids.data<int64_t>(),
                 bsz,
                 block_num_per_seq,
                 length,
-                pre_id_length);
+                pre_id_length,
+                first_token_ids);
 #ifdef DEBUG_STEP
         cudaDeviceSynchronize();
 #endif
@@ -367,63 +334,63 @@ void SpeculateStepPaddle(const paddle::Tensor &stop_flags,
 }
 
 PD_BUILD_OP(speculate_step_paddle)
-        .Inputs({"stop_flags",
-                "seq_lens_this_time",
-                "ori_seq_lens_encoder",
-                "seq_lens_encoder",
-                "seq_lens_decoder",
-                "block_tables",
-                "encoder_block_lens",
-                "is_block_step",
-                "step_block_list",
-                "step_lens",
-                "recover_block_list",
-                "recover_lens",
-                "need_block_list",
-                "need_block_len",
-                "used_list_len",
-                "free_list",
-                "free_list_len",
-                "input_ids",
-                "pre_ids",
-                "step_idx",
-                "next_tokens",
-                "first_token_ids"})
-        .Attrs({"block_size: int", "encoder_decoder_block_num: int", "max_draft_tokens: int"})
-        .Outputs({"stop_flags_out",
-                "seq_lens_this_time_out",
-                "seq_lens_encoder_out",
-                "seq_lens_decoder_out",
-                "block_tables_out",
-                "encoder_block_lens_out",
-                "is_block_step_out",
-                "step_block_list_out",
-                "step_lens_out",
-                "recover_block_list_out",
-                "recover_lens_out",
-                "need_block_list_out",
-                "need_block_len_out",
-                "used_list_len_out",
-                "free_list_out",
-                "free_list_len_out",
-                "input_ids_out",
-                "first_token_ids_out"})
-        .SetInplaceMap({{"stop_flags", "stop_flags_out"},
-                {"seq_lens_this_time", "seq_lens_this_time_out"},
-                {"seq_lens_encoder", "seq_lens_encoder_out"},
-                {"seq_lens_decoder", "seq_lens_decoder_out"},
-                {"block_tables", "block_tables_out"},
-                {"encoder_block_lens", "encoder_block_lens_out"},
-                {"is_block_step", "is_block_step_out"},
-                {"step_block_list", "step_block_list_out"},
-                {"step_lens", "step_lens_out"},
-                {"recover_block_list", "recover_block_list_out"},
-                {"recover_lens", "recover_lens_out"},
-                {"need_block_list", "need_block_list_out"},
-                {"need_block_len", "need_block_len_out"},
-                {"used_list_len", "used_list_len_out"},
-                {"free_list", "free_list_out"},
-                {"free_list_len", "free_list_len_out"},
-                {"input_ids", "input_ids_out"},
-                {"first_token_ids", "first_token_ids_out"}})
-        .SetKernelFn(PD_KERNEL(SpeculateStepPaddle));
+    .Inputs({"stop_flags", 
+             "seq_lens_this_time",
+             "ori_seq_lens_encoder",
+             "seq_lens_encoder",
+             "seq_lens_decoder",
+             "block_tables",
+             "encoder_block_lens",
+             "is_block_step",
+             "step_block_list",
+             "step_lens",
+             "recover_block_list",
+             "recover_lens",
+             "need_block_list",
+             "need_block_len",
+             "used_list_len",
+             "free_list",
+             "free_list_len",
+             "input_ids",
+             "pre_ids",
+             "step_idx",
+             "next_tokens"})
+    .Attrs({"block_size: int",
+            "encoder_decoder_block_num: int",
+            "first_token_id: int64_t",
+            "max_draft_tokens: int"})
+    .Outputs({"stop_flags_out",
+              "seq_lens_this_time_out",
+              "seq_lens_encoder_out",
+              "seq_lens_decoder_out",
+              "block_tables_out",
+              "encoder_block_lens_out",
+              "is_block_step_out",
+              "step_block_list_out",
+              "step_lens_out",
+              "recover_block_list_out",
+              "recover_lens_out",
+              "need_block_list_out",
+              "need_block_len_out",
+              "used_list_len_out",
+              "free_list_out",
+              "free_list_len_out",
+              "input_ids_out"})
+    .SetInplaceMap({{"stop_flags", "stop_flags_out"},
+                    {"seq_lens_this_time", "seq_lens_this_time_out"},
+                    {"seq_lens_encoder", "seq_lens_encoder_out"},
+                    {"seq_lens_decoder", "seq_lens_decoder_out"},
+                    {"block_tables", "block_tables_out"},
+                    {"encoder_block_lens", "encoder_block_lens_out"},
+                    {"is_block_step", "is_block_step_out"},
+                    {"step_block_list", "step_block_list_out"},
+                    {"step_lens", "step_lens_out"},
+                    {"recover_block_list", "recover_block_list_out"},
+                    {"recover_lens", "recover_lens_out"},
+                    {"need_block_list", "need_block_list_out"},
+                    {"need_block_len", "need_block_len_out"},
+                    {"used_list_len", "used_list_len_out"},
+                    {"free_list", "free_list_out"},
+                    {"free_list_len", "free_list_len_out"},
+                    {"input_ids", "input_ids_out"}})
+    .SetKernelFn(PD_KERNEL(SpeculateStepPaddle));

@@ -1681,21 +1681,30 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
 
 @register_base_model
 class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
+    def __init__(self, speculate_max_draft_token_num: int, speculate_method: str = None, config: LlamaConfig = None):
+        self.speculate_max_draft_token_num = speculate_max_draft_token_num
+        self.speculate_method = speculate_method
+        super().__init__(config)
+
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
         elif self.quant_type == "a8w8" or self.quant_type == "a8w8c8":
-            self.transformer_block = FusedSpeculateMultiTransformerA8W8(transformer_config)
+            self.transformer_block = FusedSpeculateMultiTransformerA8W8(
+                self.speculate_max_draft_token_num, self.speculate_method, transformer_config
+            )
         elif "fp8" in self.quant_type:
             self.transformer_block = FusedBlockMultiTransformerFP8(transformer_config)
         else:
-            self.transformer_block = FusedSpeculateMultiTransformer(transformer_config)
+            self.transformer_block = FusedSpeculateMultiTransformer(
+                self.speculate_max_draft_token_num, self.speculate_method, transformer_config
+            )
 
     def remove_padding(self, input_ids, draft_tokens, seq_lens_this_time, seq_lens_encoder):
         """
-        The overloading of remove_padding, using the speculate_get_padding_offset operator, 
-        differs from the base class in that the decoder is the append scenario. The actual 
-        number of draft tokens for each batch in the speculative sampling decoding stage may 
+        The overloading of remove_padding, using the speculate_get_padding_offset operator,
+        differs from the base class in that the decoder is the append scenario. The actual
+        number of draft tokens for each batch in the speculative sampling decoding stage may
         be different, so we need a remove_padding adapted to the speculative sampling decoder stage.
 
         Args:
@@ -1704,7 +1713,7 @@ class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
             seq_lens_this_time (Tensor): the sequence lengths of this time step.
             seq_lens_encoder (Tensor): the sequence lengths of encoder stage.
         Returns:
-            Tuple[Tensor]: the removed padding IDs, padding offsets, cumulative offsets, 
+            Tuple[Tensor]: the removed padding IDs, padding offsets, cumulative offsets,
         """
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
@@ -1737,7 +1746,6 @@ class LlamaSpeculateInferenceModel(LlamaBlockInferenceModel):
         kwargs["padding_offsets"] = padding_offset
         kwargs["max_input_length"] = self.max_seq_len
 
-        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
         inputs_embeds = self.embed_tokens(ids_remove_padding)
         with dy2st_nocheck_guard_context():
             hidden_states, _ = self.transformer_block(
@@ -2014,12 +2022,7 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
 
     def __init__(self, config):
         super().__init__(config)
-        # Since LlamaForCausalLMSpeculateInferenceModel inherit from LlamaForCausalLMBlockInferenceModel, when call LlamaBlockInferenceModel's
-        # __init__ function will init self.llama twice, it will cause paramater name repeate error.
-        if config.speculate_method is not None:
-            self.llama = LlamaSpeculateInferenceModel(config)
-        else:
-            self.llama = LlamaBlockInferenceModel(config)
+        self.llama = LlamaBlockInferenceModel(config)
         self.lm_head = LlamaLMHead(config)
 
     @classmethod
@@ -2225,10 +2228,14 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
 
 class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceModel):
     def __init__(self, config):
-        super().__init__(config)
+        LlamaPretrainedModel.__init__(self, config)
         self.max_seq_len = config.max_seq_len
         self.max_candidate_len = config.speculate_max_candidate_len
         self.verify_window = config.speculate_verify_window
+        self.speculate_max_draft_token_num = config.speculate_max_draft_token_num
+        self.speculate_method = config.speculate_method
+        self.llama = LlamaSpeculateInferenceModel(self.speculate_max_draft_token_num, self.speculate_method, config)
+        self.lm_head = LlamaLMHead(config)
 
     def prepare_inputs_for_generation(self, **kwargs):
         model_inputs = super().prepare_inputs_for_generation(**kwargs)
@@ -2341,7 +2348,9 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
                 model_kwargs["seq_lens_decoder"],
                 model_kwargs["stop_flags"],
                 model_kwargs["not_need_stop"],
-                model_kwargs["draft_tokens"],  # Both input and output, need to write the last 1 token accepted to position 0.
+                model_kwargs[
+                    "draft_tokens"
+                ],  # Both input and output, need to write the last 1 token accepted to position 0.
                 model_kwargs["seq_lens_this_time"],
                 verify_tokens,
                 verify_scores,
@@ -2357,7 +2366,7 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
                 True,  # enable_topp
             )
 
-            # Since the output token length is not bsz anymore, we need to change the token_num 
+            # Since the output token length is not bsz anymore, we need to change the token_num
             # in the msg queue and write accept_num tokens into the msg queue.
             speculate_save_output(
                 model_kwargs["accept_tokens"],

@@ -28,6 +28,7 @@ from paddle.distributed import fleet
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
 
+from llm.predict.predictor import MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 from paddlenlp.datasets import ZeroPaddingIterableDataset
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer import Trainer, TrainerCallback
@@ -786,7 +787,7 @@ def speculate_read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_q
     paddle.device.set_device("cpu")
     paddle.disable_static()
     outputs = []
-    for _ in range(MAX_BSZ):
+    for _ in range(SPECULATE_MAX_BSZ):
         outputs.append([])
     output_tensor = tensor_queue.get(timeout=1)
     done_event.set()
@@ -803,7 +804,13 @@ def speculate_read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_q
         accept_num = output_tensor[2 : bsz + 2].numpy()
         for bi in range(bsz):
             output_numpy = output_tensor[
-                2 + MAX_BSZ + bi * MAX_DRAFT_TOKENS : 2 + MAX_BSZ + bi * MAX_DRAFT_TOKENS + int(accept_num[bi]), 0
+                2
+                + SPECULATE_MAX_BSZ
+                + bi * MAX_DRAFT_TOKENS : 2
+                + SPECULATE_MAX_BSZ
+                + bi * MAX_DRAFT_TOKENS
+                + int(accept_num[bi]),
+                0,
             ].numpy()
             output_numpy[output_numpy == -1] = tokenizer.eos_token_id
             outputs[bi].extend(output_numpy.tolist())

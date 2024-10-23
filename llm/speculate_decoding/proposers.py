@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from __future__ import annotations
 
 import paddle
 from paddlenlp_ops import ngram_match
@@ -43,10 +43,10 @@ class InferenceWithReferenceProposer(Proposer):
     It match tokens in the input and output as draft tokens.
     """
 
-    def __init__(self, max_draft_tokens: int, max_ngram_size: int, max_batch_size: int, max_seq_len: int, **kwargs):
+    def __init__(self, max_draft_token_num: int, max_ngram_size: int, max_batch_size: int, max_seq_len: int, **kwargs):
         """
         Args:
-        max_draft_tokens (int):
+        max_draft_token_num (int):
             Maximum number of tokens a proposer can generate at one time.
             The hyperparameter of k in the paper.
         max_ngram_size (int):
@@ -61,8 +61,14 @@ class InferenceWithReferenceProposer(Proposer):
         self.max_ngram_size = max_ngram_size
         self.input_ids_len = paddle.zeros(shape=[max_batch_size, 1], dtype="int64").cpu()
         self.max_batch_size = max_batch_size
-        self.max_draft_tokens = max_draft_tokens
+        self.max_draft_token_num = max_draft_token_num
         self.input_ids_cpu = paddle.full(shape=[max_batch_size, max_seq_len], fill_value=1, dtype="int64").cpu()
+
+    def update(self, bid: int, seq_len: int):
+        """
+        Used when inserting a new query to update the length of the input_ids.
+        """
+        self.input_ids_len[bid] = seq_len
 
     def run(self, model_inputs: dict[str, paddle.Tensor], **kargs):
         """
@@ -84,7 +90,7 @@ class InferenceWithReferenceProposer(Proposer):
             seq_lens_decoder,
             kargs["real_batch_size"],
             self.max_ngram_size,
-            self.max_draft_tokens,
+            self.max_draft_token_num,
         )
 
         model_inputs["draft_tokens"][:] = draft_tokens.cuda()

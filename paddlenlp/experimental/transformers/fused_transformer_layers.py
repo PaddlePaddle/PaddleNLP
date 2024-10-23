@@ -649,6 +649,11 @@ class FusedMultiTransformerBase(Layer):
 
         self.linear = fused_linear
 
+        # used in speculative decoding, if speculate_max_draft_token_num is 1
+        # and speculate_method is None, it will be autogressive decoding.
+        self.speculate_max_draft_token_num = 1
+        self.speculate_method = None
+
     def init_weight(self):
         self.qkv_weights = []
         self.linear_weights = []
@@ -1095,7 +1100,6 @@ class FusedMultiTransformerBase(Layer):
             kwargs["decoder_block_shape_q"] = 16
             kwargs["max_partition_size"] = 32768
             kwargs["encoder_max_partition_size"] = 32768
-            kwargs["speculate_max_draft_token_num"] = 5
 
             from paddlenlp_ops import get_block_shape_and_split_kv_block
 
@@ -1120,7 +1124,7 @@ class FusedMultiTransformerBase(Layer):
                 kwargs.get("decoder_block_shape_q", 16),
                 self.num_heads // self.kv_num_heads,
                 kwargs.get("block_size", 64),
-                kwargs["speculate_max_draft_token_num"],
+                self.speculate_max_draft_token_num,
             )
 
         residual_input = src
@@ -2259,9 +2263,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 kwargs.get("decoder_block_shape_q", 16),
                 kwargs.get("max_partition_size", 32768),
                 kwargs.get("encoder_max_partition_size", 32768),
-                kwargs["speculate_max_draft_token_num"],  # speculate_max_draft_token_num
+                self.speculate_max_draft_token_num,  # speculate_max_draft_token_num
                 True,  # causal
-                False,  # speculate_decoder
+                self.speculate_method is not None,  # speculate_decoder
             )[0]
         else:
             if core.is_compiled_with_xpu():
@@ -2441,9 +2445,9 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
                 kwargs.get("decoder_block_shape_q", 16),
                 kwargs.get("max_partition_size", 32768),
                 kwargs.get("encoder_max_partition_size", 32768),
-                kwargs["speculate_max_draft_token_num"],  # speculate_max_draft_token_num
+                self.speculate_max_draft_token_num,  # speculate_max_draft_token_num
                 True,  # causal
-                False,  # speculate_decoder
+                self.speculate_method is not None,  # speculate_decoder
             )[0]
         else:
             fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
@@ -3258,7 +3262,17 @@ class FusedBlockMultiTransformerFP8(Layer):
         return out, caches
 
 
-class FusedSpeculateMultiTransformer(FusedAppendMultiTransformer):
+class FusedSpeculateMultiTransformer(FusedBlockMultiTransformer):
+    def __init__(
+        self,
+        speculate_max_draft_token_num: int,
+        speculate_method: str = None,
+        config: FusedMultiTransformerConfig = None,
+    ):
+        super().__init__(config)
+        self.speculate_max_draft_token_num = speculate_max_draft_token_num
+        self.speculate_method = speculate_method
+
     def post_process(self, **kwargs):
         embed_dim = self.config.embed_dim
         multi_block_output = kwargs.get("multi_block_output", None)
@@ -3279,12 +3293,18 @@ class FusedSpeculateMultiTransformer(FusedAppendMultiTransformer):
         return out
 
 
-class FusedSpeculateMultiTransformerA8W8(FusedAppendMultiTransformerA8W8):
-    def __init__(self, config: FusedMultiTransformerConfig):
+class FusedSpeculateMultiTransformerA8W8(FusedBlockMultiTransformerA8W8):
+    def __init__(
+        self,
+        speculate_max_draft_token_num: int,
+        speculate_method: str = None,
+        config: FusedMultiTransformerConfig = None,
+    ):
         super().__init__(config)
+        self.speculate_max_draft_token_num = speculate_max_draft_token_num
+        self.speculate_method = speculate_method
 
     def post_process(self, **kwargs):
-        logger.info("use FusedSpeculateMultiTransformerA8W8")
         embed_dim = self.config.embed_dim
         multi_block_output = kwargs.get("multi_block_output", None)
         cum_offsets = kwargs.get("cum_offsets", None)

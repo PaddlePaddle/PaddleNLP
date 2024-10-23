@@ -19,7 +19,7 @@
 #include <sys/types.h>
 #include "paddle/extension.h"
 
-#define MAX_BSZ 512
+#define MAX_BSZ 256
 #define MAX_DRAFT_TOKENS 6
 
 struct msgdata {
@@ -31,7 +31,7 @@ void SpeculateSaveWithOutputMsg(const paddle::Tensor& accept_tokens,
                  const paddle::Tensor& accept_num,
                  const paddle::Tensor& not_need_stop,
                  int64_t rank_id,
-                 const int msg_queue_id) {          
+                 const int msg_queue_id) {        
     if (rank_id > 0) return;
 
     int max_draft_tokens = accept_tokens.shape()[1];
@@ -71,7 +71,7 @@ void SpeculateSaveWithOutputMsg(const paddle::Tensor& accept_tokens,
         }
     }
     if ((msgsnd(msgid, &msg_sed, (MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2) * 4, 0)) == -1) {
-        printf("full msg buffer\n");
+      printf("full msg buffer\n");
     }
     return;
 }
@@ -98,10 +98,3 @@ PD_BUILD_OP(speculate_save_output)
     .Outputs({"x_out"})
     .SetInplaceMap({{"accept_tokens", "x_out"}})
     .SetKernelFn(PD_KERNEL(SpeculateSaveWithOutputMsgStatic));
-
-PD_BUILD_OP(speculate_save_output_dynamic)
-    .Inputs({"accept_tokens", "accept_num", "not_need_stop"})
-    .Attrs({"rank_id: int64_t", "msg_queue_id: int"})
-    .Outputs({"x_out"})
-    .SetInplaceMap({{"accept_tokens", "x_out"}})
-    .SetKernelFn(PD_KERNEL(SpeculateSaveWithOutputMsgDynamic));

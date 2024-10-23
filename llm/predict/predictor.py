@@ -27,7 +27,7 @@ import paddle.incubate.multiprocessing as mp
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode, use_pir_api
 from paddle.distributed import fleet
 
-from llm.speculate_decoding.proposer import InferenceWithReferenceProposer
+from llm.speculate_decoding.proposers import InferenceWithReferenceProposer
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
@@ -49,6 +49,8 @@ from paddlenlp.utils.log import logger
 
 # Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
 MAX_BSZ = 512
+# Note(@Wanglongzhi2001): SPECULATE_MAX_BSZ must be the same as definition in speculate_get_output / speculate_save_output
+SPECULATE_MAX_BSZ = 256
 MAX_DRAFT_TOKENS = 6
 
 
@@ -106,7 +108,7 @@ class PredictorArgument:
         default="fp16",
         metadata={"help": "avx cachekv type. Supported values: fp16,int8"},
     )
-    batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
+    batch_size: int = field(default=10, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
         default=False,
         metadata={
@@ -142,7 +144,7 @@ class PredictorArgument:
             "help": "speculate method, it should be one of ['None', 'autoregressive', 'inference_with_reference']"
         },
     )
-    speculate_max_draft_tokens: int = field(
+    speculate_max_draft_token_num: int = field(
         default=1,
         metadata={"help": "the max length of draft tokens for speculate method."},
     )
@@ -1180,7 +1182,7 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
         # init speculate components
         if config.speculate_method == "inference_with_reference":
             self.proposer = InferenceWithReferenceProposer(
-                config.speculate_max_draft_tokens,
+                config.speculate_max_draft_token_num,
                 config.speculate_max_ngram_size,
                 config.batch_size,
                 config.max_length,
@@ -1192,7 +1194,7 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
     def predict(self, input_texts: list[str], return_tokens=False):
         self._preprocess(input_texts)
 
-        # Parameters such as seq_lens_encoder have been set in the preprocessor function, 
+        # Parameters such as seq_lens_encoder have been set in the preprocessor function,
         # then we use them to init the proposer's args
         self.init_proposer_args()
 
@@ -1206,7 +1208,7 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
             read_res_process.start()
 
         output_tensor = paddle.full(
-            shape=[MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2, 1], fill_value=2, dtype="int64"
+            shape=[SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1], fill_value=2, dtype="int64"
         ).cpu()
         tensor_queue.put(output_tensor)
         if self.tensor_parallel_rank == 0:
@@ -1250,14 +1252,14 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
 
     def init_proposer_args(self):
         self.model_inputs["accept_tokens"] = paddle.full(
-            shape=[self.config.batch_size, self.config.speculate_max_draft_tokens + 1], fill_value=0, dtype="int64"
+            shape=[self.config.batch_size, self.config.speculate_max_draft_token_num + 1], fill_value=0, dtype="int64"
         )
         self.model_inputs["accept_num"] = paddle.full(shape=[self.config.batch_size], fill_value=0, dtype="int32")
         self.model_inputs["draft_tokens"] = paddle.full(
-            shape=[self.config.batch_size, self.config.speculate_max_draft_tokens + 1], fill_value=0, dtype="int64"
+            shape=[self.config.batch_size, self.config.speculate_max_draft_token_num + 1], fill_value=0, dtype="int64"
         )
         self.model_inputs["actual_draft_token_num"] = paddle.full(
-            shape=[self.config.batch_size], fill_value=self.config.speculate_max_draft_tokens, dtype="int32"
+            shape=[self.config.batch_size], fill_value=self.config.speculate_max_draft_token_num, dtype="int32"
         )
         if self.config.speculate_method == "inference_with_reference":
             self.proposer.input_ids_cpu = self.model_inputs["input_ids"].cpu()
@@ -1275,7 +1277,7 @@ class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
         # init speculate components
         if config.speculate_method == "inference_with_reference":
             self.proposer = InferenceWithReferenceProposer(
-                config.speculate_max_draft_tokens,
+                config.speculate_max_draft_token_num,
                 config.speculate_max_ngram_size,
                 config.batch_size,
                 config.max_length,
@@ -1285,14 +1287,14 @@ class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
 
     def init_proposer_args(self):
         self.model_inputs["accept_tokens"] = paddle.full(
-            shape=[self.config.batch_size, self.config.speculate_max_draft_tokens + 1], fill_value=0, dtype="int64"
+            shape=[self.config.batch_size, self.config.speculate_max_draft_token_num + 1], fill_value=0, dtype="int64"
         )
         self.model_inputs["accept_num"] = paddle.full(shape=[self.config.batch_size], fill_value=0, dtype="int32")
         self.model_inputs["draft_tokens"] = paddle.full(
-            shape=[self.config.batch_size, self.config.speculate_max_draft_tokens + 1], fill_value=0, dtype="int64"
+            shape=[self.config.batch_size, self.config.speculate_max_draft_token_num + 1], fill_value=0, dtype="int64"
         )
         self.model_inputs["actual_draft_token_num"] = paddle.full(
-            shape=[self.config.batch_size], fill_value=self.config.speculate_max_draft_tokens, dtype="int32"
+            shape=[self.config.batch_size], fill_value=self.config.speculate_max_draft_token_num, dtype="int32"
         )
         if self.config.speculate_method == "inference_with_reference":
             self.proposer.input_ids_cpu = self.model_inputs["input_ids"].cpu()
@@ -1309,7 +1311,7 @@ class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
         s_time = time.time()
         self._preprocess(input_texts)
 
-        # Parameters such as seq_lens_encoder have been set in the preprocessor function, 
+        # Parameters such as seq_lens_encoder have been set in the preprocessor function,
         # then we use them to init the proposer's args
         self.init_proposer_args()
         logger.info(f"preprocess spend {time.time()  -  s_time}")
@@ -1332,7 +1334,7 @@ class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
         output_tensor = paddle.full(
-            shape=[MAX_BSZ * MAX_DRAFT_TOKENS + MAX_BSZ + 2, 1], fill_value=2, dtype="int64"
+            shape=[SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1], fill_value=2, dtype="int64"
         ).cpu()
         tensor_queue.put(output_tensor)
         if self.tensor_parallel_rank == 0:
@@ -1505,7 +1507,7 @@ def create_predictor(
                 elif predictor_args.speculate_method is not None:
                     config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
-                    config.speculate_max_draft_tokens = predictor_args.speculate_max_draft_tokens
+                    config.speculate_max_draft_token_num = predictor_args.speculate_max_draft_token_num
                     config.speculate_max_ngram_size = predictor_args.speculate_max_ngram_size
                     config.speculate_verify_window = predictor_args.speculate_verify_window
                     config.speculate_max_candidate_len = predictor_args.speculate_max_candidate_len
@@ -1738,7 +1740,7 @@ def create_predictor(
                 elif predictor_args.speculate_method is not None:
                     config.max_seq_len = predictor_args.total_max_length
                     config.block_size = predictor_args.block_size
-                    config.speculate_max_draft_tokens = predictor_args.speculate_max_draft_tokens
+                    config.speculate_max_draft_token_num = predictor_args.speculate_max_draft_token_num
                     config.speculate_max_ngram_size = predictor_args.speculate_max_ngram_size
                     config.speculate_verify_window = predictor_args.speculate_verify_window
                     config.speculate_max_candidate_len = predictor_args.speculate_max_candidate_len
