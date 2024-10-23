@@ -60,16 +60,21 @@ def process_dist_configs(config):
 
     other_degree = mp_degree * pp_degree
 
-    assert nranks % other_degree == 0, "Requires nranks should be divided by mp_degree*pp_degree."
+    if config.Engine.get("auto_mode", "semi") != "semi":
+        pass
+    else:
+        assert nranks % other_degree == 0, "Requires nranks should be divided by mp_degree*pp_degree."
     dp_degree = configs.setdefault("dp_degree", nranks // other_degree)
-    assert nranks % dp_degree == 0, "unreasonable config of dist_strategy."
-    assert nranks == dp_degree * other_degree, (
-        "Mismatched config using {} cards with dp_degree[{}],"
-        "mp_degree[{}], pp_degree[{}] and sharding_degree[{}]".format(
-            nranks, dp_degree, mp_degree, pp_degree, sharding_degree
+    if config.Engine.get("auto_mode", "semi") != "semi":
+        pass
+    else:
+        assert nranks % dp_degree == 0, "unreasonable config of dist_strategy."
+        assert nranks == dp_degree * other_degree, (
+            "Mismatched config using {} cards with dp_degree[{}],"
+            "mp_degree[{}], pp_degree[{}] and sharding_degree[{}]".format(
+                nranks, dp_degree, mp_degree, pp_degree, sharding_degree
+            )
         )
-    )
-
 
 def process_global_configs(config):
     """
@@ -137,6 +142,7 @@ def process_engine_configs(config):
 
     save_load_cfg["output_dir"] = save_load_cfg.get("output_dir", "./output")
     save_load_cfg["ckpt_dir"] = save_load_cfg.get("ckpt_dir", None)
+    save_load_cfg["auto_mode"] = save_load_cfg.get("auto_mode", False)
 
     config.Engine["max_steps"] = config.Engine.get("max_steps", 500000)
     config.Engine["eval_freq"] = config.Engine.get("eval_freq", -1)
@@ -159,7 +165,8 @@ def process_strategy(config):
     process auto strategy for auto parallel
     """
     strategy = auto.Strategy()
-    strategy.auto_mode = "semi"
+    #strategy.auto_mode = "semi"
+    strategy.auto_mode = config.Engine.get("auto_mode", "semi")
     # strategy.seed = config["Global"]["seed"]
 
     if config.get("FusedPasses", None) is not None:
