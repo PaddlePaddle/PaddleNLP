@@ -52,6 +52,8 @@ from paddlenlp.transformers import (
     LlamaForCausalLM,
     LlamaForCausalLMPipe,
     LlamaTokenizer,
+    Qwen2ForCausalLM,
+    Qwen2ForCausalLMPipe,
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
@@ -69,7 +71,7 @@ from paddlenlp.utils.tools import get_env_device
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "False"
 
-flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
+flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe, Qwen2ForCausalLM, Qwen2ForCausalLMPipe]
 
 
 def main():
@@ -109,6 +111,7 @@ def main():
     if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
         try:
             from paddle_xpu.layers.nn.linear import LinearConfig  # noqa: F401
+
             LinearConfig.enable_accumulate_steps_opt()
             LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
         except ImportError:
@@ -559,6 +562,8 @@ def main():
         gen_args=gen_args,
         data_args=data_args,
     )
+    trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
+    trainer.set_optimizer_grouped_parameters(trainable_parameters)
 
     # Train
     if training_args.do_train:

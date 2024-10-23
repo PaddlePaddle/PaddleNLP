@@ -602,7 +602,9 @@ class Trainer:
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
             uc_async_save = self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config
-            resume_from_checkpoint = get_last_checkpoint(self.args.output_dir, uc_async_save)
+            resume_from_checkpoint = get_last_checkpoint(
+                self.args.output_dir, signal_folder=self.args.output_signal_dir, uc_async_save=uc_async_save
+            )
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
@@ -2216,6 +2218,9 @@ class Trainer:
         return (loss, outputs) if return_outputs else loss
 
     def _enable_delay_scale_loss(self):
+        if in_auto_parallel_align_mode():
+            return True
+
         key = "enable_delay_scale_loss"
         if self.args.pipeline_parallel_degree > 1:
             return key in self.args.pipeline_parallel_config
@@ -2310,7 +2315,11 @@ class Trainer:
 
         return _maybe_unscale_loss_in_align_mode(loss.detach())
 
-    def save_model(self, output_dir: Optional[str] = None, merge_tensor_parallel: Optional[bool] = False):
+    def save_model(
+        self,
+        output_dir: Optional[str] = None,
+        merge_tensor_parallel: Optional[bool] = False,
+    ):
         """
         Will save the model, so you can reload it using `from_pretrained()`.
 
@@ -2320,6 +2329,11 @@ class Trainer:
         if output_dir is None:
             output_dir = self.args.output_dir
 
+        if PREFIX_CHECKPOINT_DIR in output_dir:
+            signal_dir = os.path.join(self.args.output_signal_dir, os.path.split(output_dir)[-1])
+        else:
+            signal_dir = self.args.output_signal_dir
+
         if ShardingOption.FULL_SHARD in self.args.sharding:
             self.model_wrapped.get_all_parameters(convert2cpu=True)
 
@@ -2327,10 +2341,10 @@ class Trainer:
             self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
         else:
             if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
-                os.makedirs(output_dir, exist_ok=True)
+                os.makedirs(signal_dir, exist_ok=True)
                 if self.is_in_train:
                     global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
-                    paddle.save(global_rank, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
+                    paddle.save(global_rank, os.path.join(signal_dir, f".model_weight.done.{global_rank}"))
 
         if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
             # save model_done file to ensure model is complete
@@ -2346,9 +2360,9 @@ class Trainer:
             and "async_save" in self.args.unified_checkpoint_config
             and not self.is_in_train
         ):
-            os.makedirs(output_dir, exist_ok=True)
+            os.makedirs(signal_dir, exist_ok=True)
             global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
-            paddle.save(self.state.global_step, os.path.join(output_dir, f".model_weight.done.{global_rank}"))
+            paddle.save(self.state.global_step, os.path.join(signal_dir, f".model_weight.done.{global_rank}"))
 
     def _filter_moe_no_sync_optimizer_params(self):
         """
@@ -2359,7 +2373,7 @@ class Trainer:
         filter_optimzier_state_dict = OrderedDict()
         param_names_in_master_weights = list(optimzier_state_dict["master_weights"].keys()) if self.args.bf16 else []
         filter_optimzier_state_dict["master_weights"] = OrderedDict()
-        for k, v in state_dict.items():
+        for _, v in state_dict.items():
             if getattr(v, "no_sync", False):
                 if v.name in param_names_in_master_weights:
                     filter_optimzier_state_dict["master_weights"][v.name] = optimzier_state_dict["master_weights"][
@@ -2378,8 +2392,10 @@ class Trainer:
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
 
         run_dir = self.args.output_dir
+        run_signal_dir = self.args.output_signal_dir
 
         output_dir = os.path.join(run_dir, checkpoint_folder)
+        signal_dir = os.path.join(run_signal_dir, checkpoint_folder)
 
         if isinstance(self.model, LoRAModel) and (self.model.quantized or self.args.pipeline_parallel_degree > 1):
             self.save_model(output_dir)
@@ -2402,6 +2418,7 @@ class Trainer:
                             self.model,
                             self.optimizer,
                             output_dir,
+                            signal_dir,
                         )
                     else:
                         if self.dp_group.rank > 0:  # this should only work for MoE saving
@@ -2424,10 +2441,10 @@ class Trainer:
                 else:
                     if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
-                        os.makedirs(output_dir, exist_ok=True)
-                        paddle.save(global_rank, os.path.join(output_dir, f".optimizer_weight.done.{global_rank}"))
+                        os.makedirs(signal_dir, exist_ok=True)
+                        paddle.save(global_rank, os.path.join(signal_dir, f".optimizer_weight.done.{global_rank}"))
                         if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
-                            paddle.save(global_rank, os.path.join(output_dir, f".master_weight.done.{global_rank}"))
+                            paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
             if self.args.should_save or self.args.use_expert_parallel:
                 if not self.args.use_hybrid_parallel:
                     logger.info("Saving optimizer files.")
@@ -2436,6 +2453,7 @@ class Trainer:
                             self.model,
                             self.optimizer,
                             output_dir,
+                            signal_dir,
                         )
                     else:
                         if self.args.data_parallel_rank > 0 and self.args.use_expert_parallel:
@@ -2460,10 +2478,10 @@ class Trainer:
                 if self.args.unified_checkpoint and not self.args.use_hybrid_parallel:
                     if "async_save" in self.args.unified_checkpoint_config:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
-                        os.makedirs(output_dir, exist_ok=True)
-                        paddle.save(global_rank, os.path.join(output_dir, f".optimizer_weight.done.{global_rank}"))
+                        os.makedirs(signal_dir, exist_ok=True)
+                        paddle.save(global_rank, os.path.join(signal_dir, f".optimizer_weight.done.{global_rank}"))
                         if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
-                            paddle.save(global_rank, os.path.join(output_dir, f".master_weight.done.{global_rank}"))
+                            paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
 
         self.runtime_timer.stop()
         # Determine the new best metric / best model checkpoint
@@ -2512,7 +2530,7 @@ class Trainer:
         # For hybrid parallel training, the checkpoint files maybe on different node.
         need_to_rotate_checkpoints = False
         if self.args.use_hybrid_parallel:
-            if self.dp_group.rank <= 0:
+            if self.dp_group.rank <= 0 or self.args.use_expert_parallel:
                 need_to_rotate_checkpoints = True
         else:
             need_to_rotate_checkpoints = self.args.should_save_model_state
@@ -2521,6 +2539,7 @@ class Trainer:
         need_to_rotate_checkpoints = need_to_rotate_checkpoints and self.args.local_rank == 0
         if need_to_rotate_checkpoints:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
+            self._rotate_checkpoints(use_mtime=True, output_dir=run_signal_dir)
 
         if strtobool(os.getenv("FLAG_LLM_PDC", "False")) and not ("async_save" in self.args.unified_checkpoint_config):
             # save checkpoint_done file to ensure checkpoint is complete
@@ -2595,10 +2614,24 @@ class Trainer:
             # ignore_errors for shared disks between train nodes.
             shutil.rmtree(checkpoint, ignore_errors=True)
 
-    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
+    def _save(
+        self,
+        output_dir: Optional[str] = None,
+        state_dict=None,
+        merge_tensor_parallel=False,
+    ):
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Saving model checkpoint to {output_dir}")
+
+        # signal_dir is used for asynchronous saving situations.
+        signal_dir = self.args.output_signal_dir
+        if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
+            if PREFIX_CHECKPOINT_DIR in output_dir:
+                signal_dir = os.path.join(signal_dir, os.path.split(output_dir)[-1])
+            os.makedirs(signal_dir, exist_ok=True)
+            logger.info(f"Saving model checkpoint finish signal to {signal_dir}")
+
         # Save a trained model and configuration using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
 
@@ -2608,16 +2641,15 @@ class Trainer:
             and self.args.unified_checkpoint
             and "async_save" in self.args.unified_checkpoint_config
         ):
-            os.makedirs(self.args.logging_dir, exist_ok=True)
             world_size = paddle.distributed.get_world_size()
             save_info = {
                 "world_size": world_size,
                 "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
                 "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
             }
-            if os.path.exists(os.path.join(self.args.logging_dir, "async_save_info.json")):  # afs cannot overwrite
-                os.remove(os.path.join(self.args.logging_dir, "async_save_info.json"))
-            with open(os.path.join(self.args.logging_dir, "async_save_info.json"), "w") as f:
+            if os.path.exists(os.path.join(signal_dir, "async_save_info.json")):  # afs cannot overwrite
+                os.remove(os.path.join(signal_dir, "async_save_info.json"))
+            with open(os.path.join(signal_dir, "async_save_info.json"), "w") as f:
                 json.dump(save_info, f)
 
         if self.args.should_save:
@@ -2632,7 +2664,7 @@ class Trainer:
             if not self.is_in_train:
                 self.args.unified_checkpoint_config = []
 
-            self.unified_checkpoint_handler.save_unified_checkpoint(self.model, self.optimizer, output_dir)
+            self.unified_checkpoint_handler.save_unified_checkpoint(self.model, self.optimizer, output_dir, signal_dir)
 
             # recover unified_checkpoint_config for not trine stage
             if not self.is_in_train:
