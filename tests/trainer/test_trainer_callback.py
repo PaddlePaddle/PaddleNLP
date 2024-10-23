@@ -229,7 +229,7 @@ class TrainerCallbackTest(unittest.TestCase):
         # A bit of everything
         trainer = self.get_trainer(
             callbacks=[MyTestTrainerCallback],
-            logging_steps=3,
+            logging_steps=2,
             save_steps=10,
             eval_steps=5,
             evaluation_strategy="steps",
