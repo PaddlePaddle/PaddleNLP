@@ -28,7 +28,7 @@ from paddle.distributed import fleet
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
 
-from llm.predict.predictor import MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
+from llm.predict.env import MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 from paddlenlp.datasets import ZeroPaddingIterableDataset
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer import Trainer, TrainerCallback

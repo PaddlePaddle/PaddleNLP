@@ -24,10 +24,11 @@ from threading import Thread
 import numpy as np
 import paddle
 import paddle.incubate.multiprocessing as mp
+from env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode, use_pir_api
 from paddle.distributed import fleet
+from proposers import InferenceWithReferenceProposer
 
-from llm.speculate_decoding.proposers import InferenceWithReferenceProposer
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
@@ -46,12 +47,6 @@ from paddlenlp.transformers import (
 from paddlenlp.utils import llm_utils
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
-
-# Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
-MAX_BSZ = 512
-# Note(@Wanglongzhi2001): SPECULATE_MAX_BSZ must be the same as definition in speculate_get_output / speculate_save_output
-SPECULATE_MAX_BSZ = 256
-MAX_DRAFT_TOKENS = 6
 
 
 @dataclass
@@ -108,7 +103,7 @@ class PredictorArgument:
         default="fp16",
         metadata={"help": "avx cachekv type. Supported values: fp16,int8"},
     )
-    batch_size: int = field(default=10, metadata={"help": "The batch size of data."})
+    batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
         default=False,
         metadata={
@@ -1242,15 +1237,11 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
             else:
                 return outputs
 
-    def _preprocess(self, input_text: list[str]):
-        super()._preprocess(input_text)
-
+    def init_proposer_args(self):
         for bid in range(self.config.batch_size):
             self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
                 self.model_inputs["seq_lens_this_time"][bid] - 1
             ]  # get the last token before padding of this batch
-
-    def init_proposer_args(self):
         self.model_inputs["accept_tokens"] = paddle.full(
             shape=[self.config.batch_size, self.config.speculate_max_draft_token_num + 1], fill_value=0, dtype="int64"
         )
@@ -1286,6 +1277,11 @@ class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
             self.proposer = None
 
     def init_proposer_args(self):
+        for bid in range(self.config.batch_size):
+            self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
+                self.model_inputs["seq_lens_this_time"][bid] - 1
+            ]  # get the last token before padding of this batch
+
         self.model_inputs["accept_tokens"] = paddle.full(
             shape=[self.config.batch_size, self.config.speculate_max_draft_token_num + 1], fill_value=0, dtype="int64"
         )
@@ -1298,14 +1294,6 @@ class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
         )
         if self.config.speculate_method == "inference_with_reference":
             self.proposer.input_ids_cpu = self.model_inputs["input_ids"].cpu()
-
-    def _preprocess(self, input_text: list[str]):
-        super()._preprocess(input_text)
-
-        for bid in range(self.config.batch_size):
-            self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
-                self.model_inputs["seq_lens_this_time"][bid] - 1
-            ]  # get the last token before padding of this batch
 
     def predict(self, input_texts: list[str], return_tokens=False):
         s_time = time.time()

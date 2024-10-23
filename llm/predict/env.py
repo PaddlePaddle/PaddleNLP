@@ -11,3 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
+MAX_BSZ = 512
+# Note(@Wanglongzhi2001): SPECULATE_MAX_BSZ must be the same as definition in speculate_get_output / speculate_save_output
+SPECULATE_MAX_BSZ = 256
+MAX_DRAFT_TOKENS = 6
