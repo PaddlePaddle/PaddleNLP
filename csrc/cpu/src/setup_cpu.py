@@ -112,7 +112,7 @@ libs = [":libxfastertransformer.so", ":libxft_comm_helper.so"]
 
 custom_kernel_dot_module = CppExtension(
     sources=[
-        "../generation/save_with_output.cc",
+        "../gpu/save_with_output.cc",
         "./src/token_penalty_multi_scores.cc",
         "./src/stop_generation_multi_ends.cc",
         "./src/set_value_by_flags.cc",
@@ -129,6 +129,6 @@ custom_kernel_dot_module = CppExtension(
 setup(
     name="paddlenlp_ops",
     version="1.0",
-    description="custom kernel fot compiling",
+    description="custom kernel for compiling",
     ext_modules=[custom_kernel_dot_module],
 )

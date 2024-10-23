@@ -17,7 +17,7 @@
 # apt-get install numactl
 
 # 1. download XFT
-if [ ! -d xFasterTransformer]; then
+if [ ! -d xFasterTransformer ]; then
     git clone https://github.com/intel/xFasterTransformer.git
 fi
 
@@ -55,12 +55,12 @@ rm -rf build
 mkdir build && cd build
 cmake ..
 make -j
+cd ..
 
 #xft
 export XFT_HEADER_DIR=$PWD
 export XFT_LIB_DIR=$XFT_HEADER_DIR/build
 export LD_LIBRARY_PATH=$XFT_LIB_DIR:$LD_LIBRARY_PATH
-
 #setup cpu paddle_nlp ops
 cd ..
-python ./src/setup_cpu.py install
+python ./src/setup_cpu.py install --user
