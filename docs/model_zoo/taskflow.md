@@ -1454,8 +1454,21 @@ from paddlenlp import Taskflow
 ```
 
 #### 可配置参数说明
-* `model`：可选模型，默认为`IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese`。
+* `model`：可选模型，默认为"PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA"，支持的模型有["unimo-text-1.0-summary","IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese", "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese", "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese-V1", "PaddlePaddle/Randeng-Pegasus-238M-Summary-Chinese-SSTIA", "PaddlePaddle/Randeng-Pegasus-523M-Summary-Chinese-SSTIA"]。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `max_length`：生成摘要的最大文本长度，默认为128。
+* `min_length`：生成摘要的最小文本长度，默认为0。
+* `decode_strategy`：生成过程中的解码策略，默认为beam search。
+* `temperature`：生成过程中softmax函数的超参数，默认为1.0。
+* `top_k`：Top k采样中的保留结果数，默认为5。
+* `top_p`：Top p采样中的累计概率，默认为1.0。
+* `num_beams`：beam search中的beam数量，默认为4。
+* `length_penalty`：生成摘要的文本长度惩罚，默认为0.0。
+* `num_return_sequences`：单条输入返回的输出摘要个数，默认为1。
+* `repetition_penalty`：生成摘要的文本重复惩罚，默认为1。
+* `use_faster`：是否使用FasterGeneration高性能解码，默认为False。
+* `use_fp16_decoding`：是否使用FasterGeneration中的FP16混合精度计算，默认为False。
+
 
 </div></details>
 
