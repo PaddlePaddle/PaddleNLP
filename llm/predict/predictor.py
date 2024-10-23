@@ -898,6 +898,11 @@ class BlockInferencePredictorMixin(BasePredictor):
             tgt_mask = (alibi_decoder + (1 - tgt_mask) * paddle.finfo(self.dtype).min).cast(self.dtype)
             self.model_inputs["rope_emb"] = paddle.concat([src_mask.reshape([-1]), tgt_mask.reshape([-1])])
 
+        elif config.device == "npu" and "chatglmv3" in self.architectures:
+            from paddlenlp.experimental.transformers.chatglm_v3 import get_rotary_position_embedding
+            self.model_inputs["rope_emb"] = get_rotary_position_embedding(
+                paddle.arange(config.total_max_length).reshape((1, -1)), self.head_dim)
+
     def _preprocess(self, input_text: list[str]):
         if self.tokenizer.chat_template is not None:
             input_text = [input_text] if isinstance(input_text, str) else input_text
@@ -1362,6 +1367,24 @@ def create_predictor(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
                 model.eval()
+
+            elif "chatglmv3" in config.architectures[0].lower() and predictor_args.device == "npu":
+                if predictor_args.block_attn:
+                    config.max_seq_len = predictor_args.total_max_length
+                    config.block_size = predictor_args.block_size
+                    from paddlenlp.experimental.transformers.chatglm_v3 import ChatGLMv3ForCausalLMBlockInferenceModel
+
+                    model = ChatGLMv3ForCausalLMBlockInferenceModel.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        config=config,
+                        dtype=predictor_args.dtype,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
+                    )
+                else:
+                    raise ValueError("Function not implemented")
+                model.eval()
+
             elif "chatglmforcausallm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMForCausalLMInferenceModel,
@@ -1529,14 +1552,20 @@ def create_predictor(
                 cache_kvs_shape = ChatGLMv2ForCausalLMInferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
-            elif "chatglmv2forcausallm" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    ChatGLMv2ForCausalLMInferenceModel,
-                )
 
-                cache_kvs_shape = ChatGLMv2ForCausalLMInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
+            elif "chatglmv3" in config.architectures[0].lower() and predictor_args.device == "npu":
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                    config.use_dynamic_cachekv_quant = predictor_args.use_cachekv_int8 == "dynamic"
+                    from paddlenlp.experimental.transformers import ChatGLMv3ForCausalLMBlockInferenceModel
+
+                    cache_kvs_shape = ChatGLMv3ForCausalLMBlockInferenceModel.get_cache_kvs_shape(
+                        config, predictor_args.batch_size, predictor_args.total_max_length
+                    )
+                else:
+                    raise ValueError("Function not implemented")
+
             elif "chatglmforcausallm" in config.architectures[0].lower():
                 from paddlenlp.experimental.transformers import (
                     ChatGLMForCausalLMInferenceModel,

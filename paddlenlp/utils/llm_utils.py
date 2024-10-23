@@ -135,6 +135,20 @@ def get_lora_target_modules(model):
             ".*dense_h_to_4h.*",
             ".*dense_4h_to_h.*",
         ]
+    elif model.base_model_prefix == "chatglm_v3":
+        target_modules = [
+            ".*query.*",
+            ".*key.*",
+            ".*value.*",
+            ".*query_key_value.*",
+            ".*dense.*",
+            ".*q_proj.*",
+            ".*k_proj.*",
+            ".*v_proj.*",
+            ".*dense_h_to_4h.*",
+            ".*dense_4h_to_h.*",
+        ]
+
     elif model.base_model_prefix == "gpt":
         target_modules = [
             ".*qkv_proj.*",
