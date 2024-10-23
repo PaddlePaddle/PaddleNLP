@@ -30,10 +30,10 @@ import paddle.tensor as tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
+from paddle.utils import try_import
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-        ScatterOp,
         mark_as_sequence_parallel_parameter,
     )
 except:
@@ -61,6 +61,7 @@ __all__ = [
     "GPTForCausalLMAuto",
     "GPTEmbeddingsAuto",
     "GPTDecoderLayerAuto",
+    "GPTLayerNorm",
 ]
 
 
@@ -90,6 +91,29 @@ def seed_guard_context(name=None):
         return get_rng_state_tracker().rng_state(name)
     else:
         return contextlib.nullcontext()
+
+
+def fast_layer_norm(input, weight, bias, eps):
+    fast_ln_lib = try_import("fast_ln")
+    return fast_ln_lib.fast_ln(input, weight, bias, eps)[0]
+
+
+class GPTLayerNorm(nn.LayerNorm):
+    def __init__(self, config, normalized_shape, epsilon=1e-05, weight_attr=None, bias_attr=None, name=None):
+        super().__init__(
+            normalized_shape=normalized_shape, epsilon=epsilon, weight_attr=weight_attr, bias_attr=bias_attr
+        )
+        self.config = config
+        self._check_normalized_shape(self._normalized_shape)
+
+    def _check_normalized_shape(self, normalized_shape):
+        if isinstance(normalized_shape, (list, tuple)):
+            assert len(normalized_shape) == 1
+
+    def forward(self, input):
+        if self.config.use_fast_layer_norm:
+            return fast_layer_norm(input, self.weight, self.bias, self._epsilon)
+        return super().forward(input)
 
 
 def _make_causal_mask(input_ids_shape, past_key_values_length):
@@ -152,6 +176,7 @@ class MultiHeadAttentionAuto(nn.Layer):
 
         if self.config.fuse_attention_qkv:
             self.qkv_proj = nn.Linear(config.hidden_size, 3 * config.hidden_size, bias_attr=True)
+            # self.qkv_proj.weight = dist.shard_tensor(self.qkv_proj.weight,get_mesh(self.ipp),[dist.Replicate(), dist.Shard(1)])
         else:
             self.q_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
             self.k_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
@@ -333,6 +358,7 @@ class MultiHeadAttentionAuto(nn.Layer):
         out = self.out_proj(out)
         # if sequence_parallel is true, out shape are [bs * seq_len / n, dim]
         # else their shape are [bs, seq_len, dim], n is mp parallelism.
+
         outs = [out]
         if output_attentions:
             outs.append(weights)
@@ -351,8 +377,8 @@ class TransformerDecoder(nn.Layer):
 
         self.config = config
         self.layers = decoder_layers
-        self.norm = nn.LayerNorm(config.hidden_size, epsilon=1e-5, bias_attr=True)
 
+        self.norm = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5)
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.norm.weight)
             mark_as_sequence_parallel_parameter(self.norm.bias)
@@ -419,7 +445,7 @@ class TransformerDecoder(nn.Layer):
             if decoder_layer.ipp is not None and pre_ipp != decoder_layer.ipp:
                 output = dist.reshard(output, get_mesh(decoder_layer.ipp), [dist.Shard(0), dist.Replicate()])
             has_gradient = not output.stop_gradient
-            if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full_attn":
+            if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full":
                 outputs = self.recompute_training(
                     layer_module=decoder_layer,
                     hidden_states=output,
@@ -490,16 +516,15 @@ class GPTDecoderLayerAuto(nn.Layer):
 
         self.linear1.weight = dist.shard_tensor(self.linear1.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(1)])
         self.linear2.weight = dist.shard_tensor(self.linear2.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(0)])
-
-        self.norm1 = nn.LayerNorm(config.hidden_size, epsilon=1e-5, bias_attr=True)
-        self.norm2 = nn.LayerNorm(config.hidden_size, epsilon=1e-5, bias_attr=True)
+        # fix : change nn.LayerNorm(config.hidden_size, epsilon=1e-5, bias_attr=True) to GPTLayerNorm()
+        self.norm1 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5, bias_attr=True)
+        self.norm2 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5, bias_attr=True)
 
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.norm1.weight)
             mark_as_sequence_parallel_parameter(self.norm1.bias)
             mark_as_sequence_parallel_parameter(self.norm2.weight)
             mark_as_sequence_parallel_parameter(self.norm2.bias)
-
         if config.use_fused_dropout_add:
             self.fused_dropout_add1 = FusedDropoutAdd(config.attention_probs_dropout_prob, mode="upscale_in_train")
             self.fused_dropout_add2 = FusedDropoutAdd(config.hidden_dropout_prob, mode="upscale_in_train")
@@ -646,14 +671,14 @@ class GPTEmbeddingsAuto(nn.Layer):
 
         position_embeddings = self.position_embeddings(position_ids)
         embeddings = inputs_embeddings + position_embeddings
-
         if self.config.sequence_parallel:
+            # embeddings = dist.shard_tensor(embeddings,get_mesh(),[dist.Replicate(),dist.Replicate()])
             bs, seq_len, hidden_size = embeddings.shape
             # [bs, seq_len, dim] -> [bs * seq_len, dim]
             embeddings = paddle.reshape_(embeddings, [bs * seq_len, hidden_size])
             # [bs * seq_len / n, dim] (n is mp parallelism)
-            embeddings = ScatterOp.apply(embeddings)
-
+            # embeddings = ScatterOp.apply(embeddings)
+            embeddings = dist.reshard(embeddings, get_mesh(), [dist.Replicate(), dist.Shard(0)])
         # Use a ternary operator for a more concise assignment of current_seed
         current_seed = "local_seed" if self.config.sequence_parallel else "global_seed"
         # The 'with' block ensures the correct seed context is used
@@ -876,7 +901,7 @@ class GPTModelAuto(GPTPretrainedModelAuto):
         self.bias = paddle.tril(
             paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
         )
-
+        self.bias = dist.shard_tensor(self.bias, get_mesh(), [dist.Replicate(), dist.Replicate()])
         self.embeddings = GPTEmbeddingsAuto(config)
 
         decoder_layers = nn.LayerList()
@@ -1116,6 +1141,8 @@ class GPTPretrainingCriterionAuto(paddle.nn.Layer):
 
         """
         with paddle.amp.auto_cast(False):
+            if len(prediction_scores.shape) < len(masked_lm_labels.unsqueeze(2).shape):
+                prediction_scores = paddle.unsqueeze_(prediction_scores, 0)
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
             masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
             loss = paddle.mean(masked_lm_loss)
@@ -1155,6 +1182,11 @@ class GPTLMHeadAuto(nn.Layer):
                 self.weight.split_axis = 0
 
     def forward(self, hidden_states, tensor_parallel_output=None):
+
+        if self.config.sequence_parallel:
+            hidden_states = dist.reshard(hidden_states, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
+            hidden_states = paddle.reshape(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
+
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
