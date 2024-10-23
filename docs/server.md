@@ -1,6 +1,6 @@
 # PaddleNLP SimpleSevring
 
-PaddleNLP SimpleServing 是基于 unicorn 封装的模型部署服务化工具，该服务化工具具备灵活、易用的特性，可以简易部署预训练模型和预训练模型工具Taskflow，PaddleNLP SimpleServing 具备以下两个特性：
+PaddleNLP SimpleServing 是基于 uvicorn 封装的模型部署服务化工具，该服务化工具具备灵活、易用的特性，可以简易部署预训练模型和预训练模型工具Taskflow，PaddleNLP SimpleServing 具备以下两个特性：
   - 易用：一行代码即可部署预训练模型和预训练工具Taskflow
   - 灵活：Handler机制可以快速定制化服务化部署方式
 
