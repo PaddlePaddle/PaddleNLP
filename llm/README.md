@@ -15,18 +15,21 @@
 
 ## 🛠️ 支持模型列表 🛠️
 
-| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Torch convert |
+| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO | RLHF | Quantization | Torch convert |
 |----------------------------------------|----------|-----|------|---------------|-----|------|--------------|---------------|
 | [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅   | ✅    | ✅            | ✅             |
 | [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧   | 🚧           | ✅             |
-| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | 🚧  | 🚧   | 🚧           | 🚧            |
+| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | ✅   | 🚧   | 🚧           | 🚧            |
 | [Mistral](./config/mistral)            | ❌        | ✅   | ✅    | ✅             | ✅   | 🚧   | 🚧           | ✅             |
 | [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧   | ✅            | ✅             |
 | [ChatGLM-6B](./config/chatglm)         | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ❌             |
-| [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ✅             |
+| [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅    | ✅             | ✅   | 🚧   | ✅            | ✅             |
 | [Bloom](./config/bloom)                | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ✅             |
 | [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧  | 🚧   | 🚧           | ✅             |
 | [OPT](./config/opt)                    | 🚧       | ✅   | ✅    | 🚧            | 🚧  | 🚧   | 🚧           | ✅             |
+| [Gemma](./config/gemma)                | 🚧       | ✅   |🚧     | 🚧            | ✅  | 🚧   | 🚧           | 🚧             |
+| [Yuan](./config/yuan)                  | ✅       | ✅   |✅     | 🚧            | ✅  | 🚧   | 🚧           | 🚧             |
+
 
 - ✅: Supported
 - 🚧: In Progress
@@ -81,7 +84,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 
 注意：
 
-1. 建议使用 paddle develop 版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失 whl 包
+1. 建议使用 paddle develop 版本训练，需要安装`pip install fast_dataindex visualdl==2.5.3`等相关缺失 whl 包
 2. `use_flash_attention` 需要在 A100机器开启，建议使用 cuda11.8环境。
 3. `use_fused_rms_norm` 需要安装自定义算子。如果安装后仍然找不到算子，需要额外设置 PYTHONPATH
 4. `continue_training` 表示从现有的预训练模型加载训练。7b 模型初始 loss 大概为2.xx, 随机初始化模型 loss 从11.x 左右下降。
@@ -115,15 +118,15 @@ PaddleNLP 支持多个主流大模型的 SFT、LoRA、Prefix Tuning 等精调策
 样例数据：
 
 ```text
-{"src": "类型#裙*颜色#蓝色*风格#清新*图案#蝴蝶结", "tgt": "裙身处采用立体蝴蝶结装饰辅以蓝色条带点缀，令衣身造型饱满富有层次的同时为其注入一丝甜美气息。将女孩清新娇俏的一面衬托而出。"}
+{"src": "Give three tips for staying healthy.", "tgt": "1.Eat a balanced diet and make sure to include plenty of fruits and vegetables. \n2. Exercise regularly to keep your body active and strong. \n3. Get enough sleep and maintain a consistent sleep schedule."}
 ...
 ```
 
-为了方便测试，我们也提供了广告生成数据集可以直接使用：
+为了方便测试，我们也提供了[tatsu-lab/alpaca](https://huggingface.co/datasets/tatsu-lab/alpaca)demo 数据集可以直接使用：
 
 ```shell
-wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
-tar -zxvf AdvertiseGen.tar.gz
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/alpaca_demo.gz
+tar -xvf alpaca_demo.gz
 ```
 
 #### 2.2 全参精调：SFT
@@ -193,6 +196,7 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 # DPO 启动命令参考
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
+更多 DPO 技术细节和使用说明详见[DPO 文档](./docs/dpo.md)。
 
 #### 3.2 RLHF
 
@@ -210,38 +214,37 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo
 </div>
 <div align="center">
     <font size ="1">
-    飞桨量化算法效果展示
+    飞桨 W4和 W8A8量化算法效果展示
+     </font>
+</div>
+<div align="center">
+    <img width="300" alt="llm" src="https://github.com/user-attachments/assets/ab8d04ba-d589-4f54-acf1-b00c0fd9159e">
+</div>
+<div align="center">
+    <font size ="1">
+    飞桨 W8A8C8和 FP8量化效果展示
      </font>
 </div>
 
 ```shell
 # PTQ 量化启动命令参考
-python  run_finetune.py ./config/llama/ptq_argument.json
+python run_finetune.py ./config/llama/ptq_argument.json
 
 # GPTQ 量化启动命令参考
-python  run_finetune.py ./config/llama/ptq_argument.json
+python run_finetune.py ./config/llama/ptq_argument.json
+
+# W8A8C8(INT)量化启动命令参考
+python run_finetune.py ./config/llama/ptq_c8_argument.json
+
+# W8A8(FP8)量化启动命令参考
+python run_finetune.py ./config/llama/fp8_ptq_argument.json
 ```
 
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。
 
 ### 5. 推理
 
-PaddleNLP 除了提供常用模型推理外，还提供了高性能推理，内置动态插入和全环节算子融合策略，极大加快并行推理的速度。
-
-- **常用模型推理**：PaddleNLP 提供了动态图推理和静态图推理两种方式，方便用户快速验证模型推理效果（包含 LoRA、PrefixTuning）。
-
-```shell
-# 动态图模型推理命令参考
-python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --data_file ./data/dev.json --dtype float16
-
-# 静态图模型推理命令参考
-# step1 : 静态图导出
-python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --output_path ./inference --dtype float16
-# step2: 静态图推理
-python ./predict/predictor.py --model_name_or_path ./inference --data_file ./data/dev.json --dtype float16 --mode static
-```
-
-- **InferenceModel 高性能推理**：PaddleNLP 还提供了高性能推理模型加快并行推理的速度，同时支持 FP16、Prefix Tuning、WINT8、A8W8多种推理方式。
+PaddleNLP 提供高性能推理，内置动态插入和全环节算子融合策略，极大加快并行推理的速度，同时支持 FP16/BF16、WINT8、WINT4、A8W8、A8W8C8多种推理方式。
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/PaddlePaddle/PaddleNLP/assets/63761690/fb248224-0ad1-4d6a-a1ca-3a8dd765c41d">
@@ -253,17 +256,17 @@ python ./predict/predictor.py --model_name_or_path ./inference --data_file ./dat
 </div>
 
 ```shell
-# 高性能动态图模型推理命令参考
+# 动态图模型推理命令参考
 python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --dtype float16
 
-# 高性能静态图模型推理命令参考
+# 静态图模型推理命令参考
 # step1 : 静态图导出
 python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat --inference_model --output_path ./inference --dtype float16
 # step2: 静态图推理
 python ./predict/predictor.py --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static"
 ```
 
-更多常用模型推理和高性能模型使用方法详见[大模型推理文档](./docs/inference.md)。
+更多模型推理使用方法详见[大模型推理文档](./docs/predict/inference.md)。
 
 ### 6. 服务化部署
 
@@ -287,7 +290,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_ser
 
 - `port`: Gradio UI 服务端口号，默认8011。
 - `flask_port`: Flask 服务端口号，默认8010。
-- 其他参数请参见[推理文档](./docs/inference.md)中推理参数配置。
+- 其他参数请参见[推理文档](./docs/predict/inference.md)中推理参数配置。
 
 此外，如果想通过 API 脚本的方式跑推理，可参考：`./predict/request_flask_server.py` 文件。
 

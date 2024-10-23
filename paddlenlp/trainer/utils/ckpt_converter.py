@@ -33,15 +33,22 @@ from paddle.distributed.fleet.utils.log_util import logger
 MODEL_WEIGHT_SUFFIX = ".pdparams"
 OPTIMIZER_WEIGHT_SUFFIX = ".pdopt"
 SCHEDULER_NAME = "scheduler.pdparams"
+SCALAR_NAME = "scalar.pdparams"
 MODEL_META_FILE_NAME = "model_meta.json"
 OPTIMIZER_STATE_NAME_SUFFIX = [".moment1", ".moment2", ".beta1_pow_acc", ".beta2_pow_acc", ".master_weight"]
 MODEL_STATE_FILE_MIN_SIZE = 512
 
 
 class CheckpointConverter:
-    def __init__(self, hybrid_parallel_ckpt_path, state_dict, parameter_to_structured_name, patch_dict=None):
+    def __init__(
+        self, hybrid_parallel_ckpt_path, state_dict, parameter_to_structured_name, trainging_args=None, patch_dict=None
+    ):
         self.use_dist = True if paddle.distributed.get_world_size() > 1 else False
         self.path = hybrid_parallel_ckpt_path
+
+        if trainging_args.ignore_load_lr_and_optim:
+            state_dict.pop("optimizer")
+
         self.auto_parallel_state_dict = self.flatten_state_dict(state_dict)
         self.parameter_to_structured_name = self.gather_global_object(parameter_to_structured_name)
         model_state_global_shape = {}
@@ -74,9 +81,9 @@ class CheckpointConverter:
             for k, v in self.auto_parallel_state_dict.items():
                 if k in self.patch_dict:
                     del_keys.append(k)
-
             for k in del_keys:
                 self.auto_parallel_state_dict[self.patch_dict[k]] = self.auto_parallel_state_dict[k]
+            for k in del_keys:
                 self.auto_parallel_state_dict.pop(k)
 
         flags = [
@@ -141,11 +148,8 @@ class CheckpointConverter:
 
             # In this scenario, the data type of the model state is bfloat16.
             for param_name, param_value in model_params.items():
-                if param_value.is_dist():
-                    master_weight = self.auto_parallel_state_dict[param_name + ".master_weight"]
-                    cast_master_weight = paddle.cast(master_weight._local_value(), param_value.dtype)
-                    paddle.assign(cast_master_weight, param_value._local_value())
-                else:
+                if param_value._is_initialized():
+                    # These codes are compatible for both dense tensor and dist tensor
                     master_weight = self.auto_parallel_state_dict[param_name + ".master_weight"]
                     cast_master_weight = paddle.cast(master_weight, param_value.dtype)
                     paddle.assign(cast_master_weight, param_value)
@@ -210,8 +214,8 @@ class CheckpointConverter:
             assert self.model_meta is not None
             global_model_state_shapes = []
             sharding_metas_keys = []
-            for i in range(self.pp_degree):
-                for j in range(self.tp_degree):
+            for i in range(self.tp_degree):
+                for j in range(self.pp_degree):
                     sharding_metas_keys.append("tp{:02d}_pp{:02d}".format(i, j))
             for key in sharding_metas_keys:
                 param_meta = self.model_meta["sharding_metas"][key]["param_meta"]
@@ -243,24 +247,25 @@ class CheckpointConverter:
             # Generate the optimizer states corresponding to the model weights.
             logger.info("Requesting GPU memory space to concatenate tensors split by sharding1 v2.")
             optimizer_state_dict = {}
-            for key in cur_rank_need_load_model_state_keys:
-                for tp_rank in range(self.tp_degree):
-                    tp_rank_suffix = "_tp{:02d}".format(tp_rank)
-                    optimizer_state_dict[key + ".moment1" + tp_rank_suffix] = paddle.zeros(
-                        (param_flattened_shapes[key],), "float32"
-                    )
-                    optimizer_state_dict[key + ".moment2" + tp_rank_suffix] = paddle.zeros(
-                        (param_flattened_shapes[key],), "float32"
-                    )
-                    if self.optimizer_state_with_master_weights:
-                        optimizer_state_dict[key + ".master_weight" + tp_rank_suffix] = paddle.zeros(
+            with paddle.base.dygraph.guard(place=paddle.CPUPlace()):
+                for key in cur_rank_need_load_model_state_keys:
+                    for tp_rank in range(self.tp_degree):
+                        tp_rank_suffix = "_tp{:02d}".format(tp_rank)
+                        optimizer_state_dict[key + ".moment1" + tp_rank_suffix] = paddle.zeros(
                             (param_flattened_shapes[key],), "float32"
                         )
-                    # When handling tensor parallelism (TP), if some tensors are replicated, we initially assume that they are partitioned.
-                    # Later, when these are compared with the global shape, we realize that they are replicated.
+                        optimizer_state_dict[key + ".moment2" + tp_rank_suffix] = paddle.zeros(
+                            (param_flattened_shapes[key],), "float32"
+                        )
+                        if self.optimizer_state_with_master_weights:
+                            optimizer_state_dict[key + ".master_weight" + tp_rank_suffix] = paddle.zeros(
+                                (param_flattened_shapes[key],), "float32"
+                            )
+                        # When handling tensor parallelism (TP), if some tensors are replicated, we initially assume that they are partitioned.
+                        # Later, when these are compared with the global shape, we realize that they are replicated.
 
-                    optimizer_state_dict[key + ".beta1_pow_acc" + tp_rank_suffix] = paddle.zeros((1,), "float32")
-                    optimizer_state_dict[key + ".beta2_pow_acc" + tp_rank_suffix] = paddle.zeros((1,), "float32")
+                        optimizer_state_dict[key + ".beta1_pow_acc" + tp_rank_suffix] = paddle.zeros((1,), "float32")
+                        optimizer_state_dict[key + ".beta2_pow_acc" + tp_rank_suffix] = paddle.zeros((1,), "float32")
 
             malloc_size = 0
             for opt_state_name, opt_state_value in optimizer_state_dict.items():
@@ -896,25 +901,26 @@ class CheckpointConverter:
         return renamed_state_dict
 
     def rename_using_optimizer_state_order(self, model_state_keys, optimizer_state_dict):
-
         name_mapping = {}
         suffix_bucket = {}
         assert len(optimizer_state_dict) % len(model_state_keys) == 0
         for suffix in OPTIMIZER_STATE_NAME_SUFFIX:
             suffix_bucket[suffix] = []
-        for satte_name, satte_value in optimizer_state_dict.items():
-            if "moment1" in satte_name:
-                suffix_bucket[".moment1"].append(satte_name)
-            elif "moment2" in satte_name:
-                suffix_bucket[".moment2"].append(satte_name)
-            elif "beta1_pow_acc" in satte_name:
-                suffix_bucket[".beta1_pow_acc"].append(satte_name)
-            elif "beta2_pow_acc" in satte_name:
-                suffix_bucket[".beta2_pow_acc"].append(satte_name)
+        for opt_name, opt_value in optimizer_state_dict.items():
+            if "moment1" in opt_name:
+                suffix_bucket[".moment1"].append(opt_name)
+            elif "moment2" in opt_name:
+                suffix_bucket[".moment2"].append(opt_name)
+            elif "beta1_pow_acc" in opt_name:
+                suffix_bucket[".beta1_pow_acc"].append(opt_name)
+            elif "beta2_pow_acc" in opt_name:
+                suffix_bucket[".beta2_pow_acc"].append(opt_name)
             else:
-                suffix_bucket[".master_weight"].append(satte_name)
+                suffix_bucket[".master_weight"].append(opt_name)
 
         for suffix, old_names in suffix_bucket.items():
+            if len(old_names) == 0:
+                continue
             assert len(old_names) == len(model_state_keys)
             for i in range(len(old_names)):
                 name_mapping[old_names[i]] = model_state_keys[i] + suffix
@@ -1011,6 +1017,9 @@ class CheckpointConverter:
                 cur_rank_optimizer_state_file_names.append(file_name)
         if SCHEDULER_NAME in cur_rank_model_state_file_names:
             cur_rank_model_state_file_names.remove(SCHEDULER_NAME)
+        if SCALAR_NAME in cur_rank_model_state_file_names:
+            cur_rank_model_state_file_names.remove(SCALAR_NAME)
+
         return cur_rank_model_state_file_names, cur_rank_optimizer_state_file_names
 
     def get_distribution_rank_from_file_name(self, file_name):

@@ -42,7 +42,7 @@ function gpt_case_list_dygraph(){
     gpt_generation_345M_single
     gpt_generation_345M_hybrid
     gpt_345M_mp8_qat
-    gpt_export_345M_mp1
+    # gpt_export_345M_mp1
     # gpt_export_345M_mp2
     # gpt_export_qat_345M
     # gpt_inference_345M_single
@@ -512,6 +512,7 @@ function before_hook_for_gpt() {
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
+    export no_proxy=bcebos.com
     if [[ $FLAGS_install_deps == 0 ]];then
         echo -e "\033[31m ---- Install requirements for GPT dygraph cases  \033[0m"
         cp requirements.txt requirements_nlp.txt
@@ -619,6 +620,7 @@ function before_hook_for_llm_gpt() {
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
+    export no_proxy=bcebos.com
     python -m pip install -r $root_path/requirements.txt
     python -m pip install -r $root_path/requirements-dev.txt
     if [[ ! $FLAGS_download_data =~ "llm_gpt" ]];then

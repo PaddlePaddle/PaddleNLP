@@ -91,7 +91,7 @@ class EmptyActScale:
         self.key_map = key_map_dict
         self.scale = {}
         for scale_type, key_template in self.key_map.items():
-            self.scale[scale_type] = np.full([num_of_layers], fill_value=0.1)
+            self.scale[scale_type] = np.full([num_of_layers], fill_value=0.1, dtype="float32")
 
 
 class EmptyWeightScale:
@@ -103,18 +103,19 @@ class EmptyWeightScale:
         self,
         key_map_dict,
         num_of_layers,
-        num_head,
+        num_heads,
         dim_head,
         ffn_hidden_size,
         num_key_value_heads=-1,
         mp_size=1,
+        concat_qkv=False,
+        concat_ffn1=False,
     ):
         self.key_map = key_map_dict
         self.scale = {}
 
-        num_key_value_heads = num_key_value_heads
         qkv_out_size = (
-            3 * num_head * dim_head if num_key_value_heads <= 0 else (num_head + 2 * num_key_value_heads) * dim_head
+            3 * num_heads * dim_head if num_key_value_heads <= 0 else (num_heads + 2 * num_key_value_heads) * dim_head
         )
 
         for scale_type, key_template in self.key_map.items():
@@ -123,8 +124,19 @@ class EmptyWeightScale:
             elif "ffn1" in scale_type:
                 n = ffn_hidden_size * 2 // mp_size
             else:
-                n = num_head * dim_head
+                n = num_heads * dim_head
             self.scale[scale_type] = np.full([num_of_layers, n], fill_value=0.1, dtype="float32")
+
+        # concat qkv and ffn1
+        if concat_qkv:
+            self.scale["qkv_weight_scale"] = np.full(
+                [num_of_layers, qkv_out_size // mp_size], fill_value=0.1, dtype="float32"
+            )
+
+        if concat_ffn1:
+            self.scale["ffn1_weight_scale"] = np.full(
+                [num_of_layers, ffn_hidden_size * 2 // mp_size], fill_value=0.1, dtype="float32"
+            )
 
 
 class EmptyCacheScale:

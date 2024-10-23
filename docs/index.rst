@@ -48,7 +48,7 @@
    :maxdepth: 1
    :caption: 飞桨大模型
 
-   大模型预训练文档 <llm/pretraining/index.rst>
+   大模型预训练文档 <llm/docs/pretrain.rst>
    大模型精调文档 <llm/docs/finetune.md>
    大模型常用算法文档 <llm/docs/algorithm_overview.md>
    大模型RLHF文档 <llm/docs/rlhf.md>
@@ -57,6 +57,7 @@
    大模型统一存储文档 <llm/docs/unified_checkpoint.md>
    混合并行训练教程 <llm/docs/llm_trainer.rst>
    模型权重转换教程 <llm/docs/torch2paddle.md>
+   大模型DPO文档 <llm/docs/dpo.md>
 
 .. toctree::
    :maxdepth: 1

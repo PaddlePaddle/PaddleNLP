@@ -283,6 +283,7 @@ class GPTInferenceModel(GPTPretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        self.transformer_block.init_weight()
         dtype = paddle.get_default_dtype()
         if "gpt.decoder.layers.0.self_attn.q_proj.weight" in state_dict.keys():
             for i in range(self.num_layers):

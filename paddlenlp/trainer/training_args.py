@@ -39,6 +39,17 @@ from .trainer_utils import (
     ShardingOption,
 )
 
+try:
+    from paddle.distributed import in_auto_parallel_align_mode
+except Exception:
+
+    def in_auto_parallel_align_mode():
+        """
+        hack for paddlenlp develop branch.
+        """
+        return False
+
+
 __all__ = [
     "default_logdir",
     "TrainingArguments",
@@ -436,6 +447,7 @@ class TrainingArguments:
         },
     )
     logging_dir: Optional[str] = field(default=None, metadata={"help": "VisualDL log dir."})
+    output_signal_dir: Optional[str] = field(default=None, metadata={"help": "Asynchronous saving signal dir."})
     logging_strategy: IntervalStrategy = field(
         default="steps",
         metadata={"help": "The logging strategy to use."},
@@ -549,6 +561,17 @@ class TrainingArguments:
             )
         },
     )
+    sharding_comm_buffer_size_MB: int = field(
+        default=-1,
+        metadata={
+            "help": (
+                "Set the size of the fuse gradient in sharding communication. This option only takes effect when "
+                "the sharding option is turned on.The default value is -1, which means that the gradient size of "
+                "all communication fuses follows the default configuration, which is 256MB. "
+            )
+        },
+    )
+
     save_sharded_model: bool = field(
         default=False,
         metadata={
@@ -856,8 +879,18 @@ class TrainingArguments:
     release_grads: Optional[bool] = field(
         default=False, metadata={"help": "Whether to release gradients during training. Default is `False`."}
     )
+    skip_data_intervals: Optional[List[List[int]]] = field(
+        default=None,
+        metadata={"help": "The intervals to skip, pass start global step and end global step at each interval"},
+    )
 
     def __post_init__(self):
+        if in_auto_parallel_align_mode():
+            self.max_grad_norm = 0.0
+            os.environ["FLAGS_max_inplace_grad_add"] = "65536"
+            os.environ["FLAGS_embedding_deterministic"] = "1"
+            os.environ["FLAGS_cudnn_deterministic"] = "1"
+
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size() > 1:
             self.local_rank = env_local_rank
@@ -882,6 +915,10 @@ class TrainingArguments:
             self.logging_dir = os.path.join(self.output_dir, default_logdir())
         if self.logging_dir is not None:
             self.logging_dir = os.path.expanduser(self.logging_dir)
+        if self.output_signal_dir is None and self.output_dir is not None:
+            self.output_signal_dir = self.output_dir
+        if self.output_signal_dir is not None:
+            self.output_signal_dir = os.path.expanduser(self.output_signal_dir)
 
         if self.disable_tqdm is None:
             self.disable_tqdm = False  # logger.getEffectiveLevel() > logging.WARN
@@ -959,6 +996,7 @@ class TrainingArguments:
         if self.sharding_degree > 0:
             warnings.warn("`sharding_degree` is deprecated, please use `sharding_parallel_degree`")
             self.sharding_parallel_degree = max(self.sharding_degree, self.sharding_parallel_degree)
+        self.data_parallel_degree = 1
 
         delattr(self, "sharding_degree")
 
@@ -1087,6 +1125,7 @@ class TrainingArguments:
                                 "enable_clear_every_step_cache",
                                 "enable_overlap_p2p_comm",
                                 "disable_batch_p2p_comm",
+                                "best_unbalanced_scheduler",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -1121,10 +1160,11 @@ class TrainingArguments:
                         "dp_comm_overlap": enable_dp_comm_overlap,
                         "sharding_comm_overlap": enable_sharding_comm_overlap,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
-                        "release_gradients": "enable_release_grads" in pipeline_parallel_config,
+                        "release_gradients": "enable_release_grads" in pipeline_parallel_config or self.release_grads,
                         "overlap_p2p_comm": "enable_overlap_p2p_comm" in pipeline_parallel_config,
                         "clear_every_step_cache": "enable_clear_every_step_cache" in pipeline_parallel_config,
                         "use_batch_p2p_comm": "disable_batch_p2p_comm" not in pipeline_parallel_config,
+                        "best_unbalanced_scheduler": "best_unbalanced_scheduler" in pipeline_parallel_config,
                     }
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
@@ -1293,6 +1333,11 @@ class TrainingArguments:
                             )
 
                     try:
+                        if self.sharding_comm_buffer_size_MB > 0:
+                            strategy.hybrid_configs["sharding_configs"].comm_buffer_size_MB = int(
+                                self.sharding_comm_buffer_size_MB
+                            )
+
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
 
@@ -1427,7 +1472,7 @@ class TrainingArguments:
                             "enable_send_recv_overlap",
                             # "disable_p2p_cache_shape",      # no need for auto_parallel
                             # "disable_partial_send_recv",    # no implemenation for auto_parallel
-                            # "enable_delay_scale_loss",      # default True in auto_parallel, non-configurable
+                            "enable_delay_scale_loss",
                             # "enable_dp_comm_overlap",       # no implemenation for auto_parallel
                             # "enable_sharding_comm_overlap", # no implemenation for auto_parallel
                             # "enable_timer",                 # no implemenation for auto_parallel
@@ -1445,6 +1490,7 @@ class TrainingArguments:
                 pipeline.accumulate_steps = self.gradient_accumulation_steps
                 pipeline.micro_batch_size = self.per_device_train_batch_size
                 pipeline.schedule_mode = self.pipeline_schedule_mode
+                pipeline.pp_degree = self.pipeline_parallel_degree
 
                 logger.info(f"PP configs:{strategy.pipeline}, use master_grad: {self.amp_master_grad}")
 
@@ -1475,6 +1521,7 @@ class TrainingArguments:
                     if len(x) > 0:
                         if x not in [
                             "enable_mp_async_allreduce",  # allreduce_matmul_grad_overlapping in auto_parallel
+                            "enable_delay_scale_loss",
                             # "enable_mp_skip_c_identity",
                             # "enable_mp_fused_linear_param_grad_add",
                         ]:

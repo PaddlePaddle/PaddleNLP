@@ -25,7 +25,7 @@ import re
 import unicodedata
 from collections import OrderedDict
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import numpy
 import numpy as np
@@ -940,8 +940,10 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         init_dict.pop("self", None)
         super(PretrainedTokenizer, self).__init__(**init_dict)
 
-        self.added_tokens_encoder: Dict[str, int] = {}
-        self.added_tokens_decoder: Dict[int, str] = {}
+        self.added_tokens_decoder: Dict[int, AddedToken] = {}
+        self.added_tokens_decoder.update(kwargs.pop("added_tokens_decoder", {}))
+        self.added_tokens_encoder: Dict[str, int] = {k.content: v for v, k in self.added_tokens_decoder.items()}
+
         self.unique_no_split_tokens: List[str] = []
         self.tokens_trie = Trie()
 
@@ -1211,7 +1213,9 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
         if isinstance(ids, int):
             if ids in self.added_tokens_decoder:
-                return self.added_tokens_decoder[ids]
+                token = self.added_tokens_decoder[ids]
+                token = token.content if isinstance(token, AddedToken) else token
+                return token
             else:
                 return self._convert_id_to_token(ids)
         tokens = []
@@ -1220,7 +1224,9 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             if skip_special_tokens and index in self.all_special_ids:
                 continue
             if index in self.added_tokens_decoder:
-                tokens.append(self.added_tokens_decoder[index])
+                token = self.added_tokens_decoder[index]
+                token = token.content if isinstance(token, AddedToken) else token
+                tokens.append(token)
             else:
                 tokens.append(self._convert_id_to_token(index))
         return tokens
@@ -1332,6 +1338,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_position_ids: Optional[bool] = None,
         return_token_type_ids: Optional[bool] = None,
@@ -1383,6 +1390,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             max_length=max_length,
             stride=stride,
             pad_to_multiple_of=pad_to_multiple_of,
+            padding_side=padding_side,
             return_tensors=return_tensors,
             prepend_batch_axis=True,
             return_position_ids=return_position_ids,
@@ -1413,6 +1421,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_position_ids: Optional[bool] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_token_type_ids: Optional[bool] = None,
@@ -1481,6 +1490,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             max_length=max_length,
             stride=stride,
             pad_to_multiple_of=pad_to_multiple_of,
+            padding_side=padding_side,
             return_position_ids=return_position_ids,
             return_attention_mask=return_attention_mask,
             return_token_type_ids=return_token_type_ids,
@@ -1505,6 +1515,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         max_length: Optional[int] = None,
         stride: int = 0,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_position_ids: Optional[bool] = None,
         return_tensors: Optional[str] = None,
         return_token_type_ids: Optional[bool] = None,
@@ -1617,6 +1628,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                     max_length=max_length,
                     stride=stride,
                     pad_to_multiple_of=None,  # we pad in batch afterward
+                    padding_side=padding_side,  # we pad in batch afterward
                     return_position_ids=return_position_ids,  # we pad in batch afterward
                     return_attention_mask=False,  # we pad in batch afterward
                     return_token_type_ids=return_token_type_ids,
@@ -1639,6 +1651,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             padding=padding_strategy.value,
             max_length=max_length,
             pad_to_multiple_of=pad_to_multiple_of,
+            padding_side=padding_side,
             return_attention_mask=return_attention_mask,
         )
         if return_dict:
@@ -1875,10 +1888,14 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         """tokenizer decoding for the streaming generation use case. This method can be overrided for tokenizer that doesn't follow this API"""
         # The prefix text is necessary only to defeat cleanup algorithms in the decode
         # which decide to add a space or not depending on the surrounding ids.
-        prefix_text = self.decode(all_input_ids[prefix_offset:read_offset], skip_special_tokens=False)
-        new_text = self.decode(all_input_ids[prefix_offset:], skip_special_tokens=False)
+        prefix_text = self.decode(
+            all_input_ids[prefix_offset:read_offset], skip_special_tokens=False, clean_up_tokenization_spaces=False
+        )
+        new_text = self.decode(
+            all_input_ids[prefix_offset:], skip_special_tokens=False, clean_up_tokenization_spaces=False
+        )
 
-        if len(new_text) > len(prefix_text) and not new_text.endswith("�"):
+        if len(new_text) > len(prefix_text) and not prefix_text.endswith("�") and not new_text.endswith("�"):
             # utf-8 char at the end means it's a potential unfinished byte sequence
             # from byte fallback tokenization.
             # If it's in the middle, it's probably a real invalid id generated

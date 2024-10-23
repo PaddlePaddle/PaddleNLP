@@ -53,42 +53,7 @@ class ZeroPadding:
     ]
 
     @classmethod
-    def _pad_batch_records_to_max_length(cls, batch_records, max_length, pad_token=0):
-        # confirm the at least one item in the pack
-        if len(batch_records) == 0:
-            return batch_records
-        # count all records total length
-        total_length = sum([len(record["input_ids"]) for record in batch_records])
-        reserved_length = max_length - total_length
-
-        # append padding to the max_length
-        if "attn_mask_startend_row_indices" in batch_records[0]:
-            # attn_mask_startend_row_indices is a list of row indices `0`,
-            # which indicates that all tokens are masked.
-            batch_records.append(
-                {
-                    "input_ids": [pad_token] * reserved_length,
-                    "labels": [-100] * reserved_length,
-                    "attn_mask_startend_row_indices": [0] * reserved_length,
-                }
-            )
-        elif "attention_mask" in batch_records[0]:
-            # attention_mask is a fullly masked attention matrix (all False)
-            # which indicates that all tokens are masked.
-            batch_records.append(
-                {
-                    "input_ids": [pad_token] * reserved_length,
-                    "labels": [-100] * reserved_length,
-                    "attention_mask": np.zeros((reserved_length, reserved_length), dtype=bool),
-                }
-            )
-
-        return batch_records
-
-    @classmethod
-    def _pad_batch_records(cls, batch_records, max_length):
-        batch_records = cls._pad_batch_records_to_max_length(batch_records, max_length)
-
+    def _pad_batch_records(cls, batch_records):
         # Only consider supported input keys
         input_keys = [key for key in batch_records[0].keys() if key in cls.supported_input_keys]
         if "attn_mask_startend_row_indices" not in input_keys and "attention_mask" not in input_keys:
@@ -102,11 +67,14 @@ class ZeroPadding:
             elif "rejected_labels" in input_keys and "chosen_labels" in input_keys:
                 batched_features["rejected_labels"].extend(record["rejected_labels"])
                 batched_features["chosen_labels"].extend(record["chosen_labels"])
-                response_indexs = [
-                    record["response_indexs"][0] + sequence_sum,  # chosen_response_start_index
-                    record["response_indexs"][1] + sequence_sum,  # rejeted_response_start_index
-                    record["response_indexs"][2] + sequence_sum,  # rejeted_response_end_index + 1
-                ]
+                response_indexs = []
+                for ii in range(len(record["response_indexs"])):
+                    response_indexs.append(record["response_indexs"][ii] + sequence_sum)
+                batched_features["response_indexs"].append(response_indexs)
+            elif "response_indexs" in input_keys:
+                response_indexs = []
+                for ii in range(len(record["response_indexs"])):
+                    response_indexs.append(record["response_indexs"][ii] + sequence_sum)
                 batched_features["response_indexs"].append(response_indexs)
             else:
                 raise ValueError("labels is required for ZeroPadding Dataset")
@@ -157,7 +125,7 @@ class ZeroPaddingMapDataset(ZeroPadding, Dataset):
                     cur_len_so_far += len(record["input_ids"])
                 else:
                     # exceed max length
-                    padded_list = self._pad_batch_records(batch_records, self.max_length)
+                    padded_list = self._pad_batch_records(batch_records)
                     total_data.append(padded_list)
                     # reset
                     batch_records = []
@@ -168,7 +136,7 @@ class ZeroPaddingMapDataset(ZeroPadding, Dataset):
 
             # remaining data
             if batch_records:
-                padded_list = self._pad_batch_records(batch_records, self.max_length)
+                padded_list = self._pad_batch_records(batch_records)
                 total_data.append(padded_list)
         else:
             examples = []
@@ -185,7 +153,7 @@ class ZeroPaddingMapDataset(ZeroPadding, Dataset):
                     generate_packs = generate_greedy_packs(examples, self.max_length)
                     for batch_records in generate_packs:
                         if len(batch_records) > 0:
-                            padded_list = self._pad_batch_records(batch_records, self.max_length)
+                            padded_list = self._pad_batch_records(batch_records)
                             total_data.append(padded_list)
                     examples = [record]
                     i = 1
@@ -193,7 +161,7 @@ class ZeroPaddingMapDataset(ZeroPadding, Dataset):
                 generate_packs = generate_greedy_packs(examples, self.max_length)
                 for batch_records in generate_packs:
                     if len(batch_records) > 0:
-                        padded_list = self._pad_batch_records(batch_records, self.max_length)
+                        padded_list = self._pad_batch_records(batch_records)
                         total_data.append(padded_list)
 
         return total_data
@@ -225,7 +193,7 @@ class ZeroPaddingIterableDataset(ZeroPadding, IterableDataset):
                     cur_len_so_far += len(record["input_ids"])
                 else:
                     # exceed max length
-                    padded_list = self._pad_batch_records(batch_records, self.max_length)
+                    padded_list = self._pad_batch_records(batch_records)
                     yield padded_list
                     # reset
                     batch_records = []
@@ -235,7 +203,7 @@ class ZeroPaddingIterableDataset(ZeroPadding, IterableDataset):
                     self.zero_padding_global_step += 1
                     cur_len_so_far += len(record["input_ids"])
             if batch_records:
-                padded_list = self._pad_batch_records(batch_records, self.max_length)
+                padded_list = self._pad_batch_records(batch_records)
                 yield padded_list
         else:
             examples = []
@@ -253,7 +221,7 @@ class ZeroPaddingIterableDataset(ZeroPadding, IterableDataset):
                     generate_packs = generate_greedy_packs(examples, self.max_length)
                     for batch_records in generate_packs:
                         if len(batch_records) > 0:
-                            padded_list = self._pad_batch_records(batch_records, self.max_length)
+                            padded_list = self._pad_batch_records(batch_records)
                             yield padded_list
                     examples = [record]
                     self.zero_padding_global_step += 1
@@ -262,5 +230,5 @@ class ZeroPaddingIterableDataset(ZeroPadding, IterableDataset):
                 generate_packs = generate_greedy_packs(examples, self.max_length)
                 for batch_records in generate_packs:
                     if len(batch_records) > 0:
-                        padded_list = self._pad_batch_records(batch_records, self.max_length)
+                        padded_list = self._pad_batch_records(batch_records)
                         yield padded_list

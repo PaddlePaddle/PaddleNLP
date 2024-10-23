@@ -30,7 +30,6 @@ from paddlenlp.experimental.model_utils import (
 )
 from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedBlockMultiTransformer,
-    FusedBlockMultiTransformerA8W8,
     FusedBlockMultiTransformerWeightOnly,
     FusedMultiTransformerA8W8,
     FusedMultiTransformerBase,
@@ -54,6 +53,7 @@ from paddlenlp.transformers.model_utils import (
     dy2st_nocheck_guard_context,
     register_base_model,
 )
+from paddlenlp.utils.download import resolve_file_path
 from paddlenlp.utils.log import logger
 
 __all__ = [
@@ -338,8 +338,9 @@ class MixtralInferenceModel(MixtralPretrainedModel):
             use_neox_rotary_style=self.use_neox,
             cachekv_int8_type=config.cachekv_int8_type,
             rank_id=config.tensor_parallel_rank,
-            trans_qkvw=(False if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8" else True),
+            trans_qkvw=(False if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type else True),
             moe_config=moe_config,
+            append_attn=config.append_attn,
         )
 
         self.set_transformer_block(transformer_config)
@@ -493,6 +494,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        self.transformer_block.init_weight()
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
         split_fn = split_param_func()
@@ -527,7 +529,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                 unfused_state_dict["self_attn.v_proj.weight"] = state_dict[
                     "mixtral.layers.{}.self_attn.v_proj.weight".format(idx)
                 ]
-                if paddle.is_compiled_with_rocm() and self.quant_type == "a8w8":
+                if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type:
                     concated_qkv_weight = np.concatenate(
                         [
                             unfused_state_dict["self_attn.q_proj.weight"],
@@ -642,7 +644,11 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                         ffn1_weight_tensor[i], algo=self.quant_algo
                     )
                     ffn1_quanted_weight_list.append(
-                        ffn1_quanted_weight_list_i.reshape([self.transformer_block.config.embed_dim, -1])
+                        ffn1_quanted_weight_list_i.reshape(
+                            [self.transformer_block.embed_dim, self.transformer_block.dim_feedforward * 2]
+                            if self.quant_type == "weight_only_int8"
+                            else [self.transformer_block.embed_dim, self.transformer_block.dim_feedforward]
+                        )
                     )
                     ffn1_quanted_weight_scale.append(ffn1_quanted_weight_scale_i)
                 ffn1_quanted_weight_tensor = paddle.to_tensor(ffn1_quanted_weight_list)
@@ -677,7 +683,11 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                         ffn2_weight_tensor[i], algo=self.quant_algo
                     )
                     ffn2_quanted_weight_list.append(
-                        ffn2_quanted_weight_list_i.reshape([-1, self.transformer_block.config.embed_dim])
+                        ffn2_quanted_weight_list_i.reshape(
+                            [self.transformer_block.dim_feedforward, self.transformer_block.embed_dim]
+                            if self.quant_type == "weight_only_int8"
+                            else [self.transformer_block.dim_feedforward, self.transformer_block.embed_dim // 2]
+                        )
                     )
                     ffn2_quanted_weight_scale.append(ffn2_quanted_weight_scale_i)
                 ffn2_quanted_weight_tensor = paddle.to_tensor(ffn2_quanted_weight_list)
@@ -707,16 +717,24 @@ class MixtralInferenceModel(MixtralPretrainedModel):
             if "a8w8" in self.quant_type:
                 if self.shift_smooth_all_linears:
                     self.transformer_block.linear_shifts[idx].set_value(
-                        paddle.to_tensor(state_dict["mixtral.layers.{}.self_attn.o_proj.shift_bias".format(idx)])
+                        paddle.to_tensor(
+                            state_dict["mixtral.layers.{}.self_attn.o_proj.shift_bias".format(idx)]
+                        ).astype(paddle.get_default_dtype())
                     )
                     self.transformer_block.linear_smooths[idx].set_value(
-                        paddle.to_tensor(state_dict["mixtral.layers.{}.self_attn.o_proj.smooth_weight".format(idx)])
+                        paddle.to_tensor(
+                            state_dict["mixtral.layers.{}.self_attn.o_proj.smooth_weight".format(idx)]
+                        ).astype(paddle.get_default_dtype())
                     )
                     self.transformer_block.ffn2_shifts[idx].set_value(
-                        paddle.to_tensor(state_dict["mixtral.layers.{}.mlp.down_proj.shift_bias".format(idx)])
+                        paddle.to_tensor(state_dict["mixtral.layers.{}.mlp.down_proj.shift_bias".format(idx)]).astype(
+                            paddle.get_default_dtype()
+                        )
                     )
                     self.transformer_block.ffn2_smooths[idx].set_value(
-                        paddle.to_tensor(state_dict["mixtral.layers.{}.mlp.down_proj.smooth_weight".format(idx)])
+                        paddle.to_tensor(
+                            state_dict["mixtral.layers.{}.mlp.down_proj.smooth_weight".format(idx)]
+                        ).astype(paddle.get_default_dtype())
                     )
 
                 if self.shift:
@@ -795,13 +813,13 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                 weight_scale_map_dict = scale_map_dict["weight_scale"]
                 cache_scale_map_dict = scale_map_dict["cachekv_scale"]
 
-                act_scale_json_path = os.path.join(self.quant_model_path, "act_scales.json")
-                weight_scale_json_path = os.path.join(self.quant_model_path, "weight_scales.json")
+                act_scale_json_path = resolve_file_path(self.quant_model_path, "act_scales.json")
+                weight_scale_json_path = resolve_file_path(self.quant_model_path, "weight_scales.json")
                 if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                    act_scale_json_path = os.path.join(
+                    act_scale_json_path = resolve_file_path(
                         self.quant_model_path, f"act_scales_{self.config.tensor_parallel_rank}.json"
                     )
-                    weight_scale_json_path = os.path.join(
+                    weight_scale_json_path = resolve_file_path(
                         self.quant_model_path, f"weight_scales_{self.config.tensor_parallel_rank}.json"
                     )
                 act_scale_loader = ActScalesLoader(
@@ -818,9 +836,9 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                 )
 
                 if self.config.cachekv_int8_type == "static":
-                    cache_scale_json_path = os.path.join(self.quant_model_path, "cachekv_scales.json")
+                    cache_scale_json_path = resolve_file_path(self.quant_model_path, "cachekv_scales.json")
                     if self.config.tensor_parallel_degree > 1 and not self.config.single_card_ptq:
-                        cache_scale_json_path = os.path.join(
+                        cache_scale_json_path = resolve_file_path(
                             self.quant_model_path, f"cachekv_act_scales_{self.config.tensor_parallel_rank}.json"
                         )
                     cache_scales_loader = CacheScaleLoader(
@@ -831,7 +849,10 @@ class MixtralInferenceModel(MixtralPretrainedModel):
                     )
                     for k, v in cache_scales_loader.scale.items():
                         for i_layer, weight_scale in enumerate(v):
-                            weight_scale = weight_scale.astype("float32")
+                            if self.config.append_attn:
+                                weight_scale = paddle.to_tensor(weight_scale).cast(paddle.get_default_dtype())
+                            else:
+                                weight_scale = weight_scale.astype("float32")
                             if k == "cache_k_scale":
                                 self.transformer_block.cache_k_scales[i_layer].set_value(weight_scale)
                             elif k == "cache_v_scale":
@@ -1053,6 +1074,7 @@ class MixtralForCausalLMInferenceModel(GenerationInferenceModel, MixtralPretrain
 @register_base_model
 class MixtralBlockInferenceModel(MixtralInferenceModel):
     def __init__(self, config: MixtralConfig):
+        self.append_attn = config.append_attn
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size
@@ -1060,8 +1082,6 @@ class MixtralBlockInferenceModel(MixtralInferenceModel):
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
             self.transformer_block = FusedBlockMultiTransformerWeightOnly(transformer_config)
-        elif "a8w8" in self.quant_type:
-            self.transformer_block = FusedBlockMultiTransformerA8W8(transformer_config)
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 

@@ -30,6 +30,8 @@ from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .image_processing_utils import ImageProcessingMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
+from .sequence_parallel_utils import AllGatherVarlenOp, sequence_parallel_sparse_mask_labels
+from .tensor_parallel_utils import parallel_matmul, parallel_linear, fused_head_and_loss_fn
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
@@ -92,6 +94,9 @@ from .convbert.tokenizer import *
 from .ctrl.modeling import *
 from .ctrl.tokenizer import *
 from .ctrl.configuration import *
+from .deepseek_v2.modeling import *
+from .deepseek_v2.tokenizer_fast import *
+from .deepseek_v2.configuration import *
 from .dpt.modeling import *
 from .dpt.configuration import *
 from .dpt.image_processing import *

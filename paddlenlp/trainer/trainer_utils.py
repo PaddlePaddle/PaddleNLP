@@ -256,7 +256,7 @@ def _check_checkpoint_files(folder_path, world_size, ignore_save_lr_and_optim, s
         return a
 
 
-def get_last_checkpoint(folder, uc_async_save=False):
+def get_last_checkpoint(folder, signal_folder=None, uc_async_save=False):
     content = os.listdir(folder)
     checkpoints = [
         path
@@ -265,6 +265,9 @@ def get_last_checkpoint(folder, uc_async_save=False):
     ]
     if len(checkpoints) == 0:
         return
+
+    if uc_async_save:
+        assert signal_folder is not None
 
     if strtobool(os.getenv("FLAG_LLM_PDC", "False")):
         for i in sorted(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0]), reverse=True):
@@ -275,11 +278,12 @@ def get_last_checkpoint(folder, uc_async_save=False):
                     return current_path
             else:
                 saving_info = paddle.load(distributed_file(os.path.join(current_path, ".saving_info")))
+                current_signal_path = os.path.join(signal_folder, i)
                 pre_world_size = saving_info.get("world_size", 1)
                 ignore_save_lr_and_optim = saving_info.get("ignore_save_lr_and_optim", False)
                 skip_save_model_weight = saving_info.get("skip_save_model_weight", False)
                 if _check_checkpoint_files(
-                    current_path, pre_world_size, ignore_save_lr_and_optim, skip_save_model_weight
+                    current_signal_path, pre_world_size, ignore_save_lr_and_optim, skip_save_model_weight
                 ):
                     return current_path
         return
@@ -344,7 +348,7 @@ def total_processes_number(local_rank):
     return 1
 
 
-def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_length=None):
+def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_length=None, model_flops=None):
     """
     Measure and return speed performance metrics.
 
@@ -365,6 +369,11 @@ def speed_metrics(split, start_time, num_samples=None, num_steps=None, seq_lengt
         if seq_length is not None:
             tokens_per_second_per_device = samples_per_second * seq_length / paddle.distributed.get_world_size()
             result[f"{split}_tokens_per_second_per_device"] = round(tokens_per_second_per_device, 4)
+        if model_flops is not None:
+            result[f"{split}_hardware_tflops_per_device"] = round(
+                tokens_per_second_per_device * model_flops / seq_length / 2**40, 2
+            )
+
     if num_steps is not None:
         steps_per_second = num_steps / runtime
         result[f"{split}_steps_per_second"] = round(steps_per_second, 4)
@@ -1100,3 +1109,20 @@ def set_hyrbid_parallel_seed(basic_seed, dataset_rank, tp_rank, pp_rank=0):
         tracker.add("global_seed", global_seed)
     if "local_seed" not in tracker.states_ and local_seed not in tracker.seeds_:
         tracker.add("local_seed", local_seed)
+
+
+def should_skip_data(global_step, skip_data_intervals):
+    """Whether to skip current step data"""
+
+    if skip_data_intervals is None:
+        return False
+    skip_flag = False
+    for interval in skip_data_intervals:
+        if len(interval) != 2 or interval[0] > interval[1] or interval[0] <= 0:
+            raise ValueError(f"Please check your skip interval {interval}")
+        start_global_step, end_global_step = interval[0], interval[1]
+        # start_global_step and end_global_step start from 1, while global_step start from 0
+        if start_global_step <= global_step + 1 <= end_global_step:
+            skip_flag = True
+            break
+    return skip_flag

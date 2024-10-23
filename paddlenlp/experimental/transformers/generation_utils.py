@@ -18,12 +18,7 @@ from typing import List, Union
 import paddle
 import paddle.nn.functional as F
 
-from paddlenlp.generation import (
-    GenerationMixin,
-    LogitsProcessor,
-    LogitsProcessorList,
-    TopPProcess,
-)
+from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
 
 __all__ = ["GenerationInferenceModel", "GenerationBlockInferenceModel", "GenerationAvxInferenceModel"]
 
@@ -334,8 +329,13 @@ class GenerationInferenceModel(GenerationMixin):
             # sample
             probs = F.softmax(logits)
 
-            # compute next_tokens, use paddle.tensor.top_p_sampling
-            _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
+            # compute next_tokens
+            try:
+                from paddlenlp_ops import top_p_sampling_reject
+
+                next_tokens = top_p_sampling_reject(probs, top_p, 0)
+            except:
+                _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
@@ -672,7 +672,14 @@ class GenerationBlockInferenceModel(GenerationMixin):
 
             # sample
             probs = F.softmax(logits)
-            _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
+
+            # compute next_tokens
+            try:
+                from paddlenlp_ops import top_p_sampling_reject
+
+                next_tokens = top_p_sampling_reject(probs, top_p, 0)
+            except:
+                _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
                 paddle.distributed.broadcast(next_tokens, 0)
@@ -941,10 +948,10 @@ class GenerationAvxInferenceModel(GenerationMixin):
             )
             logits = logits / temperature
             probs = F.softmax(logits)
-            min_tokens_to_keep = 1
-            if top_p is not None and top_p < 1.0:
-                probs = TopPProcess(probs, top_p, min_tokens_to_keep)
-            next_tokens = paddle.multinomial(probs)
+
+            from paddlenlp_ops import xft_greedy_search
+
+            next_tokens = xft_greedy_search(probs)
 
             model_kwargs = self.update_model_kwargs_for_generation(
                 cache, just_decoder, next_tokens, eos_token_id, model_kwargs

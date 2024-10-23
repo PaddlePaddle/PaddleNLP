@@ -41,7 +41,7 @@ try:
 except ImportError:
     fused_rotary_position_embedding = None
 try:
-    if get_env_device() in ["npu", "gcu"]:
+    if get_env_device() in ["npu", "mlu", "gcu"]:
         from paddle.base import core
 
         for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
@@ -128,6 +128,8 @@ def rms_norm_fused(x_in, w, eps, use_fast_ln=False):
 def fusion_rms_norm(hidden_states, weight, variance_epsilon, use_fast_ln=False):
     if get_env_device() == "npu":
         return core.eager._run_custom_op("rms_norm_npu", hidden_states, weight, variance_epsilon)[0]
+    if get_env_device() == "mlu":
+        return core.eager._run_custom_op("rms_norm_mlu", hidden_states, weight, variance_epsilon)[0]
     elif get_env_device() == "gcu":
         return core.eager._run_custom_op("rms_norm_gcu", hidden_states, weight, variance_epsilon)[0]
     elif get_env_device() == "xpu":
@@ -214,23 +216,33 @@ def fusion_flash_attention(
                 )
             else:
                 if attn_mask_startend_row_indices is not None:
-                    assert alibi is None, "flash_attention_with_sparse_mask not support alibi"
+                    assert alibi is None, "flashmask_attention or flash_attention_with_sparse_mask not support alibi"
                     if len(attn_mask_startend_row_indices.shape) == 2:
                         attn_mask_startend_row_indices = paddle.unsqueeze(attn_mask_startend_row_indices, axis=1)
-                    attn_output = F.flash_attention_with_sparse_mask(
-                        query_states,
-                        key_states,
-                        value_states,
-                        attn_mask_start_row_indices=attn_mask_startend_row_indices,
-                        is_causal=True,
-                    )
+
+                    if hasattr(F, "flashmask_attention"):
+                        attn_output = F.flashmask_attention(
+                            query_states,
+                            key_states,
+                            value_states,
+                            startend_row_indices=attn_mask_startend_row_indices.unsqueeze(-1),
+                            causal=True,
+                        )
+                    else:
+                        attn_output = F.flash_attention_with_sparse_mask(
+                            query_states,
+                            key_states,
+                            value_states,
+                            attn_mask_start_row_indices=attn_mask_startend_row_indices,
+                            is_causal=True,
+                        )
                 else:
                     attn_output = F.scaled_dot_product_attention(
                         query_states,
                         key_states,
                         value_states,
                         attn_mask=attention_mask,
-                        is_causal=attention_mask is None and query_states.shape[1] != 1,
+                        is_causal=query_states.shape[1] != 1,
                     )
         attn_weights = None
 
