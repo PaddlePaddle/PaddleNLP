@@ -29,6 +29,15 @@ from paddlenlp.transformers.mc2_parallel_linear import (
     MC2RowSeqParallelLinear,
 )
 from paddlenlp.utils.tools import get_env_device
+from paddlenlp.utils.log import logger
+
+if get_env_device() == "xpu":
+    try:
+        import paddle_xpu
+    except Exception as e:
+        logger.warning("Failed to import paddle_xpu, using PaddlePaddle's native implementations.")
+    else:
+        logger.info("Import paddle_xpu succeeded.")
 
 Linear = nn.Linear
 ColumnParallelLinear = mpu.ColumnParallelLinear
@@ -62,23 +71,8 @@ if get_env_device() == "npu":
         ColumnSequenceParallelLinear = MC2ColumnSeqParallelLinear
         RowSequenceParallelLinear = MC2RowSeqParallelLinear
 elif get_env_device() == "xpu":
-    try:
-        from paddle_xpu.layers.nn import ColumnParallelLinear as XPUColumnParallelLinear
-        from paddle_xpu.layers.nn import Linear as XPULinear
-        from paddle_xpu.layers.nn import RowParallelLinear as XPURowParallelLinear
-        from paddle_xpu.layers.nn.sequence_parallel import (
-            XPUColumnSequenceParallelLinear,
-            XPURowSequenceParallelLinear,
-        )
-
-        Linear = XPULinear
-        ColumnParallelLinear = XPUColumnParallelLinear
-        RowParallelLinear = XPURowParallelLinear
-        ColumnSequenceParallelLinear = XPUColumnSequenceParallelLinear
-        RowSequenceParallelLinear = XPURowSequenceParallelLinear
-    except ImportError:
-        # If paddle_xpu is not installed, just use Paddle's native Linear implementations
-        pass
+    import importlib
+    importlib.reload(nn)
 else:
     # By default, use Paddle's native Linear implementations
     pass

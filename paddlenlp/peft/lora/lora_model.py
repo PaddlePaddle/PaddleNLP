@@ -50,36 +50,22 @@ from .lora_config import LoRAConfig
 
 
 def get_lora_layers():
-    try:
-        if get_env_device() == "xpu":
-            # If paddle_xpu is not installed, just use PaddleNLP's native lora layers
-            from paddle_xpu.layers.nn.lora_layers import (
-                XPUColumnParallelLoRALinear as ColumnParallelLoRALinear,
-            )
-            from paddle_xpu.layers.nn.lora_layers import (
-                XPUColumnSequenceParallelLoRALinear as ColumnSequenceParallelLoRALinear,
-            )
-            from paddle_xpu.layers.nn.lora_layers import XPULoRALinear as LoRALinear
-            from paddle_xpu.layers.nn.lora_layers import (
-                XPURowParallelLoRALinear as RowParallelLoRALinear,
-            )
-            from paddle_xpu.layers.nn.lora_layers import (
-                XPURowSequenceParallelLoRALinear as RowSequenceParallelLoRALinear,
-            )
-
-            from .lora_layers import LoRAConv2D
+    if get_env_device() == "xpu":
+        try:
+            import paddle_xpu
+            paddle_xpu.init_lora_layers()
+        except Exception as e:
+            logger.warning("Failed to import LoRALinear from paddle_xpu, using PaddleNLP's native implementation.")
         else:
-            raise ImportError  # Force to use the fallback if not XPU
-    except ImportError:
-        from .lora_layers import (
-            ColumnParallelLoRALinear,
-            ColumnSequenceParallelLoRALinear,
-            LoRAConv2D,
-            LoRALinear,
-            RowParallelLoRALinear,
-            RowSequenceParallelLoRALinear,
-        )
-
+            logger.info("Import paddle_xpu succeeded.")
+    from .lora_layers import (
+        ColumnParallelLoRALinear,
+        ColumnSequenceParallelLoRALinear,
+        LoRAConv2D,
+        LoRALinear,
+        RowParallelLoRALinear,
+        RowSequenceParallelLoRALinear,
+    )
     return {
         "ColumnParallelLoRALinear": ColumnParallelLoRALinear,
         "ColumnSequenceParallelLoRALinear": ColumnSequenceParallelLoRALinear,
