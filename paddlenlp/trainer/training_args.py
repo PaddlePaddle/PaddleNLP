@@ -1472,7 +1472,7 @@ class TrainingArguments:
                             "enable_send_recv_overlap",
                             # "disable_p2p_cache_shape",      # no need for auto_parallel
                             # "disable_partial_send_recv",    # no implemenation for auto_parallel
-                            # "enable_delay_scale_loss",      # default True in auto_parallel, non-configurable
+                            "enable_delay_scale_loss",
                             # "enable_dp_comm_overlap",       # no implemenation for auto_parallel
                             # "enable_sharding_comm_overlap", # no implemenation for auto_parallel
                             # "enable_timer",                 # no implemenation for auto_parallel
@@ -1521,6 +1521,7 @@ class TrainingArguments:
                     if len(x) > 0:
                         if x not in [
                             "enable_mp_async_allreduce",  # allreduce_matmul_grad_overlapping in auto_parallel
+                            "enable_delay_scale_loss",
                             # "enable_mp_skip_c_identity",
                             # "enable_mp_fused_linear_param_grad_add",
                         ]:

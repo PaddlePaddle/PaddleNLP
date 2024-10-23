@@ -44,7 +44,7 @@ def parallel_matmul(lm_output, logit_weights, tensor_parallel_output=True, train
             logits = xpu_parallel_matmul(
                 lm_output,
                 logit_weights,
-                tensor_parallel_output,
+                tensor_parallel_output=tensor_parallel_output,
                 training=training,
             )
             return logits
