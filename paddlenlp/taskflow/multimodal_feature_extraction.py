@@ -109,7 +109,7 @@ class MultimodalFeatureExtractionTask(Task):
             ],
             "config": [
                 "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-base-patch16/config.json",
-                "3611b5c34ad69dcf91e3c1d03b01a93a",
+                "dc543b61c15d6cad5787aea161f76279",
             ],
             "vocab_file": [
                 "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-base-patch16/vocab.txt",
@@ -135,7 +135,7 @@ class MultimodalFeatureExtractionTask(Task):
             ],
             "config": [
                 "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14/config.json",
-                "a5e35843aa87ab1106e9f60f1e16b96d",
+                "f90be56bdfda90cdaf3c4af1ea0279cd",
             ],
             "vocab_file": [
                 "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14/vocab.txt",
@@ -161,7 +161,7 @@ class MultimodalFeatureExtractionTask(Task):
             ],
             "config": [
                 "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14-336px/config.json",
-                "cb2794d99bea8c8f45901d177e663e1e",
+                "531b4ff94cfc48031c5bf793c14f60b2",
             ],
             "vocab_file": [
                 "https://paddlenlp.bj.bcebos.com/models/community/OFA-Sys/chinese-clip-vit-large-patch14-336px/vocab.txt",
