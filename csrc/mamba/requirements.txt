@@ -1,0 +1,4 @@
+triton
+einops
+numpy
+pybind11
