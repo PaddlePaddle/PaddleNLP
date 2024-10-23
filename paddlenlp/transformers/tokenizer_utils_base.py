@@ -1389,7 +1389,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         self.model_input_names = kwargs.pop("model_input_names", self.model_input_names)
 
         # By default, cleaning tokenization spaces for both fast and slow tokenizers
-        self.clean_up_tokenization_spaces = kwargs.pop("clean_up_tokenization_spaces", True)
+        self.clean_up_tokenization_spaces = kwargs.pop("clean_up_tokenization_spaces", False)
 
         # By default, do not split special tokens for both fast and slow tokenizers
         self.split_special_tokens = kwargs.pop("split_special_tokens", False)
@@ -1531,8 +1531,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             "added_tokens_file": ADDED_TOKENS_FILE,
             "special_tokens_map_file": SPECIAL_TOKENS_MAP_FILE,
             "tokenizer_config_file": TOKENIZER_CONFIG_FILE,
-            "chat_template_file": CHAT_TEMPLATE_CONFIG_NAME,  # what's this
-            # "tokenizer_file": FULL_TOKENIZER_FILE,
+            "chat_template_file": CHAT_TEMPLATE_CONFIG_NAME,
         }
 
         vocab_files_target = {**cls.resource_files_names, **additional_files_names}
