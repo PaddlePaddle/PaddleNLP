@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import numpy as np
+import paddle
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 
@@ -67,6 +68,30 @@ def get_convert_example(model):
 
 class DataFormatError(ValueError):
     pass
+
+
+def tokenize_autogressive(tokenizer, example, data_args, is_test=True, zero_padding=False, flash_mask=False):
+    if "text" in example:
+        source = example["text"][0] if isinstance(example["text"], list) else example["text"]
+    else:
+        raise DataFormatError(
+            f"Example format is wrong, please check: {example} or rewrite tokenize_example in data.py "
+        )
+    outputs = tokenizer(
+        source,
+        max_length=data_args.max_length,
+        truncation=False,
+        return_tensors="pd",
+        padding=True,
+        pad_to_multiple_of=data_args.max_length,
+    )
+
+    input_batch = paddle.split(
+        outputs["input_ids"], num_or_sections=outputs["input_ids"].shape[1] // data_args.max_length, axis=1
+    )
+    input_batch = paddle.squeeze(input_batch[0]).numpy().tolist()
+    # input_batch = [paddle.squeeze(input_batch[0])]
+    return {"input_ids": input_batch}
 
 
 def tokenize_example(tokenizer, example, data_args):
@@ -176,10 +201,13 @@ def tokenize_rounds_example(tokenizer, example, data_args, **kwargs):
     return tokenized_source, labels
 
 
-def convert_example_common(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False):
+def convert_example_common(
+    example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False, autogressive=False
+):
     if tokenizer.chat_template is not None:
         return convert_rounds_example_common(example, tokenizer, data_args, is_test, zero_padding, flash_mask)
-
+    if autogressive:
+        return tokenize_autogressive(tokenizer, example, data_args)
     tokenized_source, tokenized_target_input_ids = tokenize_example(tokenizer, example, data_args)
 
     if is_test:
