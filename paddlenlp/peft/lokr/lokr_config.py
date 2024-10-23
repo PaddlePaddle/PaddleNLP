@@ -24,11 +24,11 @@ from ...utils.env import LOKR_CONFIG_NAME
 class LoKrConfig:
     """
     This is the configuration class to store the configuration of a [`LoKrModel`].
+    Convention of LoKrModel: W1 can be named as scaling matrix, W2 can be named as adapter matrix.
     Args:
         target_modules (`Union[List[str],str]`): The names of the modules to apply Lora to.
         trainable_modules (`List[str]`): The names of the modules to train when applying Lora.
         lokr_alpha (`float`): The alpha parameter for Lora scaling.
-        lora_dropout (`float`): The dropout probability for Lora layers.
         merge_weights (`bool`):
             Whether to merge the weights of the Lora layers with the base transformer model in `eval` mode.
     """
@@ -53,7 +53,7 @@ class LoKrConfig:
     trainable_bias: Optional[str] = field(
         default=None, metadata={"help": "Define trainable bias parameters for the Lora model."}
     )
-    lora_dim: int = field(default=8, metadata={"help": "Lora dimention in LoKr dimension"})
+    lora_dim: int = field(default=8, metadata={"help": "Lora dimention in LoKr dimension, for adapter matrix"})
     factor: int = field(default=-1, metadata={"help": "Determine the decomposition size of LoKr matrices"})
     decompose_both: bool = field(
         default=False,
