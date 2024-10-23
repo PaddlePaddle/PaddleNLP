@@ -211,6 +211,27 @@ except ImportError:
 __all__ = ["Trainer"]
 
 
+def _get_align_mode_scale():
+    hcg = fleet.get_hybrid_communicate_group()
+    data_parallel_world_size = hcg.get_data_parallel_world_size()
+    sharding_parallel_world_size = hcg.get_sharding_parallel_world_size()
+    return max(data_parallel_world_size, 1) * max(sharding_parallel_world_size, 1)
+
+def _maybe_scale_loss_in_align_mode(loss):
+    # In align mode, we scale the grad in dp/sharding group in advance
+    if in_auto_parallel_align_mode():
+        return loss / _get_align_mode_scale()
+    else:
+        return loss
+
+def _maybe_unscale_loss_in_align_mode(loss):
+    # In align mode, we scale the grad in dp/sharding group in advance
+    # Here we unscale the detached loss to show the actual loss
+    if in_auto_parallel_align_mode():
+        return loss * _get_align_mode_scale()
+    else:
+        return loss
+
 class Trainer:
     """
     Trainer is a simple but feature-complete training and eval loop for PaddlePaddle, optimized for PaddleNLP.
@@ -2227,7 +2248,8 @@ class Trainer:
             `paddle.Tensor`: The tensor with training loss on this batch.
         """
         if self.args.pipeline_parallel_degree > 1:
-            return self.training_pipeline_step(model, inputs)
+            loss = self.training_pipeline_step(model, inputs)
+            return _maybe_scale_loss_in_align_mode(loss)
 
         model.train()
         inputs = self._prepare_inputs(inputs)
@@ -2237,11 +2259,13 @@ class Trainer:
         if self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
 
+        loss = _maybe_scale_loss_in_align_mode(loss)
+
         if self.do_grad_scaling:
             self.scaler.scale(loss).backward()
         else:
             loss.backward()
-        return loss.detach()
+        return _maybe_unscale_loss_in_align_mode(loss.detach())
 
     def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         """
@@ -2289,7 +2313,7 @@ class Trainer:
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
 
-        return loss.detach()
+        return _maybe_unscale_loss_in_align_mode(loss.detach())
 
     def save_model(
         self,
