@@ -346,35 +346,6 @@ class SelfAttention(nn.Layer):
             ],
             axis=-1,
         )
-        # quer_state, key_state, val_state are used by flash attention
-
-        query_states, key_states, value_states = query_layer, key_layer, value_layer
-        q_length, batch_size, _ = query_layer.shape
-        query_states = query_states.reshape(
-            [
-                batch_size,
-                q_length,
-                self.num_attention_heads_per_partition,
-                self.hidden_size_per_attention_head,
-            ]
-        )
-        key_states = key_states.reshape(
-            [
-                batch_size,
-                q_length,
-                self.num_multi_query_groups_per_partition,
-                self.hidden_size_per_attention_head,
-            ]
-        )
-        value_states = value_states.reshape(
-            [
-                batch_size,
-                q_length,
-                self.num_multi_query_groups_per_partition,
-                self.hidden_size_per_attention_head,
-            ]
-        )
-
         if self.sequence_parallel:
             query_layer = query_layer.reshape(
                 [self.seq_length, -1, self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
@@ -421,9 +392,10 @@ class SelfAttention(nn.Layer):
         value_layer = value_layer.reshape(
             value_layer.shape[:2] + [self.num_attention_heads_per_partition, self.hidden_size_per_attention_head]
         )
-        # =================================
-        # flash attention computation
-        # =================================
+
+        # ==================================
+        # core attention computation
+        # ==================================
         version = paddle.version.full_version
         version_check = True
         if self.config.use_flash_attention and version != "0.0.0" and version <= "2.5.2":
@@ -432,43 +404,48 @@ class SelfAttention(nn.Layer):
             )
             version_check = False
         if self.config.use_flash_attention and version_check:
-            attention_mask = attention_mask
+            query_layer = query_layer.transpose([1, 0, 2, 3])
+            key_layer = key_layer.transpose([1, 0, 2, 3])
+            value_layer = value_layer.transpose([1, 0, 2, 3])
+            # attention_mask = attention_mask
             attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
+                query_layer,
+                key_layer,
+                value_layer,
                 attn_mask=attention_mask,
                 dropout_p=self.config.attention_dropout,
                 training=self.training,
                 is_causal=False,
             )
-            # reshape the output to [seq_length, batch_size, hidden_size]
-            attn_output = attn_output.reshape([q_length, batch_size, -1])
-            output = self.dense(attn_output)
-            return output, kv_cache
-
-        # ==================================
-        # core attention computation
-        # ==================================
-        attention_fuc = self._core_attention
-
-        has_gradient = (
-            (not query_layer.stop_gradient) or (not key_layer.stop_gradient) or (not value_layer.stop_gradient)
-        )
-        if self.enable_recompute and self.config.recompute_granularity == "core_attn" and has_gradient:
-            context_layer = recompute(
-                attention_fuc,
-                query_layer,
-                key_layer,
-                value_layer,
-                attention_mask,
-                output_attentions,
-                use_reentrant=False,
-            )
+            batch_size, q_length, _, _ = query_layer.shape
+            if self.config.sequence_parallel:
+                context_layer = attn_output.reshape([batch_size * q_length, -1])
+            else:
+                context_layer = attn_output.reshape([q_length, batch_size, -1])
         else:
-            context_layer = attention_fuc(
-                query_layer, key_layer, value_layer, attention_mask=attention_mask, output_attentions=output_attentions
+            attention_fuc = self._core_attention
+
+            has_gradient = (
+                (not query_layer.stop_gradient) or (not key_layer.stop_gradient) or (not value_layer.stop_gradient)
             )
+            if self.enable_recompute and self.config.recompute_granularity == "core_attn" and has_gradient:
+                context_layer = recompute(
+                    attention_fuc,
+                    query_layer,
+                    key_layer,
+                    value_layer,
+                    attention_mask,
+                    output_attentions,
+                    use_reentrant=False,
+                )
+            else:
+                context_layer = attention_fuc(
+                    query_layer,
+                    key_layer,
+                    value_layer,
+                    attention_mask=attention_mask,
+                    output_attentions=output_attentions,
+                )
         # =================
         # Output. [seq_length, b, h]
         # =================
