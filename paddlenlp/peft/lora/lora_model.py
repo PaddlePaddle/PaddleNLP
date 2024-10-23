@@ -737,6 +737,7 @@ class LoRAModel(nn.Layer):
                 module_name = i[0]
                 if re.fullmatch(target_module, module_name):
                     self._find_and_replace_module(model, module_name, lora_config, enable_lora)
+
         return model
 
     def restore_original_model(self):

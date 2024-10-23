@@ -158,6 +158,9 @@ def main():
     if model_args.fuse_attention_ffn is not None:
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
 
+    if model_args.lqlora_quantize_cfg is not None:
+        model_config.lqlora_quantize_cfg = model_args.lqlora_quantize_cfg
+
     model_config.seq_length = data_args.max_length
 
     logger.info(f"Final model config: {model_config}")
