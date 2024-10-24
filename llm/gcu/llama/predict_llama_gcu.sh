@@ -21,7 +21,7 @@ export CUSTOM_DEVICE_BLACK_LIST="softmax_with_cross_entropy"
 export PYTHONPATH=../../:$PYTHONPATH
 
 echo 'run llama wiki_text eval, log: wikitext_eval_gcu.log'
-python ../../../legacy/examples/benchmark/wiki_lambada/eval.py \
+python ../../../slm/examples/benchmark/wiki_lambada/eval.py \
     --model_name_or_path "__internal_testing__/sci-benchmark-llama-13b-5k" \
     --device gcu \
     --batch_size 4 \
