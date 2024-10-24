@@ -420,6 +420,42 @@ def main():
                 else None
             )
 
+    if model_args.loraga:
+        from paddlenlp.utils.llm_utils import estimate_gradient
+
+        if (
+            training_args.pipeline_parallel_degree > 1
+            or training_args.sequence_parallel
+            or training_args.autotuner_benchmark
+            or data_args.zero_padding
+            or data_args.pad_to_max_length
+        ):
+            # NOTE(gongenlei): new add autotuner_benchmark
+            max_length = data_args.max_length
+            padding = "max_length"
+        else:
+            max_length = None
+            padding = True
+
+        data_collator = DataCollatorForSeq2Seq(
+            tokenizer=tokenizer,
+            max_length=max_length,
+            padding=padding,
+            max_label_length=max_length,
+            return_tensors="np",
+            return_attention_mask=not model_args.flash_mask,
+            pad_to_multiple_of=data_args.pad_to_multiple_of,
+        )
+        named_grads = estimate_gradient(
+            model=model,
+            train_ds=train_ds,
+            data_collator=data_collator,
+            world_size=training_args.world_size,
+            batch_size=model_args.loraga_init_bsz,
+            iters=model_args.loraga_init_iters,
+            tokenizer=tokenizer,
+        )
+
     if model_args.prefix_tuning:
         if training_args.pipeline_parallel_degree > 1:
             raise NotImplementedError("Prefix tuning is not implemented for pipeline parallelism.")
@@ -471,7 +507,10 @@ def main():
             model = LoRAModel(model, lora_config)
         else:
             model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
+        if model_args.loraga:
+            from paddlenlp.utils.llm_utils import loraga_reinit
 
+            loraga_reinit(model, named_grads, stable_gamma=model_args.loraga_stable_gamma)
         model.print_trainable_parameters()
 
     def compute_metrics_do_generation(eval_preds):

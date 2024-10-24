@@ -209,6 +209,10 @@ class ModelArgument:
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
     lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+ technique"})
     pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
+    loraga: bool = field(default=False, metadata={"help": "Whether to use LoRA-GA:https://arxiv.org/pdf/2407.05000"})
+    loraga_init_bsz: int = field(default=1, metadata={"help": "The batch size for lora ga"})
+    loraga_init_iters: int = field(default=32, metadata={"help": "The number of init iterations for lora ga"})
+    loraga_stable_gamma: int = field(default=64, metadata={"help": "Lora Ga stable gamma"})
 
     # vera related parameters
     vera: bool = field(default=False, metadata={"help": "Whether to use vera technique"})
