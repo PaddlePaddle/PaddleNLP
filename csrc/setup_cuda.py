@@ -84,6 +84,9 @@ library_path = os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64")
 
 
 sources = [
+    "./gpu/pass/remove_assign_out_pass.cc",
+    "./gpu/pass/apply_vtensor_concat_pass.cc",
+    "./gpu/vtensor.cu",
     "./gpu/save_with_output.cc",
     "./gpu/set_value_by_flags.cu",
     "./gpu/token_penalty_multi_scores.cu",
@@ -166,7 +169,7 @@ setup(
     ext_modules=CUDAExtension(
         sources=sources,
         extra_compile_args={"cxx": ["-O3"], "nvcc": nvcc_compile_args},
-        libraries=["cublasLt"],
+        libraries=["cublasLt", 'cuda'],
         library_dirs=[library_path],
     ),
 )
