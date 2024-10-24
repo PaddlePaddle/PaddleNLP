@@ -104,7 +104,7 @@ class PredictorArgument:
         default="fp16",
         metadata={"help": "avx cachekv type. Supported values: fp16,int8"},
     )
-    batch_size: int = field(default=10, metadata={"help": "The batch size of data."})
+    batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
         default=False,
         metadata={
