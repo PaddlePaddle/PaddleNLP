@@ -891,7 +891,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
 
         export CUDA_DEVICE_MAX_CONNECTIONS=1
         export PARALLEL_CROSS_ENTROPY=true
-        export FLAGS_enable_pir_api=False # 暂时disable pir，后期修复后打开 @卢畅
+        export FLAGS_enable_pir_api=true
 
         task_name="llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw"
         case_out_dir="output/$task_name"
