@@ -31,7 +31,7 @@ Prompt API 提供了这类算法实现的基本模块，支持[PET](https://arxi
     * [数据准备](#数据准备)
     * [预训练参数准备](#预训练参数准备)
     * [定义提示学习模型](#定义提示学习模型)
-    * [使用PromptTrainer训练](#使用PromptTrainer训练)
+    * [使用 PromptTrainer 训练](#使用 PromptTrainer 训练)
 * [实践教程](#实践教程)
     * [文本分类示例](#文本分类示例)
     * 其他任务示例（待更新）
@@ -486,13 +486,13 @@ prompt_model = PromptModelForSequenceClassification(model,
 - ``freeze_dropout`` : 在训练时固定预训练模型参数并关闭 ``dropout`` 。 当 ``freeze_dropout=True`` ，``freeze_plm`` 也为 ``True`` 。
 
 
-### 使用PromptTrainer训练
+### 使用 PromptTrainer 训练
 
 ``PromptTrainer`` 继承自 ``Trainer`` ， 封装了数据处理，模型训练、测试，训练策略等，便于训练流程的快速搭建。
 
 **配置训练参数**
 
-``PromptTuningArguments`` 继承自 ``TrainingArguments`` ，包含了提示学习的主要训练参数。其中 ``TrainingArguments`` 参数见 `Trainer API 文档 <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md>`_ ，其余参数详见 [Prompt Trainer参数列表](#PromptTrainer参数列表) 。推荐使用 **命令行** 的形式进行参数配置，即
+``PromptTuningArguments`` 继承自 ``TrainingArguments`` ，包含了提示学习的主要训练参数。其中 ``TrainingArguments`` 参数见 `Trainer API 文档 <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md>`_ ，其余参数详见 [Prompt Trainer 参数列表](#PromptTrainer 参数列表) 。推荐使用 **命令行** 的形式进行参数配置，即
 
 ```shell
 python xxx.py --output_dir xxx --learning_rate xxx
@@ -561,11 +561,11 @@ if training_args.do_train:
 ### 文本分类示例
 
 
-- [多分类文本分类示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/applications/text_classification/multi_class/few-shot)
+- [多分类文本分类示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/slm/applications/text_classification/multi_class/few-shot)
 
-- [多标签文本分类示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/applications/text_classification/multi_label/few-shot)
+- [多标签文本分类示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/slm/applications/text_classification/multi_label/few-shot)
 
-- [多层次文本分类示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/applications/text_classification/hierarchical/few-shot)
+- [多层次文本分类示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/slm/applications/text_classification/hierarchical/few-shot)
 
 
 ## Reference
@@ -581,7 +581,7 @@ if training_args.do_train:
 ### 附录
 
 
-#### PromptTrainer参数列表
+#### PromptTrainer 参数列表
 
 
 | 参数              |  类型  | 默认值   |   含义                                                   |

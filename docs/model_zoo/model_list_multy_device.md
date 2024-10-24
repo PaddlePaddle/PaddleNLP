@@ -3,11 +3,11 @@
 ## 1.模型列表
 | 模型名称/硬件支持 | NPU | XPU | MLU |
 | - | - | - | - |
-| [BERT](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/bert) | ✅ | ✅ | ✅ |
-| [ERNIE-3.0](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/ernie-3.0) | ✅ | ❌ | ❌ |
-| [UIE](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/uie) | ✅ | ❌ | ❌ |
+| [BERT](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/slm/model_zoo/bert) | ✅ | ✅ | ✅ |
+| [ERNIE-3.0](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/slm/model_zoo/ernie-3.0) | ✅ | ❌ | ❌ |
+| [UIE](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/slm/model_zoo/uie) | ✅ | ❌ | ❌ |
 | [UTC](https://github.com/PaddlePaddle/PaddleNLP/tree/release/2.8/applications/zero_shot_text_classification) | ✅ | ❌ | ❌ |
-| [RoBERTa](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/roberta) | ✅ | ❌ | ❌ |
+| [RoBERTa](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/slm/model_zoo/roberta) | ✅ | ❌ | ❌ |
 
 ## 2.各硬件使用指南
 首先在硬件平台上安装飞桨环境，然后参照模型文档中的使用方法，只需将 device 参数改为对应的硬件平台即可。
