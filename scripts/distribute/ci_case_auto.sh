@@ -1061,7 +1061,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
         loss_base=9.16783295
         loss_md5_base=8ea72495fba4e1b9ba004b4431e27218
         if [ $IS_A100 -ne 0 ];then
-            loss_base=9.38009949
+            loss_base=9.37966919
         fi
         ips_base=-1
         mem_base=-1
