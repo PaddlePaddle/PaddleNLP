@@ -1,4 +1,5 @@
 jieba
+blobfile
 colorlog
 colorama
 seqeval

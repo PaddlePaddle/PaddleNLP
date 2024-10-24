@@ -13,11 +13,12 @@
 # limitations under the License.
 from __future__ import annotations
 
+import importlib
 import inspect
 import io
 import json
 import os
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from typing import Dict, List, Type
 
 from ...utils.download import resolve_file_path
@@ -29,6 +30,250 @@ from ..model_utils import PretrainedModel
 __all__ = [
     "AutoConfig",
 ]
+
+CONFIG_MAPPING_NAMES = OrderedDict(
+    [
+        ("albert", "AlbertConfig"),
+        ("artist", "ArtistConfig"),
+        ("bart", "BartConfig"),
+        ("bert", "BertConfig"),
+        ("bigbird", "BigBirdConfig"),
+        ("bit", "BitConfig"),
+        ("blenderbot", "BlenderbotConfig"),
+        ("blenderbot_small", "BlenderbotSmallConfig"),
+        ("blip", "BlipConfig"),
+        ("blip2", "Blip2Config"),
+        ("bloom", "BloomConfig"),
+        ("chatglm", "ChatGLMConfig"),
+        ("chatglm_v2", "ChatGLMv2Config"),
+        ("chinesebert", "ChineseBertConfig"),
+        ("chineseclip", "ChineseCLIPConfig"),
+        ("clap", "ClapConfig"),
+        ("clip", "CLIPConfig"),
+        ("codegen", "CodeGenConfig"),
+        ("convbert", "ConvBertConfig"),
+        ("ctrl", "CTRLConfig"),
+        ("dallebart", "DalleBartConfig"),
+        ("deberta", "DebertaConfig"),
+        ("debertav2", "DebertaV2Config"),
+        ("distilbert", "DistilBertConfig"),
+        ("dpt", "DPTConfig"),
+        ("electra", "ElectraConfig"),
+        ("ernie", "ErnieConfig"),
+        ("ernie_code", "ErnieCodeConfig"),
+        ("ernie_ctm", "ErnieCtmConfig"),
+        ("ernie_doc", "ErnieDocConfig"),
+        ("ernie_gram", "ErnieGramConfig"),
+        ("ernie_layout", "ErnieLayoutConfig"),
+        ("ernie_m", "ErnieMConfig"),
+        ("ernie_vil", "ErnieViLConfig"),
+        ("fnet", "FNetConfig"),
+        ("funnel", "FunnelConfig"),
+        ("gau_alpha", "GAUAlphaConfig"),
+        ("gemma", "GemmaConfig"),
+        ("glm", "GLMConfig"),
+        ("gpt", "GPTConfig"),
+        ("gptj", "GPTJConfig"),
+        ("jamba", "JambaConfig"),
+        ("layoutlm", "LayoutLMConfig"),
+        ("layoutlmv2", "LayoutLMv2Config"),
+        ("layoutxlm", "LayoutXLMConfig"),
+        ("llama", "LlamaConfig"),
+        ("luke", "LukeConfig"),
+        ("mamba", "MambaConfig"),
+        ("mbart", "MBartConfig"),
+        ("megatronbert", "MegatronBertConfig"),
+        ("minigpt4", "MiniGPT4Config"),
+        ("mistral", "MistralConfig"),
+        ("mixtral", "MixtralConfig"),
+        ("mobilebert", "MobileBertConfig"),
+        ("mpnet", "MPNetConfig"),
+        ("mt5", "MT5Config"),
+        ("nezha", "NeZhaConfig"),
+        ("nystromformer", "NystromformerConfig"),
+        ("opt", "OPTConfig"),
+        ("pegasus", "PegasusConfig"),
+        ("ppminilm", "PPMiniLMConfig"),
+        ("prophetnet", "ProphetNetConfig"),
+        ("qwen", "QWenConfig"),
+        ("qwen2", "Qwen2Config"),
+        ("qwen2_moe", "Qwen2MoeConfig"),
+        ("reformer", "ReformerConfig"),
+        ("rembert", "RemBertConfig"),
+        ("roberta", "RobertaConfig"),
+        ("roformer", "RoFormerConfig"),
+        ("roformerv2", "RoFormerv2Config"),
+        ("rw", "RWConfig"),
+        ("skep", "SkepConfig"),
+        ("speecht5", "SpeechT5Config"),
+        ("squeezebert", "SqueezeBertConfig"),
+        ("t5", "T5Config"),
+        ("tinybert", "TinyBertConfig"),
+        ("unified_transformer", "UnifiedTransformerConfig"),
+        ("unimo", "UNIMOConfig"),
+        ("visualglm", "VisualGLMConfig"),
+        ("xlm", "XLMConfig"),
+        ("xlnet", "XLNetConfig"),
+        ("yuan", "YuanConfig"),
+    ]
+)
+
+
+MODEL_NAMES_MAPPING = OrderedDict(
+    # Base model mapping
+    [
+        ("albert", "Albert"),
+        ("artist", "Artist"),
+        ("bart", "Bart"),
+        ("bert", "Bert"),
+        ("bigbird", "BigBird"),
+        ("bit", "Bit"),
+        ("blenderbot", "Blenderbot"),
+        ("blenderbot_small", "BlenderbotSmall"),
+        ("blip", "Blip"),
+        ("blip2", "Blip2"),
+        ("bloom", "Bloom"),
+        ("chatglm", "ChatGLM"),
+        ("chatglm_v2", "ChatGLMv2"),
+        ("chinesebert", "ChineseBert"),
+        ("chineseclip", "ChineseCLIPText"),
+        ("clap", "CLAP"),
+        ("clip", "CLIP"),
+        ("codegen", "CodeGen"),
+        ("convbert", "ConvBert"),
+        ("ctrl", "CTRL"),
+        ("dallebart", "DalleBart"),
+        ("deberta", "Deberta"),
+        ("debertav2", "DebertaV2"),
+        ("distilbert", "DistilBert"),
+        ("dpt", "DPT"),
+        ("electra", "Electra"),
+        ("ernie", "Ernie"),
+        ("ernie_code", "ErnieCode"),
+        ("ernie_ctm", "ErnieCtm"),
+        ("ernie_doc", "ErnieDoc"),
+        ("ernie_gram", "ErnieGram"),
+        ("ernie_layout", "ErnieLayout"),
+        ("ernie_m", "ErnieM"),
+        ("ernie_vil", "ErnieViL"),
+        ("fnet", "FNet"),
+        ("funnel", "Funnel"),
+        ("gau_alpha", "GAUAlpha"),
+        ("gemma", "Gemma"),
+        ("glm", "GLM"),
+        ("gpt", "GPT"),
+        ("gptj", "GPTJ"),
+        ("jamba", "Jamba"),
+        ("layoutlm", "LayoutLM"),
+        ("layoutlmv2", "LayoutLMv2"),
+        ("layoutxlm", "LayoutXLM"),
+        ("llama", "Llama"),
+        ("luke", "Luke"),
+        ("mamba", "Mamba"),
+        ("mbart", "MBart"),
+        ("megatronbert", "MegatronBert"),
+        ("minigpt4", "MiniGPT4"),
+        ("mistral", "Mistral"),
+        ("mixtral", "Mixtral"),
+        ("mobilebert", "MobileBert"),
+        ("mpnet", "MPNet"),
+        ("mt5", "MT5"),
+        ("nezha", "NeZha"),
+        ("nystromformer", "Nystromformer"),
+        ("opt", "OPT"),
+        ("pegasus", "Pegasus"),
+        ("ppminilm", "PPMiniLM"),
+        ("prophetnet", "ProphetNet"),
+        ("qwen", "QWen"),
+        ("qwen2", "Qwen2"),
+        ("qwen2_moe", "Qwen2Moe"),
+        ("reformer", "Reformer"),
+        ("rembert", "RemBert"),
+        ("roberta", "Roberta"),
+        ("roformer", "RoFormer"),
+        ("roformerv2", "RoFormerv2"),
+        ("rw", "RW"),
+        ("skep", "Skep"),
+        ("speecht5", "SpeechT5"),
+        ("squeezebert", "SqueezeBert"),
+        ("t5", "T5"),
+        ("tinybert", "TinyBert"),
+        ("unified_transformer", "UnifiedTransformer"),
+        ("unimo", "UNIMO"),
+        ("visualglm", "VisualGLM"),
+        ("xlm", "XLM"),
+        ("xlnet", "XLNet"),
+        ("yuan", "Yuan"),
+    ]
+)
+
+
+def config_class_to_model_type(config):
+    """Converts a config class name to the corresponding model type"""
+    for key, cls in CONFIG_MAPPING_NAMES.items():
+        if cls == config:
+            return key
+    # if key not found check in extra content
+    for key, cls in CONFIG_MAPPING._extra_content.items():
+        if cls.__name__ == config:
+            return key
+    return None
+
+
+class _LazyConfigMapping(OrderedDict):
+    """
+    A dictionary that lazily load its values when they are requested.
+    """
+
+    def __init__(self, mapping):
+        self._mapping = mapping
+        self._extra_content = {}
+        self._modules = {}
+
+    def __getitem__(self, key):
+        if key in self._extra_content:
+            return self._extra_content[key]
+        if key not in self._mapping:
+            raise KeyError(key)
+        value = self._mapping[key]
+        module_name = model_type_to_module_name(key)
+        if module_name not in self._modules:
+            self._modules[module_name] = importlib.import_module(
+                f".{module_name}.configuration", "paddlenlp.transformers"
+            )
+        if hasattr(self._modules[module_name], value):
+            return getattr(self._modules[module_name], value)
+
+        # Some of the mappings have entries model_type -> config of another model type. In that case we try to grab the
+        # object at the top level.
+        transformers_module = importlib.import_module("paddlenlp")
+        return getattr(transformers_module, value)
+
+    def keys(self):
+        return list(self._mapping.keys()) + list(self._extra_content.keys())
+
+    def values(self):
+        return [self[k] for k in self._mapping.keys()] + list(self._extra_content.values())
+
+    def items(self):
+        return [(k, self[k]) for k in self._mapping.keys()] + list(self._extra_content.items())
+
+    def __iter__(self):
+        return iter(list(self._mapping.keys()) + list(self._extra_content.keys()))
+
+    def __contains__(self, item):
+        return item in self._mapping or item in self._extra_content
+
+    def register(self, key, value, exist_ok=False):
+        """
+        Register a new configuration in this mapping.
+        """
+        if key in self._mapping.keys() and not exist_ok:
+            raise ValueError(f"'{key}' is already used by a Transformers config, pick another name.")
+        self._extra_content[key] = value
+
+
+CONFIG_MAPPING = _LazyConfigMapping(CONFIG_MAPPING_NAMES)
 
 
 def get_configurations() -> Dict[str, List[Type[PretrainedConfig]]]:
@@ -62,6 +307,12 @@ def get_configurations() -> Dict[str, List[Type[PretrainedConfig]]]:
                 mappings[model_name].append(value)
 
     return mappings
+
+
+def model_type_to_module_name(key):
+    """Converts a config key to the corresponding module."""
+    key = key.replace("-", "_")
+    return key
 
 
 class AutoConfig(PretrainedConfig):
@@ -191,12 +442,29 @@ class AutoConfig(PretrainedConfig):
             from_hf_hub=from_hf_hub,
             from_aistudio=from_aistudio,
         )
-        if config_file is not None and os.path.exists(config_file):
+        config_dict, unused_kwargs = PretrainedConfig.get_config_dict(pretrained_model_name_or_path, **kwargs)
+        if "model_type" in config_dict:
+            try:
+                config_class = CONFIG_MAPPING[config_dict["model_type"]]
+            except KeyError:
+                raise ValueError(
+                    f"The checkpoint you are trying to load has model type `{config_dict['model_type']}` "
+                    "but Transformers does not recognize this architecture. This could be because of an "
+                    "issue with the checkpoint, or because your version of Transformers is out of date."
+                )
+            return config_class.from_dict(config_dict, **unused_kwargs)
+        elif "model_type" not in config_dict and config_file is not None and os.path.exists(config_file):
             config_class = cls._get_config_class_from_config(pretrained_model_name_or_path, config_file)
             logger.info("We are using %s to load '%s'." % (config_class, pretrained_model_name_or_path))
             if config_class is cls:
                 return cls.from_file(config_file)
             return config_class.from_pretrained(config_file, *model_args, **kwargs)
+        elif config_file is None:
+            # Fallback: use pattern matching on the string.
+            # We go from longer names to shorter names to catch roberta before bert (for instance)
+            for pattern in sorted(CONFIG_MAPPING.keys(), key=len, reverse=True):
+                if pattern in str(pretrained_model_name_or_path):
+                    return CONFIG_MAPPING[pattern].from_dict(config_dict, **unused_kwargs)
         else:
             raise RuntimeError(
                 f"Can't load config for '{pretrained_model_name_or_path}'.\n"
@@ -205,3 +473,20 @@ class AutoConfig(PretrainedConfig):
                 "- or a correct model-identifier of community-contributed pretrained models,\n"
                 "- or the correct path to a directory containing relevant config files.\n"
             )
+
+    @staticmethod
+    def register(model_type, config, exist_ok=False):
+        """
+        Register a new configuration for this class.
+
+        Args:
+            model_type (`str`): The model type like "bert" or "gpt".
+            config ([`PretrainedConfig`]): The config to register.
+        """
+        if issubclass(config, PretrainedConfig) and config.model_type != model_type:
+            raise ValueError(
+                "The config you are passing has a `model_type` attribute that is not consistent with the model type "
+                f"you passed (config has {config.model_type} and you passed {model_type}. Fix one of those so they "
+                "match!"
+            )
+        CONFIG_MAPPING.register(model_type, config, exist_ok=exist_ok)

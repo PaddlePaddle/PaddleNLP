@@ -35,7 +35,7 @@ from tokenizers.trainers import (
     WordPieceTrainer,
 )
 
-from ..utils.env import ADDED_TOKENS_NAME, FULL_TOKENIZER_NAME
+from ..utils.env import ADDED_TOKENS_NAME, FULL_TOKENIZER_NAME, TIKTOKEN_VOCAB_FILE
 from .convert_slow_tokenizer import convert_slow_tokenizer
 from .tokenizer_utils import ChatTemplateMixin, PretrainedTokenizer
 from .tokenizer_utils_base import (
@@ -60,7 +60,7 @@ MODEL_TO_TRAINER_MAPPING = {
     "WordPiece": WordPieceTrainer,
 }
 
-VOCAB_FILES_NAMES = {"tokenizer_file": FULL_TOKENIZER_NAME}
+VOCAB_FILES_NAMES = {"tokenizer_file": FULL_TOKENIZER_NAME, "vocab_file": TIKTOKEN_VOCAB_FILE}
 
 
 class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
@@ -97,13 +97,19 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         elif fast_tokenizer_file is not None and not from_slow:
             # We have a serialization from tokenizers which let us directly build the backend
             fast_tokenizer = TokenizerFast.from_file(fast_tokenizer_file)
-        elif slow_tokenizer is not None:
+        elif slow_tokenizer:
             # We need to convert a slow tokenizer to build the backend
             fast_tokenizer = convert_slow_tokenizer(slow_tokenizer)
-        elif self.slow_tokenizer_class is not None:
+        elif self.slow_tokenizer_class is not None and slow_tokenizer is not False:
             # We need to create and convert a slow tokenizer to build the backend
             slow_tokenizer = self.slow_tokenizer_class(*args, **kwargs)
             fast_tokenizer = convert_slow_tokenizer(slow_tokenizer)
+        elif not slow_tokenizer:
+            # We try to load with tiktoken
+            self.vocab_file = kwargs.get("vocab_file", None)
+            self.additional_special_tokens = kwargs.get("additional_special_tokens", [])
+            fast_tokenizer = convert_slow_tokenizer(self, from_tiktoken=True)
+            slow_tokenizer = None
         else:
             raise ValueError(
                 "Couldn't instantiate the backend tokenizer from one of: \n"
@@ -626,7 +632,6 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             )
 
         self._eventual_warn_about_too_long_sequence(batched_output["input_ids"], max_length, verbose)
-
         return batched_output
 
     def convert_tokens_to_string(self, tokens: List[str]) -> str:
