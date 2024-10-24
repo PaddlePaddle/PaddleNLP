@@ -43,7 +43,7 @@ function llama_case_list_auto() {
     llama_dygraph_auto_bs8_fp32_DP2-MP2
     llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
     llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
-    # llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
+    llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
     llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2
 
     # llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1
@@ -891,7 +891,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
 
         export CUDA_DEVICE_MAX_CONNECTIONS=1
         export PARALLEL_CROSS_ENTROPY=true
-        export FLAGS_enable_pir_api=true
+        export FLAGS_enable_pir_api=False # 暂时disable pir，后期修复后打开 @卢畅
 
         task_name="llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw"
         case_out_dir="output/$task_name"
