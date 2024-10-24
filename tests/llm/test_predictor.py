@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import os
 import unittest
-from unittest import skip
 
 import paddle
 from parameterized import parameterized_class
@@ -43,11 +42,11 @@ from .testing_utils import LLMTest, argv_context_guard, load_test_config
 @parameterized_class(
     ["model_name_or_path", "model_class"],
     [
-        # ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
+        ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
         ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
         ["__internal_testing__/tiny-fused-chatglm2", ChatGLMv2ForCausalLM],
-        # ["__internal_testing__/tiny-fused-qwen-inference5.2", QWenForCausalLM],
+        ["__internal_testing__/tiny-fused-qwen-inference5.2", QWenForCausalLM],
     ],
 )
 class PredictorTest(LLMTest, unittest.TestCase):
@@ -345,7 +344,6 @@ class QWenVLTest(LLMTest, unittest.TestCase):
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
 
-    @skip("Skip and wait to fix.")
     def test_forward(self):
         self.disable_static()
         config = AutoConfig.from_pretrained(self.output_dir)
