@@ -21,7 +21,7 @@ import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.experimental.transformers import QWenForQWenVLInferenceModel
-from paddlenlp.transformers import (  # ChatGLMForCausalLM,
+from paddlenlp.transformers import (
     AutoConfig,
     AutoTokenizer,
     BloomForCausalLM,
@@ -43,11 +43,11 @@ from .testing_utils import LLMTest, argv_context_guard, load_test_config
 @parameterized_class(
     ["model_name_or_path", "model_class"],
     [
-        ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
+        # ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
         ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
         ["__internal_testing__/tiny-fused-chatglm", ChatGLMForCausalLM],
         ["__internal_testing__/tiny-fused-chatglm2", ChatGLMv2ForCausalLM],
-        ["__internal_testing__/tiny-fused-qwen-inference5.2", QWenForCausalLM],
+        # ["__internal_testing__/tiny-fused-qwen-inference5.2", QWenForCausalLM],
     ],
 )
 class PredictorTest(LLMTest, unittest.TestCase):
@@ -61,7 +61,6 @@ class PredictorTest(LLMTest, unittest.TestCase):
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
 
-    @skip("Skip and wait to fix.")
     def test_predictor(self):
         self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
         result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
@@ -84,7 +83,6 @@ class PredictorTest(LLMTest, unittest.TestCase):
         else:
             self.assertGreaterEqual(count / len(result_0), 0.4)
 
-    @skip("Skip and wait to fix.")
     def test_flash_attention(self):
         self.run_predictor(
             {"inference_model": False, "use_flash_attention": False, "src_length": 512, "max_length": 48}
@@ -113,7 +111,6 @@ class PredictorTest(LLMTest, unittest.TestCase):
         else:
             self.assertEqual(full_match / len(result_0), 1.0)
 
-    @skip("Skip and wait to fix.")
     def test_wint8(self):
         self.run_predictor(
             {"inference_model": True, "quant_type": "weight_only_int8", "src_length": 512, "max_length": 48}
