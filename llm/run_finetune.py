@@ -57,8 +57,8 @@ from paddlenlp.transformers import (
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.utils.llm_utils import (
-    CausalLMTrainer,
+from paddlenlp.trl import SFTTrainer
+from paddlenlp.trl.llm_utils import (
     ZeroPaddingIterDatasetCallback,
     compute_metrics,
     get_lora_target_modules,
@@ -541,7 +541,7 @@ def main():
     else:
         metrics = compute_metrics
 
-    trainer = CausalLMTrainer(
+    trainer = SFTTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
