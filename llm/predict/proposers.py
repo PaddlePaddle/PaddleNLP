@@ -62,7 +62,6 @@ class InferenceWithReferenceProposer(Proposer):
         self.input_ids_len = paddle.zeros(shape=[max_batch_size, 1], dtype="int64").cpu()
         self.max_batch_size = max_batch_size
         self.max_draft_token_num = max_draft_token_num
-        self.input_ids_cpu = paddle.full(shape=[max_batch_size, max_seq_len], fill_value=1, dtype="int64").cpu()
 
     def update(self, bid: int, seq_len: int):
         """
@@ -79,7 +78,7 @@ class InferenceWithReferenceProposer(Proposer):
         seq_lens_encoder = model_inputs["seq_lens_encoder"].cpu()
         seq_lens_decoder = model_inputs["seq_lens_decoder"].cpu()
         ngram_match(
-            self.input_ids_cpu,
+            model_inputs["input_ids_cpu"],
             self.input_ids_len.cpu(),
             model_inputs["pre_ids"].cpu(),
             model_inputs["step_idx"].cpu(),

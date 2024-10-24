@@ -27,6 +27,7 @@ import paddle.incubate.multiprocessing as mp
 from env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode, use_pir_api
 from paddle.distributed import fleet
+from paddlenlp_ops import speculate_update_input_ids_cpu
 from proposers import InferenceWithReferenceProposer
 
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
@@ -103,7 +104,7 @@ class PredictorArgument:
         default="fp16",
         metadata={"help": "avx cachekv type. Supported values: fp16,int8"},
     )
-    batch_size: int = field(default=1, metadata={"help": "The batch size of data."})
+    batch_size: int = field(default=10, metadata={"help": "The batch size of data."})
     benchmark: bool = field(
         default=False,
         metadata={
@@ -964,6 +965,8 @@ class BlockInferencePredictorMixin(BasePredictor):
             for k, v in self.model_inputs.items():
                 v.name = k
 
+        return seq_lens
+
 
 class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
     def __init__(
@@ -1187,7 +1190,7 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
 
     @paddle.no_grad()
     def predict(self, input_texts: list[str], return_tokens=False):
-        self._preprocess(input_texts)
+        self.seq_lens = self._preprocess(input_texts)
 
         # Parameters such as seq_lens_encoder have been set in the preprocessor function,
         # then we use them to init the proposer's args
@@ -1238,10 +1241,6 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
                 return outputs
 
     def init_proposer_args(self):
-        for bid in range(self.config.batch_size):
-            self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
-                self.model_inputs["seq_lens_this_time"][bid] - 1
-            ]  # get the last token before padding of this batch
         self.model_inputs["accept_tokens"] = paddle.full(
             shape=[self.config.batch_size, self.config.speculate_max_draft_token_num + 1], fill_value=0, dtype="int64"
         )
@@ -1252,9 +1251,23 @@ class DygraphSpeculateInferencePredictor(DygraphBlockInferencePredictor):
         self.model_inputs["actual_draft_token_num"] = paddle.full(
             shape=[self.config.batch_size], fill_value=self.config.speculate_max_draft_token_num, dtype="int32"
         )
-        if self.config.speculate_method == "inference_with_reference":
-            self.proposer.input_ids_cpu = self.model_inputs["input_ids"].cpu()
-            self.proposer.input_ids_len = self.model_inputs["seq_lens_encoder"].astype("int64").cpu()
+        self.model_inputs["input_ids_cpu"] = paddle.full(
+            shape=[self.config.batch_size, self.config.total_max_length], fill_value=1, dtype="int64"
+        ).cpu()
+
+        for bid in range(self.config.batch_size):
+            if self.config.speculate_method == "inference_with_reference":
+                speculate_update_input_ids_cpu(
+                    self.model_inputs["input_ids_cpu"],
+                    self.model_inputs["input_ids"][bid].cpu().tolist(),
+                    bid,
+                    self.config.max_length,
+                )
+                self.proposer.update(bid, self.seq_lens[bid])
+
+            self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
+                self.model_inputs["seq_lens_this_time"][bid] - 1
+            ]  # get the last token before padding of this batch
 
 
 class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
@@ -1277,11 +1290,6 @@ class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
             self.proposer = None
 
     def init_proposer_args(self):
-        for bid in range(self.config.batch_size):
-            self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
-                self.model_inputs["seq_lens_this_time"][bid] - 1
-            ]  # get the last token before padding of this batch
-
         self.model_inputs["accept_tokens"] = paddle.full(
             shape=[self.config.batch_size, self.config.speculate_max_draft_token_num + 1], fill_value=0, dtype="int64"
         )
@@ -1292,12 +1300,27 @@ class StaticSpeculateInferencePredictor(StaticBlockInferencePredictor):
         self.model_inputs["actual_draft_token_num"] = paddle.full(
             shape=[self.config.batch_size], fill_value=self.config.speculate_max_draft_token_num, dtype="int32"
         )
-        if self.config.speculate_method == "inference_with_reference":
-            self.proposer.input_ids_cpu = self.model_inputs["input_ids"].cpu()
+        self.model_inputs["input_ids_cpu"] = paddle.full(
+            shape=[self.config.batch_size, self.config.total_max_length], fill_value=1, dtype="int64"
+        ).cpu()
+
+        for bid in range(self.config.batch_size):
+            if self.config.speculate_method == "inference_with_reference":
+                speculate_update_input_ids_cpu(
+                    self.model_inputs["input_ids_cpu"],
+                    self.model_inputs["input_ids"][bid].cpu().tolist(),
+                    bid,
+                    self.config.max_length,
+                )
+                self.proposer.update(bid, self.seq_lens[bid])
+
+            self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
+                self.model_inputs["seq_lens_this_time"][bid] - 1
+            ]  # get the last token before padding of this batch
 
     def predict(self, input_texts: list[str], return_tokens=False):
         s_time = time.time()
-        self._preprocess(input_texts)
+        self.seq_lens = self._preprocess(input_texts)
 
         # Parameters such as seq_lens_encoder have been set in the preprocessor function,
         # then we use them to init the proposer's args
