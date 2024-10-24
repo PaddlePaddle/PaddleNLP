@@ -84,6 +84,7 @@ library_path = os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64")
 
 
 sources = [
+    "./gpu/pass/remove_assign_out_pass.cc",
     "./gpu/save_with_output.cc",
     "./gpu/set_value_by_flags.cu",
     "./gpu/token_penalty_multi_scores.cu",
