@@ -135,7 +135,7 @@ class PredictorArgument:
     )
 
     total_max_length: int = field(
-        default=2048, metadata={"help": "Super parameter. Maximum sequence length(encoder+decoder)."}
+        default=4096, metadata={"help": "Super parameter. Maximum sequence length(encoder+decoder)."}
     )
 
     def __post_init__(self):
