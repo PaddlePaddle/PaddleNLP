@@ -2302,6 +2302,11 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     quant_min_bound=self.config.quant_min_bound,
                 )[0]
             else:
+                k_quant_scales = kwargs.get("k_quant_scales", None)
+                v_quant_scales = kwargs.get("v_quant_scales", None)
+                k_dequant_scales = kwargs.get("k_dequant_scales", None)
+                v_dequant_scales = kwargs.get("v_dequant_scales", None)
+
                 fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
                     qkv_out,
                     caches[2 * i],
@@ -2316,10 +2321,10 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     kwargs.get("block_tables", None),
                     pre_caches[2 * i] if pre_caches is not None else None,  # pre_key_cache
                     pre_caches[2 * i + 1] if pre_caches is not None else None,  # pre_value_cache
-                    None,  # k_quant_scale
-                    None,  # v_quant_scale
-                    None,  # k_dequant_scale
-                    None,  # v_dequant_scale
+                    k_quant_scales[i] if k_quant_scales is not None else None,
+                    v_quant_scales[i] if v_quant_scales is not None else None,
+                    k_dequant_scales[i] if k_dequant_scales is not None else None,
+                    v_dequant_scales[i] if v_dequant_scales is not None else None,
                     None,  # qkv_out_scales
                     None,  # qkv_bias
                     None,  # out_shifts
