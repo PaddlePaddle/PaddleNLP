@@ -34,6 +34,8 @@ from ..activations import ACT2FN
 from ..conversion_utils import StateDictNameMapping, init_name_mappings
 from ..model_outputs import MoECausalLMOutputWithPast, MoEModelOutputWithPast
 from ..model_utils import PretrainedModel, register_base_model
+from ..moe_gate import PretrainedMoEGate
+from ..moe_layer import MoELayer
 from .configuration import Qwen2MoeConfig
 
 try:
@@ -683,68 +685,69 @@ class Qwen2MoeAttention(nn.Layer):
         return outputs
 
 
-class Qwen2MoeSparseMoEBlock(nn.Layer):
+class Qwen2MoeGate(PretrainedMoEGate):
+    def __init__(self, num_experts, expert_hidden_size, **kwargs):
+        super().__init__(num_experts, expert_hidden_size, **kwargs)
+        # [hidden_size, n_expert]
+        self.weight = paddle.create_parameter(
+            shape=[expert_hidden_size, num_experts],
+            dtype=paddle.get_default_dtype(),
+            is_bias=False,
+            default_initializer=nn.initializer.Constant(1.0),
+        )
+
+    def forward(self, hidden_states):
+        """
+        Args:
+            hidden_states (_type_): [batch_size * seq_len, hidden_size]
+        """
+        _, h_dim = hidden_states.shape
+
+        # compute gating score
+        hidden_states = hidden_states.reshape([-1, h_dim])
+
+        with paddle.amp.auto_cast(False):
+            logits = F.linear(hidden_states.cast(paddle.float32), self.weight, None)
+
+        scores = self.gate_score_func(logits=logits)
+
+        # topk_weight, topk_idx = self.topk_navie(scores, k=2)
+        # topk_weight, topk_idx = self.topk_group(scores, k=2, n_group=4, topk_group=2)
+
+        capacity, combine_weights, dispatch_mask, exp_counts, l_aux = self.topkgating(scores)
+        l_zloss = self._cal_z_loss(logits)
+
+        return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
+
+
+class Qwen2MoeSparseMoEBlock(MoELayer):
     def __init__(self, config: Qwen2MoeConfig):
-        super().__init__()
+
         self.num_experts = config.num_experts
         self.top_k = config.num_experts_per_tok
         self.norm_topk_prob = config.norm_topk_prob
 
-        self.gate = nn.Linear(config.hidden_size, self.num_experts, bias_attr=False)
+        self.gate = Qwen2MoeGate(self.num_experts, config.hidden_size)
+        # self.gate = nn.Linear(config.hidden_size, self.num_experts, bias_attr=False)s
         self.experts = nn.LayerList([Qwen2MoeMLP(config) for _ in range(self.num_experts)])
+
+        super().__init__(
+            gate=self.gate,
+            capacity=2.0,
+            experts=self.experts,
+        )
 
         self.shared_expert = Qwen2MoeMLP(config, is_shared=True)
         self.shared_expert_gate = nn.Linear(config.hidden_size, 1, bias_attr=False)
 
     def forward(self, hidden_states):
-        batch_size, seq_len, hidden_dim = hidden_states.shape
-        hidden_states = hidden_states.reshape([-1, hidden_dim])
-        # router_logits: [batch_size * seq_len, num_experts]
-        router_logits = self.gate(hidden_states)
-
-        with paddle.amp.auto_cast(False):
-            routing_weights = F.softmax(router_logits.astype("float32"), axis=1)
-        routing_weights, selected_experts = paddle.topk(routing_weights, self.top_k, axis=-1)
-        if self.norm_topk_prob:  # Note: Mixtral is set norm as default, Qwen2Moe is set to no norm
-            routing_weights /= routing_weights.sum(axis=-1, keepdim=True)
-        # we cast back to input dtype
-        routing_weights = routing_weights.astype(hidden_states.dtype)
-
-        final_hidden_states = paddle.zeros(
-            [batch_size * seq_len, hidden_dim],
-            dtype=hidden_states.dtype,
-        )
-
-        # One hot encode the selected experts to create an expert mask
-        # this will be used to easily index which expert is going to be sollicitated.
-        # shape: [num_experts, top_k, batch_size * seq_len]
-        expert_mask = F.one_hot(selected_experts, num_classes=self.num_experts).transpose([2, 1, 0])
-
-        # Loop over all available experts in the model and perform the computation on each expert.
-        for expert_id in range(self.num_experts):
-            expert_layer = self.experts[expert_id]
-            idx, top_x = paddle.where(expert_mask[expert_id])
-
-            if top_x.shape[0] == 0:
-                continue
-
-            current_state = paddle.gather(hidden_states, top_x.squeeze())
-            current_hidden_states = expert_layer(current_state) * routing_weights[top_x, idx]
-
-            top_x = top_x.squeeze()
-            if top_x.shape == []:
-                top_x = paddle.to_tensor([top_x.item()])
-            final_hidden_states = paddle.index_add_(
-                final_hidden_states, top_x, 0, current_hidden_states.astype(hidden_states.dtype)
-            )
+        final_hidden_states = super().forward(hidden_states)
 
         shared_expert_output = self.shared_expert(hidden_states)
         shared_expert_output = F.sigmoid(self.shared_expert_gate(hidden_states)) * shared_expert_output
-
         final_hidden_states = final_hidden_states + shared_expert_output
 
-        final_hidden_states = final_hidden_states.reshape([batch_size, seq_len, hidden_dim])
-        return final_hidden_states, router_logits
+        return final_hidden_states, 0.0
 
 
 class Qwen2MoeDecoderLayer(nn.Layer):
