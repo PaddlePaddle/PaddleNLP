@@ -83,7 +83,7 @@ python setup.py install
 ```
 
 ## 3.微调：
-- **注：** 建议将本目录下的bash脚本迁移至llm路径下后运行。
+- **注：** 进入llm路径进行以下操作。
 ### 数据集准备
 我们提供了数据集demo便于您调试使用
 ```
@@ -103,12 +103,12 @@ tar -xvf alpaca_demo.gz
 
 可参考以下脚本启动Lora微调训练：
 ```
-bash run_lora.sh
+PYTHONPATH=.. python run_finetune.py dcu/llama/lora_argument.json
 ```
 ### sft微调
 可参考以下超参启动Lsft微调训练：
 ```
-bash run_sft.sh
+PYTHONPATH=.. python run_finetune.py dcu/llama/sft_argument.json
 ```
 ## 3.预训练：
 ### 数据准备
@@ -126,7 +126,7 @@ data
 ├── llama_openwebtext_100k.bin
 └── llama_openwebtext_100k.idx
 ```
-
+- **注：** 与微调数据集区分路径
 ### 运行脚本
 
 该训练脚本可以单节点也可多节点运行，每节点8张DCU-K100AI-64G。
@@ -136,7 +136,9 @@ data
 可参考以下脚本启动预训练：
 
 ```
-bash run_pretrain.sh
+python -m paddle.distributed.launch \
+    --gpus '0,1,2,3,4,5,6,7' \
+    run_pretrain.py dcu/llama/pretrain_pp8.json
 ```
 
 ## 4.高性能推理
