@@ -48,6 +48,16 @@ try:
 except:
     QuantizationLinear = None
 
+try:
+    from paddle.distributed import in_auto_parallel_align_mode
+except:
+
+    def in_auto_parallel_align_mode():
+        """
+        hack for paddlenlp develop branch.
+        """
+        return False
+
 MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
 DIST_CKPT_PATH = "dist_ckpt"
@@ -161,6 +171,14 @@ class AutoTrainer(Trainer):
         self.enable_autocast_context_manager = True
         self.do_grad_scaling = True if self.args.fp16 else False
         self.scaler = dist.shard_scaler(paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss))
+
+    def _loss_sum(self, loss):
+        if loss.ndim == 0:
+            return float(loss)
+        ret = paddle.to_tensor(float(0.0))
+        for l in loss.flatten():
+            ret += paddle.to_tensor(l)
+        return float(ret.item())
 
     def _get_item_from_loss(self, loss):
         if isinstance(loss, paddle.Tensor):
@@ -563,7 +581,10 @@ class AutoTrainer(Trainer):
         if isinstance(loss, paddle.Tensor):
             return loss.detach() if loss._is_initialized() else float(0.0)
         elif isinstance(loss, np.ndarray):
-            return np.sum(loss)
+            if in_auto_parallel_align_mode():
+                return self._loss_sum(loss)
+            else:
+                return np.sum(loss)
         elif loss is None:
             return float(0.0)
         else:
