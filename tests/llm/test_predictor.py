@@ -113,7 +113,6 @@ class PredictorTest(LLMTest, unittest.TestCase):
         else:
             self.assertEqual(full_match / len(result_0), 1.0)
 
-    @skip("Skip and wait to fix.")
     def test_wint8(self):
         self.run_predictor(
             {"inference_model": True, "quant_type": "weight_only_int8", "src_length": 512, "max_length": 48}
