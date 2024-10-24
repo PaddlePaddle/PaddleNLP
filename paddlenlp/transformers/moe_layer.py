@@ -206,34 +206,33 @@ class MoELayer(nn.Layer):
         ), f"num_experts must be divisible by expert_parallel_degree, got: {self.num_experts} vs {self.expert_parallel_degree}"
         self.num_local_experts = self.num_experts // self.expert_parallel_degree
 
-    def forward(self, hidden_state):
+    def expert_forward(self, dispatched_input):
+        true_experts = self.experts[self.rank * self.num_local_experts : (self.rank + 1) * self.num_local_experts]
+        expert_outputs = []
+        chunks = dispatched_input.unbind(1)
+        assert len(chunks) == len(true_experts), (len(chunks), len(true_experts))
+        for chunk, expert in zip(chunks, true_experts):
+            chunk = chunk.contiguous()
+            expert_outputs += [expert(chunk)]
+        expert_output = paddle.stack(expert_outputs, axis=1)  # [ecm]
+        return expert_output
+
+    def forward(
+        self,
+        hidden_state: paddle.Tensor,
+        used_token: paddle.Tensor = None,
+    ):
         """_summary_
 
         Args:
             input (_type_): _description_
+            used_token
 
         Returns:
             _type_: _description_
         """
-
-        true_experts = self.experts[self.rank * self.num_local_experts : (self.rank + 1) * self.num_local_experts]
-
         # Implement Algorithm 2 from GShard paper.
         batch_size, seq_len, d_model = hidden_state.shape
-
-        # Reshape into S tokens by dropping sequence dimension.
-        # reshaped_input = input.reshape(-1, d_model)
-        # assert reshaped_input.shape[0] % len(self.experts) == 0, \
-        # f'num tokens must be order of number of local experts, {input[0].shape[0]} vs {len(self.experts)}'
-        def fwdfn(dispatched_input):
-            expert_outputs = []
-            chunks = dispatched_input.unbind(1)
-            assert len(chunks) == len(true_experts), (len(chunks), len(true_experts))
-            for chunk, expert in zip(chunks, true_experts):
-                chunk = chunk.contiguous()
-                expert_outputs += [expert(chunk)]
-            expert_output = paddle.stack(expert_outputs, axis=1)  # [ecm]
-            return expert_output
 
         # Initial implementation -> Reshape into S tokens by dropping sequence dimension.
         # Reshape into G groups so that each group can distribute tokens equally
@@ -241,6 +240,8 @@ class MoELayer(nn.Layer):
         reshaped_input = hidden_state.reshape([-1, d_model])
 
         capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.gate(reshaped_input)
+
+        print(f"capacity={capacity}")
         # self.l_aux, combine_weights, dispatch_mask, self.exp_counts =
         # self.l_aux       :
         # combine_weights  : sec
@@ -253,15 +254,16 @@ class MoELayer(nn.Layer):
 
         # Re-shape after all-to-all: ecm -> gecm
         dispatched_input = dispatched_input.reshape([self.expert_parallel_degree, self.num_local_experts, -1, d_model])
-        expert_output = fwdfn(dispatched_input)
+        expert_output = self.expert_forward(dispatched_input)
         # Re-shape before drop_tokens: gecm -> ecm
         expert_output = expert_output.reshape([self.expert_parallel_degree * self.num_local_experts, -1, d_model])
 
-        expert_output = _AllToAll.apply(expert_output, self.group)
+        if self.expert_parallel_degree > 1:
+            expert_output = _AllToAll.apply(expert_output, self.group)
 
         # Re拿到不同device上的expert计算结果
         combined_output = paddle.einsum("sec,ecm->sm", combine_weights.cast(hidden_state[0].dtype), expert_output)
 
-        a = combined_output.reshape(hidden_state[0].shape)
+        a = combined_output.reshape(hidden_state.shape)
 
         return a

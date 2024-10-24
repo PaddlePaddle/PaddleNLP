@@ -147,25 +147,24 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         # force keep in float32 when using amp
         self._cast_to_low_precision = False
 
-        self.capacity_factor = kwargs["capacity_factor"] if hasattr(kwargs, "capacity_factor") else 1.0  # fmt:skip
-        self.eval_capacity_factor = kwargs["eval_capacity_factor"] if hasattr(kwargs, "eval_capacity_factor") else 1.0  # fmt:skip
-        self.min_capacity = kwargs["min_capacity"] if hasattr(kwargs, "min_capacity") else 1.0  # fmt:skip
+        self.capacity_factor = kwargs.pop("capacity_factor", 1.0)
+        self.eval_capacity_factor = kwargs.pop("eval_capacity_factor", 1.0)
+        self.min_capacity = kwargs.pop("min_capacity", 1.0)
 
-        self.group = kwargs["group"] if hasattr(kwargs, "group") else None
-        self.global_aux_loss = kwargs["global_aux_loss"] if hasattr(kwargs, "global_aux_loss") else False
+        self.group = kwargs.pop("group", None)
+        self.global_aux_loss = kwargs.pop("global_aux_loss", False)
         if self.global_aux_loss:
             assert self.group is not None, "group is required when global_aux_loss is True"
             self.rank = dist.get_rank(self.group)
 
-        self.expert_drop = kwargs["expert_drop"] if hasattr(kwargs, "expert_drop") else False
-        self.noisy_gate_policy = kwargs["noisy_gate_policy"] if hasattr(kwargs, "noisy_gate_policy") else None
-        self.drop_tokens = kwargs["drop_tokens"] if hasattr(kwargs, "drop_tokens") else True
-        self.use_rts = kwargs["use_rts"] if hasattr(kwargs, "use_rts") else True
-        self.top2_2nd_expert_sampling = (
-            kwargs["top2_2nd_expert_sampling"] if hasattr(kwargs, "top2_2nd_expert_sampling") else True
-        )
-        self.drop_policy = kwargs["drop_policy"] if hasattr(kwargs, "drop_policy") else "probs"
-        self.top_k = kwargs["top_k"] if hasattr(kwargs, "top_k") else 1
+        self.expert_drop = kwargs.pop("expert_drop", False)
+        self.noisy_gate_policy = kwargs.pop("noisy_gate_policy", None)
+        self.drop_tokens = kwargs.pop("drop_tokens", True)
+        self.use_rts = kwargs.pop("use_rts", True)
+        self.top2_2nd_expert_sampling = kwargs.pop("top2_2nd_expert_sampling", True)
+
+        self.drop_policy = kwargs.pop("drop_policy", "probs")
+        self.top_k = kwargs.pop("top_k", 2)
 
     def topk_navie(self, scores: paddle.Tensor, k: int) -> Tuple[paddle.Tensor, paddle.Tensor]:
         """_summary_
