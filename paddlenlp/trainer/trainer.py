@@ -1793,6 +1793,12 @@ class Trainer:
             for i in range(core.get_cuda_device_count()):
                 core.default_cuda_generator(i).set_state(checkpoint_rng_state["cuda"][i])
 
+        if core.is_compiled_with_xpu():
+            if not len(checkpoint_rng_state["cuda"]) == core.get_xpu_device_count():
+                raise ValueError("Length of xpu state list shoule be equal to the xpu device count")
+            for i in range(core.get_xpu_device_count()):
+                core.default_xpu_generator(i).set_state(checkpoint_rng_state["cuda"][i])
+
         if paddle.device.get_all_custom_device_type() is not None:
             custom_device_type = paddle.device.get_all_custom_device_type()
             for device in custom_device_type:
