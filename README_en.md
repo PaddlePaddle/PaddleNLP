@@ -122,8 +122,8 @@ For more steps in the entire large model process, please refer to the[Large Mode
 
 For more PaddleNLP content, please refer to:
 
-* [Model Library](./legacy/model_zoo)，which includes end-to-end usage of high-quality pre-trained models.
-* [Multi-scenario Examples](./legacy/examples)，to understand how to use PaddleNLP to solve various NLP technical problems, including basic techniques, system applications, and extended applications.
+* [Model Library](./slm/model_zoo)，which includes end-to-end usage of high-quality pre-trained models.
+* [Multi-scenario Examples](./slm/examples)，to understand how to use PaddleNLP to solve various NLP technical problems, including basic techniques, system applications, and extended applications.
 * [Interactive Tutorial](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，to quickly learn PaddleNLP on the free computing platform AI Studio.
 
 ------------------------------------------------------------------------------------------

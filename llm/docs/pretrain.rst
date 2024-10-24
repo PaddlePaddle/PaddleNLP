@@ -65,7 +65,7 @@ git clone 代码到本地，即可开始。
 .. code-block:: bash
 
     # 编译自定义算子，可选
-    cd ../legacy/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
+    cd ../slm/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 
     # llama 模型预训练
     python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json
@@ -78,7 +78,7 @@ git clone 代码到本地，即可开始。
 
 1. 建议使用paddle develop版本训练，需要安装 ``pip install fast_dataindex visualdl==2.5.3`` 等相关缺失whl包。
 2. ``use_flash_attention`` 需要在A100机器开启，建议使用cuda11.8环境。
-3. ``use_fused_rms_norm`` 需要安装 `此目录 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/gpt-3/external_ops>`_ 下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置 ``PYTHONPATH``。
+3. ``use_fused_rms_norm`` 需要安装 `此目录 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/slm/model_zoo/gpt-3/external_ops>`_ 下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置 ``PYTHONPATH``。
 4. ``continue_training`` 表示从现有的预训练模型加载训练。7b模型初始loss大概为2.xx, 随机初始化模型loss从11.x左右下降。
 5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，请参考 ``run_trainer_tp4pp2.sh`` 脚本。
 6. 多机训练时，若各机器使用的训练数据文件位置相同（例如挂载共享硬盘情况），请指定 ``--share_folder true`` 使全局0号卡制作缓存数据。否则默认各台机器的0号卡独立制作缓存数据，
