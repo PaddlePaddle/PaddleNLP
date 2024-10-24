@@ -103,7 +103,7 @@ def tokenize_example(tokenizer, example, data_args):
     return tokenized_source, tokenized_target_input_ids
 
 
-def tokenize_rounds_example(tokenizer, example, data_args, **kwargs):
+def tokenize_rounds_example(tokenizer, example, data_args, is_test):
     """tokenize multi-rounds examples with chat_template.json
 
     Args:
@@ -130,7 +130,7 @@ def tokenize_rounds_example(tokenizer, example, data_args, **kwargs):
 
     # 1. only tokenize input_ids
     conversation_result: list[tuple[list[int], list[int]]] = tokenizer.encode_chat_inputs(
-        conversations, context_data=context_data, **kwargs
+        conversations, context_data=context_data
     )
     system_ids = conversation_result.pop("system", []) or []
 
@@ -158,20 +158,24 @@ def tokenize_rounds_example(tokenizer, example, data_args, **kwargs):
             bot_input_ids = bot_input_ids[: max_length - len(user_input_ids)]
 
             should_break = True
-
-        input_ids = user_input_ids + bot_input_ids + input_ids
-        labels = len(user_input_ids) * [-100] + bot_input_ids + labels
+        if is_test:
+            if index == len(conversations_ids) - 1:
+                input_ids = user_input_ids
+                labels = bot_input_ids
+            else:
+                input_ids = user_input_ids + bot_input_ids + input_ids
+        else:
+            input_ids = user_input_ids + bot_input_ids + input_ids
+            labels = len(user_input_ids) * [-100] + bot_input_ids + labels
 
         if should_break:
             break
 
     input_ids = system_ids + input_ids
-    labels = [-100] * len(system_ids) + labels
+    if not is_test:
+        labels = [-100] * len(system_ids) + labels
     tokenized_source = {"input_ids": input_ids}
-    sequence_length = len(input_ids)
-
-    if "position_ids" in tokenizer.model_input_names:
-        tokenized_source["position_ids"] = list(range(sequence_length))
+    tokenized_source["position_ids"] = list(range(len(input_ids)))
 
     return tokenized_source, labels
 
@@ -219,7 +223,7 @@ def convert_rounds_example_common(example, tokenizer, data_args, is_test=True, z
     Returns:
         dict[str, np.ndarray]: the features of example
     """
-    rounds_inputs, labels = tokenize_rounds_example(tokenizer, example, data_args)
+    rounds_inputs, labels = tokenize_rounds_example(tokenizer, example, data_args, is_test)
 
     if is_test:
         return {
