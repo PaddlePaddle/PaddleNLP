@@ -26,7 +26,7 @@ __all__ = ["GenerationInferenceModel", "GenerationBlockInferenceModel", "Generat
 
 def use_faster_top_p_sampling():
     """Get the value of the 'USE_FASTER_TOP_P_SAMPLING' environment variable."""
-    return os.getenv("USE_FASTER_TOP_P_SAMPLING", "False") == "True"
+    return os.getenv("USE_FASTER_TOP_P_SAMPLING", "False") in ["True", "1", "true"]
 
 
 class ForcedDecodingEOSTokenLogitsProcessor(LogitsProcessor):
