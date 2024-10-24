@@ -202,18 +202,24 @@ class MoELayer(nn.Layer):
                     # logger.info(f"expert param={p.name}, no-sync={p.no_sync}")
 
         assert (
-            self.num_experts // self.expert_parallel_degree == 0
+            self.num_experts % self.expert_parallel_degree == 0
         ), f"num_experts must be divisible by expert_parallel_degree, got: {self.num_experts} vs {self.expert_parallel_degree}"
         self.num_local_experts = self.num_experts // self.expert_parallel_degree
 
-    def forward(self, input):
+    def forward(self, hidden_state):
+        """_summary_
+
+        Args:
+            input (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+
         true_experts = self.experts[self.rank * self.num_local_experts : (self.rank + 1) * self.num_local_experts]
-        if input.ndim == 3:
-            reshaped_input = input.reshape([-1, input.shape[-1]])
-        assert len(input.shape) == 2, f"input Tensor must have dimensions: (s)equence, (d)im, got:{input.shape}"
 
         # Implement Algorithm 2 from GShard paper.
-        seqlen, d_model = input.shape
+        batch_size, seq_len, d_model = hidden_state.shape
 
         # Reshape into S tokens by dropping sequence dimension.
         # reshaped_input = input.reshape(-1, d_model)
@@ -232,31 +238,30 @@ class MoELayer(nn.Layer):
         # Initial implementation -> Reshape into S tokens by dropping sequence dimension.
         # Reshape into G groups so that each group can distribute tokens equally
         # group_size = kwargs['group_size'] if 'group_size' in kwargs.keys() else 1
-        reshaped_input = input[0].reshape(-1, d_model)
-        self.l_aux, combine_weights, dispatch_mask, self.exp_counts = self.gate(reshaped_input)
+        reshaped_input = hidden_state.reshape([-1, d_model])
+
+        capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.gate(reshaped_input)
+        # self.l_aux, combine_weights, dispatch_mask, self.exp_counts =
         # self.l_aux       :
         # combine_weights  : sec
         # dispatch_mask    : sec
         # self.exp_counts  :
-        dispatched_input = paddle.einsum("sec,sm->ecm", paddle.cast(dispatch_mask, input.dtype), reshaped_input)
-
-        # capacity, dispatch_mask, combine_weights, scatter_index, router_loss = self.gate(input)
-        # self.l_aux, combine_weights, dispatch_mask, self.exp_counts = self.gate(reshaped_input, input[1])
+        dispatched_input = paddle.einsum("sec,sm->ecm", paddle.cast(dispatch_mask, hidden_state.dtype), reshaped_input)
 
         if self.expert_parallel_degree > 1:
             dispatched_input = _AllToAll.apply(dispatched_input, self.group)
 
         # Re-shape after all-to-all: ecm -> gecm
-        dispatched_input = dispatched_input.reshape(
-            [self.expert_parallel_degree * self.num_local_experts, -1, d_model]
-        )
+        dispatched_input = dispatched_input.reshape([self.expert_parallel_degree, self.num_local_experts, -1, d_model])
         expert_output = fwdfn(dispatched_input)
-
         # Re-shape before drop_tokens: gecm -> ecm
-        expert_output = expert_output.reshape(self.expert_parallel_degree * self.num_local_experts, -1, d_model)
-        if self.expert_parallel_degree > 1:
-            expert_output = _AllToAll.apply(expert_output, self.group)  # 拿到不同device上的expert计算结果
-        combined_output = paddle.einsum("sec,ecm->sm", combine_weights.type_as(input[0]), expert_output)
+        expert_output = expert_output.reshape([self.expert_parallel_degree * self.num_local_experts, -1, d_model])
 
-        a = combined_output.reshape(input[0].shape)
+        expert_output = _AllToAll.apply(expert_output, self.group)
+
+        # Re拿到不同device上的expert计算结果
+        combined_output = paddle.einsum("sec,ecm->sm", combine_weights.cast(hidden_state[0].dtype), expert_output)
+
+        a = combined_output.reshape(hidden_state[0].shape)
+
         return a
