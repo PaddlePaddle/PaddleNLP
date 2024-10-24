@@ -208,8 +208,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py 
 
 更多 PaddleNLP 内容可参考：
 
-* [精选模型库](./legacy/model_zoo)，包含优质预训练模型的端到端全流程使用。
-* [多场景示例](./legacy/examples)，了解如何使用 PaddleNLP 解决 NLP 多种技术问题，包含基础技术、系统应用与拓展应用。
+* [精选模型库](./slm/model_zoo)，包含优质预训练模型的端到端全流程使用。
+* [多场景示例](./slm/examples)，了解如何使用 PaddleNLP 解决 NLP 多种技术问题，包含基础技术、系统应用与拓展应用。
 * [交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，在🆓免费算力平台 AI Studio 上快速学习 PaddleNLP。
 
 ------------------------------------------------------------------------------------------

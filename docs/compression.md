@@ -1,21 +1,21 @@
 # PaddleNLP 模型压缩 API
 
  **目录**
-   * [模型压缩 API 功能简介](#模型压缩API功简介)
+   * [模型压缩 API 功能简介](#模型压缩 API 功简介)
    * [三大场景快速启动模型压缩示例](#三大场景快速启动模型压缩示例)
    * [四步启动模型压缩](#四步启动模型压缩)
-       * [Step1：获取模型压缩参数 compression_args](#获取模型压缩参数compression_args)
-       * [Step2：实例化 Trainer 并调用 compress()](#实例化Trainer并调用compress())
-           * [Trainer 实例化参数介绍](#Trainer实例化参数介绍)
+       * [Step1：获取模型压缩参数 compression_args](#获取模型压缩参数 compression_args)
+       * [Step2：实例化 Trainer 并调用 compress()](#实例化 Trainer 并调用 compress())
+           * [Trainer 实例化参数介绍](#Trainer 实例化参数介绍)
        * [Step3：实现自定义评估函数（按需可选）](#实现自定义评估函数（按需可选）)
        * [Step4：传参并运行压缩脚本](#传参并运行压缩脚本)
-           * [CompressionArguments 参数介绍](#CompressionArguments参数介绍)
+           * [CompressionArguments 参数介绍](#CompressionArguments 参数介绍)
    * [模型评估与部署](#模型评估与部署)
    * [FAQ](#FAQ)
    * [参考文献](#References)
 
 
-<a name="模型压缩API功能简介"></a>
+<a name="模型压缩 API 功能简介"></a>
 
 ## 模型压缩 API 功能简介
 
@@ -35,7 +35,7 @@ PaddleNLP 模型压缩 API 功能支持对 ERNIE 类下游任务上微调后的�
 | ERNIE 3.0-Medium+裁剪+FP32 | 1424.01(1.3x) | 57.31(-0.14) | 454.27(1.2x)  | 93.27(+0.23)  | 183.77(1.3x)  | 65.92(-1.03)  |
 | ERNIE 3.0-Medium+裁剪+INT8 | 3635.48(3.2x) | 57.26(-0.19) | 1105.26(3.0x) | 93.20(+0.16)  | 444.27(3.0x)  | 66.17(-0.78)  |
 
-(以上数据来自 [ERNIE 3.0 性能测试文档](../legacy/model_zoo/ernie-3.0/README.md#性能测试)，文档包含测试环境介绍)
+(以上数据来自 [ERNIE 3.0 性能测试文档](../slm/model_zoo/ernie-3.0/README.md#性能测试)，文档包含测试环境介绍)
 
 ##### UIE 压缩效果
 
@@ -51,7 +51,7 @@ PaddleNLP 模型压缩 API 功能支持对 ERNIE 类下游任务上微调后的�
 
 ### 三大场景快速启动模型压缩示例
 
-本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、抽取式阅读理解三大场景下的使用样例，可以分别参考 [ERNIE 3.0](../legacy/model_zoo/ernie-3.0) 目录下的 [compress_seq_cls.py](../legacy/model_zoo/ernie-3.0/compress_seq_cls.py) 、[compress_token_cls.py](../legacy/model_zoo/ernie-3.0/compress_token_cls.py)、[compress_qa.py](../legacy/model_zoo/ernie-3.0/compress_qa.py) 脚本，启动方式如下：
+本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、抽取式阅读理解三大场景下的使用样例，可以分别参考 [ERNIE 3.0](../slm/model_zoo/ernie-3.0) 目录下的 [compress_seq_cls.py](../slm/model_zoo/ernie-3.0/compress_seq_cls.py) 、[compress_token_cls.py](../slm/model_zoo/ernie-3.0/compress_token_cls.py)、[compress_qa.py](../slm/model_zoo/ernie-3.0/compress_qa.py) 脚本，启动方式如下：
 
 ```shell
 # 分类任务
@@ -149,7 +149,7 @@ python compress.py \
 ```
 
 
-<a name="获取模型压缩参数compression_args"></a>
+<a name="获取模型压缩参数 compression_args"></a>
 
 ### Step 1：获取模型压缩参数 compression_args
 
@@ -163,16 +163,16 @@ parser = PdArgumentParser(CompressionArguments)
 compression_args = parser.parse_args_into_dataclasses()
 ```
 
-<a name="实例化Trainer并调用compress()"></a>
+<a name="实例化 Trainer 并调用 compress()"></a>
 
 ### Step 2：实例化 Trainer 并调用 compress
 
-<a name="Trainer实例化参数介绍"></a>
+<a name="Trainer 实例化参数介绍"></a>
 
 #### Trainer 实例化参数介绍
 
 - **--model** 待压缩的模型，目前支持 ERNIE、BERT、RoBERTa、ERNIE-M、ELECTRA、ERNIE-Gram、PP-MiniLM、TinyBERT 等结构相似的模型，是在下游任务中微调后的模型，当预训练模型选择 ERNIE 时，需要继承 `ErniePretrainedModel`。以分类任务为例，可通过`AutoModelForSequenceClassification.from_pretrained(model_name_or_path)` 等方式来获取，这种情况下，`model_name_or_path`目录下需要有 model_config.json, model_state.pdparams 文件；
-- **--data_collator** 三类任务均可使用 PaddleNLP 预定义好的 [DataCollator 类](../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作。使用方法参考 [示例代码](../legacy/model_zoo/ernie-3.0/compress_seq_cls.py) 即可；
+- **--data_collator** 三类任务均可使用 PaddleNLP 预定义好的 [DataCollator 类](../paddlenlp/data/data_collator.py)，`data_collator` 可对数据进行 `Pad` 等操作。使用方法参考 [示例代码](../slm/model_zoo/ernie-3.0/compress_seq_cls.py) 即可；
 - **--train_dataset** 裁剪训练需要使用的训练集，是任务相关的数据。自定义数据集的加载可参考 [文档](https://huggingface.co/docs/datasets/loading)。不启动裁剪时，可以为 None；
 - **--eval_dataset** 裁剪训练使用的评估集，也是量化使用的校准数据，是任务相关的数据。自定义数据集的加载可参考 [文档](https://huggingface.co/docs/datasets/loading)。是 Trainer 的必选参数；
 - **--tokenizer** 模型 `model` 对应的 `tokenizer`，可使用 `AutoTokenizer.from_pretrained(model_name_or_path)` 来获取。
@@ -313,7 +313,7 @@ python compress.py \
 
 下面会介绍模型压缩启动命令可以传递的超参数。
 
-<a name="CompressionArguments参数介绍"></a>
+<a name="CompressionArguments 参数介绍"></a>
 
 #### CompressionArguments 参数介绍
 
@@ -350,7 +350,7 @@ python compress.py \
 
 - **--save_steps** 评估模型的步数。默认为 100；
 
-- **--optim** 裁剪训练使用的优化器名称，默认为adamw，默认为 'adamw'；
+- **--optim** 裁剪训练使用的优化器名称，默认为 adamw，默认为 'adamw'；
 
 - **--learning_rate** 裁剪训练使用优化器的初始学习率，默认为 5e-05；
 
@@ -415,19 +415,19 @@ python compress.py \
 
 裁剪、量化后的模型不能再通过 `from_pretrained` 导入进行预测，而是需要使用 Paddle 部署工具才能完成预测。
 
-压缩后的模型部署可以参考 [部署文档](../legacy/model_zoo/ernie-3.0/deploy) 完成。
+压缩后的模型部署可以参考 [部署文档](../slm/model_zoo/ernie-3.0/deploy) 完成。
 
 ### Python 部署
 
-服务端部署可以从这里开始。可以参考 [seq_cls_infer.py](../legacy/model_zoo/ernie-3.0/deploy/python/seq_cls_infer.py) 或者 [token_cls_infer.py](../legacy/model_zoo/ernie-3.0/deploy/python/token_cls_infer.py) 来编写自己的预测脚本。并根据 [Python 部署指南](../legacy/model_zoo/ernie-3.0/deploy/python/README.md) 的介绍安装预测环境，对压缩后的模型进行精度评估、性能测试以及部署。
+服务端部署可以从这里开始。可以参考 [seq_cls_infer.py](../slm/model_zoo/ernie-3.0/deploy/python/seq_cls_infer.py) 或者 [token_cls_infer.py](../slm/model_zoo/ernie-3.0/deploy/python/token_cls_infer.py) 来编写自己的预测脚本。并根据 [Python 部署指南](../slm/model_zoo/ernie-3.0/deploy/python/README.md) 的介绍安装预测环境，对压缩后的模型进行精度评估、性能测试以及部署。
 
 
 <a name="服务化部署"></a>
 
 ### 服务化部署
 
-- [FastDeploy ERNIE 3.0 模型 Serving 部署示例](../legacy/model_zoo/ernie-3.0/deploy/serving/README.md)
-- [基于PaddleNLP SimpleServing 的服务化部署](../legacy/model_zoo/ernie-3.0/deploy/simple_serving/README.md)
+- [FastDeploy ERNIE 3.0 模型 Serving 部署示例](../slm/model_zoo/ernie-3.0/deploy/serving/README.md)
+- [基于 PaddleNLP SimpleServing 的服务化部署](../slm/model_zoo/ernie-3.0/deploy/simple_serving/README.md)
 
 ### 移动端部署
 

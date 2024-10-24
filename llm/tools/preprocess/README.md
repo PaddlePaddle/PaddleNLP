@@ -246,7 +246,7 @@ mv ./preprocess/baike_sample* ./data
 ```
 
 * llama 预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm)。
-* ernie 预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/legacy/model_zoo/ernie-1.0/pretraining_introduction.md)。
+* ernie 预训练请参考[预训练](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/slm/model_zoo/ernie-1.0/pretraining_introduction.md)。
 
 
 代码说明：

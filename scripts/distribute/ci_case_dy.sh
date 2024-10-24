@@ -19,7 +19,7 @@ set -e
 export log_path=/workspace/case_logs
 export root_path=/workspace/PaddleNLP
 
-export gpt_case_path=$root_path/legacy/model_zoo/gpt-3
+export gpt_case_path=$root_path/slm/model_zoo/gpt-3
 export gpt_data_path=/fleetx_data
 
 export llm_gpt_case_path=$root_path/llm
@@ -273,7 +273,7 @@ function gpt_export_345M_mp1() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=$root_path/legacy/model_zoo/gpt-3:$PYTHONPATH
+    export PYTHONPATH=$root_path/slm/model_zoo/gpt-3:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=1
     python -m paddle.distributed.launch --log_dir $log_dir --devices "1" \
         ./tools/auto_export.py \
@@ -294,7 +294,7 @@ function gpt_export_345M_mp2() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=$root_path/legacy/model_zoo/gpt-3:$PYTHONPATH
+    export PYTHONPATH=$root_path/slm/model_zoo/gpt-3:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=0,1
     python -m paddle.distributed.launch --devices "0,1" \
         ./tools/auto_export.py \

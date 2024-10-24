@@ -19,7 +19,7 @@ mv llama_openwebtext_100k.idx ./data
 安装自定义算子:
 ```shell
 # 编译自定义算子，可选
-cd ../../../legacy/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
+cd ../../../slm/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 
 ```
 ## 3. 预训练
