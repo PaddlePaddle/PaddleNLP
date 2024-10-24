@@ -148,6 +148,8 @@ if cc >= 80:
 if cc >= 89:
     sources += find_end_files("gpu/cutlass_kernels/fp8_gemm_fused/autogen", ".cu")
     sources += [
+        "gpu/fp8_gemm_with_cutlass/fp8_gemm.cu",
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_gemm.cu",
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
         "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.cu",
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
