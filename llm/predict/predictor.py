@@ -1008,7 +1008,16 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
             outputs = []
             output_tokens = []
             while len(outputs) < self.batch_size:
-                result = result_queue.get(timeout=1)
+                if paddle.core.is_compiled_with_rocm():
+                    """
+                    Due to the computing performance of the DCU platform, 
+                    too short timeout will cause queue empty problems, 
+                    so the timeout is temporarily increased.
+                    """
+                    timeout=10
+                else:
+                    timeout=1
+                result = result_queue.get(timeout=timeout)
                 outputs.append(result[-1])
                 output_tokens.append(result[-2])
 
@@ -1138,7 +1147,16 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
             outputs = []
             output_tokens = []
             while len(outputs) < self.batch_size:
-                result = result_queue.get(timeout=1)
+                if paddle.core.is_compiled_with_rocm():
+                    """
+                    Due to the computing performance of the DCU platform, 
+                    too short timeout will cause queue empty problems, 
+                    so the timeout is temporarily increased.
+                    """
+                    timeout=10
+                else:
+                    timeout=1
+                result = result_queue.get(timeout=timeout)
                 outputs.append(result[-1])
                 output_tokens.append(result[-2])
 
