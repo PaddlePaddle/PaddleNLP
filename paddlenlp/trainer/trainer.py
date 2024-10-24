@@ -109,7 +109,7 @@ from ..utils.env import (
     VERA_WEIGHTS_NAME,
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
-from ..utils.log import logger
+from ..utils.log import MetricsDumper, logger
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import RuntimeTimer, get_timers, set_timers
@@ -383,6 +383,14 @@ class Trainer:
             callbacks, self.model, self.tokenizer, self.optimizer, self.lr_scheduler
         )
         self.add_callback(PrinterCallback if self.args.disable_tqdm else DEFAULT_PROGRESS_CALLBACK)
+
+        self.metrics_dumper = None
+        if self.args.metrics_output_path is not None:
+            if not os.path.exists(self.args.metrics_output_path):
+                os.makedirs(self.args.metrics_output_path, exist_ok=True)
+            metrics_output_file = os.path.join(self.args.metrics_output_path, f"metrics_rank{dist.get_rank()}.json")
+            logger.info(f"create/append metrics dumper at {metrics_output_file}")
+            self.metrics_dumper = MetricsDumper(metrics_output_file)
 
         def _save_ckpt_func(state_dict, path, signal_path=None):
             if self.args.enable_auto_parallel:
@@ -1281,7 +1289,10 @@ class Trainer:
 
         self.log(metrics)
 
-        self.control = self.callback_handler.on_train_end(args, self.state, self.control)
+        kwargs = {
+            "metrics_dumper": self.metrics_dumper,
+        }
+        self.control = self.callback_handler.on_train_end(args, self.state, self.control, **kwargs)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
@@ -2836,7 +2847,9 @@ class Trainer:
             paddle_pipeline_timers = None
         except AssertionError:
             paddle_pipeline_timers = None
-        kwargs.update(timer=self.timers, paddle_pipeline_timers=paddle_pipeline_timers)
+        kwargs.update(
+            timer=self.timers, paddle_pipeline_timers=paddle_pipeline_timers, metrics_dumper=self.metrics_dumper
+        )
 
         if self.state.epoch is not None:
             logs["progress_or_epoch"] = round(self.state.epoch, 4)
