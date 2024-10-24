@@ -40,7 +40,6 @@ if not is_paddlenlp_ops_available():
         "The paddlenlp_ops package is not installed. you can read the docs and install it by hand, "
         "you can refer to: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
     )
-from paddlenlp_ops import rebuild_padding_v2
 
 if core.is_compiled_with_cuda():
     if os.getenv("FLAGS_CUTLASS_FP8_GEMM", "False") == "True":
@@ -57,7 +56,9 @@ if core.is_compiled_with_cuda():
             encode_rotary_qk,
             qkv_transpose_split,
             quant_int8,
+            rebuild_append_padding,
             rebuild_padding,
+            rebuild_padding_v2,
             transpose_remove_padding,
             write_cache_kv,
         )
@@ -648,6 +649,11 @@ class FusedMultiTransformerBase(Layer):
 
         self.linear = fused_linear
 
+        # used in speculative decoding, if speculate_max_draft_token_num is 1
+        # and speculate_method is None, it will be autogressive decoding.
+        self.speculate_max_draft_token_num = 1
+        self.speculate_method = None
+
     def init_weight(self):
         self.qkv_weights = []
         self.linear_weights = []
@@ -1094,7 +1100,6 @@ class FusedMultiTransformerBase(Layer):
             kwargs["decoder_block_shape_q"] = 16
             kwargs["max_partition_size"] = 32768
             kwargs["encoder_max_partition_size"] = 32768
-            kwargs["speculate_max_draft_token_num"] = 5
 
             from paddlenlp_ops import get_block_shape_and_split_kv_block
 
@@ -1119,7 +1124,7 @@ class FusedMultiTransformerBase(Layer):
                 kwargs.get("decoder_block_shape_q", 16),
                 self.num_heads // self.kv_num_heads,
                 kwargs.get("block_size", 64),
-                kwargs["speculate_max_draft_token_num"],
+                self.speculate_max_draft_token_num,
             )
 
         residual_input = src
@@ -2258,9 +2263,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 kwargs.get("decoder_block_shape_q", 16),
                 kwargs.get("max_partition_size", 32768),
                 kwargs.get("encoder_max_partition_size", 32768),
-                kwargs["speculate_max_draft_token_num"],  # speculate_max_draft_token_num
+                self.speculate_max_draft_token_num,  # speculate_max_draft_token_num
                 True,  # causal
-                False,  # speculate_decoder
+                self.speculate_method is not None,  # speculate_decoder
             )[0]
         else:
             if core.is_compiled_with_xpu():
@@ -2440,9 +2445,9 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
                 kwargs.get("decoder_block_shape_q", 16),
                 kwargs.get("max_partition_size", 32768),
                 kwargs.get("encoder_max_partition_size", 32768),
-                kwargs["speculate_max_draft_token_num"],  # speculate_max_draft_token_num
+                self.speculate_max_draft_token_num,  # speculate_max_draft_token_num
                 True,  # causal
-                False,  # speculate_decoder
+                self.speculate_method is not None,  # speculate_decoder
             )[0]
         else:
             fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
@@ -3255,3 +3260,66 @@ class FusedBlockMultiTransformerFP8(Layer):
 
         out = self.post_process(**kwargs)
         return out, caches
+
+
+class FusedSpeculateMultiTransformer(FusedBlockMultiTransformer):
+    def __init__(
+        self,
+        speculate_max_draft_token_num: int,
+        speculate_method: str = None,
+        config: FusedMultiTransformerConfig = None,
+    ):
+        super().__init__(config)
+        self.speculate_max_draft_token_num = speculate_max_draft_token_num
+        self.speculate_method = speculate_method
+
+    def post_process(self, **kwargs):
+        embed_dim = self.config.embed_dim
+        multi_block_output = kwargs.get("multi_block_output", None)
+        cum_offsets = kwargs.get("cum_offsets", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        max_input_length = kwargs.get("max_input_length", -1)
+        output_padding_offset = kwargs.get("output_padding_offset", None)
+        out = rebuild_append_padding(
+            multi_block_output,
+            cum_offsets,
+            seq_lens_decoder,
+            seq_lens_encoder,
+            output_padding_offset,
+            max_input_length,
+            embed_dim,
+        )
+        return out
+
+
+class FusedSpeculateMultiTransformerA8W8(FusedBlockMultiTransformerA8W8):
+    def __init__(
+        self,
+        speculate_max_draft_token_num: int,
+        speculate_method: str = None,
+        config: FusedMultiTransformerConfig = None,
+    ):
+        super().__init__(config)
+        self.speculate_max_draft_token_num = speculate_max_draft_token_num
+        self.speculate_method = speculate_method
+
+    def post_process(self, **kwargs):
+        embed_dim = self.config.embed_dim
+        multi_block_output = kwargs.get("multi_block_output", None)
+        cum_offsets = kwargs.get("cum_offsets", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+        seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
+        max_input_length = kwargs.get("max_input_length", -1)
+        output_padding_offset = kwargs.get("output_padding_offset", None)
+
+        out = rebuild_append_padding(
+            multi_block_output,
+            cum_offsets,
+            seq_lens_decoder,
+            seq_lens_encoder,
+            output_padding_offset,
+            max_input_length,
+            embed_dim,
+        )
+        return out

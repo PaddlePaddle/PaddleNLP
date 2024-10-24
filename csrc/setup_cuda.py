@@ -114,6 +114,22 @@ sources = [
     "./gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
     "./gpu/append_attn/speculate_write_cache_with_rope_kernel.cu",
     "./gpu/sample_kernels/top_p_sampling_reject.cu",
+    "./gpu/speculate_decoding_kernels/ngram_mask.cu",
+    "./gpu/speculate_decoding_kernels/ngram_match.cc",
+    "./gpu/speculate_decoding_kernels/rebuild_append_padding.cu",
+    "./gpu/speculate_decoding_kernels/speculate_calcu_accept_ratio.cu",
+    "./gpu/speculate_decoding_kernels/speculate_clear_accept_nums.cu",
+    "./gpu/speculate_decoding_kernels/speculate_get_output_padding_offset.cu",
+    "./gpu/speculate_decoding_kernels/speculate_get_output.cc",
+    "./gpu/speculate_decoding_kernels/speculate_get_padding_offset.cu",
+    "./gpu/speculate_decoding_kernels/speculate_get_seq_lens_output.cu",
+    "./gpu/speculate_decoding_kernels/speculate_save_output.cc",
+    "./gpu/speculate_decoding_kernels/speculate_set_value_by_flags.cu",
+    "./gpu/speculate_decoding_kernels/speculate_step.cu",
+    "./gpu/speculate_decoding_kernels/speculate_update_input_ids_cpu.cc",
+    "./gpu/speculate_decoding_kernels/speculate_update_seq_lens_this_time.cu",
+    "./gpu/speculate_decoding_kernels/speculate_verify_and_update.cu",
+    "./gpu/speculate_decoding_kernels/top_p_candidates.cu",
 ]
 sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
 
