@@ -137,7 +137,7 @@ class PtbTextOnly(datasets.GeneratorBasedBuilder):
         """Yields examples."""
         # TODO: This method will receive as arguments the `gen_kwargs` defined in the previous `_split_generators` method.
         # It is in charge of opening the given file and yielding (key, example) tuples from the dataset
-        # The key is not important, it's more here for legacy reason (slm from tfds)
+        # The key is not important, it's more here for legacy reason (legacy from tfds)
         with open(filepath, encoding="utf-8") as f:
             for id_, line in enumerate(f):
                 line = line.strip()
