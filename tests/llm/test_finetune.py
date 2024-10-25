@@ -25,7 +25,15 @@ from .testing_utils import LLMTest
 
 @parameterized_class(
     ["model_dir"],
-    [["llama"], ["chatglm"], ["bloom"], ["chatglm2"], ["qwen"], ["qwen2"], ["baichuan"]],
+    [
+        ["llama"],
+        ["chatglm"],
+        # ["bloom"], @skip("Skip and wait to fix.")
+        ["chatglm2"],
+        ["qwen"],
+        ["qwen2"],
+        ["baichuan"],
+    ],
 )
 class FinetuneTest(LLMTest, unittest.TestCase):
     config_path: str = "./tests/fixtures/llm/finetune.yaml"

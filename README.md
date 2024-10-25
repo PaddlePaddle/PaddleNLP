@@ -115,19 +115,19 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 
 * 大模型预训练、精调（包含 SFT、PEFT 技术）、对齐、量化已支持 LLaMA 系列、Baichuan 系列、Bloom 系列、ChatGLM 系列、Mistral 系列、OPT 系列和 Qwen 系列，【LLM】模型预训练、精调、对齐、量化支持列表如下：
 
-| 模型名称/能力支持  | Pretrain | SFT | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Torch convert |
-|:------------------:|:--------:|:---:|:----:|:-------------:|:---:|:----:|:------------:|:-------------:|
-|       Llama        |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  ✅   |      ✅       |       ✅       |
-|        Qwen        |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      🚧      |       ✅       |
-|      Mixtral       |    ✅     |  ✅  |  ✅   |       ❌       | 🚧  |  🚧  |      🚧      |      🚧       |
-|      Mistral       |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      🚧      |       ✅       |
-| Baichuan/Baichuan2 |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      ✅       |       ✅       |
-|     ChatGLM-6B     |    ✅     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ❌       |
-| ChatGLM2/ChatGLM3  |    ✅     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅       |
-|       Bloom        |    ✅     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅       |
-|       GPT-3        |    ✅     |  ✅  |  🚧  |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
-|        OPT         |    ✅     |  ✅  |  ✅   |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
-|       Yuan2        |    ✅     |  ✅  |  ✅   |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
+| 模型名称/能力支持  | Pretrain | SFT | FlashMask | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Torch convert |
+|:------------------:|:--------:|:---:|:---------:|:----:|:-------------:|:---:|:----:|:------------:|:-------------:|
+|       Llama        |    ✅     |  ✅  |     ✅     |  ✅   |       ✅       |  ✅  |  ✅   |      ✅       |       ✅       |
+|        Qwen        |    ✅     |  ✅  |     ✅     |  ✅   |       ✅       |  ✅  |  🚧  |      🚧      |       ✅       |
+|      Mixtral       |    ✅     |  ✅  |     🚧     |  ✅  |       ❌       | 🚧  |  🚧  |      🚧      |      🚧       |
+|      Mistral       |    ✅     |  ✅  |     🚧     |  ✅  |       ✅       |  ✅  |  🚧  |      🚧      |       ✅       |
+| Baichuan/Baichuan2 |    ✅     |  ✅  |     ✅     |  ✅   |       ✅       |  ✅  |  🚧  |      ✅       |       ✅       |
+|     ChatGLM-6B     |    ✅     |  ✅  |     🚧     |  ✅  |       ✅       | 🚧  |  🚧  |      ✅       |       ❌       |
+| ChatGLM2/ChatGLM3  |    ✅     |  ✅  |     🚧     |  ✅  |       ✅       | 🚧  |  🚧  |      ✅       |       ✅       |
+|       Bloom        |    ✅     |  ✅  |     🚧     |  ✅  |       ✅       | 🚧  |  🚧  |      ✅       |       ✅       |
+|       GPT-3        |    ✅     |  ✅  |    🚧     |  🚧  |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
+|        OPT         |    ✅     |  ✅  |     🚧     |  ✅  |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
+|       Yuan2        |    ✅     |  ✅  |     🚧     |  ✅  |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
 ------------------------------------------------------------------------------------------
 
 * [大模型推理](./llm/docs/predict/inference.md)已支持 LLaMA 系列、Qwen 系列、Mistral 系列、ChatGLM 系列、Bloom 系列和 Baichuan 系列，支持 Weight Only INT8及 INT4推理，支持 WAC（权重、激活、Cache KV）进行 INT8、FP8量化的推理，【LLM】模型推理支持列表如下：
@@ -208,8 +208,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py 
 
 更多 PaddleNLP 内容可参考：
 
-* [精选模型库](./legacy/model_zoo)，包含优质预训练模型的端到端全流程使用。
-* [多场景示例](./legacy/examples)，了解如何使用 PaddleNLP 解决 NLP 多种技术问题，包含基础技术、系统应用与拓展应用。
+* [精选模型库](./slm/model_zoo)，包含优质预训练模型的端到端全流程使用。
+* [多场景示例](./slm/examples)，了解如何使用 PaddleNLP 解决 NLP 多种技术问题，包含基础技术、系统应用与拓展应用。
 * [交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，在🆓免费算力平台 AI Studio 上快速学习 PaddleNLP。
 
 ------------------------------------------------------------------------------------------

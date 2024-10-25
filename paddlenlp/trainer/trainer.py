@@ -581,7 +581,9 @@ class Trainer:
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
             uc_async_save = self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config
-            resume_from_checkpoint = get_last_checkpoint(self.args.output_dir, uc_async_save)
+            resume_from_checkpoint = get_last_checkpoint(
+                self.args.output_dir, signal_folder=self.args.output_signal_dir, uc_async_save=uc_async_save
+            )
             if resume_from_checkpoint is None:
                 raise ValueError(f"No valid checkpoint found in output directory ({self.args.output_dir})")
 
@@ -2207,6 +2209,9 @@ class Trainer:
         return (loss, outputs) if return_outputs else loss
 
     def _enable_delay_scale_loss(self):
+        if in_auto_parallel_align_mode():
+            return True
+
         key = "enable_delay_scale_loss"
         if self.args.pipeline_parallel_degree > 1:
             return key in self.args.pipeline_parallel_config
@@ -2302,7 +2307,6 @@ class Trainer:
         self,
         output_dir: Optional[str] = None,
         merge_tensor_parallel: Optional[bool] = False,
-        signal_dir: Optional[str] = None,
     ):
         """
         Will save the model, so you can reload it using `from_pretrained()`.
@@ -2313,14 +2317,16 @@ class Trainer:
         if output_dir is None:
             output_dir = self.args.output_dir
 
-        if signal_dir is None:
+        if PREFIX_CHECKPOINT_DIR in output_dir:
+            signal_dir = os.path.join(self.args.output_signal_dir, os.path.split(output_dir)[-1])
+        else:
             signal_dir = self.args.output_signal_dir
 
         if ShardingOption.FULL_SHARD in self.args.sharding:
             self.model_wrapped.get_all_parameters(convert2cpu=True)
 
         if self.args.should_save_model_state:
-            self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel, signal_dir=signal_dir)
+            self._save(output_dir=output_dir, merge_tensor_parallel=merge_tensor_parallel)
         else:
             if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
                 os.makedirs(signal_dir, exist_ok=True)
@@ -2380,11 +2386,11 @@ class Trainer:
         signal_dir = os.path.join(run_signal_dir, checkpoint_folder)
 
         if isinstance(self.model, LoRAModel) and (self.model.quantized or self.args.pipeline_parallel_degree > 1):
-            self.save_model(output_dir, False, signal_dir)
+            self.save_model(output_dir)
         elif isinstance(self.model, LoRAModel) or isinstance(self.model, PrefixModelForCausalLM):
-            self.save_model(output_dir, True, signal_dir)
+            self.save_model(output_dir, True)
         else:
-            self.save_model(output_dir, False, signal_dir)
+            self.save_model(output_dir)
 
         # only save model state dict, ignore optimizer and scheduler
         if not self.args.ignore_save_lr_and_optim:
@@ -2521,7 +2527,7 @@ class Trainer:
         need_to_rotate_checkpoints = need_to_rotate_checkpoints and self.args.local_rank == 0
         if need_to_rotate_checkpoints:
             self._rotate_checkpoints(use_mtime=True, output_dir=run_dir)
-            self._rotate_checkpoints(use_mtime=False, output_dir=run_signal_dir)
+            self._rotate_checkpoints(use_mtime=True, output_dir=run_signal_dir)
 
         if strtobool(os.getenv("FLAG_LLM_PDC", "False")) and not ("async_save" in self.args.unified_checkpoint_config):
             # save checkpoint_done file to ensure checkpoint is complete
@@ -2601,15 +2607,16 @@ class Trainer:
         output_dir: Optional[str] = None,
         state_dict=None,
         merge_tensor_parallel=False,
-        signal_dir: Optional[str] = None,
     ):
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Saving model checkpoint to {output_dir}")
 
         # signal_dir is used for asynchronous saving situations.
+        signal_dir = self.args.output_signal_dir
         if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
-            signal_dir = signal_dir if signal_dir is not None else self.args.output_signal_dir
+            if PREFIX_CHECKPOINT_DIR in output_dir:
+                signal_dir = os.path.join(signal_dir, os.path.split(output_dir)[-1])
             os.makedirs(signal_dir, exist_ok=True)
             logger.info(f"Saving model checkpoint finish signal to {signal_dir}")
 
@@ -2932,8 +2939,10 @@ class Trainer:
         prediction_loss_only = prediction_loss_only if prediction_loss_only is not None else args.prediction_loss_only
 
         if self.args.pipeline_parallel_degree > 1:
+            from paddle.distributed.fleet.meta_parallel import PipelineLayer
+
             # Only accept wrapped model for pipeline_parallel mode
-            if self.model is self.model_wrapped:
+            if self.model is self.model_wrapped and isinstance(self.model_wrapped, PipelineLayer):
                 # NOTE(gongenlei): when do_train=False, do_eval=True, we need to wrap model for pipeline
                 self.model_wrapped = fleet.distributed_model(self.model_wrapped)
             model = self.model_wrapped
