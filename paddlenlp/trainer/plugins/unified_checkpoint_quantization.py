@@ -15,7 +15,7 @@
 import paddle
 import paddle.distributed as dist
 
-from paddlenlp.utils.checkpoint_quantization_utils import (
+from paddlenlp.quantization.checkpoint_quantization_utils import (
     asymmetry_qdq_weight,
     cal_ratio,
     group_wise_quant_dequant,

@@ -533,7 +533,7 @@ class UnifiedCheckpointHandler:
 
         model_state_dict = get_expected_state_dict(model)
         struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}  # get optimizer param mappings
-        optimizer_state_dict = load_state_dict(optimizer_path, ckpt_quant_stage=self.args.ckpt_quant_stage)
+        optimizer_state_dict = load_state_dict(optimizer_path, ckpt_quant_stage=ckpt_quant_stage)
 
         master_weights = {}
 
@@ -669,6 +669,10 @@ class UnifiedCheckpointHandler:
             with open(os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME), "r") as f:
                 index = json.loads(f.read())
 
+        ckpt_quant_stage = "O0"
+        if "ckpt_quant_stage" in index:
+            ckpt_quant_stage = index["ckpt_quant_stage"]
+
         # If not having merge optimizer, then load non-merge optimizer.
         if "weight_map" not in index:
             if self.args.data_parallel_rank == 0 or self.args.use_expert_parallel:
@@ -676,7 +680,7 @@ class UnifiedCheckpointHandler:
                     model,
                     optimizer,
                     resume_from_checkpoint,
-                    ckpt_quant_stage=args.ckpt_quant_stage,
+                    ckpt_quant_stage=ckpt_quant_stage,
                 )
                 return returned_optim_state_dict
             else:
@@ -797,13 +801,12 @@ class UnifiedCheckpointHandler:
         master_path = os.path.join(output_dir, SAFE_MASTER_WEIGHTS_INDEX_NAME)
         with open(path, "w") as f:
             has_master_weights = master_weights is not None
-            ckpt_quant_stage = self.args.ckpt_quant_stage
             json.dump(
                 {
                     "metadata": {"total_size": total_optim_size},
                     "weight_map": index_optimizer_file,
                     "master_weights": has_master_weights,
-                    "ckpt_quant_stage": ckpt_quant_stage,
+                    "ckpt_quant_stage": self.args.ckpt_quant_stage,
                 },
                 f,
                 indent=4,
@@ -935,13 +938,13 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
                 )
             else:
                 tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
+
         # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
         state_dict = load_state_dict(
             shard_file,
             tp_actions if pre_tensor_parallel_split else None,
             expected_keys,
             device="expected",
-            ckpt_quant_stage=args.ckpt_quant_stage,
         )
 
         if not pre_tensor_parallel_split:
@@ -1156,8 +1159,16 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             gc.collect()
         return returned_state_dict
 
+    index = {}
+    with open(os.path.join(resume_from_checkpoint, index_filename), "r") as f:
+        index = json.loads(f.read())
+
+    ckpt_quant_stage = "O0"
+    if "ckpt_quant_stage" in index:
+        ckpt_quant_stage = index["ckpt_quant_stage"]
+
     state_dict_optim = load_resolved_archive_file(
-        resolved_archive_file, sharded_metadata, expected_keys, ckpt_quant_stage=args.ckpt_quant_stage
+        resolved_archive_file, sharded_metadata, expected_keys, ckpt_quant_stage=ckpt_quant_stage
     )
     if has_master_weights:
         state_dict_master_weight = load_resolved_archive_file(
@@ -1305,8 +1316,8 @@ def unified_optimizer_into_shards(
         use_expert_parallel=args.use_expert_parallel,
     )
     sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
-    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
-    if local_rank == 0 and args.ckpt_quant_stage in ["O1", "O2"]:
+
+    if args.should_save and args.ckpt_quant_stage in ["O1", "O2"]:
         sharded_optim_index["ckpt_quant_stage"] = args.ckpt_quant_stage
 
     if master_weights is not None:
@@ -1921,7 +1932,7 @@ def load_single_card_checkpoint(args, model, resume_from_checkpoint: str):
     if len(missing_keys) > 0:
         raise ValueError(f"Missing keys: {missing_keys}")
 
-    state_dict = load_state_dict(resolved_archive_file[0], None, expected_keys, ckpt_quant_stage=args.ckpt_quant_stage)
+    state_dict = load_state_dict(resolved_archive_file[0], None, expected_keys)
     error_msgs = _load_state_dict_into_model(model, state_dict, "")
     del state_dict
     gc.collect()
@@ -1951,12 +1962,20 @@ def load_single_card_optimizer(args, model, optimizer, resume_from_checkpoint: s
         )
         expected_keys_mw = sharded_metadata_mw["all_optimizer_keys"]
 
+    index = {}
+    with open(os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME), "r") as f:
+        index = json.loads(f.read())
+
+    ckpt_quant_stage = "O0"
+    if "ckpt_quant_stage" in index:
+        ckpt_quant_stage = index["ckpt_quant_stage"]
+
     state_dict_optim = load_state_dict(
-        resolved_archive_file[0], None, expected_keys, ckpt_quant_stage=args.ckpt_quant_stage
+        resolved_archive_file[0], None, expected_keys, ckpt_quant_stage=ckpt_quant_stage
     )
     if has_master_weights:
         state_dict_optim_mw = load_state_dict(
-            resolved_archive_file_mw[0], None, expected_keys_mw, ckpt_quant_stage=args.ckpt_quant_stage
+            resolved_archive_file_mw[0], None, expected_keys_mw, ckpt_quant_stage=ckpt_quant_stage
         )
 
     for key in list(state_dict_optim.keys()):
