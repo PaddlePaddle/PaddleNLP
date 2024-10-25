@@ -1307,7 +1307,7 @@ def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serializa
         else:
             local_resume = False
     local_resume = paddle.to_tensor([local_resume])
-    dist.all_reduce(local_resume, op=dist.ReduceOp.PROD)
+    dist.all_reduce(local_resume, op=dist.ReduceOp.MIN)
     local_resume = local_resume.item()
     return local_resume
 
@@ -1425,7 +1425,7 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
             else:
                 local_resume = False
         local_resume = paddle.to_tensor([local_resume])
-        dist.all_reduce(local_resume, op=dist.ReduceOp.PROD)
+        dist.all_reduce(local_resume, op=dist.ReduceOp.MIN)
         return local_resume.item()
 
     # check whether the optimizer checkpoint files are complete.

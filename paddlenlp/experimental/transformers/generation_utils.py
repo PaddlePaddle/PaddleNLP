@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import os
 from typing import List, Union
 
 import paddle
@@ -21,6 +22,11 @@ import paddle.nn.functional as F
 from paddlenlp.generation import GenerationMixin, LogitsProcessor, LogitsProcessorList
 
 __all__ = ["GenerationInferenceModel", "GenerationBlockInferenceModel", "GenerationAvxInferenceModel"]
+
+
+def use_faster_top_p_sampling():
+    """Get the value of the 'USE_FASTER_TOP_P_SAMPLING' environment variable."""
+    return os.getenv("USE_FASTER_TOP_P_SAMPLING", "False") in ["True", "1", "true"]
 
 
 class ForcedDecodingEOSTokenLogitsProcessor(LogitsProcessor):
@@ -330,11 +336,11 @@ class GenerationInferenceModel(GenerationMixin):
             probs = F.softmax(logits)
 
             # compute next_tokens
-            try:
+            if use_faster_top_p_sampling():
                 from paddlenlp_ops import top_p_sampling_reject
 
                 next_tokens = top_p_sampling_reject(probs, top_p, 0)
-            except:
+            else:
                 _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
@@ -674,11 +680,11 @@ class GenerationBlockInferenceModel(GenerationMixin):
             probs = F.softmax(logits)
 
             # compute next_tokens
-            try:
+            if use_faster_top_p_sampling():
                 from paddlenlp_ops import top_p_sampling_reject
 
                 next_tokens = top_p_sampling_reject(probs, top_p, 0)
-            except:
+            else:
                 _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
             if self.config.tensor_parallel_degree > 1:
