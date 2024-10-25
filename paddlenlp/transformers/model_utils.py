@@ -332,7 +332,7 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
     return last_dtype
 
 
-def dequant_unified_optimizer(self, state_dict):
+def dequant_unified_optimizer(self, state_dict, ckpt_quant_stage, scale_dict):
     rank, world_size = -1, 1
     if paddle.distributed.get_world_size() > 1:
         hcg = fleet.get_hybrid_communicate_group()
@@ -424,6 +424,7 @@ def dequant_unified_optimizer(self, state_dict):
             state_dict.update(m1_state_dict)
 
     return state_dict
+
 
 def _split_keys_evenly(keys: list, n: int) -> list:
     """Split a list into n lists with an equal number of elements.
@@ -579,7 +580,7 @@ def load_state_dict(
                         state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
 
             if quant:
-                state_dict = self.dequant_unified_optimizer(state_dict)
+                state_dict = dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict)
 
             return state_dict
 
