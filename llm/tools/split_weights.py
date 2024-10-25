@@ -22,7 +22,7 @@ import paddle
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 from paddlenlp.transformers.model_utils import load_tp_checkpoint
-from paddlenlp.utils import llm_utils
+from paddlenlp.trl import llm_utils
 
 
 def parse_arguments():

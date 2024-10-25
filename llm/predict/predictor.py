@@ -42,7 +42,7 @@ from paddlenlp.transformers import (
     PretrainedModel,
     PretrainedTokenizer,
 )
-from paddlenlp.utils import llm_utils
+from paddlenlp.trl import llm_utils
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
 
@@ -121,6 +121,8 @@ class PredictorArgument:
         },
     )
 
+    append_attn: bool = field(default=False, metadata={"help": "whether use append attention"})
+
     chat_template: str = field(
         default=None,
         metadata={
@@ -132,12 +134,16 @@ class PredictorArgument:
         },
     )
 
-    @property
-    def total_max_length(self):
-        if self.device == "npu":
-            return self.src_length + self.max_length
-        else:
-            return 8192  # Maximum sequence length.
+    total_max_length: int = field(
+        default=4096, metadata={"help": "Super parameter. Maximum sequence length(encoder+decoder)."}
+    )
+
+    def __post_init__(self):
+        if self.append_attn:
+            self.block_attn = True
+        assert (
+            self.src_length + self.max_length <= self.total_max_length
+        ), "src_length + max_length should smaller than total_max_length."
 
 
 @dataclass
@@ -514,7 +520,7 @@ class InferencePredictorMixin(BasePredictor):
             alibi_slopes = llm_utils.get_alibi_slopes(self.model_config.n_head)
             inputs["position_ids"] = paddle.to_tensor(alibi_slopes, dtype="float32")
             arange_tensor_encoder = paddle.arange(self.config.total_max_length, dtype=self.config.dtype)
-            alibi = alibi_slopes[None, :, None, None] * arange_tensor_encoder
+            alibi = (alibi_slopes[None, :, None, None] * arange_tensor_encoder).astype(self.config.dtype)
 
             if self.model_config.tensor_parallel_degree > 1:
                 block_size = self.model_config.n_head // self.model_config.tensor_parallel_degree
@@ -1242,9 +1248,10 @@ def create_predictor(
             config.tensor_parallel_rank = tensor_parallel_rank
             config.model_name_or_path = predictor_args.model_name_or_path
             config.quant_type = predictor_args.quant_type
+            config.append_attn = predictor_args.append_attn
             config.cachekv_int8_type = predictor_args.cachekv_int8_type
             config.use_fake_parameter = predictor_args.use_fake_parameter
-            config.single_card_ptq = True
+            config.single_card_ptq = not predictor_args.use_fake_parameter
             if config.quantization_config.quant_type is not None:
                 predictor_args.quant_type = config.quantization_config.quant_type
                 config.quant_type = config.quantization_config.quant_type
@@ -1345,13 +1352,19 @@ def create_predictor(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
                 model.eval()
-
             elif "chatglmv2forcausallm" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    ChatGLMv2ForCausalLMInferenceModel as Model,
-                )
-
-                model = Model.from_pretrained(
+                predictor_args.total_max_length = config.seq_length
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                    from paddlenlp.experimental.transformers import (
+                        ChatGLMv2ForCausalLMBlockInferenceModel as ChatGLMv2InferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        ChatGLMv2ForCausalLMInferenceModel as ChatGLMv2InferenceModel,
+                    )
+                model = ChatGLMv2InferenceModel.from_pretrained(
                     predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
                 )
                 model.eval()
@@ -1475,6 +1488,7 @@ def create_predictor(
 
         elif predictor_args.mode == "static":
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
+            config.append_attn = predictor_args.append_attn
 
             if config.quantization_config.quant_type is not None:
                 if "c8" in config.quantization_config.quant_type:
@@ -1514,19 +1528,19 @@ def create_predictor(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "chatglmv2forcausallm" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    ChatGLMv2ForCausalLMInferenceModel,
-                )
+                predictor_args.total_max_length = config.seq_length
+                if predictor_args.block_attn:
+                    config.block_size = predictor_args.block_size
+                    config.max_seq_len = predictor_args.total_max_length
+                    from paddlenlp.experimental.transformers import (
+                        ChatGLMv2ForCausalLMBlockInferenceModel as ChatGLMv2InferenceModel,
+                    )
+                else:
+                    from paddlenlp.experimental.transformers import (
+                        ChatGLMv2ForCausalLMInferenceModel as ChatGLMv2InferenceModel,
+                    )
 
-                cache_kvs_shape = ChatGLMv2ForCausalLMInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
-            elif "chatglmv2forcausallm" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    ChatGLMv2ForCausalLMInferenceModel,
-                )
-
-                cache_kvs_shape = ChatGLMv2ForCausalLMInferenceModel.get_cache_kvs_shape(
+                cache_kvs_shape = ChatGLMv2InferenceModel.get_cache_kvs_shape(
                     config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             elif "chatglmforcausallm" in config.architectures[0].lower():
@@ -1684,8 +1698,8 @@ def benchmark(predictor, predictor_args, model_args):
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 10
-    test_time = 100
+    warmup_time = 5
+    test_time = 20
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):

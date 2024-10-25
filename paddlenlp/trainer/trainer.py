@@ -1790,6 +1790,12 @@ class Trainer:
             for i in range(core.get_cuda_device_count()):
                 core.default_cuda_generator(i).set_state(checkpoint_rng_state["cuda"][i])
 
+        if core.is_compiled_with_xpu():
+            if not len(checkpoint_rng_state["cuda"]) == core.get_xpu_device_count():
+                raise ValueError("Length of xpu state list shoule be equal to the xpu device count")
+            for i in range(core.get_xpu_device_count()):
+                core.default_xpu_generator(i).set_state(checkpoint_rng_state["cuda"][i])
+
         if paddle.device.get_all_custom_device_type() is not None:
             custom_device_type = paddle.device.get_all_custom_device_type()
             for device in custom_device_type:
@@ -2194,6 +2200,9 @@ class Trainer:
         return (loss, outputs) if return_outputs else loss
 
     def _enable_delay_scale_loss(self):
+        if in_auto_parallel_align_mode():
+            return True
+
         key = "enable_delay_scale_loss"
         if self.args.pipeline_parallel_degree > 1:
             return key in self.args.pipeline_parallel_config
@@ -2920,8 +2929,10 @@ class Trainer:
         prediction_loss_only = prediction_loss_only if prediction_loss_only is not None else args.prediction_loss_only
 
         if self.args.pipeline_parallel_degree > 1:
+            from paddle.distributed.fleet.meta_parallel import PipelineLayer
+
             # Only accept wrapped model for pipeline_parallel mode
-            if self.model is self.model_wrapped:
+            if self.model is self.model_wrapped and isinstance(self.model_wrapped, PipelineLayer):
                 # NOTE(gongenlei): when do_train=False, do_eval=True, we need to wrap model for pipeline
                 self.model_wrapped = fleet.distributed_model(self.model_wrapped)
             model = self.model_wrapped
