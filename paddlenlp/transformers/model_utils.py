@@ -74,13 +74,13 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 
 from ..generation import GenerationConfig, GenerationMixin
-from ..utils import device_guard
-from ..utils.checkpoint_quantization_utils import (
+from ..quantization.checkpoint_quantization_utils import (
     asymmetry_qdq_weight,
     group_wise_quant_dequant,
     qdq_weight,
     split_int8,
 )
+from ..utils import device_guard
 from ..utils.download import resolve_file_path
 from .configuration_utils import PretrainedConfig
 from .conversion_utils import ConversionMixin
