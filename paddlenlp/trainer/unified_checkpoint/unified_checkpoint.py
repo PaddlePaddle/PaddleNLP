@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import copy
-import gc
 import json
 import multiprocessing
 import os
@@ -24,7 +23,6 @@ from multiprocessing import shared_memory
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
-from tqdm.auto import tqdm
 
 try:
     from paddle.base import core
@@ -33,27 +31,20 @@ except:
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.trainer.argparser import strtobool
-from paddlenlp.trainer.trainer_utils import ShardingOption
-from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
+from paddlenlp.trainer.utils.helper import distributed_isfile
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
     _add_variant,
-    _load_state_dict_into_model,
-    faster_set_state_dict,
-    load_state_dict,
     unwrap_model,
 )
 from paddlenlp.transformers.utils import (
     device_guard,
     dtype_byte_size,
-    get_checkpoint_shard_files,
     is_safetensors_available,
 )
 from paddlenlp.utils.env import (
     LORA_WEIGHTS_NAME,
-    PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_MASTER_WEIGHTS_NAME,
-    PADDLE_OPTIMIZER_INDEX_NAME,
     PADDLE_OPTIMIZER_NAME,
     PADDLE_WEIGHTS_NAME,
     PREFIX_WEIGHTS_NAME,
@@ -67,7 +58,7 @@ from paddlenlp.utils.env import (
     SAFE_WEIGHTS_NAME,
 )
 from paddlenlp.utils.log import logger
-from paddlenlp.utils.nested import flatten_list, nested_copy
+from paddlenlp.utils.nested import nested_copy
 
 if is_safetensors_available():
     from safetensors.numpy import save_file as safe_save_file
@@ -77,6 +68,7 @@ if is_safetensors_available():
     else:
         from paddlenlp.utils.safetensors import fast_load_file as load_file
 
+from .check_unified_checkpoint import check_unified_checkpoint, check_unified_optimizer
 from .shared_memory_utils import (
     _read_state_dict_from_shm,
     _traverse_copy_to_shm,
@@ -86,10 +78,11 @@ from .unified_checkpoint_dynamic import (
     load_unified_checkpoint_dynamically,
     load_unified_optimizer_dynamically,
 )
-from .unified_checkpoint_sharding_v2 import (
-    gather_splited_param_for_optimizer,
-    load_unified_optimizer_split_param,
+from .unified_checkpoint_locally_load import (
+    load_unified_checkpoint_locally,
+    load_unified_optimizer_locally,
 )
+from .unified_checkpoint_sharding_v2 import gather_splited_param_for_optimizer
 from .unified_checkpoint_single_card import (
     load_single_card_checkpoint,
     load_single_card_optimizer,
@@ -102,30 +95,25 @@ from .unified_checkpoint_utils import (
     filter_params,
     gather_sharded_object,
     generate_base_static_name,
-    get_expected_keys,
     get_expected_state_dict,
-    get_optimizer_shard_files,
     get_sharded_file_name,
     get_sharded_index,
     is_need_master_weight,
-    mapping_optimizer_tp_actions,
+    is_sharding_split_param_mode,
     merge_tensor_parallel_for_optimizer,
     merge_tensor_parallel_with_shard,
     reduce_master_weights_status,
     rename_shard_file,
-    save_config,
-    save_prefix_past_key_value,
-    select_model_weight_index,
-    update_master_weight_status,
+    save_model_config,
 )
 
 
-class UnifiedCheckpointHandler:
+class AsyncCheckpointHander:
     def __init__(self, args):
+        # Mainly for asynchronous saving.
         self.args = args
         self.global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
 
-        # Mainly for asynchronous saving.
         self._shm_model_weight = None
         self._shm_master_weight = None
         self._shm_optimizer_weight = None
@@ -294,6 +282,51 @@ class UnifiedCheckpointHandler:
         encoded_value = new_value.encode("utf-8")
         shared_array[: len(encoded_value)] = encoded_value
 
+    def unlink_shared_memory(self):
+        if not ("async_save" in self.args.unified_checkpoint_config):
+            return
+
+        if self._shared_save_model_flag is not None:
+            while self._shared_save_model_flag[0] > 0:  # async process is saving
+                if not self._process_model_weight.is_alive():
+                    raise RuntimeError("The process that saves model_weight has been killed unexpectedly.")
+                time.sleep(0.5)
+            self._shared_save_model_flag[0] = -1
+        if self._shared_save_master_weight_flag is not None:
+            while self._shared_save_master_weight_flag[0] > 0:
+                if not self._process_master_weight.is_alive():
+                    raise RuntimeError("The process that saves master_weight has been killed unexpectedly.")
+                time.sleep(0.5)
+            self._shared_save_master_weight_flag[0] = -1
+        if self._shared_save_optimizer_flag is not None:
+            while self._shared_save_optimizer_flag[0] > 0:
+                if not self._process_optimizer_weight.is_alive():
+                    raise RuntimeError("The process that saves optimizer_weight has been killed unexpectedly.")
+                time.sleep(0.5)
+            self._shared_save_optimizer_flag[0] = -1
+
+        if self._shm_model_weight is not None:
+            self._shm_model_weight.close()
+            self._shm_model_weight.unlink()
+            self._shm_model_weight = None
+        if self._shm_master_weight is not None:
+            self._shm_master_weight.close()
+            self._shm_master_weight.unlink()
+            self._shm_master_weight = None
+        if self._shm_optimizer_weight is not None:
+            self._shm_optimizer_weight.close()
+            self._shm_optimizer_weight.unlink()
+            self._shm_optimizer_weight = None
+
+        if paddle.distributed.get_world_size() > 1:
+            dist.barrier()
+
+
+class UnifiedCheckpointHandler:
+    def __init__(self, args):
+        self.args = args
+        self.async_handler = AsyncCheckpointHander(args)
+
     def save_unified_checkpoint(self, model, optimizer, output_dir, signal_dir=None):
         """save unified checkpoint
 
@@ -342,7 +375,7 @@ class UnifiedCheckpointHandler:
             is_sync_save = True
             if "async_save" in self.args.unified_checkpoint_config:
                 is_sync_save = False
-            self._file_save_async_or_sync(
+            self.async_handler._file_save_async_or_sync(
                 state_dict,
                 path=os.path.join(save_directory, shard_file),
                 signal_path=signal_dir,
@@ -361,25 +394,8 @@ class UnifiedCheckpointHandler:
                         json.dump(sharded_index, f, indent=4)
 
         if self.args.should_save:
-            # Save prefix model past_key_values
-            if isinstance(model_to_save, PrefixModelForCausalLM):
-                save_prefix_past_key_value(model_to_save, save_directory)
-                model_to_save.prefix_config.save_pretrained(save_directory)
-            if isinstance(model_to_save, LoRAModel):
-                model_to_save.lora_config.save_pretrained(save_directory)
+            save_model_config(model_to_save, save_directory)
 
-        # save the config
-        config_to_save = save_config(model_to_save)
-        # Attach architecture to the config
-        if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
-            config_to_save.architectures = [model_to_save.model.__class__.__name__]
-        else:
-            config_to_save.architectures = [model_to_save.__class__.__name__]
-        if self.args.should_save:
-            config_to_save.save_pretrained(save_directory)
-            # save generation config
-            if model_to_save.can_generate():
-                model_to_save.generation_config.save_pretrained(save_directory)
         paddle.device.cuda.empty_cache()
 
         if strtobool(os.getenv("FLAG_LLM_PDC", "False")) and self.args.should_save:
@@ -391,7 +407,7 @@ class UnifiedCheckpointHandler:
             }
             paddle.save(save_info, os.path.join(save_directory, ".saving_info"))
 
-    def load_unified_checkpoint(self, model, optimizer, resume_from_checkpoint: str):
+    def load_unified_checkpoint(self, model, resume_from_checkpoint: str):
         """Load potential model checkpoint
 
         Args:
@@ -464,14 +480,14 @@ class UnifiedCheckpointHandler:
         is_sync_save = True
         if "async_save" in self.args.unified_checkpoint_config:
             is_sync_save = False
-        self._file_save_async_or_sync(
+        self.async_handler._file_save_async_or_sync(
             optim_state_dict,
             path=os.path.join(output_dir, optimizer_name),
             signal_path=signal_dir,
             is_sync=is_sync_save,
             state_dict_type="optimizer_weight",
         )
-        self._file_save_async_or_sync(
+        self.async_handler._file_save_async_or_sync(
             master_weights,
             path=os.path.join(output_dir, master_weights_name),
             signal_path=signal_dir,
@@ -539,11 +555,7 @@ class UnifiedCheckpointHandler:
             save_single_card_optimizer(model, optimizer, output_dir)  # no need to save signal
             return
 
-        if (
-            self.args.sharding_parallel_degree > 1
-            and ShardingOption.SHARD_OP in self.args.sharding
-            and "split_param" in self.args.sharding_parallel_config
-        ):
+        if is_sharding_split_param_mode(self.args):
             optim_state_dict, master_weights = gather_splited_param_for_optimizer(optimizer)
         else:
             optim_state_dict = nested_copy(optimizer.state_dict())
@@ -578,7 +590,7 @@ class UnifiedCheckpointHandler:
         is_sync_save = True
         if "async_save" in self.args.unified_checkpoint_config:
             is_sync_save = False
-        self._file_save_async_or_sync(
+        self.async_handler._file_save_async_or_sync(
             optim_state_dict,
             path=os.path.join(save_directory, shard_optim_file),
             signal_path=signal_dir,
@@ -586,7 +598,7 @@ class UnifiedCheckpointHandler:
             state_dict_type="optimizer_weight",
         )
         if master_weight_state_dict is not None:
-            self._file_save_async_or_sync(
+            self.async_handler._file_save_async_or_sync(
                 master_weight_state_dict,
                 path=os.path.join(save_directory, shard_master_weight_file),
                 signal_path=signal_dir,
@@ -658,140 +670,7 @@ class UnifiedCheckpointHandler:
         return None
 
     def unlink_shared_memory(self):
-        if not ("async_save" in self.args.unified_checkpoint_config):
-            return
-
-        if self._shared_save_model_flag is not None:
-            while self._shared_save_model_flag[0] > 0:  # async process is saving
-                if not self._process_model_weight.is_alive():
-                    raise RuntimeError("The process that saves model_weight has been killed unexpectedly.")
-                time.sleep(0.5)
-            self._shared_save_model_flag[0] = -1
-        if self._shared_save_master_weight_flag is not None:
-            while self._shared_save_master_weight_flag[0] > 0:
-                if not self._process_master_weight.is_alive():
-                    raise RuntimeError("The process that saves master_weight has been killed unexpectedly.")
-                time.sleep(0.5)
-            self._shared_save_master_weight_flag[0] = -1
-        if self._shared_save_optimizer_flag is not None:
-            while self._shared_save_optimizer_flag[0] > 0:
-                if not self._process_optimizer_weight.is_alive():
-                    raise RuntimeError("The process that saves optimizer_weight has been killed unexpectedly.")
-                time.sleep(0.5)
-            self._shared_save_optimizer_flag[0] = -1
-
-        if self._shm_model_weight is not None:
-            self._shm_model_weight.close()
-            self._shm_model_weight.unlink()
-            self._shm_model_weight = None
-        if self._shm_master_weight is not None:
-            self._shm_master_weight.close()
-            self._shm_master_weight.unlink()
-            self._shm_master_weight = None
-        if self._shm_optimizer_weight is not None:
-            self._shm_optimizer_weight.close()
-            self._shm_optimizer_weight.unlink()
-            self._shm_optimizer_weight = None
-
-        if paddle.distributed.get_world_size() > 1:
-            dist.barrier()
-
-
-def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, safe_serialization=False):
-    """
-    Only dataset_rank == 0 or using expert parallel can enter this function.
-    """
-    index_filename = select_model_weight_index(model, resume_from_checkpoint, safe_serialization, local=True)
-
-    resolved_archive_file, sharded_metadata = get_checkpoint_shard_files(
-        pretrained_model_name_or_path=resume_from_checkpoint,
-        index_filename=os.path.join(resume_from_checkpoint, index_filename),
-    )
-    loaded_keys = sharded_metadata["all_checkpoint_keys"]
-
-    model_state_dict = get_expected_state_dict(model)
-    # If using expert parallel, when dp_rank > 0, need to modify the expected_keys here.
-    if not args.use_expert_parallel or (args.use_expert_parallel and args.data_parallel_rank == 0):
-        expected_keys = set(list(model_state_dict.keys()))
-    else:
-        expected_keys = set()
-        for key in model_state_dict.keys():
-            if getattr(model_state_dict[key], "no_sync", False):
-                expected_keys.add(key)
-    missing_keys = expected_keys - set(loaded_keys)
-
-    use_fast_set = True
-    if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
-        use_fast_set = False
-
-    if len(missing_keys) > 0:
-        raise ValueError(f"missing_keys: {missing_keys}")
-
-    def _remove_unused_keys(
-        state_dict,
-        model_state_dict,
-    ):
-        unused_keys = set(state_dict.keys()) - set(model_state_dict.keys())
-        for unused_key in unused_keys:
-            del state_dict[unused_key]
-        return unused_keys
-
-    # This should always be a list but, just to be sure.
-    if not isinstance(resolved_archive_file, list):
-        resolved_archive_file = [resolved_archive_file]
-
-    error_msgs = []
-
-    if len(resolved_archive_file) > 1:
-        resolved_archive_file = tqdm(resolved_archive_file, desc="Loading checkpoint shards")
-
-    for shard_file in resolved_archive_file:
-        # TODO: check if  no expected_keys in shard_file, then don't load it
-        if expected_keys.isdisjoint(sharded_metadata["file_map"][os.path.split(shard_file)[-1]]):
-            continue
-
-        pre_tensor_parallel_split = False
-        if shard_file.endswith(".safetensors") and model.config.tensor_parallel_degree > 1:
-            pre_tensor_parallel_split = True
-            assert loaded_keys is not None, "loaded_keys is not None."
-            if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
-                tp_actions = model._get_tensor_parallel_convert_actions(
-                    set(loaded_keys), is_split=True, ignore_error=True
-                )
-            else:
-                tp_actions = model.get_tensor_parallel_convert_actions(model.config, loaded_keys, ignore_error=True)
-        # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-        state_dict = load_state_dict(
-            shard_file, tp_actions if pre_tensor_parallel_split else None, expected_keys, device="expected"
-        )
-
-        if not pre_tensor_parallel_split:
-            # Since we load all keys but we only need one of pipeline stages
-            _ = _remove_unused_keys(state_dict, model_state_dict)
-
-        if model.config.tensor_parallel_degree > 1 and not pre_tensor_parallel_split:
-            logger.info("Converting state_dict to Tensor Parallel Format")
-            # ignore error for multi shard, since only parts of data
-            state_dict = model.convert_tensor_parallel(
-                None, model.config, state_dict=state_dict, ignore_error=len(resolved_archive_file) > 1
-            )
-
-        if use_fast_set:
-            error_msgs += faster_set_state_dict(model, state_dict, strict_dtype=False)
-        else:
-            error_msgs += _load_state_dict_into_model(model, state_dict, "")
-
-        # force memory release
-        del state_dict
-        # gc.collect()
-
-    if len(error_msgs) > 0:
-        error_msg = "\n\t".join(error_msgs)
-        if " but the expected shape is" in error_msg:
-            error_msg += (
-                "\n\tYou may consider adding `ignore_mismatched_sizes=True` in the model `from_pretrained` method."
-            )
-        raise RuntimeError(f"Error(s) in loading state_dict for {model.__class__.__name__}:\n\t{error_msg}")
+        return self.async_handler.unlink_shared_memory()
 
 
 def unified_checkpoint_into_shards(
@@ -863,129 +742,6 @@ def unified_checkpoint_into_shards(
     paddle.device.cuda.empty_cache()
 
     return state_dict, shard_file, sharded_index
-
-
-def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
-    # Special process with split param.
-    if (
-        args.sharding_parallel_degree > 1
-        and ShardingOption.SHARD_OP in args.sharding
-        and "split_param" in args.sharding_parallel_config
-    ):
-        returned_optim_state_dict = load_unified_optimizer_split_param(model, optimizer, resume_from_checkpoint)
-        return returned_optim_state_dict
-
-    # init and get optimizer LR_Scheduler
-    returned_optim_state_dict = nested_copy(optimizer.state_dict())
-
-    if not safe_serialization:
-        index_filename, index_filename_master_weights = (
-            PADDLE_OPTIMIZER_INDEX_NAME,
-            PADDLE_MASTER_WEIGHTS_INDEX_NAME,
-        )
-    else:
-        index_filename, index_filename_master_weights = SAFE_OPTIMIZER_INDEX_NAME, SAFE_MASTER_WEIGHTS_INDEX_NAME
-
-    resolved_archive_file, sharded_metadata = get_optimizer_shard_files(
-        optimizer_path=resume_from_checkpoint,
-        index_filename=os.path.join(resume_from_checkpoint, index_filename),
-    )
-    has_master_weights = True if sharded_metadata["master_weights"] else False
-
-    model_state_dict = get_expected_state_dict(model)
-    model_keys = list(model_state_dict.keys())
-    struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}  # get optimizer param mappings
-
-    expected_keys = get_expected_keys(args, sharded_metadata, model, optimizer)
-
-    # This should always be a list but, just to be sure.
-    if not isinstance(resolved_archive_file, list):
-        resolved_archive_file = [resolved_archive_file]
-
-    if len(resolved_archive_file) > 1:
-        resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
-
-    # update has_master_weights and index_filename_master_weights
-    # 1. if the master weight exists, only has_master_weights is set True and loaded when needed
-    # 2. if master weight does not exist, convert model weight to master weight when needed
-    has_master_weights, index_filename_master_weights = update_master_weight_status(
-        args, optimizer, has_master_weights, safe_serialization
-    )
-
-    if has_master_weights:
-        returned_optim_state_dict["master_weights"] = {}
-
-        resolved_archive_file_mw, sharded_metadata_mw = get_optimizer_shard_files(
-            optimizer_path=resume_from_checkpoint,
-            index_filename=os.path.join(resume_from_checkpoint, index_filename_master_weights),
-        )
-
-        expected_keys_mw = get_expected_keys(args, sharded_metadata_mw, model, optimizer, is_master_weights=True)
-        if not isinstance(resolved_archive_file_mw, list):
-            resolved_archive_file_mw = [resolved_archive_file_mw]
-        if len(resolved_archive_file_mw) > 1:
-            resolved_archive_file_mw = tqdm(resolved_archive_file_mw, desc="Loading master weights shards")
-
-    def load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, is_master_weights=False):
-        returned_state_dict = {}
-        # load optimizer
-        for shard_file in resolved_archive_file:
-            # TODO: check if no expected_keys in shard_file, then don't load it
-            if expected_keys.isdisjoint(sharded_metadata["file_map"][os.path.split(shard_file)[-1]]):
-                continue
-
-            if shard_file.endswith(".safetensors"):
-                # assert model_keys is not None, "model_keys is None." TODO: correct the assert
-                if model.config.tensor_parallel_degree > 1:
-                    if isinstance(model, LoRAModel) or isinstance(model, PrefixModelForCausalLM):
-                        tp_actions = model._get_tensor_parallel_convert_actions(
-                            model_keys, is_split=True, ignore_error=True
-                        )
-                    else:
-                        tp_actions = model.get_tensor_parallel_convert_actions(
-                            model.config, model_keys, ignore_error=True
-                        )
-                    if not is_master_weights:
-                        tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)
-
-                    # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-                    state_dict = load_state_dict(shard_file, tp_actions, expected_keys, device="expected")
-                else:
-                    # for pipeline model, we don't need to use tp_actions
-                    state_dict = load_state_dict(shard_file, None, expected_keys, device="expected")
-
-            returned_state_dict.update(state_dict)
-            # force memory release
-            del state_dict
-            gc.collect()
-        return returned_state_dict
-
-    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys)
-    if has_master_weights:
-        state_dict_master_weight = load_resolved_archive_file(
-            resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weights=True
-        )
-    # rename optimizer param
-    for key in list(state_dict_optim.keys()):
-        key_name = key.split("/")
-        static_name = struct2static_name_mappings[key_name[0]]
-        if has_master_weights:
-            if model_state_dict[key_name[0]].dtype != core.VarDesc.VarType.FP32:
-                key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
-            else:
-                key_name = "_".join([static_name, key_name[1]])
-        else:
-            key_name = "_".join([static_name, key_name[1]])
-        returned_optim_state_dict[key_name] = state_dict_optim.pop(key)
-        returned_optim_state_dict[key_name].name = key_name
-
-    if has_master_weights:
-        for key in list(state_dict_master_weight.keys()):
-            static_name = struct2static_name_mappings[key]
-            returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight.pop(key)
-            returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, FP32_MASTER])
-
-    return returned_optim_state_dict
 
 
 def unified_optimizer_into_shards(
@@ -1118,211 +874,3 @@ def unified_optimizer_into_shards(
             (optim_state_dict, shard_optimizer_file, sharded_optim_index),
             (master_weights, shard_master_weight_file, sharded_master_weight_index),
         ]
-
-
-def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization=False):
-    index_filename = select_model_weight_index(model, resume_from_checkpoint, safe_serialization, local=False)
-    index_filename = os.path.join(resume_from_checkpoint, index_filename)
-    # Find index json file and distribute this file in global group.
-    if distributed_isfile(index_filename):
-        distributed_file(index_filename)
-    else:
-        raise Exception(
-            f"Sorry, we can not find {index_filename}. This file should be appear at least on one machine."
-        )
-
-    with open(index_filename, "r") as f:
-        index = json.loads(f.read())
-    all_weight_filenames = sorted(set(index["weight_map"].values()))
-
-    # Get existed weight file list on current machine.
-    existed_filelist = []
-    existed_files = []
-    for filename in os.listdir(resume_from_checkpoint):
-        if filename in all_weight_filenames:
-            existed_files.append(filename)
-
-    # Gather all the existed files in global group.
-    dist.all_gather_object(existed_filelist, existed_files)
-    flatten_existed_filelist = flatten_list(existed_filelist)
-    diff_filelist = list(set(all_weight_filenames).difference(set(flatten_existed_filelist)))
-    if len(diff_filelist) != 0:
-        raise Exception(f"Sorry, the weight file list on the machines is not complete!, missing {diff_filelist}")
-
-    # To decide whether to load the checkpoint locally, or need to dynamically send tensors across machines.
-    local_resume = True
-    if args.dataset_rank == 0 or args.use_expert_parallel:
-        hcg = fleet.get_hybrid_communicate_group()
-        tp_group = hcg.get_model_parallel_group()
-        pp_group = hcg.get_pipe_parallel_group()
-        dp_group = hcg.get_data_parallel_group()
-        dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
-
-        need_files = set()
-        state_dict = get_expected_state_dict(model)
-        for key in state_dict.keys():
-            filename = index["weight_map"][key]
-            # When using expert parallel, there's no need to check tensors with `no_sync=False` when dp_rank > 0.
-            if args.use_expert_parallel and dp_rank > 0 and not getattr(state_dict[key], "no_sync", False):
-                continue
-            need_files.add(filename)
-        diff_filelist = list(need_files.difference(set(existed_files)))
-        num_diff = paddle.to_tensor([len(diff_filelist)])
-        if tp_group.nranks > 1:
-            dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=tp_group)
-        if pp_group.nranks > 1:
-            dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=pp_group)
-        if args.use_expert_parallel and dp_group.nranks > 1:
-            dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=dp_group)
-        if num_diff.item() == 0:
-            local_resume = True
-        else:
-            local_resume = False
-    local_resume = paddle.to_tensor([local_resume])
-    dist.all_reduce(local_resume, op=dist.ReduceOp.PROD)
-    local_resume = local_resume.item()
-    return local_resume
-
-
-def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
-    if not safe_serialization:
-        index_filename, index_filename_master_weights = PADDLE_OPTIMIZER_INDEX_NAME, PADDLE_MASTER_WEIGHTS_INDEX_NAME
-    else:
-        index_filename, index_filename_master_weights = SAFE_OPTIMIZER_INDEX_NAME, SAFE_MASTER_WEIGHTS_INDEX_NAME
-    index_filename = os.path.join(resume_from_checkpoint, index_filename)
-    index_filename_master_weights = os.path.join(resume_from_checkpoint, index_filename_master_weights)
-
-    # Find index json file and distribute the file in global group.
-    if distributed_isfile(index_filename):
-        distributed_file(index_filename)
-    else:
-        raise Exception(
-            f"Sorry, we can not find {index_filename}. This file should be appear at least on one machine."
-        )
-
-    with open(index_filename, "r") as f:
-        index = json.loads(f.read())
-    all_optimizer_filenames = sorted(set(index["weight_map"].values()))
-
-    has_master_weights = index["master_weights"]
-    # update has_master_weights and index_filename_master_weights
-    # 1. if the master weight exists, only has_master_weights is set True and loaded when needed
-    # 2. if master weight does not exist, convert model weight to master weight when needed
-    has_master_weights, index_filename_master_weights = update_master_weight_status(
-        args, optimizer, has_master_weights, safe_serialization
-    )
-    if has_master_weights:
-        index_filename_master_weights = os.path.join(resume_from_checkpoint, index_filename_master_weights)
-        if distributed_isfile(index_filename_master_weights):
-            distributed_file(index_filename_master_weights)
-        else:
-            raise Exception(
-                f"Sorry, we can not find {index_filename_master_weights}. This file should be appear at least on one machine."
-            )
-        with open(index_filename_master_weights, "r") as f:
-            index_mw = json.loads(f.read())
-        all_mw_filenames = sorted(set(index_mw["weight_map"].values()))
-
-    hcg = fleet.get_hybrid_communicate_group()
-    tp_group = hcg.get_model_parallel_group()
-    pp_group = hcg.get_pipe_parallel_group()
-    dp_group = hcg.get_data_parallel_group()
-    sharding_group = hcg.get_sharding_parallel_group()
-    sharding_rank = sharding_group.rank
-    dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
-    struct2static_name_mappings = {k: v.name for k, v in model.state_dict().items()}
-
-    if (
-        args.sharding_parallel_degree > 1
-        and ShardingOption.SHARD_OP in args.sharding
-        and "split_param" in args.sharding_parallel_config
-    ):
-        # We do not check optimizer files completion for split_param, since it is very complicated. Directly support local resume.
-        logger.warning("We only support local resume for split_param mode, do not support dynamically loading.")
-        return True
-
-    if sharding_group.nranks > 1:
-        param2rank = optimizer._param2rank
-
-    def check_complete(all_filenames):
-        # Check whether the checkpoint files on machines are complete. If not complete, raise Exception.
-        existed_filelist = []
-        existed_files = []
-        for filename in os.listdir(resume_from_checkpoint):
-            if filename in all_filenames:
-                existed_files.append(filename)
-
-        dist.all_gather_object(existed_filelist, existed_files)
-        flatten_existed_filelist = flatten_list(existed_filelist)
-        diff_filelist = list(set(all_filenames).difference(set(flatten_existed_filelist)))
-        if len(diff_filelist) != 0:
-            raise Exception(
-                f"Sorry, the optimizer file list on `data_parallel_rank==0` machines is not complete!, missing {diff_filelist}"
-            )
-        return existed_files
-
-    def check_dynamic_load(args, weight_map, existed_files, is_master_weights=False, typename_set=None):
-        # To decide whether to load the checkpoint locally, or need to dynamically distribute the checkpoint.
-        local_resume = True
-        if args.data_parallel_rank == 0 or args.use_expert_parallel:
-            need_files = set()
-            state_dict = get_expected_state_dict(model)
-
-            for key in state_dict.keys():
-                if sharding_group.nranks > 1:
-                    static_name = struct2static_name_mappings.get(key, None)
-                    param_rank = param2rank.get(static_name, None)
-                    if param_rank != sharding_rank:
-                        continue
-
-                # When using expert parallel, there's no need to check tensors with `no_sync=False` when dp_rank > 0.
-                if args.use_expert_parallel and dp_rank > 0 and not getattr(state_dict[key], "no_sync", False):
-                    continue
-
-                if is_master_weights and state_dict[key].dtype == core.VarDesc.VarType.FP32:
-                    continue
-
-                if not is_master_weights:
-                    for type_name in typename_set:
-                        type_key = key + "/" + type_name
-                        filename = weight_map[type_key]
-                        need_files.add(filename)
-                else:
-                    filename = weight_map[key]
-                    need_files.add(filename)
-
-            diff_filelist = list(need_files.difference(set(existed_files)))
-            num_diff = paddle.to_tensor([len(diff_filelist)])
-            if tp_group.nranks > 1:
-                dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=tp_group)
-            if pp_group.nranks > 1:
-                dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=pp_group)
-            if sharding_group.nranks > 1:
-                dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=sharding_group)
-            if args.use_expert_parallel and dp_group.nranks > 1:
-                dist.all_reduce(num_diff, op=dist.ReduceOp.MAX, group=dp_group)
-
-            if num_diff.item() == 0:
-                local_resume = True
-            else:
-                local_resume = False
-        local_resume = paddle.to_tensor([local_resume])
-        dist.all_reduce(local_resume, op=dist.ReduceOp.PROD)
-        return local_resume.item()
-
-    # check whether the optimizer checkpoint files are complete.
-    existed_files = check_complete(all_optimizer_filenames)
-    if has_master_weights:
-        existed_files_mw = check_complete(all_mw_filenames)
-    # get optimizer's param type name, like moment1_0.
-    typename_set = set()
-    for key in index["weight_map"].keys():
-        _, typename = key.split("/")
-        typename_set.add(typename)
-    local_resume = check_dynamic_load(
-        args, index["weight_map"], existed_files, is_master_weights=False, typename_set=typename_set
-    )
-    local_resume_rw = True
-    if has_master_weights:
-        local_resume_rw = check_dynamic_load(args, index_mw["weight_map"], existed_files_mw, is_master_weights=True)
-    return local_resume & local_resume_rw

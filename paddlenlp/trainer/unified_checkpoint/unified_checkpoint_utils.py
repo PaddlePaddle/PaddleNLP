@@ -27,7 +27,7 @@ except:
     core = None
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
-from paddlenlp.trainer.trainer_utils import ExplicitEnum
+from paddlenlp.trainer.trainer_utils import ExplicitEnum, ShardingOption
 from paddlenlp.trainer.utils.helper import distributed_isfile
 from paddlenlp.transformers.model_utils import PretrainedModel, get_parameter_dtype
 from paddlenlp.transformers.utils import dtype_byte_size
@@ -129,6 +129,9 @@ def update_master_weight_status(args, optimizer, has_master_weight, safe_seriali
 
 
 def reduce_master_weights_status(has_master_weights=False):
+    """
+    Get master_weight status througn tp, pp and sharding group.
+    """
     data = paddle.to_tensor([has_master_weights], dtype="int32")
 
     hcg = fleet.get_hybrid_communicate_group()
@@ -192,6 +195,9 @@ def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
 
 
 def get_expected_state_dict(model_to_save):
+    """
+    Get trainable state_dict of model_to_save.
+    """
     if isinstance(model_to_save, PretrainedModel):
         state_dict = model_to_save.state_dict()
         if (
@@ -293,7 +299,9 @@ def get_optimizer_shard_files(optimizer_path, index_filename):
 
 
 def generate_base_static_name(vname):
-    # return base static name and specific type name, like [embedding_0.w_0, moment1_0]
+    """
+    Return base static name and specific type name, like [embedding_0.w_0, moment1_0]
+    """
     if FP32_MASTER in vname:
         vname = vname.split("_" + FP32_MASTER + "_")
         return vname[0], vname[1]
@@ -308,6 +316,9 @@ def generate_base_static_name(vname):
 
 
 def merge_large_tensor_parallel(tensor, tp_group, tp_action, dst_rank, is_dst):
+    """
+    Move large tensor merge process to CPU, in order to avoid OOM.
+    """
     num_rows = tensor.shape[0]
     num_splits = 4
     parts = np.array_split(np.arange(num_rows), num_splits)
@@ -339,6 +350,9 @@ def merge_large_tensor_parallel(tensor, tp_group, tp_action, dst_rank, is_dst):
 
 
 def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
+    """
+    Merge tensor parallel according to tp_actions, used for model weight.
+    """
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
     dp_group = hcg.get_data_parallel_group()
@@ -393,7 +407,9 @@ def merge_tensor_parallel_with_shard(state_dict, tp_actions, all_filter_keys):
 
 
 def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys, model_state_dict=None):
-    # Core function for UC
+    """
+    Merge tensor parallel according to tp_actions, used for master_weight and optimizer weight.
+    """
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
     dp_group = hcg.get_data_parallel_group()
@@ -451,6 +467,10 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys,
 
 
 def filter_params(model_to_save, state_dict, is_optimizer=False):
+    """
+    Group according to the size of the tensor, aiming to make the weight size
+    stored on each device as equal as possible.
+    """
     hcg = fleet.get_hybrid_communicate_group()
     tp_group = hcg.get_model_parallel_group()
 
@@ -510,6 +530,9 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
 
 
 def get_sharded_file_name(args, file_name, is_optimizer=False):
+    """
+    Get safetensors file name for saving.
+    """
     if not is_optimizer:
         sd_degree = args.sharding_parallel_degree if args.sharding_parallel_degree > 1 else 1
         size = sd_degree if args.use_expert_parallel else args.dataset_world_size
@@ -542,7 +565,9 @@ def get_sharded_index(
     index_file_list,
     total_size_list,
 ):
-    # save index json file
+    """
+    Save safetensors index json file, including metadata and weight_map.
+    """
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
     if local_rank == 0:
         sharded_index_json = {}
@@ -560,7 +585,9 @@ def get_sharded_index(
 
 
 def gather_sharded_object(index_file, total_size, is_optimizer=False, use_expert_parallel=False):
-
+    """
+    All gather sharded files list across different groups.
+    """
     index_file_list, total_size_list = [], []
 
     hcg = fleet.get_hybrid_communicate_group()
@@ -618,7 +645,9 @@ def gather_sharded_object(index_file, total_size, is_optimizer=False, use_expert
 
 
 def rename_shard_file(args, shard_file, file_name):
-    """rename shard file when using expert_parallel."""
+    """
+    Rename shard file when using expert_parallel.
+    """
     assert args.use_expert_parallel, "only expert_parallel need to use this function"
 
     shard_file_list = []
@@ -656,19 +685,10 @@ def rename_shard_file(args, shard_file, file_name):
     return shard_file
 
 
-def save_config(model_to_save):
-    dtype = get_parameter_dtype(model_to_save)
-    model_to_save.config.dtype = str(dtype).split(".")[1]
-    config_to_save = copy.deepcopy(model_to_save.config)
-
-    if config_to_save.tensor_parallel_degree > 1:
-        # do we need to change?
-        config_to_save.tensor_parallel_degree = 1
-
-    return config_to_save
-
-
 def save_prefix_past_key_value(model_to_save, save_directory):
+    """
+    Used only for PrefixModelForCausalLM.
+    """
     past_key_value = model_to_save.prefix_encoder(model_to_save.prefix_tokens.unsqueeze(0).expand([1, -1]))
     past_key_value = past_key_value.reshape(
         [
@@ -680,5 +700,49 @@ def save_prefix_past_key_value(model_to_save, save_directory):
         ]
     )
     past_key_value = paddle.transpose(past_key_value, perm=[2, 1, 3, 0, 4]).cpu().numpy()
-    model_to_save.prefix_config.save_pretrained(save_directory)
     np.save(os.path.join(save_directory, PAST_KEY_VALUES_FILE_NAME), past_key_value)
+
+
+def is_sharding_split_param_mode(args):
+    return (
+        args.sharding_parallel_degree > 1
+        and ShardingOption.SHARD_OP in args.sharding
+        and "split_param" in args.sharding_parallel_config
+    )
+
+
+def save_model_config(model_to_save, save_directory):
+    """
+    Save model config.
+    """
+
+    def save_config(model_to_save):
+        dtype = get_parameter_dtype(model_to_save)
+        model_to_save.config.dtype = str(dtype).split(".")[1]
+        config_to_save = copy.deepcopy(model_to_save.config)
+
+        if config_to_save.tensor_parallel_degree > 1:
+            # do we need to change?
+            config_to_save.tensor_parallel_degree = 1
+
+        return config_to_save
+
+    # Save prefix model past_key_values
+    if isinstance(model_to_save, PrefixModelForCausalLM):
+        save_prefix_past_key_value(model_to_save, save_directory)
+        model_to_save.prefix_config.save_pretrained(save_directory)
+    if isinstance(model_to_save, LoRAModel):
+        model_to_save.lora_config.save_pretrained(save_directory)
+
+    # save the config
+    config_to_save = save_config(model_to_save)
+    # Attach architecture to the config
+    if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
+        config_to_save.architectures = [model_to_save.model.__class__.__name__]
+    else:
+        config_to_save.architectures = [model_to_save.__class__.__name__]
+
+    config_to_save.save_pretrained(save_directory)
+    # save generation config
+    if model_to_save.can_generate():
+        model_to_save.generation_config.save_pretrained(save_directory)

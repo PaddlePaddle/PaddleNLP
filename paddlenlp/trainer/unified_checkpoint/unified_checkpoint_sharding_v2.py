@@ -38,9 +38,10 @@ from .unified_checkpoint_utils import (
 )
 
 
-def distributed_send_recv_splited_param(
+def merge_splited_param(
     state_dict, partial_tensor_list, param_shape_info, send_table, recv_table, is_master_weights=False
 ):
+    """Merge the splited param in sharding group."""
     global_rank = dist.get_rank()
     for key in list(state_dict.keys()):
         if state_dict[key].numel().item() == 1:  # for example: beta1, beta2
@@ -144,13 +145,9 @@ def gather_splited_param_for_optimizer(optimizer):
         recv_table[key] = sharding_ranklist[0][0]  # which sharding_rank to recv the splited tensor
         send_table[key] = [(rank, begin, end) for rank, begin, end in sharding_ranklist]
 
-    distributed_send_recv_splited_param(
-        optim_state_dict, partial_tensor_list, param_shape_info, send_table, recv_table, False
-    )
+    merge_splited_param(optim_state_dict, partial_tensor_list, param_shape_info, send_table, recv_table, False)
     if master_weights is not None:
-        distributed_send_recv_splited_param(
-            master_weights, partial_tensor_list, param_shape_info, send_table, recv_table, True
-        )
+        merge_splited_param(master_weights, partial_tensor_list, param_shape_info, send_table, recv_table, True)
     return optim_state_dict, master_weights
 
 
