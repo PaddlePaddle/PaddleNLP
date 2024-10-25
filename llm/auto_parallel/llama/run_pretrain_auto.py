@@ -55,14 +55,7 @@ from paddlenlp.data.causal_dataset import (
     check_data_split,
     print_rank_0,
 )
-
-
-def add_start_docstrings(*docstr):
-    def docstring_decorator(fn):
-        fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
-        return fn
-
-    return docstring_decorator
+from paddlenlp.trainer.utils.doc import add_start_docstrings
 
 
 @dataclass
