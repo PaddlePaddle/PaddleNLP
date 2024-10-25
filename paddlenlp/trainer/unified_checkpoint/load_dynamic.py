@@ -45,7 +45,7 @@ if is_safetensors_available():
     else:
         from paddlenlp.utils.safetensors import fast_safe_open as safe_open
 
-from .uc_utils import (
+from .utils import (
     FP32_MASTER,
     get_expected_state_dict,
     mapping_optimizer_tp_actions,

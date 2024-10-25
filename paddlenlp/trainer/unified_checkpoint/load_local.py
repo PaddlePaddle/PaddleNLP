@@ -39,8 +39,8 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.nested import nested_copy
 
-from .uc_sharding_v2 import load_unified_optimizer_split_param
-from .uc_utils import (
+from .sharding_split_param_utils import load_unified_optimizer_split_param
+from .utils import (
     FP32_MASTER,
     get_expected_keys,
     get_expected_state_dict,

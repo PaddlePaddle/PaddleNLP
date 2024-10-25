@@ -33,10 +33,10 @@ from .shared_memory_utils import (
     create_meta_dict,
 )
 
-__all__ = ["AsyncCheckpointHander"]
+__all__ = ["AsyncCheckpointHandler"]
 
 
-class AsyncCheckpointHander:
+class AsyncCheckpointHandler:
     def __init__(self, args):
         # Mainly for asynchronous saving.
         self.args = args

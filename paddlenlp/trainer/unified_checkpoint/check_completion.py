@@ -35,7 +35,7 @@ try:
 except:
     core = None
 
-from .uc_utils import (
+from .utils import (
     get_expected_state_dict,
     is_sharding_split_param_mode,
     select_model_weight_index,
