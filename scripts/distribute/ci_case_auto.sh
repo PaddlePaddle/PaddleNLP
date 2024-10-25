@@ -19,7 +19,7 @@ set -e
 export log_path=/workspace/case_logs
 export root_path=/workspace/PaddleNLP
 
-export gpt_case_path=$root_path/legacy/model_zoo/gpt-3
+export gpt_case_path=$root_path/slm/model_zoo/gpt-3
 export gpt_data_path=/fleetx_data
 
 export llama_case_path=$root_path/llm/auto_parallel/llama
