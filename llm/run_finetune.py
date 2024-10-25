@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+import logging
 import os
 import sys
 from functools import partial
@@ -22,9 +23,10 @@ from utils.argument import (
     GenerateArgument,
     ModelArgument,
     QuantArgument,
+    ReftArgument,
     TrainingArguments,
 )
-from utils.data import get_convert_example
+from utils.data import convert_example_for_reft, get_convert_example
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import (
@@ -40,6 +42,12 @@ from paddlenlp.peft import (
     PrefixModelForCausalLM,
     VeRAConfig,
     VeRAModel,
+)
+from paddlenlp.peft.reft import (
+    ReFTConfig,
+    ReftDataCollator,
+    ReFTModel,
+    intervention_mapping,
 )
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
 from paddlenlp.trainer.trainer_callback import TrainerState
@@ -75,11 +83,13 @@ flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe, Qwen2ForCausa
 
 
 def main():
-    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
+    parser = PdArgumentParser(
+        (GenerateArgument, QuantArgument, ModelArgument, ReftArgument, DataArgument, TrainingArguments)
+    )
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+        gen_args, quant_args, model_args, reft_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
-        gen_args, quant_args, model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        gen_args, quant_args, model_args, reft_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -210,6 +220,15 @@ def main():
         )
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
+    if model_args.reft:
+        # reft requires padding side right
+        tokenizer.padding_side = "right"
+        layers = reft_args.layers
+        if reft_args.layers != "all":
+            layers = [int(l) for l in layers.split(";")]
+        else:
+            layers = [l for l in range(model_config.num_hidden_layers)]
+        logging.info("Using ReFT with layers: ", layers)
     # init chat_template for tokenizer
     init_chat_template(tokenizer, model_args.model_name_or_path, data_args.chat_template)
 
@@ -347,6 +366,14 @@ def main():
         from utils.data import convert_example_common
 
         trans_func = partial(convert_example_common, tokenizer=tokenizer, data_args=data_args)
+    elif model_args.reft:
+        trans_func = partial(
+            convert_example_for_reft,
+            tokenizer=tokenizer,
+            data_args=data_args,
+            positions=reft_args.position,
+            num_interventions=len(layers),
+        )
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
 
@@ -474,6 +501,35 @@ def main():
 
         model.print_trainable_parameters()
 
+    if model_args.reft:
+        intervention_dtype = dtype
+        intervention_params = {
+            "embed_dim": model_config.hidden_size,
+            "low_rank_dimension": reft_args.rank,
+            "dropout": reft_args.dropout,
+            "dtype": intervention_dtype,
+            "act_fn": reft_args.act_fn,
+            "device": "gpu",
+            "add_bias": reft_args.add_bias,
+        }
+        representations = [
+            {
+                "layer": l,
+                "component": "block_output",
+                "low_rank_dimension": reft_args.rank,
+                "intervention": intervention_mapping[reft_args.intervention_type](**intervention_params),
+            }
+            for l in layers
+        ]
+        reft_config = ReFTConfig(
+            representations=representations, intervention_params=intervention_params, position=reft_args.position
+        )
+        # get reft model
+        model = ReFTModel(reft_config, model)
+        # disable origianl model gradients
+        model.disable_model_gradients()
+        model.print_trainable_parameters()
+
     def compute_metrics_do_generation(eval_preds):
         rouge1 = Rouge1()
         rouge2 = Rouge2()
@@ -541,6 +597,16 @@ def main():
     else:
         metrics = compute_metrics
 
+    data_collator_fn = DataCollatorForSeq2Seq(
+        tokenizer=tokenizer,
+        max_length=max_length,
+        padding=padding,
+        max_label_length=max_length,
+        return_tensors="np",
+        return_attention_mask=not model_args.flash_mask,
+        pad_to_multiple_of=data_args.pad_to_multiple_of,
+    )
+
     trainer = CausalLMTrainer(
         model=model,
         args=training_args,
@@ -548,15 +614,7 @@ def main():
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
         compute_metrics=metrics,
-        data_collator=DataCollatorForSeq2Seq(
-            tokenizer=tokenizer,
-            max_length=max_length,
-            padding=padding,
-            max_label_length=max_length,
-            return_tensors="np",
-            return_attention_mask=not model_args.flash_mask,
-            pad_to_multiple_of=data_args.pad_to_multiple_of,
-        ),
+        data_collator=data_collator_fn if not model_args.reft else ReftDataCollator(data_collator=data_collator_fn),
         do_generation=data_args.eval_with_do_generation,
         callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
         gen_args=gen_args,

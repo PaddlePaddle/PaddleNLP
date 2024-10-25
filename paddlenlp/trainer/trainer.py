@@ -80,7 +80,7 @@ from ..data import (
     DistDataLoader,
     default_data_collator,
 )
-from ..peft import LoRAModel, PrefixModelForCausalLM, VeRAModel
+from ..peft import LoRAModel, PrefixModelForCausalLM, ReFTModel, VeRAModel
 
 try:
     from ..quantization.quantization_linear import QuantizationLinear
@@ -2654,6 +2654,7 @@ class Trainer:
             isinstance(self.model, LoRAModel)
             or isinstance(self.model, PrefixModelForCausalLM)
             or isinstance(self.model, VeRAModel)
+            or isinstance(self.model, ReFTModel)
         ):
             self.model.save_pretrained(
                 output_dir,
