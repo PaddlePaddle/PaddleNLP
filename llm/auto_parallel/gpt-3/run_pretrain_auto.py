@@ -26,7 +26,11 @@ import paddle
 import paddle.distributed as dist
 
 from paddlenlp.ops import Topology
-from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
+from paddlenlp.trainer import (
+    AutoTrainingArguments,
+    PdArgumentParser,
+    get_last_checkpoint,
+)
 from paddlenlp.trainer.auto_trainer import AutoTrainer
 from paddlenlp.trainer.trainer_utils import IntervalStrategy, _get_distributed_seeds
 from paddlenlp.transformers import (
@@ -59,8 +63,8 @@ def add_start_docstrings(*docstr):
 
 
 @dataclass
-@add_start_docstrings(TrainingArguments.__doc__)
-class PreTrainingArguments(TrainingArguments):
+@add_start_docstrings(AutoTrainingArguments.__doc__)
+class PreTrainingArguments(AutoTrainingArguments):
     min_learning_rate: float = field(
         default=1e-5,
         metadata={"help": "Minimum learning rate deacyed to."},
@@ -75,12 +79,6 @@ class PreTrainingArguments(TrainingArguments):
         default=False,
         metadata={
             "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
-        },
-    )
-    fused_linear_param_grad_add: bool = field(
-        default=False,
-        metadata={
-            "help": "Enable fused_linear_param_grad pass, which should replace add_n_op with add_op for gradients accumulation."
         },
     )
     job_schedule_profiler_start: int = field(
@@ -123,11 +121,6 @@ class PreTrainingArguments(TrainingArguments):
             self.report_to = []
             self.save_strategy = IntervalStrategy.NO
             self.evaluation_strategy = IntervalStrategy.NO
-
-        if self.fused_linear_param_grad_add:
-            fused_passes = self.strategy.fused_passes
-            fused_passes.enable = True
-            fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
 
         logger.info(self.strategy)
 

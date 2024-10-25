@@ -216,23 +216,33 @@ def fusion_flash_attention(
                 )
             else:
                 if attn_mask_startend_row_indices is not None:
-                    assert alibi is None, "flash_attention_with_sparse_mask not support alibi"
+                    assert alibi is None, "flashmask_attention or flash_attention_with_sparse_mask not support alibi"
                     if len(attn_mask_startend_row_indices.shape) == 2:
                         attn_mask_startend_row_indices = paddle.unsqueeze(attn_mask_startend_row_indices, axis=1)
-                    attn_output = F.flash_attention_with_sparse_mask(
-                        query_states,
-                        key_states,
-                        value_states,
-                        attn_mask_start_row_indices=attn_mask_startend_row_indices,
-                        is_causal=True,
-                    )
+
+                    if hasattr(F, "flashmask_attention"):
+                        attn_output = F.flashmask_attention(
+                            query_states,
+                            key_states,
+                            value_states,
+                            startend_row_indices=attn_mask_startend_row_indices.unsqueeze(-1),
+                            causal=True,
+                        )
+                    else:
+                        attn_output = F.flash_attention_with_sparse_mask(
+                            query_states,
+                            key_states,
+                            value_states,
+                            attn_mask_start_row_indices=attn_mask_startend_row_indices,
+                            is_causal=True,
+                        )
                 else:
                     attn_output = F.scaled_dot_product_attention(
                         query_states,
                         key_states,
                         value_states,
                         attn_mask=attention_mask,
-                        is_causal=attention_mask is None and query_states.shape[1] != 1,
+                        is_causal=query_states.shape[1] != 1,
                     )
         attn_weights = None
 

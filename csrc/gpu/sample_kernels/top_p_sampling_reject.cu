@@ -16,7 +16,8 @@
 #include "sample_kernels/sampling.cuh"
 
 std::vector<paddle::Tensor> TopPSamplingReject(const paddle::Tensor& probs,
-                                               const paddle::Tensor& top_p) {
+                                               const paddle::Tensor& top_p,
+                                               int seed) {
   std::vector<int64_t> probs_shape = probs.shape();
   unsigned int batch_size = probs_shape[0];
   unsigned int vocab_size = probs_shape[1];
@@ -24,40 +25,37 @@ std::vector<paddle::Tensor> TopPSamplingReject(const paddle::Tensor& probs,
   // default is 32
   unsigned int max_top_p_rounds = 32;
   std::vector<int64_t> uniform_samples_shape = {batch_size, max_top_p_rounds};
-  paddle::Tensor uniform_samples = paddle::experimental::uniform(
-      uniform_samples_shape, paddle::DataType::FLOAT32, 0, 1, 0, probs.place());
+  paddle::Tensor uniform_samples =
+      paddle::experimental::uniform(uniform_samples_shape,
+                                    paddle::DataType::FLOAT32,
+                                    0,
+                                    1,
+                                    seed,
+                                    probs.place());
 
-  // todo: add parameter for deterministic, now default is true
-  bool deterministic = true;
-  paddle::Tensor probs_input;
-
-  probs_input = paddle::experimental::cast(probs, paddle::DataType::FLOAT32);
   auto cu_stream = probs.stream();
 
   auto samples =
-      paddle::full({batch_size}, 0, paddle::DataType::INT32, probs.place());
-  auto success =
-      paddle::full({batch_size}, 0, paddle::DataType::BOOL, probs.place());
+      paddle::empty({batch_size, 1}, paddle::DataType::INT64, probs.place());
 
-  cudaError_t status =
-      sampling::TopPSamplingFromProb<float, int>(probs_input.data<float>(),
-                                                 uniform_samples.data<float>(),
-                                                 samples.data<int>(),
-                                                 success.data<bool>(),
-                                                 nullptr,
-                                                 batch_size,
-                                                 top_p.data<float>(),
-                                                 vocab_size,
-                                                 max_top_p_rounds,
-                                                 deterministic,
-                                                 cu_stream);
+  cudaError_t status;
+
+  status = sampling::TopPSamplingFromProb<float, int64_t>(
+      const_cast<float*>(probs.data<float>()),
+      uniform_samples.data<float>(),
+      samples.data<int64_t>(),
+      batch_size,
+      top_p.data<float>(),
+      vocab_size,
+      max_top_p_rounds,
+      true,
+      cu_stream);
+  
   PD_CHECK(status == cudaSuccess,
            "SamplingFromProbs failed with error code " +
                std::string(cudaGetErrorString(status)));
 
-  paddle::Tensor samples_output;
-  samples_output = paddle::experimental::cast(samples, paddle::DataType::INT64);
-  return {samples_output};
+  return {samples};
 }
 
 std::vector<std::vector<int64_t>> TopPSamplingRejectInferShape(
@@ -69,12 +67,13 @@ std::vector<std::vector<int64_t>> TopPSamplingRejectInferShape(
 
 std::vector<paddle::DataType> TopPSamplingRejectInferDtype(
     const paddle::DataType& probs_dtype, const paddle::DataType& top_p_shape) {
-  return {probs_dtype};
+  return {paddle::DataType::INT64};
 }
 
 PD_BUILD_OP(top_p_sampling_reject)
     .Inputs({"probs", "top_p"})
     .Outputs({"samples"})
+    .Attrs({"seed: int"})
     .SetKernelFn(PD_KERNEL(TopPSamplingReject))
     .SetInferShapeFn(PD_INFER_SHAPE(TopPSamplingRejectInferShape))
     .SetInferDtypeFn(PD_INFER_DTYPE(TopPSamplingRejectInferDtype));

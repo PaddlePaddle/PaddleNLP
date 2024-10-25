@@ -118,11 +118,19 @@ class AutoTrainer(Trainer):
         dist_loader = self._wrap_for_dist_loader(train_dataloader)
 
         if ShardingOption.SHARD_OP in self.args.sharding:
-            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage1())
+            self.optimizer = dist.shard_optimizer(
+                self.optimizer, dist.ShardingStage1(), self.args.gradient_accumulation_steps
+            )
         elif ShardingOption.SHARD_GRAD_OP in self.args.sharding:
-            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage2())
+            self.optimizer = dist.shard_optimizer(
+                self.optimizer, dist.ShardingStage2(), self.args.gradient_accumulation_steps
+            )
         elif ShardingOption.FULL_SHARD in self.args.sharding:
-            self.optimizer = dist.shard_optimizer(self.optimizer, dist.ShardingStage3())
+            self.optimizer = dist.shard_optimizer(
+                self.optimizer, dist.ShardingStage3(), self.args.gradient_accumulation_steps
+            )
+        else:
+            self.optimizer = dist.shard_optimizer(self.optimizer, None, self.args.gradient_accumulation_steps)
 
         if self.args.to_static:
             unified_strategy = dist.Strategy()
@@ -173,41 +181,54 @@ class AutoTrainer(Trainer):
         if self.args.to_static and self._in_pir_mode and self.args.gradient_accumulation_steps > 1:
             return [inputs]
 
-        local_batches = [{} for i in range(self.args.gradient_accumulation_steps)]
+        global_micro_batchs = [{} for i in range(self.args.gradient_accumulation_steps)]
         assert isinstance(inputs, dict)
 
-        def split_dtensor_by_axis(dtensor, axis):
-            mesh = dtensor.process_mesh
-            placements = [dist.Replicate() for _ in range(len(mesh.shape))]
-            replicate_value = dist.reshard(dtensor, mesh, placements)
-            local_datas = replicate_value.split(self.args.gradient_accumulation_steps, axis=0)
-            return local_datas
+        def split_dtensor_by_axis(dtensor, axis=0):
+            if not dtensor._is_initialized():
+                return dtensor.split(self.args.gradient_accumulation_steps, axis=axis)
+
+            micro_batch_shape = dtensor.shape
+            micro_batch_shape[axis] = int(dtensor.shape[axis] / self.args.gradient_accumulation_steps)
+
+            global_micro_batchs = [
+                paddle.zeros(micro_batch_shape, dtype=dtensor.dtype)
+                for _ in range(self.args.gradient_accumulation_steps)
+            ]
+            global_micro_batchs = [
+                dist.shard_tensor(b, dtensor.process_mesh, dtensor.placements) for b in global_micro_batchs
+            ]
+
+            local_micro_batchs = dtensor._local_value().split(self.args.gradient_accumulation_steps, axis=axis)
+            for local_micro_batch, global_micro_batch in zip(local_micro_batchs, global_micro_batchs):
+                paddle.assign(local_micro_batch, global_micro_batch._local_value())
+            return global_micro_batchs
 
         for key, dtensors in inputs.items():
             if isinstance(dtensors, paddle.Tensor):
                 mesh, placements = dtensors.process_mesh, dtensors.placements
-                local_datas = split_dtensor_by_axis(dtensors, 0)
-                for index, data in enumerate(local_datas):
-                    local_batches[index].update({key: dist.reshard(data, mesh, placements)})
+                global_datas = split_dtensor_by_axis(dtensors, 0)
+                for index, data in enumerate(global_datas):
+                    global_micro_batchs[index].update({key: dist.reshard(data, mesh, placements)})
             elif isinstance(dtensors, (list, tuple)):
                 if len(dtensors) == 0:
                     for i in range(self.args.gradient_accumulation_steps):
-                        local_batches[i].update({key: []})
+                        global_micro_batchs[i].update({key: []})
                 else:
                     for dtensor in dtensors:
                         if isinstance(dtensor, paddle.Tensor):
                             mesh, placements = dtensor.process_mesh, dtensor.placements
-                            local_datas = split_dtensor_by_axis(dtensor, 0)
-                            for index, data in enumerate(local_datas):
-                                if key in local_batches[index].keys():
-                                    local_batches[index][key].append(dist.reshard(data, mesh, placements))
+                            global_datas = split_dtensor_by_axis(dtensor, 0)
+                            for index, data in enumerate(global_datas):
+                                if key in global_micro_batchs[index].keys():
+                                    global_micro_batchs[index][key].append(dist.reshard(data, mesh, placements))
                                 else:
-                                    local_batches[index].update({key: [dist.reshard(data, mesh, placements)]})
+                                    global_micro_batchs[index].update({key: [dist.reshard(data, mesh, placements)]})
                         else:
                             raise ValueError(f"unsupported type: {type(dtensor)}")
             else:
                 raise ValueError(f"unsupported type: {type(dtensors)}")
-        return local_batches
+        return global_micro_batchs
 
     def _inner_training_loop(
         self,
@@ -372,6 +393,9 @@ class AutoTrainer(Trainer):
 
                         self.timers and self.timers("optimizer-step").start()
 
+                        if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss():
+                            tr_loss /= self.args.gradient_accumulation_steps
+
                         # Optimizer step
                         self.callback_handler.on_optimizer_begin(
                             args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
@@ -503,11 +527,11 @@ class AutoTrainer(Trainer):
 
         return (loss, outputs) if return_outputs else loss
 
-    def dynamic_traning(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
+    def dynamic_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs)
 
-        if loss is not None and self.args.gradient_accumulation_steps > 1:
+        if loss is not None and self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
 
         if self.do_grad_scaling:
@@ -517,11 +541,11 @@ class AutoTrainer(Trainer):
 
         return loss
 
-    def static_traning(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
+    def static_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
         input_ids, labels = tuple(inputs.values())
         loss = model(input_ids, labels)
 
-        if loss is not None and self.args.gradient_accumulation_steps > 1:
+        if loss is not None and self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
 
         return loss
@@ -532,9 +556,9 @@ class AutoTrainer(Trainer):
         inputs = self._prepare_inputs(inputs)
 
         if not self.args.to_static:
-            loss = self.dynamic_traning(model, inputs)
+            loss = self.dynamic_training(model, inputs)
         else:
-            loss = self.static_traning(model, inputs)
+            loss = self.static_training(model, inputs)
 
         if isinstance(loss, paddle.Tensor):
             return loss.detach() if loss._is_initialized() else float(0.0)
@@ -687,7 +711,12 @@ class AutoTrainer(Trainer):
                 # For ckpt integrity
                 paddle.save(self.state.global_step, os.path.join(output_dir, ".checkpoint_done"))
 
-    def _save(self, output_dir: Optional[str] = None, state_dict=None, merge_tensor_parallel=False):
+    def _save(
+        self,
+        output_dir: Optional[str] = None,
+        state_dict=None,
+        merge_tensor_parallel=False,
+    ):
         output_dir = output_dir if output_dir is not None else self.args.output_dir
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Saving model checkpoint to {output_dir}")

@@ -19,7 +19,7 @@ set -e
 export log_path=/workspace/case_logs
 export root_path=/workspace/PaddleNLP
 
-export gpt_case_path=$root_path/legacy/model_zoo/gpt-3
+export gpt_case_path=$root_path/slm/model_zoo/gpt-3
 export gpt_data_path=/fleetx_data
 
 export llm_gpt_case_path=$root_path/llm
@@ -42,7 +42,7 @@ function gpt_case_list_dygraph(){
     gpt_generation_345M_single
     gpt_generation_345M_hybrid
     gpt_345M_mp8_qat
-    gpt_export_345M_mp1
+    # gpt_export_345M_mp1
     # gpt_export_345M_mp2
     # gpt_export_qat_345M
     # gpt_inference_345M_single
@@ -273,7 +273,7 @@ function gpt_export_345M_mp1() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=$root_path/legacy/model_zoo/gpt-3:$PYTHONPATH
+    export PYTHONPATH=$root_path/slm/model_zoo/gpt-3:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=1
     python -m paddle.distributed.launch --log_dir $log_dir --devices "1" \
         ./tools/auto_export.py \
@@ -294,7 +294,7 @@ function gpt_export_345M_mp2() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=$root_path/legacy/model_zoo/gpt-3:$PYTHONPATH
+    export PYTHONPATH=$root_path/slm/model_zoo/gpt-3:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=0,1
     python -m paddle.distributed.launch --devices "0,1" \
         ./tools/auto_export.py \
@@ -512,6 +512,7 @@ function before_hook_for_gpt() {
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
+    export no_proxy=bcebos.com
     if [[ $FLAGS_install_deps == 0 ]];then
         echo -e "\033[31m ---- Install requirements for GPT dygraph cases  \033[0m"
         cp requirements.txt requirements_nlp.txt
@@ -619,6 +620,7 @@ function before_hook_for_llm_gpt() {
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
+    export no_proxy=bcebos.com
     python -m pip install -r $root_path/requirements.txt
     python -m pip install -r $root_path/requirements-dev.txt
     if [[ ! $FLAGS_download_data =~ "llm_gpt" ]];then

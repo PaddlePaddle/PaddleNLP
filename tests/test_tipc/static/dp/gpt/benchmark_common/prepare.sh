@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cd ../legacy/model_zoo/gpt/data_tools/
+cd ../slm/model_zoo/gpt/data_tools/
 sed -i "s/python3/python/g" Makefile
 sed -i "s/python-config/python3.7m-config/g" Makefile
 cd -
 
-cd ../legacy/model_zoo/gpt-3/data_tools/
+cd ../slm/model_zoo/gpt-3/data_tools/
 sed -i "s/python3/python/g" Makefile
 sed -i "s/python-config/python3.7m-config/g" Makefile
 cd -

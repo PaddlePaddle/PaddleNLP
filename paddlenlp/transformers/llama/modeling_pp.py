@@ -17,7 +17,11 @@ from collections import OrderedDict
 import paddle
 import paddle.distributed.fleet as fleet
 import paddle.nn as nn
-from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer
+from paddle.distributed.fleet.meta_parallel import (
+    LayerDesc,
+    PipelineLayer,
+    SharedLayerDesc,
+)
 from paddle.distributed.fleet.utils import recompute
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
@@ -102,6 +106,13 @@ def return_args(
     return ret
 
 
+def get_attr(layer, name):
+    if getattr(layer, name, None) is not None:
+        return getattr(layer, name, None)
+    else:
+        return get_attr(layer._layer, name)
+
+
 class LlamaEmbeddingPipe(nn.Layer):
     """Extends LlamaEmbeddings to forward attention_mask through the pipeline."""
 
@@ -118,6 +129,10 @@ class LlamaEmbeddingPipe(nn.Layer):
             )
         else:
             self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
+
+    @property
+    def embedding_weight(self):
+        return get_attr(self.embed_tokens, "weight")
 
     def forward(self, args):
         """_summary_
@@ -269,6 +284,15 @@ class LlamaRMSNormPipe(nn.Layer):
         return self.norm(hidden_states)
 
 
+class LlamaLMHeadPipe(LlamaLMHead):
+    def __init__(self, config, transpose_y=False):
+        super(LlamaLMHeadPipe, self).__init__(config, transpose_y=transpose_y)
+
+    @property
+    def embedding_weight(self):
+        return get_attr(self, "weight")
+
+
 class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     """LlamaForPretraining adapted for pipeline parallelism.
 
@@ -332,14 +356,35 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         config.tensor_parallel_degree = tensor_parallel_degree
         config.tensor_parallel_rank = tensor_parallel_rank
 
-        self.add_sequential_layer(LayerDesc(LlamaEmbeddingPipe, config=config), "llama")
+        if config.tie_word_embeddings:
+            self.add_sequential_layer(
+                SharedLayerDesc(
+                    "llama_shared_weight", LlamaEmbeddingPipe, shared_weight_attr="embedding_weight", config=config
+                ),
+                "llama",
+            )
+        else:
+            self.add_sequential_layer(LayerDesc(LlamaEmbeddingPipe, config=config), "llama")
+
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
                 LayerDesc(LlamaDecoderLayerPipe, config=config, layerwise_recompute=i not in self.no_recompute_layers),
                 f"llama.layers.{i}",
             )
         self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config), "llama")
-        self.add_head(config)
+        if config.tie_word_embeddings:
+            self.add_sequential_layer(
+                SharedLayerDesc(
+                    "llama_shared_weight",
+                    LlamaLMHeadPipe,
+                    shared_weight_attr="embedding_weight",
+                    config=config,
+                    **{"transpose_y": True},
+                ),
+                "lm_head",
+            )
+        else:
+            self.add_sequential_layer(LayerDesc(LlamaLMHeadPipe, config=config), "lm_head")
 
         recompute_interval = 0
 
@@ -365,9 +410,6 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.apply(self._init_weights)
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)
-
-    def add_head(self, config):
-        self.add_sequential_layer(LayerDesc(LlamaLMHead, config=config), "lm_head")
 
     def get_loss_fn(self, config):
         return LlamaPretrainingCriterion(config)

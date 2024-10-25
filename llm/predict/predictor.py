@@ -24,7 +24,7 @@ from threading import Thread
 import numpy as np
 import paddle
 import paddle.incubate.multiprocessing as mp
-from paddle.base.framework import in_cinn_mode, in_pir_executor_mode
+from paddle.base.framework import in_cinn_mode, in_pir_executor_mode, use_pir_api
 from paddle.distributed import fleet
 
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
@@ -121,6 +121,8 @@ class PredictorArgument:
         },
     )
 
+    append_attn: bool = field(default=False, metadata={"help": "whether use append attention"})
+
     chat_template: str = field(
         default=None,
         metadata={
@@ -138,6 +140,10 @@ class PredictorArgument:
             return self.src_length + self.max_length
         else:
             return 8192  # Maximum sequence length.
+
+    def __post_init__(self):
+        if self.append_attn:
+            self.block_attn = True
 
 
 @dataclass
@@ -624,8 +630,10 @@ class StaticInferencePredictor(InferencePredictorMixin):
         infer_model_path = llm_utils.get_infer_model_path(
             predictor_args.model_name_or_path, predictor_args.model_prefix
         )
-
-        config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
+        if use_pir_api():
+            config = paddle.inference.Config(infer_model_path + ".json", infer_model_path + ".pdiparams")
+        else:
+            config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
         config.switch_ir_optim(True)
         # remove `gpu_cpu_map_matmul_v2_to_matmul_pass` to avoid mapping matmul_v2 -> matmul op
@@ -886,12 +894,8 @@ class BlockInferencePredictorMixin(BasePredictor):
                 ]
             )
             # self.model_inputs["src_mask/tgt_mask"] is read only, will not be updated!
-            src_mask = (
-                alibi_encoder + (1 - src_mask) * paddle.finfo(self.dtype).min
-            ).cast(self.dtype)
-            tgt_mask = (
-                alibi_decoder + (1 - tgt_mask) * paddle.finfo(self.dtype).min
-            ).cast(self.dtype)
+            src_mask = (alibi_encoder + (1 - src_mask) * paddle.finfo(self.dtype).min).cast(self.dtype)
+            tgt_mask = (alibi_decoder + (1 - tgt_mask) * paddle.finfo(self.dtype).min).cast(self.dtype)
             self.model_inputs["rope_emb"] = paddle.concat([src_mask.reshape([-1]), tgt_mask.reshape([-1])])
 
     def _preprocess(self, input_text: list[str]):
@@ -1061,7 +1065,10 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
             predictor_args.model_name_or_path, predictor_args.model_prefix
         )
 
-        config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
+        if use_pir_api():
+            config = paddle.inference.Config(infer_model_path + ".json", infer_model_path + ".pdiparams")
+        else:
+            config = paddle.inference.Config(infer_model_path + ".pdmodel", infer_model_path + ".pdiparams")
 
         config.switch_ir_optim(False)
         if predictor_args.device in paddle.device.get_all_custom_device_type():
@@ -1241,9 +1248,10 @@ def create_predictor(
             config.tensor_parallel_rank = tensor_parallel_rank
             config.model_name_or_path = predictor_args.model_name_or_path
             config.quant_type = predictor_args.quant_type
+            config.append_attn = predictor_args.append_attn
             config.cachekv_int8_type = predictor_args.cachekv_int8_type
             config.use_fake_parameter = predictor_args.use_fake_parameter
-            config.single_card_ptq = True
+            config.single_card_ptq = not predictor_args.use_fake_parameter
             if config.quantization_config.quant_type is not None:
                 predictor_args.quant_type = config.quantization_config.quant_type
                 config.quant_type = config.quantization_config.quant_type
@@ -1474,6 +1482,7 @@ def create_predictor(
 
         elif predictor_args.mode == "static":
             config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
+            config.append_attn = predictor_args.append_attn
 
             if config.quantization_config.quant_type is not None:
                 if "c8" in config.quantization_config.quant_type:
@@ -1683,8 +1692,8 @@ def benchmark(predictor, predictor_args, model_args):
     batch_benchmark_texts = batchfy_text(benchmark_texts, predictor_args.batch_size)
     print("***********Start Benchmark**********")
 
-    warmup_time = 10
-    test_time = 100
+    warmup_time = 5
+    test_time = 20
 
     print("***********Start Warmup**********")
     for _ in range(warmup_time):

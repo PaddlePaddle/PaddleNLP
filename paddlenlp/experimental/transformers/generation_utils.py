@@ -333,7 +333,7 @@ class GenerationInferenceModel(GenerationMixin):
             try:
                 from paddlenlp_ops import top_p_sampling_reject
 
-                next_tokens = top_p_sampling_reject(probs, top_p)
+                next_tokens = top_p_sampling_reject(probs, top_p, 0)
             except:
                 _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
@@ -677,7 +677,7 @@ class GenerationBlockInferenceModel(GenerationMixin):
             try:
                 from paddlenlp_ops import top_p_sampling_reject
 
-                next_tokens = top_p_sampling_reject(probs, top_p)
+                next_tokens = top_p_sampling_reject(probs, top_p, 0)
             except:
                 _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
 
