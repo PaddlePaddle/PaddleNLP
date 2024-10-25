@@ -55,6 +55,8 @@ from .uc_utils import (
     update_master_weight_status,
 )
 
+__all__ = ["load_unified_checkpoint_dynamically", "load_unified_optimizer_dynamically"]
+
 
 def create_send_table(file_keyname_mappings, file_machine_mappings):
     send_table = {}
@@ -258,7 +260,7 @@ def distributed_send_recv(
     return state_dict
 
 
-def load_uc_dynamically(args, model, resume_from_checkpoint, safe_serialization=False):
+def load_unified_checkpoint_dynamically(args, model, resume_from_checkpoint, safe_serialization=False):
     index_filename = select_model_weight_index(model, resume_from_checkpoint, safe_serialization, local=False)
     index_filename = os.path.join(resume_from_checkpoint, index_filename)
 

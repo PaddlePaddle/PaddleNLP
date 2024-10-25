@@ -42,6 +42,8 @@ from .uc_utils import (
     update_master_weight_status,
 )
 
+__all__ = ["check_unified_checkpoint", "check_unified_optimizer"]
+
 
 def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serialization=False):
     index_filename = select_model_weight_index(model, resume_from_checkpoint, safe_serialization, local=False)
@@ -102,7 +104,7 @@ def check_unified_checkpoint(args, model, resume_from_checkpoint, safe_serializa
         else:
             local_resume = False
     local_resume = paddle.to_tensor([local_resume])
-    dist.all_reduce(local_resume, op=dist.ReduceOp.PROD)
+    dist.all_reduce(local_resume, op=dist.ReduceOp.MIN)
     local_resume = local_resume.item()
     return local_resume
 
@@ -226,7 +228,7 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
             else:
                 local_resume = False
         local_resume = paddle.to_tensor([local_resume])
-        dist.all_reduce(local_resume, op=dist.ReduceOp.PROD)
+        dist.all_reduce(local_resume, op=dist.ReduceOp.MIN)
         return local_resume.item()
 
     # check whether the optimizer checkpoint files are complete.

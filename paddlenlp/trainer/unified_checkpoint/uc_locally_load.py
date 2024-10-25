@@ -51,6 +51,8 @@ from .uc_utils import (
     update_master_weight_status,
 )
 
+__all__ = ["load_unified_checkpoint_locally", "load_unified_optimizer_locally"]
+
 
 def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, safe_serialization=False):
     """

@@ -37,6 +37,8 @@ from .uc_utils import (
     mapping_optimizer_tp_actions,
 )
 
+__all__ = ["gather_splited_param_for_optimizer", "load_unified_optimizer_split_param"]
+
 
 def merge_splited_param(
     state_dict, partial_tensor_list, param_shape_info, send_table, recv_table, is_master_weights=False
