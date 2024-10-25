@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 else:
     TOKENIZER_MAPPING_NAMES = OrderedDict(
         [
-            ("albert", (("AlbertTokenizer", "AlbertChineseTokenizer", "AlbertEnglishTokenizer"), None)),
+            ("albert", (("AlbertChineseTokenizer", "AlbertEnglishTokenizer"), None)),
             ("bart", "BartTokenizer"),
             ("bert", "BertTokenizer"),
             ("blenderbot", "BlenderbotTokenizer"),
@@ -119,19 +119,39 @@ else:
         ]
     )
 
-TOKENIZER_MAPPING = _LazyAutoMapping(CONFIG_MAPPING_NAMES, TOKENIZER_MAPPING_NAMES)
 
-CONFIG_TO_TYPE = {v: k for k, v in CONFIG_MAPPING_NAMES.items()}
+def get_mapping_tokenizers(tokenizers, with_fast=True):
+    all_tokenizers = []
+    if isinstance(tokenizers, tuple):
+        (tokenizer_slow, tokenizer_fast) = tokenizers
+        if isinstance(tokenizer_slow, tuple):
+            all_tokenizers.extend(tokenizer_slow)
+        else:
+            all_tokenizers.append(tokenizer_slow)
+        if with_fast and tokenizer_fast is not None:
+            all_tokenizers.append(tokenizer_fast)
+    else:
+        all_tokenizers.append(tokenizers)
+    return all_tokenizers
 
 
 def get_configurations():
     MAPPING_NAMES = OrderedDict()
-    for key, class_name in TOKENIZER_MAPPING_NAMES.items():
-        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
-        tokenizer_name = getattr(import_class, key)
-        name = tuple(tokenizer_name.pretrained_init_configuration.keys())
-        MAPPING_NAMES[name] = tokenizer_name
+    for class_name, values in TOKENIZER_MAPPING_NAMES.items():
+        all_tokenizers = get_mapping_tokenizers(values, with_fast=False)
+        for key in all_tokenizers:
+            import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
+            tokenizer_name = getattr(import_class, key)
+            name = tuple(tokenizer_name.pretrained_init_configuration.keys())
+            MAPPING_NAMES[name] = tokenizer_name
     return MAPPING_NAMES
+
+
+INIT_CONFIG_MAPPING = get_configurations()
+
+TOKENIZER_MAPPING = _LazyAutoMapping(CONFIG_MAPPING_NAMES, TOKENIZER_MAPPING_NAMES)
+
+CONFIG_TO_TYPE = {v: k for k, v in CONFIG_MAPPING_NAMES.items()}
 
 
 def tokenizer_class_from_name(class_name: str):
@@ -139,17 +159,7 @@ def tokenizer_class_from_name(class_name: str):
         return PretrainedTokenizerFast
 
     for module_name, tokenizers in TOKENIZER_MAPPING_NAMES.items():
-        all_tokenizers = []
-        if isinstance(tokenizers, tuple):
-            (tokenizer_slow, tokenizer_fast) = tokenizers
-            if isinstance(tokenizer_slow, tuple):
-                all_tokenizers.extend(tokenizer_slow)
-            else:
-                all_tokenizers.append(tokenizer_slow)
-            if tokenizer_fast is not None:
-                all_tokenizers.append(tokenizer_fast)
-        else:
-            all_tokenizers.append(tokenizers)
+        all_tokenizers = get_mapping_tokenizers(tokenizers)
         if class_name in all_tokenizers:
             module_name = model_type_to_module_name(module_name)
             try:
@@ -280,6 +290,8 @@ class AutoTokenizer:
     base tokenizer classes when created with the AutoTokenizer.from_pretrained() classmethod.
     """
 
+    _tokenizer_mapping = get_configurations()
+
     def __init__(self):
         raise EnvironmentError(
             "AutoTokenizer is designed to be instantiated "
@@ -380,6 +392,20 @@ class AutoTokenizer:
             # TODO: Support tokenizer_type
             raise NotImplementedError("tokenizer_type is not supported yet.")
 
+        all_tokenizer_names = []
+
+        for names, tokenizer_class in cls._tokenizer_mapping.items():
+            for name in names:
+                all_tokenizer_names.append(name)
+
+        # From built-in pretrained models
+        if pretrained_model_name_or_path in all_tokenizer_names:
+            for names, tokenizer_class in cls._tokenizer_mapping.items():
+                for pattern in names:
+                    if pattern == pretrained_model_name_or_path:
+                        logger.info("We are using %s to load '%s'." % (tokenizer_class, pretrained_model_name_or_path))
+                        return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+
         tokenizer_config = get_tokenizer_config(pretrained_model_name_or_path, **kwargs)
         config_tokenizer_class = tokenizer_config.get("tokenizer_class")
         if config_tokenizer_class is None:
@@ -417,6 +443,7 @@ class AutoTokenizer:
                         return tokenizer_class_py.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
                     else:
                         # Use the first tokenizer class in the list
+                        print("We are using %s to load '%s'." % (tokenizer_class_py[0], pretrained_model_name_or_path))
                         return tokenizer_class_py[0].from_pretrained(
                             pretrained_model_name_or_path, *model_args, **kwargs
                         )
