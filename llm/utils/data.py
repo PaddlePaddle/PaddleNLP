@@ -45,6 +45,7 @@ def get_convert_example(model):
         return convert_example_chatglm
     elif base_model_prefix in [
         "chatglm_v2",
+        "chatglm_v3",
         "llama",
         "bloom",
         "opt",
