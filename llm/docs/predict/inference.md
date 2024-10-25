@@ -95,9 +95,9 @@ PaddleNLP 提供了多种参数，用于配置推理模型和优化推理性能�
 
 - `block_attn`: 是否使用 Block Attention 推理， 默认值为False。Block Attention 是基于 PageAttention 的思想设计并实现的，在保持高性能推理和动态插入的基础上可以动态地为 cachekv 分配存储空间，极大地节省显存并提升推理的吞吐。
 
-- `append_attn`: Append Attention 在 Block Attention 实现的基础上，进一步借鉴 FlashInfer 的实现对 Attention 模块进行了优化，并增加了C4的高性能支持，极大地提升了推理性能。
+- `append_attn`: Append Attention 在 Block Attention 实现的基础上，进一步借鉴 FlashInfer 的实现对 Attention 模块进行了优化，并增加了C4的高性能支持，极大地提升了推理性能。属于是 Block Attention 实现的升级版，此选项可替代`block_attn`单独开启。
 
-- `block_size`: 如果使用 Block Attention 推理，指定一个 Block 可以存储的 token 数量，默认值为64。
+- `block_size`: 如果使用 Block Attention 或者 Append Attention 推理，指定一个 Block 可以存储的 token 数量，默认值为64。
 
 
 ### 3.3 量化参数
