@@ -49,7 +49,7 @@ print_info() {
 # case list
 # 2 msra_ner （不可控，内置）
 msra_ner() {
-    cd ${nlp_dir}/legacy/examples/information_extraction/msra_ner/
+    cd ${nlp_dir}/slm/examples/information_extraction/msra_ner/
     export CUDA_VISIBLE_DEVICES=${cudaid2}
     ## train
     time (python -m paddle.distributed.launch ./train.py \
@@ -85,7 +85,7 @@ msra_ner() {
 }
 # 3 glue
 glue() {
-    cd ${nlp_dir}/legacy/examples/benchmark/glue/
+    cd ${nlp_dir}/slm/examples/benchmark/glue/
     export CUDA_VISIBLE_DEVICES=${cudaid2}
     ##  TASK_SST-2
     export TASK_NAME=SST-2
@@ -106,11 +106,11 @@ glue() {
 # 4 bert
 bert() {
     export CUDA_VISIBLE_DEVICES=${cudaid2}
-    # cd ${nlp_dir}/legacy/model_zoo/bert/
+    # cd ${nlp_dir}/slm/model_zoo/bert/
     # wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/bert.tar.gz
     # tar -xzvf bert.tar.gz
     python -c "import datasets;from datasets import load_dataset; train_dataset=load_dataset('glue', 'sst2', split='train')"
-    cd ${nlp_dir}/legacy/model_zoo/bert/data/
+    cd ${nlp_dir}/slm/model_zoo/bert/data/
     wget -q https://bj.bcebos.com/paddlenlp/models/transformers/bert/data/training_data.hdf5
     cd ../
     # pretrain
@@ -156,7 +156,7 @@ bert() {
 }
 # 5 skep (max save 不可控 内置)
 skep() {
-    cd ${nlp_dir}/legacy/examples/sentiment_analysis/skep/
+    cd ${nlp_dir}/slm/examples/sentiment_analysis/skep/
     export CUDA_VISIBLE_DEVICES=${cudaid2}
     ## train_sentence
     time (python -m paddle.distributed.launch train_sentence.py --batch_size 16 --epochs 1 --model_name "skep_ernie_1.0_large_ch" --device gpu --save_dir ./checkpoints >${log_path}/skep_train_sentence) >>${log_path}/skep_train_sentence 2>&1
@@ -179,7 +179,7 @@ skep() {
 }
 # 6 bigbird
 bigbird(){
-    cd ${nlp_dir}/legacy/model_zoo/bigbird/
+    cd ${nlp_dir}/slm/model_zoo/bigbird/
     export CUDA_VISIBLE_DEVICES=${cudaid2}
     time (python -m paddle.distributed.launch  --log_dir log  run_pretrain.py --model_name_or_path bigbird-base-uncased \
         --input_dir "./data" \
@@ -197,7 +197,7 @@ bigbird(){
 # 9 ernie
 ernie(){
     #data process
-    cd ${nlp_dir}/legacy/model_zoo/ernie-1.0/
+    cd ${nlp_dir}/slm/model_zoo/ernie-1.0/
 
     if [ -d "data_ernie_3.0" ];then
         rm -rf data_ernie_3.0
@@ -242,7 +242,7 @@ ernie(){
 }
 # 11 ofa
 ofa(){
-    cd ${nlp_dir}/legacy/examples/model_compression/ofa/
+    cd ${nlp_dir}/slm/examples/model_compression/ofa/
     cd ../../benchmark/glue/
     export CUDA_VISIBLE_DEVICES=${cudaid2}
     # finetuing
@@ -260,7 +260,7 @@ ofa(){
         --output_dir ./ \
         --device gpu  >${log_path}/ofa_pretrain) >>${log_path}/ofa_pretrain 2>&1
     print_info $? ofa_pretrain
-    mv sst-2_ft_model_1.pdparams/  ${nlp_dir}/legacy/examples/model_compression/ofa/
+    mv sst-2_ft_model_1.pdparams/  ${nlp_dir}/slm/examples/model_compression/ofa/
     cd -
     #model slim
     # export CUDA_VISIBLE_DEVICES=${cudaid2}
@@ -281,7 +281,7 @@ ofa(){
 }
 # 12 albert
 albert() {
-    cd ${nlp_dir}/legacy/examples/benchmark/glue/
+    cd ${nlp_dir}/slm/examples/benchmark/glue/
     export CUDA_VISIBLE_DEVICES=${cudaid2}
     time (python -m paddle.distributed.launch run_glue.py \
         --model_type albert \
@@ -300,7 +300,7 @@ albert() {
 }
 # 13 squad
 # squad() {
-#     cd ${nlp_dir}/legacy/examples/machine_reading_comprehension/SQuAD/
+#     cd ${nlp_dir}/slm/examples/machine_reading_comprehension/SQuAD/
 #     export CUDA_VISIBLE_DEVICES=${cudaid1}
 #     # finetune
 #     time (python -m paddle.distributed.launch run_squad.py \
@@ -337,7 +337,7 @@ albert() {
 # 15 lexical_analysis
 lexical_analysis(){
     export CUDA_VISIBLE_DEVICES=${cudaid2}
-    cd ${nlp_dir}/legacy/examples/lexical_analysis/
+    cd ${nlp_dir}/slm/examples/lexical_analysis/
     #train
     time (python download.py --data_dir ./ )
     time (python -m paddle.distributed.launch train.py \
@@ -371,7 +371,7 @@ lexical_analysis(){
 
 # 22 transformer
 transformer() {
-    cd ${nlp_dir}/legacy/examples/machine_translation/transformer/
+    cd ${nlp_dir}/slm/examples/machine_translation/transformer/
     wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/WMT14.en-de.partial.tar.gz
     tar -xzvf WMT14.en-de.partial.tar.gz
     time (
@@ -419,7 +419,7 @@ transformer() {
 }
 #28 question_matching
 question_matching() {
-    cd ${nlp_dir}/legacy/examples/text_matching/question_matching/
+    cd ${nlp_dir}/slm/examples/text_matching/question_matching/
     wget -q https://paddle-qa.bj.bcebos.com/paddlenlp/data_v4.tar.gz
     tar -xvzf data_v4.tar.gz
     export CUDA_VISIBLE_DEVICES=${cudaid2}
@@ -452,7 +452,7 @@ question_matching() {
 # 29 ernie-csc
 ernie-csc() {
     export CUDA_VISIBLE_DEVICES=${cudaid2}
-    cd ${nlp_dir}/legacy/examples/text_correction/ernie-csc
+    cd ${nlp_dir}/slm/examples/text_correction/ernie-csc
     #dowdnload data
     python download.py --data_dir ./extra_train_ds/ --url https://github.com/wdimmy/Automatic-Corpus-Generation/raw/master/corpus/train.sgml
     #trans xml txt
@@ -472,7 +472,7 @@ ernie-csc() {
 }
 
 clue() {
-    cd ${nlp_dir}/legacy/examples/benchmark/clue/classification
+    cd ${nlp_dir}/slm/examples/benchmark/clue/classification
     python -u ./run_clue_classifier_trainer.py \
         --model_name_or_path ernie-3.0-base-zh \
         --dataset "clue afqmc" \
@@ -514,7 +514,7 @@ clue() {
         --max_steps 1 \
         --do_train >${log_path}/clue-class >>${log_path}/clue-class 2>&1
     print_info $? clue-class
-    cd ${nlp_dir}/legacy/examples/benchmark/clue/mrc
+    cd ${nlp_dir}/slm/examples/benchmark/clue/mrc
     export CUDA_VISIBLE_DEVICES=${cudaid1}
     # python -m paddle.distributed.launch run_cmrc2018.py \
     #     --model_name_or_path ernie-3.0-base-zh \
@@ -553,7 +553,7 @@ llm(){
 }
 
 ernie-3.0(){
-    cd ${nlp_dir}/legacy/model_zoo/ernie-3.0/
+    cd ${nlp_dir}/slm/model_zoo/ernie-3.0/
     #训练
     python run_seq_cls.py  --model_name_or_path ernie-3.0-medium-zh  --dataset afqmc --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml --max_steps=2 --save_step=2 >${log_path}/ernie-3.0_train_seq_cls >>${log_path}/ernie-3.0_train_seq_cls 2>&1
     print_info $? ernie-3.0_train_seq_cls
@@ -577,7 +577,7 @@ ernie-3.0(){
     # print_info $? ernie-3.0_compress_qa
 }
 uie(){
-    cd ${nlp_dir}/legacy/model_zoo/uie/
+    cd ${nlp_dir}/slm/model_zoo/uie/
     mkdir data && cd data && wget https://bj.bcebos.com/paddlenlp/datasets/uie/doccano_ext.json && cd ../
     python doccano.py --doccano_file ./data/doccano_ext.json --task_type ext --save_dir ./data --splits 0.8 0.2 0 --schema_lang ch >${log_path}/uie_doccano>>${log_path}/uie_doccano 2>&1
     print_info $? uie_doccano
@@ -592,7 +592,7 @@ uie(){
     print_info $? uie_eval
 }
 ernie-layout(){
-    cd ${nlp_dir}/legacy/model_zoo/ernie-layout/
+    cd ${nlp_dir}/slm/model_zoo/ernie-layout/
     # train ner
     python -u run_ner.py --model_name_or_path ernie-layoutx-base-uncased --output_dir ./ernie-layoutx-base-uncased/models/funsd/ \
         --dataset_name funsd --do_train --do_eval --max_steps 2 --eval_steps 2 --save_steps 2 --save_total_limit 1 --seed 1000 --overwrite_output_dir \
@@ -604,7 +604,7 @@ ernie-layout(){
     python export_model.py --task_type ner --model_path ./ernie-layoutx-base-uncased/models/funsd/ --output_path ./ner_export >${log_path}/ernie-layout_export>>${log_path}/ernie-layout_export2>&1
     print_info $? ernie-layout_export
     # deploy ner
-    cd ${nlp_dir}/legacy/model_zoo/ernie-layout/deploy/python
+    cd ${nlp_dir}/slm/model_zoo/ernie-layout/deploy/python
     wget https://bj.bcebos.com/paddlenlp/datasets/document_intelligence/images.zip && unzip images.zip
     python infer.py --model_path_prefix ../../ner_export/inference --task_type ner --lang "en" --batch_size 8 >${log_path}/ernie-layout_deploy>>${log_path}/ernie-layout_deploy 2>&1
     print_info $? ernie-layout_deploy

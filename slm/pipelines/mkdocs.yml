@@ -1,0 +1,92 @@
+site_name: PaddleNLP-Pipelines
+repo_url: https://github.com/PaddlePaddle/PaddleNLP/tree/develop/slm/pipelines
+repo_name: PaddleNLP-Pipelines
+site_url: https://paddlenlp-pipelines.readthedocs.io/zh-cn/latest/
+site_description: provides an easy-to-use paddlenlp application tool suite.
+
+nav:
+- Pipelines module: 
+  - Pipeline: 'package/pipelines/standard_pipelines.md'
+
+- Nodes module: 
+  - retriever: 'package/nodes/retriever.md'
+  - ranker: 'package/nodes/ranker.md'
+  - reader: 'package/nodes/reader.md'
+  - preprocessor: 'package/nodes/preprocessor.md'
+  - file_converter: 'package/nodes/file_converter.md'
+  - document_intelligence: 'package/nodes/document_intelligence.md'
+  - llm: 'package/nodes/llm.md'
+  - quetion_generator: 'package/nodes/question_generator.md'
+  - search_engine: 'package/nodes/search_engine.md'
+  - sentiment_analysis: 'package/nodes/sentiment_analysis.md'
+  - answer_extractor: 'package/nodes/answer_extractor.md'
+  - other: 'package/nodes/other.md'
+
+
+- Memory module: 
+  - faiss: 'package/docstore/faiss.md'
+  - elasticsearch: 'package/docstore/elasticsearch.md'
+  - milvus2: 'package/docstore/milvus2.md'
+
+- Agents module:
+  - agent: 'package/agents/agents.md'
+  - memory: 'package/agents/memory.md'
+
+- Server module: 
+  - application: 'package/rest_api/application.md'
+  - controller: 'package/rest_api/controller.md'
+
+
+copyright: Copyright &copy; 2024 - Now PaddlePaddle Community
+
+
+theme:
+  language: zh
+  name: material
+  features:
+    - navigation.tabs.sticky
+    - toc.integrate
+    - navigation.footer
+    - navigation.indexes
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - navigation.tracking
+  font:
+    text: Noto Serif Simplified Chinese
+    code: Noto Serif Simplified Chinese
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - admonition
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.tabbed
+  - toc:
+      permalink: true
+
+
+plugins:
+  - search
+  - mkdocs-jupyter:
+      ignore_h1_titles: True
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            show_bases: false
+            show_root_heading: true
+            docstring_style: sphinx
+          paths: [pipelines/pipelines]
+          selection:
+            filters:
+              - "^__init__$"  # but always include __init__ modules and methods
+              
