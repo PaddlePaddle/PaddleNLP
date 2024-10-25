@@ -1,8 +1,8 @@
 # FlashMask
 
 ## 1. Introduction
-
-FlashMask ... 待补充
+[FlashMask](https://arxiv.org/abs/2410.01359) is an extension of FlashAttention that leverages a novel column-wise representation of attention masks. This approach allows for the efficient handling of a broader range of mask types without compromising computational accuracy. FLASHMASK achieves linear memory complexity while enabling kernel optimizations that reduce unnecessary computations, resulting in significant computational speedups and enhanced training efficiency.
+.
 
 ## 2. Quick Start
 
