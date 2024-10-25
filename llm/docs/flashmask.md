@@ -1,8 +1,102 @@
 # FlashMask
 
-## 1. Introduction
-[FlashMask](https://arxiv.org/abs/2410.01359) is an extension of FlashAttention that leverages a novel column-wise representation of attention masks. This approach allows for the efficient handling of a broader range of mask types without compromising computational accuracy. FLASHMASK achieves linear memory complexity while enabling kernel optimizations that reduce unnecessary computations, resulting in significant computational speedups and enhanced training efficiency.
-.
+FlashMask 是 FlashAttention 的扩展，它利用了一种新颖的按列注意力掩码表示法。这种方法允许在不牺牲计算精度的情况下，更有效地处理更广泛类型的掩码。FlashMask 实现了线性内存复杂度，并且支持内核优化，减少不必要的计算，从而实现显著的计算加速和增强的训练效率。
+
+## 1. 背景
+
+在 Transformer 类大模型训练任务中，注意力掩码（Attention Mask）一方面带来了大量的冗余计算，另一方面因其 $O(N^2)$ 巨大的存储占用导致难以实现长序列场景的高效训练（其中$N$为序列长度）。虽然业界已有 FlashAttention 等针对特定注意力掩码的计算加速方法，但其支持的注意力掩码模式有限，难以满足大模型训练任务对灵活注意力掩码的需求。为了解决上述问题，飞桨独创 FlashMask 技术，提出了列式稀疏的注意力掩码表示方法，支持灵活多样的注意力掩码模式，使得存储复杂度从 $O(N^2)$ 降低至 $O(N)$，并在此基础上实现了高效的算子 Kernel，极致加速大模型训练效率，尤其是长序列场景下的训练效率。
+
+* arXiv 论文地址 https://arxiv.org/pdf/2410.01359
+* PaddlePaddle 官方文档地址 https://www.paddlepaddle.org.cn/documentation/docs/en/develop/api/paddle/nn/functional/flashmask_attention_en.html
+* PaddleNLP 开源地址 https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/docs/flashmask.md
+
+
+## 2. FlashMask: 列式稀疏掩码表示
+
+FlashMask 的核心发现是，在大模型常见的注意力掩码模式中，Query-Key token 的掩码模式具有一定的连续性。具体地，对于每一个 Key token 而言，不进行有效 Attention 计算的 Query token 是相邻的，即在图1中二维掩码矩阵中，Query token 作用在每一列的 Key token 的灰色部分在列方向上是连续分布的。基于这一洞察，FlashMask 巧妙地将二维的稠密掩码矩阵转换为一维的行索引区间这一更为紧凑的表示形式，显著降低存储需求。我们可以公式化表示为：
+
+$M_{j} = [start_j, end_j), \quad \forall j \in \{1, \ldots, N\}$
+
+其中 $N$ 为 Key 的序列长度，$M_j$ 为二维的稠密掩码矩阵的第 $j$ 列，$[start_j, end_j)$ 为连续的行索引区间，表示 $start_j$ 到 $end_{j} - 1$ 的连续 Query token 是被 mask 掉，置为无效 Attention 计算。
+
+
+为了高效处理因果和双向注意力场景中的复杂掩码模式，FlashMask 提出了一种新颖的列式稀疏表示方法。以对角线为区分，它使用四个一维向量来表示掩码：
+* 下三角起始行索引（Lower Triangular Start，简称 LTS）
+* 下三角结束行索引（Lower Triangular End，简称 LTE）
+* 上三角起始行索引（Upper Triangular Start，简称 UTS）
+* 上三角结束行索引（Upper Triangular End，简称 UTE）
+
+其中下三角被 mask 掉的行索引区间使用 $[𝐿𝑇𝑆, 𝐿𝑇𝐸)$ 表示，上三角被 mask 掉的行索引区间使用 $[𝑈𝑇𝑆, 𝑈𝑇𝐸)$ 表示。
+
+<div align="center">
+    <img width="300" alt="llm" src="https://github.com/user-attachments/assets/989cc61e-174b-489d-ba7a-d1e6d172ff91">
+    <div align="center">
+        <font size ="2">
+        图1：较为复杂的二维稠密因果注意力的掩码矩阵示意图
+        </font>
+    </div>
+</div>
+
+如图1所示，我们展示了16个 Query token 和16个 Key token 做 Attention 计算时较为复杂的二维稠密因果注意力的掩码矩阵，灰色单元格是 mask 区域。
+
+可以通过 $[LTS,LTE)$ 两个向量进行表达，如下所示：
+| col_idx | 0  | 1  | 2  | 3  | 4  | 5  | 6  | 7  | 8  | 9  | 10 | 11 | 12 | 13 | 14 | 15 |
+|---------|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|----|
+| $LTS$   | 13 | 5  | 5  | 5  | 6  | 6  | 9  | 9  | 9  | 12 | 12 | 12 | 16 | 16 | 16 | 16 |
+| $LTE$   | 15 | 14 | 14 | 15 | 12 | 12 | 11 | 11 | 16 | 16 | 16 | 16 | 16 | 16 | 16 | 16 |
+
+以第1列为例，开始 mask 的行为13，结束 mask 的行为15（开区间），表示位置为13和14的 Query token 不与位置为0的 Key token 做有效 Attention 计算。
+
+<div align="center">
+    <div align="center">
+        <img width="400" alt="llm" src="https://github.com/user-attachments/assets/55a023ec-f1d9-46c9-aa3a-9fed14ed89f0">
+        <img width="300" alt="llm" src="https://github.com/user-attachments/assets/67c8076a-da8e-415b-988a-6b5f65023464">
+    </div>
+    <div align="center">
+        <font size ="2">
+        图2: 常见的注意力掩码类型及使用 FlashMask 的列式稀疏掩码表示方法表示图1的注意力掩码模式
+        </font>
+    </div>
+</div>
+
+更多的例子参考图2，FlashMask 使用列式稀疏掩码表示方法，表达了图1中所有的注意力掩码模式。其中 $-$ 的空缺表示在不同的场景下有不同的默认值，$LTS$ 和 $UTS$ 中的默认值是 0，表示 mask 区域默认从第0行开始，$LTE$和$UTE$中的默认值是 Query 的序列长度，表示 mask 区域默认结束于最后一行。
+
+
+## 3. FlashMask: 扩展 FlashAttention 支持复杂掩码
+
+FlashMask 将列式掩码表示方法集成到 FlashAttention-2 算法中，扩展了其对注意力掩码的支持能力。FlashMask 的高性能 Kernel 实现包括两个关键步骤：预处理和实时块跳过计算。
+
+在 FlashAttention 的 Kernel 实现中，得分矩阵（score matrix）的计算是分块（Tile Block）实现的。如图4的简化表示所示，整个得分矩阵计算被分为了 4 x 4 的块，每个块包含 4 个 Query token 和 4 个 Key token 交互的 4 x 4  Attention 计算。FlashMask 的原始输入是 token 级别的逐列表示，通过预处理阶段转化成块级别的表示，用于在实时跳过计算阶段快速实时计算出每个块的类型。
+
+<div align="center">
+    <img width="300" alt="llm" src="https://github.com/user-attachments/assets/1a244bb1-1b3c-4bc4-8839-5d3e77f02bed">
+    <div align="center">
+        <font size ="2">
+        图3：FlashMask 计算过程示意图
+        </font>
+    </div>
+</div>
+
+预处理阶段
+在 FlashMask 的预处理阶段，列式稀疏掩码向量 $LTS$、$LTE$、$UTS$、$UTE$ 首先被加载到高带宽存储（HBM）中，然后根据 FlashAttention 的分块列大小，将列式稀疏掩码向量分块，计算出每个分块中所有列的向量最大值和最小值，生成8个中间向量：
+
+* $LTStart^{min}$, $LTStart^{max}$
+* $LTEnd^{min}$, $LTEnd^{min}$
+* $UTStart^{min}$, $UTStart^{min}$
+* $UTEnd^{min}$, $UTEnd^{min}$
+
+以图4最左边的4个分块为例，分块包含4个列，这4列的 $LTS=[13,5,5,5]$和 $LTE=[15,14,14,15]$，因此 $LTStart^{min}=min(LTS)=5$，$LTStart^{max}=max(LTS)=13$，$LTEnd^{min}=min(LTE)=14$，$LTEnd^{max}=max(LTE)=15$。剩余的计算结果如图5所示：
+
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/user-attachments/assets/76a5cca9-c268-4bd8-b0f6-d84ba3948b68">
+    <div align="center">
+        <font size ="2">
+        图4：预处理计算的分块最大值/最小值计算
+        </font>
+    </div>
+</div>
+
+
 
 ## 2. Quick Start
 
