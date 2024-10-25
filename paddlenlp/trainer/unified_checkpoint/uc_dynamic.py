@@ -45,7 +45,7 @@ if is_safetensors_available():
     else:
         from paddlenlp.utils.safetensors import fast_safe_open as safe_open
 
-from .unified_checkpoint_utils import (
+from .uc_utils import (
     FP32_MASTER,
     get_expected_state_dict,
     mapping_optimizer_tp_actions,
@@ -258,7 +258,7 @@ def distributed_send_recv(
     return state_dict
 
 
-def load_unified_checkpoint_dynamically(args, model, resume_from_checkpoint, safe_serialization=False):
+def load_uc_dynamically(args, model, resume_from_checkpoint, safe_serialization=False):
     index_filename = select_model_weight_index(model, resume_from_checkpoint, safe_serialization, local=False)
     index_filename = os.path.join(resume_from_checkpoint, index_filename)
 

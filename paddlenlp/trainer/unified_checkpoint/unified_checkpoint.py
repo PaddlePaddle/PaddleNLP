@@ -68,28 +68,28 @@ if is_safetensors_available():
     else:
         from paddlenlp.utils.safetensors import fast_load_file as load_file
 
-from .check_unified_checkpoint import check_unified_checkpoint, check_unified_optimizer
+from .check_uc import check_unified_checkpoint, check_unified_optimizer
 from .shared_memory_utils import (
     _read_state_dict_from_shm,
     _traverse_copy_to_shm,
     create_meta_dict,
 )
-from .unified_checkpoint_dynamic import (
+from .uc_dynamic import (
     load_unified_checkpoint_dynamically,
     load_unified_optimizer_dynamically,
 )
-from .unified_checkpoint_locally_load import (
+from .uc_locally_load import (
     load_unified_checkpoint_locally,
     load_unified_optimizer_locally,
 )
-from .unified_checkpoint_sharding_v2 import gather_splited_param_for_optimizer
-from .unified_checkpoint_single_card import (
+from .uc_sharding_v2 import gather_splited_param_for_optimizer
+from .uc_single_card import (
     load_single_card_checkpoint,
     load_single_card_optimizer,
     save_single_card_checkpoint,
     save_single_card_optimizer,
 )
-from .unified_checkpoint_utils import (
+from .uc_utils import (
     FP32_MASTER,
     UnifiedCheckpointOption,
     filter_params,

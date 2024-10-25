@@ -29,7 +29,7 @@ from paddlenlp.utils.env import (
 )
 from paddlenlp.utils.nested import nested_copy
 
-from .unified_checkpoint_utils import (
+from .uc_utils import (
     FP32_MASTER,
     generate_base_static_name,
     get_expected_state_dict,

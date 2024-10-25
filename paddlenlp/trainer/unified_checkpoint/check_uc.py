@@ -35,7 +35,7 @@ try:
 except:
     core = None
 
-from .unified_checkpoint_utils import (
+from .uc_utils import (
     get_expected_state_dict,
     is_sharding_split_param_mode,
     select_model_weight_index,

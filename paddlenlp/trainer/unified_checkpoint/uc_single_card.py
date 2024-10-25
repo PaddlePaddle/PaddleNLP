@@ -46,7 +46,7 @@ from paddlenlp.utils.nested import nested_copy
 if is_safetensors_available():
     from safetensors.numpy import save_file as safe_save_file
 
-from .unified_checkpoint_utils import (
+from .uc_utils import (
     FP32_MASTER,
     generate_base_static_name,
     get_expected_state_dict,
