@@ -72,15 +72,17 @@ Attached GPUs                                     : 8
 ```
  # 您可以使用 --device=/dev/dri/card0 指定仅GPU 0在容器内可见（其它卡同理），--device=/dev/dri 表示所有GPU可见
 docker run -it --rm --device=/dev/dri
-    --device=/dev/mxcd --group-add video -network=host --uts=host --ipc=host --privileged=true --shm-size 128g {image id}
+    --device=/dev/mxcd --group-add video -network=host --uts=host --ipc=host --privileged=true --shm-size 128g registry.baidubce.com/paddlepaddle/paddle:2.6.1-gpu-cuda11.7-cudnn8.4-trt8.4
 ```
 
 2. 安装MXMACA软件栈
 
+   > 您可以联系 fae_support@metax-tech.com 以获取MXMACA安装包及技术支持， 已授权用户可以访问[沐曦软件中心](https://sw-download.metax-tech.com/login)获取相关安装包。
+   >
+
 ```
 # 假设您已下载并解压好MXMACA驱动
 sudo bash /path/to/maca_package/mxmaca-sdk-install.sh
-您可以联系 MetaX 或访问 https://sw-download.metax-tech.com 获取对应的安装包。
 ```
 
 3. 安装PaddlePaddle
