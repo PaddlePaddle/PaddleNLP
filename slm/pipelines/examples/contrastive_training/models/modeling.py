@@ -13,13 +13,20 @@
 # limitations under the License.
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple, Union, cast
 
+import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.nn as nn
+from tqdm import tqdm
 
-from paddlenlp.transformers import AutoConfig, AutoModel, PretrainedModel
+from paddlenlp.transformers import (
+    AutoConfig,
+    AutoModel,
+    AutoModelForCausalLM,
+    PretrainedModel,
+)
 from paddlenlp.transformers.model_outputs import ModelOutput
 from paddlenlp.utils.log import logger
 
@@ -44,9 +51,14 @@ class BiEncoderModel(PretrainedModel):
         margin: float = 0.3,
         matryoshka_dims: Optional[List[int]] = None,
         matryoshka_loss_weights: Optional[List[float]] = None,
+        query_instruction: Optional[str] = None,
+        document_instruction: Optional[str] = None,
+        eval_batch_size: int = 8,
+        tokenizer=None,
+        max_seq_length: int = 4096,
     ):
         super().__init__()
-        self.model = AutoModel.from_pretrained(model_name_or_path)
+        self.model = AutoModel.from_pretrained(model_name_or_path, convert_from_torch=True)
         self.model_config = AutoConfig.from_pretrained(model_name_or_path)
         self.cross_entropy = nn.CrossEntropyLoss(reduction="mean")
 
@@ -57,6 +69,12 @@ class BiEncoderModel(PretrainedModel):
         self.config = self.model_config
         self.margin = margin
         self.matryoshka_dims = matryoshka_dims
+
+        self.query_instruction = query_instruction
+        self.document_instruction = document_instruction
+        self.eval_batch_size = eval_batch_size
+        self.tokenizer = tokenizer
+        self.max_seq_length = max_seq_length
 
         if self.matryoshka_dims:
             self.matryoshka_loss_weights = (
@@ -83,6 +101,14 @@ class BiEncoderModel(PretrainedModel):
             return s / d
         elif self.sentence_pooling_method == "cls":
             return hidden_state[:, 0]
+        elif self.sentence_pooling_method == "last":
+            # return hidden_state[:, -1] # this is for padding side is left
+            sequence_lengths = mask.sum(axis=1)
+            last_token_indices = sequence_lengths - 1
+            embeddings = hidden_state[paddle.arange(hidden_state.shape[0]), last_token_indices]
+            return embeddings
+        else:
+            raise ValueError(f"Invalid sentence pooling method: {self.sentence_pooling_method}")
 
     def get_model_config(
         self,
@@ -90,8 +116,8 @@ class BiEncoderModel(PretrainedModel):
         return self.model_config.to_dict()
 
     def encode(self, features):
-        psg_out = self.model(**features, return_dict=True)
-        p_reps = self.sentence_embedding(psg_out.last_hidden_state, features["attention_mask"])
+        psg_out = self.model(**features, return_dict=True, output_hidden_states=True)
+        p_reps = self.sentence_embedding(psg_out.hidden_states[-1], features["attention_mask"])
         return p_reps
 
     def compute_similarity(self, q_reps, p_reps):
@@ -189,13 +215,85 @@ class BiEncoderModel(PretrainedModel):
 
         return all_tensors
 
-    @classmethod
-    def from_pretrained(cls, **kwargs):
-        # Instantiate model.
-        model = cls(**kwargs)
-        return model
-
     def save_pretrained(self, output_dir: str, **kwargs):
         state_dict = self.model.state_dict()
         state_dict = type(state_dict)({k: v.clone().cpu() for k, v in state_dict.items()})
         self.model.save_pretrained(output_dir, state_dict=state_dict)
+
+    @paddle.no_grad()
+    def encode_sentences(self, sentences: List[str], **kwargs) -> np.ndarray:
+        self.model.eval()
+        all_embeddings = []
+        for start_index in tqdm(range(0, len(sentences), self.eval_batch_size), desc="Batches"):
+            sentences_batch = sentences[start_index : start_index + self.eval_batch_size]
+
+            inputs = self.tokenizer(
+                sentences_batch,
+                padding=True,
+                truncation=True,
+                return_tensors="pd",
+                max_length=self.max_seq_length,
+                return_attention_mask=True,
+            )
+            outputs = self.model(
+                input_ids=inputs.input_ids,
+                attention_mask=inputs.attention_mask,
+                return_dict=True,
+                output_hidden_states=True,
+            )
+            last_hidden_state = outputs.hidden_states[-1]
+
+            if self.sentence_pooling_method == "last":
+                if self.tokenizer.padding_side == "right":
+                    sequence_lengths = inputs.attention_mask.sum(axis=1)
+                    last_token_indices = sequence_lengths - 1
+                    embeddings = last_hidden_state[paddle.arange(last_hidden_state.shape[0]), last_token_indices]
+                elif self.tokenizer.padding_side == "left":
+                    embeddings = last_hidden_state[:, -1]
+                else:
+                    raise NotImplementedError(f"Padding side {self.tokenizer.padding_side} not supported.")
+            elif self.sentence_pooling_method == "cls":
+                embeddings = last_hidden_state[:, 1]
+            elif self.sentence_pooling_method == "mean":
+                s = paddle.sum(last_hidden_state * inputs.attention_mask.unsqueeze(-1), axis=1)
+                d = inputs.attention_mask.sum(axis=1, keepdim=True)
+                embeddings = s / d
+            else:
+                raise NotImplementedError(f"Pooling method {self.pooling_method} not supported.")
+
+            embeddings = paddle.nn.functional.normalize(embeddings, p=2, axis=-1)
+
+            all_embeddings.append(embeddings.cpu().numpy().astype("float32"))
+
+        return np.concatenate(all_embeddings, axis=0)
+
+    def encode_queries(self, queries: List[str], **kwargs) -> np.ndarray:
+        """
+        This function will be used to encode queries for retrieval task
+        if there is a instruction for queries, we will add it to the query text
+        """
+        if self.query_instruction is not None:
+            input_texts = [f"{self.query_instruction}{query}" for query in queries]
+        else:
+            input_texts = queries
+        return self.encode_sentences(input_texts)
+
+    def encode_corpus(self, corpus: List[Union[Dict[str, str], str]], **kwargs) -> np.ndarray:
+        """
+        This function will be used to encode corpus for retrieval task
+        if there is a instruction for docs, we will add it to the doc text
+        """
+        if isinstance(corpus[0], dict):
+            if self.document_instruction is not None:
+                input_texts = [
+                    "{}{} {}".format(self.document_instruction, doc.get("title", ""), doc["text"]).strip()
+                    for doc in corpus
+                ]
+            else:
+                input_texts = ["{} {}".format(doc.get("title", ""), doc["text"]).strip() for doc in corpus]
+        else:
+            if self.document_instruction is not None:
+                input_texts = [f"{self.document_instruction}{doc}" for doc in corpus]
+            else:
+                input_texts = corpus
+        return self.encode_sentences(input_texts)
