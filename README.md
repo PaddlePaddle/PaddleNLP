@@ -219,7 +219,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py 
 * 微信扫描二维码并填写问卷，即可加入交流群与众多社区开发者以及官方团队深度交流.
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11987277/245085922-0aa68d24-00ff-442e-9c53-2f1e898151ce.png" width="150" height="150" />
+    <img src="https://github.com/user-attachments/assets/3a58cc9f-69c7-4ccb-b6f5-73e966b8051a" width="150" height="150" />
 </div>
 
 ## Citation
