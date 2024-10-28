@@ -27,12 +27,12 @@ from paddlenlp.utils.log import logger
 if is_safetensors_available():
     from safetensors.numpy import save_file as safe_save_file
 
+from .quantization import quant_unified_optimizer
 from .shared_memory_utils import (
     _read_state_dict_from_shm,
     _traverse_copy_to_shm,
     create_meta_dict,
 )
-from .unified_checkpoint_quantization import quant_unified_optimizer
 
 __all__ = ["AsyncCheckpointHandler"]
 

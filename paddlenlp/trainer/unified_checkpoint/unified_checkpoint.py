@@ -279,7 +279,7 @@ class UnifiedCheckpointHandler:
             ckpt_quant_stage=self.args.ckpt_quant_stage,
         )
         if master_weights is not None:
-            self._file_save_async_or_sync(
+            self.async_handler._file_save_async_or_sync(
                 master_weights,
                 path=os.path.join(output_dir, master_weights_name),
                 signal_path=signal_dir,
