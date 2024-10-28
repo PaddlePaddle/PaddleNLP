@@ -115,19 +115,20 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 
 * 大模型预训练、精调（包含 SFT、PEFT 技术）、对齐、量化已支持 LLaMA 系列、Baichuan 系列、Bloom 系列、ChatGLM 系列、Mistral 系列、OPT 系列和 Qwen 系列，【LLM】模型预训练、精调、对齐、量化支持列表如下：
 
-| 模型名称/能力支持  | Pretrain | SFT | FlashMask | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Torch convert |
+| 模型名称/能力支持  | Pretrain | SFT | FlashMask | LoRA | Prefix Tuning | DPO/SimPO/ORPO | RLHF | Quantization | Torch convert |
 |:------------------:|:--------:|:---:|:---------:|:----:|:-------------:|:---:|:----:|:------------:|:-------------:|
 |       Llama        |    ✅     |  ✅  |     ✅     |  ✅   |       ✅       |  ✅  |  ✅   |      ✅       |       ✅       |
 |        Qwen        |    ✅     |  ✅  |     ✅     |  ✅   |       ✅       |  ✅  |  🚧  |      🚧      |       ✅       |
-|      Mixtral       |    ✅     |  ✅  |     🚧     |  ✅  |       ❌       | 🚧  |  🚧  |      🚧      |      🚧       |
+|      Mixtral       |    ✅     |  ✅  |     🚧     |  ✅  |       ❌       | ✅  |  🚧  |      🚧      |      🚧       |
 |      Mistral       |    ✅     |  ✅  |     🚧     |  ✅  |       ✅       |  ✅  |  🚧  |      🚧      |       ✅       |
 | Baichuan/Baichuan2 |    ✅     |  ✅  |     ✅     |  ✅   |       ✅       |  ✅  |  🚧  |      ✅       |       ✅       |
 |     ChatGLM-6B     |    ✅     |  ✅  |     🚧     |  ✅  |       ✅       | 🚧  |  🚧  |      ✅       |       ❌       |
-| ChatGLM2/ChatGLM3  |    ✅     |  ✅  |     🚧     |  ✅  |       ✅       | 🚧  |  🚧  |      ✅       |       ✅       |
+| ChatGLM2/ChatGLM3  |    ✅     |  ✅  |     🚧     |  ✅  |       ✅       | ✅  |  🚧  |      ✅       |       ✅       |
 |       Bloom        |    ✅     |  ✅  |     🚧     |  ✅  |       ✅       | 🚧  |  🚧  |      ✅       |       ✅       |
 |       GPT-3        |    ✅     |  ✅  |    🚧     |  🚧  |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
 |        OPT         |    ✅     |  ✅  |     🚧     |  ✅  |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
-|       Yuan2        |    ✅     |  ✅  |     🚧     |  ✅  |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
+|       Gemma        |    ✅     |  ✅  |     🚧     |  ✅  |      🚧       | ✅  |  🚧  |      🚧      |       ✅       |
+|       Yuan2        |    ✅     |  ✅  |     🚧     |  ✅  |      🚧       | ✅  |  🚧  |      🚧      |       ✅       |
 ------------------------------------------------------------------------------------------
 
 * [大模型推理](./llm/docs/predict/inference.md)已支持 LLaMA 系列、Qwen 系列、Mistral 系列、ChatGLM 系列、Bloom 系列和 Baichuan 系列，支持 Weight Only INT8及 INT4推理，支持 WAC（权重、激活、Cache KV）进行 INT8、FP8量化的推理，【LLM】模型推理支持列表如下：
