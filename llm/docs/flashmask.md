@@ -113,7 +113,7 @@ FlashMask 将列式掩码表示方法集成到 FlashAttention-2 算法中，扩�
 * $UTStart^{min}$, $UTStart^{min}$
 * $UTEnd^{min}$, $UTEnd^{min}$
 
-以图4最左边的4个分块为例，分块包含4个列，这4列的 $LTS=[13,5,5,5]$和 $LTE=[15,14,14,15]$，因此 $LTStart^{min}=min(LTS)=5$ ，$LTStart^{max}=max(LTS)=13$ ，$LTEnd^{min}=min(LTE)=14$ ，$LTEnd^{max}=max(LTE)=15$ 。剩余的计算结果如图5所示：
+以图4最左边的4个分块为例，分块包含4个列，这4列的 $LTS=[13,5,5,5]$和 $LTE=[15,14,14,15]$，因此 $LTStart^{min}=min(LTS)=5$，$LTStart^{max}=max(LTS)=13$，$LTEnd^{min}=min(LTE)=14$，$LTEnd^{max}=max(LTE)=15$。剩余的计算结果如图5所示：
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/user-attachments/assets/76a5cca9-c268-4bd8-b0f6-d84ba3948b68">
