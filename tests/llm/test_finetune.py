@@ -66,6 +66,18 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         self.run_predictor({"inference_model": False})
 
 
+@parameterized_class(
+    ["model_dir"],
+    [
+        ["llama"],
+        ["chatglm"],
+        # ["bloom"], @skip("Skip and wait to fix.")
+        ["chatglm2"],
+        ["qwen"],
+        ["qwen2"],
+        ["baichuan"],
+    ],
+)
 class CkptQuantTest(LLMTest, TestMultipleGpus):
     config_path: str = "./tests/fixtures/llm/finetune.yaml"
     model_dir: str = None

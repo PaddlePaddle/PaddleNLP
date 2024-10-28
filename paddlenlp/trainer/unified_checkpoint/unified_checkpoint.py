@@ -600,8 +600,8 @@ def unified_optimizer_into_shards(
 
     # filter optimizer param
     if master_weights is not None:
-        filter_master_keys = filter_params(model, master_weights, is_optimizer=True)
-    filter_optim_keys = filter_params(model, optim_state_dict, is_optimizer=True)
+        filter_master_keys = filter_params(model, master_weights, args, is_optimizer=True)
+    filter_optim_keys = filter_params(model, optim_state_dict, args, is_optimizer=True)
 
     tp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
     tp_size = tp_group.nranks
