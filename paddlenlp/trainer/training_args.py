@@ -1402,6 +1402,12 @@ class TrainingArguments:
                             f"but got logging_steps={self.logging_steps}."
                         )
 
+                    if "split_param" in sharding_parallel_config:
+                        assert self.sharding == [ShardingOption.SHARD_OP], "Only sharding stage1 support split_param."
+                        assert (
+                            self.amp_master_grad
+                        ), "If `split_param` in sharding_parallel_config, `amp_master_grad` must be True."
+
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
 

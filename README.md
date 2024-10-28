@@ -129,7 +129,6 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 | [Gemma](./llm/config/gemma)                |    ✅     |  ✅  |  🚧  |    🚧     |      🚧       |       ✅        |  🚧  |      🚧      |
 | [Yuan](./llm/config/yuan)                  |    ✅     |  ✅  |  ✅   |    🚧     |      🚧       |       ✅        |  🚧  |      🚧      |
 
-
 * [大模型推理](./llm/docs/predict/inference.md)已支持 LLaMA 系列、Qwen 系列、Mistral 系列、ChatGLM 系列、Bloom 系列和 Baichuan 系列，支持 Weight Only INT8及 INT4推理，支持 WAC（权重、激活、Cache KV）进行 INT8、FP8量化的推理，【LLM】模型推理支持列表如下：
 
 |          模型名称/量化类型支持           | FP16/BF16 | WINT8 | WINT4 | INT8-A8W8 | FP8-A8W8 | INT8-A8W8C8 |
@@ -219,7 +218,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py 
 * 微信扫描二维码并填写问卷，即可加入交流群与众多社区开发者以及官方团队深度交流.
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11987277/245085922-0aa68d24-00ff-442e-9c53-2f1e898151ce.png" width="150" height="150" />
+    <img src="https://github.com/user-attachments/assets/3a58cc9f-69c7-4ccb-b6f5-73e966b8051a" width="150" height="150" />
 </div>
 
 ## Citation
