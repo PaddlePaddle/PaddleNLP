@@ -15,7 +15,6 @@
 import copy
 import json
 import os
-import sys
 
 import paddle
 from paddle.distributed import fleet
@@ -34,7 +33,7 @@ from paddlenlp.transformers.model_utils import (
     load_state_dict,
     unwrap_model,
 )
-from paddlenlp.transformers.utils import dtype_byte_size, is_safetensors_available
+from paddlenlp.transformers.utils import dtype_byte_size
 from paddlenlp.utils.env import (
     LORA_WEIGHTS_NAME,
     PADDLE_MASTER_WEIGHTS_NAME,
@@ -52,12 +51,6 @@ from paddlenlp.utils.env import (
 )
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.nested import nested_copy
-
-if is_safetensors_available():
-    if sys.platform.startswith("win"):
-        from safetensors.numpy import load_file
-    else:
-        from paddlenlp.utils.safetensors import fast_load_file as load_file
 
 from .async_handler import AsyncCheckpointHandler
 from .check_completion import check_unified_checkpoint, check_unified_optimizer
@@ -279,10 +272,6 @@ class UnifiedCheckpointHandler:
 
         model_state_dict = get_expected_state_dict(model)
         struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}  # get optimizer param mappings
-        optimizer_state_dict = load_file(optimizer_path)
-        if has_master_weights:
-            master_weights = load_file(master_weights_path)
-
         optimizer_state_dict = load_state_dict(optimizer_path, None, None, device="expected")
         if has_master_weights:
             master_weights = load_state_dict(master_weights_path, None, None, device="expected")
