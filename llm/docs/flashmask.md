@@ -1,56 +1,68 @@
 <!-- vscode-markdown-toc -->
-* [1. 背景](#)
-* [2. FlashMask: 列式稀疏掩码表示](#FlashMask:)
-* [3. FlashMask: 扩展 FlashAttention 支持复杂掩码](#FlashMask:FlashAttention)
-    * [3.1 预处理阶段](#-1)
-    * [3.2 实时块跳过计算阶段](#-1)
-* [4. FlashMask: 速度与存储的双重提升](#FlashMask:-1)
-    * [4.1 端到端训练吞吐量提升](#-1)
-    * [4.2 端到端训练收敛验证](#-1)
-* [4.3 稀疏度与 Kernel 计算时延的线性关系](#Kernel)
-* [4.4 Kernel 性能对比](#Kernel-1)
-* [5. Quick Start](#QuickStart)
-* [5.1 Requirements](#Requirements)
-* [5.2 SFT & LoRA](#SFTLoRA)
-    * [5.2.1 Data Preparation](#DataPreparation)
-    * [5.2.2 SFT](#SFT)
-    * [5.2.3 LoRA](#LoRA)
-* [5.3 DPO & RM](#DPORM)
-    * [5.3.1 Data Preparation](#DataPreparation-1)
-    * [5.3.2 DPO](#DPO)
-    * [5.3.3 RM](#RM)
+* [1. 大语言模型的挑战](#)
+* [2. FlashMask 的创新：列式稀疏掩码表示方法与高效计算](#FlashMask)
+	* [2.1 关键洞察](#-1)
+	* [2.2 注意力掩码的列式稀疏掩码表示方法](#-1)
+	* [2.3 扩展 FlashAttention 支持复杂掩码](#FlashAttention)
+		* [2.3.1 预处理阶段](#-1)
+		* [2.3.2 实时块跳过计算阶段](#-1)
+	* [2.4 效率提升与精度保证](#-1)
+* [3. FlashMask 的优势：速度与存储的双重提升](#FlashMask-1)
+	* [3.1 端到端训练吞吐量提升](#-1)
+	* [3.2 端到端训练收敛验证](#-1)
+	* [3.3 稀疏度与 Kernel 计算时延的线性关系](#Kernel)
+	* [3.4 Kernel 性能对比](#Kernel-1)
+* [4. 快速开始](#-1)
+	* [4.1 Requirements](#Requirements)
+	* [4.2 SFT & LoRA](#SFTLoRA)
+		* [4.2.1 数据准备](#-1)
+		* [4.2.2 SFT](#SFT)
+		* [4.2.3 LoRA](#LoRA)
+	* [4.3 DPO & RM](#DPORM)
+		* [4.3.1 数据准备](#-1)
+		* [4.3.2 DPO](#DPO)
+		* [4.3.3 RM](#RM)
 
 <!-- vscode-markdown-toc-config
-    numbering=false
-    autoSave=true
-    /vscode-markdown-toc-config -->
+	numbering=false
+	autoSave=true
+	/vscode-markdown-toc-config -->
 <!-- /vscode-markdown-toc -->
 
 # FlashMask
 
 FlashMask 是 FlashAttention 的扩展，它利用了一种新颖的按列注意力掩码表示法。这种方法允许在不牺牲计算精度的情况下，更有效地处理更广泛类型的掩码。FlashMask 实现了线性内存复杂度，并且支持内核优化，减少不必要的计算，从而实现显著的计算加速和增强的训练效率。
 
-## <a name=''></a>1. 背景
+## <a name=''></a>1. 大语言模型的挑战
 
-在 Transformer 类大模型训练任务中，注意力掩码（Attention Mask）一方面带来了大量的冗余计算，另一方面因其 $O(N^2)$ 巨大的存储占用导致难以实现长序列场景的高效训练（其中$N$为序列长度）。虽然业界已有 FlashAttention 等针对特定注意力掩码的计算加速方法，但其支持的注意力掩码模式有限，难以满足大模型训练任务对灵活注意力掩码的需求。为了解决上述问题，飞桨独创 FlashMask 技术，提出了列式稀疏的注意力掩码表示方法，支持灵活多样的注意力掩码模式，使得存储复杂度从 $O(N^2)$ 降低至 $O(N)$，并在此基础上实现了高效的算子 Kernel，极致加速大模型训练效率，尤其是长序列场景下的训练效率。
+随着人工智能技术的迅猛发展，以 Transformer 为代表的大模型在自然语言处理、计算机视觉和多模态应用中展现出了非凡的能力。在这些大模型中，注意力（Attention）机制是一个关键环节。为了在大模型训练任务中确定哪些 Query-Key token 之间需要进行有效的 Attention 计算，业界通常使用注意力掩码（Attention Mask）。然而，目前的注意力掩码通常采用二维稠密矩阵表示，这导致了一些问题。一方面，这种表示方法引入了大量冗余计算，因为许多无效的 token 间 Attention 仍需计算；另一方面，这种掩码的空间复杂度为 $O(N^2)$（其中$N$为序列长度），在长序列的训练场景中可能会造成巨大的存储压力，因此难以进行高效训练。为了解决这些问题，业界已经提出了一些方案，如 Memory Efficient Attention (MEA) [1] 和 FlashAttention [2]。然而，这些方案支持的注意力掩码类型较为有限。正如图1所示，FlashAttention 只能支持如纯因果掩码（Causal）、滑动窗口掩码（Sliding Window）、因果文档掩码（Causal Document Mask）和文档掩码（Document Mask）等几种固定形式的掩码。然而，实际训练任务中使用的注意力掩码形式往往丰富多变，当前技术难以满足大模型在不同训练任务中对注意力掩码灵活性的要求。
 
-我们在 NVIDIA A100 (80G) GPU 上对 FlashMask 在大语言模型微调和对齐训练中的表现进行了评估，包括 SFT、LoRA、DPO 和 RM。与现有的 FlashAttention 密集掩码方法相比，FlashMask 在端到端训练速度上实现了显著提升，速度提高幅度在1.65倍到3.22倍之间。此外，我们还评估了其内核层次上的性能。FlashMask 在理论最大浮点运算次数上达到了37.8%到62.3%，在内核每秒浮点运算次数（TFLOPs/s）方面，其性能超过 FlexAttention，提升幅度为12.1%到60.7%。
+<div align="center">
+    <img width="300" alt="llm" src="https://github.com/user-attachments/assets/7b1013c6-de4b-4965-bbe3-857511c2dc5f">
+    <div align="center">
+        <font size ="2">
+        图1: 常见的注意力掩码类型
+        </font>
+    </div>
+</div>
+
+为了解决上述问题，飞桨独创 FlashMask 技术，提出了列式稀疏的注意力掩码表示方法，支持灵活多样的注意力掩码模式，使得存储复杂度从 $O(N^2)$ 降低至 $O(N)$，并在此基础上实现了高效的算子 Kernel，极致加速大模型训练效率，尤其是长序列场景下的训练效率。我们在 NVIDIA A100 (80G) GPU 上对 FlashMask 在大语言模型微调和对齐训练中的表现进行了评估，包括 SFT、LoRA、DPO 和 RM。与现有的 FlashAttention 密集掩码方法相比，FlashMask 在端到端训练速度上实现了显著提升，速度提高幅度在1.65倍到3.22倍之间。此外，我们还评估了其内核层次上的性能。FlashMask 在理论最大浮点运算次数上达到了37.8%到62.3%，在内核每秒浮点运算次数（TFLOPs/s）方面，其性能超过 FlexAttention，提升幅度为12.1%到60.7%。
 
 * arXiv 论文地址 https://arxiv.org/pdf/2410.01359
 * PaddlePaddle 官方文档地址 https://www.paddlepaddle.org.cn/documentation/docs/en/develop/api/paddle/nn/functional/flashmask_attention_en.html
 * PaddleNLP 开源地址 https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/docs/flashmask.md
 
 
-## <a name='FlashMask:'></a>2. FlashMask 的创新：列式稀疏掩码表示方法与高效计算
+## <a name='FlashMask'></a>2. FlashMask 的创新：列式稀疏掩码表示方法与高效计算
 
-### 2.1 关键洞察
+### <a name='-1'></a>2.1 关键洞察
 FlashMask 的核心发现是，在大模型常见的注意力掩码模式中，Query-Key token 的掩码模式具有一定的连续性。具体地，对于每一个 Key token 而言，不进行有效 Attention 计算的 Query token 是相邻的，即在图1中二维掩码矩阵中，Query token 作用在每一列的 Key token 的灰色部分在列方向上是连续分布的。基于这一洞察，FlashMask 巧妙地将二维的稠密掩码矩阵转换为一维的行索引区间这一更为紧凑的表示形式，显著降低存储需求。我们可以公式化表示为：
 
 $M_{j} = [start_j, end_j), \quad \forall j \in \{1, \ldots, N\}$
 
 其中 $N$ 为 Key 的序列长度，$M_j$ 为二维的稠密掩码矩阵的第 $j$ 列，$[start_j, end_j)$ 为连续的行索引区间，表示 $start_j$ 到 $end_{j} - 1$ 的连续 Query token 是被 mask 掉，置为无效 Attention 计算。
 
-### 2.2 注意力掩码的列式稀疏掩码表示方法
+### <a name='-1'></a>2.2 注意力掩码的列式稀疏掩码表示方法
 为了高效处理因果和双向注意力场景中的复杂掩码模式，FlashMask 提出了一种新颖的列式稀疏表示方法。以对角线为区分，它使用四个一维向量来表示掩码：
 * 下三角起始行索引（Lower Triangular Start，简称 LTS）
 * 下三角结束行索引（Lower Triangular End，简称 LTE）
@@ -63,12 +75,12 @@ $M_{j} = [start_j, end_j), \quad \forall j \in \{1, \ldots, N\}$
     <img width="300" alt="llm" src="https://github.com/user-attachments/assets/989cc61e-174b-489d-ba7a-d1e6d172ff91">
     <div align="center">
         <font size ="2">
-        图1：较为复杂的二维稠密因果注意力的掩码矩阵示意图
+        图2：较为复杂的二维稠密因果注意力的掩码矩阵示意图
         </font>
     </div>
 </div>
 
-如图1所示，我们展示了16个 Query token 和16个 Key token 做 Attention 计算时较为复杂的二维稠密因果注意力的掩码矩阵，灰色单元格是 mask 区域。
+如图2所示，我们展示了16个 Query token 和16个 Key token 做 Attention 计算时较为复杂的二维稠密因果注意力的掩码矩阵，灰色单元格是 mask 区域。
 
 可以通过 $[LTS,LTE)$ 两个向量进行表达，如下所示：
 | col_idx | 0  | 1  | 2  | 3  | 4  | 5  | 6  | 7  | 8  | 9  | 10 | 11 | 12 | 13 | 14 | 15 |
@@ -80,20 +92,19 @@ $M_{j} = [start_j, end_j), \quad \forall j \in \{1, \ldots, N\}$
 
 <div align="center">
     <div align="center">
-        <img width="400" alt="llm" src="https://github.com/user-attachments/assets/55a023ec-f1d9-46c9-aa3a-9fed14ed89f0">
         <img width="300" alt="llm" src="https://github.com/user-attachments/assets/67c8076a-da8e-415b-988a-6b5f65023464">
     </div>
     <div align="center">
         <font size ="2">
-        图2: 常见的注意力掩码类型及使用 FlashMask 的列式稀疏掩码表示方法表示的注意力掩码模式
+        图3: 使用 FlashMask 的列式稀疏掩码表示方法表示图1的注意力掩码模式
         </font>
     </div>
 </div>
 
-更多的例子参考图2，FlashMask 使用列式稀疏掩码表示方法，表达了图1中所有的注意力掩码模式。其中 $-$ 的空缺表示在不同的场景下有不同的默认值，$LTS$ 和 $UTS$ 中的默认值是 0，表示 mask 区域默认从第0行开始，$LTE$和$UTE$中的默认值是 Query 的序列长度，表示 mask 区域默认结束于最后一行。
+更多的例子参考图3，FlashMask 使用列式稀疏掩码表示方法，表达了图1中所有的注意力掩码模式。其中 $-$ 的空缺表示在不同的场景下有不同的默认值，$LTS$ 和 $UTS$ 中的默认值是 0，表示 mask 区域默认从第0行开始，$LTE$和$UTE$中的默认值是 Query 的序列长度，表示 mask 区域默认结束于最后一行。
 
 
-### <a name='FlashMask:FlashAttention'></a>2.3 扩展 FlashAttention 支持复杂掩码
+### <a name='FlashAttention'></a>2.3 扩展 FlashAttention 支持复杂掩码
 
 FlashMask 将列式掩码表示方法集成到 FlashAttention-2 算法中，扩展了其对注意力掩码的支持能力。FlashMask 的高性能 Kernel 实现包括两个关键步骤：预处理和实时块跳过计算。
 
@@ -103,7 +114,7 @@ FlashMask 将列式掩码表示方法集成到 FlashAttention-2 算法中，扩�
     <img width="300" alt="llm" src="https://github.com/user-attachments/assets/1a244bb1-1b3c-4bc4-8839-5d3e77f02bed">
     <div align="center">
         <font size ="2">
-        图3：FlashMask 计算过程示意图
+        图4：FlashMask 计算过程示意图
         </font>
     </div>
 </div>
@@ -122,30 +133,39 @@ FlashMask 将列式掩码表示方法集成到 FlashAttention-2 算法中，扩�
     <img width="500" alt="llm" src="https://github.com/user-attachments/assets/76a5cca9-c268-4bd8-b0f6-d84ba3948b68">
     <div align="center">
         <font size ="2">
-        图4：预处理计算的分块最大值/最小值计算
+        图5：预处理计算的分块最大值/最小值计算
         </font>
     </div>
 </div>
 
 #### <a name='-1'></a>2.3.2 实时块跳过计算阶段
 在实时计算阶段，FlashMask 利用预处理生成的最小值和最大值向量，对注意力得分矩阵的每个分块进行分类，以提升计算效率。分类依据为以下三种类型：
-
-1. 完全掩码块：若 $BlockRow_{min} \geq Start^{max} \text{ and } BlockRow_{max} \leq End^{min}$ ，则此块的所有元素均被掩码，计算可直接跳过。
-2. 部分掩码块：若 $BlockRow_{min} < End^{max} \text{ and } BlockRow_{max} > Start^{min}$ ，则此块的部分元素被掩码，因此需要对该块进行逐元素的掩码计算。
-3. 未掩码块：其他情况则归为未掩码块，此类块中的所有元素均未被掩码，可以简化计算过程，不进行额外的掩码操作。
+* 完全掩码块：若 $BlockRow_{min} \geq Start^{max} \text{ and } BlockRow_{max} \leq End^{min}$ ，则此块的所有元素均被掩码，计算可直接跳过。
+* 部分掩码块：若 $BlockRow_{min} < End^{max} \text{ and } BlockRow_{max} > Start^{min}$ ，则此块的部分元素被掩码，因此需要对该块进行逐元素的掩码计算。
+* 未掩码块：其他情况则归为未掩码块，此类块中的所有元素均未被掩码，可以简化计算过程，不进行额外的掩码操作。
 通过这种分类处理，FlashMask 可以显著提升计算效率：完全掩码块的计算被跳过，未掩码块的计算得以简化，仅对部分掩码块执行必要的掩码操作。
 
-
-
 图4展示了在因果掩码场景下，使用 $LTS$ 和 $LTE$ 进行 Kernel 计算的完整过程。图中每种分块类型的实时计算公式都已标注，以下是具体例子说明：
-
 * 完全掩码块，例如，图4中 [3, 2] 位置的块，其最小行号为12，大于等于 $LTStart^{max}=12$ ，最大行号为15，小于等于 $LTEnd^{max}=16$ ，因此块中所有元素被掩码，计算可以直接跳过。
 * 部分掩码块，例如，图4中 [1, 1] 位置的块，其最小行号为4，小于 $LTEnd^{max}=12$ ，最大行号为7，大于 $LTStart^{min}=6$ ，因此块中部分元素被掩码，需要对该块逐元素进行掩码计算。
 * 未掩码块，例如，图4中 [3, 1] 位置的块，其最小行号为12，大于等于 $LTEnd^{max}=12$ ，表明此块中所有元素未被掩码，计算时无需额外的掩码操作，从而减少计算开销。
 
+算法1详细描述了 FlashMask 扩展 FlashAttention-2 的前向计算过程，其中浅蓝色阴影部分表示 FlashMask 新增的计算步骤。详细算法实现可参考 [FlashMask 论文](https://arxiv.org/pdf/2410.01359) [3]。
 
-### <a name='FlashMask:-1'></a>3. FlashMask 的优势：速度与存储的双重提升
+<div align="center">
+    <img width="500" alt="llm" src="https://github.com/user-attachments/assets/91153ab6-240c-4787-9469-ef29cdc8eb12">
+    <div align="center">
+        <font size ="2">
+        算法1: FlashMask 的前向计算伪代码
+        </font>
+    </div>
+</div>
+
+### <a name='-1'></a>2.4 效率提升与精度保证
 FlashMask 充分利用了注意力掩码中的稀疏性，通过跳过完全掩码块的计算，减少了计算开销，同时不改变算法的精度。与使用稠密掩码矩阵的注意力计算保持比特级别的数值等效性，确保了精度无损。更多分析详见 [FlashMask 论文](https://arxiv.org/pdf/2410.01359) 的第4.3节 [3]。
+
+
+## <a name='FlashMask-1'></a>3. FlashMask 的优势：速度与存储的双重提升
 
 ### <a name='-1'></a>3.1 端到端训练吞吐量提升
 在 Llama-2 7B、13B、70B 等模型规模下，针对 SFT、LoRA、DPO、RM 四种下游训练场景和不同序列长度的实验表明，FlashMask 在各个模型规模和序列长度下均实现了端到端的加速和存储效率的提升。相比现有的基于稠密掩码矩阵的计算方法，FlashMask 实现了1.65倍至3.22倍的吞吐量提升，并支持更长的序列长度。
@@ -189,7 +209,7 @@ FlashMask 充分利用了注意力掩码中的稀疏性，通过跳过完全掩�
     </div>
 </div>
 
-## <a name='Kernel'></a>3.3 稀疏度与 Kernel 计算时延的线性关系
+### <a name='Kernel'></a>3.3 稀疏度与 Kernel 计算时延的线性关系
 
 FlashMask 利用注意力掩码的块稀疏性，跳过完全掩码块的计算，将计算复杂度降低到 $O((1 - ρ)T_rT_c)$ ，其中 $ρ$ 表示块稀疏性。为了验证这一关系，FlashMask 进行了多组实验，测试了三种不同的掩码类型（因果文档掩码、共享问题掩码和文档掩码），并使用不同稀疏度的数据。实验结果（如图5所示）表明，Kernel 执行延迟与稀疏性之间呈线性关系，意味着随着稀疏性的增加，FlashMask 的计算速度进一步提升。
 
@@ -202,7 +222,7 @@ FlashMask 利用注意力掩码的块稀疏性，跳过完全掩码块的计算�
     </div>
 </div>
 
-## <a name='Kernel-1'></a>3.4 Kernel 性能对比
+### <a name='Kernel-1'></a>3.4 Kernel 性能对比
 关注到近期 PyTorch 推出了 FlexAttention[4]（使用编译器技术支持 Attention Mask），FlashMask 与之在 Kernel 级别进行了对比。在各种常见的注意力掩码模式下，FlashMask 展现了更高的计算效率。在 TFLOPs/s 指标上，FlashMask 比 FlexAttention 高出12.1%至60.7%，在 A100 GPU 上实现了37.8%至62.3%的理论峰值计算性能。
 
 <div align="center">
@@ -215,17 +235,16 @@ FlashMask 利用注意力掩码的块稀疏性，跳过完全掩码块的计算�
 </div>
 
 
-## <a name='QuickStart'></a>5. 快速开始
+## <a name='-1'></a>4. 快速开始
 
-## <a name='Requirements'></a>5.1 Requirements
+### <a name='Requirements'></a>4.1 Requirements
 
 - PaddlePaddle develop
 - PaddleNLP  develop
 
-## <a name='SFTLoRA'></a>5.2 SFT & LoRA
+### <a name='SFTLoRA'></a>4.2 SFT & LoRA
 
-### <a name='DataPreparation'></a>5.2.1 数据准备
-
+#### <a name='-1'></a>4.2.1 数据准备
 
 The data format we support is as follows:
 
@@ -246,19 +265,19 @@ wget https://paddlenlp.bj.bcebos.com/datasets/examples/tulu.jsonl
 mv tulu.jsonl data/train.json
 ```
 
-### <a name='SFT'></a>5.2.2 SFT
+#### <a name='SFT'></a>4.2.2 SFT
 ```
 python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.py./config/llama/flashmask/sft.json
 ```
 
-### <a name='LoRA'></a>5.2.3 LoRA
+#### <a name='LoRA'></a>4.2.3 LoRA
 ```
 python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.py ./config/llama/flashmask/lora.json
 ```
 
-## <a name='DPORM'></a>5.3 DPO & RM
+### <a name='DPORM'></a>4.3 DPO & RM
 
-### <a name='DataPreparation-1'></a>5.3.1 数据准备
+#### <a name='-1'></a>4.3.1 数据准备
 
 The data format we support is a JSON file where each line contains a dictionary, and each dictionary includes the following fields:
 
@@ -290,14 +309,25 @@ mkdir dpo_data
 wget https://paddlenlp.bj.bcebos.com/datasets/examples/ultrafeedback.jsonl
 mv ultrafeedback.jsonl dpo_data/
 ```
-### <a name='DPO'></a>5.3.2 DPO
+#### <a name='DPO'></a>4.3.2 DPO
 
 ```bash
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/flashmask/dpo.json
 ```
 
-### <a name='RM'></a>5.3.3 RM
+#### <a name='RM'></a>4.3.3 RM
 
 ```bash
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/rm/flashmask/run_reward.py ./config/llama/flashmask/rm.json
 ```
+
+
+参考文献
+
+[1] Self-attention Does Not Need O(n^2) Memory. https://arxiv.org/pdf/2112.05682
+
+[2] FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning. https://arxiv.org/pdf/2307.08691
+
+[3] FlashMask: Efficient and Rich Mask Extension of FlashAttention. https://arxiv.org/pdf/2410.01359
+
+[4] FlexAttention: The Flexibility of PyTorch with the Performance of FlashAttention. https://pytorch.org/blog/flexattention/
