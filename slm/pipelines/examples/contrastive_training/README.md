@@ -15,21 +15,18 @@ pip install -r requirements.txt
 ```
 
 下载 DuReader-Retrieval 中文数据集：
-
 ```
 cd data
 wget https://paddlenlp.bj.bcebos.com/datasets/dureader_dual.train.jsonl
 ```
 
-## 运行
-
-### 单卡训练
-
+## 训练
+当模型架构为 encoder-only 时，以 RocketQA 为例，模型名称为`rocketqa-zh-base-query-encoder`，采用单卡训练：
 ```
 export CUDA_VISIBLE_DEVICES=0
 python train.py --do_train \
               --model_name_or_path rocketqa-zh-base-query-encoder \
-              --output_dir ./checkpoints \
+              --output_dir rocketqa-zh-base-query-encoder-duretrieval \
               --train_data ./data/dureader_dual.train.jsonl \
               --overwrite_output_dir \
               --fine_tune_type sft \
@@ -42,8 +39,60 @@ python train.py --do_train \
               --passage_max_len 512 \
               --use_matryoshka
 ```
+单卡训练效率过低，batch_size 较小，建议使用多卡训练，对于对比学习训练推荐使用大 batch_size，多卡训练，示例命令如下：
 
-- `model_name_or_path`: 选择预训练模型，可选 rocketqa-zh-base-query-encoder
+```
+python -m paddle.distributed.launch --gpus "1,2,3,4" train.py --do_train \
+              --model_name_or_path rocketqa-zh-base-query-encoder \
+              --output_dir rocketqa-zh-base-query-encoder-duretrieval \
+              --train_data ./data/dual.train.json \
+              --overwrite_output_dir \
+              --fine_tune_type sft \
+              --sentence_pooling_method cls \
+              --num_train_epochs 3 \
+              --per_device_train_batch_size 32 \
+              --learning_rate 3e-5 \
+              --train_group_size 8 \
+              --recompute \
+              --passage_max_len 512 \
+              --use_matryoshka
+```
+
+当模型架构为 decoder-only 时，以[RepLLaMA](https://huggingface.co/castorini/repllama-v1-7b-lora-passage) 和 [NV-Embed-v1](https://huggingface.co/nvidia/NV-Embed-v1) 为例，采用多卡训练：
+```
+model_name=castorini/repllama-v1-7b-lora-passage 或 NV-Embed-v1
+output_dir=repllama-v1-7b-duretrieval 或 NV-Embed-v1-duretrieval
+
+python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train.py --do_train \
+    --query_instruction_for_retrieval "query: " \
+    --passage_instruction_for_retrieval "" \
+    --model_name_or_path ${model_name} \
+    --output_dir ${output_dir}$ \
+    --save_steps 100 \
+    --train_data ./data/dureader_dual.train.jsonl  \
+    --bf16 \
+    --per_device_train_batch_size 1 \
+    --gradient_accumulation_steps 32 \
+    --recompute \
+    --train_group_size 4 \
+    --learning_rate 1e-4 \
+    --query_max_len 128 \
+    --passage_max_len 4096 \
+    --num_train_epochs 1 \
+    --logging_steps 1 \
+    --overwrite_output_dir \
+    --negatives_cross_device \
+    --warmup_steps 100 \
+    --do_train \
+    --fine_tune_type lora \
+    --fp16_opt_level "O2" \
+    --sentence_pooling_method last \
+    --sharding "stage3 offload" \
+    --use_flash_attention \
+    --temperature 0.01
+```
+可配置参数包括：
+- `model_name_or_path`: 选择预训练模型，可选 rocketqa-zh-base-query-encoder 等
 - `output_dir`: 模型保存路径
 - `train_data`: 训练数据集路径，这里使用的是 dureader 中文数据集
 - `overwrite_output_dir`: 是否覆盖模型保存路径，默认为 False
@@ -67,48 +116,48 @@ python train.py --do_train \
 - `temperature`: in batch negatives 策略的 temperature 参数，默认为0.02
 - `negatives_cross_device`: 跨设备 in batch negatives 策略，默认为 False
 - `margin`: in batch negatives 策略的 margin 参数，默认为0.2
+- `sharding`: 是否使用 Paddle Sharding 数据并行训练，基础选项应为 stage1、stage2 或 stage3，并且您可以像这样将 CPU 卸载添加到 stage2 或 stage3：stage2 offload 或 stage3 offload
+- `fp16_opt_level`: 对于混合精度训练，AMP 优化级别可以选择 ['O0', 'O1', 'O2']。详情请参考 [链接](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/api/paddle/amp/auto_cast_cn.html)。
 
-### 多卡训练
-
-单卡训练效率过低，batch_size 较小，建议使用多卡训练，对于对比学习训练推荐使用大 batch_size，多卡训练，示例命令如下：
-
-```
-python -m paddle.distributed.launch --gpus "1,2,3,4" train.py --do_train \
-              --model_name_or_path rocketqa-zh-base-query-encoder \
-              --output_dir ./checkpoints \
-              --train_data ./data/dual.train.json \
-              --overwrite_output_dir \
-              --fine_tune_type sft \
-              --sentence_pooling_method cls \
-              --num_train_epochs 3 \
-              --per_device_train_batch_size 32 \
-              --learning_rate 3e-5 \
-              --train_group_size 8 \
-              --recompute \
-              --passage_max_len 512 \
-              --use_matryoshka
-```
 
 ## 评估
-
-评估脚本：
-
+对上述训练模型在 MTEB 的DuRetrieval 上进行评估。对 RocketQA 的测试代码示例如下：
 ```
-export CUDA_VISIBLE_DEVICES=0
-python evaluation/benchmarks.py --model_type bert \
-                              --query_model checkpoints/checkpoint-1500 \
-                              --passage_model checkpoints/checkpoint-1500 \
-                              --query_max_length 64 \
-                              --passage_max_length 512 \
+model_path=rocketqa-zh-base-query-encoder-duretrieval
+python -u eval_mteb.py \
+    --base_model_name_or_path ${model_path} \
+    --output_folder eval_results/${model_path} \
+    --task_name 'DuRetrieval' \
+    --eval_batch_size 8 \
+    --max_seq_length 2048 \
+    --task_split dev
 ```
-- `model_type`: 模型的类似，可选 bert 或 roberta 等等
-- `query_model`: query 向量模型的路径
-- `passage_model`: passage 向量模型的路径
-- `query_max_length`: query 的最大长度
-- `passage_max_length`: passage 的最大长度
-- `evaluate_all`: 是否评估所有的 checkpoint，默认为 False，即只评估指定的 checkpoint
-- `checkpoint_dir`: 与`evaluate_all`一起使用
-
+对 RepLLaMA 和NV-Embed 的测试代码示例如下：
+```
+model_path=repllama-v1-7b-duretrieval 或 NV-Embed-v1-duretrieval
+python -u eval_mteb.py \
+    --base_model_name_or_path ${model_path} \
+    --output_folder eval_results/${model_path} \
+    --query_instruction "query: " \
+    --task_name 'DuRetrieval' \
+    --eval_batch_size 8 \
+    --max_seq_length 4096 \
+    --task_split dev
+```
+可配置参数包括：
+- `base_model_name_or_path`: 模型名称或路径
+- `output_folder`: 结果文件存储路径
+- `task_name`：任务（数据集）名称，如 DuRetrieval
+- `task_split`：测试查询集合，如 test 或 dev
+- `query_instruction`：查询前添加的提示文本，如'query: '或 None
+- `document_instruction`：文档前添加的提示文本，如'passage: '或 None
+- `pooling_method`：获取表示的方式，last 表示取最后 token，mean 表示取平均，cls 表示取`[CLS]`token
+- `max_seq_length`: 最大序列长度
+- `eval_batch_size`: 模型预测的批次大小（单个 GPU）
+- `pad_token`：设置 padding 的 token，可取 unk_token、eos_token 或 pad_token
+- `padding_side`：设置 padding 的位置，可取 left 或 right
+- `add_bos_token`：是否添加起始符，0表示不添加，1表示添加
+- `add_eos_token`：是否添加结束符，0表示不添加，1表示添加
 
 ## MTEB 评估
 [MTEB](https://github.com/embeddings-benchmark/mteb)
@@ -216,3 +265,7 @@ python evaluation/mteb/eval_mteb.py \
 [2] Xueguang Ma, Liang Wang, Nan Yang, Furu Wei, Jimmy Lin: Fine-Tuning LLaMA for Multi-Stage Text Retrieval. arXiv 2023.
 
 [3] Shitao Xiao, Zheng Liu, Peitian Zhang, Niklas Muennighof: C-Pack: Packaged Resources To Advance General Chinese Embedding. SIGIR 2024.
+
+[4] Niklas Muennighoff, Nouamane Tazi, Loic Magne, Nils Reimers: MTEB: Massive Text Embedding Benchmark. EACL 2023.
+
+[5] Chankyu Lee, Rajarshi Roy, Mengyao Xu, Jonathan Raiman, Mohammad Shoeybi, Bryan Catanzaro, Wei Ping: NV-Embed: Improved Techniques for Training LLMs as Generalist Embedding Models. arXiv 2024.
