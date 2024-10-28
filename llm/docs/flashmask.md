@@ -106,7 +106,7 @@ FlashMask 将列式掩码表示方法集成到 FlashAttention-2 算法中，扩�
 </div>
 
 ### <a name='-1'></a>3.1 预处理阶段
-在 FlashMask 的预处理阶段，列式稀疏掩码向量 $LTS$、$LTE$、$UTS$、$UTE$ 首先被加载到高带宽存储（HBM）中，然后根据 FlashAttention 的分块列大小，将列式稀疏掩码向量分块，计算出每个分块中所有列的向量最大值和最小值，生成8个中间向量：
+在 FlashMask 的预处理阶段，列式稀疏掩码向量 $LTS$、 $LTE$、 $UTS$、 $UTE$ 首先被加载到高带宽存储（HBM）中，然后根据 FlashAttention 的分块列大小，将列式稀疏掩码向量分块，计算出每个分块中所有列的向量最大值和最小值，生成8个中间向量：
 
 * $LTStart^{min}$, $LTStart^{max}$
 * $LTEnd^{min}$, $LTEnd^{min}$
