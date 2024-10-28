@@ -31,6 +31,7 @@ from paddlenlp.trainer.utils.helper import distributed_isfile
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
     _add_variant,
+    load_state_dict,
     unwrap_model,
 )
 from paddlenlp.transformers.utils import (
@@ -39,11 +40,7 @@ from paddlenlp.transformers.utils import (
     is_safetensors_available,
 )
 from paddlenlp.utils.env import (
-    BETA1_KEYNAME,
-    BETA2_KEYNAME,
     LORA_WEIGHTS_NAME,
-    MOMENT1_KEYNAME,
-    MOMENT2_KEYNAME,
     PADDLE_MASTER_WEIGHTS_NAME,
     PADDLE_OPTIMIZER_NAME,
     PADDLE_WEIGHTS_NAME,

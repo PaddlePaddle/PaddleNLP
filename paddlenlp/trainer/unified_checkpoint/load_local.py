@@ -14,6 +14,7 @@
 """Unfied checkpoint locally loading functions."""
 
 import gc
+import json
 import os
 
 from tqdm.auto import tqdm
@@ -208,7 +209,9 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         if len(resolved_archive_file_mw) > 1:
             resolved_archive_file_mw = tqdm(resolved_archive_file_mw, desc="Loading master weights shards")
 
-    def load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, is_master_weights=False, ckpt_quant_stage="O0"):
+    def load_resolved_archive_file(
+        resolved_archive_file, sharded_metadata, expected_keys, is_master_weights=False, ckpt_quant_stage="O0"
+    ):
         returned_state_dict = {}
         # load optimizer
         for shard_file in resolved_archive_file:
@@ -231,10 +234,22 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
                         tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)
 
                     # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-                    state_dict = load_state_dict(shard_file, tp_actions, expected_keys, device="expected", ckpt_quant_stage=ckpt_quant_stage,)
+                    state_dict = load_state_dict(
+                        shard_file,
+                        tp_actions,
+                        expected_keys,
+                        device="expected",
+                        ckpt_quant_stage=ckpt_quant_stage,
+                    )
                 else:
                     # for pipeline model, we don't need to use tp_actions
-                    state_dict = load_state_dict(shard_file, None, expected_keys, device="expected", ckpt_quant_stage=ckpt_quant_stage,)
+                    state_dict = load_state_dict(
+                        shard_file,
+                        None,
+                        expected_keys,
+                        device="expected",
+                        ckpt_quant_stage=ckpt_quant_stage,
+                    )
 
             returned_state_dict.update(state_dict)
             # force memory release

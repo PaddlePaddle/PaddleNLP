@@ -33,6 +33,10 @@ from paddlenlp.transformers.model_utils import PretrainedModel, get_parameter_dt
 from paddlenlp.transformers.utils import dtype_byte_size
 from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
 from paddlenlp.utils.env import (
+    BETA1_KEYNAME,
+    BETA2_KEYNAME,
+    MOMENT1_KEYNAME,
+    MOMENT2_KEYNAME,
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_PEFT_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
