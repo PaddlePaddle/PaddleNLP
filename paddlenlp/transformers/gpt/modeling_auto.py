@@ -41,7 +41,10 @@ except:
 
 from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import BaseModelOutputWithPastAndCrossAttentions
+from ..model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions,
+    CausalLMOutputWithCrossAttentions,
+)
 from .configuration import GPT_PRETRAINED_INIT_CONFIGURATION, GPTConfig
 
 try:
@@ -176,7 +179,12 @@ class MultiHeadAttentionAuto(nn.Layer):
 
         if self.config.fuse_attention_qkv:
             self.qkv_proj = nn.Linear(config.hidden_size, 3 * config.hidden_size, bias_attr=True)
-            # self.qkv_proj.weight = dist.shard_tensor(self.qkv_proj.weight,get_mesh(self.ipp),[dist.Replicate(), dist.Shard(1)])
+            self.qkv_proj.weight = dist.shard_tensor(
+                self.qkv_proj.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(1)]
+            )
+            self.qkv_proj.bias = dist.shard_tensor(
+                self.qkv_proj.bias, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)]
+            )
         else:
             self.q_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
             self.k_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
@@ -515,6 +523,7 @@ class GPTDecoderLayerAuto(nn.Layer):
         self.linear2 = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
 
         self.linear1.weight = dist.shard_tensor(self.linear1.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(1)])
+        self.linear1.bias = dist.shard_tensor(self.linear1.bias, get_mesh(ipp), [dist.Replicate(), dist.Shard(0)])
         self.linear2.weight = dist.shard_tensor(self.linear2.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(0)])
         # fix : change nn.LayerNorm(config.hidden_size, epsilon=1e-5, bias_attr=True) to GPTLayerNorm()
         self.norm1 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5, bias_attr=True)
@@ -596,8 +605,14 @@ class GPTDecoderLayerAuto(nn.Layer):
         # hidden_states => [bs * seq_len / n, embed_dim]
         with seed_guard_context(current_seed):
             if not self.config.use_fused_dropout_add:
-                act = self.activation(self.linear1(hidden_states), approximate=True)
+                l_1 = self.linear1(hidden_states)
+                act = self.activation(l_1, approximate=True)
+                # NOTE(align_mode)
+                if dist.in_auto_parallel_align_mode():
+                    act = dist.reshard(act, get_mesh(self.ipp), [dist.Shard(0), dist.Shard(2)])
                 l_2 = self.linear2(act)
+                if dist.in_auto_parallel_align_mode():
+                    l_2 = dist.reshard(l_2, get_mesh(self.ipp), [dist.Shard(0), dist.Replicate()])
                 hidden_states = residual + self.dropout2(l_2)
             else:
                 hidden_states = self.fused_dropout_add2(
@@ -640,12 +655,20 @@ class GPTEmbeddingsAuto(nn.Layer):
             config.max_position_embeddings,
             config.hidden_size,
         )
-        self.word_embeddings.weight = dist.shard_tensor(
-            self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)]
-        )
-        self.position_embeddings.weight = dist.shard_tensor(
-            self.position_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)]
-        )
+        if dist.in_auto_parallel_align_mode():
+            self.word_embeddings.weight = dist.shard_tensor(
+                self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(0)]
+            )
+            self.position_embeddings.weight = dist.shard_tensor(
+                self.position_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Replicate()]
+            )
+        else:
+            self.word_embeddings.weight = dist.shard_tensor(
+                self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)]
+            )
+            self.position_embeddings.weight = dist.shard_tensor(
+                self.position_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)]
+            )
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, input_ids, position_ids=None, inputs_embeddings=None):
@@ -654,23 +677,22 @@ class GPTEmbeddingsAuto(nn.Layer):
         if position_ids is not None and inputs_embeddings is not None:
             raise ValueError("You cannot specify both `inputs_embeddings` and `position_ids`)")
 
-        # if input_ids is not None:
-        #     input_shape = input_ids.shape
-        #     inputs_embeddings = self.word_embeddings(input_ids)
+        with paddle.amp.auto_cast(False):
+            if input_ids is not None:
+                input_shape = input_ids.shape
+                inputs_embeddings = self.word_embeddings(input_ids)
+            else:
+                input_shape = inputs_embeddings.shape[:-1]
 
-        if input_ids is not None:
-            input_shape = input_ids.shape
-            inputs_embeddings = self.word_embeddings(input_ids)
-        else:
-            input_shape = inputs_embeddings.shape[:-1]
+            if position_ids is None:
+                ones = paddle.ones(input_shape, dtype="int64")
+                seq_length = paddle.cumsum(ones, axis=-1)
+                position_ids = seq_length - ones
+            position_embeddings = self.position_embeddings(position_ids)
 
-        if position_ids is None:
-            ones = paddle.ones(input_shape, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=-1)
-            position_ids = seq_length - ones
-
-        position_embeddings = self.position_embeddings(position_ids)
         embeddings = inputs_embeddings + position_embeddings
+
+        # exit()
         if self.config.sequence_parallel:
             # embeddings = dist.shard_tensor(embeddings,get_mesh(),[dist.Replicate(),dist.Replicate()])
             bs, seq_len, hidden_size = embeddings.shape
@@ -684,6 +706,9 @@ class GPTEmbeddingsAuto(nn.Layer):
         # The 'with' block ensures the correct seed context is used
         with seed_guard_context(current_seed):
             embeddings = self.dropout(embeddings)
+            # NOTE(align_mode)
+            if dist.in_auto_parallel_align_mode():
+                embeddings = dist.reshard(embeddings, get_mesh(), [dist.Shard(0), dist.Replicate()])  # NOTE
         return embeddings
 
 
@@ -810,7 +835,6 @@ class GPTPretrainedModelAuto(PretrainedModel):
             ]
 
             model_mappings.extend(layer_mappings)
-
         # downstream mappings
         if "GPT2Model" not in config.architectures:
             for mapping in model_mappings:
@@ -820,8 +844,8 @@ class GPTPretrainedModelAuto(PretrainedModel):
             model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
         if "GPT2ForSequenceClassification" in config.architectures:
             model_mappings.extend([["score.weight", "score.weight", "transpose"]])
-        if "GPT2LMHeadModel" in config.architectures:
-            model_mappings.append(["lm_head.weight", "lm_head.decoder.weight"])
+        # if "GPT2LMHeadModel" in config.architectures:
+        #     model_mappings.append(["lm_head.weight", "lm_head.decoder.weight"])
 
         mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
         return mappings
@@ -1054,7 +1078,7 @@ class GPTModelAuto(GPTPretrainedModelAuto):
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
         # input_shape => bs, seq_len
-
+        # print("GPT_Model inputs_ids",input_ids._md5sum())
         if past_key_values is None:
             past_key_values = tuple([None] * len(self.decoder.layers))
 
@@ -1143,9 +1167,18 @@ class GPTPretrainingCriterionAuto(paddle.nn.Layer):
         with paddle.amp.auto_cast(False):
             if len(prediction_scores.shape) < len(masked_lm_labels.unsqueeze(2).shape):
                 prediction_scores = paddle.unsqueeze_(prediction_scores, 0)
+            # print(" prediction_scores ",prediction_scores.dtype,prediction_scores._local_value()._md5sum()[:5],prediction_scores._md5sum()[:5])
+            # print(" masked_lm_labels ",masked_lm_labels.dtype,masked_lm_labels._local_value()._md5sum()[:5],masked_lm_labels._md5sum()[:5])
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
-            masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
-            loss = paddle.mean(masked_lm_loss)
+            # print(" masked_lm_loss ",masked_lm_loss.dtype,masked_lm_loss._local_value()._md5sum()[:5],masked_lm_loss._md5sum()[:5])
+            # masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
+            # loss = paddle.mean(masked_lm_loss)
+            if loss_mask is None:
+                loss_mask = (masked_lm_loss > 0).astype("float32")
+                loss_mask = loss_mask.reshape([-1])
+            masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
+            loss = masked_lm_loss / loss_mask.sum()
+            # print(" loss ",loss.dtype,loss._local_value()._md5sum()[:5],loss._md5sum()[:5])
         return loss
 
 
@@ -1190,6 +1223,15 @@ class GPTLMHeadAuto(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
+        if dist.in_auto_parallel_align_mode() and False:
+            y = dist.reshard(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(1)])
+            # print("GPTLMHeadAuto hidden_states",hidden_states._md5sum())
+            # print("GPTLMHeadAuto weight",y._md5sum())
+            logits = paddle.matmul(hidden_states, y, transpose_y=self.transpose_y)
+            # print("GPTLMHeadAuto logits",logits._md5sum())
+            # logits = dist.reshard(logits, get_mesh(self.ipp),
+            #           [dist.Shard(0), dist.Replicate()])
+            return logits
         y = dist.reshard(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)])
         logits = paddle.matmul(hidden_states, y, transpose_y=self.transpose_y)
         return logits
@@ -1209,9 +1251,10 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
         super(GPTForCausalLMAuto, self).__init__(config)
         self.gpt = GPTModelAuto(config)
         self.ipp = self.gpt.get_last_layer_ipp()
-        self.lm_head = GPTLMHeadAuto(
-            config, embedding_weights=self.gpt.embeddings.word_embeddings.weight, ipp=self.ipp
-        )
+        self.lm_head = None
+        # GPTLMHeadAuto(
+        #     config, embedding_weights=self.gpt.embeddings.word_embeddings.weight, ipp=self.ipp
+        # )
 
         self.tie_weights()
         self.criterion = GPTPretrainingCriterionAuto(config)
@@ -1290,26 +1333,49 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
             hidden_states = outputs
         else:
             hidden_states = outputs[0]
-        logits = self.lm_head(hidden_states)
-        return logits
+        # print("hidden_states ",hidden_states._local_value().dtype,hidden_states._local_value()._md5sum()[:5])
+        # logits = self.lm_head(hidden_states)
+        # NOTE(zhangweilong):lm_head(hidden_states)
+        if self.config.sequence_parallel:
+            hidden_states = dist.reshard(hidden_states, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
+            hidden_states = paddle.reshape(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
 
+        if dist.in_auto_parallel_align_mode() and False:
+            y = dist.reshard(
+                self.gpt.embeddings.word_embeddings.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(1)]
+            )
+            # print("GPTLMHeadAuto hidden_states",hidden_states._md5sum())
+            # print("GPTLMHeadAuto weight",y._md5sum())
+            logits = paddle.matmul(hidden_states, y, transpose_y=True)
+            # print("GPTLMHeadAuto logits",logits._md5sum())
+            # logits = dist.reshard(logits, get_mesh(self.ipp),
+            #           [dist.Shard(0), dist.Replicate()])
+        else:
+            y = dist.reshard(
+                self.gpt.embeddings.word_embeddings.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)]
+            )
+            logits = paddle.matmul(hidden_states, y, transpose_y=True)
+        # print("logits ",logits._local_value().dtype,logits._local_value()._md5sum()[:5],logits._md5sum()[:5])
+        # return logits
+        # print("logits ",logits._md5sum()
         # NOTE: The following code failed to run from dynamic to static mode
-        # loss = None
-        # if labels is not None:
-        #     loss = self.criterion(logits, labels)
-        # if not return_dict:
-        #     if isinstance(outputs, input_type):
-        #         return (loss, logits) if loss is not None else logits
-        #     outputs = (logits,) + outputs[1:]
-        #     return ((loss,) + outputs) if loss is not None else outputs
-        # return CausalLMOutputWithCrossAttentions(
-        #     loss=loss,
-        #     logits=logits,
-        #     past_key_values=outputs.past_key_values,
-        #     hidden_states=outputs.hidden_states,
-        #     attentions=outputs.attentions,
-        #     cross_attentions=outputs.cross_attentions,
-        # )
+        loss = None
+        if labels is not None:
+            loss = self.criterion(logits, labels)
+
+        if not return_dict:
+            if isinstance(outputs, input_type):
+                return (loss, logits) if loss is not None else logits
+            outputs = (logits,) + outputs[1:]
+            return ((loss,) + outputs) if loss is not None else outputs
+        return CausalLMOutputWithCrossAttentions(
+            loss=loss,
+            logits=logits,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+            cross_attentions=outputs.cross_attentions,
+        )
 
     def prepare_fast_entry(self, kwargs):
         from paddlenlp.ops import FasterGPT
