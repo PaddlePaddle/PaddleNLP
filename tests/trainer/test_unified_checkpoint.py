@@ -18,7 +18,7 @@ import shutil
 import numpy as np
 import pytest
 
-from paddlenlp.trainer.plugins.unified_checkpoint import UnifiedCheckpointOption
+from paddlenlp.trainer.unified_checkpoint.utils import UnifiedCheckpointOption
 from tests.parallel_launch import TestMultipleGpus
 from tests.testing_utils import (
     require_paddle_at_least_2_gpu,

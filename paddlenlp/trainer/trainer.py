@@ -113,7 +113,6 @@ from ..utils.log import logger
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import RuntimeTimer, get_timers, set_timers
-from .plugins.unified_checkpoint import UnifiedCheckpointHandler
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -144,6 +143,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     speed_metrics,
 )
 from .training_args import TrainingArguments
+from .unified_checkpoint import UnifiedCheckpointHandler
 from .utils import reshard as reshard_util
 from .utils.async_save import AsyncSaver
 from .utils.helper import (  # nested_truncate,
@@ -598,7 +598,6 @@ class Trainer:
                 if use_unified_checkpoint:
                     self.unified_checkpoint_handler.load_unified_checkpoint(
                         self.model,
-                        self.optimizer,
                         resume_from_checkpoint,
                     )
                     logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
@@ -1253,7 +1252,6 @@ class Trainer:
                 if self.args.unified_checkpoint:
                     self.unified_checkpoint_handler.load_unified_checkpoint(
                         self.model,
-                        self.optimizer,
                         self.state.best_model_checkpoint,
                     )
                     if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
@@ -1301,7 +1299,6 @@ class Trainer:
         if self.args.unified_checkpoint:
             self.unified_checkpoint_handler.load_unified_checkpoint(
                 self.model,
-                self.optimizer,
                 self.state.best_model_checkpoint,
             )
             if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
@@ -1804,6 +1801,12 @@ class Trainer:
                 raise ValueError("Length of gpu state list shoule be equal to the gpu device count")
             for i in range(core.get_cuda_device_count()):
                 core.default_cuda_generator(i).set_state(checkpoint_rng_state["cuda"][i])
+
+        if core.is_compiled_with_xpu():
+            if not len(checkpoint_rng_state["cuda"]) == core.get_xpu_device_count():
+                raise ValueError("Length of xpu state list shoule be equal to the xpu device count")
+            for i in range(core.get_xpu_device_count()):
+                core.default_xpu_generator(i).set_state(checkpoint_rng_state["cuda"][i])
 
         if paddle.device.get_all_custom_device_type() is not None:
             custom_device_type = paddle.device.get_all_custom_device_type()
@@ -2781,7 +2784,6 @@ class Trainer:
                     opt_state_dict = None
             else:
                 opt_state_dict = self.unified_checkpoint_handler.load_unified_optimizer(
-                    args=self.args,
                     model=self.model,
                     optimizer=self.optimizer,
                     resume_from_checkpoint=checkpoint,
