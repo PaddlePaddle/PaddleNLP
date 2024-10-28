@@ -72,17 +72,15 @@ install_external_ops(){
     python -c "import fused_ln;";
 }
 
-is_gpu_type() {  
-    local gpu_type=$1  
-    if nvidia-smi | grep "$gpu_type" > /dev/null; then  
-        echo 1  
-    else  
-        echo 0  
-    fi  
-}  
- 
-IS_V100=$(is_gpu_type V100)  
-IS_A100=$(is_gpu_type A100)  
+function is_a100() {
+    if [ $(nvidia-smi|grep A100|wc -l)  -ne 0 ];then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
+IS_A100=$(is_a100) 
 
 ####################################
 get_diff_TO_case(){
@@ -114,7 +112,7 @@ if [ $IS_A100 -ne 0 ];then
             done
         fi
     done
-elif [ $IS_V100 -ne 0 ];then
+else
     case_list[${#case_list[*]}]=gpt-3_auto
     case_list[${#case_list[*]}]=gpt-3_dygraph
     case_list[${#case_list[*]}]=llama_auto
