@@ -2236,7 +2236,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     quant_round_type=self.config.quant_round_type,
                     quant_max_bound=self.config.quant_max_bound,
                     quant_min_bound=self.config.quant_min_bound,
-                    rope_theta=self.rope_theta,
+                    rope_theta=self.config.rope_theta,
                 )[0]
             else:
                 k_quant_scales = kwargs.get("k_quant_scales", None)
@@ -2278,7 +2278,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     quant_round_type=self.config.quant_round_type,
                     quant_max_bound=self.config.quant_max_bound,
                     quant_min_bound=self.config.quant_min_bound,
-                    rope_theta=self.rope_theta,
+                    rope_theta=self.config.rope_theta,
                 )[0]
 
         out_linear_out = self.compute_out_linear(fmha_out, i)
@@ -2424,7 +2424,7 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
                 quant_min_bound=self.quant_min_bound,
                 out_scale=self.act_scales["out_linear_in_scale"][i],
                 compute_dtype=self._fuse_kernel_compute_dtype,
-                rope_theta=self.rope_theta,
+                rope_theta=self.config.rope_theta,
             )[0]
 
         out_linear_out = self.compute_out_linear(fmha_out, i)
@@ -2937,7 +2937,7 @@ class FusedBlockMultiTransformerFP8(Layer):
             quant_max_bound=self.config.quant_max_bound,
             quant_min_bound=self.config.quant_min_bound,
             out_scale=self.act_scales.scale["out_linear_in_scale"][i],
-            rope_theta=self.rope_theta,
+            rope_theta=self.config.rope_theta,
         )[0]
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
