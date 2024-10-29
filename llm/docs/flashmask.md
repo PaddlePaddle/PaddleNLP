@@ -1,5 +1,13 @@
 # FlashMask
 
+FlashMask 是 FlashAttention 的扩展，它利用了一种新颖的按列注意力掩码表示法。这种方法允许在不牺牲计算精度的情况下，更有效地处理更广泛类型的掩码。FlashMask 实现了线性内存复杂度，并且支持内核优化，减少不必要的计算，从而实现显著的计算加速和增强的训练效率。
+
+* arXiv 论文地址 https://arxiv.org/pdf/2410.01359
+* PaddlePaddle 官方文档地址 https://www.paddlepaddle.org.cn/documentation/docs/en/develop/api/paddle/nn/functional/flashmask_attention_en.html
+* PaddleNLP 开源集成 https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/docs/flashmask.md
+* 星河社区快速体验 [【PaddleNLP 3.0】FlashMask 灵活注意力掩码，长序列训练利器 - 飞桨 AI Studio 星河社区](https://aistudio.baidu.com/projectdetail/8459413)
+
+**目录**
 <!-- vscode-markdown-toc -->
 * [1. 大语言模型的挑战](#1.)
 * [2. FlashMask 的创新：列式稀疏掩码表示方法与高效计算](#2.)
@@ -36,8 +44,6 @@
     /vscode-markdown-toc-config -->
 <!-- /vscode-markdown-toc -->
 
-FlashMask 是 FlashAttention 的扩展，它利用了一种新颖的按列注意力掩码表示法。这种方法允许在不牺牲计算精度的情况下，更有效地处理更广泛类型的掩码。FlashMask 实现了线性内存复杂度，并且支持内核优化，减少不必要的计算，从而实现显著的计算加速和增强的训练效率。
-
 ## <a name='1.'></a>1. 大语言模型的挑战
 
 随着人工智能技术的迅猛发展，以 Transformer 为代表的大模型在自然语言处理、计算机视觉和多模态应用中展现出了非凡的能力。在这些大模型中，注意力（Attention）机制是一个关键环节。为了在大模型训练任务中确定哪些 Query-Key token 之间需要进行有效的 Attention 计算，业界通常使用注意力掩码（Attention Mask）。然而，目前的注意力掩码通常采用二维稠密矩阵表示，这导致了一些问题。一方面，这种表示方法引入了大量冗余计算，因为许多无效的 token 间 Attention 仍需计算；另一方面，这种掩码的空间复杂度为 $O(N^2)$（其中$N$为序列长度），在长序列的训练场景中可能会造成巨大的存储压力，因此难以进行高效训练。为了解决这些问题，业界已经提出了一些方案，如 Memory Efficient Attention (MEA) [1] 和 FlashAttention [2]。然而，这些方案支持的注意力掩码类型较为有限。正如图1所示，FlashAttention 只能支持如纯因果掩码（Causal）、滑动窗口掩码（Sliding Window）、因果文档掩码（Causal Document Mask）和文档掩码（Document Mask）等几种固定形式的掩码。然而，实际训练任务中使用的注意力掩码形式往往丰富多变，当前技术难以满足大模型在不同训练任务中对注意力掩码灵活性的要求。
@@ -53,10 +59,7 @@ FlashMask 是 FlashAttention 的扩展，它利用了一种新颖的按列注意
 
 为了解决上述问题，飞桨独创 FlashMask 技术，提出了列式稀疏的注意力掩码表示方法，支持灵活多样的注意力掩码模式，使得存储复杂度从 $O(N^2)$ 降低至 $O(N)$，并在此基础上实现了高效的算子 Kernel，极致加速大模型训练效率，尤其是长序列场景下的训练效率。我们在 NVIDIA A100 (80G) GPU 上对 FlashMask 在大语言模型微调和对齐训练中的表现进行了评估，包括 SFT、LoRA、DPO 和 RM。与现有的 FlashAttention 密集掩码方法相比，FlashMask 在端到端训练速度上实现了显著提升，速度提高幅度在1.65倍到3.22倍之间。此外，我们还评估了其内核层次上的性能。FlashMask 在理论最大浮点运算次数上达到了37.8%到62.3%，在内核每秒浮点运算次数（TFLOPs/s）方面，其性能超过 FlexAttention，提升幅度为12.1%到60.7%。
 
-* arXiv 论文地址 https://arxiv.org/pdf/2410.01359
-* PaddlePaddle 官方文档地址 https://www.paddlepaddle.org.cn/documentation/docs/en/develop/api/paddle/nn/functional/flashmask_attention_en.html
-* PaddleNLP 开源集成 https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/docs/flashmask.md
-* 星河社区快速体验：[【PaddleNLP 3.0】FlashMask 灵活注意力掩码，长序列训练利器 - 飞桨 AI Studio 星河社区] (https://aistudio.baidu.com/projectdetail/8459413)
+
 
 
 ## <a name='2.'></a>2. FlashMask 的创新：列式稀疏掩码表示方法与高效计算
