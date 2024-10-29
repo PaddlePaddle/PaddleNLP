@@ -1,3 +1,5 @@
+# FlashMask
+
 <!-- vscode-markdown-toc -->
 * [1. 大语言模型的挑战](#1.)
 * [2. FlashMask 的创新：列式稀疏掩码表示方法与高效计算](#2.)
@@ -34,8 +36,6 @@
     /vscode-markdown-toc-config -->
 <!-- /vscode-markdown-toc -->
 
-# FlashMask
-
 FlashMask 是 FlashAttention 的扩展，它利用了一种新颖的按列注意力掩码表示法。这种方法允许在不牺牲计算精度的情况下，更有效地处理更广泛类型的掩码。FlashMask 实现了线性内存复杂度，并且支持内核优化，减少不必要的计算，从而实现显著的计算加速和增强的训练效率。
 
 ## <a name='1.'></a>1. 大语言模型的挑战
@@ -59,7 +59,7 @@ FlashMask 是 FlashAttention 的扩展，它利用了一种新颖的按列注意
 * 星河社区快速体验：[【PaddleNLP 3.0】FlashMask 灵活注意力掩码，长序列训练利器 - 飞桨 AI Studio 星河社区] (https://aistudio.baidu.com/projectdetail/8459413)
 
 
-## <a name='FlashMask'></a>2. FlashMask 的创新：列式稀疏掩码表示方法与高效计算
+## <a name='2.'></a>2. FlashMask 的创新：列式稀疏掩码表示方法与高效计算
 
 ### <a name='2.1'></a>2.1 关键洞察
 FlashMask 的核心发现是，在大模型常见的注意力掩码模式中，Query-Key token 的掩码模式具有一定的连续性。具体而言，对于每一个 Key token，无效注意力计算的 Query token 是相邻排列的。也就是说，在图1中二维掩码矩阵中，Query token 作用在每一列的 Key token 的灰色部分沿列方向连续分布。基于这一洞察，FlashMask 巧妙地将二维稠密掩码矩阵转换为一维的行索引区间，从而实现更为紧凑的表示形式，并显著降低了存储需求。我们可以公式化表示为：
