@@ -14,4 +14,4 @@ bash setup.sh
 ```
 **Note:**
 
-包含avx指令CPU机器大模型推理教程 [X86 CPU](../cpu_install.md)
+包含 avx 指令 CPU 机器大模型推理教程 [X86 CPU](../../llm/docs/cpu_install.md)

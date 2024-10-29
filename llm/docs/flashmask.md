@@ -1,6 +1,8 @@
 # FlashMask
 
-FlashMask 是 FlashAttention 的扩展，它利用了一种新颖的按列注意力掩码表示法。这种方法允许在不牺牲计算精度的情况下，更有效地处理更广泛类型的掩码。FlashMask 实现了线性内存复杂度，并且支持内核优化，减少不必要的计算，从而实现显著的计算加速和增强的训练效率。
+在 Transformer 类大模型训练任务中，注意力掩码（Attention Mask）一方面带来了大量的冗余计算，另一方面因其$O(N^2)$巨大的存储占用导致难以实现长序列场景的高效训练（其中$N$为序列长度）。虽然业界已有 FlashAttention 等针对特定注意力掩码的计算加速方法，但其支持的注意力掩码模式有限，难以满足大模型训练任务对灵活注意力掩码的需求。为了解决上述问题，飞桨独创 FlashMask 技术，提出了列式稀疏的注意力掩码表示方法，支持灵活多样的注意力掩码模式，使得存储复杂度从$O(N^2)$降低至 $O(N)$，并在此基础上实现了高效的算子 Kernel，极致加速大模型训练效率，尤其是长序列场景下的训练效率。
+
+我们在 NVIDIA A100 (80G) GPU 上对 FlashMask 在大语言模型微调和对齐训练中的表现进行了评估，包括 SFT、LoRA、DPO 和 RM。与现有的 FlashAttention 密集掩码方法相比，FlashMask 在端到端训练速度上实现了显著提升，速度提高幅度在1.65倍到3.22倍之间。此外，我们还评估了其内核层次上的性能。FlashMask 在理论最大浮点运算次数上达到了37.8%到62.3%，在内核每秒浮点运算次数（TFLOPs/s）方面，其性能超过 FlexAttention，提升幅度为12.1%到60.7%。
 
 * arXiv 论文地址 https://arxiv.org/pdf/2410.01359
 * PaddlePaddle 官方文档地址 https://www.paddlepaddle.org.cn/documentation/docs/en/develop/api/paddle/nn/functional/flashmask_attention_en.html
@@ -56,11 +58,6 @@ FlashMask 是 FlashAttention 的扩展，它利用了一种新颖的按列注意
         </font>
     </div>
 </div>
-
-为了解决上述问题，飞桨独创 FlashMask 技术，提出了列式稀疏的注意力掩码表示方法，支持灵活多样的注意力掩码模式，使得存储复杂度从 $O(N^2)$ 降低至 $O(N)$，并在此基础上实现了高效的算子 Kernel，极致加速大模型训练效率，尤其是长序列场景下的训练效率。我们在 NVIDIA A100 (80G) GPU 上对 FlashMask 在大语言模型微调和对齐训练中的表现进行了评估，包括 SFT、LoRA、DPO 和 RM。与现有的 FlashAttention 密集掩码方法相比，FlashMask 在端到端训练速度上实现了显著提升，速度提高幅度在1.65倍到3.22倍之间。此外，我们还评估了其内核层次上的性能。FlashMask 在理论最大浮点运算次数上达到了37.8%到62.3%，在内核每秒浮点运算次数（TFLOPs/s）方面，其性能超过 FlexAttention，提升幅度为12.1%到60.7%。
-
-
-
 
 ## <a name='2.'></a>2. FlashMask 的创新：列式稀疏掩码表示方法与高效计算
 
@@ -194,7 +191,7 @@ FlashMask 充分利用了注意力掩码中的稀疏性，通过跳过完全掩�
     <img width="500" alt="llm" src="https://github.com/user-attachments/assets/9bbe637b-9a04-4df4-a227-36f6eab38bbc">
     <div align="center">
         <font size ="2">
-        图5：在四个下游训练任务（SFT、LoRA、DPO 和 RM）中，3 个 Llama2 模型规模，不同序列长度下的端到端训练峰值显存消耗
+        图6：在四个下游训练任务（SFT、LoRA、DPO 和 RM）中，3 个 Llama2 模型规模，不同序列长度下的端到端训练峰值显存消耗
         </font>
     </div>
 </div>
@@ -203,19 +200,19 @@ FlashMask 充分利用了注意力掩码中的稀疏性，通过跳过完全掩�
     <img width="500" alt="llm" src="https://github.com/user-attachments/assets/f0f7880a-c439-4a9f-9232-6f4171090c90">
     <div align="center">
         <font size ="2">
-        图5：在 Llama2 7B 模型上 FlashMask 对比 FlexAttention (Causal=True) 的显存消耗，单位(GB)
+        表2：在 Llama2 7B 模型上 FlashMask 对比 FlashAttention (Causal=True) 的显存消耗，单位(GB)
         </font>
     </div>
 </div>
 
 ### <a name='3.2'></a>3.2 端到端训练收敛验证
-在 Llama 3.1 模型上的实验验证了 FlashMask 对收敛精度没有影响。作为一种精确的算法，通过控制计算过程的随机性（如去除 FlashAttention 反向 Query 梯度计算的 atomicAdd 操作），FlashMask 可以与使用稠密掩码的 FlashAttention 在比特级别精确对齐。
+在 Llama 3.1 模型上的实验验证了 FlashMask 对收敛精度没有影响。作为一种精确的算法，通过控制计算过程的随机性（如 FlashAttention 反向 Query 梯度计算使用 atomicAdd 操作），FlashMask 可以与使用稠密掩码的 FlashAttention 在比特级别精确对齐。
 
 <div align="center">
     <img width="500" alt="llm" src="https://github.com/user-attachments/assets/ad68e6f1-e100-42fe-a4dd-59f150487588">
     <div align="center">
         <font size ="2">
-        图5：在四个下游训练任务（SFT、LoRA、DPO 和 RM）中，Llama3.1 8B 模型端到端训练 Loss 对比
+        图7：在四个下游训练任务（SFT、LoRA、DPO 和 RM）中，Llama3.1 8B 模型端到端训练 Loss 对比
         </font>
     </div>
 </div>
@@ -228,7 +225,7 @@ FlashMask 利用注意力掩码的块稀疏性，跳过完全掩码块的计算�
     <img width="500" alt="llm" src="https://github.com/user-attachments/assets/ff1f05b4-c469-4b55-82be-f1445dbafcc6">
     <div align="center">
         <font size ="2">
-        图5：在四个下游训练任务（SFT、LoRA、DPO 和 RM）中，Llama3.1 8B 模型端到端训练 Loss 对比
+        图8：不同块稀疏度下的 Kernel 计算时延
         </font>
     </div>
 </div>
@@ -240,7 +237,7 @@ FlashMask 利用注意力掩码的块稀疏性，跳过完全掩码块的计算�
     <img width="500" alt="llm" src="https://github.com/user-attachments/assets/f4ea0875-adf2-471c-bb55-fe254e062c0a">
     <div align="center">
         <font size ="2">
-        图5：在四个下游训练任务（SFT、LoRA、DPO 和 RM）中，Llama3.1 8B 模型端到端训练 Loss 对比
+        图9：在 A100-SXM 80G GPU 上的 Kernel 前向和反向速度对比。FlexAttention 使用 PyTorch 2.6.0.dev20240920+cu124
         </font>
     </div>
 </div>
@@ -260,6 +257,7 @@ FlashMask 支持多种注意力模式，包括因果掩码（单向注意力）�
 ### <a name='4.3'></a>4.3 支持多模态图文数据的混合多分辨率训练
 在多模态数据处理中，不同模态的数据可能具有不同的分辨率。虽然文中未明确提及 FlashMask 在多模态和多分辨率训练中的应用，但 FlashMask 可以通过不同的注意力模式和掩码策略，有效处理这些具有不同分辨率的数据。针对长序列处理能力的优化，使得 FlashMask 能够帮助模型更好地学习不同模态数据之间的关联。例如，在图文匹配任务中，FlashMask 可以帮助模型更有效地对齐图像和文本中的关键信息。
 
+FlashMask 的开源代码已在 PaddlePaddle 和 PaddleNLP 平台发布，支持超过千亿参数的模型以及超过 128K tokens 的上下文长度。我们相信，FlashMask 将成为推动大语言模型发展的重要力量，为算法研究人员提供更广阔的注意力掩码创新与研究空间。
 
 ## <a name='5.'></a>5. 快速开始
 
