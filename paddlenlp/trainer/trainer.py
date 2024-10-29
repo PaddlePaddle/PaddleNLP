@@ -2308,7 +2308,7 @@ class Trainer:
         if output_dir is None:
             output_dir = self.args.output_dir
 
-        if PREFIX_CHECKPOINT_DIR in output_dir:
+        if PREFIX_CHECKPOINT_DIR in os.path.split(output_dir)[-1]:
             signal_dir = os.path.join(self.args.output_signal_dir, os.path.split(output_dir)[-1])
         else:
             signal_dir = self.args.output_signal_dir
@@ -2606,7 +2606,7 @@ class Trainer:
         # signal_dir is used for asynchronous saving situations.
         signal_dir = self.args.output_signal_dir
         if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
-            if PREFIX_CHECKPOINT_DIR in output_dir:
+            if PREFIX_CHECKPOINT_DIR in os.path.split(output_dir)[-1]:
                 signal_dir = os.path.join(signal_dir, os.path.split(output_dir)[-1])
             os.makedirs(signal_dir, exist_ok=True)
             logger.info(f"Saving model checkpoint finish signal to {signal_dir}")
@@ -2626,9 +2626,11 @@ class Trainer:
                 "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
                 "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
             }
-            if os.path.exists(os.path.join(signal_dir, "async_save_info.json")):  # afs cannot overwrite
-                os.remove(os.path.join(signal_dir, "async_save_info.json"))
-            with open(os.path.join(signal_dir, "async_save_info.json"), "w") as f:
+            if os.path.exists(
+                os.path.join(self.args.output_signal_dir, "async_save_info.json")
+            ):  # afs cannot overwrite
+                os.remove(os.path.join(self.args.output_signal_dir, "async_save_info.json"))
+            with open(os.path.join(self.args.output_signal_dir, "async_save_info.json"), "w") as f:
                 json.dump(save_info, f)
 
         if self.args.should_save:
