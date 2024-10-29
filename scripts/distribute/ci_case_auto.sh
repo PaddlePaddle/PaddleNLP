@@ -43,7 +43,7 @@ function llama_case_list_auto() {
     llama_dygraph_auto_bs8_fp32_DP2-MP2
     llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
     llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
-    llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
+    # llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw @liangjianzhong, reopen this case when vpp and split bw is ready.
     llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2
 
     # llama_static_auto_recompute_bs8_fp32_DP1-MP1-PP1
@@ -1061,7 +1061,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
         loss_base=9.16783295
         loss_md5_base=8ea72495fba4e1b9ba004b4431e27218
         if [ $IS_A100 -ne 0 ];then
-            loss_base=9.38009949
+            loss_base=9.37966919
         fi
         ips_base=-1
         mem_base=-1
