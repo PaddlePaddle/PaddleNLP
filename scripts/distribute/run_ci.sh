@@ -201,11 +201,12 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         # 2. Tests that fail the loss verification, indicating the existence of a diff, 
         # and these failed tests are marked with 'check failed' in the result.log file.
         FF=`ls *FAIL*|wc -l`
+        VF=`grep 'check failed! ' result.log | awk '{print $2}' | sort -u | wc -l`
         EXCODE=2
-        echo -e "\033[31m ---- Total cases: ${TOTAL_FILES}, case Failed number: ${FF} \033"
-        echo -e "\033[31m ---- Runtime failed test \033"
+        echo -e "\033[31m ---- Total cases: ${TOTAL_FILES}, case Failed number: ${((FF + VF))}  \033"
+        echo -e "\033[31m ---- Runtime failed test: ${FF}  \033"
         ls *_FAIL*
-        echo -e "\033[31m ---- Loss verification failed test \033"
+        echo -e "\033[31m ---- Loss verification failed test:  ${VF} \033"
         grep 'check failed! ' result.log | awk '{print $2}'
     fi
 else
