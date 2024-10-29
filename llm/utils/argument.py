@@ -209,6 +209,9 @@ class ModelArgument:
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
     lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+ technique"})
     pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
+    lora_use_mixer: bool = field(
+        default=False, metadata={"help": "Whether to use MosLoRA: https://arxiv.org/pdf/2406.11909"}
+    )
 
     # vera related parameters
     vera: bool = field(default=False, metadata={"help": "Whether to use vera technique"})

@@ -443,6 +443,7 @@ class LoRAModel(nn.Layer):
                 pissa=lora_config.pissa,
                 bias_attr=False if module.bias is None else None,
                 use_quick_lora=lora_config.use_quick_lora,
+                lora_use_mixer=lora_config.lora_use_mixer,
             )
         if isinstance(module, nn.Conv2D):
             lora_module = LoRAConv2D(
