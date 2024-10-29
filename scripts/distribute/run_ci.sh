@@ -189,15 +189,24 @@ if [[ ${#case_list[*]} -ne 0 ]];then
     fi
     echo -e "\033[31m ---- end run case  \033"
     cd ${log_path}
+    # result.log records the execution results of all cases
+    TOTAL_FILES=$(find . -maxdepth 1 -type f | grep -vF './result.log' | wc -l)  
     if [ ! -f *FAIL* ];then
         FF=0
         EXCODE=0
-        echo -e "\033[32m ---- all case Success \033"
+        echo -e "\033[32m ---- Total cases: ${TOTAL_FILES}, all cases Success  \033"
     else
+        # The failed tests can be categorized into two types: 
+        # 1. Tests that fail during execution, with their log files ending in '_FAIL'. 
+        # 2. Tests that fail the loss verification, indicating the existence of a diff, 
+        # and these failed tests are marked with 'check failed' in the result.log file.
         FF=`ls *FAIL*|wc -l`
         EXCODE=2
-        echo -e "\033[31m ---- case Failed number: ${FF} \033"
+        echo -e "\033[31m ---- Total cases: ${TOTAL_FILES}, case Failed number: ${FF} \033"
+        echo -e "\033[31m ---- Runtime failed test \033"
         ls *_FAIL*
+        echo -e "\033[31m ---- Loss verification failed test \033"
+        grep 'check failed! ' result.log | awk '{print $2}'
     fi
 else
     echo -e "\033[32m Changed Not CI case, Skips \033"
