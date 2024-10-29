@@ -291,7 +291,6 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
     @paddle.no_grad()
     # avx
     def set_state_dict(self, state_dict):
-        self.transformer_block.init_weight()
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
         split_fn = split_param_func()
