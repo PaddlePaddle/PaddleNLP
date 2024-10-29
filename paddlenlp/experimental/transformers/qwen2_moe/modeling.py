@@ -252,6 +252,7 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             qkv_bias_attrs=qkv_bias_attrs,
             epsilon=self.rms_norm_eps,
+            rope_theta=self.rope_theta,
             norm_type="rmsnorm",
             use_neox_rotary_style=self.use_neox,
             rank_id=config.tensor_parallel_rank,

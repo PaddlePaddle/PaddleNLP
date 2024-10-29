@@ -214,6 +214,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             ffn2_bias_attrs=None,
             norm_type="rmsnorm",
             epsilon=self.epsilon,
+            rope_theta=self.rope_theta,
             nranks=config.tensor_parallel_degree,
             avx_config=avx_config,
         )
@@ -630,6 +631,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 ffn2_weight_attrs=ffn2_weight_attrs,
                 ffn2_bias_attrs=ffn2_bias_attrs,
                 epsilon=self.epsilon,
+                rope_theta=self.rope_theta,
                 norm_type="rmsnorm",
                 use_neox_rotary_style=self.use_neox,
                 rank_id=config.tensor_parallel_rank,
@@ -676,6 +678,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 cache_k_out_scale_attrs=cache_k_out_scale_attrs,
                 cache_v_out_scale_attrs=cache_v_out_scale_attrs,
                 epsilon=self.epsilon,
+                rope_theta=self.rope_theta,
                 norm_type="rmsnorm",
                 use_neox_rotary_style=self.use_neox,
                 cachekv_int8_type=config.cachekv_int8_type,
