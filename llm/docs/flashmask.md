@@ -1,6 +1,6 @@
 # FlashMask
 
-在 Transformer 类大模型训练任务中，注意力掩码（Attention Mask）一方面带来了大量的冗余计算，另一方面因其$O(N^2)$巨大的存储占用导致难以实现长序列场景的高效训练（其中$N$为序列长度）。虽然业界已有 FlashAttention 等针对特定注意力掩码的计算加速方法，但其支持的注意力掩码模式有限，难以满足大模型训练任务对灵活注意力掩码的需求。为了解决上述问题，飞桨独创 FlashMask 技术，提出了列式稀疏的注意力掩码表示方法，支持灵活多样的注意力掩码模式，使得存储复杂度从$O(N^2)$降低至 $O(N)$，并在此基础上实现了高效的算子 Kernel，极致加速大模型训练效率，尤其是长序列场景下的训练效率。
+在 Transformer 类大模型训练任务中，注意力掩码（Attention Mask）一方面带来了大量的冗余计算，另一方面因其 $O(N^2)$ 巨大的存储占用导致难以实现长序列场景的高效训练（其中 $N$ 为序列长度）。虽然业界已有 FlashAttention 等针对特定注意力掩码的计算加速方法，但其支持的注意力掩码模式有限，难以满足大模型训练任务对灵活注意力掩码的需求。为了解决上述问题，飞桨独创 FlashMask 技术，提出了列式稀疏的注意力掩码表示方法，支持灵活多样的注意力掩码模式，使得存储复杂度从 $O(N^2)$ 降低至 $O(N)$，并在此基础上实现了高效的算子 Kernel，极致加速大模型训练效率，尤其是长序列场景下的训练效率。
 
 我们在 NVIDIA A100 (80G) GPU 上对 FlashMask 在大语言模型微调和对齐训练中的表现进行了评估，包括 SFT、LoRA、DPO 和 RM。与现有的 FlashAttention 密集掩码方法相比，FlashMask 在端到端训练速度上实现了显著提升，速度提高幅度在1.65倍到3.22倍之间。此外，我们还评估了其内核层次上的性能。FlashMask 在理论最大浮点运算次数上达到了37.8%到62.3%，在内核每秒浮点运算次数（TFLOPs/s）方面，其性能超过 FlexAttention，提升幅度为12.1%到60.7%。
 
@@ -48,10 +48,10 @@
 
 ## <a name='1.'></a>1. 大语言模型的挑战
 
-随着人工智能技术的迅猛发展，以 Transformer 为代表的大模型在自然语言处理、计算机视觉和多模态应用中展现出了非凡的能力。在这些大模型中，注意力（Attention）机制是一个关键环节。为了在大模型训练任务中确定哪些 Query-Key token 之间需要进行有效的 Attention 计算，业界通常使用注意力掩码（Attention Mask）。然而，目前的注意力掩码通常采用二维稠密矩阵表示，这导致了一些问题。一方面，这种表示方法引入了大量冗余计算，因为许多无效的 token 间 Attention 仍需计算；另一方面，这种掩码的空间复杂度为 $O(N^2)$（其中$N$为序列长度），在长序列的训练场景中可能会造成巨大的存储压力，因此难以进行高效训练。为了解决这些问题，业界已经提出了一些方案，如 Memory Efficient Attention (MEA) [1] 和 FlashAttention [2]。然而，这些方案支持的注意力掩码类型较为有限。正如图1所示，FlashAttention 只能支持如纯因果掩码（Causal）、滑动窗口掩码（Sliding Window）、因果文档掩码（Causal Document Mask）和文档掩码（Document Mask）等几种固定形式的掩码。然而，实际训练任务中使用的注意力掩码形式往往丰富多变，当前技术难以满足大模型在不同训练任务中对注意力掩码灵活性的要求。
+随着人工智能技术的迅猛发展，以 Transformer 为代表的大模型在自然语言处理、计算机视觉和多模态应用中展现出了非凡的能力。在这些大模型中，注意力（Attention）机制是一个关键环节。为了在大模型训练任务中确定哪些 Query-Key token 之间需要进行有效的 Attention 计算，业界通常使用注意力掩码（Attention Mask）。然而，目前的注意力掩码通常采用二维稠密矩阵表示，这导致了一些问题。一方面，这种表示方法引入了大量冗余计算，因为许多无效的 token 间 Attention 仍需计算；另一方面，这种掩码的空间复杂度为 $O(N^2)$（其中 $N$ 为序列长度），在长序列的训练场景中可能会造成巨大的存储压力，因此难以进行高效训练。为了解决这些问题，业界已经提出了一些方案，如 Memory Efficient Attention (MEA) [1] 和 FlashAttention [2]。然而，这些方案支持的注意力掩码类型较为有限。正如图1所示，FlashAttention 只能支持如纯因果掩码（Causal）、滑动窗口掩码（Sliding Window）、因果文档掩码（Causal Document Mask）和文档掩码（Document Mask）等几种固定形式的掩码。然而，实际训练任务中使用的注意力掩码形式往往丰富多变，当前技术难以满足大模型在不同训练任务中对注意力掩码灵活性的要求。
 
 <div align="center">
-    <img width="300" alt="llm" src="https://github.com/user-attachments/assets/7b1013c6-de4b-4965-bbe3-857511c2dc5f">
+    <img width="500" alt="llm" src="https://github.com/user-attachments/assets/7b1013c6-de4b-4965-bbe3-857511c2dc5f">
     <div align="center">
         <font size ="2">
         图1: 常见的注意力掩码类型
@@ -64,9 +64,9 @@
 ### <a name='2.1'></a>2.1 关键洞察
 FlashMask 的核心发现是，在大模型常见的注意力掩码模式中，Query-Key token 的掩码模式具有一定的连续性。具体而言，对于每一个 Key token，无效注意力计算的 Query token 是相邻排列的。也就是说，在图1中二维掩码矩阵中，Query token 作用在每一列的 Key token 的灰色部分沿列方向连续分布。基于这一洞察，FlashMask 巧妙地将二维稠密掩码矩阵转换为一维的行索引区间，从而实现更为紧凑的表示形式，并显著降低了存储需求。我们可以公式化表示为：
 
-$M_{j} = [start_j, end_j), \quad \forall j \in \{1, \ldots, N\}$
+$$M_{j} = [start_j, end_j), \quad \forall j \in \{1, \ldots, N\}$$
 
-其中 $N$ 为 Key 的序列长度，$M_j$ 为二维的稠密掩码矩阵的第 $j$ 列，$[start_j, end_j)$ 为连续的行索引区间，表示 $start_j$ 到 $end_{j} - 1$ 的连续 Query token 是被 mask 掉，置为无效 Attention 计算。
+其中 $N$ 为 Key 的序列长度, $M_j$ 为二维的稠密掩码矩阵的第 $j$ 列, $[start_j, end_j)$ 为连续的行索引区间，表示 $start_j$ 到 $end_{j} - 1$ 的连续 Query token 是被 mask 掉，置为无效 Attention 计算。
 
 ### <a name='2.2'></a>2.2 注意力掩码的列式稀疏掩码表示方法
 为了高效处理因果和双向注意力场景中的复杂掩码模式，FlashMask 提出了一种新颖的列式稀疏表示方法。以对角线为区分，它使用四个一维向量来表示掩码：
@@ -107,7 +107,7 @@ $M_{j} = [start_j, end_j), \quad \forall j \in \{1, \ldots, N\}$
     </div>
 </div>
 
-更多的例子参考图3，FlashMask 使用列式稀疏掩码表示方法，表达了图1中所有的注意力掩码模式。其中 $-$ 的空缺表示在不同的场景下有不同的默认值，$LTS$ 和 $UTS$ 中的默认值是 0，表示 mask 区域默认从第0行开始，$LTE$和$UTE$中的默认值是 Query 的序列长度，表示 mask 区域默认结束于最后一行。
+更多的例子参考图3，FlashMask 使用列式稀疏掩码表示方法，表达了图1中所有的注意力掩码模式。其中 $-$ 的空缺表示在不同的场景下有不同的默认值, $LTS$ 和 $UTS$ 中的默认值是 0，表示 mask 区域默认从第0行开始, $LTE$和 $UTE$中的默认值是 Query 的序列长度，表示 mask 区域默认结束于最后一行。
 
 
 ### <a name='2.3'></a>2.3 扩展 FlashAttention 支持复杂掩码
@@ -182,7 +182,7 @@ FlashMask 充分利用了注意力掩码中的稀疏性，通过跳过完全掩�
     <img width="500" alt="llm" src="https://github.com/user-attachments/assets/49208427-49b8-4a74-aca4-e7782294071d">
     <div align="center">
         <font size ="2">
-        图5：在四个下游训练任务（SFT、LoRA、DPO 和 RM）中，3 个 Llama2 模型规模，在不同序列长度下的端到端训练吞吐量
+        图6：在四个下游训练任务（SFT、LoRA、DPO 和 RM）中，3 个 Llama2 模型规模，在不同序列长度下的端到端训练吞吐量
         </font>
     </div>
 </div>
@@ -191,7 +191,7 @@ FlashMask 充分利用了注意力掩码中的稀疏性，通过跳过完全掩�
     <img width="500" alt="llm" src="https://github.com/user-attachments/assets/9bbe637b-9a04-4df4-a227-36f6eab38bbc">
     <div align="center">
         <font size ="2">
-        图6：在四个下游训练任务（SFT、LoRA、DPO 和 RM）中，3 个 Llama2 模型规模，不同序列长度下的端到端训练峰值显存消耗
+        图7：在四个下游训练任务（SFT、LoRA、DPO 和 RM）中，3 个 Llama2 模型规模，不同序列长度下的端到端训练峰值显存消耗
         </font>
     </div>
 </div>
@@ -212,7 +212,7 @@ FlashMask 充分利用了注意力掩码中的稀疏性，通过跳过完全掩�
     <img width="500" alt="llm" src="https://github.com/user-attachments/assets/ad68e6f1-e100-42fe-a4dd-59f150487588">
     <div align="center">
         <font size ="2">
-        图7：在四个下游训练任务（SFT、LoRA、DPO 和 RM）中，Llama3.1 8B 模型端到端训练 Loss 对比
+        图8：在四个下游训练任务（SFT、LoRA、DPO 和 RM）中，Llama3.1 8B 模型端到端训练 Loss 对比
         </font>
     </div>
 </div>
@@ -225,7 +225,7 @@ FlashMask 利用注意力掩码的块稀疏性，跳过完全掩码块的计算�
     <img width="500" alt="llm" src="https://github.com/user-attachments/assets/ff1f05b4-c469-4b55-82be-f1445dbafcc6">
     <div align="center">
         <font size ="2">
-        图8：不同块稀疏度下的 Kernel 计算时延
+        图9：不同块稀疏度下的 Kernel 计算时延
         </font>
     </div>
 </div>
@@ -237,7 +237,7 @@ FlashMask 利用注意力掩码的块稀疏性，跳过完全掩码块的计算�
     <img width="500" alt="llm" src="https://github.com/user-attachments/assets/f4ea0875-adf2-471c-bb55-fe254e062c0a">
     <div align="center">
         <font size ="2">
-        图9：在 A100-SXM 80G GPU 上的 Kernel 前向和反向速度对比。FlexAttention 使用 PyTorch 2.6.0.dev20240920+cu124
+        图10：在 A100-SXM 80G GPU 上的 Kernel 前向和反向速度对比。FlexAttention 使用 PyTorch 2.6.0.dev20240920+cu124
         </font>
     </div>
 </div>
@@ -284,7 +284,10 @@ pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/pad
 
 样例数据：
 ```json
-{"src": ["Show me the most compelling argument for the existence of God from a theists perspective and then contrast that with the most compelling argument from an atheists perspective. 1 / 1", "The most compelling argument for the existence of God from a theist's perspective is the cosmological argument, which posits that the universe had a cause or a beginning and that cause must be God. The argument goes like this: everything that begins to exist has a cause, the universe began to exist, therefore the universe has a cause. The cause of the universe must be uncaused, eternal, and necessary, and that cause is God.\n\nOn the other hand, from an atheist's perspective, the most compelling argument against the existence of God is the problem of evil. The problem of evil argues that the existence of evil in the world, such as suffering and injustice, is incompatible with the idea of an all-powerful, all-knowing, and all-good God. The argument goes like this: if God is all-powerful, he could prevent evil; if God is all-knowing, he would know about evil; if God is all-good, he would want to prevent evil. Therefore, the existence of evil is evidence against the existence of God.\n\nTo summarize, the cosmological argument is the most compelling argument for the existence of God from a theist's perspective, while the problem of evil is the most compelling argument against the existence of God from an atheist's perspective.", "Please cite your sources for these.1 / 1", "Sure! Here are the sources for the arguments I presented:\n\nThe cosmological argument:\n\n* Rowe, William L. \"Cosmological Argument.\" Stanford Encyclopedia of Philosophy. <https://plato.stanford.edu/entries/cosmological-argument/>\n* Craig, William Lane. The Kalam Cosmological Argument. Eugene, OR: Wipf and Stock Publishers, 1979.\n\nThe problem of evil:\n\n* Mackie, J.L. \"Evil and Omnipotence.\" Mind 64, no. 254 (1955): 200-212.\n* Rowe, William L. \"The Problem of Evil.\" Stanford Encyclopedia of Philosophy. <https://plato.stanford.edu/entries/evil/>"], "tgt": ["The most compelling argument for the existence of God from a theist's perspective is the cosmological argument, which posits that the universe had a cause or a beginning and that cause must be God. The argument goes like this: everything that begins to exist has a cause, the universe began to exist, therefore the universe has a cause. The cause of the universe must be uncaused, eternal, and necessary, and that cause is God.\n\nOn the other hand, from an atheist's perspective, the most compelling argument against the existence of God is the problem of evil. The problem of evil argues that the existence of evil in the world, such as suffering and injustice, is incompatible with the idea of an all-powerful, all-knowing, and all-good God. The argument goes like this: if God is all-powerful, he could prevent evil; if God is all-knowing, he would know about evil; if God is all-good, he would want to prevent evil. Therefore, the existence of evil is evidence against the existence of God.\n\nTo summarize, the cosmological argument is the most compelling argument for the existence of God from a theist's perspective, while the problem of evil is the most compelling argument against the existence of God from an atheist's perspective.", "Please cite your sources for these.1 / 1", "Sure! Here are the sources for the arguments I presented:\n\nThe cosmological argument:\n\n* Rowe, William L. \"Cosmological Argument.\" Stanford Encyclopedia of Philosophy. <https://plato.stanford.edu/entries/cosmological-argument/>\n* Craig, William Lane. The Kalam Cosmological Argument. Eugene, OR: Wipf and Stock Publishers, 1979.\n\nThe problem of evil:\n\n* Mackie, J.L. \"Evil and Omnipotence.\" Mind 64, no. 254 (1955): 200-212.\n* Rowe, William L. \"The Problem of Evil.\" Stanford Encyclopedia of Philosophy. <https://plato.stanford.edu/entries/evil/>", "Why are these arguments considered the most compelling?1 / 1"]}
+{
+   "src": ["Show me the most compelling argument for the existence of God from a theists perspective and then contrast that with the most compelling argument from an atheists perspective. 1 / 1", "The most compelling argument for the existence of God from a theist's perspective is the cosmological argument, which posits that the universe had a cause or a beginning and that cause must be God. The argument goes like this: everything that begins to exist has a cause, the universe began to exist, therefore the universe has a cause. The cause of the universe must be uncaused, eternal, and necessary, and that cause is God.\n\nOn the other hand, from an atheist's perspective, the most compelling argument against the existence of God is the problem of evil. The problem of evil argues that the existence of evil in the world, such as suffering and injustice, is incompatible with the idea of an all-powerful, all-knowing, and all-good God. The argument goes like this: if God is all-powerful, he could prevent evil; if God is all-knowing, he would know about evil; if God is all-good, he would want to prevent evil. Therefore, the existence of evil is evidence against the existence of God.\n\nTo summarize, the cosmological argument is the most compelling argument for the existence of God from a theist's perspective, while the problem of evil is the most compelling argument against the existence of God from an atheist's perspective.", "Please cite your sources for these.1 / 1", "Sure! Here are the sources for the arguments I presented:\n\nThe cosmological argument:\n\n* Rowe, William L. \"Cosmological Argument.\" Stanford Encyclopedia of Philosophy. <https://plato.stanford.edu/entries/cosmological-argument/>\n* Craig, William Lane. The Kalam Cosmological Argument. Eugene, OR: Wipf and Stock Publishers, 1979.\n\nThe problem of evil:\n\n* Mackie, J.L. \"Evil and Omnipotence.\" Mind 64, no. 254 (1955): 200-212.\n* Rowe, William L. \"The Problem of Evil.\" Stanford Encyclopedia of Philosophy. <https://plato.stanford.edu/entries/evil/>"],
+   "tgt": ["The most compelling argument for the existence of God from a theist's perspective is the cosmological argument, which posits that the universe had a cause or a beginning and that cause must be God. The argument goes like this: everything that begins to exist has a cause, the universe began to exist, therefore the universe has a cause. The cause of the universe must be uncaused, eternal, and necessary, and that cause is God.\n\nOn the other hand, from an atheist's perspective, the most compelling argument against the existence of God is the problem of evil. The problem of evil argues that the existence of evil in the world, such as suffering and injustice, is incompatible with the idea of an all-powerful, all-knowing, and all-good God. The argument goes like this: if God is all-powerful, he could prevent evil; if God is all-knowing, he would know about evil; if God is all-good, he would want to prevent evil. Therefore, the existence of evil is evidence against the existence of God.\n\nTo summarize, the cosmological argument is the most compelling argument for the existence of God from a theist's perspective, while the problem of evil is the most compelling argument against the existence of God from an atheist's perspective.", "Please cite your sources for these.1 / 1", "Sure! Here are the sources for the arguments I presented:\n\nThe cosmological argument:\n\n* Rowe, William L. \"Cosmological Argument.\" Stanford Encyclopedia of Philosophy. <https://plato.stanford.edu/entries/cosmological-argument/>\n* Craig, William Lane. The Kalam Cosmological Argument. Eugene, OR: Wipf and Stock Publishers, 1979.\n\nThe problem of evil:\n\n* Mackie, J.L. \"Evil and Omnipotence.\" Mind 64, no. 254 (1955): 200-212.\n* Rowe, William L. \"The Problem of Evil.\" Stanford Encyclopedia of Philosophy. <https://plato.stanford.edu/entries/evil/>", "Why are these arguments considered the most compelling?1 / 1"]
+}
 ```
 
 为了方便测试，我们也提供了 [allenai/tulu-v2-sft-mixture](https://huggingface.co/datasets/allenai/tulu-v2-sft-mixture) 数据集可以直接使用：
