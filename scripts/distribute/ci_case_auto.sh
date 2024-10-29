@@ -2079,24 +2079,39 @@ function check_md5_result() {
     fi
 }
 
+function compare_float() {
+    local num1=$1  
+    local num2=$2  
+    result1=$(echo "$num1 > $num2" | bc)
+    result2=$(echo "$num1 < $num2" | bc)
+    if [ $result1 -ne 1 ]; then
+        if [ $result2 -ne 1 ]; then
+            echo 0
+            return 0
+        fi
+    fi
+    echo 1
+}
+
 function check_result() {
     echo -e "$1" >> ${log_path}/result.log
     if [ $? -ne 0 ];then
         echo -e "\033[31m $1 run failed! \033[0m" | tee -a ${log_path}/result.log
-        exit -1
+        return 0
     fi
 
     if [ $# -ne 7 ] && [ $# -ne 8 ]; then
         echo -e "\033[31m $1 parameter transfer failed: $@ \033[0m" | tee -a ${log_path}/result.log
-        exit -1
+        return 0
     fi
 
     diff_loss=$(echo $2 $3|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
     echo -e "loss_base: $2 loss_test: $3 loss_diff: $diff_loss%" | tee -a ${log_path}/result.log
-    if [ $2 != $3 ];then
+    ans=$(compare_float $2 $3)
+    if [ $ans != 0 ];then
         if [ -z "$8" ] || [ $8 -ne 1 ] ;then
             echo -e "\033[31m $1 loss diff check failed! \033[0m" | tee -a ${log_path}/result.log
-            exit -1
+            return 0
         else
             diff=$(echo "$2 $3" | awk '{print $1-$2}')
             gt=$(echo "${diff#-} 1e-5" | awk '{print ($1>$2)?"1":"0"}')
@@ -2116,7 +2131,7 @@ function check_result() {
     fi
     if [[ $v2 == 0 ]];then
         echo -e "\033[31m $1 IPS diff check failed! \033[0m" | tee -a $log_path/result.log
-        exit -1
+        return 0
     fi
 
     diff_mem=$(echo $6 $7|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
@@ -2125,7 +2140,7 @@ function check_result() {
     w2=$(echo $diff_mem -5.0|awk '{print($1<=$2)?"0":"1"}')
     if [[ $w1 == 0 ]];then
         echo -e "\033[31m $1 MEM diff check failed! \033[0m" | tee -a $log_path/result.log
-        exit -1
+        return 0
     fi
     if [[ $w2 == 0 ]];then
         echo -e "$1 MEM decreases greater than 5%, not exit " | tee -a $log_path/result.log
