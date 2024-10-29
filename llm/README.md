@@ -76,7 +76,7 @@ mv llama_openwebtext_100k.idx ./data
 
 ```shell
 # 编译自定义算子，可选
-cd ../legacy/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
+cd ../slm/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 
 # 模型预训练参考
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json

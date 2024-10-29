@@ -1402,6 +1402,12 @@ class TrainingArguments:
                             f"but got logging_steps={self.logging_steps}."
                         )
 
+                    if "split_param" in sharding_parallel_config:
+                        assert self.sharding == [ShardingOption.SHARD_OP], "Only sharding stage1 support split_param."
+                        assert (
+                            self.amp_master_grad
+                        ), "If `split_param` in sharding_parallel_config, `amp_master_grad` must be True."
+
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
 
@@ -1472,7 +1478,7 @@ class TrainingArguments:
                             "enable_send_recv_overlap",
                             # "disable_p2p_cache_shape",      # no need for auto_parallel
                             # "disable_partial_send_recv",    # no implemenation for auto_parallel
-                            # "enable_delay_scale_loss",      # default True in auto_parallel, non-configurable
+                            "enable_delay_scale_loss",
                             # "enable_dp_comm_overlap",       # no implemenation for auto_parallel
                             # "enable_sharding_comm_overlap", # no implemenation for auto_parallel
                             # "enable_timer",                 # no implemenation for auto_parallel
@@ -1521,6 +1527,7 @@ class TrainingArguments:
                     if len(x) > 0:
                         if x not in [
                             "enable_mp_async_allreduce",  # allreduce_matmul_grad_overlapping in auto_parallel
+                            "enable_delay_scale_loss",
                             # "enable_mp_skip_c_identity",
                             # "enable_mp_fused_linear_param_grad_add",
                         ]:

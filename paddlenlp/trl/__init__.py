@@ -14,5 +14,6 @@
 
 from .dpo_criterion import DPOCriterion
 from .dpo_trainer import DPOTrainer
+from .sft_trainer import *
 from .trl_data import *
 from .trl_utils import *

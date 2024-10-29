@@ -49,7 +49,7 @@ from paddlenlp.trl import (
     preference_collate_fn,
     preprocess_preference_data,
 )
-from paddlenlp.utils.llm_utils import get_lora_target_modules
+from paddlenlp.trl.llm_utils import get_lora_target_modules
 from paddlenlp.utils.log import logger
 
 flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]

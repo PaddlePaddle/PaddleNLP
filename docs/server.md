@@ -1,13 +1,13 @@
 # PaddleNLP SimpleSevring
 
-PaddleNLP SimpleServing 是基于 unicorn 封装的模型部署服务化工具，该服务化工具具备灵活、易用的特性，可以简易部署预训练模型和预训练模型工具Taskflow，PaddleNLP SimpleServing 具备以下两个特性：
-  - 易用：一行代码即可部署预训练模型和预训练工具Taskflow
-  - 灵活：Handler机制可以快速定制化服务化部署方式
+PaddleNLP SimpleServing 是基于 unicorn 封装的模型部署服务化工具，该服务化工具具备灵活、易用的特性，可以简易部署预训练模型和预训练模型工具 Taskflow，PaddleNLP SimpleServing 具备以下两个特性：
+  - 易用：一行代码即可部署预训练模型和预训练工具 Taskflow
+  - 灵活：Handler 机制可以快速定制化服务化部署方式
 
 
-## Tasflow部署
+## Tasflow 部署
 
-Taskflow 是 PaddleNLP 预训练模型工具，具备开箱即用的特性，同时 Taskflow 可以支持加载微调后的模型，基于 Taskflow 的服务化方式可以进一步降低使用者的部署难度。PaddleNLP SimpleServing 基于这样的设计需求，设计了一套基于Taskflow的快速部署方式。下面从 server 搭建，client 发送请求来详细介绍使用方式。
+Taskflow 是 PaddleNLP 预训练模型工具，具备开箱即用的特性，同时 Taskflow 可以支持加载微调后的模型，基于 Taskflow 的服务化方式可以进一步降低使用者的部署难度。PaddleNLP SimpleServing 基于这样的设计需求，设计了一套基于 Taskflow 的快速部署方式。下面从 server 搭建，client 发送请求来详细介绍使用方式。
 
 ### server 搭建
 
@@ -35,7 +35,7 @@ taskflow_handler(paddlenlp.server.BaseTaskflowHandler, 可选):
       Taskflow句柄处理类，可以自定义处理类来定制化Taskflow服务，默认为None，是默认的TaskflowHandler
 ```
 ### 多卡服务化(可选)
-在机器环境里面如果有多卡，那就可以register taskflow服务化时，可以注册多个Taskflow实例，在服务化处理请求的过程中做了负载均衡，保证机器设备利用率充分利用，下面是具体的使用例子
+在机器环境里面如果有多卡，那就可以 register taskflow 服务化时，可以注册多个 Taskflow 实例，在服务化处理请求的过程中做了负载均衡，保证机器设备利用率充分利用，下面是具体的使用例子
 ```python
 schema = ['出发地', '目的地', '费用', '时间']
 uie1 = Taskflow("information_extraction", schema=schema, device_id=0)
@@ -77,9 +77,9 @@ r = requests.post(url=url, headers=headers, data=json.dumps(data))
 datas = json.loads(r.text)
 print(datas)
 ```
-通过上述代码配置即可发送POST请求，同时注意在`data`这个key填入相关请求
+通过上述代码配置即可发送 POST 请求，同时注意在`data`这个 key 填入相关请求
 
-同时可以支持定义 `schema` 传入到client请求中，可以快速切换 `schema`
+同时可以支持定义 `schema` 传入到 client 请求中，可以快速切换 `schema`
 
 ```python
 import requests
@@ -102,7 +102,7 @@ print(datas)
 ```
 
 ## 预训练模型部署
-PaddleNLP SimpleServing 除了能支持Taskflow的服务化部署，也能支持预训练模型的部署，通过简单的配置即可加载预训练模型来进行服务化，同时在接口层面也能支持服务化的扩展，支持模型前后处理的定制化需求。
+PaddleNLP SimpleServing 除了能支持 Taskflow 的服务化部署，也能支持预训练模型的部署，通过简单的配置即可加载预训练模型来进行服务化，同时在接口层面也能支持服务化的扩展，支持模型前后处理的定制化需求。
 
 ## server 搭建
 
@@ -142,8 +142,8 @@ precision(str):
 device_id(int, list(int)):
        GPU设备，device_id默认为0，同时如果有多张显卡，可以设置成list,例如[0, 1]就可以支持多卡服务化；CPU设备，不用设置。
 ```
-- BaseModelHandler继承类：主要是 `CustomModelHandler`，该类的实现可以参考[链接](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/server/handlers/custom_model_handler.py), 绝大多数语义理解模型均可使用该继承类
-- BasePostHandler继承类：主要是文本分类 `MultiClassificationPostHandler`、`MultiLabelClassificationPostHandler` 来支持多分类、多标签分类，实现代码部分可以参考[链接](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/server/handlers/cls_post_handler.py)；`TokenClsModelHandler` 支持 序列标注任务，实现代码部分可以参考[链接](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/server/handlers/token_model_handler.py)
+- BaseModelHandler 继承类：主要是 `CustomModelHandler`，该类的实现可以参考[链接](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/server/handlers/custom_model_handler.py), 绝大多数语义理解模型均可使用该继承类
+- BasePostHandler 继承类：主要是文本分类 `MultiClassificationPostHandler`、`MultiLabelClassificationPostHandler` 来支持多分类、多标签分类，实现代码部分可以参考[链接](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/server/handlers/cls_post_handler.py)；`TokenClsModelHandler` 支持 序列标注任务，实现代码部分可以参考[链接](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/server/handlers/token_model_handler.py)
 
 ### 启动服务化
 执行代码的即可启动服务
@@ -199,9 +199,9 @@ texts = [
     result_json = json.loads(r.text)
     print(result_json)
 ```
-在Client发送请求的过程中可以一些参数来控制服务化处理逻辑，例如上面的 `max_seq_len`和 `batch_size` 均可以控制服务化处理时的序列长度和处理batch_size 。
+在 Client 发送请求的过程中可以一些参数来控制服务化处理逻辑，例如上面的 `max_seq_len`和 `batch_size` 均可以控制服务化处理时的序列长度和处理 batch_size 。
 
 ## 参考示例
-- [UIE 服务化部署](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/uie/deploy/serving/simple_serving)
-- [文本分类服务化部署](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/applications/text_classification/multi_class/deploy/simple_serving)
-- [预训练模型定制化post_handler](https://github.com/PaddlePaddle/PaddleNLP/blob/release/2.8/model_zoo/ernie-health/cblue/deploy/serving/simple_serving)
+- [UIE 服务化部署](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/slm/model_zoo/uie/deploy/serving/simple_serving)
+- [文本分类服务化部署](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/slm/applications/text_classification/multi_class/deploy/simple_serving)
+- [预训练模型定制化 post_handler](https://github.com/PaddlePaddle/PaddleNLP/blob/release/2.8/model_zoo/ernie-health/cblue/deploy/serving/simple_serving)
