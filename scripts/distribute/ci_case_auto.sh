@@ -2079,20 +2079,6 @@ function check_md5_result() {
     fi
 }
 
-function compare_float() {
-    local num1=$1  
-    local num2=$2  
-    result1=$(echo "$num1 > $num2" | bc)
-    result2=$(echo "$num1 < $num2" | bc)
-    if [ $result1 -ne 1 ]; then
-        if [ $result2 -ne 1 ]; then
-            echo 0
-            return 0
-        fi
-    fi
-    echo 1
-}
-
 function check_result() {
     echo -e "$1" >> ${log_path}/result.log
     if [ $? -ne 0 ];then
@@ -2107,8 +2093,7 @@ function check_result() {
 
     diff_loss=$(echo $2 $3|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
     echo -e "loss_base: $2 loss_test: $3 loss_diff: $diff_loss%" | tee -a ${log_path}/result.log
-    ans=$(compare_float $2 $3)
-    if [ $ans != 0 ];then
+    if [ $2 != $3 ];then
         if [ -z "$8" ] || [ $8 -ne 1 ] ;then
             echo -e "\033[31m $1 loss diff check failed! \033[0m" | tee -a ${log_path}/result.log
             return 0
