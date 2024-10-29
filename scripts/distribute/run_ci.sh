@@ -21,7 +21,7 @@ export log_path=/workspace/case_logs
 export case_list=()
 
 target_lists_for_gpt=(
-    "legacy/model_zoo/gpt-3"
+    "slm/model_zoo/gpt-3"
     "llm/auto_parallel/gpt-3"
     "paddlenlp/transformers/gpt/modeling.py"
     "paddlenlp/transformers/gpt/modeling_pp.py"
@@ -67,7 +67,7 @@ install_paddlenlp(){
 install_external_ops(){
     echo -e "\033[31m ---- Install extern_ops  \033"
     export PYTHONPATH=${nlp_dir}:$PYTHONPATH
-    cd ${nlp_dir}/legacy/model_zoo/gpt-3/external_ops
+    cd ${nlp_dir}/slm/model_zoo/gpt-3/external_ops
     python setup.py install
     python -c "import fused_ln;";
 }

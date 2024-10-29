@@ -39,13 +39,13 @@ BF16推理
 
 ```shell
 # 动态图推理
-python ./predict/predictor.py --model_name_or_path Qwen/Qwen2-1.5B-Instruct --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1
+python ./predict/predictor.py --model_name_or_path Qwen/Qwen2-1.5B-Instruct --dtype bfloat16 --mode dynamic --inference_model 1 --append_attn 1
 
 # 动转静导出模型
-python predict/export_model.py --model_name_or_path Qwen/Qwen2-1.5B-Instruct --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --block_attn 1
+python predict/export_model.py --model_name_or_path Qwen/Qwen2-1.5B-Instruct --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --append_attn 1
 
 # 静态图推理
-python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --block_attn 1
+python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --append_attn 1
 
 ```
 
@@ -53,13 +53,13 @@ WINT8推理
 
 ```shell
 # 动态图推理
-python predict/predictor.py --model_name_or_path Qwen/Qwen2-1.5B-Instruct --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1 --quant_type weight_only_int8
+python predict/predictor.py --model_name_or_path Qwen/Qwen2-1.5B-Instruct --dtype bfloat16 --mode dynamic --inference_model 1 --append_attn 1 --quant_type weight_only_int8
 
 # 动转静导出模型
-python predict/export_model.py --model_name_or_path Qwen/Qwen2-1.5B-Instruct --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --block_attn 1 --quant_type weight_only_int8
+python predict/export_model.py --model_name_or_path Qwen/Qwen2-1.5B-Instruct --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --append_attn 1 --quant_type weight_only_int8
 
 # 静态图推理
-python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --block_attn 1 --quant_type weight_only_int8
+python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --append_attn 1 --quant_type weight_only_int8
 ```
 
 下面量化推理所需要的模型需要根据[大模型量化教程](../quantization.md)产出，如 checkpoints/qwen_ptq_ckpts，或者使用所提供的预先量化好的模型，如 Qwen/Qwen2-1.5B-Instruct-A8W8C8。
@@ -68,36 +68,36 @@ INT8-A8W8推理
 
 ```shell
 # 动态图推理
-python predict/predictor.py --model_name_or_path checkpoints/qwen_ptq_ckpts --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1 --quant_type a8w8
+python predict/predictor.py --model_name_or_path checkpoints/qwen_ptq_ckpts --dtype bfloat16 --mode dynamic --inference_model 1 --append_attn 1 --quant_type a8w8
 
 # 动转静导出模型
-python predict/export_model.py --model_name_or_path checkpoints/qwen_ptq_ckpts --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --block_attn 1 --quant_type a8w8
+python predict/export_model.py --model_name_or_path checkpoints/qwen_ptq_ckpts --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --append_attn 1 --quant_type a8w8
 
 # 静态图推理
-python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --block_attn 1 --quant_type a8w8
+python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --append_attn 1 --quant_type a8w8
 ```
 
 INT8-A8W8C8推理
 
 ```shell
 # 动态图推理
-python predict/predictor.py --model_name_or_path Qwen/Qwen2-1.5B-Instruct-A8W8C8 --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1 --quant_type a8w8 --cachekv_int8_type static
+python predict/predictor.py --model_name_or_path Qwen/Qwen2-1.5B-Instruct-A8W8C8 --dtype bfloat16 --mode dynamic --inference_model 1 --append_attn 1 --quant_type a8w8 --cachekv_int8_type static
 
 # 动转静导出模型
-python predict/export_model.py --model_name_or_path Qwen/Qwen2-1.5B-Instruct-A8W8C8 --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --block_attn 1 --quant_type a8w8 --cachekv_int8_type static
+python predict/export_model.py --model_name_or_path Qwen/Qwen2-1.5B-Instruct-A8W8C8 --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --append_attn 1 --quant_type a8w8 --cachekv_int8_type static
 
 # 静态图推理
-python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --block_attn 1 --quant_type a8w8 --cachekv_int8_type static
+python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --append_attn 1 --quant_type a8w8 --cachekv_int8_type static
 ```
 
 FP8-A8W8推理
 ```shell
 # 动态图推理
-python predict/predictor.py --model_name_or_path Qwen/Qwen2-7B-Instruct-A8W8-FP8 --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1 --quant_type a8w8_fp8
+python predict/predictor.py --model_name_or_path Qwen/Qwen2-7B-Instruct-A8W8-FP8 --dtype bfloat16 --mode dynamic --inference_model 1 --append_attn 1 --quant_type a8w8_fp8
 
 # 动转静导出模型
-python predict/export_model.py --model_name_or_path Qwen/Qwen2-7B-Instruct-A8W8-FP8 --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --block_attn 1 --quant_type a8w8_fp8
+python predict/export_model.py --model_name_or_path Qwen/Qwen2-7B-Instruct-A8W8-FP8 --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --append_attn 1 --quant_type a8w8_fp8
 
 # 静态图推理
-python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --block_attn 1 --quant_type a8w8_fp8
+python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --append_attn 1 --quant_type a8w8_fp8
 ```

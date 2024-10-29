@@ -214,6 +214,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
             ffn2_bias_attrs=None,
             norm_type="rmsnorm",
             epsilon=self.epsilon,
+            rope_theta=self.rope_theta,
             nranks=config.tensor_parallel_degree,
             avx_config=avx_config,
         )
@@ -291,7 +292,6 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
     @paddle.no_grad()
     # avx
     def set_state_dict(self, state_dict):
-        self.transformer_block.init_weight()
         unfused_state_dict = {}
         head_size = self.hidden_size // self.num_attention_heads
         split_fn = split_param_func()
@@ -630,9 +630,11 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 ffn2_weight_attrs=ffn2_weight_attrs,
                 ffn2_bias_attrs=ffn2_bias_attrs,
                 epsilon=self.epsilon,
+                rope_theta=self.rope_theta,
                 norm_type="rmsnorm",
                 use_neox_rotary_style=self.use_neox,
                 rank_id=config.tensor_parallel_rank,
+                append_attn=config.append_attn,
             )
 
         else:
@@ -675,11 +677,13 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 cache_k_out_scale_attrs=cache_k_out_scale_attrs,
                 cache_v_out_scale_attrs=cache_v_out_scale_attrs,
                 epsilon=self.epsilon,
+                rope_theta=self.rope_theta,
                 norm_type="rmsnorm",
                 use_neox_rotary_style=self.use_neox,
                 cachekv_int8_type=config.cachekv_int8_type,
                 rank_id=config.tensor_parallel_rank,
                 trans_qkvw=(False if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type else True),
+                append_attn=config.append_attn,
             )
 
         self.set_transformer_block(transformer_config)
@@ -871,11 +875,13 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                     weight_scales_loader = EmptyWeightScale(
                         weight_scale_map_dict,
                         num_of_layers=self.config.num_hidden_layers,
-                        num_head=self.num_attention_heads,
+                        num_heads=self.num_attention_heads,
                         dim_head=self.hidden_size // self.num_attention_heads,
                         ffn_hidden_size=self.intermediate_size,
                         num_key_value_heads=self.num_key_value_heads,
                         mp_size=self.config.tensor_parallel_degree,
+                        concat_qkv=True,
+                        concat_ffn1=True,
                     )
                 self.transformer_block.weight_scales = weight_scales_loader.scale
                 self.transformer_block.act_scales = act_scale_loader.scale
@@ -1097,16 +1103,24 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                                 dtype=paddle.get_default_dtype(),
                             )
                     self.transformer_block.linear_shifts[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.shift_bias".format(idx)])
+                        paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.shift_bias".format(idx)]).astype(
+                            paddle.get_default_dtype()
+                        )
                     )
                     self.transformer_block.linear_smooths[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.self_attn.o_proj.smooth_weight".format(idx)])
+                        paddle.to_tensor(
+                            state_dict["llama.layers.{}.self_attn.o_proj.smooth_weight".format(idx)]
+                        ).astype(paddle.get_default_dtype())
                     )
                     self.transformer_block.ffn2_shifts[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.shift_bias".format(idx)])
+                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.shift_bias".format(idx)]).astype(
+                            paddle.get_default_dtype()
+                        )
                     )
                     self.transformer_block.ffn2_smooths[idx].set_value(
-                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.smooth_weight".format(idx)])
+                        paddle.to_tensor(state_dict["llama.layers.{}.mlp.down_proj.smooth_weight".format(idx)]).astype(
+                            paddle.get_default_dtype()
+                        )
                     )
 
                 if self.shift:
@@ -1233,7 +1247,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 
                 for k, v in cache_scales_loader.scale.items():
                     for i_layer, weight_scale in enumerate(v):
-                        weight_scale = weight_scale.astype("float32")
+                        if self.config.append_attn:
+                            weight_scale = paddle.to_tensor(weight_scale).cast(paddle.get_default_dtype())
+                        else:
+                            weight_scale = weight_scale.astype("float32")
                         if k == "cache_k_scale":
                             self.transformer_block.cache_k_scales[i_layer].set_value(weight_scale)
                         elif k == "cache_v_scale":
@@ -1352,7 +1369,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             )
             for k, v in cache_scales_loader.scale.items():
                 for i_layer, weight_scale in enumerate(v):
-                    weight_scale = weight_scale.astype("float32")
+                    if self.config.append_attn:
+                        weight_scale = paddle.to_tensor(weight_scale).cast(paddle.get_default_dtype())
+                    else:
+                        weight_scale = weight_scale.astype("float32")
                     if k == "cache_k_scale":
                         self.transformer_block.cache_k_scales[i_layer].set_value(weight_scale)
                     elif k == "cache_v_scale":
@@ -1576,6 +1596,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
 @register_base_model
 class LlamaBlockInferenceModel(LlamaInferenceModel):
     def __init__(self, config: LlamaConfig):
+        self.append_attn = config.append_attn
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size

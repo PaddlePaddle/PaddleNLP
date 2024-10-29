@@ -252,10 +252,12 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
             ffn2_weight_scale_attrs=ffn2_weight_scale_attrs,
             qkv_bias_attrs=qkv_bias_attrs,
             epsilon=self.rms_norm_eps,
+            rope_theta=self.rope_theta,
             norm_type="rmsnorm",
             use_neox_rotary_style=self.use_neox,
             rank_id=config.tensor_parallel_rank,
             moe_config=moe_config,
+            append_attn=config.append_attn,
         )
 
         self.set_transformer_block(transformer_config)
@@ -761,6 +763,7 @@ class Qwen2MoeForCausalLMInferenceModel(GenerationInferenceModel, Qwen2MoePretra
 @register_base_model
 class Qwen2MoeBlockInferenceModel(Qwen2MoeInferenceModel):
     def __init__(self, config: Qwen2MoeConfig):
+        self.append_attn = config.append_attn
         super().__init__(config)
         self.max_seq_len = config.max_seq_len
         self.block_size = config.block_size

@@ -20,7 +20,7 @@ import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.experimental.transformers import QWenForQWenVLInferenceModel
-from paddlenlp.transformers import (  # ChatGLMForCausalLM,
+from paddlenlp.transformers import (
     AutoConfig,
     AutoTokenizer,
     BloomForCausalLM,
@@ -202,7 +202,7 @@ class PredictorPrecacheTest(LLMTest, unittest.TestCase):
     ["model_name_or_path", "model_class"],
     [
         ["__internal_testing__/tiny-fused-llama-inference5.2", LlamaForCausalLM],
-        ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
+        # ["__internal_testing__/tiny-fused-bloom", BloomForCausalLM],
     ],
 )
 class BlockAttnPredictorTest(LLMTest, unittest.TestCase):

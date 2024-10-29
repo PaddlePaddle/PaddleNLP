@@ -128,7 +128,7 @@ class Qwen2Tokenizer(PretrainedTokenizer):
     """
 
     resource_files_names = VOCAB_FILES_NAMES
-    model_input_names = ["input_ids", "attention_mask"]
+    model_input_names = ["input_ids", "attention_mask", "attn_mask_startend_row_indices"]
     max_model_input_sizes = MAX_MODEL_INPUT_SIZES
 
     pretrained_resource_files_map = {

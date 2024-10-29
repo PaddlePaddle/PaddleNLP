@@ -14,8 +14,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import copy
+import inspect
 import io
 import json
 import os
@@ -25,7 +25,17 @@ import warnings
 from collections import UserDict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Dict,
+    List,
+    Literal,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import aistudio_sdk
 import numpy as np
@@ -1361,6 +1371,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         self.model_input_names = kwargs.pop("model_input_names", self.model_input_names)
 
+        # By default, cleaning tokenization spaces for both fast and slow tokenizers
+        self.clean_up_tokenization_spaces = kwargs.pop("clean_up_tokenization_spaces", False)
+
         # By default, do not split special tokens for both fast and slow tokenizers
         self.split_special_tokens = kwargs.pop("split_special_tokens", False)
 
@@ -2110,6 +2123,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         return_offsets_mapping: bool = False,
         add_special_tokens: bool = True,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         verbose: bool = True,
         **kwargs
@@ -2219,6 +2233,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 If set will pad the sequence to a multiple of the provided value. This is especially useful to enable
                 the use of Tensor Cores on NVIDIA hardware with compute capability >= 7.5 (Volta).
                 Defaults to `None`.
+            padding_side (`str`, *optional*):
+                The side on which the model should have padding applied. Should be selected between ['right', 'left'].
+                Default value is picked from the class attribute of the same name.
             return_tensors (str or [TensorType], optional):
                 If set, will return tensors instead of list of python integers. Acceptable values are:
 
@@ -2331,6 +2348,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 return_offsets_mapping=return_offsets_mapping,
                 add_special_tokens=add_special_tokens,
                 pad_to_multiple_of=pad_to_multiple_of,
+                padding_side=padding_side,
                 return_tensors=return_tensors,
                 verbose=verbose,
                 **kwargs,
@@ -2353,6 +2371,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 return_offsets_mapping=return_offsets_mapping,
                 add_special_tokens=add_special_tokens,
                 pad_to_multiple_of=pad_to_multiple_of,
+                padding_side=padding_side,
                 return_tensors=return_tensors,
                 verbose=verbose,
                 **kwargs,
@@ -2369,6 +2388,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
@@ -2423,6 +2443,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             stride=stride,
             is_split_into_words=is_split_into_words,
             pad_to_multiple_of=pad_to_multiple_of,
+            padding_side=padding_side,
             return_tensors=return_tensors,
             return_position_ids=return_position_ids,
             return_token_type_ids=return_token_type_ids,
@@ -2445,6 +2466,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         max_length: Optional[int] = None,
         stride: int = 0,
         is_split_into_words: bool = False,
+        padding_side: Optional[Literal["right", "left"]] = None,
         pad_to_multiple_of: Optional[int] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_token_type_ids: Optional[bool] = None,
@@ -2496,6 +2518,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             stride=stride,
             is_split_into_words=is_split_into_words,
             pad_to_multiple_of=pad_to_multiple_of,
+            padding_side=padding_side,
             return_tensors=return_tensors,
             return_token_type_ids=return_token_type_ids,
             return_attention_mask=return_attention_mask,
@@ -2518,6 +2541,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_position_ids: Optional[bool] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_token_type_ids: Optional[bool] = None,
@@ -2557,6 +2581,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         return_offsets_mapping=False,
         add_special_tokens=True,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         verbose: bool = True,
         **kwargs
@@ -2607,6 +2632,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             stride=stride,
             is_split_into_words=is_split_into_words,
             pad_to_multiple_of=pad_to_multiple_of,
+            padding_side=padding_side,
             return_tensors=return_tensors,
             return_position_ids=return_position_ids,
             return_token_type_ids=return_token_type_ids,
@@ -2637,6 +2663,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_position_ids: Optional[bool] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_token_type_ids: Optional[bool] = None,
@@ -2662,6 +2689,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         ],
         padding: Union[bool, str, PaddingStrategy] = True,
         max_length: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         pad_to_multiple_of: Optional[int] = None,
         return_attention_mask: Optional[bool] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
@@ -2706,6 +2734,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
                 This is especially useful to enable the use of Tensor Cores on NVIDIA hardware with compute capability
                 >= 7.5 (Volta).
+            padding_side (`str`, *optional*):
+                The side on which the model should have padding applied. Should be selected between ['right', 'left'].
+                Default value is picked from the class attribute of the same name.
             return_attention_mask (`bool`, *optional*):
                 Whether to return the attention mask. If left to the default, will return the attention mask according
                 to the specific tokenizer's default, defined by the `return_outputs` attribute.
@@ -2767,13 +2798,28 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         required_input = encoded_inputs[self.model_input_names[0]]
         if required_input and not isinstance(required_input[0], (list, tuple)):
-            encoded_inputs = self._pad(
-                encoded_inputs,
-                max_length=max_length,
-                padding_strategy=padding_strategy,
-                pad_to_multiple_of=pad_to_multiple_of,
-                return_attention_mask=return_attention_mask,
-            )
+            # some tokenizers might not have the padding_side attribute
+            if "padding_side" in set(inspect.signature(self._pad).parameters.keys()):
+                encoded_inputs = self._pad(
+                    encoded_inputs,
+                    max_length=max_length,
+                    padding_strategy=padding_strategy,
+                    pad_to_multiple_of=pad_to_multiple_of,
+                    padding_side=padding_side,
+                    return_attention_mask=return_attention_mask,
+                )
+            else:
+                original_padding_side = self.padding_side
+                self.padding_side = padding_side
+                encoded_inputs = self._pad(
+                    encoded_inputs,
+                    max_length=max_length,
+                    padding_strategy=padding_strategy,
+                    pad_to_multiple_of=pad_to_multiple_of,
+                    return_attention_mask=return_attention_mask,
+                )
+                self.padding_side = original_padding_side
+
             return BatchEncoding(encoded_inputs, tensor_type=return_tensors)
 
         batch_size = len(required_input)
@@ -2792,6 +2838,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 inputs,
                 max_length=max_length,
                 padding_strategy=padding_strategy,
+                padding_side=padding_side,
                 pad_to_multiple_of=pad_to_multiple_of,
                 return_attention_mask=return_attention_mask,
             )
@@ -2872,6 +2919,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         max_length: Optional[int] = None,
         stride: int = 0,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_position_ids=None,
         return_token_type_ids: Optional[bool] = None,
@@ -3002,6 +3050,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 max_length=max_length,
                 padding=padding_strategy.value,
                 pad_to_multiple_of=pad_to_multiple_of,
+                padding_side=padding_side,
                 return_attention_mask=return_attention_mask,
             )
 
@@ -3141,6 +3190,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         max_length: Optional[int] = None,
         padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_attention_mask: Optional[bool] = None,
     ) -> dict:
         """
@@ -3156,13 +3206,16 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 - PaddingStrategy.LONGEST Pad to the longest sequence in the batch
                 - PaddingStrategy.MAX_LENGTH: Pad to the max length (default)
                 - PaddingStrategy.DO_NOT_PAD: Do not pad
-                The tokenizer padding sides are defined in self.padding_side:
+                The tokenizer padding sides are defined in `padding_side` argument:
 
                     - 'left': pads on the left of the sequences
                     - 'right': pads on the right of the sequences
             pad_to_multiple_of: (optional) Integer if set will pad the sequence to a multiple of the provided value.
                 This is especially useful to enable the use of Tensor Core on NVIDIA hardware with compute capability
                 >= 7.5 (Volta).
+            padding_side: (optional) The side on which the model should have padding applied.
+                Should be selected between ['right', 'left'].
+                Default value is picked from the class attribute of the same name.
             return_attention_mask:
                 (optional) Set to False to avoid returning attention mask (default: set to model specifics)
         """
@@ -3186,11 +3239,30 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         if needs_to_be_padded:
             difference = max_length - len(required_input)
+            padding_side = padding_side if padding_side is not None else self.padding_side
 
-            if self.padding_side == "right":
+            if padding_side == "right":
                 if return_attention_mask:
-
-                    encoded_inputs["attention_mask"] = encoded_inputs["attention_mask"] + [0] * difference
+                    if len(np.shape(encoded_inputs["attention_mask"])) > 2:
+                        # attention_mask shape [1,seq_len,seq_len]
+                        encoded_inputs["attention_mask"] = np.pad(
+                            encoded_inputs["attention_mask"],
+                            pad_width=[(0, 0), (0, difference), (0, difference)],
+                            mode="constant",
+                            constant_values=0,
+                        ).tolist()
+                    else:
+                        encoded_inputs["attention_mask"] = encoded_inputs["attention_mask"] + [0] * difference
+                if "attn_mask_startend_row_indices" in encoded_inputs:
+                    # TODO @DrownFish19 encoded_inputs["attn_mask_startend_row_indices"] is generated in the shape [seq_len]
+                    # and convert the shape to [1,seq_len] here. However, it is supported in the generation phase.
+                    encoded_inputs["attn_mask_startend_row_indices"] = np.concatenate(
+                        [
+                            np.array([encoded_inputs["attn_mask_startend_row_indices"]], dtype=np.int32),
+                            np.zeros([1, difference], dtype=np.int32),
+                        ],
+                        axis=-1,
+                    )
                 if "token_type_ids" in encoded_inputs:
                     encoded_inputs["token_type_ids"] = (
                         encoded_inputs["token_type_ids"] + [self.pad_token_type_id] * difference
@@ -3207,9 +3279,28 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 if "end_positions" in encoded_inputs and isinstance(encoded_inputs["end_positions"], list):
                     encoded_inputs["end_positions"] = encoded_inputs["end_positions"] + [0] * difference
                 encoded_inputs[self.model_input_names[0]] = required_input + [self.pad_token_id] * difference
-            elif self.padding_side == "left":
+            elif padding_side == "left":
                 if return_attention_mask:
-                    encoded_inputs["attention_mask"] = [0] * difference + encoded_inputs["attention_mask"]
+                    if len(np.shape(encoded_inputs["attention_mask"])) > 2:
+                        # attention_mask shape [1,seq_len,seq_len]
+                        encoded_inputs["attention_mask"] = np.pad(
+                            encoded_inputs["attention_mask"],
+                            pad_width=[(0, 0), (difference, 0), (difference, 0)],
+                            mode="constant",
+                            constant_values=0,
+                        ).tolist()
+                    else:
+                        encoded_inputs["attention_mask"] = [0] * difference + encoded_inputs["attention_mask"]
+                if "attn_mask_startend_row_indices" in encoded_inputs:
+                    # TODO @DrownFish19 encoded_inputs["attn_mask_startend_row_indices"] is generated in the shape [seq_len]
+                    # and convert the shape to [1,seq_len] here. However, it is supported in the generation phase.
+                    encoded_inputs["attn_mask_startend_row_indices"] = np.concatenate(
+                        [
+                            np.zeros([1, difference], dtype=np.int32),
+                            np.array([encoded_inputs["attn_mask_startend_row_indices"]], dtype=np.int32) + difference,
+                        ],
+                        axis=-1,
+                    )
                 if "token_type_ids" in encoded_inputs:
                     encoded_inputs["token_type_ids"] = [self.pad_token_type_id] * difference + encoded_inputs[
                         "token_type_ids"
@@ -3227,6 +3318,15 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
             else:
                 raise ValueError("Invalid padding strategy:" + str(self.padding_side))
+        else:
+            if "attn_mask_startend_row_indices" in encoded_inputs:
+                if len(np.shape(encoded_inputs["attn_mask_startend_row_indices"])) == 1:
+                    # TODO @DrownFish19 encoded_inputs["attn_mask_startend_row_indices"] is generated in the shape [seq_len]
+                    # and convert the shape to [1,seq_len] here. However, it is supported in the generation phase.
+                    encoded_inputs["attn_mask_startend_row_indices"] = np.array([encoded_inputs["attn_mask_startend_row_indices"]], dtype=np.int32)  # fmt:skip
+
+        if "attn_mask_startend_row_indices" in encoded_inputs:
+            assert len(np.shape(encoded_inputs["attn_mask_startend_row_indices"])) == 2  # [num_head, seq_len]
 
         return encoded_inputs
 
