@@ -50,6 +50,7 @@
 
    大模型预训练文档 <llm/docs/pretrain.rst>
    大模型精调文档 <llm/docs/finetune.md>
+   大模型FlashMask算法 <llm/docs/flashmask.md>
    大模型常用算法文档 <llm/docs/algorithm_overview.md>
    大模型RLHF文档 <llm/docs/rlhf.md>
    大模型量化教程 <llm/docs/quantization.md>

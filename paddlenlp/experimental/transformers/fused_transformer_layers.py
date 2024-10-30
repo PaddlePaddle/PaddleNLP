@@ -41,7 +41,11 @@ if not is_paddlenlp_ops_available():
         "The paddlenlp_ops package is not installed. you can read the docs and install it by hand, "
         "you can refer to: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/csrc/README.md"
     )
-from paddlenlp_ops import rebuild_padding_v2
+
+if (
+    paddle.device.get_all_custom_device_type() is not None and len(paddle.device.get_all_custom_device_type()) > 0
+) or paddle.is_compiled_with_cuda():
+    from paddlenlp_ops import rebuild_padding_v2
 
 
 def use_cutlass_fp8_gemm():
@@ -144,6 +148,7 @@ class FusedMultiTransformerConfig:
         activation="gelu",
         norm_type="layernorm",
         use_neox_rotary_style=False,
+        rope_theta=10000.0,
         normalize_before=True,
         ln_scale_attrs=None,
         ln_bias_attrs=None,
@@ -207,7 +212,7 @@ class FusedMultiTransformerConfig:
         self.dropout_rate = dropout_rate
         self.activation = activation
         self.norm_type = norm_type
-
+        self.rope_theta = rope_theta
         self.use_neox_rotary_style = use_neox_rotary_style
         self.normalize_before = normalize_before
         self.ln_scale_attrs = ln_scale_attrs
@@ -2231,6 +2236,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     quant_round_type=self.config.quant_round_type,
                     quant_max_bound=self.config.quant_max_bound,
                     quant_min_bound=self.config.quant_min_bound,
+                    rope_theta=self.config.rope_theta,
                 )[0]
             else:
                 k_quant_scales = kwargs.get("k_quant_scales", None)
@@ -2272,6 +2278,7 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                     quant_round_type=self.config.quant_round_type,
                     quant_max_bound=self.config.quant_max_bound,
                     quant_min_bound=self.config.quant_min_bound,
+                    rope_theta=self.config.rope_theta,
                 )[0]
 
         out_linear_out = self.compute_out_linear(fmha_out, i)
@@ -2417,6 +2424,7 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
                 quant_min_bound=self.quant_min_bound,
                 out_scale=self.act_scales["out_linear_in_scale"][i],
                 compute_dtype=self._fuse_kernel_compute_dtype,
+                rope_theta=self.config.rope_theta,
             )[0]
 
         out_linear_out = self.compute_out_linear(fmha_out, i)
@@ -2929,6 +2937,7 @@ class FusedBlockMultiTransformerFP8(Layer):
             quant_max_bound=self.config.quant_max_bound,
             quant_min_bound=self.config.quant_min_bound,
             out_scale=self.act_scales.scale["out_linear_in_scale"][i],
+            rope_theta=self.config.rope_theta,
         )[0]
         out_linear_out = self.compute_out_linear(fmha_out, i)
 
