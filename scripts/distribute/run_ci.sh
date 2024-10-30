@@ -165,6 +165,23 @@ function contain_case(){
     return 0
 }
 ####################################
+function track_case_status() {  
+    local case_name="$1"  
+    local prefix="$2"  
+    local original_path  
+  
+    original_path=$(pwd)  
+    cd ${log_path} || { echo "Failed to enter log_path: $log_path"; return 1; }  
+  
+    total_count=$(ls -1 "$prefix"* 2>/dev/null | wc -l)  
+    fail_count=$(ls -1 "$prefix"*_FAIL 2>/dev/null | wc -l)  
+  
+    # return original path 
+    cd "$original_path" || { echo "Failed to return to original path: $original_path"; return 1; }  
+    echo -e "\033[31m ---- $case_name total tests :  $total_count \033"
+    echo -e "\033[31m ---- $case_name failed tests :  $fail_count \033"
+}  
+####################################
 get_diff_TO_case # 获取待执行case列表
 case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${case_list[*]}))  # 去重并将结果存储回原列表
 if [[ ${#case_list[*]} -ne 0 ]];then
@@ -188,6 +205,8 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh llama_case_list_auto $FLAGS_install_deps $FLAGS_download_data
         print_info $? `ls -lt ${log_path} | grep llama | head -n 1 | awk '{print $9}'` llama_auto
         export FLAGS_download_data="llama ""$FLAGS_download_data"
+        log_prefix="llama_"
+        track_case_status "llama_auto"  $log_prefix
         let case_num++
     fi
     if [[ $(contain_case gpt-3_auto ${case_list[@]}; echo $?) -eq 1 ]];then
@@ -196,6 +215,8 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` gpt-3_auto
         export FLAGS_install_deps=1
         export FLAGS_download_data="gpt ""$FLAGS_download_data"
+        log_prefix="llm_gpt_dygraph_auto_"
+        track_case_status "gpt-3_auto"  $log_prefix
         let case_num++        
     fi
     if [[ $(contain_case gpt-3_dygraph ${case_list[@]}; echo $?) -eq 1 ]];then
@@ -204,6 +225,8 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` gpt-3_dygraph
         export FLAGS_install_deps=1
         export FLAGS_download_data="gpt ""$FLAGS_download_data"
+        log_prefix="gpt_"
+        track_case_status "llama_auto"  $log_prefix
         let case_num++
     fi
     echo -e "\033[31m ---- end run case  \033"

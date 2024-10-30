@@ -28,6 +28,8 @@ export llm_gpt_data_path=/llm_gpt_data
 unset CUDA_VISIBLE_DEVICES
 
 function gpt_case_list_dygraph(){
+    # The test name must have "gpt_" as a prefix, which will 
+    # be used for tracking the execution status of the case.
     gpt_preprocess_data
     gpt_345M_single
     gpt_1.3B_dp

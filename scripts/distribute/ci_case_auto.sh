@@ -40,6 +40,8 @@ IS_A100=$(is_a100)
 
 # NOTE: Please place the new tests as much as possible after the existing tests
 function llama_case_list_auto() {
+    # The test name must have "llama_" as a prefix, which will 
+    # be used for tracking the execution status of the case.
     llama_dygraph_auto_bs8_fp32_DP2
     llama_dygraph_auto_bs8_fp32_DP2-MP2
     llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
@@ -58,6 +60,8 @@ function llama_case_list_auto() {
 }
 
 function llm_gpt_case_list_auto() {
+    # The test name must have "llm_gpt_dygraph_auto_" as a prefix, 
+    # which will be used for tracking the execution status of the case.
     llm_gpt_dygraph_auto_bs8_fp32_DP2
     llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2
     llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2
