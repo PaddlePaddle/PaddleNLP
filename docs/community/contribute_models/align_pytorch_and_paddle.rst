@@ -27,11 +27,15 @@
 ------------------------------------------
 验证模型精度的整体流程如下图所示：
 
-[流程图]
+.. figure:: https://github.com/user-attachments/assets/e20aeed6-fc54-49ca-95c9-8e9863416796
+  :width: 300px
+  :alt: align_workflow
+  :align: center
 
 
 3. 模型对齐流程
 ==========================================
+
 3.1 模型结构对齐
 ------------------------------------------
 
@@ -40,8 +44,10 @@
 * 网络结构代码转换
 * 权重转换
 * 模型组网正确性验证
+
 3.1.1 网络结构代码转换
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 【基本流程】
 
 PyTorch的API和PaddlePaddle的API基本相似，可以参考PyTorch 最新 release 与 Paddle develop API 映射表，部分组网代码也可手动转换。
@@ -54,12 +60,12 @@ PyTorch的API和PaddlePaddle的API基本相似，可以参考PyTorch 最新 rele
 
 3.1.2 权重转换
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 【基本流程】
 
 组网代码转换完成之后，需要对模型权重进行转换。
 
 .. code-block:: python
-    :linenos:
 
     import json
     import os
@@ -183,7 +189,6 @@ PyTorch的API和PaddlePaddle的API基本相似，可以参考PyTorch 最新 rele
 https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54eeb17058d/paddlenlp/transformers/qwen2/modeling.py#L732-L766
 
 .. code-block:: python
-    :linenos:
 
     class Qwen2PretrainedModel(PretrainedModel):
         @classmethod
@@ -225,7 +230,9 @@ https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54ee
 
 3.1.3 模型组网正确性验证
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 【基本流程】
+
 1. 定义PyTorch模型，加载权重，固定seed，基于numpy生成随机数，转换为PyTorch可以处理的tensor，送入网络，获取输出。
 2. 定义PaddlePaddle模型，加载权重，固定seed，基于numpy生成随机数，转换为PaddlePaddle可以处理的tensor，送入网络，获取输出。
 3. 排查diff，小于阈值，即可完成自测。
@@ -233,7 +240,6 @@ https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54ee
 【示例代码】
 
 .. code-block:: python
-    :linenos:
 
     import numpy as np
     import paddle
@@ -269,13 +275,14 @@ https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54ee
     eval_model_convert()
 
 【注意事项】
+
 * 模型在前向对齐验证时，需要调用model.eval()方法，保证组网中的随机量被关闭，比如BatchNorm、Dropout等。
 * 给定相同的输入数据，为保证可复现性，如果有随机数生成，固定相关的随机种子。
 * 输出diff可以使用np.mean(np.abs(o1 - o2))进行计算，一般小于1e-6的话，可以认为前向没有问题。如果最终输出结果diff较大，可以使用二分的方法进行排查，比如说BERT，包含1个embdding层、12个transformer-block以及最后的MLM head层，那么完成模型组网和权重转换之后，如果模型输出没有对齐，可以尝试输出中间某一个transformer-block的tensor进行对比，如果相同，则向后进行排查；如果不同，则继续向前进行排查，以此类推，直到找到导致没有对齐的操作。
 * 在验证精度时需设置环境变量，避免算子的随机性，环境变量如下：
 
 .. code-block:: shell
-    :linenos:
+
     # 通用环境变量，避免随机性
     export NVIDIA_TF32_OVERRIDE=0
     export FLAGS_embedding_deterministic=1
@@ -290,21 +297,17 @@ https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54ee
 
 3.1.4 分布式组网对齐
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 【基本流程】
 
-基本流程同 3.1.3 模型组网正确性验证。
-
-此外，在模型初始化时，需创建分布式并行环境，并使用paddle.distributed.launch进行启动运行，示例命令如下：
+基本流程同 3.1.3 模型组网正确性验证。此外，在模型初始化时，需创建分布式并行环境，并使用paddle.distributed.launch进行启动运行，示例命令如下：
 
 .. code-block:: shell
-    :linenos:
 
     python -m paddle.distributed.launch --devices 0,1 compare_torch_with_paddle.py
 
-
 【示例代码】
 .. code-block:: python
-    :linenos:
 
     import numpy as np
     import paddle
@@ -355,8 +358,9 @@ https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54ee
 【注意事项】
 
 * 在验证精度时需设置环境变量，避免算子的随机性，环境变量如下：
+
 .. code-block:: shell
-    :linenos:
+
     # 通用环境变量，避免随机性
     export NVIDIA_TF32_OVERRIDE=0
     export FLAGS_embedding_deterministic=1
@@ -369,7 +373,6 @@ https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54ee
     export FLAGS_shard_use_reduce=1
     export FLAGS_sync_before_allreduce=1
 
-
 3.2 前向对齐&反向对齐-对齐工具验证
 ------------------------------------------
 
@@ -380,6 +383,7 @@ https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54ee
 PaDiff: https://github.com/PaddlePaddle/PaDiff
 
 【使用方式】
+
 .. code-block:: python
     :linenos:
 
@@ -431,58 +435,18 @@ PaDiff: https://github.com/PaddlePaddle/PaDiff
 
 精度对齐情况参考，可作为验证标准
 
-模型
-
-size
-
-logits精度对齐 (float32)
-
-loss精度对齐 (float32)
-
-【每层对齐】PaDiff 精度对齐（float32）
-
-Qwen/Qwen2-0.5B
-
-0.5B
-
-1e-4
-
-1e-5
-
-1e-4
-
-Qwen/Qwen2-1.5B
-
-1.5B
-
-1e-3
-
-1e-5
-
-1e-3
-
-Qwen/Qwen2-7B
-
-7B
-
-1e-3
-
-1e-5
-
-1e-3
-
-Qwen/Qwen1.5-14B
-
-14B
-
-1e-4
-
-1e-5
-
-1e-4
++------------------+------+----------------------+--------------------+----------------------------+
+|        模型        | size | logits精度对齐 (float32) | loss精度对齐 (float32) | 【每层对齐】PaDiff 精度对齐（float32） |
++==================+======+======================+====================+============================+
+| Qwen/Qwen2-0.5B  | 0.5B |         1e-4         |        1e-5        |            1e-4            |
+| Qwen/Qwen2-1.5B  | 1.5B |         1e-3         |        1e-5        |            1e-3            |
+|  Qwen/Qwen2-7B   |  7B  |         1e-3         |        1e-5        |            1e-3            |
+| Qwen/Qwen1.5-14B | 14B  |         1e-4         |        1e-5        |            1e-4            |
++------------------+------+----------------------+--------------------+----------------------------+
 
 3.3 模型训练对齐
 ------------------------------------------
+
 【基本流程】
 
 完成前面的步骤之后，就可以开始全量数据的训练对齐任务了。按照下面的步骤进行训练对齐。
@@ -490,11 +454,13 @@ Qwen/Qwen1.5-14B
 1. 准备train/eval data, loader, model
 2. 模型初始化
 3. 加载配置，开始训练，迭代得到最终模型与评估指标。
+
 【注意事项】
 
-* 【强烈】建议先做完反向对齐之后再进行模型训练对齐，二者之间的不确定量包括：数据集、PaddlePaddle与参考代码在模型training mode下的区别，初始化参数。
-* 在训练对齐过程中，受到较多随机量的影响，精度有少量diff是正常的，以SST-2数据集的分类为例，diff在0.15%以内可以认为是正常的，这里可以根据不同的任务，适当调整对齐检查的阈值(ReprodDiffHelper.report函数中的diff_threshold参数)。
-* 训练过程中的波动是正常的，如果最终收敛结果不一致，可以
+#. 【强烈】建议先做完反向对齐之后再进行模型训练对齐，二者之间的不确定量包括：数据集、PaddlePaddle与参考代码在模型training mode下的区别，初始化参数。
+#. 在训练对齐过程中，受到较多随机量的影响，精度有少量diff是正常的，以SST-2数据集的分类为例，diff在0.15%以内可以认为是正常的，这里可以根据不同的任务，适当调整对齐检查的阈值(ReprodDiffHelper.report函数中的diff_threshold参数)。
+#. 训练过程中的波动是正常的，如果最终收敛结果不一致，可以从以下方面进行排查：
+
   * 仔细排查Dropout、BatchNorm以及其他组网模块及超参是否无误。
   * 基于参考代码随机生成一份预训练模型，转化为PaddlePaddle的模型，并使用PaddlePaddle加载训练，对比二者的收敛曲线与最终结果，排查初始化影响。
   * 使用参考代码的Dataloader生成的数据，进行模型训练，排查train dataloader的影响。
