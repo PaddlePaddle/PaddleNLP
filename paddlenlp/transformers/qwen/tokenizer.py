@@ -139,6 +139,7 @@ class QWenTokenizer(PretrainedTokenizer):
                 added_tokens.append(token)
 
             import tiktoken
+
             self.tokenizer = tiktoken.Encoding(
                 "Qwen",
                 pat_str=PAT_STR,
