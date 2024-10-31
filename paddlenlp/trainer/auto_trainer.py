@@ -52,7 +52,7 @@ MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
 DIST_CKPT_PATH = "dist_ckpt"
 DIST_MODEL_PATH = "dist_model"
-FREE_SVAE_LOAD_KEY_PATTERNS = ["learning_rate_", "gradient_merge_", "@GRAD@MERG", "eager_tmp"]
+FREE_SVAE_LOAD_KEY_PATTERNS = ["learning_rate_", "gradient_merge_", "@GRAD@MERG", "eager_tmp","generated_tensor_0"]
 
 
 class AutoTrainer(Trainer):
@@ -443,10 +443,10 @@ class AutoTrainer(Trainer):
 
         total_batch_size_per_acc_step = self.args.per_device_train_batch_size * self.args.dataset_world_size
         total_batch_size = total_batch_size_per_acc_step * self.args.gradient_accumulation_steps
-
+        use_shuffle = False if dist.in_auto_parallel_align_mode() else True
         return paddle.io.BatchSampler(
             dataset=self.train_dataset,
-            shuffle=True,
+            shuffle=use_shuffle,
             batch_size=total_batch_size,
             drop_last=self.args.dataloader_drop_last,
         )

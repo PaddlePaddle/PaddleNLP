@@ -554,8 +554,7 @@ class CheckpointConverter:
         for file, state_dict in self.cur_rank_loaded_state_dict.items():
             for k, v in state_dict.items():
                 memory_size += v.numel() * v.element_size()
-
-        memory_size = memory_size.numpy() / 2**20
+        memory_size = memory_size / 2**20
         logger.debug(
             f"The current rank has finished loading the checkpoint file and has allocated {memory_size} MB of GPU memory."
         )

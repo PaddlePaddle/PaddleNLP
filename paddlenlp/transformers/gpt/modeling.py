@@ -30,6 +30,7 @@ import paddle.tensor as tensor
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
+import paddle.distributed as dist
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
@@ -198,21 +199,21 @@ class Concat(PyLayer):
         axis = ctx.args_axis
         group = ctx.args_group
         with paddle.no_grad():
-            grads = paddle.split(grad, paddle.distributed.get_world_size(group), axis=axis)
+            grads = paddle.split(
+                grad, paddle.distributed.get_world_size(group), axis=axis
+            )
         grad = grads[paddle.distributed.get_rank(group)]
         return grad
-
-
+    
 def concat_mp_with_grad(input):
     hcg = fleet.get_hybrid_communicate_group()
     mp_degree = hcg.get_model_parallel_world_size()
-    if mp_degree <= 1:
+    if mp_degree <=1:
         return input
     else:
         group = hcg.get_model_parallel_group()
         return Concat.apply(input, -1, group)
-
-
+    
 class MultiHeadAttention(nn.Layer):
     """
     Attention mapps queries and a set of key-value pairs to outputs, and
@@ -1368,10 +1369,12 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
     def __init__(self, config):
         super(GPTPretrainingCriterion, self).__init__()
         self.config = config
-        # if config.tensor_parallel_degree > 1 and config.tensor_parallel_output:
-        #     self.loss_func = mpu.ParallelCrossEntropy(ignore_index=config.ignore_index)
-        # else:
-        self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
+        if config.tensor_parallel_degree > 1 and config.tensor_parallel_output:
+            self.loss_func = mpu.ParallelCrossEntropy(ignore_index=config.ignore_index)
+        else:
+            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
+        if dist.in_auto_parallel_align_mode():
+            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
 
     def forward(self, prediction_scores, masked_lm_labels, loss_mask=None):
         """
@@ -1564,7 +1567,8 @@ class GPTForCausalLM(GPTPretrainedModel):
     def __init__(self, config: GPTConfig):
         super(GPTForCausalLM, self).__init__(config)
         self.gpt = GPTModel(config)
-        self.lm_head = GPTLMHead(config, embedding_weights=self.gpt.embeddings.word_embeddings.weight)
+        self.lm_head = None
+        # GPTLMHead(config, embedding_weights=self.gpt.embeddings.word_embeddings.weight)
 
         self.tie_weights()
         self.criterion = GPTPretrainingCriterion(config)
@@ -1640,8 +1644,16 @@ class GPTForCausalLM(GPTPretrainedModel):
         else:
             hidden_states = outputs[0]
         # print("hidden_states ",hidden_states.dtype,hidden_states._md5sum()[:5])
-        logits = self.lm_head(hidden_states)
-        logits = concat_mp_with_grad(logits)
+        # logits = self.lm_head(hidden_states)
+        if self.config.sequence_parallel:
+            hidden_states = GatherOp.apply(hidden_states)
+            hidden_states = paddle.reshape_(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
+
+        logits = parallel_matmul(
+            hidden_states, self.gpt.embeddings.word_embeddings.weight, transpose_y=True, tensor_parallel_output=self.config.tensor_parallel_output
+        )
+        if dist.in_auto_parallel_align_mode():
+            logits = concat_mp_with_grad(logits)
         # print("logits ",logits.dtype,logits._md5sum()[:5])
         loss = None
         # print(labels)

@@ -26,9 +26,7 @@ export GLOG_v=0
 export FLAGS_cudnn_deterministic=1
 export FLAGS_embedding_deterministic=1 
 # export FLAGS_max_inplace_grad_add=65536
-export NVIDIA_TF32_OVERRIDE=0
-export FLAGS_enable_auto_parallel_align_mode=0
-
+export FLAGS_enable_auto_parallel_align_mode=1
 export test_ci_no_save_model=0
 
 set -x
@@ -43,7 +41,7 @@ rm -rf $log_dir
 python -u -m paddle.distributed.launch \
     --gpus "6,7" \
     --log_dir ${log_dir} \
-    /root/paddlejob/workspace/env_run/zhangwl/zwl_rep/PaddleNLP/llm/run_pretrain.py \
+    /root/paddlejob/workspace/env_run/zhangwl/zwl/PaddleNLP/llm/run_pretrain.py \
     --model_name_or_path test_config.json \
     --tokenizer_name_or_path gpt3-13B-en \
     --input_dir "./data" \
@@ -93,7 +91,7 @@ python -u -m paddle.distributed.launch \
     --save_sharded_model false \
     --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
     --tensor_parallel_config "enable_mp_async_allreduce" \
-    --resume_from_checkpoint "dy_20layer_1024/gpt3_13b_hand_perf/checkpoint-3000"
+    --resume_from_checkpoint "output/gpt3_13b_hand/checkpoint-1"
     # --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
     # --tensor_parallel_config "enable_mp_async_allreduce enable_mp_skip_c_identity enable_mp_fused_linear_param_grad_add" \
     # --pipeline_parallel_config "enable_sharding_comm_overlap" \

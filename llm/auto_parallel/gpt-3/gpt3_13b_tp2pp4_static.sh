@@ -19,14 +19,14 @@ export FLAGS_enable_pir_api=1
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="gpt3_13b_hand_perf"
+task_name="gpt3_13b_auto"
 log_dir="log/$task_name"
 rm -rf $log_dir
 to_static=1
 # export PYTHONPATH=../../../:$PYTHONPATH
 
 python -u -m paddle.distributed.launch \
-    --gpus "4,5,6,7" \
+    --gpus "6,7" \
     --log_dir ${log_dir} \
     run_pretrain_auto.py \
     --model_name_or_path config.json \
@@ -58,14 +58,14 @@ python -u -m paddle.distributed.launch \
     --model_type "gpt" \
     --sharding "stage1" \
     --sharding_parallel_degree 1 \
-    --tensor_parallel_degree 1 \
-    --pipeline_parallel_degree 4 \
+    --tensor_parallel_degree 2 \
+    --pipeline_parallel_degree 1 \
     --sequence_parallel 0 \
     --use_flash_attention 1 \
-    --use_fused_linear 0 \
+    --fused_linear 0 \
     --use_fused_dropout_add 0 \
     --fuse_attention_qkv 0 \
-    --enable_linear_fused_grad_add 0 \
+    --fused_linear_param_grad_add 0 \
     --recompute 0 \
     --recompute_use_reentrant true \
     --recompute_granularity "full" \

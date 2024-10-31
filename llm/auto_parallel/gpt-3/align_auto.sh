@@ -99,7 +99,7 @@ python -u -m paddle.distributed.launch \
     --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
     --tensor_parallel_config "enable_mp_async_allreduce" \
     --auto_parallel_resume_form_hybrid_parallel true \
-    --resume_from_checkpoint "dy_20layer_1024/gpt3_13b_hand_perf/checkpoint-1"
+    --resume_from_checkpoint "output/gpt3_13b_hand/checkpoint-1"
     #--pipeline_parallel_config "enable_sharding_comm_overlap" \
     # --fused_linear 1 \
     # --use_fast_layer_norm 1 \

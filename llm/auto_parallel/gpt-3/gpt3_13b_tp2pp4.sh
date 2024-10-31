@@ -10,14 +10,14 @@ export PADDLE_TRAINERS_NUM=1
 set -x
 unset CUDA_VISIBLE_DEVICES
 
-task_name="gpt3_13b_hand_perf"
+task_name="gpt3_13b_hand"
 log_dir="log/$task_name"
 rm -rf $log_dir
 
 # export PYTHONPATH=../../../:$PYTHONPATH
 
 python -u -m paddle.distributed.launch \
-    --gpus "4,5,6,7" \
+    --gpus "0,1,2,3,4,5,6,7" \
     --log_dir ${log_dir} \
     /root/paddlejob/workspace/env_run/zhangwl/zwl_rep/PaddleNLP/llm/run_pretrain.py \
     --model_name_or_path config.json \
@@ -46,7 +46,7 @@ python -u -m paddle.distributed.launch \
     --device "gpu" \
     --sharding "stage1" \
     --sharding_parallel_degree 1 \
-    --tensor_parallel_degree 1 \
+    --tensor_parallel_degree 2 \
     --pipeline_parallel_degree 4 \
     --sequence_parallel 0 \
     --use_flash_attention 1 \
@@ -69,7 +69,6 @@ python -u -m paddle.distributed.launch \
     --save_sharded_model false \
     --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
     --tensor_parallel_config "enable_mp_async_allreduce" \
-
     # --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
     # --tensor_parallel_config "enable_mp_async_allreduce enable_mp_skip_c_identity enable_mp_fused_linear_param_grad_add" \
     # --pipeline_parallel_config "enable_sharding_comm_overlap" \
