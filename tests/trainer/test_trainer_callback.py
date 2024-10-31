@@ -206,7 +206,9 @@ class TrainerCallbackTest(unittest.TestCase):
         self.assertEqual(events, self.get_expected_events(trainer))
 
         # Independent log/save/eval
-        trainer = self.get_trainer(callbacks=[MyTestTrainerCallback], logging_steps=5)
+        trainer = self.get_trainer(
+            callbacks=[MyTestTrainerCallback], logging_steps=5, metrics_output_path="./output/paddle_distributed_logs"
+        )
         trainer.train()
         events = trainer.callback_handler.callbacks[-2].events
         self.assertEqual(events, self.get_expected_events(trainer))

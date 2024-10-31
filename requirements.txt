@@ -28,3 +28,4 @@ regex
 numpy<=1.26.4
 tiktoken
 tokenizers
+

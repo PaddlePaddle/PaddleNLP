@@ -827,6 +827,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to use async_save instead of paddle.save."},
     )
+    metrics_output_path: Optional[str] = field(
+        default=None,
+        metadata={"help": "Where to save training metrics (None for skipping save)."},
+    )
     skip_profile_timer: Optional[bool] = field(
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl."},
