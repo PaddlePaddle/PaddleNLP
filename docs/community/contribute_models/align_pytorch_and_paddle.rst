@@ -7,14 +7,14 @@
 
 1.1 背景
 ------------------------------------------
-模型精度对齐是开展后续工作的关键，确保了不同模型或同一模型在不同环境、不同参数配置下输出结果的稳定性和一致性，为后续的数据分析、决策制定以及系统优化提供了坚实的基础。
+模型精度对齐是开展后续工作的关键，确保了相同模型在相同环境和相同参数配置下输出结果的稳定性和一致性，为后续的数据分析、决策制定以及系统优化提供了坚实的基础。
 
 1.2 前序工作
 ------------------------------------------
-基于本精度对齐验收标准，建议准备以下内容：
+基于精度对齐验收标准，建议准备以下内容：
 
 * 准备好训练/验证数据集，用于模型训练与评估。
-* 准备好PyTorch模型结构，为模型精度baseline。
+* 准备好PyTorch模型结构，作为模型精度baseline。
 * 准备好验证设备，如模型参数为fp16，可准备V100、A100等计算卡，如模型参数为bf16，需准备A100等计算卡。
 
 2. 整体流程
@@ -48,9 +48,23 @@
 
 【基本流程】
 
-PyTorch的API和PaddlePaddle的API基本相似，可以参考PyTorch 最新 release 与 Paddle develop API 映射表，部分组网代码也可手动转换。
+PyTorch的API和PaddlePaddle的API基本相似，
+可以参考 `PyTorch最新release与Paddle develop API映射表`_ ，
+部分组网代码也可手动转换。
 
-大模型网络结构示例：
+.. _PyTorch最新release与Paddle develop API映射表 : https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/model_convert/convert_from_pytorch/pytorch_api_mapping_cn.html
+
+【代码自动转换工具】
+
+`代码自动转换工具PaConvert`_ 能自动将其它深度学习框架训练或推理的代码，转换为 PaddlePaddle 的代码，方便快速自动地 模型代码迁移。
+
+目前仅支持自动转换 Pytorch 代码，其它深度学习框架的支持后续新增中，
+转换时会尽量保持原代码的风格与结构，将其它深度学习框架的 API 接口 转换为 PaddlePaddle 的 API 接口。
+
+.. _代码自动转换工具PaConvert : https://www.paddlepaddle.org.cn/documentation/docs/zh/guides/model_convert/convert_from_pytorch/paconvert_introduction_cn.html
+
+
+【大模型网络结构示例】
 
 * Llama: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/transformers/llama/modeling.py
 * Qwen2: https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/transformers/qwen2/modeling.py
@@ -183,7 +197,7 @@ PyTorch的API和PaddlePaddle的API基本相似，可以参考PyTorch 最新 rele
 
     convert_from_paddle_to_torch(paddle_path="/root/code/PaddleNLP/ckpt/Qwen/Qwen2-0.5B"， paddle_class=Qwen2MoeForCausalLM)
 
-其中，模型结构中需实现_get_name_mapping方法，其中将线性层参数进行转置后适配Paddle nn.Linear。参考如Qwen模型结构：
+其中，模型结构中需实现_get_name_mapping方法，在这个方法中会将线性层参数标识需要转置的参数，进而适配Paddle nn.Linear的参数。参考如Qwen模型结构：
 
 https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54eeb17058d/paddlenlp/transformers/qwen2/modeling.py#L732-L766
 
@@ -279,7 +293,7 @@ https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54ee
 
 * 模型在前向对齐验证时，需要调用model.eval()方法，保证组网中的随机量被关闭，比如BatchNorm、Dropout等。
 * 给定相同的输入数据，为保证可复现性，如果有随机数生成，固定相关的随机种子。
-* 输出diff可以使用np.mean(np.abs(o1 - o2))进行计算，一般小于1e-6的话，可以认为前向没有问题。如果最终输出结果diff较大，可以使用二分的方法进行排查，比如说BERT，包含1个embdding层、12个transformer-block以及最后的MLM head层，那么完成模型组网和权重转换之后，如果模型输出没有对齐，可以尝试输出中间某一个transformer-block的tensor进行对比，如果相同，则向后进行排查；如果不同，则继续向前进行排查，以此类推，直到找到导致没有对齐的操作。
+* 输出diff可以使用np.max(np.abs(o1 - o2))进行计算，一般小于1e-5的话，可以认为前向没有问题。如果最终输出结果diff较大，可以使用二分的方法进行排查，比如说BERT，包含1个embdding层、12个transformer-block以及最后的MLM head层，那么完成模型组网和权重转换之后，如果模型输出没有对齐，可以尝试输出中间某一个transformer-block的tensor进行对比，如果相同，则向后进行排查；如果不同，则继续向前进行排查，以此类推，直到找到导致没有对齐的操作。
 * 在验证精度时需设置环境变量，避免算子的随机性，环境变量如下：
 
 .. code-block:: shell
@@ -360,6 +374,7 @@ https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54ee
         assert np.allclose(out_paddle.numpy(), out_torch.detach().numpy(), rtol=1e-5, atol=1e-4)
 
     eval_model_convert_parallel(mp_degree=2)
+
 【注意事项】
 
 * 在验证精度时需设置环境变量，避免算子的随机性，环境变量如下：
@@ -477,5 +492,6 @@ PaDiff: https://github.com/PaddlePaddle/PaDiff
 
 
 参考文档:
+
 1. https://github.com/PaddlePaddle/PaDiff
 2. https://github.com/PaddlePaddle/models/blob/release/2.2/docs/lwfx/ArticleReproduction_NLP.md
