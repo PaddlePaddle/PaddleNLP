@@ -23,6 +23,7 @@
 * 微信交流群: 微信扫描二维码并填写问卷之后，即可加入交流群，与众多社区开发者以及官方团队深度交流。
 
 .. image:: https://github.com/user-attachments/assets/3a58cc9f-69c7-4ccb-b6f5-73e966b8051a
+   :width: 200px
    :align: center
    :alt: paddlenlp微信交流群二维码
 
