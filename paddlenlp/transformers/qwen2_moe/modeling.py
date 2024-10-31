@@ -722,20 +722,14 @@ class Qwen2MoeGate(PretrainedMoEGate):
 
 class Qwen2MoeSparseMoEBlock(MoELayer):
     def __init__(self, config: Qwen2MoeConfig):
+        super().__init__(num_experts=config.num_experts, capacity=2.0)
 
-        self.num_experts = config.num_experts
         self.top_k = config.num_experts_per_tok
         self.norm_topk_prob = config.norm_topk_prob
 
         self.gate = Qwen2MoeGate(self.num_experts, config.hidden_size)
-        # self.gate = nn.Linear(config.hidden_size, self.num_experts, bias_attr=False)s
+        # self.gate = nn.Linear(config.hidden_size, self.num_experts, bias_attr=False)
         self.experts = nn.LayerList([Qwen2MoeMLP(config) for _ in range(self.num_experts)])
-
-        super().__init__(
-            gate=self.gate,
-            capacity=2.0,
-            experts=self.experts,
-        )
 
         self.shared_expert = Qwen2MoeMLP(config, is_shared=True)
         self.shared_expert_gate = nn.Linear(config.hidden_size, 1, bias_attr=False)

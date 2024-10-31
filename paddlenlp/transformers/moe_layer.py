@@ -160,17 +160,14 @@ class MoELayer(nn.Layer):
 
     def __init__(
         self,
-        gate: nn.Layer,
-        capacity: int,
-        experts: nn.LayerList,
+        num_experts: int,
+        capacity: int = 1.0,
         group: Group = None,
         all_to_all_dropout=0.0,
     ):
         super().__init__()
-        self.gate = gate
 
-        self.num_experts = len(experts)
-        self.experts = experts
+        self.num_experts = num_experts
         self.capacity = capacity
 
         self.group = group
@@ -179,32 +176,24 @@ class MoELayer(nn.Layer):
         self.enable_recompute = False
 
         self.expert_parallel_degree = 1 if dist.get_world_size(self.group) < 1 else dist.get_world_size(group)
-        is_dummy_moe = dist.get_world_size(group) == 1
+        self.is_dummy_moe = dist.get_world_size(self.group) == 1
         self.rank = 0 if dist.get_rank(self.group) < 0 else dist.get_rank(self.group)
-
-        for p in self.gate.parameters():
-            p.is_gate = True
-
-        if isinstance(experts, nn.LayerList):
-            self.experts = experts
-        else:
-            logger.info(f"using fused experts, type={type(experts)}")
-            self.experts = nn.LayerList([experts])
-        self.group = group
-        self.all_to_all_dropout = all_to_all_dropout
-        is_dummy_moe = dist.get_world_size(group) == 1 or dist.get_world_size(group) == -1
-
-        for k in experts:
-            if k is not None:
-                for p in k.parameters():
-                    p.expert = not is_dummy_moe
-                    p.no_sync = not is_dummy_moe
-                    # logger.info(f"expert param={p.name}, no-sync={p.no_sync}")
 
         assert (
             self.num_experts % self.expert_parallel_degree == 0
         ), f"num_experts must be divisible by expert_parallel_degree, got: {self.num_experts} vs {self.expert_parallel_degree}"
         self.num_local_experts = self.num_experts // self.expert_parallel_degree
+
+    def _post_init(self):
+        for p in self.gate.parameters():
+            p.is_gate = True
+
+        for k in self.experts:
+            if k is not None:
+                for p in k.parameters():
+                    p.expert = not self.is_dummy_moe
+                    p.no_sync = not self.is_dummy_moe
+                    # logger.info(f"expert param={p.name}, no-sync={p.no_sync}")
 
     def expert_forward(self, dispatched_input):
         true_experts = self.experts[self.rank * self.num_local_experts : (self.rank + 1) * self.num_local_experts]
