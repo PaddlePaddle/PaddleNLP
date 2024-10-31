@@ -1886,7 +1886,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             for name, param in model.named_parameters():
                 if any(module_to_keep_in_fp32 in name for module_to_keep_in_fp32 in keep_in_fp32_modules):
                     if param.dtype != paddle.float32:
-                        param = param.to(dtype=paddle.float32)
+                        param_fp32 = param.cast(dtype=paddle.float32)
+                        param_fp32_tensor = param_fp32.value().get_tensor()
+                        param_tensor = param.value().get_tensor()
+                        param_tensor._share_data_with(param_fp32_tensor)
 
         # Make sure we are able to load base models as well as derived models (with heads)
         start_prefix = ""
