@@ -66,7 +66,7 @@ else:
             (
                 "llama",
                 (
-                    "LlamaTokenizer",
+                    ("LlamaTokenizer", "Llama3Tokenizer"),
                     "LlamaTokenizerFast" if is_tokenizers_available() else None,
                 ),
             ),
