@@ -66,6 +66,7 @@ PyTorch的API和PaddlePaddle的API基本相似，可以参考PyTorch 最新 rele
 组网代码转换完成之后，需要对模型权重进行转换。
 
 .. code-block:: python
+    :linenos:
 
     import json
     import os
@@ -189,6 +190,7 @@ PyTorch的API和PaddlePaddle的API基本相似，可以参考PyTorch 最新 rele
 https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54eeb17058d/paddlenlp/transformers/qwen2/modeling.py#L732-L766
 
 .. code-block:: python
+    :linenos:
 
     class Qwen2PretrainedModel(PretrainedModel):
         @classmethod
@@ -240,6 +242,7 @@ https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54ee
 【示例代码】
 
 .. code-block:: python
+    :linenos:
 
     import numpy as np
     import paddle
@@ -282,6 +285,7 @@ https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54ee
 * 在验证精度时需设置环境变量，避免算子的随机性，环境变量如下：
 
 .. code-block:: shell
+    :linenos:
 
     # 通用环境变量，避免随机性
     export NVIDIA_TF32_OVERRIDE=0
@@ -303,11 +307,13 @@ https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54ee
 基本流程同 3.1.3 模型组网正确性验证。此外，在模型初始化时，需创建分布式并行环境，并使用paddle.distributed.launch进行启动运行，示例命令如下：
 
 .. code-block:: shell
+    :linenos:
 
     python -m paddle.distributed.launch --devices 0,1 compare_torch_with_paddle.py
 
 【示例代码】
 .. code-block:: python
+    :linenos:
 
     import numpy as np
     import paddle
@@ -360,7 +366,8 @@ https://github.com/PaddlePaddle/PaddleNLP/blob/0040a6068f56df27e0ae98e15f52d54ee
 * 在验证精度时需设置环境变量，避免算子的随机性，环境变量如下：
 
 .. code-block:: shell
-
+    :linenos:
+    
     # 通用环境变量，避免随机性
     export NVIDIA_TF32_OVERRIDE=0
     export FLAGS_embedding_deterministic=1
