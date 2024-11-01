@@ -1,3 +1,17 @@
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 unset PADDLE_ELASTIC_JOB_ID
 unset PADDLE_TRAINER_ENDPOINTS
 unset DISTRIBUTED_TRAINER_ENDPOINTS
@@ -26,7 +40,7 @@ to_static=1
 # export PYTHONPATH=../../../:$PYTHONPATH
 
 python -u -m paddle.distributed.launch \
-    --gpus "6,7" \
+    --gpus "0,1,2,3,4,5,6,7" \
     --log_dir ${log_dir} \
     run_pretrain_auto.py \
     --model_name_or_path config.json \
@@ -59,7 +73,7 @@ python -u -m paddle.distributed.launch \
     --sharding "stage1" \
     --sharding_parallel_degree 1 \
     --tensor_parallel_degree 2 \
-    --pipeline_parallel_degree 1 \
+    --pipeline_parallel_degree 4 \
     --sequence_parallel 0 \
     --use_flash_attention 1 \
     --fused_linear 0 \

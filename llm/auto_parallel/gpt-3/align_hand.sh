@@ -41,7 +41,7 @@ rm -rf $log_dir
 python -u -m paddle.distributed.launch \
     --gpus "6,7" \
     --log_dir ${log_dir} \
-    /root/paddlejob/workspace/env_run/zhangwl/zwl/PaddleNLP/llm/run_pretrain.py \
+    ../../run_pretrain.py \
     --model_name_or_path test_config.json \
     --tokenizer_name_or_path gpt3-13B-en \
     --input_dir "./data" \
@@ -91,7 +91,6 @@ python -u -m paddle.distributed.launch \
     --save_sharded_model false \
     --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
     --tensor_parallel_config "enable_mp_async_allreduce" \
-    --resume_from_checkpoint "output/gpt3_13b_hand/checkpoint-1"
     # --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
     # --tensor_parallel_config "enable_mp_async_allreduce enable_mp_skip_c_identity enable_mp_fused_linear_param_grad_add" \
     # --pipeline_parallel_config "enable_sharding_comm_overlap" \

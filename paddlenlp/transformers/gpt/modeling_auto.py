@@ -1078,7 +1078,6 @@ class GPTModelAuto(GPTPretrainedModelAuto):
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
         # input_shape => bs, seq_len
-        # print("GPT_Model inputs_ids",input_ids._md5sum())
         if past_key_values is None:
             past_key_values = tuple([None] * len(self.decoder.layers))
 
@@ -1167,10 +1166,8 @@ class GPTPretrainingCriterionAuto(paddle.nn.Layer):
         with paddle.amp.auto_cast(False):
             if len(prediction_scores.shape) < len(masked_lm_labels.unsqueeze(2).shape):
                 prediction_scores = paddle.unsqueeze_(prediction_scores, 0)
-            # print(" prediction_scores ",prediction_scores.dtype,prediction_scores._local_value()._md5sum()[:5],prediction_scores._md5sum()[:5])
-            # print(" masked_lm_labels ",masked_lm_labels.dtype,masked_lm_labels._local_value()._md5sum()[:5],masked_lm_labels._md5sum()[:5])
+
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
-            # print(" masked_lm_loss ",masked_lm_loss.dtype,masked_lm_loss._local_value()._md5sum()[:5],masked_lm_loss._md5sum()[:5])
             # masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
             # loss = paddle.mean(masked_lm_loss)
             if loss_mask is None:
@@ -1178,7 +1175,6 @@ class GPTPretrainingCriterionAuto(paddle.nn.Layer):
                 loss_mask = loss_mask.reshape([-1])
             masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
             loss = masked_lm_loss / loss_mask.sum()
-            # print(" loss ",loss.dtype,loss._local_value()._md5sum()[:5],loss._md5sum()[:5])
         return loss
 
 
@@ -1223,15 +1219,6 @@ class GPTLMHeadAuto(nn.Layer):
         if tensor_parallel_output is None:
             tensor_parallel_output = self.config.tensor_parallel_output
 
-        if dist.in_auto_parallel_align_mode() and False:
-            y = dist.reshard(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(1)])
-            # print("GPTLMHeadAuto hidden_states",hidden_states._md5sum())
-            # print("GPTLMHeadAuto weight",y._md5sum())
-            logits = paddle.matmul(hidden_states, y, transpose_y=self.transpose_y)
-            # print("GPTLMHeadAuto logits",logits._md5sum())
-            # logits = dist.reshard(logits, get_mesh(self.ipp),
-            #           [dist.Shard(0), dist.Replicate()])
-            return logits
         y = dist.reshard(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)])
         logits = paddle.matmul(hidden_states, y, transpose_y=self.transpose_y)
         return logits
@@ -1333,32 +1320,16 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
             hidden_states = outputs
         else:
             hidden_states = outputs[0]
-        # print("hidden_states ",hidden_states._local_value().dtype,hidden_states._local_value()._md5sum()[:5])
         # logits = self.lm_head(hidden_states)
         # NOTE(zhangweilong):lm_head(hidden_states)
         if self.config.sequence_parallel:
             hidden_states = dist.reshard(hidden_states, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
             hidden_states = paddle.reshape(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
 
-        if dist.in_auto_parallel_align_mode() and False:
-            y = dist.reshard(
-                self.gpt.embeddings.word_embeddings.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(1)]
-            )
-            # print("GPTLMHeadAuto hidden_states",hidden_states._md5sum())
-            # print("GPTLMHeadAuto weight",y._md5sum())
-            logits = paddle.matmul(hidden_states, y, transpose_y=True)
-            # print("GPTLMHeadAuto logits",logits._md5sum())
-            # logits = dist.reshard(logits, get_mesh(self.ipp),
-            #           [dist.Shard(0), dist.Replicate()])
-        else:
-            y = dist.reshard(
-                self.gpt.embeddings.word_embeddings.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)]
-            )
-            logits = paddle.matmul(hidden_states, y, transpose_y=True)
-        # print("logits ",logits._local_value().dtype,logits._local_value()._md5sum()[:5],logits._md5sum()[:5])
-        # return logits
-        # print("logits ",logits._md5sum()
-        # NOTE: The following code failed to run from dynamic to static mode
+        y = dist.reshard(
+            self.gpt.embeddings.word_embeddings.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)]
+        )
+        logits = paddle.matmul(hidden_states, y, transpose_y=True)
         loss = None
         if labels is not None:
             loss = self.criterion(logits, labels)
