@@ -1784,6 +1784,11 @@ class Trainer:
             for key, value in self.optimizer._master_weights.items():
                 self.optimizer._master_weights[key] = value.pin_memory()
 
+        if hasattr(self.optimizer, "_accumulators_holder"):
+            # offload accumulators_holder
+            for key, value in self.optimizer._accumulators_holder.items():
+                self.optimizer._accumulators_holder[key] = value.pin_memory()
+
     def _load_rng_state(self, checkpoint):
         # Load RNG states from `checkpoint`
         if checkpoint is None:
@@ -2874,6 +2879,11 @@ class Trainer:
                 self.scaler.load_state_dict(
                     paddle.load(distributed_file(os.path.join(checkpoint, SCALER_NAME)), return_numpy=True)
                 )
+
+        if self.args.offload_optim:
+            logger.info("Offloading optimizer state...")
+            self._offload_optimizer()
+
         self.runtime_timer.stop()
 
     def log(self, logs: Dict[str, float], **kwargs) -> None:
