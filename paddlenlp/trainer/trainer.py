@@ -1689,6 +1689,11 @@ class Trainer:
             for key, value in self.optimizer._master_weights.items():
                 self.optimizer._master_weights[key] = value.pin_memory()
 
+        if hasattr(self.optimizer, "_accumulators_holder"):
+            # offload accumulators_holder
+            for key, value in self.optimizer._accumulators_holder.items():
+                self.optimizer._accumulators_holder[key] = value.pin_memory()
+
     def _load_rng_state(self, checkpoint):
         # Load RNG states from `checkpoint`
         if checkpoint is None:
