@@ -447,6 +447,7 @@ class TrainingArguments:
         },
     )
     logging_dir: Optional[str] = field(default=None, metadata={"help": "VisualDL log dir."})
+    output_signal_dir: Optional[str] = field(default=None, metadata={"help": "Asynchronous saving signal dir."})
     logging_strategy: IntervalStrategy = field(
         default="steps",
         metadata={"help": "The logging strategy to use."},
@@ -826,6 +827,12 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to use async_save instead of paddle.save."},
     )
+    ordered_save_group_size: int = field(
+        default=0,
+        metadata={
+            "help": "Select ordered_save_group_size to save checkpoint in ordered. if ordered_save_group_size=0, not used ordered save"
+        },
+    )
     skip_profile_timer: Optional[bool] = field(
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl."},
@@ -914,6 +921,10 @@ class TrainingArguments:
             self.logging_dir = os.path.join(self.output_dir, default_logdir())
         if self.logging_dir is not None:
             self.logging_dir = os.path.expanduser(self.logging_dir)
+        if self.output_signal_dir is None and self.output_dir is not None:
+            self.output_signal_dir = self.output_dir
+        if self.output_signal_dir is not None:
+            self.output_signal_dir = os.path.expanduser(self.output_signal_dir)
 
         if self.disable_tqdm is None:
             self.disable_tqdm = False  # logger.getEffectiveLevel() > logging.WARN
@@ -1397,6 +1408,12 @@ class TrainingArguments:
                             f"but got logging_steps={self.logging_steps}."
                         )
 
+                    if "split_param" in sharding_parallel_config:
+                        assert self.sharding == [ShardingOption.SHARD_OP], "Only sharding stage1 support split_param."
+                        assert (
+                            self.amp_master_grad
+                        ), "If `split_param` in sharding_parallel_config, `amp_master_grad` must be True."
+
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
 
@@ -1467,7 +1484,7 @@ class TrainingArguments:
                             "enable_send_recv_overlap",
                             # "disable_p2p_cache_shape",      # no need for auto_parallel
                             # "disable_partial_send_recv",    # no implemenation for auto_parallel
-                            # "enable_delay_scale_loss",      # default True in auto_parallel, non-configurable
+                            "enable_delay_scale_loss",
                             # "enable_dp_comm_overlap",       # no implemenation for auto_parallel
                             # "enable_sharding_comm_overlap", # no implemenation for auto_parallel
                             # "enable_timer",                 # no implemenation for auto_parallel
@@ -1516,6 +1533,7 @@ class TrainingArguments:
                     if len(x) > 0:
                         if x not in [
                             "enable_mp_async_allreduce",  # allreduce_matmul_grad_overlapping in auto_parallel
+                            "enable_delay_scale_loss",
                             # "enable_mp_skip_c_identity",
                             # "enable_mp_fused_linear_param_grad_add",
                         ]:

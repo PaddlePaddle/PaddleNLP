@@ -61,9 +61,9 @@ function _train(){
     mkdir $OUTPUT_PATH
 
     if [ ${model_item} = "gpt2" ];then
-        static_scripts="../legacy/model_zoo/gpt/"
+        static_scripts="../slm/model_zoo/gpt/"
     else
-        static_scripts="../legacy/model_zoo/gpt-3/static/"
+        static_scripts="../slm/model_zoo/gpt-3/static/"
     fi
 
     echo "current CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES}, model_name=${model_name}, device_num=${device_num}, is profiling=${profiling}"
@@ -165,7 +165,7 @@ function _train(){
 	;;
     *) echo "choose run_mode "; exit 1;
     esac
-    cd ../legacy/model_zoo/gpt-3/static/
+    cd ../slm/model_zoo/gpt-3/static/
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
     python -c "import paddlenlp"
     timeout 15m ${train_cmd} > ${log_file} 2>&1

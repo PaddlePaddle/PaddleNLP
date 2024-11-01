@@ -20,7 +20,7 @@ def get_model_list():
     """
     get model list from
     <https://github.com/PaddlePaddle/PaddleNLP/model_zoo/>
-    <https://github.com/PaddlePaddle/PaddleNLP/legacy/examples/>
+    <https://github.com/PaddlePaddle/PaddleNLP/slm/examples/>
     """
 
     CI_MODEL_LIST = [
@@ -72,9 +72,9 @@ def get_model_list():
     ]
     examples_second_list = ["model_interpretation", "semantic_indexing", "lexical_analysis", "word_embedding"]
 
-    model_list = os.listdir("legacy/model_zoo")
+    model_list = os.listdir("slm/model_zoo")
     model_list = os.listdir("model_zoo")
-    examples_list = os.listdir("legacy/examples/")
+    examples_list = os.listdir("slm/examples/")
     app_list = os.listdir("applications/")
 
     # remove model_list README
