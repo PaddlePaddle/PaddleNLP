@@ -174,13 +174,26 @@ function track_case_status() {
     cd ${log_path} || { echo "Failed to enter log_path: $log_path"; return 1; }  
   
     total_count=$(ls -1 "$prefix"* 2>/dev/null | wc -l)  
-    fail_count=$(ls -1 "$prefix"*_FAIL 2>/dev/null | wc -l)  
-  
+    run_fail_count=$(ls -1 "$prefix"*_FAIL 2>/dev/null | wc -l)  
+    loss_fail_count=$(grep 'check failed! ' result.log | awk '$2 ~ /^prefix/ {print $2}'| wc -l)
+
     # return original path 
     cd "$original_path" || { echo "Failed to return to original path: $original_path"; return 1; }  
     echo -e "\033[31m ---- $case_name total tests :  $total_count \033"
-    echo -e "\033[31m ---- $case_name failed tests :  $fail_count \033"
-}  
+    if [ $run_fail_count -eq 0 ] && [ $loss_fail_count  -eq 0 ]; then
+        echo -e "\033[32m ---- all cases Success  \033"
+    else
+        if [[ $run_fail_count -ne 0 ]] ; then
+            echo -e "\033[31m ---- $case_name runtime failed test  :  $run_fail_count \033"
+            ls -1 "$prefix"* 2>/dev/null
+        fi
+        if [[ $loss_fail_count -ne 0 ]] ; then
+            echo -e "\033[31m ---- $case_name loss verification failed test  :  $loss_fail_count \033"
+            grep 'check failed! ' result.log | awk '$2 ~ /^prefix/ {print $2}'
+        fi
+
+    fi
+} 
 ####################################
 get_diff_TO_case # 获取待执行case列表
 case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${case_list[*]}))  # 去重并将结果存储回原列表
