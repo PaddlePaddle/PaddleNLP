@@ -175,24 +175,23 @@ function track_case_status() {
   
     total_count=$(ls -1 "$prefix"* 2>/dev/null | wc -l)  
     run_fail_count=$(ls -1 "$prefix"*_FAIL 2>/dev/null | wc -l)  
-    loss_fail_count=$(grep 'check failed! ' result.log | awk '$2 ~ /^prefix/ {print $2}'| wc -l)
-
+    loss_fail_count=$(grep 'check failed! ' result.log | awk -v prefix="$prefix_var" '{if ($2 ~ "^" prefix) print $2}'| wc -l)
+    
     # return original path 
-    cd "$original_path" || { echo "Failed to return to original path: $original_path"; return 1; }  
     echo -e "\033[31m ---- $case_name total tests :  $total_count \033"
     if [ $run_fail_count -eq 0 ] && [ $loss_fail_count  -eq 0 ]; then
-        echo -e "\033[32m ---- all cases Success  \033"
+        echo -e "\033[32m ---- $case_name all cases Success  \033"
     else
         if [[ $run_fail_count -ne 0 ]] ; then
             echo -e "\033[31m ---- $case_name runtime failed test  :  $run_fail_count \033"
-            ls -1 "$prefix"* 2>/dev/null
+            ls -1 "$prefix"*_FAIL 2>/dev/null
         fi
         if [[ $loss_fail_count -ne 0 ]] ; then
             echo -e "\033[31m ---- $case_name loss verification failed test  :  $loss_fail_count \033"
-            grep 'check failed! ' result.log | awk '$2 ~ /^prefix/ {print $2}'
+            grep 'check failed! ' result.log | awk -v prefix="$prefix_var" '{if ($2 ~ "^" prefix) print $2}'
         fi
-
     fi
+    cd "$original_path" || { echo "Failed to return to original path: $original_path"; return 1; }  
 } 
 ####################################
 get_diff_TO_case # 获取待执行case列表
@@ -218,8 +217,6 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         bash /workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh llama_case_list_auto $FLAGS_install_deps $FLAGS_download_data
         print_info $? `ls -lt ${log_path} | grep llama | head -n 1 | awk '{print $9}'` llama_auto
         export FLAGS_download_data="llama ""$FLAGS_download_data"
-        log_prefix="llama_"
-        track_case_status "llama_auto"  $log_prefix
         let case_num++
     fi
     if [[ $(contain_case gpt-3_auto ${case_list[@]}; echo $?) -eq 1 ]];then
@@ -228,8 +225,6 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` gpt-3_auto
         export FLAGS_install_deps=1
         export FLAGS_download_data="gpt ""$FLAGS_download_data"
-        log_prefix="llm_gpt_dygraph_auto_"
-        track_case_status "gpt-3_auto"  $log_prefix
         let case_num++        
     fi
     if [[ $(contain_case gpt-3_dygraph ${case_list[@]}; echo $?) -eq 1 ]];then
@@ -238,36 +233,11 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         print_info $? `ls -lt ${log_path} | grep gpt | head -n 1 | awk '{print $9}'` gpt-3_dygraph
         export FLAGS_install_deps=1
         export FLAGS_download_data="gpt ""$FLAGS_download_data"
-        log_prefix="gpt_"
-        track_case_status "llama_auto"  $log_prefix
         let case_num++
     fi
     echo -e "\033[31m ---- end run case  \033"
-    cd ${log_path}
-    # result.log records the execution results of all cases
-    TOTAL_FILES=$(find . -maxdepth 1 -type f | grep -vF './result.log' | wc -l)  
-    FF=`ls *FAIL*|wc -l`
-    VF=`grep 'check failed! ' result.log | awk '{print $2}' | sort -u | wc -l`
-    if [[ ! -f *FAIL* ]] && [[ $VF -eq 0 ]];then
-        FF=0
-        EXCODE=0
-        echo -e "\033[32m ---- Total cases: ${TOTAL_FILES}, all cases Success  \033"
-    else
-        # The failed tests can be categorized into two types: 
-        # 1. Tests that fail during execution, with their log files ending in '_FAIL'. 
-        # 2. Tests that fail the loss verification, indicating the existence of a diff, 
-        # and these failed tests are marked with 'check failed' in the result.log file.
-        EXCODE=2
-        echo -e "\033[31m ---- Total cases: ${TOTAL_FILES}, case Failed number: $((FF + VF)) \033"
-        if [ $FF -ne 0 ]; then
-            echo -e "\033[31m ---- Runtime failed test: ${FF}  \033"
-            ls *_FAIL*
-        fi
-        if [ $VF -ne 0 ]; then
-            echo -e "\033[31m ---- Loss verification failed test:  ${VF} \033"
-            grep 'check failed! ' result.log | awk '{print $2}'
-        fi
-    fi  
+
+    track_case_status  $FUNCNAME ""
 else
     echo -e "\033[32m Changed Not CI case, Skips \033"
     EXCODE=0

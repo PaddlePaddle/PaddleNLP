@@ -27,6 +27,35 @@ export llm_gpt_data_path=/llm_gpt_data
 
 unset CUDA_VISIBLE_DEVICES
 
+function track_case_status() {  
+    local case_name="$1"  
+    local prefix="$2"  
+    local original_path  
+  
+    original_path=$(pwd)  
+    cd ${log_path} || { echo "Failed to enter log_path: $log_path"; return 1; }  
+  
+    total_count=$(ls -1 "$prefix"* 2>/dev/null | wc -l)  
+    run_fail_count=$(ls -1 "$prefix"*_FAIL 2>/dev/null | wc -l)  
+    loss_fail_count=$(grep 'check failed! ' result.log | awk -v prefix="$prefix_var" '{if ($2 ~ "^" prefix) print $2}'| wc -l)
+    
+    # return original path 
+    echo -e "\033[31m ---- $case_name total tests :  $total_count \033"
+    if [ $run_fail_count -eq 0 ] && [ $loss_fail_count  -eq 0 ]; then
+        echo -e "\033[32m ---- $case_name all cases Success  \033"
+    else
+        if [[ $run_fail_count -ne 0 ]] ; then
+            echo -e "\033[31m ---- $case_name runtime failed test  :  $run_fail_count \033"
+            ls -1 "$prefix"*_FAIL 2>/dev/null
+        fi
+        if [[ $loss_fail_count -ne 0 ]] ; then
+            echo -e "\033[31m ---- $case_name loss verification failed test  :  $loss_fail_count \033"
+            grep 'check failed! ' result.log | awk -v prefix="$prefix_var" '{if ($2 ~ "^" prefix) print $2}'
+        fi
+    fi
+    cd "$original_path" || { echo "Failed to return to original path: $original_path"; return 1; }  
+} 
+
 function gpt_case_list_dygraph(){
     # The test name must have "gpt_" as a prefix, which will 
     # be used for tracking the execution status of the case.
@@ -52,10 +81,16 @@ function gpt_case_list_dygraph(){
     gpt_345M_single_finetune
     gpt_eval_WikiText
     gpt_eval_LAMBADA
+
+    track_case_status $FUNCNAME "gpt_"
 }
 
 function llm_gpt_case_list_dygraph() {
+    # The test name must have "llm_gpt_" as a prefix, which will 
+    # be used for tracking the execution status of the case.
     llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1
+
+    track_case_status $FUNCNAME "llm_gpt_"
 }
 
 ############ case start ############
