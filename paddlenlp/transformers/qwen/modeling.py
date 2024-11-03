@@ -19,13 +19,47 @@ from functools import partial
 from typing import List
 
 import paddle
+import paddle.distributed as dist
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
+from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import try_import
+
+
+class Concat(PyLayer):
+    @staticmethod
+    def forward(ctx, inp, axis, group):
+        inputs = []
+        paddle.distributed.all_gather(inputs, inp, group=group)
+        with paddle.no_grad():
+            cat = paddle.concat(inputs, axis=axis)
+        ctx.args_axis = axis
+        ctx.args_group = group
+        return cat
+
+    @staticmethod
+    def backward(ctx, grad):
+        axis = ctx.args_axis
+        group = ctx.args_group
+        with paddle.no_grad():
+            grads = paddle.split(grad, paddle.distributed.get_world_size(group), axis=axis)
+        grad = grads[paddle.distributed.get_rank(group)]
+        return grad
+
+
+def concat_mp_with_grad(input):
+    hcg = fleet.get_hybrid_communicate_group()
+    mp_degree = hcg.get_model_parallel_world_size()
+    if mp_degree <= 1:
+        return input
+    else:
+        group = hcg.get_model_parallel_group()
+        return Concat.apply(input, -1, group)
+
 
 try:
     from paddle.incubate.nn.functional import swiglu
@@ -171,7 +205,7 @@ class QWenAttention(nn.Layer):
             self.c_proj = RowParallelLinear(
                 config.hidden_size,
                 self.projection_size,
-                has_bias=not config.no_bias,
+                has_bias=False,
                 input_is_parallel=True,
             )
         else:
@@ -179,7 +213,7 @@ class QWenAttention(nn.Layer):
             self.c_proj = Linear(
                 config.hidden_size,
                 self.projection_size,
-                bias_attr=not config.no_bias,
+                bias_attr=False,
             )
 
         if config.rotary_pct == 1.0:
@@ -292,14 +326,17 @@ class QWenAttention(nn.Layer):
         mixed_x_layer = self.c_attn(hidden_states)
 
         if self.sequence_parallel:
-            target_shape = [-1, self.seq_length, self.num_heads * 3 * self.head_dim]
-            mixed_x_layer = paddle.reshape_(mixed_x_layer, target_shape)
+            target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
+        else:
+            target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
+
+        mixed_x_layer = paddle.reshape_(mixed_x_layer, target_shape)
 
         # [bz, sql, hid] ==> [bz, sql, nh, hdim]
         query, key, value = paddle.split(mixed_x_layer, num_or_sections=3, axis=-1)
-        query = self._split_heads(query, self.num_heads, self.head_dim)
-        key = self._split_heads(key, self.num_heads, self.head_dim)
-        value = self._split_heads(value, self.num_heads, self.head_dim)
+        # query = self._split_heads(query, self.num_heads, self.head_dim)
+        # key = self._split_heads(key, self.num_heads, self.head_dim)
+        # value = self._split_heads(value, self.num_heads, self.head_dim)
 
         kv_seq_len = key.shape[-3]
         if layer_past:
@@ -421,11 +458,11 @@ class QWenMLP(nn.Layer):
             )
         else:
             if self.fuse_attention_ffn:
-                self.gate_up_fused_proj = Linear(config.hidden_size, ff_dim_in * 2, bias_attr=not config.no_bias)
+                self.gate_up_fused_proj = Linear(config.hidden_size, ff_dim_in * 2, bias_attr=False)
             else:
-                self.w1 = Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
-                self.w2 = Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
-            self.c_proj = Linear(ff_dim_in, config.hidden_size, bias_attr=not config.no_bias)
+                self.w1 = Linear(config.hidden_size, ff_dim_in, bias_attr=False)
+                self.w2 = Linear(config.hidden_size, ff_dim_in, bias_attr=False)
+            self.c_proj = Linear(ff_dim_in, config.hidden_size, bias_attr=False)
 
     def forward(self, hidden_states):
         # up
@@ -979,6 +1016,9 @@ class QWenPretrainingCriterion(paddle.nn.Layer):
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
+        if dist.in_auto_parallel_align_mode():
+            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
+
     def forward(self, prediction_scores, masked_lm_labels):
         if self.enable_parallel_cross_entropy:
             if prediction_scores.shape[-1] == self.config.vocab_size:
@@ -1114,6 +1154,9 @@ class QWenForCausalLM(QWenPretrainedModel):
         hidden_states = transformer_outputs[0]
 
         lm_logits = self.lm_head(hidden_states)
+
+        if dist.in_auto_parallel_align_mode():
+            lm_logits = concat_mp_with_grad(lm_logits)
 
         loss = None
         if labels is not None:

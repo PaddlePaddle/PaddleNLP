@@ -26,7 +26,7 @@ export PADDLE_TRAINERS_NUM=1
 export FLAGS_call_stack_level=3
 export FLAGS_use_cuda_managed_memory=true
 
-task_name="llama_auto_dp2mp2pp2"
+task_name="llama_auto"
 rm -rf output/$task_name/
 rm -rf "output/$task_name""_log"
 
@@ -34,7 +34,7 @@ export SOT_LOG_LEVEL=4
 export PYTHONPATH=../../../:$PYTHONPATH
 
 
-rm -rf ./log/auto_3d_auto_dp2mp2pp2
+rm -rf ./log/auto_3d_hand
 
 export FLAGS_embedding_deterministic=1        
 export FLAGS_cudnn_deterministic=1
@@ -46,5 +46,47 @@ export FLAGS_enable_pir_in_executor=1
 
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
-    --log_dir "log/auto_3d_auto_dp2mp2pp2" \
-    run_pretrain_3D_auto.py ./pretrain_argument_auto_dp2tp2pp2.json
+    --log_dir "log/auto_3d_hand" \
+    ../../run_pretrain.py \
+    --model_name_or_path "qwen/qwen-14b" \
+    --tokenizer_name_or_path "qwen/qwen-14b" \
+    --input_dir "./data" \
+    --output_dir "./checkpoints/qwen_pretrain_ckpts" \
+    --per_device_train_batch_size 1\
+    --gradient_accumulation_steps 32\
+    --per_device_eval_batch_size 16\
+    --data_parallel_degree 2\
+    --tensor_parallel_degree 2\
+    --pipeline_parallel_degree 2\
+    --virtual_pp_degree 1\
+    --sequence_parallel 0\
+    --use_flash_attention false\
+    --use_fused_rms_norm false\
+    --use_fused_rope false\
+    --max_seq_length 4096\
+    --learning_rate 3e-05\
+    --min_learning_rate 3e-06\
+    --scale_loss 1024\
+    --warmup_steps 30\
+    --logging_steps 1\
+    --max_steps 10000\
+    --save_steps 1000\
+    --eval_steps 10000\
+    --weight_decay 0.01\
+    --bf16 true\
+    --fp16_opt_level "O2"\
+    --warmup_ratio 0.01\
+    --max_grad_norm 0.0\
+    --dataloader_num_workers 4\
+    --continue_training 0\
+    --do_train true\
+    --do_eval false\
+    --do_predict false\
+    --disable_tqdm true\
+    --recompute false\
+    --recompute_granularity "core_attn"\
+    --recompute_use_reentrant true\
+    --distributed_dataloader 0\
+    --save_total_limit 2\
+    --enable_auto_parallel 1\
+    --to_static 0
