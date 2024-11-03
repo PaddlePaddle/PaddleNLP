@@ -94,3 +94,5 @@ python -u -m paddle.distributed.launch \
     # --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
     # --tensor_parallel_config "enable_mp_async_allreduce enable_mp_skip_c_identity enable_mp_fused_linear_param_grad_add" \
     # --pipeline_parallel_config "enable_sharding_comm_overlap" \
+
+    

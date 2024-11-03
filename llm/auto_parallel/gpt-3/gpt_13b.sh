@@ -100,3 +100,4 @@ python -u -m paddle.distributed.launch \
     # --use_fast_layer_norm 1 \
     # --use_fused_dropout_add 1 \
     
+    

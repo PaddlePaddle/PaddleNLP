@@ -52,7 +52,7 @@ MODEL_NAME = "model"
 OPTIMIZER_NAME = "optimizer"
 DIST_CKPT_PATH = "dist_ckpt"
 DIST_MODEL_PATH = "dist_model"
-FREE_SVAE_LOAD_KEY_PATTERNS = ["learning_rate_", "gradient_merge_", "@GRAD@MERG", "eager_tmp","generated_tensor_0"]
+FREE_SVAE_LOAD_KEY_PATTERNS = ["learning_rate_", "gradient_merge_", "@GRAD@MERG", "eager_tmp", "generated_tensor_0"]
 
 
 class AutoTrainer(Trainer):

@@ -70,3 +70,4 @@ python -u -m paddle.distributed.launch \
     --to_static ${to_static} \
     --fp16 0 \
     --fp16_opt_level "O2"  \
+

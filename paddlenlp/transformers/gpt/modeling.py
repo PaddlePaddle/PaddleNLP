@@ -1577,6 +1577,7 @@ class GPTForCausalLM(GPTPretrainedModel):
     ):
         r"""
 
+
         Args:
             input_ids (Tensor, optional):
                 See :class:`GPTModel`.
