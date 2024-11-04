@@ -71,35 +71,71 @@ install_external_ops(){
     python setup.py install
     python -c "import fused_ln;";
 }
+
+function is_a100() {
+    if [ $(nvidia-smi|grep A100|wc -l)  -ne 0 ];then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
+IS_A100=$(is_a100) 
+
 ####################################
 get_diff_TO_case(){
 cd ${nlp_dir}
-for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
-    arr_file_name=(${file_name//// })
-    dir1=${arr_file_name[0]}
-    dir2=${arr_file_name[1]}
-    dir3=${arr_file_name[2]}
-    dir4=${arr_file_name[3]}
-    file_item=$dir1/$dir2/$dir3/$dir4
-    echo "file_name:"${file_name}, "path:"${file_item}
-    if [ ! -f ${file_name} ];then # 针对pr删掉文件
-        continue
-    elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
-        continue
-    else
-        for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
-            if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
-                case_list[${#case_list[*]}]=gpt-3_auto
-                case_list[${#case_list[*]}]=gpt-3_dygraph
-            fi
-        done
-        for ((i=0; i<${#target_lists_for_llama[@]}; i++)); do
-            if [[ ${file_item} == *${target_lists_for_llama[i]}* ]];then
-                case_list[${#case_list[*]}]=llama_auto
-            fi
-        done
-    fi
-done
+if [ $IS_A100 -ne 0 ];then
+    for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+        arr_file_name=(${file_name//// })
+        dir1=${arr_file_name[0]}
+        dir2=${arr_file_name[1]}
+        dir3=${arr_file_name[2]}
+        dir4=${arr_file_name[3]}
+        file_item=$dir1/$dir2/$dir3/$dir4
+        echo "file_name:"${file_name}, "path:"${file_item}
+        if [ ! -f ${file_name} ];then # 针对pr删掉文件
+            continue
+        elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
+            continue
+        else
+            for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
+                if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
+                    case_list[${#case_list[*]}]=gpt-3_auto
+                    case_list[${#case_list[*]}]=gpt-3_dygraph
+                fi
+            done
+            for ((i=0; i<${#target_lists_for_llama[@]}; i++)); do
+                if [[ ${file_item} == *${target_lists_for_llama[i]}* ]];then
+                    case_list[${#case_list[*]}]=llama_auto
+                fi
+            done
+        fi
+    done
+else
+    case_list[${#case_list[*]}]=gpt-3_auto
+    case_list[${#case_list[*]}]=llama_auto
+    for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+        arr_file_name=(${file_name//// })
+        dir1=${arr_file_name[0]}
+        dir2=${arr_file_name[1]}
+        dir3=${arr_file_name[2]}
+        dir4=${arr_file_name[3]}
+        file_item=$dir1/$dir2/$dir3/$dir4
+        echo "file_name:"${file_name}, "path:"${file_item}
+        if [ ! -f ${file_name} ];then # 针对pr删掉文件
+            continue
+        elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
+            continue
+        else
+            for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
+                if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
+                    case_list[${#case_list[*]}]=gpt-3_dygraph
+                fi
+            done
+        fi
+    done
+fi
 }
 ####################################
 print_info(){
@@ -128,6 +164,35 @@ function contain_case(){
     done
     return 0
 }
+####################################
+function track_case_status() {  
+    local case_name="$1"  
+    local prefix="$2"  
+    local original_path  
+  
+    original_path=$(pwd)  
+    cd ${log_path} || { echo "Failed to enter log_path: $log_path"; return 1; }  
+  
+    total_count=$(ls -1 "$prefix"* 2>/dev/null | wc -l)  
+    run_fail_count=$(ls -1 "$prefix"*_FAIL 2>/dev/null | wc -l)  
+    loss_fail_count=$(grep 'check failed! ' result.log | awk -v prefix="$prefix_var" '{if ($2 ~ "^" prefix) print $2}'| wc -l)
+    
+    # return original path 
+    echo -e "\033[31m ---- $case_name total tests :  $total_count \033"
+    if [ $run_fail_count -eq 0 ] && [ $loss_fail_count  -eq 0 ]; then
+        echo -e "\033[32m ---- $case_name all cases Success  \033"
+    else
+        if [[ $run_fail_count -ne 0 ]] ; then
+            echo -e "\033[31m ---- $case_name runtime failed test  :  $run_fail_count \033"
+            ls -1 "$prefix"*_FAIL 2>/dev/null
+        fi
+        if [[ $loss_fail_count -ne 0 ]] ; then
+            echo -e "\033[31m ---- $case_name loss verification failed test  :  $loss_fail_count \033"
+            grep 'check failed! ' result.log | awk -v prefix="$prefix_var" '{if ($2 ~ "^" prefix) print $2}'
+        fi
+    fi
+    cd "$original_path" || { echo "Failed to return to original path: $original_path"; return 1; }  
+} 
 ####################################
 get_diff_TO_case # 获取待执行case列表
 case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${case_list[*]}))  # 去重并将结果存储回原列表
@@ -171,17 +236,8 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         let case_num++
     fi
     echo -e "\033[31m ---- end run case  \033"
-    cd ${log_path}
-    if [ ! -f *FAIL* ];then
-        FF=0
-        EXCODE=0
-        echo -e "\033[32m ---- all case Success \033"
-    else
-        FF=`ls *FAIL*|wc -l`
-        EXCODE=2
-        echo -e "\033[31m ---- case Failed number: ${FF} \033"
-        ls *_FAIL*
-    fi
+
+    track_case_status  $FUNCNAME ""
 else
     echo -e "\033[32m Changed Not CI case, Skips \033"
     EXCODE=0

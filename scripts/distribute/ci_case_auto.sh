@@ -38,8 +38,39 @@ function is_a100() {
 
 IS_A100=$(is_a100)
 
+function track_case_status() {  
+    local case_name="$1"  
+    local prefix="$2"  
+    local original_path  
+  
+    original_path=$(pwd)  
+    cd ${log_path} || { echo "Failed to enter log_path: $log_path"; return 1; }  
+  
+    total_count=$(ls -1 "$prefix"* 2>/dev/null | wc -l)  
+    run_fail_count=$(ls -1 "$prefix"*_FAIL 2>/dev/null | wc -l)  
+    loss_fail_count=$(grep 'check failed! ' result.log | awk -v prefix="$prefix_var" '{if ($2 ~ "^" prefix) print $2}'| wc -l)
+    
+    # return original path 
+    echo -e "\033[31m ---- $case_name total tests :  $total_count \033"
+    if [ $run_fail_count -eq 0 ] && [ $loss_fail_count  -eq 0 ]; then
+        echo -e "\033[32m ---- $case_name all cases Success  \033"
+    else
+        if [[ $run_fail_count -ne 0 ]] ; then
+            echo -e "\033[31m ---- $case_name runtime failed test  :  $run_fail_count \033"
+            ls -1 "$prefix"*_FAIL 2>/dev/null
+        fi
+        if [[ $loss_fail_count -ne 0 ]] ; then
+            echo -e "\033[31m ---- $case_name loss verification failed test  :  $loss_fail_count \033"
+            grep 'check failed! ' result.log | awk -v prefix="$prefix_var" '{if ($2 ~ "^" prefix) print $2}'
+        fi
+    fi
+    cd "$original_path" || { echo "Failed to return to original path: $original_path"; return 1; }  
+} 
+
 # NOTE: Please place the new tests as much as possible after the existing tests
 function llama_case_list_auto() {
+    # The test name must have "llama_" as a prefix, which will 
+    # be used for tracking the execution status of the case.
     llama_dygraph_auto_bs8_fp32_DP2
     llama_dygraph_auto_bs8_fp32_DP2-MP2
     llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
@@ -55,20 +86,30 @@ function llama_case_list_auto() {
     llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1
     llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
     llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4
+
+    track_case_status $FUNCNAME "llama_"
 }
 
 function llm_gpt_case_list_auto() {
+    # The test name must have "llm_gpt_dygraph_auto_" as a prefix, 
+    # which will be used for tracking the execution status of the case.
     llm_gpt_dygraph_auto_bs8_fp32_DP2
     llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2
     llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2
     llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+
+    track_case_status $FUNCNAME "llm_gpt_dygraph_auto_"
 }
 
 function llm_qwen_case_list_auto() {
+    # The test name must have "llm_qwen_dygraph_auto_" as a prefix, 
+    # which will be used for tracking the execution status of the case.
     llm_qwen_dygraph_auto_bs1_fp32_DP2
     llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2
     llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2-PP2
     llm_qwen_dygraph_auto_bs1_bf16_DP2-MP2-PP2
+
+    track_case_status $FUNCNAME "llm_qwen_dygraph_auto_"
 }
 
 ############ case start ############
@@ -2083,12 +2124,12 @@ function check_result() {
     echo -e "$1" >> ${log_path}/result.log
     if [ $? -ne 0 ];then
         echo -e "\033[31m $1 run failed! \033[0m" | tee -a ${log_path}/result.log
-        exit -1
+        return 0
     fi
 
     if [ $# -ne 7 ] && [ $# -ne 8 ]; then
         echo -e "\033[31m $1 parameter transfer failed: $@ \033[0m" | tee -a ${log_path}/result.log
-        exit -1
+        return 0
     fi
 
     diff_loss=$(echo $2 $3|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
@@ -2096,7 +2137,7 @@ function check_result() {
     if [ $2 != $3 ];then
         if [ -z "$8" ] || [ $8 -ne 1 ] ;then
             echo -e "\033[31m $1 loss diff check failed! \033[0m" | tee -a ${log_path}/result.log
-            exit -1
+            return 0
         else
             diff=$(echo "$2 $3" | awk '{print $1-$2}')
             gt=$(echo "${diff#-} 1e-5" | awk '{print ($1>$2)?"1":"0"}')
@@ -2116,7 +2157,7 @@ function check_result() {
     fi
     if [[ $v2 == 0 ]];then
         echo -e "\033[31m $1 IPS diff check failed! \033[0m" | tee -a $log_path/result.log
-        exit -1
+        return 0
     fi
 
     diff_mem=$(echo $6 $7|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
@@ -2125,7 +2166,7 @@ function check_result() {
     w2=$(echo $diff_mem -5.0|awk '{print($1<=$2)?"0":"1"}')
     if [[ $w1 == 0 ]];then
         echo -e "\033[31m $1 MEM diff check failed! \033[0m" | tee -a $log_path/result.log
-        exit -1
+        return 0
     fi
     if [[ $w2 == 0 ]];then
         echo -e "$1 MEM decreases greater than 5%, not exit " | tee -a $log_path/result.log

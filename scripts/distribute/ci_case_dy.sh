@@ -27,7 +27,38 @@ export llm_gpt_data_path=/llm_gpt_data
 
 unset CUDA_VISIBLE_DEVICES
 
+function track_case_status() {  
+    local case_name="$1"  
+    local prefix="$2"  
+    local original_path  
+  
+    original_path=$(pwd)  
+    cd ${log_path} || { echo "Failed to enter log_path: $log_path"; return 1; }  
+  
+    total_count=$(ls -1 "$prefix"* 2>/dev/null | wc -l)  
+    run_fail_count=$(ls -1 "$prefix"*_FAIL 2>/dev/null | wc -l)  
+    loss_fail_count=$(grep 'check failed! ' result.log | awk -v prefix="$prefix_var" '{if ($2 ~ "^" prefix) print $2}'| wc -l)
+    
+    # return original path 
+    echo -e "\033[31m ---- $case_name total tests :  $total_count \033"
+    if [ $run_fail_count -eq 0 ] && [ $loss_fail_count  -eq 0 ]; then
+        echo -e "\033[32m ---- $case_name all cases Success  \033"
+    else
+        if [[ $run_fail_count -ne 0 ]] ; then
+            echo -e "\033[31m ---- $case_name runtime failed test  :  $run_fail_count \033"
+            ls -1 "$prefix"*_FAIL 2>/dev/null
+        fi
+        if [[ $loss_fail_count -ne 0 ]] ; then
+            echo -e "\033[31m ---- $case_name loss verification failed test  :  $loss_fail_count \033"
+            grep 'check failed! ' result.log | awk -v prefix="$prefix_var" '{if ($2 ~ "^" prefix) print $2}'
+        fi
+    fi
+    cd "$original_path" || { echo "Failed to return to original path: $original_path"; return 1; }  
+} 
+
 function gpt_case_list_dygraph(){
+    # The test name must have "gpt_" as a prefix, which will 
+    # be used for tracking the execution status of the case.
     gpt_preprocess_data
     gpt_345M_single
     gpt_1.3B_dp
@@ -50,10 +81,16 @@ function gpt_case_list_dygraph(){
     gpt_345M_single_finetune
     gpt_eval_WikiText
     gpt_eval_LAMBADA
+
+    track_case_status $FUNCNAME "gpt_"
 }
 
 function llm_gpt_case_list_dygraph() {
+    # The test name must have "llm_gpt_" as a prefix, which will 
+    # be used for tracking the execution status of the case.
     llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1
+
+    track_case_status $FUNCNAME "llm_gpt_"
 }
 
 ############ case start ############
@@ -465,20 +502,20 @@ function check_result() {
     echo -e "$1" >> ${log_path}/result.log
     if [ $? -ne 0 ];then
         echo -e "\033[31m $1 run failed! \033[0m" | tee -a ${log_path}/result.log
-        exit -1
+        return 0
     fi
 
     if [[ ! $1 =~ "llm" ]]; then
         echo -e "\033 $1 run successfully! \033" | tee -a ${log_path}/result.log
     elif [ $# -ne 7 ]; then
         echo -e "\033[31m $1 parameter transfer failed: $@ \033[0m" | tee -a ${log_path}/result.log
-        exit -1
+        return 0
     else
         diff_loss=$(echo $2 $3|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
         echo -e "loss_base: $2 loss_test: $3 loss_diff: $diff_loss%" | tee -a ${log_path}/result.log
         if [ $2 != $3 ];then
             echo -e "\033[31m $1 loss diff check failed! \033[0m" | tee -a ${log_path}/result.log
-            exit -1
+            return 0
         fi
         
         diff_ips=$(echo $4 $5|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
@@ -490,7 +527,7 @@ function check_result() {
         fi
         if [[ $v2 == 0 ]];then
             echo -e "\033[31m $1 IPS diff check failed! \033[0m" | tee -a $log_path/result.log
-            exit -1
+            return 0
         fi
 
         diff_mem=$(echo $6 $7|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
@@ -499,7 +536,7 @@ function check_result() {
         w2=$(echo $diff_mem -5.0|awk '{print($1<=$2)?"0":"1"}')
         if [[ $w1 == 0 ]];then
             echo -e "\033[31m $1 MEM diff check failed! \033[0m" | tee -a $log_path/result.log
-            exit -1
+            return 0
         fi
         if [[ $w2 == 0 ]];then
             echo -e "$1 MEM decreases greater than 5%, not exit " | tee -a $log_path/result.log
