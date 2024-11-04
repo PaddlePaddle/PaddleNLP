@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import argparse
 import json
 import os
@@ -66,6 +65,8 @@ def reft_predict(predictor_args):
         eval_dataset=dev_ds,
         batch_size=predictor_args.batch_size,
         predict_path=predictor_args.output_file,
+        num_beams=predictor_args.num_beams,
+        max_length=predictor_args.max_length,
     )
 
 
@@ -78,7 +79,7 @@ def get_pred_parser():
     parser.add_argument("--dataset_name_or_path", type=str, help="The dataset name or path")
     parser.add_argument("--max_length", type=int, default=1024, help="The maximum length of input sequences")
     parser.add_argument("--src_length", type=int, default=512, help="The source sequence length")
-
+    parser.add_argument("--num_beams", type=int, default=4, help="The maximum length of input sequences")
     return parser.parse_args()
 
 

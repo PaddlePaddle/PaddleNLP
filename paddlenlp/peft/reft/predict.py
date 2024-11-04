@@ -27,13 +27,13 @@ from .modeling_utils import ReftDataCollator
 device = "gpu" if paddle.is_compiled_with_cuda() else "cpu"
 
 
-def make_data_collator(tokenizer, model):
+def make_data_collator(tokenizer, model, max_length):
     data_collator_fn = DataCollatorForSeq2Seq(
         tokenizer=tokenizer,
         model=model,
         label_pad_token_id=-100,
         padding="longest",
-        max_length=2048,
+        max_length=max_length,
     )
     return ReftDataCollator(data_collator=data_collator_fn)
 
@@ -48,7 +48,6 @@ def do_predict(
     intervenable,
     tokenizer: AutoTokenizer,
     eval_dataset: Dataset,
-    # data_items: list,
     batch_size: int = 4,
     data_collator=None,
     greedy_decoding=True,
@@ -58,11 +57,14 @@ def do_predict(
     max_new_tokens=32,
     do_sample=False,
     predict_path=None,
+    num_beams=4,
+    max_length=2048,
 ):
     # switch the tokenizer mode first for generation tasks
     tokenizer.padding_side = "left"  # switch padding side for collator
-    num_beams = 4 if not greedy_decoding else 1
-    data_collator = make_data_collator(tokenizer, intervenable.model)
+    if greedy_decoding:
+        num_beams = 1
+    data_collator = make_data_collator(tokenizer, intervenable.model, max_length)
     eval_dataloader = make_dataloader(eval_dataset, batch_size, data_collator, shuffle=False)
     generations = []
     eval_iterator = tqdm(eval_dataloader, position=0, leave=True)
