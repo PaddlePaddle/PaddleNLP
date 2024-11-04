@@ -45,19 +45,20 @@ export FLAGS_enable_pir_in_executor=1
 
 
 python -u  -m paddle.distributed.launch \
-    --gpus "0,1,2,3,4,5,6,7" \
+    --gpus "6,7" \
     --log_dir "log/auto_3d_hand" \
     ../../run_pretrain.py \
     --model_name_or_path "qwen/qwen-14b" \
     --tokenizer_name_or_path "qwen/qwen-14b" \
-    --input_dir "./data" \
+    --input_dir "../llama_data" \
     --output_dir "./checkpoints/qwen_pretrain_ckpts" \
     --per_device_train_batch_size 1\
     --gradient_accumulation_steps 32\
     --per_device_eval_batch_size 16\
-    --data_parallel_degree 2\
+    --sharding "stage1" \
+    --sharding_parallel_degree 1\
     --tensor_parallel_degree 2\
-    --pipeline_parallel_degree 2\
+    --pipeline_parallel_degree 1\
     --virtual_pp_degree 1\
     --sequence_parallel 0\
     --use_flash_attention false\
@@ -75,6 +76,7 @@ python -u  -m paddle.distributed.launch \
     --weight_decay 0.01\
     --bf16 true\
     --fp16_opt_level "O2"\
+    --amp_master_grad true \
     --warmup_ratio 0.01\
     --max_grad_norm 0.0\
     --dataloader_num_workers 4\
@@ -88,5 +90,9 @@ python -u  -m paddle.distributed.launch \
     --recompute_use_reentrant true\
     --distributed_dataloader 0\
     --save_total_limit 2\
-    --enable_auto_parallel 1\
-    --to_static 0
+    --enable_auto_parallel 0\
+    --to_static 0 \
+    --num_hidden_layers 1 \
+    --attention_probs_dropout_prob 0 \
+    --hidden_dropout_prob 0 \
+    --resume_from_checkpoint "./checkpoints/qwen_tp2_1layer/checkpoint-1" \

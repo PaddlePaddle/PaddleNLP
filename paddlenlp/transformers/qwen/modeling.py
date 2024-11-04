@@ -1017,7 +1017,7 @@ class QWenPretrainingCriterion(paddle.nn.Layer):
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
         if dist.in_auto_parallel_align_mode():
-            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
+            self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
     def forward(self, prediction_scores, masked_lm_labels):
         if self.enable_parallel_cross_entropy:

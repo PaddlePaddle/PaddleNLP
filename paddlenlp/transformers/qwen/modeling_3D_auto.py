@@ -245,10 +245,7 @@ class QWenAttentionAuto(nn.Layer):
         # # [bz, sql, hid] ==> [bz, sql, 3*hid]
         mixed_x_layer = self.c_attn(hidden_states)
         # [bz, sql, 3*hid] ==> [bz, sql, hid]
-        if self.sequence_parallel:
-            target_shape = [-1, self.seq_length, self.num_heads, 3 * self.head_dim]
-        else:
-            target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
+        target_shape = [0, 0, self.num_heads, 3 * self.head_dim]
 
         mixed_x_layer = paddle.reshape_(mixed_x_layer, target_shape)
         query, key, value = paddle.split(mixed_x_layer, num_or_sections=3, axis=-1)
@@ -331,6 +328,7 @@ class QWenMLPAuto(nn.Layer):
     def __init__(self, config, ipp=None):
         super().__init__()
         ff_dim_in = config.intermediate_size // 2
+        self.fuse_attention_ffn = config.fuse_attention_ffn
         self.w1 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
         self.w2 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=False)
         self.c_proj = nn.Linear(ff_dim_in, config.hidden_size, bias_attr=False)
@@ -536,7 +534,7 @@ class QWenModelAuto(QWenPretrainedModelAuto):
         self.recompute_granularity = config.recompute_granularity
 
         self.wte = nn.Embedding(self.vocab_size, self.embed_dim)
-        self.wte.weight = dist.shard_tensor(self.wte.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)])
+        self.wte.weight = dist.shard_tensor(self.wte.weight, get_mesh(), [dist.Replicate(), dist.Shard(0)])
         self.drop = nn.Dropout(config.emb_dropout_prob)
 
         self.h = nn.LayerList(
@@ -669,7 +667,8 @@ class QWenModelAuto(QWenPretrainedModelAuto):
 
         encoder_attention_mask = None
         if inputs_embeds is None:
-            inputs_embeds = self.wte(input_ids)
+            with paddle.amp.auto_cast(False):
+                inputs_embeds = self.wte(input_ids)
 
         hidden_states = inputs_embeds
 
