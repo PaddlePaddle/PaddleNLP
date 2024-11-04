@@ -1159,6 +1159,10 @@ class Trainer:
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
                     optimizer_was_run = True
+
+                    if self.args.offload_optim:
+                        self._reload_optimizer()
+
                     if self.do_grad_scaling:
                         if args.pipeline_parallel_degree > 1:
                             assert not self.args.use_expert_parallel, "pipeline moe not work under fp16"
@@ -1183,8 +1187,6 @@ class Trainer:
                         self.optimizer.step()
 
                     if self.args.offload_optim:
-                        # Only offloading the optimizer state to the pinned memory is required without explicit reloading.
-                        # Paddle implicitly moves the optimizer state to the GPU device when invoking optimizer update operations.
                         self._offload_optimizer()
 
                     self.timers and self.timers("optimizer-step").stop()
@@ -1764,30 +1766,32 @@ class Trainer:
 
         return self.optimizer
 
-    def _offload_optimizer(self):
+    def _apply_to_optimizer(self, action):
         if "gpu" not in paddle.device.get_device():
-            logger.warning("offload optimizer's states is only supported on GPU devices.")
+            logger.warning("offload/reload optimizer's states is only supported on GPU devices.")
             return
 
-        if hasattr(self.optimizer, "_accumulators") and hasattr(self.optimizer, "_moment1_acc_str"):
-            # offload moment1
-            for key, value in self.optimizer._accumulators[self.optimizer._moment1_acc_str].items():
-                self.optimizer._accumulators[self.optimizer._moment1_acc_str][key] = value.pin_memory()
+        attributes = [
+            ("_accumulators", "_moment1_acc_str"),
+            ("_accumulators", "_moment2_acc_str"),
+            ("_master_weights",),
+            ("_accumulators_holder",),
+        ]
 
-        if hasattr(self.optimizer, "_accumulators") and hasattr(self.optimizer, "_moment2_acc_str"):
-            # offload moment2
-            for key, value in self.optimizer._accumulators[self.optimizer._moment2_acc_str].items():
-                self.optimizer._accumulators[self.optimizer._moment2_acc_str][key] = value.pin_memory()
+        for attr in attributes:
+            if all(hasattr(self.optimizer, a) for a in attr):
+                target_attr = getattr(self.optimizer, attr[0])
+                if len(attr) == 2:
+                    target_attr = target_attr[getattr(self.optimizer, attr[1])]
 
-        if hasattr(self.optimizer, "_master_weights"):
-            # offload master_weight
-            for key, value in self.optimizer._master_weights.items():
-                self.optimizer._master_weights[key] = value.pin_memory()
+                for key, value in target_attr.items():
+                    target_attr[key] = getattr(value, action)()
 
-        if hasattr(self.optimizer, "_accumulators_holder"):
-            # offload accumulators_holder
-            for key, value in self.optimizer._accumulators_holder.items():
-                self.optimizer._accumulators_holder[key] = value.pin_memory()
+    def _offload_optimizer(self):
+        self._apply_to_optimizer("pin_memory")
+
+    def _reload_optimizer(self):
+        self._apply_to_optimizer("cuda")
 
     def _load_rng_state(self, checkpoint):
         # Load RNG states from `checkpoint`
