@@ -780,7 +780,6 @@ class GPTEmbeddings(nn.Layer):
     def forward(self, input_ids, position_ids=None, inputs_embeddings=None):
         if input_ids is not None:
             input_shape = input_ids.shape
-            # inputs_embeddings = paddle.cast(self.word_embeddings(input_ids), dtype="float32")
             inputs_embeddings = self.word_embeddings(input_ids)
         else:
             input_shape = inputs_embeddings.shape[:-1]
@@ -789,9 +788,12 @@ class GPTEmbeddings(nn.Layer):
             ones = paddle.ones(input_shape, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
             position_ids = seq_length - ones
-
-        # position_embeddings = paddle.cast(self.position_embeddings(position_ids),dtype="float32")
-        position_embeddings = self.position_embeddings(position_ids)
+        # NOTE(zhangweilong):in auto_parallel_align_mode , embedding must run in fp32 , but gpt_model must need bf16. so donnot use amp in here.
+        if dist.in_auto_parallel_align_mode():
+            with paddle.amp.auto_cast(False):
+                position_embeddings = self.position_embeddings(position_ids)
+        else:
+            position_embeddings = self.position_embeddings(position_ids)
         embeddings = inputs_embeddings + position_embeddings
         if self.config.sequence_parallel:
             bs, seq_len, hidden_size = embeddings.shape
