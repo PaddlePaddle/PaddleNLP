@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "/home/ldn/baidu/pyreft/paddle-version/mypr/0705/reft-pr/simple-reft/PaddleNLP/llm/predict/reft_predictor.py", line 22, in <module>
-    from utils.data import convert_example_for_reft
-ModuleNotFoundError: No module named 'utils'
