@@ -54,7 +54,7 @@ except ImportError:
 
 try:
     from paddle.nn.functional.flash_attention import flash_attention
-except:
+except ImportError:
     flash_attention = None
 
 __all__ = [
@@ -722,14 +722,17 @@ class Qwen2MoeGate(PretrainedMoEGate):
 
 class Qwen2MoeSparseMoEBlock(MoELayer):
     def __init__(self, config: Qwen2MoeConfig):
-        super().__init__(num_experts=config.num_experts, capacity=2.0)
+        super().__init__(
+            config,
+            moe_num_experts=config.num_experts,
+            expert_class=Qwen2MoeMLP,
+            expert_kwargs=config,
+            gate=Qwen2MoeGate(config.num_experts, config.hidden_size),
+            capacity=2.0,
+        )
 
         self.top_k = config.num_experts_per_tok
         self.norm_topk_prob = config.norm_topk_prob
-
-        self.gate = Qwen2MoeGate(self.num_experts, config.hidden_size)
-        # self.gate = nn.Linear(config.hidden_size, self.num_experts, bias_attr=False)
-        self.experts = nn.LayerList([Qwen2MoeMLP(config) for _ in range(self.num_experts)])
 
         self.shared_expert = Qwen2MoeMLP(config, is_shared=True)
         self.shared_expert_gate = nn.Linear(config.hidden_size, 1, bias_attr=False)

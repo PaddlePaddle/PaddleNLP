@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Tuple
+from copy import deepcopy
+from typing import Any, Tuple, Union
 
 import paddle
 import paddle.distributed as dist
@@ -160,29 +161,72 @@ class MoELayer(nn.Layer):
 
     def __init__(
         self,
-        num_experts: int,
+        config,
+        moe_num_experts: int,
+        expert_class: nn.Layer,
+        expert_kwargs: dict,
+        gate: nn.Layer,
         capacity: int = 1.0,
-        group: Group = None,
+        moe_group: str = "data",
         all_to_all_dropout=0.0,
     ):
         super().__init__()
 
-        self.num_experts = num_experts
+        self.config = config
+
+        self.moe_num_experts = moe_num_experts
         self.capacity = capacity
 
-        self.group = group
-        self.all_to_all_dropout = all_to_all_dropout
+        self.moe_group = self._parse_moe_group(moe_group)  # moe_group is str
+        self.moe_rank = dist.get_rank(self.moe_group)
+        self.moe_rank = 0 if self.moe_rank < 0 else self.moe_rank
+        self.expert_parallel_degree = dist.get_world_size(self.moe_group)
+        self.expert_parallel_degree = 1 if self.expert_parallel_degree < 0 else self.expert_parallel_degree
+        self.moe_num_experts_per_device = self._parse_moe_expert_parallel(
+            config, self.moe_num_experts, self.expert_parallel_degree
+        )
 
+        self.all_to_all_dropout = all_to_all_dropout
         self.enable_recompute = False
 
-        self.expert_parallel_degree = 1 if dist.get_world_size(self.group) < 1 else dist.get_world_size(group)
-        self.is_dummy_moe = dist.get_world_size(self.group) == 1
-        self.rank = 0 if dist.get_rank(self.group) < 0 else dist.get_rank(self.group)
+        self.experts = nn.LayerList([])
+        expert = expert_class(**expert_kwargs)
+        for i in range(self.moe_num_experts):
+            if i // self.moe_world_size_per_device == self.moe_rank:
+                self.experts.append(deepcopy(expert))
+            else:
+                self.experts.append(None)
 
+        self.gate = gate
+
+    def _parse_moe_group(
+        self,
+        moe_group: str = "data",
+    ) -> Union[str, paddle.distributed.communication.group.Group]:
+        moe_group = moe_group.lower()
+        assert moe_group in {"data", "dp", "dummy"}, f"moe-group not supported, got: {moe_group}"
+        logger.info(f"using moe-group: {moe_group}")
+        if not hasattr(dist.fleet.fleet, "_hcg"):
+            assert moe_group in {"dummy"}, "only support dummy gate in `single-model`"
+        if moe_group in {"data", "dp"}:
+            moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
+        elif moe_group in {"dummy"}:
+            dummy_group = dist.communication.group.Group(0, None, [0])
+            moe_group = dummy_group
+        else:
+            moe_group = dist.communication.group._get_global_group()  # None 为全局通信组
+
+        return moe_group
+
+    def _parse_moe_expert_parallel(self, moe_num_experts, expert_parallel_degree):
         assert (
-            self.num_experts % self.expert_parallel_degree == 0
-        ), f"num_experts must be divisible by expert_parallel_degree, got: {self.num_experts} vs {self.expert_parallel_degree}"
-        self.num_local_experts = self.num_experts // self.expert_parallel_degree
+            moe_num_experts >= expert_parallel_degree
+        ), f"expert moe_num_experts={moe_num_experts} >= moe_world_size={expert_parallel_degree}"
+        assert (
+            moe_num_experts % expert_parallel_degree == 0
+        ), f"expert moe_num_experts={moe_num_experts} % moe_world_size={expert_parallel_degree} == 0"
+        moe_world_size_per_device = moe_num_experts // expert_parallel_degree
+        return moe_world_size_per_device
 
     def _post_init(self):
         for p in self.gate.parameters():

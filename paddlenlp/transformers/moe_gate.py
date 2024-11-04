@@ -41,7 +41,9 @@ class MoEGateMixin:
             elif scoring_func == "leaky_relu":
                 scores = F.leaky_relu(logits.cast("float32"))
             else:
-                logger.warning(f"insupportable scoring function for MoE gating: {scoring_func}, use softmax instead")
+                logger.warning_once(
+                    f"insupportable scoring function for MoE gating: {scoring_func}, use softmax instead"
+                )
                 scores = F.softmax(logits.cast("float32"), axis=-1)
         return scores
 
