@@ -20,3 +20,8 @@ from .custom_tokenizer import CustomTokenizer
 class CustomTokenizerFast(BertTokenizerFast):
     slow_tokenizer_class = CustomTokenizer
     pass
+
+
+class CustomTokenizerFast2(BertTokenizerFast):
+    slow_tokenizer_class = None
+    pass

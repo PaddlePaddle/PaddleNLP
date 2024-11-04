@@ -24,7 +24,8 @@ from paddlenlp.transformers import AutoConfig
 from paddlenlp.transformers.auto.configuration import CONFIG_MAPPING
 from paddlenlp.transformers.bert.configuration import BertConfig
 from paddlenlp.utils.env import CONFIG_NAME
-from tests.utils.test_module.custom_configuration import CustomConfig
+
+from ...utils.test_module.custom_configuration import CustomConfig
 
 
 class AutoConfigTest(unittest.TestCase):

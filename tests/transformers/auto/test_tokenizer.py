@@ -25,9 +25,13 @@ from paddlenlp.transformers.bert.configuration import BertConfig
 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
 from paddlenlp.transformers.bert.tokenizer_fast import BertTokenizerFast
 from paddlenlp.utils.env import TOKENIZER_CONFIG_NAME
-from tests.utils.test_module.custom_configuration import CustomConfig
-from tests.utils.test_module.custom_tokenizer import CustomTokenizer
-from tests.utils.test_module.custom_tokenizer_fast import CustomTokenizerFast
+
+from ...utils.test_module.custom_configuration import CustomConfig
+from ...utils.test_module.custom_tokenizer import CustomTokenizer
+from ...utils.test_module.custom_tokenizer_fast import (
+    CustomTokenizerFast,
+    CustomTokenizerFast2,
+)
 
 
 class AutoTokenizerTest(unittest.TestCase):
@@ -68,6 +72,18 @@ class AutoTokenizerTest(unittest.TestCase):
 
     def test_new_tokenizer_fast_registration(self):
         try:
+            # Trying to register nothing
+            with self.assertRaises(ValueError):
+                AutoTokenizer.register(CustomConfig)
+            # Trying to register tokenizer with wrong type
+            with self.assertRaises(ValueError):
+                AutoTokenizer.register(CustomConfig, fast_tokenizer_class=CustomTokenizer)
+            with self.assertRaises(ValueError):
+                AutoTokenizer.register(CustomConfig, slow_tokenizer_class=CustomTokenizerFast)
+            with self.assertRaises(ValueError):
+                AutoTokenizer.register(
+                    CustomConfig, slow_tokenizer_class=CustomTokenizer, fast_tokenizer_class=CustomTokenizerFast2
+                )
             AutoConfig.register("custom", CustomConfig)
 
             # Can register in two steps
@@ -86,6 +102,8 @@ class AutoTokenizerTest(unittest.TestCase):
             # Trying to register something existing in the PaddleNLP library will raise an error
             with self.assertRaises(ValueError):
                 AutoTokenizer.register(BertConfig, fast_tokenizer_class=BertTokenizerFast)
+            with self.assertRaises(ValueError):
+                AutoTokenizer.register(BertConfig, slow_tokenizer_class=BertTokenizer)
 
             # We pass through a llama tokenizer fast cause there is no converter slow to fast for our new toknizer
             # and that model does not have a tokenizer.json
@@ -102,7 +120,6 @@ class AutoTokenizerTest(unittest.TestCase):
 
                 new_tokenizer = AutoTokenizer.from_pretrained(tmp_dir, use_fast=False)
                 self.assertIsInstance(new_tokenizer, CustomTokenizer)
-
         finally:
             if "custom" in CONFIG_MAPPING._extra_content:
                 del CONFIG_MAPPING._extra_content["custom"]
