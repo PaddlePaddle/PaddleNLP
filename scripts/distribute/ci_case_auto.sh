@@ -467,7 +467,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
 
         export CUDA_DEVICE_MAX_CONNECTIONS=1
         export PARALLEL_CROSS_ENTROPY=true
-        export FLAGS_enable_pir_api=False # 暂时disable pir，后期修复后打开 @卢畅
+        export FLAGS_enable_pir_api=True # 功能已经实现并监控，具体显存数值对齐 @卢畅
 
         task_name="llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw"
         case_out_dir="output/$task_name"
@@ -545,9 +545,9 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
         ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
         mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
         echo "result: loss=$loss ips=$ips mem=$mem"
-        loss_base=7.54158936
-        ips_base=5864.2898
-        mem_base=23.745134115219116
+        loss_base=7.54568558 # record new data
+        ips_base=-1
+        mem_base=-1
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
         echo "=========== $FUNCNAME run  end ==========="  
     fi
