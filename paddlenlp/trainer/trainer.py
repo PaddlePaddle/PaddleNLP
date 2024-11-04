@@ -1685,8 +1685,12 @@ class Trainer:
 
         for attr in attributes:
             if all(hasattr(self.optimizer, a) for a in attr):
-                for key, value in getattr(self.optimizer, attr[0]).items():
-                    getattr(self.optimizer, attr[0])[key] = getattr(value, action)()
+                target_attr = getattr(self.optimizer, attr[0])
+                if len(attr) == 2:
+                    target_attr = target_attr[getattr(self.optimizer, attr[1])]
+
+                for key, value in target_attr.items():
+                    target_attr[key] = getattr(value, action)()
 
     def _offload_optimizer(self):
         self._apply_to_optimizer("pin_memory")
