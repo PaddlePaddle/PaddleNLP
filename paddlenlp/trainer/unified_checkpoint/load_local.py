@@ -16,12 +16,8 @@
 import gc
 import os
 
+import paddle
 from tqdm.auto import tqdm
-
-try:
-    from paddle.base import core
-except:
-    core = None
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.transformers.model_utils import (
@@ -252,7 +248,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         key_name = key.split("/")
         static_name = struct2static_name_mappings[key_name[0]]
         if has_master_weights:
-            if model_state_dict[key_name[0]].dtype != core.VarDesc.VarType.FP32:
+            if model_state_dict[key_name[0]].dtype != paddle.float32:
                 key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
             else:
                 key_name = "_".join([static_name, key_name[1]])
