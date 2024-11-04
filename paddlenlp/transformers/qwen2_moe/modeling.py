@@ -691,7 +691,7 @@ class Qwen2MoeGate(PretrainedMoEGate):
         # [hidden_size, n_expert]
         self.weight = paddle.create_parameter(
             shape=[expert_hidden_size, num_experts],
-            dtype=paddle.get_default_dtype(),
+            dtype=paddle.float32,
             is_bias=False,
             default_initializer=nn.initializer.Constant(1.0),
         )
