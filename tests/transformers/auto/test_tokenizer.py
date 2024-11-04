@@ -30,7 +30,7 @@ from ...utils.test_module.custom_configuration import CustomConfig
 from ...utils.test_module.custom_tokenizer import CustomTokenizer
 from ...utils.test_module.custom_tokenizer_fast import (
     CustomTokenizerFast,
-    CustomTokenizerFast2,
+    CustomTokenizerFastWithoutSlow,
 )
 
 
@@ -82,7 +82,7 @@ class AutoTokenizerTest(unittest.TestCase):
                 AutoTokenizer.register(CustomConfig, slow_tokenizer_class=CustomTokenizerFast)
             with self.assertRaises(ValueError):
                 AutoTokenizer.register(
-                    CustomConfig, slow_tokenizer_class=CustomTokenizer, fast_tokenizer_class=CustomTokenizerFast2
+                    CustomConfig, slow_tokenizer_class=CustomTokenizer, fast_tokenizer_class=CustomTokenizerFastWithoutSlow
                 )
             AutoConfig.register("custom", CustomConfig)
 

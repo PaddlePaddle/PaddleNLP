@@ -22,6 +22,6 @@ class CustomTokenizerFast(BertTokenizerFast):
     pass
 
 
-class CustomTokenizerFast2(BertTokenizerFast):
+class CustomTokenizerFastWithoutSlow(BertTokenizerFast):
     slow_tokenizer_class = None
     pass
