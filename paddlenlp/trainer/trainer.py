@@ -396,6 +396,13 @@ class Trainer:
 
         self._save_ckpt_func = _save_ckpt_func
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
+
+        if self.args.ordered_save_group_size > 0:
+            logger.info(f"using save in order, its group size is {self.args.ordered_save_group_size}")
+            assert not self.args.use_async_save, "Not support async save in ordered save"
+            assert self.args.tensor_parallel_degree % self.args.ordered_save_group_size == 0
+            self._save_ckpt_func = self._ordered_save
+
         if self.args.use_async_save:
             self._async_optimizer_saver = AsyncSaver()
 
@@ -2368,6 +2375,26 @@ class Trainer:
                     if op_k.startswith(v.name):
                         filter_optimzier_state_dict[op_k] = op_v
         return filter_optimzier_state_dict
+
+    def _ordered_save(self, state_dict, save_path):
+        group_size = self.args.ordered_save_group_size
+        hcg = fleet.get_hybrid_communicate_group()
+        if hcg.get_sharding_parallel_world_size() > 1 or hcg.get_model_parallel_world_size() <= 1:
+            return paddle.save(state_dict, save_path)
+
+        mp_group = hcg.get_model_parallel_group()
+        ranks = list(mp_group.ranks)
+        n = len(ranks)
+
+        group_num = (n + group_size - 1) // group_size
+        groups = []
+        for i in range(group_num):
+            groups.append([ranks[j] for j in range(i, n, group_num)])
+
+        for group in groups:
+            if dist.get_rank() in group:
+                paddle.save(state_dict, save_path)
+            dist.barrier(mp_group)
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
