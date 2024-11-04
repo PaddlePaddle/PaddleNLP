@@ -66,7 +66,7 @@ def save_file_sync(state_dict, path):
     for k in list(state_dict.keys()):
         if isinstance(state_dict[k], paddle.Tensor):
             state_dict[k] = state_dict.pop(k).cpu().numpy()
-        safe_save_file(state_dict, path, metadata={"format": "np"})
+    safe_save_file(state_dict, path, metadata={"format": "np"})
 
 
 def save_single_card_checkpoint(model_to_save, output_dir):
