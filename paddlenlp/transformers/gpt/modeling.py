@@ -1003,8 +1003,8 @@ class GPTPretrainedModel(PretrainedModel):
             model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
         if "GPT2ForSequenceClassification" in config.architectures:
             model_mappings.extend([["score.weight", "score.weight", "transpose"]])
-        # if "GPT2LMHeadModel" in config.architectures:
-        #     model_mappings.append(["lm_head.weight", "lm_head.decoder.weight"])
+        if "GPT2LMHeadModel" in config.architectures:
+            model_mappings.append(["lm_head.weight", "lm_head.decoder.weight"])
 
         mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
         return mappings
@@ -1552,11 +1552,13 @@ class GPTForCausalLM(GPTPretrainedModel):
 
     """
 
+    _tied_weights_keys = ["lm_head.weight", "lm_head.decoder.weight"]
+    _keys_to_ignore_on_save = [r"lm_head.weight", r"lm_head.decoder.weight"]
+
     def __init__(self, config: GPTConfig):
         super(GPTForCausalLM, self).__init__(config)
         self.gpt = GPTModel(config)
-        self.lm_head = None
-        # GPTLMHead(config, embedding_weights=self.gpt.embeddings.word_embeddings.weight)
+        self.lm_head = GPTLMHead(config, embedding_weights=self.gpt.embeddings.word_embeddings.weight)
 
         self.tie_weights()
         self.criterion = GPTPretrainingCriterion(config)
@@ -1632,17 +1634,7 @@ class GPTForCausalLM(GPTPretrainedModel):
             hidden_states = outputs
         else:
             hidden_states = outputs[0]
-        # logits = self.lm_head(hidden_states)
-        if self.config.sequence_parallel:
-            hidden_states = GatherOp.apply(hidden_states)
-            hidden_states = paddle.reshape_(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
-
-        logits = parallel_matmul(
-            hidden_states,
-            self.gpt.embeddings.word_embeddings.weight,
-            transpose_y=True,
-            tensor_parallel_output=self.config.tensor_parallel_output,
-        )
+        logits = self.lm_head(hidden_states)
         if dist.in_auto_parallel_align_mode():
             logits = concat_mp_with_grad(logits)
 

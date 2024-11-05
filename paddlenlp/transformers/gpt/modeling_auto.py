@@ -844,8 +844,8 @@ class GPTPretrainedModelAuto(PretrainedModel):
             model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
         if "GPT2ForSequenceClassification" in config.architectures:
             model_mappings.extend([["score.weight", "score.weight", "transpose"]])
-        # if "GPT2LMHeadModel" in config.architectures:
-        #     model_mappings.append(["lm_head.weight", "lm_head.decoder.weight"])
+        if "GPT2LMHeadModel" in config.architectures:
+            model_mappings.append(["lm_head.weight", "lm_head.decoder.weight"])
 
         mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
         return mappings
@@ -1234,14 +1234,16 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
 
     """
 
+    _tied_weights_keys = ["lm_head.weight", "lm_head.decoder.weight"]
+    _keys_to_ignore_on_save = [r"lm_head.weight", r"lm_head.decoder.weight"]
+
     def __init__(self, config: GPTConfig):
         super(GPTForCausalLMAuto, self).__init__(config)
         self.gpt = GPTModelAuto(config)
         self.ipp = self.gpt.get_last_layer_ipp()
-        self.lm_head = None
-        # GPTLMHeadAuto(
-        #     config, embedding_weights=self.gpt.embeddings.word_embeddings.weight, ipp=self.ipp
-        # )
+        self.lm_head = GPTLMHeadAuto(
+            config, embedding_weights=self.gpt.embeddings.word_embeddings.weight, ipp=self.ipp
+        )
 
         self.tie_weights()
         self.criterion = GPTPretrainingCriterionAuto(config)
@@ -1320,16 +1322,7 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
             hidden_states = outputs
         else:
             hidden_states = outputs[0]
-        # logits = self.lm_head(hidden_states)
-        # NOTE(zhangweilong):lm_head(hidden_states)
-        if self.config.sequence_parallel:
-            hidden_states = dist.reshard(hidden_states, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
-            hidden_states = paddle.reshape(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
-
-        y = dist.reshard(
-            self.gpt.embeddings.word_embeddings.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)]
-        )
-        logits = paddle.matmul(hidden_states, y, transpose_y=True)
+        logits = self.lm_head(hidden_states)
         loss = None
         if labels is not None:
             loss = self.criterion(logits, labels)

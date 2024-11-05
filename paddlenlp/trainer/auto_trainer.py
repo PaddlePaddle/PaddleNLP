@@ -797,7 +797,11 @@ class AutoTrainer(Trainer):
                     )
                     optim_state_dict = self.optimizer.state_dict()
                     optim_state_dict.pop("LR_Scheduler", None)
-
+            # Handle the case where some state_dict keys shouldn't be load
+            if self.model_wrapped._keys_to_ignore_on_save is not None:
+                for ignore_key in self.model_wrapped._keys_to_ignore_on_save:
+                    if ignore_key in model_state_dict.keys():
+                        del model_state_dict[ignore_key]
             state_dict = {
                 MODEL_NAME: model_state_dict,
                 OPTIMIZER_NAME: optim_state_dict,
@@ -808,8 +812,13 @@ class AutoTrainer(Trainer):
                 parameter_to_structured_name = self.model_wrapped._parameter_to_structured_name
             else:
                 for state_name, state_value in self.model_wrapped.state_dict().items():
+                    # Handle the case where some state_dict keys shouldn't be load
+                    if (
+                        self.model_wrapped._keys_to_ignore_on_save is not None
+                        and state_name in self.model_wrapped._keys_to_ignore_on_save
+                    ):
+                        continue
                     parameter_to_structured_name[state_value.name] = state_name
-
             if self.args.auto_parallel_resume_form_hybrid_parallel:
                 CheckpointConverter(
                     resume_from_checkpoint, state_dict, parameter_to_structured_name, self.args
