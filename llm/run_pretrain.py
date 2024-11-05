@@ -505,8 +505,6 @@ def main():
             model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
         )
 
-    print("training_args.recompute: {training_args.recompute}")
-
     if training_args.recompute:
         model.recompute_enable()
 

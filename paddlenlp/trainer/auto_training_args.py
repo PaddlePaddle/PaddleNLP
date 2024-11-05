@@ -26,7 +26,7 @@ class AutoTrainingArguments(TrainingArguments):
     """
 
     fused_linear: bool = field(
-        default=True,
+        default=False,
         metadata={"help": "Enable fused linear op, which will fuse matmul and bias add together."},
     )
 
