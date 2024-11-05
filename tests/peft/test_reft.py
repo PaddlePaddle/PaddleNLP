@@ -39,7 +39,7 @@ from paddlenlp.peft.reft.modeling_utils import (
     set_seed,
 )
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
-from paddlenlp.utils.llm_utils import CausalLMTrainer
+from paddlenlp.trl import SFTTrainer
 
 
 class TestReftDataCollator(unittest.TestCase):
@@ -317,7 +317,7 @@ class TestReFTModelPredict(unittest.TestCase):
             tokenizer=tokenizer, model=model, label_pad_token_id=-100, padding="longest"
         )
         data_collator = ReftDataCollator(data_collator=data_collator_fn)
-        trainer = CausalLMTrainer(
+        trainer = SFTTrainer(
             model=reft_model,
             tokenizer=tokenizer,
             train_dataset=train_ds,
