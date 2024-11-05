@@ -21,7 +21,9 @@ from paddle.utils.cpp_extension import CUDAExtension, setup
 
 def clone_git_repo(version, repo_url, destination_path):
     try:
-        subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path], check=True)
+        subprocess.run(
+            ["git", "clone", "-b", version, "--single-branch", repo_url, destination_path, "--depth=1"], check=True
+        )
         return True
     except subprocess.CalledProcessError as e:
         print(f"Git clone {repo_url} operation failed with the following error: {e}")
@@ -107,8 +109,13 @@ sources = [
     "./gpu/dequant_int8.cu",
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
+    "./gpu/append_attention.cu",
+    "./gpu/append_attn/get_block_shape_and_split_kv_block.cu",
+    "./gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
+    "./gpu/append_attn/speculate_write_cache_with_rope_kernel.cu",
     "./gpu/sample_kernels/top_p_sampling_reject.cu",
 ]
+sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
 
 cutlass_dir = "third_party/cutlass"
 nvcc_compile_args = gencode_flags
@@ -142,16 +149,17 @@ nvcc_compile_args += [
 ]
 
 cc = get_sm_version()
+cuda_version = float(paddle.version.cuda())
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
-if cc >= 89:
+if cc >= 89 and cuda_version >= 12.4:
+    os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels.py")
+    os.system("python utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels.py")
     sources += find_end_files("gpu/cutlass_kernels/fp8_gemm_fused/autogen", ".cu")
     sources += [
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
-        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.cu",
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
-        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_dual_gemm_scale_bias_act.cu",
     ]
 
 setup(

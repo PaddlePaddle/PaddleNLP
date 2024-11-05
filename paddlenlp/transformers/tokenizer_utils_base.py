@@ -14,8 +14,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import copy
+import inspect
 import io
 import json
 import os
@@ -25,7 +25,17 @@ import warnings
 from collections import UserDict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Dict,
+    List,
+    Literal,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 import aistudio_sdk
 import numpy as np
@@ -41,8 +51,24 @@ from huggingface_hub.utils import EntryNotFoundError
 
 from ..utils.download import resolve_file_path
 from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME, TOKENIZER_CONFIG_NAME
-from ..utils.import_utils import is_tokenizers_available
+from ..utils.import_utils import is_protobuf_available, is_tokenizers_available
 from ..utils.log import logger
+
+
+def import_protobuf_decode_error(error_message=""):
+    if is_protobuf_available():
+        from google.protobuf.message import DecodeError
+
+        return DecodeError
+    else:
+        raise ImportError(
+            f"""
+{error_message} requires the protobuf library but it was not found in your environment. Checkout the instructions on the
+installation page of its repo: https://github.com/protocolbuffers/protobuf/tree/master/python#installation and follow the ones
+that match your environment. Please note that you may need to restart your runtime after installation.
+"""
+        )
+
 
 if is_tokenizers_available():
     from tokenizers import AddedToken
@@ -132,6 +158,7 @@ EncodedInputPair = Tuple[List[int], List[int]]
 SPECIAL_TOKENS_MAP_FILE = "special_tokens_map.json"
 ADDED_TOKENS_FILE = "added_tokens.json"
 TOKENIZER_CONFIG_FILE = "tokenizer_config.json"
+FULL_TOKENIZER_FILE = "tokenizer.json"
 
 
 def to_py_obj(obj):
@@ -1361,6 +1388,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         self.model_input_names = kwargs.pop("model_input_names", self.model_input_names)
 
+        # By default, cleaning tokenization spaces for both fast and slow tokenizers
+        self.clean_up_tokenization_spaces = kwargs.pop("clean_up_tokenization_spaces", False)
+
         # By default, do not split special tokens for both fast and slow tokenizers
         self.split_special_tokens = kwargs.pop("split_special_tokens", False)
 
@@ -1423,10 +1453,13 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         self._processor_class = processor_class
 
     def __repr__(self) -> str:
+        added_tokens_decoder_rep = "\n\t".join([f"{k}: {v.__repr__()}," for k, v in self.added_tokens_decoder.items()])
         return (
-            f"{'PretrainedTokenizer'}(name_or_path='{self.name_or_path}', "
-            f"vocab_size={self.vocab_size}, model_max_len={self.model_max_length}, "
-            f"padding_side='{self.padding_side}', truncation_side='{self.truncation_side}', special_tokens={self.special_tokens_map_extended})"
+            f"{self.__class__.__name__}(name_or_path='{self.name_or_path}',"
+            f" vocab_size={self.vocab_size}, model_max_length={self.model_max_length}, is_fast={self.is_fast},"
+            f" padding_side='{self.padding_side}', truncation_side='{self.truncation_side}',"
+            f" special_tokens={self.special_tokens_map}, clean_up_tokenization_spaces={self.clean_up_tokenization_spaces}), "
+            " added_tokens_decoder={\n\t" + added_tokens_decoder_rep + "\n}"
         )
 
     def get_vocab(self) -> Dict[str, int]:
@@ -1482,19 +1515,17 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 # Load from local directory path
                 tokenizer = BertTokenizer.from_pretrained('./my_bert/')
         """
-
-        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
         from_aistudio = kwargs.pop("from_aistudio", False)
         subfolder = kwargs.pop("subfolder", "")
         return_tokenizer_file_dir = kwargs.pop("return_tokenizer_file_dir", False)
 
-        if subfolder is None:
-            subfolder = ""
-
+        pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         vocab_files = {}
         init_configuration = {}
+
+        # is_local = os.path.isdir(pretrained_model_name_or_path)
 
         additional_files_names = {
             "added_tokens_file": ADDED_TOKENS_FILE,
@@ -1504,7 +1535,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         }
 
         vocab_files_target = {**cls.resource_files_names, **additional_files_names}
-
         # From HF Hub or AI Studio
         if from_hf_hub or from_aistudio:
             # Only include the necessary resource files specified by the tokenizer cls
@@ -1528,8 +1558,8 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             # Assuming from community-contributed pretrained models
             for file_id, file_name in vocab_files_target.items():
                 vocab_files[file_id] = file_name
-
         resolved_vocab_files = {}
+
         for file_id, file_path in vocab_files.items():
             if file_path is None or os.path.isfile(file_path):
                 resolved_vocab_files[file_id] = file_path
@@ -1542,12 +1572,49 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 from_aistudio=from_aistudio,
                 from_hf_hub=from_hf_hub,
             )
-
         for file_id, file_path in resolved_vocab_files.items():
             if resolved_vocab_files[file_id] is not None:
                 cache_dir = os.path.dirname(resolved_vocab_files[file_id])
                 break
+        return cls._from_pretrained(
+            resolved_vocab_files,
+            pretrained_model_name_or_path,
+            init_configuration,
+            *args,
+            cache_dir=cache_dir,
+            return_tokenizer_file_dir=return_tokenizer_file_dir,
+            from_hf_hub=from_hf_hub,
+            **kwargs,
+        )
 
+    @classmethod
+    def _from_pretrained(
+        cls,
+        resolved_vocab_files,
+        pretrained_model_name_or_path,
+        init_configuration,
+        *init_inputs,
+        cache_dir=None,
+        return_tokenizer_file_dir=False,
+        from_hf_hub=False,
+        **kwargs,
+    ):
+        if cls.__name__.endswith("Fast"):
+            from_slow = kwargs.get("from_slow", False)
+        else:
+            from_slow = kwargs.get("from_slow", True)
+        has_tokenizer_file = resolved_vocab_files.get("tokenizer_file", None) is not None
+        if (from_slow or not has_tokenizer_file) and cls.slow_tokenizer_class is not None:
+            slow_tokenizer = (cls.slow_tokenizer_class)._from_pretrained(
+                copy.deepcopy(resolved_vocab_files),
+                pretrained_model_name_or_path,
+                copy.deepcopy(init_configuration),
+                *init_inputs,
+                cache_dir=cache_dir,
+                **(copy.deepcopy(kwargs)),
+            )
+        else:
+            slow_tokenizer = None
         tokenizer_config_file_dir_list = set()
         for k, v in resolved_vocab_files.items():
             if v is not None and os.path.isfile(v):
@@ -1555,6 +1622,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         tokenizer_config_file_dir_list = list(tokenizer_config_file_dir_list)
         # TODO: check this
         assert len(tokenizer_config_file_dir_list) > 0, "All tokenizer files should be in the same directory."
+
         # Prepare tokenizer initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
         has_tokenizer_file = resolved_vocab_files.get("tokenizer_file", None) is not None
@@ -1562,8 +1630,14 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         if tokenizer_config_file is not None:
             with io.open(tokenizer_config_file, encoding="utf-8") as f:
                 init_kwargs = json.load(f)
+            init_kwargs.pop("tokenizer_class", None)
         else:
             init_kwargs = init_configuration
+
+        if slow_tokenizer is not None:
+            init_kwargs["__slow_tokenizer"] = slow_tokenizer
+        init_kwargs["name_or_path"] = pretrained_model_name_or_path
+        init_kwargs["from_slow"] = from_slow
 
         pass_added_tokens_file = False
         # Handle tokenizer serialization of added and special tokens
@@ -1584,11 +1658,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             pass_added_tokens_file = True
 
         # position args are stored in kwargs, maybe better not include
-        init_args = init_kwargs.pop("init_args", ())
         init_kwargs.pop("init_class", None)
 
         # Update with newly provided args and kwargs
-        init_args = init_args if not args else args
         init_kwargs.update(kwargs)
 
         def convert_added_tokens(obj):
@@ -1632,7 +1704,22 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             init_kwargs.pop("tokenizer_file")
 
         # TODO(guosheng): avoid reduplication of position args and key word args
-        tokenizer = cls(*init_args, **init_kwargs)
+        try:
+            tokenizer = cls(*init_inputs, **init_kwargs)
+        except import_protobuf_decode_error():
+            logger.info(
+                "Unable to load tokenizer model from SPM, loading from TikToken will be attempted instead."
+                "(Google protobuf error: Tried to load SPM model with non-SPM vocab file).",
+            )
+            return False
+        except RuntimeError as e:
+            if "sentencepiece_processor.cc" in str(e):
+                logger.info(
+                    "Unable to load tokenizer model from SPM, loading from TikToken will be attempted instead."
+                    "(SentencePiece RuntimeError: Tried to load SPM model with non-SPM vocab file).",
+                )
+            return False
+
         chat_template = init_kwargs.pop("chat_template", None)
         if chat_template is not None:
             tokenizer.init_chat_template(chat_template)
@@ -1764,6 +1851,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         # Add tokenizer class to the tokenizer config to be able to reload it with from_pretrained
         tokenizer_class = self.__class__.__name__
+        # Remove the Fast at the end unless we have a special `PreTrainedTokenizerFast`
+        if tokenizer_class.endswith("Fast") and tokenizer_class != "PreTrainedTokenizerFast":
+            tokenizer_class = tokenizer_class[:-4]
         tokenizer_config["tokenizer_class"] = tokenizer_class
 
         with io.open(tokenizer_config_file, "w", encoding="utf-8") as f:
@@ -2110,6 +2200,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         return_offsets_mapping: bool = False,
         add_special_tokens: bool = True,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         verbose: bool = True,
         **kwargs
@@ -2219,6 +2310,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 If set will pad the sequence to a multiple of the provided value. This is especially useful to enable
                 the use of Tensor Cores on NVIDIA hardware with compute capability >= 7.5 (Volta).
                 Defaults to `None`.
+            padding_side (`str`, *optional*):
+                The side on which the model should have padding applied. Should be selected between ['right', 'left'].
+                Default value is picked from the class attribute of the same name.
             return_tensors (str or [TensorType], optional):
                 If set, will return tensors instead of list of python integers. Acceptable values are:
 
@@ -2331,6 +2425,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 return_offsets_mapping=return_offsets_mapping,
                 add_special_tokens=add_special_tokens,
                 pad_to_multiple_of=pad_to_multiple_of,
+                padding_side=padding_side,
                 return_tensors=return_tensors,
                 verbose=verbose,
                 **kwargs,
@@ -2353,6 +2448,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 return_offsets_mapping=return_offsets_mapping,
                 add_special_tokens=add_special_tokens,
                 pad_to_multiple_of=pad_to_multiple_of,
+                padding_side=padding_side,
                 return_tensors=return_tensors,
                 verbose=verbose,
                 **kwargs,
@@ -2369,6 +2465,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
@@ -2423,6 +2520,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             stride=stride,
             is_split_into_words=is_split_into_words,
             pad_to_multiple_of=pad_to_multiple_of,
+            padding_side=padding_side,
             return_tensors=return_tensors,
             return_position_ids=return_position_ids,
             return_token_type_ids=return_token_type_ids,
@@ -2445,6 +2543,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         max_length: Optional[int] = None,
         stride: int = 0,
         is_split_into_words: bool = False,
+        padding_side: Optional[Literal["right", "left"]] = None,
         pad_to_multiple_of: Optional[int] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_token_type_ids: Optional[bool] = None,
@@ -2496,6 +2595,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             stride=stride,
             is_split_into_words=is_split_into_words,
             pad_to_multiple_of=pad_to_multiple_of,
+            padding_side=padding_side,
             return_tensors=return_tensors,
             return_token_type_ids=return_token_type_ids,
             return_attention_mask=return_attention_mask,
@@ -2518,6 +2618,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_position_ids: Optional[bool] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_token_type_ids: Optional[bool] = None,
@@ -2557,6 +2658,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         return_offsets_mapping=False,
         add_special_tokens=True,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         verbose: bool = True,
         **kwargs
@@ -2607,6 +2709,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             stride=stride,
             is_split_into_words=is_split_into_words,
             pad_to_multiple_of=pad_to_multiple_of,
+            padding_side=padding_side,
             return_tensors=return_tensors,
             return_position_ids=return_position_ids,
             return_token_type_ids=return_token_type_ids,
@@ -2637,6 +2740,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_position_ids: Optional[bool] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_token_type_ids: Optional[bool] = None,
@@ -2662,6 +2766,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         ],
         padding: Union[bool, str, PaddingStrategy] = True,
         max_length: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         pad_to_multiple_of: Optional[int] = None,
         return_attention_mask: Optional[bool] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
@@ -2706,6 +2811,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
                 This is especially useful to enable the use of Tensor Cores on NVIDIA hardware with compute capability
                 >= 7.5 (Volta).
+            padding_side (`str`, *optional*):
+                The side on which the model should have padding applied. Should be selected between ['right', 'left'].
+                Default value is picked from the class attribute of the same name.
             return_attention_mask (`bool`, *optional*):
                 Whether to return the attention mask. If left to the default, will return the attention mask according
                 to the specific tokenizer's default, defined by the `return_outputs` attribute.
@@ -2767,13 +2875,28 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         required_input = encoded_inputs[self.model_input_names[0]]
         if required_input and not isinstance(required_input[0], (list, tuple)):
-            encoded_inputs = self._pad(
-                encoded_inputs,
-                max_length=max_length,
-                padding_strategy=padding_strategy,
-                pad_to_multiple_of=pad_to_multiple_of,
-                return_attention_mask=return_attention_mask,
-            )
+            # some tokenizers might not have the padding_side attribute
+            if "padding_side" in set(inspect.signature(self._pad).parameters.keys()):
+                encoded_inputs = self._pad(
+                    encoded_inputs,
+                    max_length=max_length,
+                    padding_strategy=padding_strategy,
+                    pad_to_multiple_of=pad_to_multiple_of,
+                    padding_side=padding_side,
+                    return_attention_mask=return_attention_mask,
+                )
+            else:
+                original_padding_side = self.padding_side
+                self.padding_side = padding_side
+                encoded_inputs = self._pad(
+                    encoded_inputs,
+                    max_length=max_length,
+                    padding_strategy=padding_strategy,
+                    pad_to_multiple_of=pad_to_multiple_of,
+                    return_attention_mask=return_attention_mask,
+                )
+                self.padding_side = original_padding_side
+
             return BatchEncoding(encoded_inputs, tensor_type=return_tensors)
 
         batch_size = len(required_input)
@@ -2792,6 +2915,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 inputs,
                 max_length=max_length,
                 padding_strategy=padding_strategy,
+                padding_side=padding_side,
                 pad_to_multiple_of=pad_to_multiple_of,
                 return_attention_mask=return_attention_mask,
             )
@@ -2872,6 +2996,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         max_length: Optional[int] = None,
         stride: int = 0,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_tensors: Optional[Union[str, TensorType]] = None,
         return_position_ids=None,
         return_token_type_ids: Optional[bool] = None,
@@ -3002,6 +3127,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 max_length=max_length,
                 padding=padding_strategy.value,
                 pad_to_multiple_of=pad_to_multiple_of,
+                padding_side=padding_side,
                 return_attention_mask=return_attention_mask,
             )
 
@@ -3141,6 +3267,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         max_length: Optional[int] = None,
         padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_attention_mask: Optional[bool] = None,
     ) -> dict:
         """
@@ -3156,13 +3283,16 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 - PaddingStrategy.LONGEST Pad to the longest sequence in the batch
                 - PaddingStrategy.MAX_LENGTH: Pad to the max length (default)
                 - PaddingStrategy.DO_NOT_PAD: Do not pad
-                The tokenizer padding sides are defined in self.padding_side:
+                The tokenizer padding sides are defined in `padding_side` argument:
 
                     - 'left': pads on the left of the sequences
                     - 'right': pads on the right of the sequences
             pad_to_multiple_of: (optional) Integer if set will pad the sequence to a multiple of the provided value.
                 This is especially useful to enable the use of Tensor Core on NVIDIA hardware with compute capability
                 >= 7.5 (Volta).
+            padding_side: (optional) The side on which the model should have padding applied.
+                Should be selected between ['right', 'left'].
+                Default value is picked from the class attribute of the same name.
             return_attention_mask:
                 (optional) Set to False to avoid returning attention mask (default: set to model specifics)
         """
@@ -3186,11 +3316,30 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         if needs_to_be_padded:
             difference = max_length - len(required_input)
+            padding_side = padding_side if padding_side is not None else self.padding_side
 
-            if self.padding_side == "right":
+            if padding_side == "right":
                 if return_attention_mask:
-
-                    encoded_inputs["attention_mask"] = encoded_inputs["attention_mask"] + [0] * difference
+                    if len(np.shape(encoded_inputs["attention_mask"])) > 2:
+                        # attention_mask shape [1,seq_len,seq_len]
+                        encoded_inputs["attention_mask"] = np.pad(
+                            encoded_inputs["attention_mask"],
+                            pad_width=[(0, 0), (0, difference), (0, difference)],
+                            mode="constant",
+                            constant_values=0,
+                        ).tolist()
+                    else:
+                        encoded_inputs["attention_mask"] = encoded_inputs["attention_mask"] + [0] * difference
+                if "attn_mask_startend_row_indices" in encoded_inputs:
+                    # TODO @DrownFish19 encoded_inputs["attn_mask_startend_row_indices"] is generated in the shape [seq_len]
+                    # and convert the shape to [1,seq_len] here. However, it is supported in the generation phase.
+                    encoded_inputs["attn_mask_startend_row_indices"] = np.concatenate(
+                        [
+                            np.array([encoded_inputs["attn_mask_startend_row_indices"]], dtype=np.int32),
+                            np.zeros([1, difference], dtype=np.int32),
+                        ],
+                        axis=-1,
+                    )
                 if "token_type_ids" in encoded_inputs:
                     encoded_inputs["token_type_ids"] = (
                         encoded_inputs["token_type_ids"] + [self.pad_token_type_id] * difference
@@ -3207,9 +3356,28 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 if "end_positions" in encoded_inputs and isinstance(encoded_inputs["end_positions"], list):
                     encoded_inputs["end_positions"] = encoded_inputs["end_positions"] + [0] * difference
                 encoded_inputs[self.model_input_names[0]] = required_input + [self.pad_token_id] * difference
-            elif self.padding_side == "left":
+            elif padding_side == "left":
                 if return_attention_mask:
-                    encoded_inputs["attention_mask"] = [0] * difference + encoded_inputs["attention_mask"]
+                    if len(np.shape(encoded_inputs["attention_mask"])) > 2:
+                        # attention_mask shape [1,seq_len,seq_len]
+                        encoded_inputs["attention_mask"] = np.pad(
+                            encoded_inputs["attention_mask"],
+                            pad_width=[(0, 0), (difference, 0), (difference, 0)],
+                            mode="constant",
+                            constant_values=0,
+                        ).tolist()
+                    else:
+                        encoded_inputs["attention_mask"] = [0] * difference + encoded_inputs["attention_mask"]
+                if "attn_mask_startend_row_indices" in encoded_inputs:
+                    # TODO @DrownFish19 encoded_inputs["attn_mask_startend_row_indices"] is generated in the shape [seq_len]
+                    # and convert the shape to [1,seq_len] here. However, it is supported in the generation phase.
+                    encoded_inputs["attn_mask_startend_row_indices"] = np.concatenate(
+                        [
+                            np.zeros([1, difference], dtype=np.int32),
+                            np.array([encoded_inputs["attn_mask_startend_row_indices"]], dtype=np.int32) + difference,
+                        ],
+                        axis=-1,
+                    )
                 if "token_type_ids" in encoded_inputs:
                     encoded_inputs["token_type_ids"] = [self.pad_token_type_id] * difference + encoded_inputs[
                         "token_type_ids"
@@ -3227,6 +3395,15 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 encoded_inputs[self.model_input_names[0]] = [self.pad_token_id] * difference + required_input
             else:
                 raise ValueError("Invalid padding strategy:" + str(self.padding_side))
+        else:
+            if "attn_mask_startend_row_indices" in encoded_inputs:
+                if len(np.shape(encoded_inputs["attn_mask_startend_row_indices"])) == 1:
+                    # TODO @DrownFish19 encoded_inputs["attn_mask_startend_row_indices"] is generated in the shape [seq_len]
+                    # and convert the shape to [1,seq_len] here. However, it is supported in the generation phase.
+                    encoded_inputs["attn_mask_startend_row_indices"] = np.array([encoded_inputs["attn_mask_startend_row_indices"]], dtype=np.int32)  # fmt:skip
+
+        if "attn_mask_startend_row_indices" in encoded_inputs:
+            assert len(np.shape(encoded_inputs["attn_mask_startend_row_indices"])) == 2  # [num_head, seq_len]
 
         return encoded_inputs
 
