@@ -15,15 +15,13 @@
 # limitations under the License.
 
 from copy import deepcopy
-from typing import Any, Tuple, Union
+from typing import Any, Tuple
 
 import paddle
 import paddle.distributed as dist
 from paddle import Tensor, nn
 from paddle.distributed.communication import stream
 from paddle.distributed.communication.group import Group
-
-from ..utils.log import logger
 
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
@@ -177,46 +175,33 @@ class MoELayer(nn.Layer):
         self.moe_num_experts = moe_num_experts
         self.capacity = capacity
 
-        self.moe_group = self._parse_moe_group(moe_group)  # moe_group is str
-        self.moe_rank = dist.get_rank(self.moe_group)
-        self.moe_rank = 0 if self.moe_rank < 0 else self.moe_rank
-        self.expert_parallel_degree = dist.get_world_size(self.moe_group)
-        self.expert_parallel_degree = 1 if self.expert_parallel_degree < 0 else self.expert_parallel_degree
-        self.moe_num_experts_per_device = self._parse_moe_expert_parallel(
-            config, self.moe_num_experts, self.expert_parallel_degree
-        )
+        if dist.get_world_size() > 1:
+            self.moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
+            self.moe_rank = dist.get_rank(self.moe_group)
+            self.moe_rank = 0 if self.moe_rank < 0 else self.moe_rank
+            self.expert_parallel_degree = dist.get_world_size(self.moe_group)
+            self.expert_parallel_degree = 1 if self.expert_parallel_degree < 0 else self.expert_parallel_degree
+            self.moe_num_experts_per_device = self._parse_moe_expert_parallel(
+                self.moe_num_experts, self.expert_parallel_degree
+            )
+        else:
+            self.moe_group = None
+            self.moe_rank = 0
+            self.expert_parallel_degree = 1
+            self.moe_num_experts_per_device = self.moe_num_experts
 
         self.all_to_all_dropout = all_to_all_dropout
         self.enable_recompute = False
 
         self.experts = nn.LayerList([])
-        expert = expert_class(**expert_kwargs)
+        expert = expert_class(expert_kwargs)
         for i in range(self.moe_num_experts):
-            if i // self.moe_world_size_per_device == self.moe_rank:
+            if i // self.moe_num_experts_per_device == self.moe_rank:
                 self.experts.append(deepcopy(expert))
             else:
                 self.experts.append(None)
 
         self.gate = gate
-
-    def _parse_moe_group(
-        self,
-        moe_group: str = "data",
-    ) -> Union[str, paddle.distributed.communication.group.Group]:
-        moe_group = moe_group.lower()
-        assert moe_group in {"data", "dp", "dummy"}, f"moe-group not supported, got: {moe_group}"
-        logger.info(f"using moe-group: {moe_group}")
-        if not hasattr(dist.fleet.fleet, "_hcg"):
-            assert moe_group in {"dummy"}, "only support dummy gate in `single-model`"
-        if moe_group in {"data", "dp"}:
-            moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
-        elif moe_group in {"dummy"}:
-            dummy_group = dist.communication.group.Group(0, None, [0])
-            moe_group = dummy_group
-        else:
-            moe_group = dist.communication.group._get_global_group()  # None 为全局通信组
-
-        return moe_group
 
     def _parse_moe_expert_parallel(self, moe_num_experts, expert_parallel_degree):
         assert (
@@ -225,8 +210,8 @@ class MoELayer(nn.Layer):
         assert (
             moe_num_experts % expert_parallel_degree == 0
         ), f"expert moe_num_experts={moe_num_experts} % moe_world_size={expert_parallel_degree} == 0"
-        moe_world_size_per_device = moe_num_experts // expert_parallel_degree
-        return moe_world_size_per_device
+        moe_num_experts_per_device = moe_num_experts // expert_parallel_degree
+        return moe_num_experts_per_device
 
     def _post_init(self):
         for p in self.gate.parameters():
@@ -240,7 +225,9 @@ class MoELayer(nn.Layer):
                     # logger.info(f"expert param={p.name}, no-sync={p.no_sync}")
 
     def expert_forward(self, dispatched_input):
-        true_experts = self.experts[self.rank * self.num_local_experts : (self.rank + 1) * self.num_local_experts]
+        true_experts = self.experts[
+            self.moe_rank * self.moe_num_experts_per_device : (self.moe_rank + 1) * self.moe_num_experts_per_device
+        ]
         expert_outputs = []
         chunks = dispatched_input.unbind(1)
         assert len(chunks) == len(true_experts), (len(chunks), len(true_experts))
@@ -274,7 +261,7 @@ class MoELayer(nn.Layer):
 
         capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.gate(reshaped_input)
 
-        print(f"capacity={capacity}")
+        # print(f"capacity={capacity}")
         # self.l_aux, combine_weights, dispatch_mask, self.exp_counts =
         # self.l_aux       :
         # combine_weights  : sec
@@ -283,16 +270,20 @@ class MoELayer(nn.Layer):
         dispatched_input = paddle.einsum("sec,sm->ecm", paddle.cast(dispatch_mask, hidden_state.dtype), reshaped_input)
 
         if self.expert_parallel_degree > 1:
-            dispatched_input = _AllToAll.apply(dispatched_input, self.group)
+            dispatched_input = _AllToAll.apply(dispatched_input, self.moe_group)
 
         # Re-shape after all-to-all: ecm -> gecm
-        dispatched_input = dispatched_input.reshape([self.expert_parallel_degree, self.num_local_experts, -1, d_model])
+        dispatched_input = dispatched_input.reshape(
+            [self.expert_parallel_degree, self.moe_num_experts_per_device, -1, d_model]
+        )
         expert_output = self.expert_forward(dispatched_input)
         # Re-shape before drop_tokens: gecm -> ecm
-        expert_output = expert_output.reshape([self.expert_parallel_degree * self.num_local_experts, -1, d_model])
+        expert_output = expert_output.reshape(
+            [self.expert_parallel_degree * self.moe_num_experts_per_device, -1, d_model]
+        )
 
         if self.expert_parallel_degree > 1:
-            expert_output = _AllToAll.apply(expert_output, self.group)
+            expert_output = _AllToAll.apply(expert_output, self.moe_group)
 
         # Re拿到不同device上的expert计算结果
         combined_output = paddle.einsum("sec,ecm->sm", combine_weights.cast(hidden_state[0].dtype), expert_output)
