@@ -294,8 +294,8 @@ class MultiHeadAttentionAuto(nn.Layer):
         # softmax_mask_fuse_upper_triangle is not supported sif paddle is not compiled with cuda/rocm
         if not paddle.is_compiled_with_cuda():
             attention_mask = get_triangle_upper_mask(product, attention_mask)
-
         if attention_mask is not None:
+            attention_mask = dist.reshard(attention_mask, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
             product = product + attention_mask.astype(product.dtype)
             weights = F.softmax(product)
         else:

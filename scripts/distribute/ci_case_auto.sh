@@ -1614,8 +1614,8 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
         --tensor_parallel_degree 2 \
         --pipeline_parallel_degree 2 \
         --sequence_parallel 0 \
-        --fuse_attention_qkv 1 \
-        --use_flash_attention 1 \
+        --fuse_attention_qkv 0 \
+        --use_flash_attention 0 \
         --scale_loss 1024 \
         --learning_rate 0.00001 \
         --min_learning_rate 0.000005 \
