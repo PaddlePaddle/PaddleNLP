@@ -409,10 +409,10 @@ def init_seed(seed: int = 1234, args=None):
             topo = Topology(
                 dist.get_rank(),
                 dist.get_world_size(),
-                dp_degree=1,
+                dp_degree=args.data_parallel_degree,
                 pp_degree=args.pipeline_parallel_degree,
                 mp_degree=args.tensor_parallel_degree,
-                sharding_degree=args.sharding_parallel_degree,
+                sharding_degree=1,
                 order=order,
             )
 
