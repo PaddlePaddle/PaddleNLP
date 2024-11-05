@@ -19,11 +19,6 @@ import os
 import paddle
 from paddle.distributed import fleet
 
-try:
-    from paddle.base import core
-except:
-    core = None
-
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.trainer.utils.helper import distributed_isfile
@@ -300,7 +295,7 @@ class UnifiedCheckpointHandler:
             model_weight_key = key_name[0]
             static_name = struct2static_name_mappings[key_name[0]]
             if not is_amp_o1:
-                if model_state_dict[key_name[0]].dtype != core.VarDesc.VarType.FP32:
+                if model_state_dict[key_name[0]].dtype != paddle.float32:
                     key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
                 else:
                     key_name = "_".join([static_name, key_name[1]])
@@ -569,7 +564,7 @@ def unified_optimizer_into_shards(
     fp32_weight = {}
     for k, v in state_dict.items():
         static2struct_name_mappings[v.name] = k
-        if master_weights is not None and v.dtype == core.VarDesc.VarType.FP32:
+        if master_weights is not None and v.dtype == paddle.float32:
             if args.dataset_rank > 0:  # deal with different dataset rank.
                 continue
             fp32_weight[k] = v

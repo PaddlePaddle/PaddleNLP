@@ -396,6 +396,13 @@ class Trainer:
 
         self._save_ckpt_func = _save_ckpt_func
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
+
+        if self.args.ordered_save_group_size > 0:
+            logger.info(f"using save in order, its group size is {self.args.ordered_save_group_size}")
+            assert not self.args.use_async_save, "Not support async save in ordered save"
+            assert self.args.tensor_parallel_degree % self.args.ordered_save_group_size == 0
+            self._save_ckpt_func = self._ordered_save
+
         if self.args.use_async_save:
             self._async_optimizer_saver = AsyncSaver()
 
@@ -817,7 +824,13 @@ class Trainer:
         logger.info(f"  Total num train samples = {num_train_samples:,}")
         # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
         # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
-        per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
+        if self.args.enable_auto_parallel:
+            per_device_trainable_numel = 0
+            for p in model.parameters():
+                if not p.stop_gradient:
+                    per_device_trainable_numel += np.prod(p._local_shape) if p.is_dist() else np.prod(p.shape)
+        else:
+            per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
         logger.debug(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
         if self.args.use_hybrid_parallel:
             # todo fix for pipeline_parallel_degree
@@ -1146,6 +1159,10 @@ class Trainer:
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
                     optimizer_was_run = True
+
+                    if self.args.offload_optim:
+                        self._reload_optimizer()
+
                     if self.do_grad_scaling:
                         if args.pipeline_parallel_degree > 1:
                             assert not self.args.use_expert_parallel, "pipeline moe not work under fp16"
@@ -1168,6 +1185,9 @@ class Trainer:
                         self.optimizer._step(parameters_list)
                     else:
                         self.optimizer.step()
+
+                    if self.args.offload_optim:
+                        self._offload_optimizer()
 
                     self.timers and self.timers("optimizer-step").stop()
 
@@ -1745,6 +1765,33 @@ class Trainer:
             )
 
         return self.optimizer
+
+    def _apply_to_optimizer(self, action):
+        if "gpu" not in paddle.device.get_device():
+            logger.warning("offload/reload optimizer's states is only supported on GPU devices.")
+            return
+
+        attributes = [
+            ("_accumulators", "_moment1_acc_str"),
+            ("_accumulators", "_moment2_acc_str"),
+            ("_master_weights",),
+            ("_accumulators_holder",),
+        ]
+
+        for attr in attributes:
+            if all(hasattr(self.optimizer, a) for a in attr):
+                target_attr = getattr(self.optimizer, attr[0])
+                if len(attr) == 2:
+                    target_attr = target_attr[getattr(self.optimizer, attr[1])]
+
+                for key, value in target_attr.items():
+                    target_attr[key] = getattr(value, action)()
+
+    def _offload_optimizer(self):
+        self._apply_to_optimizer("pin_memory")
+
+    def _reload_optimizer(self):
+        self._apply_to_optimizer("cuda")
 
     def _load_rng_state(self, checkpoint):
         # Load RNG states from `checkpoint`
@@ -2363,6 +2410,26 @@ class Trainer:
                         filter_optimzier_state_dict[op_k] = op_v
         return filter_optimzier_state_dict
 
+    def _ordered_save(self, state_dict, save_path):
+        group_size = self.args.ordered_save_group_size
+        hcg = fleet.get_hybrid_communicate_group()
+        if hcg.get_sharding_parallel_world_size() > 1 or hcg.get_model_parallel_world_size() <= 1:
+            return paddle.save(state_dict, save_path)
+
+        mp_group = hcg.get_model_parallel_group()
+        ranks = list(mp_group.ranks)
+        n = len(ranks)
+
+        group_num = (n + group_size - 1) // group_size
+        groups = []
+        for i in range(group_num):
+            groups.append([ranks[j] for j in range(i, n, group_num)])
+
+        for group in groups:
+            if dist.get_rank() in group:
+                paddle.save(state_dict, save_path)
+            dist.barrier(mp_group)
+
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
         self.runtime_timer.start("checkpoint saving time")
@@ -2817,6 +2884,11 @@ class Trainer:
                 self.scaler.load_state_dict(
                     paddle.load(distributed_file(os.path.join(checkpoint, SCALER_NAME)), return_numpy=True)
                 )
+
+        if self.args.offload_optim:
+            logger.info("Offloading optimizer state...")
+            self._offload_optimizer()
+
         self.runtime_timer.stop()
 
     def log(self, logs: Dict[str, float], **kwargs) -> None:

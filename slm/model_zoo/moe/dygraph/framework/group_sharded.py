@@ -37,7 +37,6 @@ from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_optimizer_sta
 from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_stage2 import (
     GroupShardedStage2,
 )
-from paddle.framework import core
 from paddle.incubate.distributed.models.moe.grad_clip import ClipGradForMOEByGlobalNorm
 from paddle.optimizer import Optimizer
 
@@ -99,7 +98,7 @@ class ClipGradForShardedMOEByGlobalNorm(ClipGradForMOEByGlobalNorm):
                 params_and_grads.append((p, g))
                 continue
             # TODO(wangxi): use inplace elementwise_mul
-            clip_input = clip_var.astype("float16") if g.dtype == core.VarDesc.VarType.FP16 else clip_var
+            clip_input = clip_var.astype("float16") if g.dtype == paddle.float16 else clip_var
             new_grad = paddle.multiply(x=g, y=clip_input)
             params_and_grads.append((p, new_grad))
         return params_and_grads

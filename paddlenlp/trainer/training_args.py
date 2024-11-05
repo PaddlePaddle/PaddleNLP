@@ -827,6 +827,12 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to use async_save instead of paddle.save."},
     )
+    ordered_save_group_size: int = field(
+        default=0,
+        metadata={
+            "help": "Select ordered_save_group_size to save checkpoint in ordered. if ordered_save_group_size=0, not used ordered save"
+        },
+    )
     skip_profile_timer: Optional[bool] = field(
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl."},
@@ -887,6 +893,10 @@ class TrainingArguments:
     skip_data_intervals: Optional[List[List[int]]] = field(
         default=None,
         metadata={"help": "The intervals to skip, pass start global step and end global step at each interval"},
+    )
+    offload_optim: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Offload optimizer after optimizer.step()"},
     )
 
     def __post_init__(self):
@@ -1345,6 +1355,7 @@ class TrainingArguments:
 
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
+                            assert self.amp_master_grad, "Currently sharding stage1 v2 only support amp_master_grad"
 
                         if "enable_release_grads" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].release_gradients = True
@@ -1408,7 +1419,8 @@ class TrainingArguments:
                         )
 
                     if "split_param" in sharding_parallel_config:
-                        assert self.sharding == [ShardingOption.SHARD_OP], "Only sharding stage1 support split_param."
+                        if ShardingOption.SHARD_OP not in self.sharding:
+                            logger.warning("Only sharding stage1 support split_param.")
                         assert (
                             self.amp_master_grad
                         ), "If `split_param` in sharding_parallel_config, `amp_master_grad` must be True."
