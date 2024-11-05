@@ -257,7 +257,6 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             gc.collect()
         return returned_state_dict
 
-    index = {}
     with open(os.path.join(resume_from_checkpoint, index_filename), "r") as f:
         index = json.loads(f.read())
 

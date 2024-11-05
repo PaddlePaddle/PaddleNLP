@@ -169,6 +169,7 @@ class UnifiedCheckpointHandler:
                 "world_size": world_size,
                 "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
                 "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
+                "remove_master_weight": "remove_master_weight" in self.args.unified_checkpoint_config,
             }
             paddle.save(save_info, os.path.join(save_directory, ".saving_info"))
 
@@ -215,10 +216,6 @@ class UnifiedCheckpointHandler:
             static_name, type_name = generate_base_static_name(key)
             new_name = static2struct_name_mappings[static_name] + "/" + type_name
             optim_state_dict[new_name] = optim_state_dict.pop(key)
-
-        if UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value in self.args.unified_checkpoint_config:
-            logger.info("Skip master weight saving.")
-            master_weights = None
 
         if master_weights is not None:
             for key in list(master_weights.keys()):
@@ -352,6 +349,10 @@ class UnifiedCheckpointHandler:
                 optim_state_dict.pop("master_weights")
             if "LR_Scheduler" in optim_state_dict.keys():
                 optim_state_dict.pop("LR_Scheduler")
+
+        if UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value in self.args.unified_checkpoint_config:
+            logger.info("Skip master weight saving.")
+            master_weights = None
 
         if "ignore_merge_optimizer" in self.args.unified_checkpoint_config:
             self.save_non_merge_optimizer(model, optim_state_dict, master_weights, output_dir, signal_dir)
@@ -578,6 +579,7 @@ def unified_optimizer_into_shards(
         static_name, type_name = generate_base_static_name(key)
         new_name = static2struct_name_mappings[static_name] + "/" + type_name
         optim_state_dict[new_name] = optim_state_dict.pop(key)
+
     if master_weights is not None:
         for key in list(master_weights.keys()):
             master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
@@ -649,6 +651,10 @@ def unified_optimizer_into_shards(
         use_expert_parallel=args.use_expert_parallel,
     )
     sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
+
+    if args.should_save and args.ckpt_quant_stage in ["O1", "O2"]:
+        sharded_optim_index["ckpt_quant_stage"] = args.ckpt_quant_stage
+
     if master_weights is not None:
         index_master_weight_filelist, total_master_weight_size_list = gather_sharded_object(
             index_master_weight_file,

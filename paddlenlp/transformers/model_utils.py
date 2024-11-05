@@ -332,7 +332,7 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
     return last_dtype
 
 
-def dequant_unified_optimizer(self, state_dict, ckpt_quant_stage, scale_dict):
+def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
     rank, world_size = -1, 1
     if paddle.distributed.get_world_size() > 1:
         hcg = fleet.get_hybrid_communicate_group()
