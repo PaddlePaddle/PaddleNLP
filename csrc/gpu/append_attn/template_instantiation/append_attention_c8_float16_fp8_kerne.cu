@@ -11,10 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "../append_attention_c4_impl.cuh"
+#include "../append_attention_c8_impl.cuh"
 
-
-template void CascadeAppendAttentionC4Kernel<paddle::float16, paddle::float16>(
+template void CascadeAppendAttentionC8Kernel<paddle::float16, paddle::float8_e4m3fn>(
     const AppendAttnMetaData& meta_data,
     const paddle::Tensor& qkv,  // [token_num, num_heads, head_dim]
     const paddle::Tensor&

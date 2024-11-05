@@ -30,11 +30,6 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.nested import flatten_list
 
-try:
-    from paddle.base import core
-except:
-    core = None
-
 from .utils import (
     get_expected_state_dict,
     is_sharding_split_param_mode,
@@ -200,7 +195,7 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
                 if args.use_expert_parallel and dp_rank > 0 and not getattr(state_dict[key], "no_sync", False):
                     continue
 
-                if is_master_weights and state_dict[key].dtype == core.VarDesc.VarType.FP32:
+                if is_master_weights and state_dict[key].dtype == paddle.float32:
                     continue
 
                 if not is_master_weights:

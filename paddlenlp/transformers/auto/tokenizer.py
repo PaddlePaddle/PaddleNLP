@@ -24,6 +24,7 @@ from ...utils.download import resolve_file_path
 from ...utils.import_utils import import_module
 from ...utils.log import logger
 from ..configuration_utils import PretrainedConfig
+from ..tokenizer_utils import PretrainedTokenizer
 from ..tokenizer_utils_base import TOKENIZER_CONFIG_FILE
 from ..tokenizer_utils_fast import PretrainedTokenizerFast
 from .configuration import (
@@ -45,7 +46,13 @@ else:
         [
             ("albert", (("AlbertChineseTokenizer", "AlbertEnglishTokenizer"), None)),
             ("bart", "BartTokenizer"),
-            ("bert", "BertTokenizer"),
+            (
+                "bert",
+                (
+                    "BertTokenizer",
+                    "BertTokenizerFast" if is_tokenizers_available() else None,
+                ),
+            ),
             ("blenderbot", "BlenderbotTokenizer"),
             ("bloom", "BloomTokenizer"),
             ("clip", "CLIPTokenizer"),
@@ -459,3 +466,46 @@ class AutoTokenizer:
             "- or a correct model-identifier of community-contributed pretrained models,\n"
             "- or the correct path to a directory containing relevant tokenizer files.\n"
         )
+
+    def register(config_class, slow_tokenizer_class=None, fast_tokenizer_class=None, exist_ok=False):
+        """
+        Register a new tokenizer in this mapping.
+
+
+        Args:
+            config_class ([`PretrainedConfig`]):
+                The configuration corresponding to the model to register.
+            slow_tokenizer_class ([`PretrainedTokenizer`], *optional*):
+                The slow tokenizer to register.
+            fast_tokenizer_class ([`PretrainedTokenizerFast`], *optional*):
+                The fast tokenizer to register.
+        """
+        if slow_tokenizer_class is None and fast_tokenizer_class is None:
+            raise ValueError("You need to pass either a `slow_tokenizer_class` or a `fast_tokenizer_class")
+        if slow_tokenizer_class is not None and issubclass(slow_tokenizer_class, PretrainedTokenizerFast):
+            raise ValueError("You passed a fast tokenizer in the `slow_tokenizer_class`.")
+        if fast_tokenizer_class is not None and issubclass(fast_tokenizer_class, PretrainedTokenizer):
+            raise ValueError("You passed a slow tokenizer in the `fast_tokenizer_class`.")
+
+        if (
+            slow_tokenizer_class is not None
+            and fast_tokenizer_class is not None
+            and issubclass(fast_tokenizer_class, PretrainedTokenizerFast)
+            and fast_tokenizer_class.slow_tokenizer_class != slow_tokenizer_class
+        ):
+            raise ValueError(
+                "The fast tokenizer class you are passing has a `slow_tokenizer_class` attribute that is not "
+                "consistent with the slow tokenizer class you passed (fast tokenizer has "
+                f"{fast_tokenizer_class.slow_tokenizer_class} and you passed {slow_tokenizer_class}. Fix one of those "
+                "so they match!"
+            )
+
+        # Avoid resetting a set slow/fast tokenizer if we are passing just the other ones.
+        if config_class in TOKENIZER_MAPPING._extra_content:
+            existing_slow, existing_fast = TOKENIZER_MAPPING[config_class]
+            if slow_tokenizer_class is None:
+                slow_tokenizer_class = existing_slow
+            if fast_tokenizer_class is None:
+                fast_tokenizer_class = existing_fast
+
+        TOKENIZER_MAPPING.register(config_class, (slow_tokenizer_class, fast_tokenizer_class), exist_ok=exist_ok)
