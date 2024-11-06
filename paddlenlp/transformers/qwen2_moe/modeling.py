@@ -691,7 +691,7 @@ class Qwen2MoeGate(PretrainedMoEGate):
         # [hidden_size, n_expert]
         self.weight = paddle.create_parameter(
             shape=[expert_hidden_size, num_experts],
-            dtype=paddle.float32,
+            dtype=paddle.get_default_dtype(),
             is_bias=False,
             default_initializer=nn.initializer.Constant(1.0),
         )
@@ -705,11 +705,10 @@ class Qwen2MoeGate(PretrainedMoEGate):
 
         # compute gating score
         hidden_states = hidden_states.reshape([-1, h_dim])
+        logits = F.linear(hidden_states, self.weight, None)
 
         with paddle.amp.auto_cast(False):
-            logits = F.linear(hidden_states.cast(paddle.float32), self.weight, None)
-
-        scores = self.gate_score_func(logits=logits)
+            scores = self.gate_score_func(logits=logits.cast(paddle.float32))
 
         # topk_weight, topk_idx = self.topk_navie(scores, k=2)
         # topk_weight, topk_idx = self.topk_group(scores, k=2, n_group=4, topk_group=2)
@@ -722,12 +721,19 @@ class Qwen2MoeGate(PretrainedMoEGate):
 
 class Qwen2MoeSparseMoEBlock(MoELayer):
     def __init__(self, config: Qwen2MoeConfig):
+        gate = Qwen2MoeGate(
+            config.num_experts,
+            config.hidden_size,
+            top_k=config.num_experts_per_tok,
+            drop_tokens=False,
+        )
+
         super().__init__(
             config,
             moe_num_experts=config.num_experts,
             expert_class=Qwen2MoeMLP,
             expert_kwargs=config,
-            gate=Qwen2MoeGate(config.num_experts, config.hidden_size),
+            gate=gate,
             capacity=2.0,
         )
 

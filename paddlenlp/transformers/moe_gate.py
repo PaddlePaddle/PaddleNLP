@@ -167,6 +167,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         self.drop_policy = kwargs.pop("drop_policy", "probs")
         self.top_k = kwargs.pop("top_k", 2)
+        self.norm_topk_prob = kwargs.pop("norm_topk_prob", False)
 
     def topk_navie(self, scores: paddle.Tensor, k: int) -> Tuple[paddle.Tensor, paddle.Tensor]:
         """_summary_
@@ -406,6 +407,8 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
                 raise ValueError(f"Invalid drop_policy: {self.drop_policy}")
         else:
             # Do not drop tokens - set capacity according to current expert assignments
+            locations = paddle.cumsum(mask, axis=0) - 1
+
             new_capacity = paddle.max(exp_counts)
             if self.group is not None:
                 dist.all_reduce(new_capacity, op=dist.ReduceOp.MAX, group=self.group)
@@ -415,7 +418,8 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         gates_masked = gates * mask
         gates_s = paddle.sum(gates_masked, axis=-1, keepdim=True)
         denom_s = paddle.clip(gates_s, min=paddle.finfo(gates_masked.dtype).eps)
-        gates_masked = gates_masked / denom_s
+        if self.norm_topk_prob:
+            gates_masked = gates_masked / denom_s
 
         # dispatch_mask
         locations_sc = self._one_hot_to_float(locations * mask, num_classes=capacity)
