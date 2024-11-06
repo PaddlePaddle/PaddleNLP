@@ -17,12 +17,8 @@ import sys
 from functools import partial
 
 import paddle
-from utils.argument import (
-    DataArgument,
+from utils.argument import (  # DataArgument,; ModelArgument,; QuantArgument,; TrainingArguments,
     GenerateArgument,
-    ModelArgument,
-    QuantArgument,
-    TrainingArguments,
 )
 from utils.data import get_convert_example
 
@@ -57,7 +53,7 @@ from paddlenlp.transformers import (
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.trl import SFTTrainer
+from paddlenlp.trl import DataConfig, ModelConfig, QuantConfig, SFTConfig, SFTTrainer
 from paddlenlp.trl.llm_utils import (
     ZeroPaddingIterDatasetCallback,
     compute_metrics,
@@ -75,7 +71,7 @@ flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe, Qwen2ForCausa
 
 
 def main():
-    parser = PdArgumentParser((GenerateArgument, QuantArgument, ModelArgument, DataArgument, TrainingArguments))
+    parser = PdArgumentParser((GenerateArgument, QuantConfig, ModelConfig, DataConfig, SFTConfig))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         gen_args, quant_args, model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
