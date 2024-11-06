@@ -42,6 +42,8 @@ import paddle.nn as nn
 from packaging import version
 from paddle import framework
 
+from paddlenlp.utils import infohub
+
 try:
     from paddle.base import core
 except:
@@ -3172,7 +3174,13 @@ class Trainer:
 
         # Metrics!
         if self.compute_metrics is not None and all_preds is not None and all_labels is not None:
-            metrics = self.compute_metrics(EvalPrediction(predictions=all_preds, label_ids=all_labels))
+            # all_labels maybe is a tuple when prediction_steps output label_mask
+            if isinstance(all_labels, (list, tuple)):
+                # compute_metrics in train.py
+                metrics = self.compute_metrics(EvalPrediction(predictions=all_preds, label_ids=all_labels[0]))
+            else:
+                # compute_metrics in modeling.py
+                metrics = self.compute_metrics(EvalPrediction(predictions=all_preds, label_ids=all_labels))
         else:
             metrics = {}
 
@@ -3268,6 +3276,14 @@ class Trainer:
                 labels = None
             inputs = inputs.pop("input_ids")
 
+        model_config_backup = model.accumulate_steps
+        if isinstance(inputs, tuple):
+            input_ids = inputs[0]
+        else:
+            input_ids = inputs
+
+        model.accumulate_steps = input_ids.shape[0]
+
         with paddle.no_grad():
             if has_labels:
                 with self.autocast_smart_context_manager():
@@ -3276,8 +3292,39 @@ class Trainer:
                 loss = loss.mean().detach()
             else:
                 raise ValueError("pipeline mode eval need label!")
+        model.accumulate_steps = model_config_backup
 
         return (loss, None, labels)
+
+    def prediction_pipeline_step_with_logits_acc(
+        self,
+        *args,
+        **kwargs,
+    ):
+        loss, _, labels = self.prediction_pipeline_step(*args, **kwargs)
+        logits = None
+        # infohub
+        hcg = fleet.get_hybrid_communicate_group()
+        if hcg:
+            pp_group = hcg.get_pipe_parallel_group()
+            if pp_group.nranks > 1:
+                logit_shape = [[]]
+                if "pp_logits" in infohub:
+                    logits = paddle.concat(infohub["pp_logits"], axis=0)
+                    # broadcast
+                    logit_shape = [logits.shape]
+                    infohub["pp_logits"] = []
+
+                paddle.distributed.broadcast_object_list(
+                    logit_shape,
+                    src=pp_group.ranks[-1],
+                    group=pp_group,
+                )
+                logits = paddle.empty(shape=logit_shape[0], dtype=paddle.float32)
+                task = dist.stream.broadcast(logits, src=pp_group.ranks[-1], group=pp_group, sync_op=False)
+                task.wait()
+
+        return (loss, logits, labels)
 
     def prediction_step(
         self,
@@ -3312,6 +3359,8 @@ class Trainer:
         if self.args.pipeline_parallel_degree > 1:
             # hack for pipeline mode
             inputs = self._prepare_inputs(inputs)
+            if self.args.metric_for_best_model == "accuracy":
+                return self.prediction_pipeline_step_with_logits_acc(model, inputs, prediction_loss_only, ignore_keys)
             return self.prediction_pipeline_step(model, inputs, prediction_loss_only, ignore_keys)
 
         has_labels = all(inputs.get(k) is not None for k in self.label_names)
