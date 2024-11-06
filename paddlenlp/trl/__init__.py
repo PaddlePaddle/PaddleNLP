@@ -14,5 +14,7 @@
 
 from .dpo_criterion import DPOCriterion
 from .dpo_trainer import DPOTrainer
+from .kto_criterion import KTOCriterion
+from .kto_trainer import KTOTrainer
 from .trl_data import *
 from .trl_utils import *
