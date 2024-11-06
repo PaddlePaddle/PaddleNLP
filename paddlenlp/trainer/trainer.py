@@ -1572,7 +1572,6 @@ class Trainer:
     def _get_eval_sampler(self, eval_dataset: Dataset):
         if eval_dataset is None or not has_length(eval_dataset):
             return None
-
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 eval_dataset,
@@ -1583,19 +1582,27 @@ class Trainer:
         else:
             drop_last = False
             if self.args.pipeline_parallel_degree > 1:
-                drop_last = True
-                logger.warning(
-                    "In parallel mode, the batch_size is strictly checked. set DistributedBatchSampler drop_last=True."
-                )
+                # In pipeline parallelism, batch size will be strictly checked
+                # Use FirstBatchPaddingSampler to pad the last batch with the first batch
+                from .trainer_utils import FirstBatchPaddingSampler
 
-            return DistributedBatchSampler(
-                eval_dataset,
-                num_replicas=self.args.dataset_world_size,
-                rank=self.args.dataset_rank,
-                batch_size=self.args.per_device_eval_batch_size,
-                shuffle=False,
-                drop_last=drop_last,
-            )
+                return FirstBatchPaddingSampler(
+                    eval_dataset,
+                    num_replicas=self.args.dataset_world_size,
+                    rank=self.args.dataset_rank,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    shuffle=False,
+                    drop_last=False,
+                )
+            else:
+                return DistributedBatchSampler(
+                    eval_dataset,
+                    num_replicas=self.args.dataset_world_size,
+                    rank=self.args.dataset_rank,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    shuffle=False,
+                    drop_last=drop_last,
+                )
 
     def get_eval_dataloader(self, eval_dataset: Optional[Dataset] = None) -> DataLoader:
         """
