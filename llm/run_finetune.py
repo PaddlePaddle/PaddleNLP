@@ -450,10 +450,8 @@ def main():
             model=model,
             train_ds=train_ds,
             data_collator=data_collator,
-            world_size=training_args.world_size,
-            batch_size=model_args.loraga_init_bsz,
-            iters=model_args.loraga_init_iters,
-            tokenizer=tokenizer,
+            training_args=training_args,
+            loraga_init_iters=model_args.loraga_init_iters,
         )
 
     if model_args.prefix_tuning:

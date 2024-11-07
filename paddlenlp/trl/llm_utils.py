@@ -25,12 +25,13 @@ import paddle.distributed as dist
 import paddle.distributed.fleet.base.topology as tp
 import paddle.incubate.multiprocessing as mp
 from paddle.distributed import fleet
+from paddle.io import DataLoader, DistributedBatchSampler
 from sklearn.metrics import accuracy_score
 
 from paddlenlp.datasets import ZeroPaddingIterableDataset
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.trainer import TrainerCallback
-from paddlenlp.trainer.trainer_utils import IterableDatasetShard
+from paddlenlp.trainer.trainer_utils import IterableDatasetShard, ShardingOption
 from paddlenlp.transformers import (
     AutoTokenizer,
     ChatGLMv2Tokenizer,
@@ -38,6 +39,7 @@ from paddlenlp.transformers import (
     PretrainedConfig,
     Qwen2ForCausalLMPipe,
 )
+from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
@@ -744,41 +746,206 @@ def get_eos_token_id(
     return list(eos_token_ids_dict.values())
 
 
-def estimate_gradient(model, train_ds, data_collator, world_size=1, batch_size=1, iters=4, tokenizer=None):
+def wrap_loraga_model(model, training_args):
+    sharding = None
+    if len(training_args.sharding) > 0:
+        if training_args.local_rank == -1:
+            raise ValueError("Using sharding only works in distributed training.")
+        sharding = True
+
+    in_pipeline_parallel_mode = training_args.pipeline_parallel_degree > 1
+    in_sharding_parallel_mode = sharding is not None
+    in_tensor_parallel_mode = training_args.tensor_parallel_degree > 1
+    in_sep_parallel_mode = training_args.sep_parallel_degree > 1
+    in_cp_parallel_mode = training_args.context_parallel_degree > 1
+
+    # Multi-gpu training
+    if training_args.world_size > 1 and (not training_args.use_hybrid_parallel):
+        # MOE use DDP to broadcaset parameters.
+        ddp_kwargs = {}
+        if training_args.ddp_find_unused_parameters is not None:
+            ddp_kwargs["find_unused_parameters"] = training_args.ddp_find_unused_parameters
+        elif isinstance(model, PretrainedModel):
+            # find_unused_parameters breaks checkpointing as per
+            # https://github.com/huggingface/transformers/pull/4659#issuecomment-643356021
+            ddp_kwargs["find_unused_parameters"] = not any(
+                hasattr(m, "enable_recompute") and m.enable_recompute for m in model.sublayers(include_self=True)
+            )
+        else:
+            ddp_kwargs["find_unused_parameters"] = True
+        model = paddle.DataParallel(model, **ddp_kwargs)
+
+    # No pipeline mode, sharding only
+    if not in_pipeline_parallel_mode and in_sharding_parallel_mode:
+        # Sharded DDP!
+        if training_args.tensor_parallel_degree > 1:
+            hcg = fleet.get_hybrid_communicate_group()
+            assert (
+                ShardingOption.SHARD_GRAD_OP in training_args.sharding
+                or ShardingOption.SHARD_OP in training_args.sharding
+            ), "Only support tensor parallel + sharding stage1/stage2 hybrid parallel now."
+            model = paddle.distributed.fleet.meta_parallel.TensorParallel(model, hcg, strategy=None)
+        if ShardingOption.SHARD_OP in training_args.sharding:
+            model = fleet.distributed_model(model)
+
+    if (
+        not in_pipeline_parallel_mode
+        and not in_sharding_parallel_mode
+        and (in_tensor_parallel_mode or in_sep_parallel_mode or in_cp_parallel_mode)
+    ):
+        model = fleet.distributed_model(model)
+
+    return model
+
+
+def get_loraga_dataloader(train_dataset, data_collator, training_args):
+    from paddlenlp.data import DistDataLoader
+
+    def _is_iterable_dataset(dataset):
+        return isinstance(dataset, paddle.io.IterableDataset)
+
+    def _is_iterable_dataset_distributed(dataset):
+        # For distributed dataloaer.
+        is_iterable_dataset_tensor = paddle.to_tensor(is_iterable_dataset(dataset)).astype("int32").reshape([1])
+        if dist.get_world_size() > 1:
+            dist.all_reduce(is_iterable_dataset_tensor, op=dist.ReduceOp.MAX)
+        if is_iterable_dataset_tensor.item() == 1:
+            return True
+        return False
+
+    if training_args.distributed_dataloader:
+        is_iterable_dataset = _is_iterable_dataset_distributed(train_dataset)
+    else:
+        is_iterable_dataset = _is_iterable_dataset(train_dataset)
+
+    # if is_datasets_available() and train_dataset is not None and isinstance(train_dataset, datasets.Dataset):
+    #     train_dataset = self._remove_unused_columns(train_dataset, description="training")
+    _DataLoader = DistDataLoader if training_args.distributed_dataloader else DataLoader
+
+    if is_iterable_dataset:  # For iterable dataset
+        if training_args.dataset_world_size > 1 and train_dataset is not None:
+            train_dataset = IterableDatasetShard(
+                train_dataset,
+                batch_size=training_args.per_device_train_batch_size,
+                drop_last=training_args.dataloader_drop_last,
+                num_processes=training_args.dataset_world_size,
+                process_index=training_args.dataset_rank,
+            )
+
+        if training_args.distributed_dataloader:
+            logger.info("Training using DistDataLoader.")
+            additional_configs = {"is_iterable_dataset": True}
+        else:
+            additional_configs = {}
+        return _DataLoader(
+            train_dataset,
+            batch_size=training_args.per_device_train_batch_size,
+            collate_fn=data_collator,
+            num_workers=training_args.dataloader_num_workers,
+            **additional_configs,
+        )
+    else:
+        train_sampler = get_loraga_train_sampler(train_dataset, training_args)
+        if training_args.distributed_dataloader:
+            logger.info("Training using DistDataLoader.")
+        return _DataLoader(
+            train_dataset,
+            batch_sampler=train_sampler,
+            collate_fn=data_collator,
+            num_workers=training_args.dataloader_num_workers,
+        )
+
+
+def get_loraga_train_sampler(train_dataset, training_args) -> Optional[paddle.io.Sampler]:
+    if training_args.world_size <= 1:
+        return paddle.io.BatchSampler(
+            dataset=train_dataset,
+            shuffle=True,
+            batch_size=training_args.per_device_train_batch_size,
+            drop_last=training_args.dataloader_drop_last,
+        )
+
+    return DistributedBatchSampler(
+        train_dataset,
+        batch_size=training_args.per_device_train_batch_size,
+        shuffle=True,
+        num_replicas=training_args.dataset_world_size,
+        rank=training_args.dataset_rank,
+        drop_last=training_args.dataloader_drop_last,
+    )
+
+
+def estimate_gradient(model, train_ds, data_collator, training_args, loraga_init_iters=32):
     """Estimate the gradient of the model on the given dataset"""
 
-    logger.info("Estimating gradient for LoraGA")
-    model.train()
-    named_grads = {}
-    dataloader = DataLoader(train_ds, collate_fn=data_collator, batch_size=batch_size, shuffle=False)
-    num_batch = 0
-    for batch in dataloader:
-        num_batch += 1
-        batch = {k: paddle.to_tensor(v) for k, v in batch.items()}
-        loss, logits = model(**batch)
-        loss.backward()
+    import time
 
+    start_time = time.time()
+    logger.info("Estimating gradient for LoraGA")
+    split_mappings = model._get_tensor_parallel_mappings(config=model.config, is_split=False)
+    model = wrap_loraga_model(model, training_args)
+    model.train()
+    gradient_dict = {}
+    logger.info(f"Initilization iterions for LoraGA: {loraga_init_iters}")
+    dataloader = get_loraga_dataloader(train_ds, data_collator, training_args)
+    iters = 0
+    for batch in dataloader:
+        iters += 1
+        batch = {k: paddle.to_tensor(v) for k, v in batch.items()}
+        # Do not support pipeline parallel by now
+        loss, logits = model(**batch)
+        # log_memory_usage()
+        loss.backward()
+        # log_memory_usage()
         # Record gradients
         for grad_name, param in model.named_parameters():
-            # if param.stop_gradient is False:
-            if param.stop_gradient is False and param.grad is not None:
-                if grad_name not in named_grads:
-                    named_grads[grad_name] = param.grad.clone()
+            # 经过tp和sharding包裹后的模型可能以若干个_layer.开头，这里需要去掉
+            grad_name = grad_name.split("_layers.")[-1]
+            if not param.stop_gradient and param.grad is not None:
+                if grad_name not in gradient_dict:
+                    gradient_dict[grad_name] = param.grad.clone()
                 else:
-                    named_grads[grad_name] += param.grad
+                    gradient_dict[grad_name] += param.grad
+                param.clear_gradient(False)  # release gradient memory
 
-                param.clear_gradient()
-        if num_batch == iters:
+        if iters == loraga_init_iters:
             break
 
-    for grad_name, param in named_grads.items():
-        named_grads[grad_name] /= num_batch
-
+    for grad_name, param in gradient_dict.items():
+        # 暂时不支持pp!
+        # tp
+        if training_args.tensor_parallel_degree > 1:
+            if grad_name.split("gpt.")[-1] in split_mappings:
+                # 有的模型可能不以gpt.开头？
+                merge_func = split_mappings[grad_name.split("gpt.")[-1]]
+                hcg = fleet.get_hybrid_communicate_group()
+                model_parallel_group = hcg.get_model_parallel_group()
+                output_tensors = []
+                dist.all_gather(output_tensors, gradient_dict[grad_name], group=model_parallel_group)
+                output_tensors = [t if len(t.shape) > 0 else t.reshape_([-1]) for t in output_tensors]
+                gradient_dict[grad_name] = paddle.to_tensor(merge_func(output_tensors))
+        # sharding
+        if training_args.sharding_parallel_degree > 1:
+            hcg = fleet.get_hybrid_communicate_group()
+            sharding_parallel_group = hcg.get_sharding_parallel_group()
+            if sharding_parallel_group.nranks > 1:
+                dist.all_reduce(gradient_dict[grad_name], op=dist.ReduceOp.SUM, group=sharding_parallel_group)
+                gradient_dict[grad_name] /= sharding_parallel_group.nranks
+        # dp
+        if training_args.data_parallel_degree > 1:
+            hcg = fleet.get_hybrid_communicate_group()
+            data_parallel_group = hcg.get_data_parallel_group()
+            if data_parallel_group.nranks > 1:
+                dist.all_reduce(gradient_dict[grad_name], op=dist.ReduceOp.SUM, group=data_parallel_group)
+                gradient_dict[grad_name] /= data_parallel_group.nranks
+        gradient_dict[grad_name] /= loraga_init_iters
     paddle.device.cuda.empty_cache()
-    return named_grads
+
+    logger.info("Gradient Approximation execution time: {} seconds".format(time.time() - start_time))
+    return gradient_dict
 
 
-def loraga_reinit(model, named_grads, stable_gamma, **kwargs):
+def loraga_reinit(model, gradient_dict, stable_gamma, training_args, **kwargs):
     """Re-initialize the weights of the model using the estimated gradients"""
     from tqdm import tqdm
 
@@ -787,19 +954,37 @@ def loraga_reinit(model, named_grads, stable_gamma, **kwargs):
         desc="Reinitializing Lora",
         total=len(list(model.named_sublayers())),
     ):
-        from paddlenlp.peft.lora.lora_layers import LoRALinear
+        from paddlenlp.peft.lora.lora_layers import (
+            ColumnParallelLoRALinear,
+            ColumnSequenceParallelLoRALinear,
+            LoRALinear,
+            RowParallelLoRALinear,
+            RowSequenceParallelLoRALinear,
+        )
 
-        if isinstance(module, LoRALinear):
-            loraga_reinit_modules(name, module, named_grads, stable_gamma, **kwargs)
+        lora_split_mapping = None
+        if (
+            isinstance(module, LoRALinear)
+            or isinstance(module, RowSequenceParallelLoRALinear)
+            or isinstance(module, ColumnSequenceParallelLoRALinear)
+            or isinstance(module, RowParallelLoRALinear)
+            or isinstance(module, ColumnParallelLoRALinear)
+        ):
+            is_tp = training_args.tensor_parallel_degree > 1
+            if is_tp:
+                lora_split_mapping = model._get_tensor_parallel_mappings(model.config)
+            loraga_reinit_modules(name, module, gradient_dict, stable_gamma, is_tp, lora_split_mapping, **kwargs)
 
 
-def loraga_reinit_modules(name, module, named_grads, stable_gamma, **kwargs):
+def loraga_reinit_modules(name, module, gradient_dict, stable_gamma, is_tp=False, lora_split_mapping=None, **kwargs):
     with paddle.no_grad():
         lora_r = module.r
         grad_name = ".".join(name.split(".")[1:]) + ".weight"
-        grads = named_grads[grad_name]
+        loraA_name = ".".join(name.split(".")[1:]) + ".lora_A"
+        loraB_name = ".".join(name.split(".")[1:]) + ".lora_B"
+        grads = gradient_dict[grad_name]
 
-        U, S, V = paddle.linalg.svd_lowrank(grads.cuda().astype("float32"), q=4 * lora_r, niter=4)
+        U, S, V = paddle.linalg.svd_lowrank(grads.astype("float32"), q=4 * lora_r, niter=4)
 
         V = V.T
         A = U[:, lora_r : 2 * lora_r]
@@ -812,6 +997,13 @@ def loraga_reinit_modules(name, module, named_grads, stable_gamma, **kwargs):
         else:
             A = A / module.scaling
             B = B / module.scaling
+        if is_tp:
+            if module.lora_A.is_distributed and lora_split_mapping:
+                split_function = lora_split_mapping[loraA_name]
+                A = paddle.to_tensor(split_function(A))
+            if module.lora_B.is_distributed and lora_split_mapping:
+                split_function = lora_split_mapping[loraB_name]
+                B = paddle.to_tensor(split_function(B))
         module.lora_A.set_value(A.astype(module.lora_A.dtype))
         module.lora_B.set_value(B.astype(module.lora_B.dtype))
         offset = module.lora_A @ module.lora_B
