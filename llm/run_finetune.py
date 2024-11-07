@@ -253,7 +253,9 @@ def main():
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
 
-    train_ds, dev_ds, ptq_ds = trans_dataset_to_ids(model_args, data_args, eval_zero_padding, trans_func)
+    train_ds, dev_ds, ptq_ds = trans_dataset_to_ids(
+        train_ds, dev_ds, ptq_ds, model_args, data_args, eval_zero_padding, trans_func
+    )
 
     if data_args.zero_padding:
         if data_args.lazy:
