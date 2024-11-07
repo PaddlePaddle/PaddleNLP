@@ -20,6 +20,8 @@ from paddlenlp.trainer.trainer_utils import IntervalStrategy
 from paddlenlp.trainer.utils.doc import add_start_docstrings
 from paddlenlp.transformers.configuration_utils import llmmetaclass
 
+__all__ = ["SFTConfig"]
+
 
 @dataclass
 @llmmetaclass

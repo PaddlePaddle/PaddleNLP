@@ -15,6 +15,8 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
+__all__ = ["ModelConfig"]
+
 
 @dataclass
 @dataclass

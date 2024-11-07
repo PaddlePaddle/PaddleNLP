@@ -14,6 +14,8 @@
 
 from dataclasses import dataclass, field
 
+__all__ = ["DataConfig"]
+
 
 @dataclass
 class DataConfig:

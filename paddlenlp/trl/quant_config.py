@@ -15,6 +15,8 @@
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+__all__ = ["QuantConfig"]
+
 
 @dataclass
 class QuantConfig:
