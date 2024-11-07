@@ -321,6 +321,16 @@ def main():
     else:
         metrics = compute_metrics
 
+    data_collator = DataCollatorForSeq2Seq(
+        tokenizer=tokenizer,
+        max_length=max_length,
+        padding=padding,
+        max_label_length=max_length,
+        return_tensors="np",
+        return_attention_mask=not model_args.flash_mask,
+        pad_to_multiple_of=data_args.pad_to_multiple_of,
+    )
+
     trainer = SFTTrainer(
         model=model,
         args=training_args,
@@ -328,20 +338,13 @@ def main():
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
         compute_metrics=metrics,
-        data_collator=DataCollatorForSeq2Seq(
-            tokenizer=tokenizer,
-            max_length=max_length,
-            padding=padding,
-            max_label_length=max_length,
-            return_tensors="np",
-            return_attention_mask=not model_args.flash_mask,
-            pad_to_multiple_of=data_args.pad_to_multiple_of,
-        ),
+        data_collator=data_collator,
         do_generation=data_args.eval_with_do_generation,
         callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
         gen_args=gen_args,
         data_args=data_args,
     )
+
     trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
     trainer.set_optimizer_grouped_parameters(trainable_parameters)
 
@@ -364,28 +367,7 @@ def main():
             logger.info("Benchmark done.")
         else:
             if model_args.save_to_aistudio:
-                kwargs = {}
-                if model_args.aistudio_token is not None:
-                    kwargs["token"] = model_args.aistudio_token
-                # PEFT Model only save PEFT parameters, if pretrained model obtains from aistudio
-                if model_args.from_aistudio and (model_args.lora or model_args.prefix_tuning):
-                    kwargs["base_model"] = model_args.model_name_or_path
-                else:
-                    trainer.tokenizer.save_to_aistudio(
-                        repo_id=model_args.aistudio_repo_id,
-                        private=model_args.aistudio_repo_private,
-                        license=model_args.aistudio_repo_license,
-                        exist_ok=True,
-                        **kwargs,
-                    )
-                trainer.model.save_to_aistudio(
-                    repo_id=model_args.aistudio_repo_id,
-                    private=model_args.aistudio_repo_private,
-                    license=model_args.aistudio_repo_license,
-                    merge_tensor_parallel=training_args.tensor_parallel_degree > 1,
-                    exist_ok=True,
-                    **kwargs,
-                )
+                save_model_to_aistudio(model_args, training_args, trainer)
 
             if not training_args.autotuner_benchmark:
                 trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
@@ -509,6 +491,31 @@ def main():
         logger.info("*** Evaluate result after train/ptq/qat/ etc.***")
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
+
+
+def save_model_to_aistudio(model_args, training_args, trainer):
+    kwargs = {}
+    if model_args.aistudio_token is not None:
+        kwargs["token"] = model_args.aistudio_token
+        # PEFT Model only save PEFT parameters, if pretrained model obtains from aistudio
+    if model_args.from_aistudio and (model_args.lora or model_args.prefix_tuning):
+        kwargs["base_model"] = model_args.model_name_or_path
+    else:
+        trainer.tokenizer.save_to_aistudio(
+            repo_id=model_args.aistudio_repo_id,
+            private=model_args.aistudio_repo_private,
+            license=model_args.aistudio_repo_license,
+            exist_ok=True,
+            **kwargs,
+        )
+    trainer.model.save_to_aistudio(
+        repo_id=model_args.aistudio_repo_id,
+        private=model_args.aistudio_repo_private,
+        license=model_args.aistudio_repo_license,
+        merge_tensor_parallel=training_args.tensor_parallel_degree > 1,
+        exist_ok=True,
+        **kwargs,
+    )
 
 
 def trans_dataset_to_ids(train_ds, dev_ds, ptq_ds, model_args, data_args, eval_zero_padding, trans_func):
