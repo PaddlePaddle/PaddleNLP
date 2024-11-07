@@ -216,108 +216,8 @@ def main():
     if isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
-    if data_args.dataset_name_or_path is None:
-        raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
-    elif (
-        os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json"))
-        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev.json"))
-        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json"))
-    ):
-        if training_args.do_train or quant_args.do_qat:
-            train_ds = load_dataset(
-                "json",
-                data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
-                lazy=data_args.lazy,
-            )[0]
-        else:
-            train_ds = None
-        if training_args.do_eval:
-            dev_ds = load_dataset(
-                "json",
-                data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
-                lazy=data_args.lazy,
-            )[0]
-        else:
-            dev_ds = None
-        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
-            if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
-                ptq_ds = load_dataset(
-                    "json",
-                    data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"),
-                    lazy=data_args.lazy,
-                )[0]
-            elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")):
-                ptq_ds = load_dataset(
-                    "json",
-                    data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
-                    lazy=data_args.lazy,
-                )[0]
-                logger.info(
-                    f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
-                )
-            else:
-                raise ValueError(
-                    f"Quant strategy requires quant.json or train.json in {data_args.dataset_name_or_path}"
-                )
-        else:
-            ptq_ds = None
-    elif (
-        os.path.exists(os.path.join(data_args.dataset_name_or_path, "train"))
-        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev"))
-        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant"))
-    ):
-        import glob
+    train_ds, dev_ds, ptq_ds = create_train_dataset(quant_args, data_args, training_args)
 
-        if training_args.do_train or quant_args.do_qat:
-            train_ds = load_dataset(
-                "json",
-                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
-                lazy=data_args.lazy,
-            )[0]
-        else:
-            train_ds = None
-        if training_args.do_eval:
-            dev_ds = load_dataset(
-                "json",
-                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "dev", "*.json")),
-                lazy=data_args.lazy,
-            )[0]
-        else:
-            dev_ds = None
-        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
-            if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant")):
-                ptq_ds = load_dataset(
-                    "json",
-                    data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "quant", "*.json")),
-                    lazy=data_args.lazy,
-                )[0]
-            elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")):
-                ptq_ds = load_dataset(
-                    "json",
-                    data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
-                    lazy=data_args.lazy,
-                )[0]
-                logger.info(
-                    f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
-                )
-            else:
-                raise ValueError(f"Quant strategy requires quant or train folder in {data_args.dataset_name_or_path}")
-        else:
-            ptq_ds = None
-    else:
-        if training_args.do_train or quant_args.do_qat:
-            train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
-        else:
-            train_ds = None
-        if training_args.do_eval:
-            dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
-        else:
-            dev_ds = None
-        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
-            ptq_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
-            logger.info("Set train dataset as PTQ calibration dataset.")
-        else:
-            ptq_ds = None
     # TODO(ZHUI & sijunhe): Temporary implementation. Generalize this logic and move to Trainer later.
     if training_args.resume_from_checkpoint is not None and data_args.lazy:
         logger.info(
@@ -339,6 +239,13 @@ def main():
         )
         train_ds = train_ds.skip(consumed_samples)
 
+    eval_zero_padding = data_args.zero_padding
+    if data_args.zero_padding and data_args.eval_with_do_generation:
+        logger.warning(
+            "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
+        )
+        eval_zero_padding = False
+
     if training_args.pipeline_parallel_degree > 1:
         from utils.data import convert_example_common
 
@@ -346,129 +253,18 @@ def main():
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
 
-    train_ds = (
-        train_ds.map(
-            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
-        )
-        if train_ds is not None
-        else None
-    )
-    ptq_ds = (
-        ptq_ds.map(
-            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
-        )
-        if ptq_ds is not None
-        else None
-    )
-    eval_zero_padding = data_args.zero_padding
-    if data_args.zero_padding and data_args.eval_with_do_generation:
-        logger.warning(
-            "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
-        )
-        eval_zero_padding = False
-    dev_ds = (
-        dev_ds.map(
-            partial(
-                trans_func,
-                is_test=data_args.eval_with_do_generation,
-                zero_padding=eval_zero_padding,
-                flash_mask=model_args.flash_mask,
-            )
-        )
-        if dev_ds is not None
-        else None
-    )
+    train_ds, dev_ds, ptq_ds = trans_dataset_to_ids(model_args, data_args, eval_zero_padding, trans_func)
+
     if data_args.zero_padding:
         if data_args.lazy:
             intoken_dataset = ZeroPaddingIterableDataset
         else:
             intoken_dataset = ZeroPaddingMapDataset
-        logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
-        train_ds = (
-            intoken_dataset(
-                train_ds,
-                tokenizer=tokenizer,
-                max_length=data_args.max_length,
-                greedy_zero_padding=data_args.greedy_zero_padding,
-            )
-            if train_ds is not None
-            else None
-        )
-        ptq_ds = (
-            intoken_dataset(
-                ptq_ds,
-                tokenizer=tokenizer,
-                max_length=data_args.max_length,
-                greedy_zero_padding=data_args.greedy_zero_padding,
-            )
-            if ptq_ds is not None
-            else None
+        train_ds, dev_ds, ptq_ds = create_zero_padding_ds(
+            train_ds, dev_ds, ptq_ds, data_args, tokenizer, eval_zero_padding, intoken_dataset
         )
 
-        if eval_zero_padding:
-            dev_ds = (
-                intoken_dataset(
-                    dev_ds,
-                    tokenizer=tokenizer,
-                    max_length=data_args.max_length,
-                )
-                if dev_ds is not None
-                else None
-            )
-
-    if model_args.prefix_tuning:
-        if training_args.pipeline_parallel_degree > 1:
-            raise NotImplementedError("Prefix tuning is not implemented for pipeline parallelism.")
-
-        prefix_tuning_params = get_prefix_tuning_params(model)
-        prefix_config = PrefixConfig(
-            num_prefix_tokens=model_args.num_prefix_tokens,
-            num_attention_heads=prefix_tuning_params["num_attention_heads"],
-            num_hidden_layers=prefix_tuning_params["num_hidden_layers"],
-            hidden_size=prefix_tuning_params["hidden_size"],
-            multi_query_group_num=prefix_tuning_params["multi_query_group_num"],
-            dtype=dtype,
-        )
-        if model_args.prefix_path is None:
-            model = PrefixModelForCausalLM(
-                model=model,
-                prefix_config=prefix_config,
-                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
-            )
-        else:
-            model = PrefixModelForCausalLM.from_pretrained(
-                model=model,
-                prefix_path=model_args.prefix_path,
-                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
-            )
-        model.print_trainable_parameters()
-
-    if model_args.lora:
-        if training_args.sharding_parallel_degree > 1:
-            assert (
-                "enable_stage1_overlap" not in training_args.sharding_parallel_config
-            ), "Currently not support enabling sharding_stage1_overlap in lora mode."
-        if model_args.lora_path is None:
-            target_modules = get_lora_target_modules(model)
-            lora_config = LoRAConfig(
-                target_modules=target_modules,
-                r=model_args.lora_rank,
-                lora_alpha=2 * model_args.lora_rank if not model_args.rslora else 4,
-                rslora=model_args.rslora,
-                lora_plus_scale=model_args.lora_plus_scale,
-                pissa=model_args.pissa,
-                merge_weights=False,
-                tensor_parallel_degree=training_args.tensor_parallel_degree,
-                dtype=dtype,
-                do_qat=quant_args.do_qat,
-                base_model_name_or_path=model_args.model_name_or_path,
-                use_quick_lora=model_args.use_quick_lora,
-            )
-            model = LoRAModel(model, lora_config)
-        else:
-            model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
-
-        model.print_trainable_parameters()
+    model = create_peft_model(model, model_args, training_args, quant_args, dtype)
 
     def compute_metrics_do_generation(eval_preds):
         rouge1 = Rouge1()
@@ -499,20 +295,6 @@ def main():
             "rougel": rougel.score(),
             "bleu4": bleu4.score(),
         }
-
-    if model_args.vera:
-        target_modules = get_lora_target_modules(model)
-        vera_config = VeRAConfig(
-            target_modules=target_modules,
-            r=model_args.vera_rank,
-            vera_alpha=model_args.vera_rank,
-            dtype=dtype,
-            base_model_name_or_path=model_args.model_name_or_path,
-            pissa_init=True,
-        )
-        model = VeRAModel(model, vera_config)
-        model.mark_only_vera_as_trainable(notfreezeB=True)
-        model.print_trainable_parameters()
 
     # Create trainer
 
@@ -725,6 +507,242 @@ def main():
         logger.info("*** Evaluate result after train/ptq/qat/ etc.***")
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
+
+
+def trans_dataset_to_ids(train_ds, dev_ds, ptq_ds, model_args, data_args, eval_zero_padding, trans_func):
+    zero_padding = data_args.zero_padding
+    flash_mask = model_args.flash_mask
+    if train_ds is not None:
+        train_ds = train_ds.map(partial(trans_func, is_test=False, zero_padding=zero_padding, flash_mask=flash_mask))
+    if ptq_ds is not None:
+        ptq_ds = ptq_ds.map(partial(trans_func, is_test=False, zero_padding=zero_padding, flash_mask=flash_mask))
+
+    if dev_ds is not None:
+        dev_ds = dev_ds.map(
+            partial(
+                trans_func,
+                is_test=data_args.eval_with_do_generation,
+                zero_padding=eval_zero_padding,
+                flash_mask=flash_mask,
+            )
+        )
+
+    return train_ds, dev_ds, ptq_ds
+
+
+def create_zero_padding_ds(
+    train_ds,
+    dev_ds,
+    ptq_ds,
+    data_args,
+    tokenizer,
+    eval_zero_padding,
+    intoken_dataset,
+):
+    logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
+    if train_ds is not None:
+        train_ds = intoken_dataset(
+            train_ds,
+            tokenizer=tokenizer,
+            max_length=data_args.max_length,
+            greedy_zero_padding=data_args.greedy_zero_padding,
+        )
+
+    if ptq_ds is not None:
+        ptq_ds = intoken_dataset(
+            ptq_ds,
+            tokenizer=tokenizer,
+            max_length=data_args.max_length,
+            greedy_zero_padding=data_args.greedy_zero_padding,
+        )
+
+    if eval_zero_padding:
+        if dev_ds is not None:
+            dev_ds = intoken_dataset(
+                dev_ds,
+                tokenizer=tokenizer,
+                max_length=data_args.max_length,
+            )
+
+    return train_ds, dev_ds, ptq_ds, intoken_dataset
+
+
+def create_train_dataset(quant_args, data_args, training_args):
+    if data_args.dataset_name_or_path is None:
+        raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
+    elif (
+        os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json"))
+        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev.json"))
+        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json"))
+    ):
+        if training_args.do_train or quant_args.do_qat:
+            train_ds = load_dataset(
+                "json",
+                data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
+                lazy=data_args.lazy,
+            )[0]
+        else:
+            train_ds = None
+        if training_args.do_eval:
+            dev_ds = load_dataset(
+                "json",
+                data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
+                lazy=data_args.lazy,
+            )[0]
+        else:
+            dev_ds = None
+        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
+            if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
+                ptq_ds = load_dataset(
+                    "json",
+                    data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"),
+                    lazy=data_args.lazy,
+                )[0]
+            elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")):
+                ptq_ds = load_dataset(
+                    "json",
+                    data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
+                    lazy=data_args.lazy,
+                )[0]
+                logger.info(
+                    f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
+                )
+            else:
+                raise ValueError(
+                    f"Quant strategy requires quant.json or train.json in {data_args.dataset_name_or_path}"
+                )
+        else:
+            ptq_ds = None
+    elif (
+        os.path.exists(os.path.join(data_args.dataset_name_or_path, "train"))
+        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev"))
+        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant"))
+    ):
+        import glob
+
+        if training_args.do_train or quant_args.do_qat:
+            train_ds = load_dataset(
+                "json",
+                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
+                lazy=data_args.lazy,
+            )[0]
+        else:
+            train_ds = None
+        if training_args.do_eval:
+            dev_ds = load_dataset(
+                "json",
+                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "dev", "*.json")),
+                lazy=data_args.lazy,
+            )[0]
+        else:
+            dev_ds = None
+        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
+            if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant")):
+                ptq_ds = load_dataset(
+                    "json",
+                    data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "quant", "*.json")),
+                    lazy=data_args.lazy,
+                )[0]
+            elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")):
+                ptq_ds = load_dataset(
+                    "json",
+                    data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
+                    lazy=data_args.lazy,
+                )[0]
+                logger.info(
+                    f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
+                )
+            else:
+                raise ValueError(f"Quant strategy requires quant or train folder in {data_args.dataset_name_or_path}")
+        else:
+            ptq_ds = None
+    else:
+        if training_args.do_train or quant_args.do_qat:
+            train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
+        else:
+            train_ds = None
+        if training_args.do_eval:
+            dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
+        else:
+            dev_ds = None
+        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
+            ptq_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
+            logger.info("Set train dataset as PTQ calibration dataset.")
+        else:
+            ptq_ds = None
+    return train_ds, dev_ds, ptq_ds
+
+
+def create_peft_model(model, model_args, training_args, quant_args, dtype):
+    if model_args.prefix_tuning:
+        if training_args.pipeline_parallel_degree > 1:
+            raise NotImplementedError("Prefix tuning is not implemented for pipeline parallelism.")
+
+        prefix_tuning_params = get_prefix_tuning_params(model)
+        prefix_config = PrefixConfig(
+            num_prefix_tokens=model_args.num_prefix_tokens,
+            num_attention_heads=prefix_tuning_params["num_attention_heads"],
+            num_hidden_layers=prefix_tuning_params["num_hidden_layers"],
+            hidden_size=prefix_tuning_params["hidden_size"],
+            multi_query_group_num=prefix_tuning_params["multi_query_group_num"],
+            dtype=dtype,
+        )
+        if model_args.prefix_path is None:
+            model = PrefixModelForCausalLM(
+                model=model,
+                prefix_config=prefix_config,
+                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
+            )
+        else:
+            model = PrefixModelForCausalLM.from_pretrained(
+                model=model,
+                prefix_path=model_args.prefix_path,
+                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
+            )
+        model.print_trainable_parameters()
+
+    if model_args.lora:
+        if training_args.sharding_parallel_degree > 1:
+            assert (
+                "enable_stage1_overlap" not in training_args.sharding_parallel_config
+            ), "Currently not support enabling sharding_stage1_overlap in lora mode."
+        if model_args.lora_path is None:
+            target_modules = get_lora_target_modules(model)
+            lora_config = LoRAConfig(
+                target_modules=target_modules,
+                r=model_args.lora_rank,
+                lora_alpha=2 * model_args.lora_rank if not model_args.rslora else 4,
+                rslora=model_args.rslora,
+                lora_plus_scale=model_args.lora_plus_scale,
+                pissa=model_args.pissa,
+                merge_weights=False,
+                tensor_parallel_degree=training_args.tensor_parallel_degree,
+                dtype=dtype,
+                do_qat=quant_args.do_qat,
+                base_model_name_or_path=model_args.model_name_or_path,
+                use_quick_lora=model_args.use_quick_lora,
+            )
+            model = LoRAModel(model, lora_config)
+        else:
+            model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
+
+        model.print_trainable_parameters()
+
+    if model_args.vera:
+        target_modules = get_lora_target_modules(model)
+        vera_config = VeRAConfig(
+            target_modules=target_modules,
+            r=model_args.vera_rank,
+            vera_alpha=model_args.vera_rank,
+            dtype=dtype,
+            base_model_name_or_path=model_args.model_name_or_path,
+            pissa_init=True,
+        )
+        model = VeRAModel(model, vera_config)
+        model.mark_only_vera_as_trainable(notfreezeB=True)
+        model.print_trainable_parameters()
+
+    return model
 
 
 if __name__ == "__main__":
