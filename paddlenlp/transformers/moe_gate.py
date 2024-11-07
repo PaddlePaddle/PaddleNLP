@@ -220,7 +220,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         # Shape: [tokens_per_group, num_experts, expert_capacity].
         valid_mask = paddle.logical_and(token_priority >= 0, token_priority < capacity)
         token_priority = paddle.masked_fill(token_priority, ~valid_mask, 0)
-        dispatch_mask = F.one_hot(token_priority, capacity)
+        dispatch_mask = F.one_hot(token_priority, capacity).cast(paddle.int32)
         valid_mask = valid_mask.unsqueeze(-1).expand(valid_mask.shape + [capacity])
         dispatch_mask = paddle.masked_fill(dispatch_mask, ~valid_mask, 0)
 
@@ -476,7 +476,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         if self.norm_topk_prob:
             gates_masked = gates_masked / denom_s
 
-        combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority)
+        combine_weights = paddle.einsum("se,sec->sec", gates_masked, token_priority.cast(paddle.get_default_dtype()))
         dispatch_mask = combine_weights.cast(paddle.bool)
 
         return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss
