@@ -1393,7 +1393,8 @@ class TrainingArguments:
                         )
 
                     if "split_param" in sharding_parallel_config:
-                        assert self.sharding == [ShardingOption.SHARD_OP], "Only sharding stage1 support split_param."
+                        if ShardingOption.SHARD_OP not in self.sharding:
+                            logger.warning("Only sharding stage1 support split_param.")
                         assert (
                             self.amp_master_grad
                         ), "If `split_param` in sharding_parallel_config, `amp_master_grad` must be True."
