@@ -247,10 +247,10 @@ class KTOCriterion(nn.Layer):
             reference_kl_logps,
         )
         if self.use_infohub:
-            infohub.policy_chosen_logps.append(policy_chosen_logps)
-            infohub.policy_rejected_logps.append(policy_rejected_logps)
-            infohub.policy_kl_logps.append(policy_kl_logps)
-            infohub.kl.append(kl)
+            infohub.policy_chosen_logps.append(policy_chosen_logps.detach())
+            infohub.policy_rejected_logps.append(policy_rejected_logps.detach())
+            infohub.policy_kl_logps.append(policy_kl_logps.detach())
+            infohub.kl.append(kl.detach())
             return loss
         else:
             return (

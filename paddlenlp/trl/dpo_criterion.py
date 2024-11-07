@@ -287,10 +287,10 @@ class DPOCriterion(nn.Layer):
         )
         loss = dpo_loss + sft_loss
         if self.use_infohub:
-            infohub.policy_chosen_logps.append(policy_chosen_logps)
-            infohub.policy_rejected_logps.append(policy_rejected_logps)
-            infohub.sft_loss.append(sft_loss)
-            infohub.dpo_loss.append(dpo_loss)
+            infohub.policy_chosen_logps.append(policy_chosen_logps.detach())
+            infohub.policy_rejected_logps.append(policy_rejected_logps.detach())
+            infohub.sft_loss.append(sft_loss.detach())
+            infohub.dpo_loss.append(dpo_loss.detach())
             return loss
         else:
             return policy_chosen_logps, policy_rejected_logps, sft_loss, dpo_loss, loss

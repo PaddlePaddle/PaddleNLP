@@ -181,7 +181,7 @@ def load_unified_optimizer_split_param(args, model, optimizer, resume_from_check
     param_shape_info = {}
 
     comm_buffer_list = optimizer._inner_opt._comm_buffer_list
-    if args.enable_sharding_comm_overlap:
+    if hasattr(args, "enable_sharding_comm_overlap") and args.enable_sharding_comm_overlap:
         comm_buffer_list = list(chain(*model._chunk_2_comm_buffers.values()))
         model = unwrap_model(model)
 
