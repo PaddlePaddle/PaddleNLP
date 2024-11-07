@@ -59,7 +59,7 @@ class MoEGateMixin:
     def _one_hot_to_float(self, x, num_classes):
         if x.dtype not in (paddle.int32, paddle.int64):
             x = paddle.cast(x, paddle.int64)
-        return F.one_hot(x, num_classes=num_classes).cast(paddle.float32)
+        return F.one_hot(x, num_classes=num_classes).cast(paddle.get_default_dtype())
 
     @paddle.no_grad()
     def _one_hot_to_int64(self, x, num_classes):
@@ -68,7 +68,9 @@ class MoEGateMixin:
         return F.one_hot(x, num_classes=num_classes).cast(paddle.int64)
 
     @paddle.no_grad()
-    def _capacity(self, gates: paddle.Tensor, capacity_factor: float, min_capacity: int) -> paddle.Tensor:
+    def _capacity(
+        self, gates: paddle.Tensor, capacity_factor: float, max_capacity: int, min_capacity: int
+    ) -> paddle.Tensor:
         """Calculate the capacity for each expert based on the gates and capacity factor.
 
         Args:
@@ -87,6 +89,8 @@ class MoEGateMixin:
         capacity = int((num_tokens // num_experts) * capacity_factor)
         if capacity < min_capacity:
             capacity = min_capacity
+        if capacity > max_capacity:
+            capacity = max_capacity
         assert capacity > 0, f"requires capacity > 0, capacity_factor: {capacity_factor}, input_shape: {gates.shape}"
 
         return capacity
@@ -96,8 +100,8 @@ class MoEGateMixin:
         计算辅助损失
 
         Args:
-            gates (paddle.Tensor): 表示每个expert的输出概率。形状为[batch_size，num_experts]
-            mask (paddle.Tensor): 表示每个样本是否属于某个expert。形状为[batch_size，num_experts]
+            gates (paddle.Tensor): 表示每个expert的输出概率。形状为[batch_size, num_experts]
+            mask (paddle.Tensor): 表示每个样本是否属于某个expert。形状为[batch_size, num_experts]
 
         Returns:
             paddle.Tensor: 辅助损失值。
@@ -140,8 +144,10 @@ class MoEGateMixin:
 
 
 class PretrainedMoEGate(nn.Layer, MoEGateMixin):
-    def __init__(self, num_experts, expert_hidden_size, **kwargs):
+    def __init__(self, config, num_experts, expert_hidden_size, **kwargs):
         super(PretrainedMoEGate, self).__init__()
+
+        self.config = config
 
         self.num_experts = num_experts
         self.expert_hidden_size = expert_hidden_size
@@ -152,6 +158,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         self.capacity_factor = kwargs.pop("capacity_factor", 1.0)
         self.eval_capacity_factor = kwargs.pop("eval_capacity_factor", 1.0)
         self.min_capacity = kwargs.pop("min_capacity", 1.0)
+        self.max_capacity = kwargs.pop("max_capacity", pow(2, 32))
 
         self.group = kwargs.pop("group", None)
         self.global_aux_loss = kwargs.pop("global_aux_loss", False)
@@ -169,7 +176,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         self.top_k = kwargs.pop("top_k", 2)
         self.norm_topk_prob = kwargs.pop("norm_topk_prob", False)
 
-    def topk_navie(self, scores: paddle.Tensor, k: int) -> Tuple[paddle.Tensor, paddle.Tensor]:
+    def topk_naive(self, scores: paddle.Tensor, k: int) -> Tuple[paddle.Tensor, paddle.Tensor]:
         """_summary_
 
         Args:
@@ -226,7 +233,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             logits += self.gumbel_rsample(logits.shape)
 
         gates = self.gate_score_func(logits=logits)
-        capacity = self._capacity(gates, self.capacity_factor, self.min_capacity)
+        capacity = self._capacity(gates, self.capacity_factor, self.max_capacity, self.min_capacity)
 
         # Create a mask for 1st's expert per token
         # noisy gating
@@ -235,7 +242,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         # mask only used tokens
         if used_token is not None:
-            mask1 = paddle.einsum("s,se->se", used_token, mask1)  # 将used_token与mask1进行逐元素相乘，得到新的mask1
+            mask1 = paddle.einsum("s,se->se", used_token, mask1)  # 将used_token与mask1进行逐元素相乘,得到新的mask1
 
         # gating decisions
         exp_counts = paddle.sum(mask1, axis=0)  # 计算每个专家的token数量
@@ -264,7 +271,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         _, top_idx = paddle.topk(mask1_rand, k=capacity, axis=0)  # 选择top_capacity个token
 
-        # 将mask1中的元素与top_idx进行逐元素相乘，得到新的mask1
+        # 将mask1中的元素与top_idx进行逐元素相乘,得到新的mask1
         new_mask1 = mask1 * paddle.zeros_like(mask1).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=0)
         mask1 = new_mask1
 
@@ -290,14 +297,14 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
     ) -> Tuple[int, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor]:
         """
         Args:
-            logits: [S, E]，形状为 [seq_len, num_experts]，用于计算top2 gate。
+            logits: [S, E],形状为 [seq_len, num_experts],用于计算top2 gate。
             cap: 表示每个token可以分发的最大数量的超参数。
 
         Returns:
             tuple:
                 - capacity: 每个token可分发的最大数量。
                 - dispatch_masks: 用于dispatching的mask。
-                - combine_weights：用于combining的权重。
+                - combine_weights: 用于combining的权重。
                 - scatter_indexes: 用于scattering的索引。
                 - loss_aux: aux loss。
                 - loss_z: z loss。
@@ -337,7 +344,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         exp_counts = paddle.sum(mask1 + mask2, axis=0)
         if self.drop_tokens:
             # Calculate configured capacity and remove locations outside capacity from mask
-            capacity = self._capacity(gates, self.capacity_factor, self.min_capacity)
+            capacity = self._capacity(gates, self.capacity_factor, self.max_capacity, self.min_capacity)
             # Remove locations outside capacity from mask.
             mask1 *= (locations1 < capacity).cast(paddle.int64)
             mask2 *= (locations2 < capacity).cast(paddle.int64)
@@ -380,17 +387,19 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         gates: paddle.Tensor,
     ) -> Tuple[int, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor]:
         """Implements TopKGating on logits."""
+        l_zloss = self._cal_z_loss(gates)
+
         # get topk gates
         top_gate, top_idx = paddle.topk(gates, k=self.top_k, axis=1)
         # get topk mask
         mask = paddle.zeros_like(gates).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=1)
-        exp_counts = paddle.sum(mask, axis=0)
-
         l_aux = self._cal_aux_loss(gates, mask)
+
+        exp_counts = paddle.sum(mask.cast(paddle.int64), axis=0)
 
         if self.drop_tokens:
             # Calculate configured capacity and remove locations outside capacity from mask
-            capacity = self._capacity(gates, self.capacity_factor * self.top_k, self.min_capacity)
+            capacity = self._capacity(gates, self.capacity_factor * self.top_k, self.max_capacity, self.min_capacity)
 
             # update mask and locations by capacity
             if self.drop_policy == "probs":
@@ -426,62 +435,4 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         combine_weights = paddle.einsum("se,sec->sec", gates_masked, locations_sc)
         dispatch_mask = combine_weights.cast(paddle.bool)
 
-        return capacity, combine_weights, dispatch_mask, exp_counts, l_aux
-
-    def forward(self, hidden_states):
-        raise NotImplementedError("Please implement the forward function.")
-
-
-class TopKGate(PretrainedMoEGate):
-    def __init__(
-        self,
-        num_experts,
-        expert_hidden_size,
-        weight_attr=None,
-        bias_attr=None,
-        top_k=2,
-        capacity_factor=1.0,
-        eval_capacity_factor=1.0,
-        scoring_func="softmax",
-        scaling_attr=None,
-    ):
-        super().__init__(num_experts, expert_hidden_size, weight_attr, bias_attr)
-        self.top_k = top_k
-        self.scoring_func = scoring_func
-        self.scaling_attr = scaling_attr
-
-    def forward(
-        self,
-        hidden_states: paddle.Tensor,
-        used_token: paddle.Tensor = None,
-    ):
-        bsz, seq_len, hidden_size = hidden_states.shape
-        hidden_states = hidden_states.reshape([-1, hidden_size])
-        logits = F.linear(x=paddle.cast(hidden_states, paddle.float32), weight=self.weight, bias=self.bias)
-        if self.top_k == 1:
-            gate_output = self.top1gating(
-                logits,
-                self.capacity_factor if self.training else self.eval_capacity_factor,
-                self.min_capacity,
-                used_token,
-                self.noisy_gate_policy if self.training else None,
-                self.drop_tokens,
-            )
-        elif self.top_k == 2:
-            gate_output = self.top2gating(
-                logits,
-                self.capacity_factor if self.training else self.eval_capacity_factor,
-                self.min_capacity,
-                self.drop_tokens,
-                self.top2_2nd_expert_sampling,
-            )
-        else:
-            gate_output = self.topkgating(
-                logits,
-                self.top_k,
-                self.capacity_factor if self.training else self.eval_capacity_factor,
-                self.min_capacity,
-                self.drop_tokens,
-            )
-
-        return gate_output
+        return capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss

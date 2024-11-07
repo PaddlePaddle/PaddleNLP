@@ -261,8 +261,6 @@ class MoELayer(nn.Layer):
 
         capacity, combine_weights, dispatch_mask, exp_counts, l_aux, l_zloss = self.gate(reshaped_input)
 
-        # print(f"capacity={capacity}")
-        # self.l_aux, combine_weights, dispatch_mask, self.exp_counts =
         # self.l_aux       :
         # combine_weights  : sec
         # dispatch_mask    : sec
@@ -285,9 +283,9 @@ class MoELayer(nn.Layer):
         if self.expert_parallel_degree > 1:
             expert_output = _AllToAll.apply(expert_output, self.moe_group)
 
-        # Re拿到不同device上的expert计算结果
+        # combine withe expert weights
         combined_output = paddle.einsum("sec,ecm->sm", combine_weights.cast(hidden_state[0].dtype), expert_output)
 
         a = combined_output.reshape(hidden_state.shape)
 
-        return a
+        return a, l_aux, l_zloss
