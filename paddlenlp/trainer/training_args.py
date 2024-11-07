@@ -1136,6 +1136,15 @@ class TrainingArguments:
                         raise ValueError(
                             "If `enable_sharding_comm_overlap` in pipeline_parallel_configs, `amp_master_grad` must be True."
                         )
+                    if (
+                        enable_sharding_comm_overlap
+                        and self.unified_checkpoint
+                        and "split_param" in split_parallel_config(self.sharding_parallel_config)
+                    ):
+                        logger.warning(
+                            "Currently unified checkpoint do not support using `sharding_comm_overlap` and `split_param` at the same time, delete `sharding_comm_overlap`."
+                        )
+                        enable_sharding_comm_overlap = False
 
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
