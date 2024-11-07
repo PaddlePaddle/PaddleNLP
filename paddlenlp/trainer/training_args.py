@@ -827,6 +827,12 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to use async_save instead of paddle.save."},
     )
+    ordered_save_group_size: int = field(
+        default=0,
+        metadata={
+            "help": "Select ordered_save_group_size to save checkpoint in ordered. if ordered_save_group_size=0, not used ordered save"
+        },
+    )
     skip_profile_timer: Optional[bool] = field(
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl."},
@@ -882,6 +888,10 @@ class TrainingArguments:
     skip_data_intervals: Optional[List[List[int]]] = field(
         default=None,
         metadata={"help": "The intervals to skip, pass start global step and end global step at each interval"},
+    )
+    offload_optim: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Offload optimizer after optimizer.step()"},
     )
 
     def __post_init__(self):
@@ -1154,6 +1164,15 @@ class TrainingArguments:
                         raise ValueError(
                             "If `enable_sharding_comm_overlap` in pipeline_parallel_configs, `amp_master_grad` must be True."
                         )
+                    if (
+                        enable_sharding_comm_overlap
+                        and self.unified_checkpoint
+                        and "split_param" in split_parallel_config(self.sharding_parallel_config)
+                    ):
+                        logger.warning(
+                            "Currently unified checkpoint do not support using `sharding_comm_overlap` and `split_param` at the same time, delete `sharding_comm_overlap`."
+                        )
+                        enable_sharding_comm_overlap = False
 
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
@@ -1340,6 +1359,7 @@ class TrainingArguments:
 
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
+                            assert self.amp_master_grad, "Currently sharding stage1 v2 only support amp_master_grad"
 
                         if "enable_release_grads" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].release_gradients = True
@@ -1401,6 +1421,13 @@ class TrainingArguments:
                             "The logging_steps should be greater than 1 for enable_stage1_allgather_overlap, "
                             f"but got logging_steps={self.logging_steps}."
                         )
+
+                    if "split_param" in sharding_parallel_config:
+                        if ShardingOption.SHARD_OP not in self.sharding:
+                            logger.warning("Only sharding stage1 support split_param.")
+                        assert (
+                            self.amp_master_grad
+                        ), "If `split_param` in sharding_parallel_config, `amp_master_grad` must be True."
 
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
@@ -1472,7 +1499,7 @@ class TrainingArguments:
                             "enable_send_recv_overlap",
                             # "disable_p2p_cache_shape",      # no need for auto_parallel
                             # "disable_partial_send_recv",    # no implemenation for auto_parallel
-                            # "enable_delay_scale_loss",      # default True in auto_parallel, non-configurable
+                            "enable_delay_scale_loss",
                             # "enable_dp_comm_overlap",       # no implemenation for auto_parallel
                             # "enable_sharding_comm_overlap", # no implemenation for auto_parallel
                             # "enable_timer",                 # no implemenation for auto_parallel
@@ -1521,6 +1548,7 @@ class TrainingArguments:
                     if len(x) > 0:
                         if x not in [
                             "enable_mp_async_allreduce",  # allreduce_matmul_grad_overlapping in auto_parallel
+                            "enable_delay_scale_loss",
                             # "enable_mp_skip_c_identity",
                             # "enable_mp_fused_linear_param_grad_add",
                         ]:

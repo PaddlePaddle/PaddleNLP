@@ -22,7 +22,8 @@
 * GitHub Issue反馈: https://github.com/PaddlePaddle/PaddleNLP/issues
 * 微信交流群: 微信扫描二维码并填写问卷之后，即可加入交流群，与众多社区开发者以及官方团队深度交流。
 
-.. image:: https://user-images.githubusercontent.com/11793384/184784832-bb97930f-a738-4480-99be-517aeb65afac.png
+.. image:: https://github.com/user-attachments/assets/3a58cc9f-69c7-4ccb-b6f5-73e966b8051a
+   :width: 200px
    :align: center
    :alt: paddlenlp微信交流群二维码
 
@@ -50,6 +51,7 @@
 
    大模型预训练文档 <llm/docs/pretrain.rst>
    大模型精调文档 <llm/docs/finetune.md>
+   大模型FlashMask算法 <llm/docs/flashmask.md>
    大模型常用算法文档 <llm/docs/algorithm_overview.md>
    大模型RLHF文档 <llm/docs/rlhf.md>
    大模型量化教程 <llm/docs/quantization.md>

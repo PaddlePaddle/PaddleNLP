@@ -113,7 +113,6 @@ from ..utils.log import logger
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import RuntimeTimer, get_timers, set_timers
-from .plugins.unified_checkpoint import UnifiedCheckpointHandler
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -144,6 +143,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     speed_metrics,
 )
 from .training_args import TrainingArguments
+from .unified_checkpoint import UnifiedCheckpointHandler
 from .utils import reshard as reshard_util
 from .utils.async_save import AsyncSaver
 from .utils.helper import (  # nested_truncate,
@@ -396,6 +396,13 @@ class Trainer:
 
         self._save_ckpt_func = _save_ckpt_func
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
+
+        if self.args.ordered_save_group_size > 0:
+            logger.info(f"using save in order, its group size is {self.args.ordered_save_group_size}")
+            assert not self.args.use_async_save, "Not support async save in ordered save"
+            assert self.args.tensor_parallel_degree % self.args.ordered_save_group_size == 0
+            self._save_ckpt_func = self._ordered_save
+
         if self.args.use_async_save:
             self._async_optimizer_saver = AsyncSaver()
 
@@ -598,7 +605,6 @@ class Trainer:
                 if use_unified_checkpoint:
                     self.unified_checkpoint_handler.load_unified_checkpoint(
                         self.model,
-                        self.optimizer,
                         resume_from_checkpoint,
                     )
                     logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
@@ -818,7 +824,13 @@ class Trainer:
         logger.info(f"  Total num train samples = {num_train_samples:,}")
         # per_device_trainable_numel = sum(p.numel().item() for p in model.parameters() if not p.stop_gradient)
         # TODO: Temporary fix since Tensor.numel() not supported in distributed mode
-        per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
+        if self.args.enable_auto_parallel:
+            per_device_trainable_numel = 0
+            for p in model.parameters():
+                if not p.stop_gradient:
+                    per_device_trainable_numel += np.prod(p._local_shape) if p.is_dist() else np.prod(p.shape)
+        else:
+            per_device_trainable_numel = sum(np.prod(p.shape) for p in model.parameters() if not p.stop_gradient)
         logger.debug(f"  Number of trainable parameters = {per_device_trainable_numel:,} (per device)")
         if self.args.use_hybrid_parallel:
             # todo fix for pipeline_parallel_degree
@@ -1147,6 +1159,10 @@ class Trainer:
                         args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
                     )
                     optimizer_was_run = True
+
+                    if self.args.offload_optim:
+                        self._reload_optimizer()
+
                     if self.do_grad_scaling:
                         if args.pipeline_parallel_degree > 1:
                             assert not self.args.use_expert_parallel, "pipeline moe not work under fp16"
@@ -1169,6 +1185,9 @@ class Trainer:
                         self.optimizer._step(parameters_list)
                     else:
                         self.optimizer.step()
+
+                    if self.args.offload_optim:
+                        self._offload_optimizer()
 
                     self.timers and self.timers("optimizer-step").stop()
 
@@ -1241,7 +1260,6 @@ class Trainer:
                 if self.args.unified_checkpoint:
                     self.unified_checkpoint_handler.load_unified_checkpoint(
                         self.model,
-                        self.optimizer,
                         self.state.best_model_checkpoint,
                     )
                     if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
@@ -1289,7 +1307,6 @@ class Trainer:
         if self.args.unified_checkpoint:
             self.unified_checkpoint_handler.load_unified_checkpoint(
                 self.model,
-                self.optimizer,
                 self.state.best_model_checkpoint,
             )
             if self.args.sharding_parallel_degree > 1 or self.args.data_parallel_degree > 1:
@@ -1749,6 +1766,33 @@ class Trainer:
 
         return self.optimizer
 
+    def _apply_to_optimizer(self, action):
+        if "gpu" not in paddle.device.get_device():
+            logger.warning("offload/reload optimizer's states is only supported on GPU devices.")
+            return
+
+        attributes = [
+            ("_accumulators", "_moment1_acc_str"),
+            ("_accumulators", "_moment2_acc_str"),
+            ("_master_weights",),
+            ("_accumulators_holder",),
+        ]
+
+        for attr in attributes:
+            if all(hasattr(self.optimizer, a) for a in attr):
+                target_attr = getattr(self.optimizer, attr[0])
+                if len(attr) == 2:
+                    target_attr = target_attr[getattr(self.optimizer, attr[1])]
+
+                for key, value in target_attr.items():
+                    target_attr[key] = getattr(value, action)()
+
+    def _offload_optimizer(self):
+        self._apply_to_optimizer("pin_memory")
+
+    def _reload_optimizer(self):
+        self._apply_to_optimizer("cuda")
+
     def _load_rng_state(self, checkpoint):
         # Load RNG states from `checkpoint`
         if checkpoint is None:
@@ -1792,6 +1836,12 @@ class Trainer:
                 raise ValueError("Length of gpu state list shoule be equal to the gpu device count")
             for i in range(core.get_cuda_device_count()):
                 core.default_cuda_generator(i).set_state(checkpoint_rng_state["cuda"][i])
+
+        if core.is_compiled_with_xpu():
+            if not len(checkpoint_rng_state["cuda"]) == core.get_xpu_device_count():
+                raise ValueError("Length of xpu state list shoule be equal to the xpu device count")
+            for i in range(core.get_xpu_device_count()):
+                core.default_xpu_generator(i).set_state(checkpoint_rng_state["cuda"][i])
 
         if paddle.device.get_all_custom_device_type() is not None:
             custom_device_type = paddle.device.get_all_custom_device_type()
@@ -2197,6 +2247,9 @@ class Trainer:
         return (loss, outputs) if return_outputs else loss
 
     def _enable_delay_scale_loss(self):
+        if in_auto_parallel_align_mode():
+            return True
+
         key = "enable_delay_scale_loss"
         if self.args.pipeline_parallel_degree > 1:
             return key in self.args.pipeline_parallel_config
@@ -2302,7 +2355,7 @@ class Trainer:
         if output_dir is None:
             output_dir = self.args.output_dir
 
-        if PREFIX_CHECKPOINT_DIR in output_dir:
+        if PREFIX_CHECKPOINT_DIR in os.path.split(output_dir)[-1]:
             signal_dir = os.path.join(self.args.output_signal_dir, os.path.split(output_dir)[-1])
         else:
             signal_dir = self.args.output_signal_dir
@@ -2356,6 +2409,26 @@ class Trainer:
                     if op_k.startswith(v.name):
                         filter_optimzier_state_dict[op_k] = op_v
         return filter_optimzier_state_dict
+
+    def _ordered_save(self, state_dict, save_path):
+        group_size = self.args.ordered_save_group_size
+        hcg = fleet.get_hybrid_communicate_group()
+        if hcg.get_sharding_parallel_world_size() > 1 or hcg.get_model_parallel_world_size() <= 1:
+            return paddle.save(state_dict, save_path)
+
+        mp_group = hcg.get_model_parallel_group()
+        ranks = list(mp_group.ranks)
+        n = len(ranks)
+
+        group_num = (n + group_size - 1) // group_size
+        groups = []
+        for i in range(group_num):
+            groups.append([ranks[j] for j in range(i, n, group_num)])
+
+        for group in groups:
+            if dist.get_rank() in group:
+                paddle.save(state_dict, save_path)
+            dist.barrier(mp_group)
 
     def _save_checkpoint(self, model, metrics=None):
         # assert unwrap_model(model) is self.model, "internal model should be a reference to self.model"
@@ -2600,7 +2673,7 @@ class Trainer:
         # signal_dir is used for asynchronous saving situations.
         signal_dir = self.args.output_signal_dir
         if self.args.unified_checkpoint and "async_save" in self.args.unified_checkpoint_config:
-            if PREFIX_CHECKPOINT_DIR in output_dir:
+            if PREFIX_CHECKPOINT_DIR in os.path.split(output_dir)[-1]:
                 signal_dir = os.path.join(signal_dir, os.path.split(output_dir)[-1])
             os.makedirs(signal_dir, exist_ok=True)
             logger.info(f"Saving model checkpoint finish signal to {signal_dir}")
@@ -2620,9 +2693,11 @@ class Trainer:
                 "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
                 "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
             }
-            if os.path.exists(os.path.join(signal_dir, "async_save_info.json")):  # afs cannot overwrite
-                os.remove(os.path.join(signal_dir, "async_save_info.json"))
-            with open(os.path.join(signal_dir, "async_save_info.json"), "w") as f:
+            if os.path.exists(
+                os.path.join(self.args.output_signal_dir, "async_save_info.json")
+            ):  # afs cannot overwrite
+                os.remove(os.path.join(self.args.output_signal_dir, "async_save_info.json"))
+            with open(os.path.join(self.args.output_signal_dir, "async_save_info.json"), "w") as f:
                 json.dump(save_info, f)
 
         if self.args.should_save:
@@ -2766,7 +2841,6 @@ class Trainer:
                     opt_state_dict = None
             else:
                 opt_state_dict = self.unified_checkpoint_handler.load_unified_optimizer(
-                    args=self.args,
                     model=self.model,
                     optimizer=self.optimizer,
                     resume_from_checkpoint=checkpoint,
@@ -2809,6 +2883,11 @@ class Trainer:
                 self.scaler.load_state_dict(
                     paddle.load(distributed_file(os.path.join(checkpoint, SCALER_NAME)), return_numpy=True)
                 )
+
+        if self.args.offload_optim:
+            logger.info("Offloading optimizer state...")
+            self._offload_optimizer()
+
         self.runtime_timer.stop()
 
     def log(self, logs: Dict[str, float], **kwargs) -> None:
@@ -2924,8 +3003,10 @@ class Trainer:
         prediction_loss_only = prediction_loss_only if prediction_loss_only is not None else args.prediction_loss_only
 
         if self.args.pipeline_parallel_degree > 1:
+            from paddle.distributed.fleet.meta_parallel import PipelineLayer
+
             # Only accept wrapped model for pipeline_parallel mode
-            if self.model is self.model_wrapped:
+            if self.model is self.model_wrapped and isinstance(self.model_wrapped, PipelineLayer):
                 # NOTE(gongenlei): when do_train=False, do_eval=True, we need to wrap model for pipeline
                 self.model_wrapped = fleet.distributed_model(self.model_wrapped)
             model = self.model_wrapped

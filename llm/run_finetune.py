@@ -52,11 +52,13 @@ from paddlenlp.transformers import (
     LlamaForCausalLM,
     LlamaForCausalLMPipe,
     LlamaTokenizer,
+    Qwen2ForCausalLM,
+    Qwen2ForCausalLMPipe,
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.utils.llm_utils import (
-    CausalLMTrainer,
+from paddlenlp.trl import SFTTrainer
+from paddlenlp.trl.llm_utils import (
     ZeroPaddingIterDatasetCallback,
     compute_metrics,
     get_lora_target_modules,
@@ -69,7 +71,7 @@ from paddlenlp.utils.tools import get_env_device
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
 os.environ["USE_CASUAL_MASK"] = "False"
 
-flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
+flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe, Qwen2ForCausalLM, Qwen2ForCausalLMPipe]
 
 
 def main():
@@ -578,7 +580,7 @@ def main():
     else:
         metrics = compute_metrics
 
-    trainer = CausalLMTrainer(
+    trainer = SFTTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
@@ -599,6 +601,8 @@ def main():
         gen_args=gen_args,
         data_args=data_args,
     )
+    trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
+    trainer.set_optimizer_grouped_parameters(trainable_parameters)
 
     # Train
     if training_args.do_train:
