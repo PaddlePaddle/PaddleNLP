@@ -3276,6 +3276,9 @@ class Trainer:
                 labels = None
             inputs = inputs.pop("input_ids")
 
+        # evaluation dont support drop last,
+        # so set the `accumulate_steps` to actually
+        # eval batch size.
         model_config_backup = model.accumulate_steps
         if isinstance(inputs, tuple):
             input_ids = inputs[0]
@@ -3292,6 +3295,7 @@ class Trainer:
                 loss = loss.mean().detach()
             else:
                 raise ValueError("pipeline mode eval need label!")
+        # reset the `accumulate_steps`.
         model.accumulate_steps = model_config_backup
 
         return (loss, None, labels)
@@ -3315,6 +3319,7 @@ class Trainer:
                     logit_shape = [logits.shape]
                     infohub["pp_logits"] = []
 
+                # broadcast logits from pp last rank to others.
                 paddle.distributed.broadcast_object_list(
                     logit_shape,
                     src=pp_group.ranks[-1],
