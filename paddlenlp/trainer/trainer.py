@@ -1988,6 +1988,9 @@ class Trainer:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
+            if self.args.enable_sharding_comm_overlap:
+                model.register_sharding_comm_overlap_hook(self.optimizer)
+
         # No pipeline mode, sharding only
         if not in_pipeline_parallel_mode and in_sharding_parallel_mode:
             # Sharded DDP!
@@ -2761,8 +2764,9 @@ class Trainer:
                 else:
                     opt_state_dict = None
             else:
+                model = self.model_wrapped if self.args.enable_sharding_comm_overlap else self.model
                 opt_state_dict = self.unified_checkpoint_handler.load_unified_optimizer(
-                    model=self.model,
+                    model=model,
                     optimizer=self.optimizer,
                     resume_from_checkpoint=checkpoint,
                 )
