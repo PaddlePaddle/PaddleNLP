@@ -81,6 +81,7 @@ pretrain_arguments = {
     "fp16_opt_level": "O2",
     "max_grad_norm": 1.0,
     "dataloader_num_workers": 0,
+    "metric_for_best_model": "accuracy",
     "continue_training": 0,
     "do_train": "true",
     "do_eval": "false",
