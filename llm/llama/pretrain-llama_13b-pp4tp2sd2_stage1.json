@@ -9,7 +9,7 @@
     "tensor_parallel_degree": 1,
     "pipeline_parallel_degree": 4,
     "pipeline_parallel_config": "disable_partial_send_recv",
-    "sharding_parallel_degree": 8,
+    "sharding_parallel_degree": -1,
     "virtual_pp_degree": 1,
     "sharding": "stage1",
     "sequence_parallel": false,
