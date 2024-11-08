@@ -19,11 +19,6 @@ import os
 
 import paddle
 
-try:
-    from paddle.base import core
-except:
-    core = None
-
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.transformers.model_utils import (
     _load_state_dict_into_model,
@@ -120,7 +115,7 @@ def save_single_card_optimizer(model, optimizer, output_dir):
     fp32_weight = {}
     for k, v in state_dict.items():
         static2struct_name_mappings[v.name] = k
-        if master_weights is not None and v.dtype == core.VarDesc.VarType.FP32:
+        if master_weights is not None and v.dtype == paddle.float32:
             fp32_weight[k] = v
 
     # rename optimizer param
@@ -226,7 +221,7 @@ def load_single_card_optimizer(model, optimizer, resume_from_checkpoint: str):
         key_name = key.split("/")
         static_name = struct2static_name_mappings[key_name[0]]
         if has_master_weights:
-            if model_state_dict[key_name[0]].dtype != core.VarDesc.VarType.FP32:
+            if model_state_dict[key_name[0]].dtype != paddle.float32:
                 key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
             else:
                 key_name = "_".join([static_name, key_name[1]])

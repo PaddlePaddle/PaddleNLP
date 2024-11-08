@@ -2249,6 +2249,26 @@ class TokenizerTesterMixin:
                     ),
                 )
 
+    def test_create_token_type_ids(self):
+        if not hasattr(self, "rust_tokenizer_class"):
+            self.skipTest(reason="Rust tokenizer not available for this tokenizer")
+        for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
+            with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+                tokenizer_r = self.rust_tokenizer_class.from_pretrained(pretrained_name, **kwargs)
+                tokenizer_p = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
+                input_simple = [1, 2, 3]
+                input_pair = [1, 2, 3]
+
+                # Generate output
+                output_r = tokenizer_r.create_token_type_ids_from_sequences(input_simple)
+                output_p = tokenizer_p.create_token_type_ids_from_sequences(input_simple)
+                self.assertEqual(output_p, output_r)
+
+                # Generate pair output
+                output_r = tokenizer_r.create_token_type_ids_from_sequences(input_simple, input_pair)
+                output_p = tokenizer_p.create_token_type_ids_from_sequences(input_simple, input_pair)
+                self.assertEqual(output_p, output_r)
+
 
 class TrieTest(unittest.TestCase):
     def test_trie(self):

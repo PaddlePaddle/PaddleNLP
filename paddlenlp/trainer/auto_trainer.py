@@ -141,9 +141,7 @@ class AutoTrainer(Trainer):
             if self.enable_autocast_context_manager:
                 unified_strategy.amp.custom_black_list.extend(["reduce_sum", "c_softmax_with_cross_entropy"])
                 if self.args.fp16_opt_level == "O2":
-                    print("custom_white_list", unified_strategy.amp.custom_white_list, flush=1)
                     unified_strategy.amp.custom_white_list.extend(["lookup_table", "lookup_table_v2"])
-                    print("custom_white_list", unified_strategy.amp.custom_white_list, flush=1)
 
             # dist.to_static() obtains the input spec information through next(dataloader), but this has side effects
             # on the passed-in dataloader, altering the state of the sampler of the dataloader. In some cases, once

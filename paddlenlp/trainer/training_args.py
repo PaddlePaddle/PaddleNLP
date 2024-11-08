@@ -889,6 +889,10 @@ class TrainingArguments:
         default=None,
         metadata={"help": "The intervals to skip, pass start global step and end global step at each interval"},
     )
+    offload_optim: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Offload optimizer after optimizer.step()"},
+    )
 
     def __post_init__(self):
         if in_auto_parallel_align_mode():
@@ -1160,6 +1164,15 @@ class TrainingArguments:
                         raise ValueError(
                             "If `enable_sharding_comm_overlap` in pipeline_parallel_configs, `amp_master_grad` must be True."
                         )
+                    if (
+                        enable_sharding_comm_overlap
+                        and self.unified_checkpoint
+                        and "split_param" in split_parallel_config(self.sharding_parallel_config)
+                    ):
+                        logger.warning(
+                            "Currently unified checkpoint do not support using `sharding_comm_overlap` and `split_param` at the same time, delete `sharding_comm_overlap`."
+                        )
+                        enable_sharding_comm_overlap = False
 
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
@@ -1346,6 +1359,7 @@ class TrainingArguments:
 
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
+                            assert self.amp_master_grad, "Currently sharding stage1 v2 only support amp_master_grad"
 
                         if "enable_release_grads" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].release_gradients = True
@@ -1409,7 +1423,8 @@ class TrainingArguments:
                         )
 
                     if "split_param" in sharding_parallel_config:
-                        assert self.sharding == [ShardingOption.SHARD_OP], "Only sharding stage1 support split_param."
+                        if ShardingOption.SHARD_OP not in self.sharding:
+                            logger.warning("Only sharding stage1 support split_param.")
                         assert (
                             self.amp_master_grad
                         ), "If `split_param` in sharding_parallel_config, `amp_master_grad` must be True."
