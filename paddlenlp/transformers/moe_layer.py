@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from copy import deepcopy
 from typing import Any, Tuple
 
 import paddle
@@ -194,10 +193,9 @@ class MoELayer(nn.Layer):
         self.enable_recompute = False
 
         self.experts = nn.LayerList([])
-        expert = expert_class(expert_kwargs)
         for i in range(self.moe_num_experts):
             if i // self.moe_num_experts_per_device == self.moe_rank:
-                self.experts.append(deepcopy(expert))
+                self.experts.append(expert_class(expert_kwargs))
             else:
                 self.experts.append(None)
 
