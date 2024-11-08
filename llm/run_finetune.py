@@ -579,7 +579,13 @@ def create_zero_padding_ds(
 def create_train_dataset(quant_args, data_args, training_args):
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
-    elif (
+
+    train_ds = None
+    dev_ds = None
+    ptq_ds = None
+
+    # what is this for ? only json file
+    if (
         os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json"))
         or os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev.json"))
         or os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json"))
@@ -590,16 +596,14 @@ def create_train_dataset(quant_args, data_args, training_args):
                 data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
                 lazy=data_args.lazy,
             )[0]
-        else:
-            train_ds = None
+
         if training_args.do_eval:
             dev_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
                 lazy=data_args.lazy,
             )[0]
-        else:
-            dev_ds = None
+
         if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
             if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
                 ptq_ds = load_dataset(
@@ -620,8 +624,7 @@ def create_train_dataset(quant_args, data_args, training_args):
                 raise ValueError(
                     f"Quant strategy requires quant.json or train.json in {data_args.dataset_name_or_path}"
                 )
-        else:
-            ptq_ds = None
+    # what is this for ? folder with json file
     elif (
         os.path.exists(os.path.join(data_args.dataset_name_or_path, "train"))
         or os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev"))
@@ -635,16 +638,14 @@ def create_train_dataset(quant_args, data_args, training_args):
                 data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
                 lazy=data_args.lazy,
             )[0]
-        else:
-            train_ds = None
+
         if training_args.do_eval:
             dev_ds = load_dataset(
                 "json",
                 data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "dev", "*.json")),
                 lazy=data_args.lazy,
             )[0]
-        else:
-            dev_ds = None
+
         if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
             if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant")):
                 ptq_ds = load_dataset(
@@ -663,22 +664,18 @@ def create_train_dataset(quant_args, data_args, training_args):
                 )
             else:
                 raise ValueError(f"Quant strategy requires quant or train folder in {data_args.dataset_name_or_path}")
-        else:
-            ptq_ds = None
+
     else:
         if training_args.do_train or quant_args.do_qat:
             train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
-        else:
-            train_ds = None
+
         if training_args.do_eval:
             dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
-        else:
-            dev_ds = None
+
         if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
             ptq_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
             logger.info("Set train dataset as PTQ calibration dataset.")
-        else:
-            ptq_ds = None
+
     return train_ds, dev_ds, ptq_ds
 
 
