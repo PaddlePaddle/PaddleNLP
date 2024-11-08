@@ -28,7 +28,7 @@ export APIcase_list=()
 declare -A Normal_dic
 declare -A all_P0case_dic
 declare -A Build_list
-all_P0case_dic=("msra_ner"]=15 
+all_P0case_dic=(["msra_ner"]=15 
     ["glue"]=2 
     ["bert"]=2 
     ["skep"]=10 
@@ -186,6 +186,7 @@ if [[ ${#Build_list[*]} -ne 0 ]];then
     echo -e "\033[32m make PaddleNLP.tar.gz  \033[0m"
     cd /workspace
     rm -rf PaddleNLP_dev/build/*
+    cd PaddleNLP_dev && git submodule update --init --recursive && cd -
     tar -zcvf PaddleNLP.tar.gz PaddleNLP_dev/
     mv PaddleNLP.tar.gz ${PPNLP_HOME}/upload
     cd ${PPNLP_HOME}
