@@ -42,7 +42,7 @@ class SFTConfig(TrainingArguments):
         metadata={"help": "whether to output logits in distributed status"},
     )
     unified_checkpoint: bool = field(
-        default=True,
+        default=False,
         metadata={"help": "Unify hybrid parallel checkpoint."},
     )
 
