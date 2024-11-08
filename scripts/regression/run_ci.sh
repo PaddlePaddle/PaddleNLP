@@ -28,7 +28,7 @@ export APIcase_list=()
 declare -A Normal_dic
 declare -A all_P0case_dic
 declare -A Build_list
-all_P0case_dic=("[msra_ner"]=15 
+all_P0case_dic=(["msra_ner"]=15 
     ["glue"]=2 
     ["bert"]=2 
     ["skep"]=10 
