@@ -1236,6 +1236,7 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
 
     _tied_weights_keys = ["lm_head.weight", "lm_head.decoder.weight"]
     _keys_to_ignore_on_save = [r"lm_head.weight", r"lm_head.decoder.weight"]
+    _keys_to_ignore_on_load_missing = [r"lm_head.weight", r"lm_head.decoder.weight"]
 
     def __init__(self, config: GPTConfig):
         super(GPTForCausalLMAuto, self).__init__(config)
