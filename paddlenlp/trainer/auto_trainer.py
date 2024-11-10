@@ -797,15 +797,15 @@ class AutoTrainer(Trainer):
                     )
                     optim_state_dict = self.optimizer.state_dict()
                     optim_state_dict.pop("LR_Scheduler", None)
-            check_load_state = (
-                hasattr(self.model_wrapped, "_keys_to_ignore_on_load_missing")
-                and self.model_wrapped._keys_to_ignore_on_load_missing is not None
-            )
+            # check_load_state = (
+            #     hasattr(self.model_wrapped, "_keys_to_ignore_on_load_missing")
+            #     and self.model_wrapped._keys_to_ignore_on_load_missing is not None
+            # )
             # Handle the case where some state_dict keys shouldn't be load
-            if check_load_state:
-                for ignore_key in self.model_wrapped._keys_to_ignore_on_load_missing:
-                    if ignore_key in model_state_dict.keys():
-                        del model_state_dict[ignore_key]
+            # if check_load_state:
+            #     for ignore_key in self.model_wrapped._keys_to_ignore_on_load_missing:
+            #         if ignore_key in model_state_dict.keys():
+            #             del model_state_dict[ignore_key]
             state_dict = {
                 MODEL_NAME: model_state_dict,
                 OPTIMIZER_NAME: optim_state_dict,
@@ -817,8 +817,8 @@ class AutoTrainer(Trainer):
             else:
                 for state_name, state_value in self.model_wrapped.state_dict().items():
                     # Handle the case where some state_dict keys shouldn't be load
-                    if check_load_state and state_name in self.model_wrapped._keys_to_ignore_on_load_missing:
-                        continue
+                    # if check_load_state and state_name in self.model_wrapped._keys_to_ignore_on_load_missing:
+                    #     continue
                     parameter_to_structured_name[state_value.name] = state_name
             if self.args.auto_parallel_resume_form_hybrid_parallel:
                 CheckpointConverter(
