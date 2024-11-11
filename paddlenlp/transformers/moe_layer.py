@@ -22,6 +22,8 @@ from paddle import Tensor, nn
 from paddle.distributed.communication import stream
 from paddle.distributed.communication.group import Group
 
+from .moe_gate import PretrainedMoEGate
+
 
 def dispatching(x, dispatch_mask, scatter_index, num_experts, capacity):
     """
@@ -162,7 +164,7 @@ class MoELayer(nn.Layer):
         moe_num_experts: int,
         expert_class: nn.Layer,
         expert_kwargs: dict,
-        gate: nn.Layer,
+        gate: PretrainedMoEGate,
         capacity: int = 1.0,
         moe_group: str = "data",
         all_to_all_dropout=0.0,
@@ -174,7 +176,7 @@ class MoELayer(nn.Layer):
         self.moe_num_experts = moe_num_experts
         self.capacity = capacity
 
-        if dist.get_world_size() > 1:
+        if dist.get_world_size() > 1 and moe_group == "data":
             self.moe_group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
             self.moe_rank = dist.get_rank(self.moe_group)
             self.moe_rank = 0 if self.moe_rank < 0 else self.moe_rank
@@ -184,6 +186,7 @@ class MoELayer(nn.Layer):
                 self.moe_num_experts, self.expert_parallel_degree
             )
         else:
+            # when moe_group is dummy, we don't need to use all_to_all
             self.moe_group = None
             self.moe_rank = 0
             self.expert_parallel_degree = 1
@@ -200,6 +203,7 @@ class MoELayer(nn.Layer):
                 self.experts.append(None)
 
         self.gate = gate
+        self.gate.group = self.moe_group
 
     def _parse_moe_expert_parallel(self, moe_num_experts, expert_parallel_degree):
         assert (
