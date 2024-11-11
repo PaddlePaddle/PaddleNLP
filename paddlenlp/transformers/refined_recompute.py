@@ -26,33 +26,33 @@ from paddle.base.framework import EagerParamBase
 from paddle.distributed.fleet.meta_parallel.parallel_layers.random import (
     get_rng_state_tracker,
 )
+from paddle.distributed.fleet.recompute.recompute import check_recompute_necessary
+from paddle.distributed.fleet.recompute.recompute import recompute as original_recompute
 from paddle.distributed.fleet.recompute.recompute import switch_rng_state_tracker
 from paddle.framework import _dygraph_tracer, core
 
+__all__ = ["NoRecomputeContext", "no_recompute", "recompute", "get_global_rr_queue_dict"]
 _in_no_recompute = False
 global_rr_queue_dict = {}
 recompute_suffix = "@recompute"
 _recompute_id = -1
 
 
-class RefienedRecomputeQueue:
-    def __init__(self) -> None:
-        self.output_tensors_queue = queue.Queue()
-        self.pack_tensors_queue = queue.Queue()
-
-
 def set_recompute_id(value=-1):
+    """switch recompute id to the given value"""
     global _recompute_id
     _recompute_id = str(value)
 
 
 def get_recompute_id():
+    """get current recompute id"""
     global _recompute_id
     return _recompute_id
 
 
 @contextlib.contextmanager
 def switch_recompute_id_ctx(value=-1):
+    """switch recompute id to the given value within the context"""
     raw_recompute_id = get_recompute_id()
     set_recompute_id(value)
     yield
@@ -60,41 +60,56 @@ def switch_recompute_id_ctx(value=-1):
 
 
 def in_no_recompute_ctx():
+    """check if in no recompute context"""
     global _in_no_recompute
     return _in_no_recompute
 
 
 def set_no_recompute(value=True):
+    """set whether in no recompute mode"""
     global _in_no_recompute
     _in_no_recompute = value
 
 
 @contextlib.contextmanager
 def switch_recompute_ctx(kwargs):
+    """switch recompute context to the given value within the context"""
     for ts in kwargs.values():
         if paddle.is_tensor(ts) and not ts.name.endswith(recompute_suffix):
+            # 1. add recompute suffix to the tensor name
             ts.name = ts.name + recompute_suffix
+    # 2. set in no recompute mode
     set_no_recompute(True)
     yield
     for ts in kwargs.values():
         if paddle.is_tensor(ts) and ts.name.endswith(recompute_suffix):
+            # 3. remove recompute suffix from the tensor name
             ts.name = ts.name[: -len(recompute_suffix)]
+    # 4. reset in no recompute mode
     set_no_recompute(False)
 
 
 def get_global_rr_queue_dict():
+    """get global rr queue dict"""
     global global_rr_queue_dict
     return global_rr_queue_dict
 
 
-def print_global_rr_queue_info(name="pack"):
-    return
-    # queue_dict = get_global_rr_queue_dict()
-    # print("{:<10} {:<20} {:<10}".format("Action", "Queue Name", "Queue Size"))
-    # print("-" * 50)
-    # for k, v in queue_dict.items():
-    #     print("{:<10} {:<20} {:<10}".format(name, k, v.qsize()))
-    # print("=" * 50)
+# def print_global_rr_queue_info(name="pack"):
+#     queue_dict = get_global_rr_queue_dict()
+#     print("{:<10} {:<20} {:<10}".format("Action", "Queue Name", "Queue Size"))
+#     print("-" * 50)
+#     for k, v in queue_dict.items():
+#         print("{:<10} {:<20} {:<10}".format(name, k, v.qsize()))
+#     print("=" * 50)
+
+
+def parse_to_kwargs(function, *args, **kwargs):
+    """Parse the function arguments into a dictionary."""
+    signature = inspect.signature(function)
+    bound_arguments = signature.bind(*args, **kwargs)
+    bound_arguments.apply_defaults()
+    return bound_arguments.arguments
 
 
 class _NoopSaveInputs(paddle.autograd.PyLayer):
@@ -116,81 +131,98 @@ class _NoopSaveInputs(paddle.autograd.PyLayer):
         raise AssertionError("Did not expect to backward on this graph")
 
 
+def no_recompute(function, *args, **kwargs):
+    """
+    Within a recompute context, do not recompute intermediate activations.
+
+    Parameters:
+        function (paddle.nn.Layer): The layer or sequence of layers that describe a part of the model's
+                                   forward pass, whose intermediate activations will not be released.
+        *args (Tensor): Input tensors to the function.
+        **kwargs (Dict): Keyword arguments to the function.
+
+    Returns:
+        The output of the function given the input tensors and keyword arguments.
+    """
+    recompute_id_with_suffix = get_recompute_id()
+    # enable kwargs, in no recompute context, has grad
+    enable = kwargs.pop("enable", True) and recompute_id_with_suffix != "-1" and _dygraph_tracer()._has_grad
+    if not enable:
+        return function(*args, **kwargs)
+
+    if isinstance(function, paddle.nn.Layer):
+        func = function.forward
+        input_kwargs = parse_to_kwargs(func, *args, **kwargs)
+    elif isinstance(function, paddle.autograd.PyLayer):
+        func = function.apply
+        input_kwargs = parse_to_kwargs(function.forward, *args, **kwargs)
+    else:
+        func = function
+        input_kwargs = parse_to_kwargs(func, *args, **kwargs)
+
+    is_first_fwd = recompute_id_with_suffix.endswith("@first")
+    recompute_id = recompute_id_with_suffix.split("@")[0]
+
+    if is_first_fwd:
+        if recompute_id not in global_rr_queue_dict:
+            global_rr_queue_dict[recompute_id] = queue.Queue()
+
+        with switch_recompute_ctx(input_kwargs):
+            result = func(*args, **kwargs)
+
+        global_rr_queue_dict[recompute_id].put(result)
+    else:
+        tensor_list = []
+        for val in input_kwargs.values():
+            if val is not None and paddle.is_tensor(val):
+                tensor_list.append(val)
+
+        if len(tensor_list) > 0:
+            _NoopSaveInputs.apply(*tensor_list)
+
+        result = global_rr_queue_dict[recompute_id].get()
+
+        if global_rr_queue_dict[recompute_id].empty():
+            global_rr_queue_dict.pop(recompute_id)
+    return result
+
+
 class NoRecomputeContext:
-    def __init__(self, enable=True, save_for_bwd_keys=None):
-        """
-        initialize the RefinedRecomputeFunction object.
-        """
+    """
+    A Context Manager class that do not recompute intermediate activations.
+    """
+
+    def __init__(self, enable=True):
+        """initialize the RefinedRecomputeFunction object."""
         self._enable = enable
-        self._save_for_bwd_keys = save_for_bwd_keys
 
     def __enter__(self):
+        """enter the context manager."""
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
+        """exit the context manager."""
         pass
 
     def __call__(self, function, *args, **kwargs):
-        # if not enable or no has grad, just run the original function
-        if not self._enable or not _dygraph_tracer()._has_grad:
-            return function(*args, **kwargs)
+        """
+        Within a recompute context, do not recompute intermediate activations.
 
-        input_kwargs = self.parse_to_kwargs(function, *args, **kwargs)
+        Parameters:
+            function (paddle.nn.Layer): The layer or sequence of layers that describe a part of the model's
+                                    forward pass, whose intermediate activations will not be released.
+            *args (Tensor): Input tensors to the function.
+            **kwargs (Dict): Keyword arguments to the function.
 
-        if self._save_for_bwd_keys is not None:
-            for key in self._save_for_bwd_keys:
-                if key not in input_kwargs:
-                    raise ValueError(
-                        f"The key name `{key}` is not found in the input arguments."
-                        " Please check your `save_for_bwd_keys`."
-                    )
-        else:
-            self._save_for_bwd_keys = input_kwargs.keys()
-
-        recompute_id_with_suffix = get_recompute_id()
-        is_first_fwd = recompute_id_with_suffix.endswith("@first")
-        recompute_id = recompute_id_with_suffix.split("@")[0]
-
-        if is_first_fwd:
-            if recompute_id not in global_rr_queue_dict:
-                global_rr_queue_dict[recompute_id] = RefienedRecomputeQueue()
-
-            with switch_recompute_ctx(input_kwargs):
-                result = function(**input_kwargs)
-
-            global_rr_queue_dict[recompute_id].output_tensors_queue.put(result)
-            global_rr_queue_dict[recompute_id].pack_tensors_queue.put(0)
-            print_global_rr_queue_info("first fwd")
-        else:
-            # is second fwd
-            tensor_list = []
-            for key in self._save_for_bwd_keys:
-                val = input_kwargs.get(key, None)
-                if val is not None and paddle.is_tensor(val):
-                    tensor_list.append(val)
-
-            tensor_offset = 0
-            while global_rr_queue_dict[recompute_id].pack_tensors_queue.get() != 0:
-                tensor_offset += 1
-            if tensor_offset > 0 and len(tensor_list[:tensor_offset]) > 0:
-                _NoopSaveInputs.apply(*tensor_list[:tensor_offset])
-
-            result = global_rr_queue_dict[recompute_id].output_tensors_queue.get()
-
-            if global_rr_queue_dict[recompute_id].output_tensors_queue.empty():
-                global_rr_queue_dict.pop(recompute_id)
-
-            print_global_rr_queue_info("second fwd")
-        return result
-
-    def parse_to_kwargs(self, function, *args, **kwargs):
-        signature = inspect.signature(function)
-        bound_arguments = signature.bind(*args, **kwargs)
-        bound_arguments.apply_defaults()
-        return bound_arguments.arguments
+        Returns:
+            The output of the function given the input tensors and keyword arguments.
+        """
+        kwargs["enable"] = self._enable
+        return no_recompute(function, *args, **kwargs)
 
 
 def share_buffer_to_tensor_or_param(inner_x):
+    """share buffer to tensor or param"""
     if hasattr(inner_x, "main_grad"):
         # donot deepcopy the `main_grad`` to save memory
         state = copy.deepcopy({k: v for k, v in inner_x.__dict__.items() if k != "main_grad"})
@@ -268,14 +300,12 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
 
     def pack(x):
         # [PACK] in no recompute context or input tensor no need recompute, return the input tensor directly
-        if in_no_recompute_ctx() and not x.name.endswith(recompute_suffix):
+        if x.persistable or (in_no_recompute_ctx() and not x.name.endswith(recompute_suffix)):
             return share_buffer_to_tensor_or_param(x)
 
         # remove the recompute suffix
         res = IntermediateHolder(x.name, x.shape, x.dtype)
         holder_list.append(weakref.ref(res))
-        if x.name.endswith(recompute_suffix):
-            global_rr_queue_dict[recompute_id].pack_tensors_queue.put(1)
         return res
 
     def unpack(x):
@@ -287,13 +317,15 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
         if len(storage) == 0:
 
             def inner_pack(inner_x):
+                if inner_x.persistable:
+                    return
+
                 nonlocal unpack_counter
                 unpack_counter += 1
 
                 if unpack_counter - 1 >= len(holder_list):
                     raise Exception(
                         "Not supported to retrieve a tensor saved by autograd multiple times that is no need to recompute."
-                        " Please check your `save_for_bwd_keys` first!"
                     )
 
                 if holder_list[unpack_counter - 1]() is None:
@@ -333,11 +365,11 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
         tensor = storage.pop(x)
         assert x.shape == tensor.shape, (
             f"The shape:{x.shape} of the tensor saved by autograd is not "
-            f"consistent with the original tensor shape:{tensor.shape}! Please check your `save_for_bwd_keys`!"
+            f"consistent with the original tensor shape:{tensor.shape}! "
         )
         assert x.dtype == tensor.dtype, (
             f"The dtype:{x.dtype} of the tensor saved by autograd is not"
-            f"consistent with the original tensor dtype:{tensor.dtype}! Please check your `save_for_bwd_keys`!"
+            f"consistent with the original tensor dtype:{tensor.dtype}! "
         )
         return tensor
 
@@ -348,11 +380,37 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
     return outputs
 
 
-def recompute_without_reentrant(function, *args, **kwargs):
+def recompute(function, *args, **kwargs):
+    """
+    recompute intermediate activations to save then memory.
+
+    Parameters:
+        function(paddle.nn.Layer): layer of sequence of layers that describes part of forward pass of the model
+              whose intermediate activations will be released to save memory in forward stage and will be recomputed
+              in backward stage for gradient calculation.
+        *args(Tensor): inputs to the function.
+        **kwargs(Dict): Kwargs should only contain two kinds of key-value params, the one is part of function's key-value params,
+                        and the other contains 'preserve_rng_state' and 'use_reentrant'. the key-value pair of preserve_rng_state,
+                        which is used to indicate whether to save the forward rng. If it is True, then the last forward rng value
+                        will be restored when the forward recalculation of backpropagation is performed, its default value is True.
+                        the key-value pair of use_reentrant is used to indicate which implementation of recompute you will be used.
+                        'use_reentrant=True' means to use the PyLayer implementation of recompute, 'use_reentrant=False' means to
+                        use the Hook implementation of recompute, its default value is True.
+    Returns:
+        Output of function on args.
+    """
     preserve = kwargs.pop("preserve_rng_state", True)
     use_reentrant = kwargs.pop("use_reentrant", True)
-    assert use_reentrant, "recompute_without_reentrant only support use_reentrant=True!"
-    return _recompute_without_reentrant(function, preserve, *args, **kwargs)
+    if not use_reentrant:
+        if _dygraph_tracer()._has_grad:
+            check_args = list(args)
+            check_args.extend(list(kwargs.values()))
+            check_recompute_necessary(check_args)
+        return _recompute_without_reentrant(function, preserve, *args, **kwargs)
+    else:
+        kwargs["preserve"] = preserve
+        kwargs["use_reentrant"] = use_reentrant
+        return original_recompute(function, *args, **kwargs)
 
 
 if __name__ == "__main__":
@@ -364,35 +422,65 @@ if __name__ == "__main__":
     paddle.set_default_dtype(dtype)
 
     in_weight_shape = (32, 3 * 2 * 32)
+    linear1 = paddle.nn.Linear(
+        in_weight_shape[0],
+        in_weight_shape[-1],
+    )
+    paddle.seed(2024)
     in_weight = paddle.create_parameter(shape=in_weight_shape, dtype=dtype, name="in_weight")
     in_weight.set_value(paddle.normal(0, 0.02, in_weight_shape))
     in_weight.main_grad = paddle.normal(0, 0.02, in_weight.shape).cast("float32")
-
+    linear1.weight.set_value(in_weight)
     in_bias = paddle.create_parameter(shape=(in_weight.shape[-1],), dtype=dtype, name="in_bias", is_bias=True)
     in_bias.main_grad = paddle.normal(0, 0.02, in_bias.shape).cast("float32")
+    linear1.bias.set_value(in_bias)
+    linear1.weight.main_grad = in_weight.main_grad
+    linear1.bias.main_grad = in_bias.main_grad
 
     out_weight_shape = (2 * 32, 32)
     out_weight = paddle.create_parameter(shape=out_weight_shape, dtype=dtype, name="out_weight")
     out_weight.set_value(paddle.normal(0, 0.02, out_weight_shape))
     out_weight.main_grad = paddle.normal(0, 0.02, out_weight.shape).cast("float32")
 
-    def fwd(x, startend_row_indices, enable=True):
-        with NoRecomputeContext(enable=enable) as no_recompute:
-            qkv = no_recompute(paddle.nn.functional.linear, x, in_weight, bias=in_bias)
+    class cus_multiply(paddle.autograd.PyLayer):
+        @staticmethod
+        def forward(ctx, a, b):
+            y = paddle.multiply(a, b)
+            ctx.save_for_backward(a, b)
+            return y
 
-        q, k, v = paddle.chunk(qkv, 3, axis=-1)
-        q = q.reshape([q.shape[0], q.shape[1], 2, q.shape[2] // 2])
-        k = k.reshape([k.shape[0], k.shape[1], 2, v.shape[2] // 2])
-        v = v.reshape([v.shape[0], k.shape[1], 2, v.shape[2] // 2])
-        with NoRecomputeContext(enable=enable) as no_recompute:
-            out = no_recompute(
-                flashmask_attention,
-                q,
-                k,
-                v,
-                startend_row_indices=startend_row_indices,
-                causal=True,
-            )
+        @staticmethod
+        def backward(ctx, dy):
+            a, b = ctx.saved_tensor()
+            grad_a = dy * a
+            grad_b = dy * b
+            return grad_a, grad_b
+
+    multiply = cus_multiply.apply
+
+    def fwd(x, startend_row_indices, enable=True):
+        def fwd_linear(x):
+            weight = multiply(linear1.weight, linear1.weight * 0.1)
+            bias = multiply(linear1.bias, linear1.bias * 0.1)
+            qkv = paddle.nn.functional.silu(paddle.nn.functional.linear(x, weight, bias))
+            q, k, v = paddle.chunk(qkv, 3, axis=-1)
+            q = q.reshape([q.shape[0], q.shape[1], 2, q.shape[2] // 2])
+            k = k.reshape([k.shape[0], k.shape[1], 2, v.shape[2] // 2])
+            v = v.reshape([v.shape[0], k.shape[1], 2, v.shape[2] // 2])
+            return q, k, v
+
+        q, k, v = no_recompute(fwd_linear, x, enable=enable)
+
+        q, k, v = q * q, k * k, v * v
+        out = no_recompute(
+            flashmask_attention,
+            q,
+            k,
+            v,
+            startend_row_indices=startend_row_indices,
+            causal=True,
+            enable=enable,
+        )
         out = out.flatten(-2, -1)
         out = paddle.matmul(out, out_weight)
         return out
@@ -402,14 +490,15 @@ if __name__ == "__main__":
     x_input = x
     startend_row_indices = paddle.randint(0, 128, (1, 2, 128, 1), dtype="int32")
 
+    enable = True
     # 第一层
-    o1 = recompute_without_reentrant(fwd, x, startend_row_indices, enable=True)
+    o1 = recompute(fwd, x, startend_row_indices, enable=enable)
     # 第二层
-    o2 = recompute_without_reentrant(fwd, o1, startend_row_indices, enable=True)
+    o2 = recompute(fwd, o1 + x, startend_row_indices, enable=enable)
     # 第三层
-    o3 = recompute_without_reentrant(fwd, o2, startend_row_indices, enable=True)
+    o3 = recompute(fwd, o2 + x, startend_row_indices, enable=enable)
 
     o3.sum().backward()
     print(x_input.grad.mean())
-    print(in_weight.grad.mean())
+    print(linear1.weight.grad.mean())
     print(out_weight.grad.mean())
