@@ -23,10 +23,6 @@ from typing import Optional, Tuple
 import paddle
 import paddle.nn.functional as F
 from paddle import nn
-from paddle.distributed.fleet.utils import recompute
-
-try:
-    from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
     fused_rotary_position_embedding = None
 
@@ -113,11 +109,6 @@ def scaled_dot_product_attention(
                 key_states,
                 value_states,
                 causal=True,
-                return_softmax=output_attentions,
-            )
-        else:
-            if alibi is not None:
-                attention_mask = attention_mask.cast(alibi.dtype) + alibi
             attn_output = F.scaled_dot_product_attention(
                 query_states,
                 key_states,
