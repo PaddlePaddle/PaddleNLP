@@ -155,6 +155,10 @@ MODEL_FOR_CAUSAL_LM_MAPPING_NAMES = OrderedDict(
     ]
 )
 
+MODEL_FOR_CAUSAL_LM_INFERENCE_MAPPING_NAMES = OrderedDict(
+    [("llama-img2txt", "LlamaForMiniGPT4"), ("qwen-img2txt", "QWenForQWenVL"), ("opt-img2txt", "OPTForBlip2")]
+)
+
 
 def get_name_mapping(task="Model"):
     """
@@ -786,7 +790,51 @@ class AutoModelForCausalLM(_BaseAutoModelClass):
                 print(type(model))
                 # <class 'paddlenlp.transformers.gpt.modeling.GPTLMHeadModel'>
         """
-        return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+        inference_mode = kwargs.get("inference_mode", False)
+        if inference_mode:
+            config = kwargs.get("config", None)
+            predictor_args = kwargs.get("predictor_args", None)
+            dtype = kwargs.get("dtype", "float16")
+            tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
+            tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
+            model_arg = kwargs.pop("model_args", None)
+
+            if model_arg.model_type is not None:
+                model_name = MODEL_FOR_CAUSAL_LM_INFERENCE_MAPPING_NAMES[model_arg.model_type]
+                predictor_args.block_attn = 0
+                if model_name is None:
+                    raise ValueError(
+                        f"Model type {model_arg.model_type} is not supported for {config.architectures[0]} inference."
+                    )
+            else:
+                execute_type = "Block" if predictor_args.block_attn else ""
+                model_name = f"{config.architectures[0]}{execute_type}"
+
+            import_class = importlib.import_module(
+                f"paddlenlp.experimental.transformers.{cls._name_mapping[config.architectures[0]]}.modeling"
+            )
+
+            model_class_name = f"{model_name}InferenceModel"
+            model_class = getattr(import_class, model_class_name)
+
+            new_model_class = model_class.set_inference_config(
+                config=config,
+                predictor_args=predictor_args,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=tensor_parallel_rank,
+            )
+            # detect the cpu avx or xpu
+            if new_model_class is not None:
+                model_class = getattr(import_class, f"{new_model_class}InferenceModel")
+                model_class.set_inference_config(
+                    config=config,
+                    predictor_args=predictor_args,
+                    tensor_parallel_degree=tensor_parallel_degree,
+                    tensor_parallel_rank=tensor_parallel_rank,
+                )
+            return model_class.from_pretrained(predictor_args.model_name_or_path, config=config, dtype=dtype)
+        else:
+            return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
 
 class AutoModelForCausalLMPipe(_BaseAutoModelClass):
