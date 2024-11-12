@@ -29,10 +29,6 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import try_import
 
-try:
-    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
-        mark_as_sequence_parallel_parameter,
-    )
 except:
     pass
 

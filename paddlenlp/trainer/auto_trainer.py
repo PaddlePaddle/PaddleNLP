@@ -23,6 +23,16 @@ import paddle.distributed as dist
 import paddle.distributed.auto_parallel.intermediate.parallelize as parallelize
 import paddle.nn as nn
 from paddle.distributed import fleet
+from paddle.distributed.auto_parallel.intermediate.parallelize import (
+    parallelize_model,
+    parallelize_optimizer,
+)
+from paddle.distributed.auto_parallel.intermediate.parallel_base import (
+    parallelize_model_and_optimizer,
+)
+from paddle.distributed.auto_parallel.intermediate.sharded_data_parallel import (
+    sharded_data_parallel,
+)
 from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
