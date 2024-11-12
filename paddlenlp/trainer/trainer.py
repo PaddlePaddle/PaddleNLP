@@ -3307,27 +3307,9 @@ class Trainer:
     ):
         loss, _, labels = self.prediction_pipeline_step(*args, **kwargs)
         logits = None
-        # infohub
-        hcg = fleet.get_hybrid_communicate_group()
-        if hcg:
-            pp_group = hcg.get_pipe_parallel_group()
-            if pp_group.nranks > 1:
-                logit_shape = [[]]
-                if "pp_logits" in infohub:
-                    logits = paddle.concat(infohub["pp_logits"], axis=0)
-                    # broadcast
-                    logit_shape = [logits.shape]
-                    infohub["pp_logits"] = []
-
-                # broadcast logits from pp last rank to others.
-                paddle.distributed.broadcast_object_list(
-                    logit_shape,
-                    src=pp_group.ranks[-1],
-                    group=pp_group,
-                )
-                logits = paddle.empty(shape=logit_shape[0], dtype=paddle.float32)
-                task = dist.stream.broadcast(logits, src=pp_group.ranks[-1], group=pp_group, sync_op=False)
-                task.wait()
+        if "pp_logits" in infohub:
+            logits = paddle.concat(infohub["pp_logits"], axis=0)
+            infohub["pp_logits"] = []
 
         return (loss, logits, labels)
 
