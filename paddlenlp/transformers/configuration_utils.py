@@ -268,6 +268,9 @@ class LlmMetaConfig:
             "Recompute granularity, Choose among ['full', 'core_attn', 'full_attn']",
         ),
         ("recompute_use_reentrant", bool, False, "recompute_use_reentrant"),
+        # refined_recompute attributes
+        ("refined_recompute", str, "", "refined_recompute"),
+        ("skip_recompute_ops", Optional[Dict[str, int]], {}, "skip_recompute_ops"),
     ]
 
     @classmethod

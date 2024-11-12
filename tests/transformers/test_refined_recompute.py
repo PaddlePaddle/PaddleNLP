@@ -29,12 +29,8 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed.fleet.recompute import recompute as original_recompute
 
-try:
-    from paddlenlp.transformers.refined_recompute import no_recompute as rr_no_recompute
-    from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
-except ImportError:
-    from demo import no_recompute as rr_no_recompute
-    from demo import recompute as rr_recompute
+from paddlenlp.transformers.refined_recompute import no_recompute as rr_no_recompute
+from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
 
 ACT2FN = {
     "relu": F.relu,
@@ -203,17 +199,13 @@ class BertSelfOutput(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.dense = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=False)
-        self.dense.weight.main_grad = paddle.zeros_like(self.dense.weight).cast("float32")
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states: paddle.Tensor, input_tensor: paddle.Tensor) -> paddle.Tensor:
-        def pylayer_dense(hidden_states):
-            return pylayer_matmul(hidden_states, self.dense.weight)
-
         hidden_states = rr_no_recompute(
-            pylayer_dense, hidden_states, enable=self.config.use_rr_recompute and self.config.recompute
+            self.dense, hidden_states, enable=self.config.use_rr_recompute and self.config.recompute
         )
         hidden_states = self.dropout(hidden_states)
 
@@ -251,6 +243,7 @@ class BertIntermediate(nn.Layer):
         super().__init__()
         self.config = config
         self.dense = nn.Linear(config.hidden_size, config.intermediate_size, bias_attr=False)
+        self.dense.weight.main_grad = paddle.zeros_like(self.dense.weight).cast("float32")
         if isinstance(config.hidden_act, str):
             self.intermediate_act_fn = ACT2FN[config.hidden_act]
         else:
@@ -272,16 +265,22 @@ class BertOutput(nn.Layer):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.dense = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=False)
+        self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
         self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states: paddle.Tensor, input_tensor: paddle.Tensor) -> paddle.Tensor:
-        def pylayer_dense(hidden_states):
-            return pylayer_matmul(hidden_states, self.dense.weight)
+        def custom_dense(hidden_states, weight, bias=None):
+            return F.linear(hidden_states, weight, bias)
 
+        bias = self.dense.bias * 1.1
         hidden_states = rr_no_recompute(
-            pylayer_dense, hidden_states, enable=self.config.use_rr_recompute and self.config.recompute
+            custom_dense,
+            hidden_states,
+            weight=self.dense.weight,
+            bias=bias,
+            enable=self.config.use_rr_recompute and self.config.recompute,
+            keys_ignore_to_save=["bias"],
         )
         hidden_states = self.dropout(hidden_states)
         hidden_states = self.LayerNorm(hidden_states + input_tensor)
@@ -470,14 +469,14 @@ class BertRefinedRecomputeTest(unittest.TestCase):
 
         for param1, param2, name in zip(model1.parameters(), model3.parameters(), name_list):
             # test main grad
-            if "attention.output.dense.weight" in name:
+            if "intermediate.dense.weight" in name:
                 self.assertTrue(param1.main_grad.sum().item() > 0)
                 self.assertTrue(param2.main_grad.sum().item() > 0)
             self.assertTrue(paddle.equal_all(param1.grad.cast("float32"), param2.grad.cast("float32")))
 
         for param1, param2, name in zip(model2.parameters(), model3.parameters(), name_list):
             # test main grad
-            if "attention.output.dense.weight" in name:
+            if "intermediate.dense.weight" in name:
                 self.assertTrue(param1.main_grad.sum().item() > 0)
                 self.assertTrue(param2.main_grad.sum().item() > 0)
             self.assertTrue(paddle.equal_all(param1.grad.cast("float32"), param2.grad.cast("float32")))
@@ -532,7 +531,7 @@ class BertRefinedRecomputeTest(unittest.TestCase):
 
         for param1, param2, name in zip(layer1.parameters(), layer3.parameters(), name_list):
             # test main grad
-            if "attention.output.dense.weight" in name:
+            if "intermediate.dense.weight" in name:
                 self.assertTrue(param1.main_grad.sum().item() > 0)
                 self.assertTrue(param2.main_grad.sum().item() > 0)
             self.assertTrue(paddle.equal_all(param1.grad.cast("float32"), param2.grad.cast("float32")))
@@ -540,7 +539,7 @@ class BertRefinedRecomputeTest(unittest.TestCase):
         self.assertTrue(paddle.equal_all(grad1.cast("float32"), grad3.cast("float32")))
         for param1, param2, name in zip(layer2.parameters(), layer3.parameters(), name_list):
             # test main grad
-            if "attention.output.dense.weight" in name:
+            if "intermediate.dense.weight" in name:
                 self.assertTrue(param1.main_grad.sum().item() > 0)
                 self.assertTrue(param2.main_grad.sum().item() > 0)
             self.assertTrue(paddle.equal_all(param1.grad.cast("float32"), param2.grad.cast("float32")))
