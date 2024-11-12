@@ -3309,6 +3309,7 @@ class Trainer:
         logits = None
         if "pp_logits" in infohub:
             logits = paddle.concat(infohub["pp_logits"], axis=0)
+            logits = logits._copy_to(paddle.framework._current_expected_place(), False)
             infohub["pp_logits"] = []
 
         return (loss, logits, labels)
