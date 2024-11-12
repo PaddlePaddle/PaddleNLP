@@ -969,7 +969,7 @@ class GPTLMHeadNet(nn.Layer):
                 shape=[config.vocab_size, config.hidden_size],
                 dtype=paddle.get_default_dtype(),
             )
-
+            
     def forward(self, hidden_states, tensor_parallel_output=None):
 
         if self.config.sequence_parallel:
