@@ -1,11 +1,11 @@
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         passage_prefix = ""
 
         if args.task_name == "QuoraRetrieval":
-            assert args.document_instruction != "document: ", f"QuoraRetrieval requires a document instruction"
+            assert args.document_instruction != "document: ", "QuoraRetrieval requires a document instruction"
             passage_prefix = "Instruct: " + args.document_instruction + "\nQuery: "  # because this is STS task
 
         encode_model = NVEncodeModel.from_pretrained(
@@ -137,7 +137,7 @@ if __name__ == "__main__":
             )  # for NV-Embed, this is no needed, but for repllama, this is needed
             encode_model.config.tensor_parallel_degree = 1
             encode_model = LoRAModel.from_pretrained(
-                encode_model, args.peft_model_name_or_path, lora_config=lora_config, dtype="bfloat16"
+                encode_model, args.peft_model_name_or_path, lora_config=lora_config, dtype=lora_config.dtype
             )
 
     encode_model.eval()

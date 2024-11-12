@@ -42,7 +42,7 @@ python train.py --do_train \
 单卡训练效率过低，batch_size 较小，建议使用多卡训练，对于对比学习训练推荐使用大 batch_size，多卡训练，示例命令如下：
 
 ```
-python -m paddle.distributed.launch --gpus "1,2,3,4" train.py --do_train \
+python -m paddle.distributed.launch --gpus "0,1,2,3" train.py --do_train \
               --model_name_or_path rocketqa-zh-base-query-encoder \
               --output_dir rocketqa-zh-base-query-encoder-duretrieval \
               --train_data ./data/dual.train.json \
