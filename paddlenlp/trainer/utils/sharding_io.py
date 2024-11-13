@@ -314,7 +314,7 @@ class ShardingIO:
         if not os.path.isfile(file_path):
             raise ValueError(f"Can't find a valid checkpoint at {resume_from_checkpoint}, no {file_path}")
 
-        logger.info(f"Loading model from {resume_from_checkpoint} .")
+        logger.info(f"Loading model from {file_path}.")
         # We load the model state dict on the CPU to avoid an OOM error.
         state_dict = paddle.load(file_path, return_numpy=True)
         state_dict = self._remap_parameter_name(resume_from_checkpoint, state_dict, is_opt=False)
@@ -424,6 +424,11 @@ class ShardingIO:
                 is_matched = reshard_util.sharding_v2.is_matched_optimizer_state_dict(
                     one_shard_opt_state_dict, self.optimizer, model_wrapped
                 )
+                is_matched = paddle.to_tensor([is_matched], dtype=paddle.int32)
+                dp_group = fleet.get_hybrid_communicate_group().get_data_parallel_group()
+                dp_src_rank = fleet.get_hybrid_communicate_group().get_data_parallel_group_src_rank()
+                dist.broadcast(is_matched, src=dp_src_rank, group=dp_group)
+                is_matched = bool(is_matched[0])
             else:
                 is_matched = True
 
