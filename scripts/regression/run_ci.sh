@@ -41,6 +41,7 @@ target_lists_for_llm=(
     "llm"
     "tests/llm"
     "csrc"
+    "scripts/regression"
 )
 all_P0case_dic=(["msra_ner"]=15 
     ["glue"]=2 
@@ -127,6 +128,9 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
         if [[ ${dir2} =~ "should_deploy" ]];then # 针对发版mini test
             P0case_list[${#P0case_list[*]}]=transformer
         fi
+        if [[ ${dir2} =~ "regression" ]];then # ci脚本修改
+            P0case_list[${#P0case_list[*]}]=llm
+        fi
     elif [[ ${dir1} =~ "paddlenlp" ]];then # API 升级
         for ((i=0; i<${#target_lists_for_llm[@]}; i++)); do  # 命中指定路径执行llm
             if [[ ${file_item} == *${target_lists_for_llm[i]}* ]];then
@@ -208,8 +212,8 @@ if [[ ${#Build_list[*]} -ne 0 ]];then
     echo -e "\033[32m make PaddleNLP.tar.gz  \033[0m"
     cd /workspace
     rm -rf PaddleNLP_dev/build/*
-    cd PaddleNLP_dev && git submodule update --init --recursive && cd -
-    tar -zcvf PaddleNLP.tar.gz PaddleNLP_dev/
+    cd PaddleNLP_dev && git submodule update --init --recursive
+    cd /workspace && tar -zcvf PaddleNLP.tar.gz PaddleNLP_dev/
     mv PaddleNLP.tar.gz ${PPNLP_HOME}/upload
     cd ${PPNLP_HOME}
     python upload.py ${PPNLP_HOME}/upload 'paddlenlp/wheels'
