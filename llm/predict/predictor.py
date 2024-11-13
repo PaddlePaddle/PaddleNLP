@@ -33,6 +33,7 @@ from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.transformers import (
     AutoConfig,
+    AutoInferenceModelForCausalLM,
     AutoModelForCausalLM,
     AutoTokenizer,
     ChatGLMTokenizer,
@@ -1243,9 +1244,8 @@ def create_predictor(
     else:
         if predictor_args.mode == "dynamic":
             # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
-            model = AutoModelForCausalLM.from_pretrained(
+            model = AutoInferenceModelForCausalLM.from_pretrained(
                 predictor_args.model_name_or_path,
-                inference_mode=True,
                 config=config,
                 predictor_args=predictor_args,
                 model_args=model_args,
@@ -1260,15 +1260,17 @@ def create_predictor(
                 predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
 
         elif predictor_args.mode == "static":
-            cache_kvs_shape = AutoModelForCausalLM.from_pretrained(
+            model_class = AutoInferenceModelForCausalLM.from_pretrained(
                 predictor_args.model_name_or_path,
-                inference_mode=True,
                 config=config,
                 predictor_args=predictor_args,
                 model_args=model_args,
                 dtype=predictor_args.dtype,
                 tensor_parallel_degree=tensor_parallel_degree,
                 tensor_parallel_rank=tensor_parallel_rank,
+            )
+            cache_kvs_shape = model_class.get_cache_kvs_shape(
+                config, predictor_args.batch_size, predictor_args.total_max_length
             )
             if predictor_args.block_attn:
                 predictor = StaticBlockInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)

@@ -1693,7 +1693,11 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
                 "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/inference.md"
             )
         elif predictor_args.device == "cpu" and predictor_args.avx_model:
-            return "LlamaForCausalLMAvx"
+            import importlib
+
+            import_class = importlib.import_module("paddlenlp.experimental.transformers.llama.modeling")
+            model_class = getattr(import_class, "LlamaForCausalLMAvxInferenceModel")
+            return model_class.set_inference_config(config, predictor_args, **kwargs)
         else:
             super().set_inference_config(config, predictor_args, **kwargs)
 

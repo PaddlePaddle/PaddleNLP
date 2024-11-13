@@ -1120,9 +1120,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         """
         tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
         tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
-        dynamic_mode = predictor_args.mode == "dynamic"
 
-        if dynamic_mode:
+        if predictor_args.mode == "dynamic":
             config.tensor_parallel_degree = tensor_parallel_degree
             config.tensor_parallel_rank = tensor_parallel_rank
             config.model_name_or_path = predictor_args.model_name_or_path
@@ -1133,15 +1132,15 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         config.append_attn = predictor_args.append_attn
 
         if config.quantization_config.quant_type is not None:
-            if dynamic_mode:
+            if predictor_args.mode == "dynamic":
                 predictor_args.quant_type = config.quantization_config.quant_type
                 config.quant_type = config.quantization_config.quant_type
             if "c8" in config.quant_type:
                 predictor_args.cachekv_int8_type = "static"
-                if dynamic_mode:
+                if predictor_args.mode == "dynamic":
                     config.cachekv_int8_type = "static"
 
-            if dynamic_mode:
+            if predictor_args.mode == "dynamic":
                 ptq_multicards_num = 0
                 if os.path.exists(config.model_name_or_path):
                     prefix = "act_scales_"
