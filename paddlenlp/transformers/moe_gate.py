@@ -97,16 +97,16 @@ class MoEGateMixin:
 
     def _cal_aux_loss(self, gates, mask):
         """
-        计算辅助损失
+        Calculate auxiliary loss
 
         Args:
-            gates (paddle.Tensor): 表示每个expert的输出概率。形状为[batch_size, num_experts]
-            mask (paddle.Tensor): 表示每个样本是否属于某个expert。形状为[batch_size, num_experts]
+            gates (paddle.Tensor): Represents the output probability of each expert. The shape is [batch_size, num_experts]
+            mask (paddle.Tensor): Represents whether each sample belongs to a certain expert. The shape is [batch_size, num_experts]
 
         Returns:
-            paddle.Tensor: 辅助损失值。
+            paddle.Tensor: The value of auxiliary loss.
 
-        """
+        """        
         me = paddle.mean(gates, axis=0)
         ce = paddle.mean(mask.cast("float32"), axis=0)
         if self.global_aux_loss:
@@ -123,11 +123,13 @@ class MoEGateMixin:
 
     def _cal_z_loss(self, logits) -> paddle.Tensor:
         """
-        计算z损失
+        Calculate the z loss.
+        
         Args:
-            logits (paddle.paddle.Tensor): 模型输出。形状为[batch_size, num_experts]
+            logits (paddle.Tensor): Model output. The shape is [batch_size, num_experts].
+        
         Returns:
-            paddle.paddle.Tensor: z损失值。
+            paddle.Tensor: The z loss value.
         """
         l_zloss = logits.exp().sum(1).log().square().mean()
         return l_zloss
@@ -287,22 +289,24 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
 
         # Create a mask for 1st's expert per token
         # noisy gating
-        indices1_s = paddle.argmax(logits if self.noisy_gate_policy == "RSample" else gates, axis=1)  # 仅保存最大值位置
-        mask1 = self._one_hot_to_float(indices1_s, num_classes=self.num_experts)  # 将最大值位置转换为one-hot向量 [s, e]
+        # Only save the position of the maximum value
+        indices1_s = paddle.argmax(logits if self.noisy_gate_policy == "RSample" else gates, axis=1)
+        # Convert the position of the maximum value to a one-hot vector [s, e]
+        mask1 = self._one_hot_to_float(indices1_s, num_classes=self.num_experts)  
 
         # mask only used tokens
         if used_token is not None:
-            mask1 = paddle.einsum("s,se->se", used_token, mask1)  # 将used_token与mask1进行逐元素相乘,得到新的mask1
+            mask1 = paddle.einsum("s,se->se", used_token, mask1)  # Element-wise multiply used_token with mask1 to obtain a new mask1
 
         # gating decisions
-        exp_counts = paddle.sum(mask1, axis=0)  # 计算每个专家的token数量
+        exp_counts = paddle.sum(mask1, axis=0)  # Calculate the number of tokens for each expert
 
         # if we don't want to drop any tokens
         if not self.drop_tokens:
-            new_capacity = paddle.max(exp_counts)  # 计算每个专家的token数量
+            new_capacity = paddle.max(exp_counts)  # Calculate the number of tokens for each expert
             # Communicate across expert processes to pick the maximum capacity.
             if self.group is not None:
-                dist.all_reduce(new_capacity, op=dist.ReduceOp.MAX, group=self.group)  # 在专家进程之间进行最大值计算
+                dist.all_reduce(new_capacity, op=dist.ReduceOp.MAX, group=self.group)  # Calculate the maximum value among expert processes
             # Make sure the capacity value does not exceed the number of tokens.
             capacity = int(min(new_capacity, paddle.tensor(mask1.size(0))))
 
@@ -319,17 +323,16 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             logits.shape[0] >= self.min_capacity
         ), "No. of tokens (batch-size) should be greater than min_capacity. Either set min_capacity to 0 or increase your batch size."
 
-        _, top_idx = paddle.topk(mask1_rand, k=capacity, axis=0)  # 选择top_capacity个token
+        _, top_idx = paddle.topk(mask1_rand, k=capacity, axis=0)  # Select top_capacity tokens
 
-        # 将mask1中的元素与top_idx进行逐元素相乘,得到新的mask1
         new_mask1 = mask1 * paddle.zeros_like(mask1).put_along_axis(top_idx, paddle.to_tensor(1.0), axis=0)
         mask1 = new_mask1
 
         # Compute locations in capacity buffer
-        locations1 = paddle.cumsum(mask1, axis=0) - 1  # 计算每个token在mask1中的位置
+        locations1 = paddle.cumsum(mask1, axis=0) - 1  # Compute the position of each token in mask1
 
         # Store the capacity location for each token
-        locations1_s = paddle.sum(locations1 * mask1, axis=1).cast(paddle.int64)  # 计算每个token在mask1中的位置
+        locations1_s = paddle.sum(locations1 * mask1, axis=1).cast(paddle.int64)
 
         # Normalize gate probabilities
         mask1_float = mask1.cast(paddle.float32)
@@ -345,21 +348,6 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         self,
         logits: paddle.Tensor,
     ) -> Tuple[int, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor, paddle.Tensor]:
-        """
-        Args:
-            logits: [S, E],形状为 [seq_len, num_experts],用于计算top2 gate。
-            cap: 表示每个token可以分发的最大数量的超参数。
-
-        Returns:
-            tuple:
-                - capacity: 每个token可分发的最大数量。
-                - dispatch_masks: 用于dispatching的mask。
-                - combine_weights: 用于combining的权重。
-                - scatter_indexes: 用于scattering的索引。
-                - loss_aux: aux loss。
-                - loss_z: z loss。
-        """
-        """Implements Top2Gating on logits."""
         # everything is in fp32 in this function
         gates = self.gate_score_func(logits=logits)
 
