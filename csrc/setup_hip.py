@@ -13,7 +13,15 @@
 # limitations under the License.
 
 from paddle.utils.cpp_extension import CUDAExtension, setup
+import subprocess
 
+def update_git_submodule():
+    try:
+        subprocess.run(["git", "submodule", "update", "--init"], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error occurred while updating git submodule: {str(e)}")
+        raise
+update_git_submodule()
 setup(
     name="paddlenlp_ops",
     ext_modules=CUDAExtension(
@@ -54,6 +62,8 @@ setup(
                 "-U__HIP_NO_BFLOAT16_CONVERSIONS__",
                 "-U__HIP_NO_BFLOAT162_OPERATORS__",
                 "-U__HIP_NO_BFLOAT162_CONVERSIONS__",
+                "-Ithird_party/cutlass/include",
+                "-Ithird_party/nlohmann_json/single_include",
             ],
         },
     ),

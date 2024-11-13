@@ -26,20 +26,6 @@ def update_git_submodule():
         print(f"Error occurred while updating git submodule: {str(e)}")
         raise
 
-def clone_git_repo(version, repo_url, destination_path):
-    try:
-        subprocess.run(
-            ["git", "clone", "-b", version, "--single-branch", repo_url, destination_path, "--depth=1"], check=True
-        )
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"Git clone {repo_url} operation failed with the following error: {e}")
-        print("Please check your network connection or access rights to the repository.")
-        print(
-            "If the problem persists, please refer to the README file for instructions on how to manually download and install the necessary components."
-        )
-        return False
-
 
 def find_end_files(directory, end_str):
     gen_files = []
@@ -126,7 +112,6 @@ sources = [
 ]
 sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
 
-cutlass_dir = "third_party/cutlass"
 nvcc_compile_args = gencode_flags
 update_git_submodule()
 nvcc_compile_args += [
