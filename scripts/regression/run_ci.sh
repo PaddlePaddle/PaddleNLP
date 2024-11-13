@@ -28,6 +28,20 @@ export APIcase_list=()
 declare -A Normal_dic
 declare -A all_P0case_dic
 declare -A Build_list
+target_lists_for_llm=(
+    "paddlenlp/transformers"
+    "paddlenlp/experimental/transformers/"
+    "paddlenlp/data"
+    "paddlenlp/datasets"
+    "paddlenlp/generation"
+    "paddlenlp/peft"
+    "paddlenlp/quantization"
+    "paddlenlp/trainer"
+    "paddlenlp/trl"
+    "llm"
+    "tests/llm"
+    "csrc"
+)
 all_P0case_dic=(["msra_ner"]=15 
     ["glue"]=2 
     ["bert"]=2 
@@ -101,6 +115,7 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
     dir2=${arr_file_name[1]}
     dir3=${arr_file_name[2]}
     dir4=${arr_file_name[3]}
+    file_item=$dir1/$dir2/$dir3/$dir4
     echo "file_name:"${file_name}, "dir1:"${dir1}, "dir2:"${dir2},"dir3:"${dir3},".xx:" ${file_name##*.}
     if [ ! -f ${file_name} ];then # 针对pr删掉文件
         continue
@@ -113,6 +128,11 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
             P0case_list[${#P0case_list[*]}]=transformer
         fi
     elif [[ ${dir1} =~ "paddlenlp" ]];then # API 升级
+        for ((i=0; i<${#target_lists_for_llm[@]}; i++)); do  # 命中指定路径执行llm
+            if [[ ${file_item} == *${target_lists_for_llm[i]}* ]];then
+                P0case_list[${#P0case_list[*]}]=llm
+            fi
+        done
         if [[ ${dir2} =~ "__init__" ]];then # 针对发版mini test
             P0case_list[${#P0case_list[*]}]=bert
         elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
@@ -167,6 +187,8 @@ for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{pri
         Build_list[${dir1}]=${dir1}
     elif [[ ${dir1} =~ "ppdiffusers" ]];then # 影响编包
         Build_list[${dir1}]=${dir1}
+    elif [[ ${dir1} =~ "csrc" ]];then # 推理改动
+        P0case_list[${#P0case_list[*]}]=llm
     else
         continue
     fi
