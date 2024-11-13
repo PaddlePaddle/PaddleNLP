@@ -141,6 +141,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     set_seed,
     should_skip_data,
     speed_metrics,
+    split_parallel_config,
 )
 from .training_args import TrainingArguments
 from .unified_checkpoint import UnifiedCheckpointHandler
@@ -2057,6 +2058,7 @@ class Trainer:
                 hasattr(self.args, "enable_sharding_comm_overlap")
                 and self.args.enable_sharding_comm_overlap
                 and self.args.unified_checkpoint
+                and "split_param" in split_parallel_config(self.args.sharding_parallel_config)
             ):
                 model.register_sharding_comm_overlap_hook(self.optimizer)
 
@@ -2848,7 +2850,11 @@ class Trainer:
                     opt_state_dict = None
             else:
                 model = self.model
-                if hasattr(self.args, "enable_sharding_comm_overlap") and self.args.enable_sharding_comm_overlap:
+                if (
+                    hasattr(self.args, "enable_sharding_comm_overlap")
+                    and self.args.enable_sharding_comm_overlap
+                    and "split_param" in split_parallel_config(self.args.sharding_parallel_config)
+                ):
                     model = self.model_wrapped
                 opt_state_dict = self.unified_checkpoint_handler.load_unified_optimizer(
                     model=model,

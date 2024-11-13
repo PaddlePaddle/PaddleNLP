@@ -37,6 +37,7 @@ from .trainer_utils import (
     OptimizerNames,
     SchedulerType,
     ShardingOption,
+    split_parallel_config,
 )
 
 try:
@@ -1095,13 +1096,6 @@ class TrainingArguments:
             if not (self.bf16 or self.fp16):
                 logger.warning("set amp_master_grad to false since amp is disabled.")
                 self.amp_master_grad = False
-
-        def split_parallel_config(parallel_config):
-            if "," in parallel_config:
-                parallel_config = set(parallel_config.split(","))
-            else:
-                parallel_config = set(parallel_config.split(" "))
-            return parallel_config
 
         # use_hybrid_parallel
         if self.use_hybrid_parallel:
