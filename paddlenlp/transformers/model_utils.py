@@ -1120,32 +1120,38 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         """
         tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
         tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
-        config.tensor_parallel_degree = tensor_parallel_degree
-        config.tensor_parallel_rank = tensor_parallel_rank
-        config.model_name_or_path = predictor_args.model_name_or_path
-        config.quant_type = predictor_args.quant_type
+        dynamic_mode = predictor_args.mode == "dynamic"
+
+        if dynamic_mode:
+            config.tensor_parallel_degree = tensor_parallel_degree
+            config.tensor_parallel_rank = tensor_parallel_rank
+            config.model_name_or_path = predictor_args.model_name_or_path
+            config.quant_type = predictor_args.quant_type
+            config.cachekv_int8_type = predictor_args.cachekv_int8_type
+            config.use_fake_parameter = predictor_args.use_fake_parameter
+            config.single_card_ptq = not predictor_args.use_fake_parameter
         config.append_attn = predictor_args.append_attn
-        config.cachekv_int8_type = predictor_args.cachekv_int8_type
-        config.use_fake_parameter = predictor_args.use_fake_parameter
-        config.single_card_ptq = not predictor_args.use_fake_parameter
 
         if config.quantization_config.quant_type is not None:
-            predictor_args.quant_type = config.quantization_config.quant_type
-            config.quant_type = config.quantization_config.quant_type
+            if dynamic_mode:
+                predictor_args.quant_type = config.quantization_config.quant_type
+                config.quant_type = config.quantization_config.quant_type
             if "c8" in config.quant_type:
                 predictor_args.cachekv_int8_type = "static"
-                config.cachekv_int8_type = "static"
+                if dynamic_mode:
+                    config.cachekv_int8_type = "static"
 
-            ptq_multicards_num = 0
-            if os.path.exists(config.model_name_or_path):
-                prefix = "act_scales_"
-                for filename in os.listdir(config.model_name_or_path):
-                    if filename.startswith(prefix):
-                        ptq_multicards_num += 1
+            if dynamic_mode:
+                ptq_multicards_num = 0
+                if os.path.exists(config.model_name_or_path):
+                    prefix = "act_scales_"
+                    for filename in os.listdir(config.model_name_or_path):
+                        if filename.startswith(prefix):
+                            ptq_multicards_num += 1
 
-            logger.info(f"PTQ from {ptq_multicards_num} cards, so we will not split")
-            if ptq_multicards_num > 1:
-                config.single_card_ptq = False
+                logger.info(f"PTQ from {ptq_multicards_num} cards, so we will not split")
+                if ptq_multicards_num > 1:
+                    config.single_card_ptq = False
 
         if predictor_args.block_attn:
             config.block_size = predictor_args.block_size

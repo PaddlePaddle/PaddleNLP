@@ -798,8 +798,9 @@ class AutoModelForCausalLM(_BaseAutoModelClass):
             tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
             tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
             model_arg = kwargs.pop("model_args", None)
+            static_mode = predictor_args.mode == "static"
 
-            if model_arg.model_type is not None:
+            if model_arg.model_type is not None and not static_mode:
                 model_name = MODEL_FOR_CAUSAL_LM_INFERENCE_MAPPING_NAMES[model_arg.model_type]
                 predictor_args.block_attn = 0
                 if model_name is None:
@@ -807,8 +808,8 @@ class AutoModelForCausalLM(_BaseAutoModelClass):
                         f"Model type {model_arg.model_type} is not supported for {config.architectures[0]} inference."
                     )
             else:
-                execute_type = "Block" if predictor_args.block_attn else ""
-                model_name = f"{config.architectures[0]}{execute_type}"
+                attn_type = "Block" if predictor_args.block_attn else ""
+                model_name = f"{config.architectures[0]}{attn_type}"
 
             import_class = importlib.import_module(
                 f"paddlenlp.experimental.transformers.{cls._name_mapping[config.architectures[0]]}.modeling"
@@ -831,6 +832,10 @@ class AutoModelForCausalLM(_BaseAutoModelClass):
                     predictor_args=predictor_args,
                     tensor_parallel_degree=tensor_parallel_degree,
                     tensor_parallel_rank=tensor_parallel_rank,
+                )
+            if static_mode:
+                return model_class.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
                 )
             return model_class.from_pretrained(predictor_args.model_name_or_path, config=config, dtype=dtype)
         else:
