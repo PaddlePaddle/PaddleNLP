@@ -101,7 +101,7 @@ def main():
     args = parse_arguments()
     paddle.set_device(args.device)
     config = AutoConfig.from_pretrained(args.model_name_or_path)
-    init_class = config["architectures"][0]
+    init_class = config["architectures"][0][:-4]
     import_class = importlib.import_module(f"paddlenlp.transformers.{MAPPING_NAMES[init_class[:-11]]}.modeling")
     model_class = getattr(import_class, init_class)
 

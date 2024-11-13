@@ -26,7 +26,7 @@ unset CUDA_VISIBLE_DEVICES
 # 10.3.7.1    g3024
 export SAVE_INIT_MODEL=1
 
-python=python3.10
+python=python
 
 # cd ../model_zoo/gpt-3/external_ops/ &&  ${python} setup.py install && cd -
 
@@ -35,7 +35,7 @@ PYTHONPATH=../ ${python} -m paddle.distributed.launch \
 	--log_dir log_$(hostname) \
         --gpus 0,1,2,3,4,5,6,7 \
 	run_pretrain.py \
-    "llama/pretrain-llama_13b-pp4tp2sd2_stage1_test.json"
+        "llama/pretrain-llama_13b-pp4tp2sd2_stage1_test.json"
 
 # llama/pretrain-llama_13b-tp2sd4_stage2.json 
 # llama/pretrain-llama_13b-pp4tp2sd2_stage1.json
