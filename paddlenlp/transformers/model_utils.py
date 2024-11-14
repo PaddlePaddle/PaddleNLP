@@ -1156,6 +1156,18 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             config.block_size = predictor_args.block_size
             config.max_seq_len = predictor_args.total_max_length
 
+    @classmethod
+    def confirm_inference_model(cls, predictor_args, **kwargs):
+        """
+        Confirm the inference model whether it need to change the AVX inference Model
+        Args:
+            model : PretrainedModel
+                The model for inference.
+            predictor_args : PredictorArgument
+                The args of the predictor.
+        """
+        return cls
+
     @property
     def base_model(self):
         """

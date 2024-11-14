@@ -1686,7 +1686,7 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
     @classmethod
-    def set_inference_config(cls, config, predictor_args, **kwargs):
+    def confirm_inference_model(cls, predictor_args, **kwargs):
         if predictor_args.device == "xpu":
             raise ValueError(
                 "you should run xpu dynamic model with --block_attn flag"
@@ -1697,10 +1697,8 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
 
             import_class = importlib.import_module("paddlenlp.experimental.transformers.llama.modeling")
             model_class = getattr(import_class, "LlamaForCausalLMAvxInferenceModel")
-            model_class.set_inference_config(config, predictor_args, **kwargs)
             return model_class
-        else:
-            super().set_inference_config(config, predictor_args, **kwargs)
+        return cls
 
 
 class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPretrainedModel):
