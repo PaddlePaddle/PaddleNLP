@@ -21,6 +21,7 @@ wget https://paddlenlp.bj.bcebos.com/datasets/dureader_dual.train.jsonl
 ```
 
 ## 训练
+### 单卡训练
 当模型架构为 encoder-only 时，以 RocketQA 为例，模型名称为`rocketqa-zh-base-query-encoder`，采用单卡训练：
 ```
 export CUDA_VISIBLE_DEVICES=0
@@ -39,6 +40,7 @@ python train.py --do_train \
               --passage_max_len 512 \
               --use_matryoshka
 ```
+### 多卡训练
 单卡训练效率过低，batch_size 较小，建议使用多卡训练，对于对比学习训练推荐使用大 batch_size，多卡训练，示例命令如下：
 
 ```
@@ -124,7 +126,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train.py --do_tr
 对上述训练模型在 MTEB 的DuRetrieval 上进行评估。对 RocketQA 的测试代码示例如下：
 ```
 model_path=rocketqa-zh-base-query-encoder-duretrieval
-python -u eval_mteb.py \
+python -u evaluation/eval_mteb.py \
     --base_model_name_or_path ${model_path} \
     --output_folder eval_results/${model_path} \
     --task_name 'DuRetrieval' \
@@ -135,7 +137,7 @@ python -u eval_mteb.py \
 对 RepLLaMA 和NV-Embed 的测试代码示例如下：
 ```
 model_path=repllama-v1-7b-duretrieval 或 NV-Embed-v1-duretrieval
-python -u eval_mteb.py \
+python -u evaluation/eval_mteb.py \
     --base_model_name_or_path ${model_path} \
     --output_folder eval_results/${model_path} \
     --query_instruction "query: " \
@@ -167,7 +169,7 @@ python -u eval_mteb.py \
 评估 NV-Embed 向量检索模型（[NV-Embed-v1](https://huggingface.co/nvidia/NV-Embed-v1)）：
 ```
 export CUDA_VISIBLE_DEVICES=0
-python eval_mteb.py \
+python evaluation/eval_mteb.py \
        --base_model_name_or_path NV-Embed-v1 \
        --output_folder en_results/nv-embed-v1 \
        --query_instruction "Given a claim, find documents that refute the claim" \
