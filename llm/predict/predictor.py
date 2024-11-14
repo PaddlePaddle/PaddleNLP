@@ -1259,7 +1259,7 @@ def create_predictor(
                 predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
 
         elif predictor_args.mode == "static":
-            model_class = AutoInferenceModelForCausalLM.from_pretrained(
+            model = AutoInferenceModelForCausalLM.from_pretrained(
                 predictor_args.model_name_or_path,
                 config=config,
                 predictor_args=predictor_args,
@@ -1268,7 +1268,7 @@ def create_predictor(
                 tensor_parallel_degree=tensor_parallel_degree,
                 tensor_parallel_rank=tensor_parallel_rank,
             )
-            cache_kvs_shape = model_class.get_cache_kvs_shape(
+            cache_kvs_shape = model.get_cache_kvs_shape(
                 config, predictor_args.batch_size, predictor_args.total_max_length
             )
             if predictor_args.block_attn:
