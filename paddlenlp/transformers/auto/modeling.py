@@ -892,13 +892,16 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         model_class_name = f"{model_name}InferenceModel"
         model_class = getattr(import_class, model_class_name)
 
-        # Set the inference config
-        model_class.set_inference_config(
+        # Set the inference config.
+        new_model_class = model_class.set_inference_config(
             config=config,
             predictor_args=predictor_args,
             tensor_parallel_degree=tensor_parallel_degree,
             tensor_parallel_rank=tensor_parallel_rank,
         )
+        # It will change the model if it need  the cpu avx to execute.
+        if new_model_class is not None:
+            model_class = new_model_class
 
         if predictor_args.mode == "dynamic":
             return model_class.from_pretrained(predictor_args.model_name_or_path, config=config, dtype=dtype)

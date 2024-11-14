@@ -1697,7 +1697,8 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
 
             import_class = importlib.import_module("paddlenlp.experimental.transformers.llama.modeling")
             model_class = getattr(import_class, "LlamaForCausalLMAvxInferenceModel")
-            return model_class.set_inference_config(config, predictor_args, **kwargs)
+            model_class.set_inference_config(config, predictor_args, **kwargs)
+            return model_class
         else:
             super().set_inference_config(config, predictor_args, **kwargs)
 
