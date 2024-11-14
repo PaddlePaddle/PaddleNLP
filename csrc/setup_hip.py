@@ -50,6 +50,8 @@ setup(
             "./gpu/quant_int8.cu",
             "./gpu/dequant_int8.cu",
             "./gpu/flash_attn_bwd.cc",
+            "./gpu/update_inputs_v2.cu",
+            "./gpu/set_preids_token_penalty_multi_scores.cu",
         ],
         extra_compile_args={
             "cxx": ["-O3"],
