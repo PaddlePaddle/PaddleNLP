@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import math
+from contextlib import nullcontext
 from typing import Optional
 
 import paddle
@@ -22,6 +23,7 @@ from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import (
     ColumnParallelLinear,
     RowParallelLinear,
+    get_rng_state_tracker,
 )
 
 try:
@@ -52,6 +54,10 @@ from paddlenlp.transformers.mc2_parallel_linear import (
 )
 
 from .lora_quick_layers import quick_lora
+
+
+def rng_ctx(is_mp: bool, in_dynamic_mode: bool):
+    return get_rng_state_tracker().rng_state() if (is_mp and in_dynamic_mode) else nullcontext()
 
 
 class LoRALinear(nn.Linear):
@@ -202,14 +208,15 @@ class RowParallelLoRALinear(RowParallelLinear):
         self.name = self._name
 
         # Actual trainable parameters
-        self.lora_A = self.create_parameter(
-            shape=[self.input_size_per_partition, r],
-            dtype=self._dtype,
-            is_bias=False,
-            attr=paddle.ParamAttr(
-                initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
-            ),
-        )
+        with rng_ctx(self.is_mp, paddle.in_dynamic_mode()):
+            self.lora_A = self.create_parameter(
+                shape=[self.input_size_per_partition, r],
+                dtype=self._dtype,
+                is_bias=False,
+                attr=paddle.ParamAttr(
+                    initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
+                ),
+            )
         self.lora_B = self.create_parameter(
             shape=[r, self.out_features],
             dtype=self._dtype,
@@ -349,14 +356,15 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
         self.name = self._name
 
         # Actual trainable parameters
-        self.lora_A = self.create_parameter(
-            shape=[self.input_size_per_partition, r],
-            dtype=self._dtype,
-            is_bias=False,
-            attr=paddle.ParamAttr(
-                initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
-            ),
-        )
+        with rng_ctx(self.is_mp, paddle.in_dynamic_mode()):
+            self.lora_A = self.create_parameter(
+                shape=[self.input_size_per_partition, r],
+                dtype=self._dtype,
+                is_bias=False,
+                attr=paddle.ParamAttr(
+                    initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
+                ),
+            )
         self.lora_B = self.create_parameter(
             shape=[r, self.out_features],
             dtype=self._dtype,
