@@ -1313,12 +1313,14 @@ class TrainingArguments:
                             strategy.hybrid_configs["sharding_configs"].comm_buffer_size_MB = int(
                                 self.sharding_comm_buffer_size_MB
                             )
+                            strategy.sharding.comm_buffer_size_MB = int(self.sharding_comm_buffer_size_MB)
 
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
 
                         if "enable_release_grads" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].release_gradients = True
+                            strategy.release_gradients = True
 
                         if self.pipeline_parallel_degree == 1:
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
