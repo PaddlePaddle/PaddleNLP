@@ -21,6 +21,7 @@ def update_git_submodule():
     except subprocess.CalledProcessError as e:
         print(f"Error occurred while updating git submodule: {str(e)}")
         raise
+
 update_git_submodule()
 setup(
     name="paddlenlp_ops",
