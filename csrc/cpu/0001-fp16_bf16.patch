@@ -1,21 +1,3 @@
-From e479452fdedfd1f0a54cc1134966f2235df14874 Mon Sep 17 00:00:00 2001
-From: bukejiyu <395822456@qq.com>
-Date: Wed, 21 Aug 2024 22:01:52 +0800
-Subject: [PATCH] fp16_bf16
-
----
- cmake/mkl.cmake                  |   2 +-
- cmake/mklml.cmake                |   2 +-
- cmake/onednn.cmake               |   1 +
- cmake/xdnn.cmake                 |   2 +-
- include/dtype.h                  |   5 +
- include/layers_decoder.h         |  21 +--
- src/layers/attention.h           |   9 +-
- src/layers/decoder_layer.cpp     | 256 ++++++++++++++++++++++++-------
- src/layers/decoder_layer.h       |   4 +-
- tests/ut/layers_decoder_test.cpp |  52 ++++---
- 10 files changed, 255 insertions(+), 99 deletions(-)
-
 diff --git a/cmake/mkl.cmake b/cmake/mkl.cmake
 index 0ef2e66..92c6d06 100644
 --- a/cmake/mkl.cmake
@@ -118,6 +100,66 @@ index 34f6aa5..a30e34d 100644
 +        const float *gateBias = nullptr, const float *upBias = nullptr, const float *downBias = nullptr,
 +        const float *myqkvBias = nullptr);
 +} // namespace xft
+diff --git a/src/common/transformer_ctx.h b/src/common/transformer_ctx.h
+index 2febed3..f3a065e 100644
+--- a/src/common/transformer_ctx.h
++++ b/src/common/transformer_ctx.h
+@@ -19,16 +19,12 @@
+ #include <cstdio>
+ #include <cstring>
+ #include <string>
+-
+-#include <filesystem>
+ #include "allocator.h"
+-
+ #include "INIReader.h"
+ #include "my_types.h"
+ #include "simple_mem_pool.h"
+ #include "split_util.h"
+ 
+-namespace fs = std::filesystem;
+ 
+ struct RopeParams {
+     float base;
+diff --git a/src/kernels/gemm_kernel_ext2.cpp b/src/kernels/gemm_kernel_ext2.cpp
+index 2859343..03cf260 100644
+--- a/src/kernels/gemm_kernel_ext2.cpp
++++ b/src/kernels/gemm_kernel_ext2.cpp
+@@ -87,7 +87,7 @@ void small_sgemm_smallm(const float *A, const int8_t *B, const float *bScale, TC
+             vb = _mm512_mul_ps(vb, vs); // apply scale
+         }
+ 
+-        constexpr const int idx = INDEX(row, col, COLS);
++        constexpr const int idx = INDEX(row, col, N/16);
+         vc[idx] = _mm512_fmadd_ps(va[row], vb, vc[idx]);
+     };
+ 
+@@ -99,8 +99,8 @@ void small_sgemm_smallm(const float *A, const int8_t *B, const float *bScale, TC
+ 
+     // Store to C
+     auto store = [&](auto i) {
+-        constexpr const int row = i / COLS;
+-        constexpr const int col = i % COLS;
++        constexpr const int row = i / (N/16);
++        constexpr const int col = i % (N/16);
+         if constexpr (N_EXPANDED) {
+             if (acc) {
+                 vc[i] = xft::load_avx512(get_mask<N, col>(mask16), ADDRESS(C, row, col * AVX3_F32_NUM, ldc)) + vc[i];
+diff --git a/src/kernels/gemm_kernel_ext3.cpp b/src/kernels/gemm_kernel_ext3.cpp
+index eade29e..13c2c10 100644
+--- a/src/kernels/gemm_kernel_ext3.cpp
++++ b/src/kernels/gemm_kernel_ext3.cpp
+@@ -65,8 +65,8 @@ void small_sgemm_fixmn(const TA *A, const TB *B, TC *C, int lda, int ldb, int ld
+ 
+     auto compute = [&](auto i, int k) {
+         // Compute in vertical direction
+-        constexpr const int row = i % ROWS;
+-        constexpr const int col = i / ROWS;
++        constexpr const int row = i % M;
++        constexpr const int col = i / M;
+ 
+         if constexpr (col == 0) { va[row] = xft::set_avx512((float)(*ADDRESS(A, row, k, lda))); }
+ 
 diff --git a/src/layers/attention.h b/src/layers/attention.h
 index 092b3d6..b438837 100644
 --- a/src/layers/attention.h
@@ -614,6 +656,3 @@ index be75d94..0e56b10 100644
 -}
 \ No newline at end of file
 +}
--- 
-2.25.1
-

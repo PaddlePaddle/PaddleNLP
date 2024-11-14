@@ -137,6 +137,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
         self.epsilon = config.rms_norm_eps
         self.max_position_embeddings = config.max_position_embeddings
         self.quant_type = config.quant_type
+        self.rope_theta = config.rope_theta
         self.dtype = config.dtype
         self.embed_tokens = nn.Embedding(
             self.vocab_size,

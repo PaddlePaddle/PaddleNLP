@@ -140,6 +140,18 @@ def is_sentencepiece_available():
     return _sentencepiece_available
 
 
+def is_cpuinfo_flags_available(cpu_flags: str) -> bool:
+    try:
+        with open("/proc/cpuinfo", "r") as cpuinfo:
+            for line in cpuinfo:
+                if line.startswith("flags") and cpu_flags in line:
+                    return True
+        return False
+    except FileNotFoundError:
+        print("/proc/cpuinfo not found.")
+        return False
+
+
 def is_paddle_available() -> bool:
     """check if `torch` package is installed
     Returns:

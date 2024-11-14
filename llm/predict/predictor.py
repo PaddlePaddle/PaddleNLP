@@ -43,7 +43,10 @@ from paddlenlp.transformers import (
     PretrainedTokenizer,
 )
 from paddlenlp.trl import llm_utils
-from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
+from paddlenlp.utils.import_utils import (
+    is_cpuinfo_flags_available,
+    is_paddlenlp_ops_available,
+)
 from paddlenlp.utils.log import logger
 
 # Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
@@ -649,6 +652,12 @@ class StaticInferencePredictor(InferencePredictorMixin):
                 "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/inference.md"
             )
         elif predictor_args.device == "cpu" and predictor_args.avx_model:
+            if not is_cpuinfo_flags_available("avx512_bf16") and (
+                "int8" in predictor_args.avx_type or "bf16" in predictor_args.avx_type
+            ):
+                raise ValueError(
+                    "Your machine does not support the avx512-bf16 instruction and can only use '--avx_type  fp16 '"
+                )
             config.disable_gpu()
             config.enable_new_ir()
             config.disable_mkldnn()

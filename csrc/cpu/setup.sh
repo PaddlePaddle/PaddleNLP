@@ -48,7 +48,9 @@ cd xFasterTransformer
 git apply paddle.patch
 
 # #4. build xFasterTransformer
-sh ./3rdparty/prepare_oneccl.sh
+if [ ! -d ./3rdparty/oneccl ] ; then
+    bash ./3rdparty/prepare_oneccl.sh
+fi
 source ./3rdparty/oneccl/build/_install/env/setvars.sh
 
 rm -rf build
@@ -63,4 +65,4 @@ export XFT_LIB_DIR=$XFT_HEADER_DIR/build
 export LD_LIBRARY_PATH=$XFT_LIB_DIR:$LD_LIBRARY_PATH
 #setup cpu paddle_nlp ops
 cd ..
-python ./src/setup_cpu.py install --user
+python ./src/setup_cpu.py install
