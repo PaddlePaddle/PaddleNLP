@@ -843,7 +843,9 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         model_class_name = f"{model_name}InferenceModel"
         model_class = getattr(import_class, model_class_name)
 
-        # It will change the model if it need  the cpu avx to execute.
+        # It may return a new model class, like LlamaForCausalLMAvxInferenceModel
+        # Some model have different inference model class in deifferent execution divice
+        # LlamaForCausalLMAvxInferenceModel is used in cpu execution device with avx instruction set
         model_class = model_class.confirm_inference_model(predictor_args=predictor_args)
 
         # Set the inference config.

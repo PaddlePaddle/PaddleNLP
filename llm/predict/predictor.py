@@ -1243,7 +1243,6 @@ def create_predictor(
             raise ValueError("the `mode` should be one of [dynamic, static]")
     else:
         if predictor_args.mode == "dynamic":
-            # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
             model = AutoInferenceModelForCausalLM.from_pretrained(
                 predictor_args.model_name_or_path,
                 config=config,
