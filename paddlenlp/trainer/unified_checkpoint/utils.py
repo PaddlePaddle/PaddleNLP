@@ -227,7 +227,7 @@ def get_expected_keys(args, sharded_metadata, model, optimizer, is_master_weight
         params2rank = optimizer._param2rank
 
     model_state_dict = get_expected_state_dict(model)
-    struct2static_name_mappings = {k: v.name for k, v in get_expected_state_dict(model).items()}
+    struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}
 
     expected_keys = []
     for key in list(sharded_metadata["all_optimizer_keys"]):
