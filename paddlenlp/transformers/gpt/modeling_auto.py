@@ -1163,8 +1163,8 @@ class GPTPretrainingCriterionAuto(paddle.nn.Layer):
         with paddle.amp.auto_cast(False):
             if len(prediction_scores.shape) < len(masked_lm_labels.unsqueeze(2).shape):
                 prediction_scores = paddle.unsqueeze_(prediction_scores, 0)
+            masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
             if dist.in_auto_parallel_align_mode():
-                masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
                 if loss_mask is None:
                     loss_mask = (masked_lm_loss > 0).astype("float32")
                     loss_mask = loss_mask.reshape([-1])
