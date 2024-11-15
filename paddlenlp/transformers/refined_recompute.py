@@ -70,7 +70,7 @@ def set_recompute_id(value=-1):
 def get_recompute_id():
     """get current recompute id"""
     global _recompute_id
-    return _recompute_id
+    return str(_recompute_id)
 
 
 @contextlib.contextmanager
@@ -439,7 +439,7 @@ def recompute(function, *args, **kwargs):
             check_recompute_necessary(check_args)
         return _recompute_without_reentrant(function, preserve, *args, **kwargs)
     else:
-        kwargs["preserve"] = preserve
+        kwargs["preserve_rng_state"] = preserve
         kwargs["use_reentrant"] = use_reentrant
         return original_recompute(function, *args, **kwargs)
 
@@ -562,6 +562,7 @@ def update_refined_recompute(rr, sequence_parallel, lora=False):
             "flash_attn": 0,
         }
         ops = rr.split(",")
+        enable_rr = False
         for op in ops:
             if ":" not in op:
                 raise ValueError("Illegal refined_recompute input, please check.")
@@ -583,7 +584,11 @@ def update_refined_recompute(rr, sequence_parallel, lora=False):
                     )
                     continue
             rr_res[op_name] = skip_num
+            if skip_num != 0:
+                enable_rr = True
 
+        if not enable_rr:
+            rr_res = {}
         return rr_res
 
 
@@ -720,7 +725,12 @@ if __name__ == "__main__":
 
     enable = True
     # 第一层
-    o1 = recompute(fwd, x, startend_row_indices, enable=enable)
+    o1 = recompute(
+        fwd,
+        x,
+        startend_row_indices,
+        enable=enable,
+    )
     # 第二层
     o2 = recompute(fwd, o1 + x, startend_row_indices, enable=enable)
     # 第三层

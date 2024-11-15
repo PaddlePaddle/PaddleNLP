@@ -269,8 +269,8 @@ class LlmMetaConfig:
         ),
         ("recompute_use_reentrant", bool, False, "recompute_use_reentrant"),
         # refined_recompute attributes
-        ("refined_recompute", str, "", "refined_recompute"),
-        ("skip_recompute_ops", Optional[Dict[str, int]], {}, "skip_recompute_ops"),
+        ("refined_recompute", str, "", "refined_recompute, Choose among ['none', 'basic', 'advanced"),
+        ("skip_recompute_ops", Optional[Dict[str, int]], None, "skip_recompute_ops"),
     ]
 
     @classmethod

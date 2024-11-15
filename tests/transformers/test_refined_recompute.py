@@ -31,6 +31,7 @@ from paddle.distributed.fleet.recompute import recompute as original_recompute
 
 from paddlenlp.transformers.refined_recompute import no_recompute as rr_no_recompute
 from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
+from paddlenlp.utils.import_utils import is_paddle_cuda_available
 
 ACT2FN = {
     "relu": F.relu,
@@ -454,6 +455,7 @@ class BertRefinedRecomputeTest(unittest.TestCase):
             round(paddle.device.cuda.max_memory_allocated() / div, 2),
         )
 
+    @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute only support on gpu")
     def test_refined_recompute(self):
         model1, mem_usage_forward1, max_mem_usage_forward1 = self.no_pp_fwd_bwd(
             recompute=True, use_rr_recompute=False
@@ -522,6 +524,7 @@ class BertRefinedRecomputeTest(unittest.TestCase):
 
         return x_copy.grad, layer
 
+    @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute-pp only support on gpu")
     def test_refined_recompute_pp(self):
         grad1, layer1 = self.pp_fwd_bwd(recompute=True, use_rr_recompute=False)
         grad2, layer2 = self.pp_fwd_bwd(recompute=True, use_rr_recompute=True)
