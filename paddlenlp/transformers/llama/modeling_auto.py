@@ -860,10 +860,15 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             self.hidden_size,
         )
 
+        embedding_placements = (
+            [dist.Replicate(), dist.Shard(0)]
+            if self.config.tensor_parallel_degree > 1
+            else [dist.Replicate(), dist.Replicate()]
+        )
         self.embed_tokens.weight = dist.shard_tensor(
             self.embed_tokens.weight,
             get_mesh(),
-            [dist.Replicate(), dist.Shard(0)],
+            embedding_placements,
         )
 
         def get_layer_pp_info(layer_index):

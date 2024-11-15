@@ -245,7 +245,7 @@ function llama_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem"
-    loss_base=9.3507843
+    loss_base=9.38427544
     if [ $IS_A100 -ne 0 ];then
         loss_base=9.38577747
     fi
