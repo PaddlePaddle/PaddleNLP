@@ -301,3 +301,4 @@ class GPTConfig(PretrainedConfig):
 
         self.use_fast_layer_norm = use_fast_layer_norm
         self.fused_softmax_with_triangular = fused_softmax_with_triangular
+        self.register_unsavable_keys(["use_fast_layer_norm", "fuse_attention_ffn", "fuse_attention_qkv"])
