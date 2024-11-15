@@ -334,6 +334,7 @@ class MixtralInferenceModel(MixtralPretrainedModel):
             cache_k_out_scale_attrs=cache_k_out_scale_attrs,
             cache_v_out_scale_attrs=cache_v_out_scale_attrs,
             epsilon=self.epsilon,
+            rope_theta=self.rope_theta,
             norm_type="rmsnorm",
             use_neox_rotary_style=self.use_neox,
             cachekv_int8_type=config.cachekv_int8_type,

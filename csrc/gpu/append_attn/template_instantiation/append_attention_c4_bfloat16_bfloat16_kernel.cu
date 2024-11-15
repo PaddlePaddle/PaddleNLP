@@ -45,6 +45,8 @@ template void CascadeAppendAttentionC4Kernel<paddle::bfloat16, paddle::bfloat16>
     const int block_shape_q,
     const int max_seq_len,
     const int max_dec_len,
+    const float quant_max_bound,
+    const float quant_min_bound,
     const float in_scale,
     const int max_partition_size,
     const int encoder_max_partition_size,

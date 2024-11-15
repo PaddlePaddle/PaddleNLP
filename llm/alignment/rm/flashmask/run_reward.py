@@ -46,7 +46,7 @@ from paddlenlp.utils.log import logger
 def main():
     """main"""
     parser = PdArgumentParser((ModelArgument, DataArgument, TrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+    if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
@@ -111,7 +111,7 @@ def main():
         tensor_parallel_rank=training_args.tensor_parallel_rank,
         recompute_granularity=model_args.recompute_granularity,
         use_flash_attention=model_args.use_flash_attention,
-        seq_length = data_args.max_seq_len
+        seq_length=data_args.max_seq_len,
     )
     if training_args.pipeline_parallel_degree > 1:
         raise ValueError("RM does not support pipeline parallelism yet.")

@@ -173,10 +173,17 @@ HOSTDEVICE inline void Store(const AlignedVector<T, Size>& vec, T* addr) {
   *addr_vec = vec;
 }
 
+#ifdef PADDLE_WITH_HIP
+template <int Size>
+HOSTDEVICE inline void Store(const AlignedVector<hip_bfloat16, Size>& vec, int8_t* addr) {
+  printf("Error: Store hip_bfloat16 to int8_t is not supported!");
+}
+#else
 template <int Size>
 HOSTDEVICE inline void Store(const AlignedVector<__nv_bfloat16, Size>& vec, int8_t* addr) {
   printf("Error: Store __nv_bfloat16 to int8_t is not supported!");
 }
+#endif
 
 template <int Size>
 HOSTDEVICE inline void Store(const AlignedVector<half, Size>& vec, int8_t* addr) {

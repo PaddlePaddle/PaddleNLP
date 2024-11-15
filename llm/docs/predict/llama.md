@@ -43,13 +43,13 @@ BF16推理
 
 ```shell
 # 动态图推理
-python ./predict/predictor.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1
+python ./predict/predictor.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --dtype bfloat16 --mode dynamic --inference_model 1 --append_attn 1
 
 # 动转静导出模型
-python predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --block_attn 1
+python predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --append_attn 1
 
 # 静态图推理
-python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --block_attn 1
+python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --append_attn 1
 
 ```
 
@@ -57,13 +57,13 @@ WINT8推理
 
 ```shell
 # 动态图推理
-python predict/predictor.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1 --quant_type weight_only_int8
+python predict/predictor.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --dtype bfloat16 --mode dynamic --inference_model 1 --append_attn 1 --quant_type weight_only_int8
 
 # 动转静导出模型
-python predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --block_attn 1 --quant_type weight_only_int8
+python predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --append_attn 1 --quant_type weight_only_int8
 
 # 静态图推理
-python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --block_attn 1 --quant_type weight_only_int8
+python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --append_attn 1 --quant_type weight_only_int8
 ```
 
 下面量化推理所需要的模型需要根据[大模型量化教程](../quantization.md)产出，如 checkpoints/llama_ptq_ckpts，或者使用所提供的预先量化好的模型，如 meta-llama/Meta-Llama-3-8B-Instruct-A8W8C8。
@@ -72,38 +72,38 @@ INT8-A8W8推理
 
 ```shell
 # 动态图推理
-python predict/predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1 --quant_type a8w8
+python predict/predictor.py --model_name_or_path checkpoints/llama_ptq_ckpts --dtype bfloat16 --mode dynamic --inference_model 1 --append_attn 1 --quant_type a8w8
 
 # 动转静导出模型
-python predict/export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --block_attn 1 --quant_type a8w8
+python predict/export_model.py --model_name_or_path checkpoints/llama_ptq_ckpts --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --append_attn 1 --quant_type a8w8
 
 # 静态图推理
-python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --block_attn 1 --quant_type a8w8
+python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --append_attn 1 --quant_type a8w8
 ```
 
 INT8-A8W8C8推理
 
 ```shell
 # 动态图推理
-python predict/predictor.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct-A8W8C8 --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1 --quant_type a8w8 --cachekv_int8_type static
+python predict/predictor.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct-A8W8C8 --dtype bfloat16 --mode dynamic --inference_model 1 --append_attn 1 --quant_type a8w8 --cachekv_int8_type static
 
 # 动转静导出模型
-python predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct-A8W8C8 --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --block_attn 1 --quant_type a8w8 --cachekv_int8_type static
+python predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct-A8W8C8 --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --append_attn 1 --quant_type a8w8 --cachekv_int8_type static
 
 # 静态图推理
-python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --block_attn 1 --quant_type a8w8 --cachekv_int8_type static
+python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --append_attn 1 --quant_type a8w8 --cachekv_int8_type static
 ```
 
 FP8-A8W8推理
 ```shell
 # 动态图推理
-python predict/predictor.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct-A8W8-FP8 --dtype bfloat16 --mode dynamic --inference_model 1 --block_attn 1 --quant_type a8w8_fp8
+python predict/predictor.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct-A8W8-FP8 --dtype bfloat16 --mode dynamic --inference_model 1 --append_attn 1 --quant_type a8w8_fp8
 
 # 动转静导出模型
-python predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct-A8W8-FP8 --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --block_attn 1 --quant_type a8w8_fp8
+python predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3-8B-Instruct-A8W8-FP8 --output_path /path/to/exported_model --dtype bfloat16 --inference_model 1 --append_attn 1 --quant_type a8w8_fp8
 
 # 静态图推理
-python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --block_attn 1 --quant_type a8w8_fp8
+python predict/predictor.py --model_name_or_path /path/to/exported_model --dtype bfloat16 --mode static --inference_model 1 --append_attn 1 --quant_type a8w8_fp8
 ```
 
 405B INT8-A8W8C8 TP8推理
@@ -121,8 +121,8 @@ generation_config = GenerationConfig.from_pretrained("meta-llama/Meta-Llama-3.1-
 
 ```shell
 # 导出模型 (可在predict/export_model.py中设置paddle.set_device("cpu")，通过内存导出模型)
-python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3.1-405B-Instruct --output_path /path/to/a8w8c8_tp8 --inference_model 1 --block_attn 1 --dtype bfloat16 --quant_type a8w8 --cachekv_int8_type static --use_fake_parameter 1
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" predict/export_model.py --model_name_or_path meta-llama/Meta-Llama-3.1-405B-Instruct --output_path /path/to/a8w8c8_tp8 --inference_model 1 --append_attn 1 --dtype bfloat16 --quant_type a8w8 --cachekv_int8_type static --use_fake_parameter 1
 
 # 推理
-python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" predict/predictor.py --model_name_or_path /path/to/a8w8c8_tp8 --mode static --inference_model 1 --block_attn 1 --dtype bfloat16 --quant_type a8w8 --cachekv_int8_type static
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" predict/predictor.py --model_name_or_path /path/to/a8w8c8_tp8 --mode static --inference_model 1 --append_attn 1 --dtype bfloat16 --quant_type a8w8 --cachekv_int8_type static
 ```
