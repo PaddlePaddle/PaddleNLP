@@ -861,7 +861,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         )
 
         embedding_placements = (
-            [dist.Replicate(), dist.Shard(0)]
+            [dist.Replicate(), dist.Shard(1)]
             if self.config.tensor_parallel_degree > 1
             else [dist.Replicate(), dist.Replicate()]
         )
