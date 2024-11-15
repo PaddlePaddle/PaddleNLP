@@ -269,7 +269,12 @@ class LlmMetaConfig:
         ),
         ("recompute_use_reentrant", bool, False, "recompute_use_reentrant"),
         # refined_recompute attributes
-        ("refined_recompute", str, "", "refined_recompute, Choose among ['none', 'basic', 'advanced"),
+        (
+            "refined_recompute",
+            str,
+            "",
+            "refined_recompute, Choose from 'mlp_row_ln', 'mlp_column_ln', 'attention_row_ln', 'attention_column_ln', 'flash_attn']",
+        ),
         ("skip_recompute_ops", Optional[Dict[str, int]], None, "skip_recompute_ops"),
     ]
 
