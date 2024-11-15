@@ -109,6 +109,11 @@ def scaled_dot_product_attention(
                 key_states,
                 value_states,
                 causal=True,
+                return_softmax=output_attentions,
+            )
+        else:
+            if alibi is not None:
+                attention_mask = attention_mask.cast(alibi.dtype) + alibi
             attn_output = F.scaled_dot_product_attention(
                 query_states,
                 key_states,
