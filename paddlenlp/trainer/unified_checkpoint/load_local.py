@@ -150,7 +150,7 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
 def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
     # Special process with split param.
     if is_sharding_split_param_mode(args):
-        returned_optim_state_dict = load_unified_optimizer_split_param(model, optimizer, resume_from_checkpoint)
+        returned_optim_state_dict = load_unified_optimizer_split_param(args, model, optimizer, resume_from_checkpoint)
         return returned_optim_state_dict
 
     # init and get optimizer LR_Scheduler

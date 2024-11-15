@@ -139,8 +139,16 @@ fi
 }
 ####################################
 print_info(){
-#解决异常退出-6的问题，CI中的偶现问题，无法复现
-if [[ $1 -ne 0 ]] && [[ $1 -ne 250 ]];then
+if [ $1 -eq 250 ];then
+    #解决异常退出-6的问题，CI中的偶现问题，无法复现
+    echo -e "\033[1;31m"  
+    echo -e "\033[1;31m The CI execution encountered an abnormal termination with error code exit -6. \033[0m"
+    echo -e "\033[1;31m This is an intermittent issue. \033[0m"
+    echo -e "\033[1;31m Please re-run the CI. \033[0m"
+    echo -e "\033[1;31m"  
+    exit 2
+fi
+if [[ $1 -ne 0 ]];then
     EXCODE=2
     if [ ! -f ${log_path}/$2 ];then
         echo -e "\033[31m run $2 CI FAIL \033"
@@ -151,7 +159,7 @@ if [[ $1 -ne 0 ]] && [[ $1 -ne 250 ]];then
     fi
     exit $EXCODE
 else
-    echo -e "\033[32m run $3 CI SUCCESS \033"
+    echo -e "\033[32m The $3 CI has completed \033"
 fi
 }
 ####################################
@@ -174,24 +182,25 @@ function track_case_status() {
     cd ${log_path} || { echo "Failed to enter log_path: $log_path"; return 1; }  
   
     total_count=$(ls -1 "$prefix"* 2>/dev/null | wc -l)  
-    run_fail_count=$(ls -1 "$prefix"*_FAIL 2>/dev/null | wc -l)  
-    loss_fail_count=$(grep 'check failed! ' result.log | awk -v prefix="$prefix_var" '{if ($2 ~ "^" prefix) print $2}'| wc -l)
+    run_fail_count=$(ls -1 "$prefix"*_FAIL* 2>/dev/null | wc -l)  
+    loss_fail_count=$(grep 'check failed! ' result.log | awk -v prefix="$prefix" '{if ($2 ~ "^" prefix) print $2}'| wc -l)
     
-    # return original path 
     echo -e "\033[31m ---- $case_name total tests :  $total_count \033"
     if [ $run_fail_count -eq 0 ] && [ $loss_fail_count  -eq 0 ]; then
-        echo -e "\033[32m ---- $case_name all cases Success  \033"
+        echo -e "\033[32m ---- all cases Success  \033"
     else
         if [[ $run_fail_count -ne 0 ]] ; then
             echo -e "\033[31m ---- $case_name runtime failed test  :  $run_fail_count \033"
-            ls -1 "$prefix"*_FAIL 2>/dev/null
+            ls -1 "$prefix"*_FAIL* 2>/dev/null | awk -v OFS="\t" '{print "\t" $0 "(failed)"}'
         fi
         if [[ $loss_fail_count -ne 0 ]] ; then
-            echo -e "\033[31m ---- $case_name loss verification failed test  :  $loss_fail_count \033"
-            grep 'check failed! ' result.log | awk -v prefix="$prefix_var" '{if ($2 ~ "^" prefix) print $2}'
+            echo -e "\033[31m ---- $case_name verification failed test  :  $loss_fail_count \033"
+            grep 'check failed! ' result.log | awk -v prefix="$prefix" 'BEGIN {OFS="\t"} {if ($2 ~ "^" prefix) print "\t" $2 "(failed)"}'
         fi
+        return 2
     fi
     cd "$original_path" || { echo "Failed to return to original path: $original_path"; return 1; }  
+    return 0
 } 
 ####################################
 get_diff_TO_case # 获取待执行case列表
@@ -238,6 +247,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
     echo -e "\033[31m ---- end run case  \033"
 
     track_case_status  $FUNCNAME ""
+    EXCODE=$?
 else
     echo -e "\033[32m Changed Not CI case, Skips \033"
     EXCODE=0

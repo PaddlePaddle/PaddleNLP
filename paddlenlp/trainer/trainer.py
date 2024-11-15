@@ -141,6 +141,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     set_seed,
     should_skip_data,
     speed_metrics,
+    split_parallel_config,
 )
 from .training_args import TrainingArguments
 from .unified_checkpoint import UnifiedCheckpointHandler
@@ -2053,6 +2054,14 @@ class Trainer:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
+            if (
+                hasattr(self.args, "enable_sharding_comm_overlap")
+                and self.args.enable_sharding_comm_overlap
+                and self.args.unified_checkpoint
+                and "split_param" in split_parallel_config(self.args.sharding_parallel_config)
+            ):
+                model.register_sharding_comm_overlap_hook(self.optimizer)
+
         # No pipeline mode, sharding only
         if not in_pipeline_parallel_mode and in_sharding_parallel_mode:
             # Sharded DDP!
@@ -2840,8 +2849,15 @@ class Trainer:
                 else:
                     opt_state_dict = None
             else:
+                model = self.model
+                if (
+                    hasattr(self.args, "enable_sharding_comm_overlap")
+                    and self.args.enable_sharding_comm_overlap
+                    and "split_param" in split_parallel_config(self.args.sharding_parallel_config)
+                ):
+                    model = self.model_wrapped
                 opt_state_dict = self.unified_checkpoint_handler.load_unified_optimizer(
-                    model=self.model,
+                    model=model,
                     optimizer=self.optimizer,
                     resume_from_checkpoint=checkpoint,
                 )

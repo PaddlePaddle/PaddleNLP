@@ -1108,6 +1108,66 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         """
         return cls._from_config(config, **kwargs)
 
+    @classmethod
+    def set_inference_config(cls, config, predictor_args, **kwargs):
+        """
+        All inference config can set here.
+        Args:
+            config : PretrainedConfig
+                The config of the model.
+            predictor_args : PredictorArgument
+                The args of the predictor.
+        """
+        tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
+        tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
+
+        if predictor_args.mode == "dynamic":
+            config.tensor_parallel_degree = tensor_parallel_degree
+            config.tensor_parallel_rank = tensor_parallel_rank
+            config.model_name_or_path = predictor_args.model_name_or_path
+            config.quant_type = predictor_args.quant_type
+            config.cachekv_int8_type = predictor_args.cachekv_int8_type
+            config.use_fake_parameter = predictor_args.use_fake_parameter
+            config.single_card_ptq = not predictor_args.use_fake_parameter
+        config.append_attn = predictor_args.append_attn
+
+        if config.quantization_config.quant_type is not None:
+            if predictor_args.mode == "dynamic":
+                predictor_args.quant_type = config.quantization_config.quant_type
+                config.quant_type = config.quantization_config.quant_type
+            if "c8" in config.quant_type:
+                predictor_args.cachekv_int8_type = "static"
+                if predictor_args.mode == "dynamic":
+                    config.cachekv_int8_type = "static"
+
+            if predictor_args.mode == "dynamic":
+                ptq_multicards_num = 0
+                if os.path.exists(config.model_name_or_path):
+                    prefix = "act_scales_"
+                    for filename in os.listdir(config.model_name_or_path):
+                        if filename.startswith(prefix):
+                            ptq_multicards_num += 1
+
+                logger.info(f"PTQ from {ptq_multicards_num} cards, so we will not split")
+                if ptq_multicards_num > 1:
+                    config.single_card_ptq = False
+
+        if predictor_args.block_attn:
+            config.block_size = predictor_args.block_size
+            config.max_seq_len = predictor_args.total_max_length
+
+    @classmethod
+    def confirm_inference_model(cls, predictor_args, **kwargs):
+        """
+        Confirm the inference model whether it need to change the AVX inference Model
+        Args:
+            model : PretrainedModel
+                The model for inference.
+            predictor_args : PredictorArgument
+                The args of the predictor.
+        """
+        return cls
+
     @property
     def base_model(self):
         """
