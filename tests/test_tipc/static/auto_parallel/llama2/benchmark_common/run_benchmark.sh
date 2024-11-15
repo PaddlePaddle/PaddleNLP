@@ -73,8 +73,8 @@ monitor_log_file() {
         if [ ! -f "$log_file" ]; then
             echo "日志文件 $log_file 不存在，检查进程状态..."
             # 如果日志文件不存在，直接判断进程是否结束
-            if ! ps -p $pid > /dev/null; then
-                echo "进程 $pid 已经结束。"
+            if ! ps -p $training_pid > /dev/null; then
+                echo "进程 $training_pid 已经结束。"
                 break
             fi
             continue  # 如果文件不存在，跳过后续逻辑，继续循环
@@ -88,9 +88,9 @@ monitor_log_file() {
             no_update_duration=$((no_update_duration + 5))
 
             if [ "$no_update_duration" -ge 180 ]; then
-                echo "文件在过去的 3 分钟内没有继续写入，准备杀掉进程 $pid."
-                kill -9 $pid  # 杀掉进程
-                echo "进程 $pid 已经被杀掉。"
+                echo "文件在过去的 3 分钟内没有继续写入，准备杀掉进程 $training_pid."
+                kill -9 $training_pid  # 杀掉进程
+                echo "进程 $training_pid 已经被杀掉。"
                 break
             fi
         else
@@ -101,8 +101,8 @@ monitor_log_file() {
         fi
 
         # 如果训练进程已经结束，退出监控
-        if ! ps -p $pid > /dev/null; then
-            echo "进程 $pid 已经结束。"
+        if ! ps -p $training_pid > /dev/null; then
+            echo "进程 $training_pid 已经结束。"
             break
         fi
     done
