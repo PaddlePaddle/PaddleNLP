@@ -19,6 +19,7 @@
 import dataclasses
 import json
 import sys
+import os
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, ArgumentTypeError
 from copy import copy
 from enum import Enum
@@ -299,6 +300,31 @@ class PdArgumentParser(ArgumentParser):
                 return [to_regular_dict(v) for v in obj]
             return obj
 
+        def get_resume_checkpoint_path(args):
+            """
+            get resume checkpoint path from mpirun env
+            """
+            pdc_init_step = os.getenv("PDC_INIT_STEP")
+            if pdc_init_step is not None:
+                assert not hasattr(args, "resume_from_checkpoint"), \
+                    "在 longjob 中通过 yaml 设置 resume_from_checkpoint 已被弃用，" \
+                    "请从 yaml 中移除 resume_from_checkpoint，并使用 " \
+                    "script/restart.sh 或 mpirun -x PDC_INIT_STEP=<value> bash script/train.sh ..."
+            if pdc_init_step == "0":
+                # from_scratch train process launched by pdc longjob
+                logger.info(f"resume training process by pdc longjob with resume step: {pdc_init_step}")
+                return None
+            elif pdc_init_step is not None:
+                # injected with mpirun by pdc longjob
+                logger.info(f"resume training process by pdc longjob with resume step: {pdc_init_step}")
+                return os.path.join(args.get("output_dir", None), f"checkpoint-{pdc_init_step}")
+            else:
+                # user defined resume_from_checkpoint
+                user_defined_resume_from_checkpoint = args.get("resume_from_checkpoint", None)
+                logger.info(f"user has defined resume_from_checkpoint: {user_defined_resume_from_checkpoint}")
+                return user_defined_resume_from_checkpoint
+
+        args["resume_from_checkpoint"] = get_resume_checkpoint_path(args)
         args_for_json = to_regular_dict(args)
 
         json_filename = args_for_json.get("args_output_to_local")
@@ -307,7 +333,7 @@ class PdArgumentParser(ArgumentParser):
                 with open(json_filename, "w") as json_file:
                     json.dump(args_for_json, json_file, indent=4)
             except Exception as e:
-                logger(f"Failed to write args output JSON file: {e}")
+                logger.error(f"Failed to write args output JSON file: {e}")
                 # Optionally handle the error or log it, then continue
 
         outputs = []
