@@ -106,7 +106,7 @@ class MoEGateMixin:
         Returns:
             paddle.Tensor: The value of auxiliary loss.
 
-        """        
+        """
         me = paddle.mean(gates, axis=0)
         ce = paddle.mean(mask.cast("float32"), axis=0)
         if self.global_aux_loss:
@@ -124,10 +124,10 @@ class MoEGateMixin:
     def _cal_z_loss(self, logits) -> paddle.Tensor:
         """
         Calculate the z loss.
-        
+
         Args:
             logits (paddle.Tensor): Model output. The shape is [batch_size, num_experts].
-        
+
         Returns:
             paddle.Tensor: The z loss value.
         """
@@ -292,11 +292,13 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         # Only save the position of the maximum value
         indices1_s = paddle.argmax(logits if self.noisy_gate_policy == "RSample" else gates, axis=1)
         # Convert the position of the maximum value to a one-hot vector [s, e]
-        mask1 = self._one_hot_to_float(indices1_s, num_classes=self.num_experts)  
+        mask1 = self._one_hot_to_float(indices1_s, num_classes=self.num_experts)
 
         # mask only used tokens
         if used_token is not None:
-            mask1 = paddle.einsum("s,se->se", used_token, mask1)  # Element-wise multiply used_token with mask1 to obtain a new mask1
+            mask1 = paddle.einsum(
+                "s,se->se", used_token, mask1
+            )  # Element-wise multiply used_token with mask1 to obtain a new mask1
 
         # gating decisions
         exp_counts = paddle.sum(mask1, axis=0)  # Calculate the number of tokens for each expert
@@ -306,7 +308,9 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
             new_capacity = paddle.max(exp_counts)  # Calculate the number of tokens for each expert
             # Communicate across expert processes to pick the maximum capacity.
             if self.group is not None:
-                dist.all_reduce(new_capacity, op=dist.ReduceOp.MAX, group=self.group)  # Calculate the maximum value among expert processes
+                dist.all_reduce(
+                    new_capacity, op=dist.ReduceOp.MAX, group=self.group
+                )  # Calculate the maximum value among expert processes
             # Make sure the capacity value does not exceed the number of tokens.
             capacity = int(min(new_capacity, paddle.tensor(mask1.size(0))))
 
