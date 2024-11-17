@@ -807,7 +807,7 @@ class ChatTemplateMixin:
 
             roundi_ans = [system] + [conv[1]] if system else [conv[1]]
             roundi_ans_str = self.chat_template.render(
-                messages=roundi_ans, add_generation_prompt=add_generation_prompt, **self.special_tokens_map
+                messages=roundi_ans, add_generation_prompt=False, **self.special_tokens_map
             ).replace(system_str, "")
             ans.append(roundi_ans_str)
 
