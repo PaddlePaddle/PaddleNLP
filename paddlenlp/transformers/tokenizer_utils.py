@@ -799,17 +799,31 @@ class ChatTemplateMixin:
         no_ans = []
         ans = []
         for conv in conversation_dict:
+            roundi = [system] + conv if system else conv
+            roundi_str = self.chat_template.render(
+                messages=roundi, add_generation_prompt=False, **self.special_tokens_map
+            )
+
             roundi_no_ans = [system] + [conv[0]] if system else [conv[0]]
             roundi_no_ans_str = self.chat_template.render(
                 messages=roundi_no_ans, add_generation_prompt=add_generation_prompt, **self.special_tokens_map
-            ).replace(system_str, "")
-            no_ans.append(roundi_no_ans_str)
+            )
 
-            roundi_ans = [system] + [conv[1]] if system else [conv[1]]
-            roundi_ans_str = self.chat_template.render(
-                messages=roundi_ans, add_generation_prompt=False, **self.special_tokens_map
-            ).replace(system_str, "")
+            roundi_ans_str = roundi_str[len(roundi_no_ans_str) :]
             ans.append(roundi_ans_str)
+
+            def replace_first_occurrence(original_string, to_find, to_replace):
+                index = original_string.find(to_find)
+                if index == -1:  # to_find not found in original_string
+                    return original_string
+                else:
+                    return original_string[:index] + to_replace + original_string[index + len(to_find) :]
+
+            roundi_no_ans_no_system_str = replace_first_occurrence(roundi_no_ans_str, system_str, "")
+            assert (
+                roundi_no_ans_str == system_str + roundi_no_ans_no_system_str
+            ), f"the src string contains system str: {system_str}"
+            no_ans.append(roundi_no_ans_no_system_str)
 
         # the first round is special, we need to add system_str
         no_ans[0] = system_str + no_ans[0]
