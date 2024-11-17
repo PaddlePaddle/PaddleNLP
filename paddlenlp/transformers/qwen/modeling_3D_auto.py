@@ -303,6 +303,7 @@ class QWenMLPAuto(nn.Layer):
     def __init__(self, config, ipp=None):
         super().__init__()
         ff_dim_in = config.intermediate_size // 2
+        self.fuse_attention_ffn = config.fuse_attention_ffn
         self.w1 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
         self.w2 = nn.Linear(config.hidden_size, ff_dim_in, bias_attr=not config.no_bias)
         self.c_proj = nn.Linear(ff_dim_in, config.hidden_size, bias_attr=not config.no_bias)
