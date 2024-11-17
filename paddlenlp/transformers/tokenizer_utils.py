@@ -771,30 +771,54 @@ class ChatTemplateMixin:
             ]
             origin_msg.extend(round_role)
             conversation_dict.append(round_role)
-        ans = []
 
-        # get answer in single round, then compile the chat entirely and split by single round ans
-        # attention: answer should include end token!
-        for conv in conversation_dict:
-            roundi = [system] + conv if system else conv
-            roundi_str = self.chat_template.render(
-                messages=roundi, add_generation_prompt=False, **self.special_tokens_map
+        assert len(conversation_dict) > 0, "conversations is empty"
+        if system:
+            system_str = self.chat_template.render([system])
+        else:
+            # get system and user str
+            round0_str = self.chat_template.render(
+                messages=conversation_dict[0][:1], add_generation_prompt=False, **self.special_tokens_map
             )
+            # get special system str
+            round0_only_system_str = self.chat_template.render(
+                messages=[{"role": "system", "content": ""}], add_generation_prompt=False, **self.special_tokens_map
+            )
+            # get special system and user str
+            round0_system_user_str = self.chat_template.render(
+                messages=[{"role": "system", "content": ""}] + conversation_dict[0][:1],
+                add_generation_prompt=False,
+                **self.special_tokens_map,
+            )
+
+            # get user str = {special system and user str} - {special system str}
+            user_str = round0_system_user_str.replace(round0_only_system_str, "")
+            # get system str = { system and user str} - {user str}
+            system_str = round0_str.replace(user_str, "")
+
+        no_ans = []
+        ans = []
+        for conv in conversation_dict:
             roundi_no_ans = [system] + [conv[0]] if system else [conv[0]]
             roundi_no_ans_str = self.chat_template.render(
                 messages=roundi_no_ans, add_generation_prompt=add_generation_prompt, **self.special_tokens_map
-            )
-            ans_roundi = roundi_str[len(roundi_no_ans_str) :]
-            ans.append(ans_roundi)
+            ).replace(system_str, "")
+            no_ans.append(roundi_no_ans_str)
 
-        non_learnable_parts = self._extract_non_learnable_parts(origin_msg, ans)
-        assert len(non_learnable_parts) == len(ans)
+            roundi_ans = [system] + [conv[1]] if system else [conv[1]]
+            roundi_ans_str = self.chat_template.render(
+                messages=roundi_ans, add_generation_prompt=add_generation_prompt, **self.special_tokens_map
+            ).replace(system_str, "")
+            ans.append(roundi_ans_str)
+
+        # the first round is special, we need to add system_str
+        no_ans[0] = system_str + no_ans[0]
 
         conversation_ids = []
-        for i in range(len(non_learnable_parts)):
+        for i in range(len(no_ans)):
             conversation_ids.append(
                 self.batch_encode(
-                    [non_learnable_parts[i], ans[i]],
+                    [no_ans[i], ans[i]],
                     add_special_tokens=False,
                     padding=False,
                 )["input_ids"]
@@ -802,19 +826,6 @@ class ChatTemplateMixin:
 
         result["conversations"] = conversation_ids
         return result
-
-    def _extract_non_learnable_parts(self, origin_msg: List[Dict[str, str]], split_s: List[str]):
-        """Split the entire chat by specified words. Extract the non-learnable parts."""
-        # distingish and replace the special words in original string to an uncompiled form: Like | -> \|
-        regex_pattern = "|".join(map(re.escape, split_s))
-        # splited by replaced specified words
-        non_learnable_parts = re.split(
-            r"(?:%s)" % regex_pattern,
-            self.chat_template.render(messages=origin_msg, add_generation_prompt=False, **self.special_tokens_map),
-        )
-        if non_learnable_parts[-1] == "":
-            non_learnable_parts.pop()
-        return non_learnable_parts
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
