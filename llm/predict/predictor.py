@@ -40,7 +40,7 @@ from paddlenlp.transformers import (
     ChatGLMv2Tokenizer,
     Llama3Tokenizer,
     LlamaTokenizer,
-    PretrainedModel,
+    PretrainedConfig,
     PretrainedTokenizer,
 )
 from paddlenlp.trl import llm_utils
@@ -231,11 +231,9 @@ class BasePredictor:
 
 
 class DygraphPredictor(BasePredictor):
-    def __init__(
-        self, config: PredictorArgument, model: PretrainedModel = None, tokenizer: PretrainedTokenizer = None
-    ):
+    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, **kwargs):
         super().__init__(config, tokenizer)
-        self.model = model
+        self.model = kwargs.get("model", None)
         if config.lora_path is not None:
             lora_config = LoRAConfig.from_pretrained(config.lora_path)
             dtype = lora_config.dtype
@@ -312,7 +310,7 @@ class DygraphPredictor(BasePredictor):
 
 
 class StaticGraphPredictor(BasePredictor):
-    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None):
+    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, **kwargs):
         super().__init__(config, tokenizer)
 
         inference_config = paddle.inference.Config(self.config.model_name_or_path, self.config.model_prefix)
@@ -609,14 +607,16 @@ class InferencePredictorMixin(BasePredictor):
         return inputs
 
 
-class StaticInferencePredictor(InferencePredictorMixin):
+class StaticGraphInferencePredictor(InferencePredictorMixin):
     def __init__(
         self,
         config: PredictorArgument,
-        cache_kvs_shape: list[list[int]],
         tokenizer: PretrainedTokenizer = None,
+        **kwargs,
     ):
-        self.cache_kvs_shape = cache_kvs_shape
+        self.cache_kvs_shape = kwargs.get("cache_kvs_shape", None)
+        if self.cache_kvs_shape is None:
+            raise ValueError("cache_kvs_shape should be provided for StaticGraphInferencePredictor")
         InferencePredictorMixin.__init__(self, config, tokenizer)
 
         self.predictor = self._create_predictor(config)
@@ -699,9 +699,12 @@ class DygraphInferencePredictor(InferencePredictorMixin):
     def __init__(
         self,
         config: PredictorArgument,
-        model: PretrainedModel = None,
         tokenizer: PretrainedTokenizer = None,
+        **kwargs,
     ):
+        model = kwargs.get("model", None)
+        if model is None:
+            raise ValueError("model should be provided for DygraphInferencePredictor")
         self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size, config.total_max_length)
         InferencePredictorMixin.__init__(self, config, tokenizer)
         self.model = model
@@ -952,12 +955,10 @@ class BlockInferencePredictorMixin(BasePredictor):
 
 
 class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
-    def __init__(
-        self,
-        config: PredictorArgument,
-        model: PretrainedModel = None,
-        tokenizer: PretrainedTokenizer = None,
-    ):
+    def __init__(self, config: PredictorArgument, tokenizer: PretrainedTokenizer = None, **kwargs):
+        model = kwargs.get("model", None)
+        if model is None:
+            raise ValueError("model should be provided for DygraphBlockInferencePredictor")
         self.cache_kvs_shape = model.get_cache_kvs_shape(model.config, config.batch_size)
         BlockInferencePredictorMixin.__init__(self, config, tokenizer)
 
@@ -1021,14 +1022,16 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
                 return outputs
 
 
-class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
+class StaticGraphBlockInferencePredictor(BlockInferencePredictorMixin):
     def __init__(
         self,
         config: PredictorArgument,
-        cache_kvs_shape: list[list[int]],
         tokenizer: PretrainedTokenizer = None,
+        **kwargs,
     ):
-        self.cache_kvs_shape = cache_kvs_shape
+        self.cache_kvs_shape = kwargs.get("cache_kvs_shape", None)
+        if self.cache_kvs_shape is None:
+            raise ValueError("cache_kvs_shape should be provided for StaticGraphBlockInferencePredictor")
         BlockInferencePredictorMixin.__init__(self, config, tokenizer)
 
         self._create_predictor(config)
@@ -1151,14 +1154,120 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
                 return outputs
 
 
-def get_ptq_multicards_num(directory):
-    count = 0
-    if os.path.exists(directory):
-        prefix = "act_scales_"
-        for filename in os.listdir(directory):
-            if filename.startswith(prefix):
-                count += 1
-    return count
+class AutoPredictor:
+    def __init__(self, *args, **kwargs):
+        raise EnvironmentError(
+            f"{self.__class__.__name__} is designed to be instantiated "
+            f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path).`"
+        )
+
+    @classmethod
+    def create_predictor(
+        cls,
+        predictor_args: PredictorArgument,
+        config: PretrainedConfig,
+        model_args: ModelArgument,
+        tokenizer: PretrainedTokenizer = None,
+        **kwargs
+    ):
+        """
+        Create a predictor
+
+        Args:
+            predictor_args (PredictorArgument): The predictor arguments.
+            config (PretrainedConfig): The model configuration.
+            model_args (ModelArgument): The model arguments.
+            tokenizer (PretrainedTokenizer): The tokenizer.
+            **kwargs: Additional keyword arguments.
+        Returns:
+            Predictor: The predictor.
+        """
+        tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
+        tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
+        model = None
+        cache_kvs_shape = None
+
+        # static or dynamic
+        execute_mode = "Dygraph" if predictor_args.mode == "dynamic" else "StaticGraph"
+
+        # infer/ no infer
+        if predictor_args.inference_model:
+            # block/no block
+            inference_mode = f"{'Block' if predictor_args.block_attn else ''}Inference"
+            if execute_mode == "Dygraph":
+                # AutoInferenceModel
+                model = AutoInferenceModelForCausalLM.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    config=config,
+                    predictor_args=predictor_args,
+                    model_args=model_args,
+                    dtype=predictor_args.dtype,
+                    tensor_parallel_degree=tensor_parallel_degree,
+                    tensor_parallel_rank=tensor_parallel_rank,
+                )
+                model.eval()
+            else:
+                # cache_kvs_shape compute
+                model = AutoInferenceModelForCausalLM.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    config=config,
+                    predictor_args=predictor_args,
+                    model_args=model_args,
+                    dtype=predictor_args.dtype,
+                    tensor_parallel_degree=tensor_parallel_degree,
+                    tensor_parallel_rank=tensor_parallel_rank,
+                )
+                cache_kvs_shape = model.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
+        else:
+            inference_mode = ""
+            if execute_mode == "Dygraph":
+                # model import (gpt-3,ernie) or AutoModel
+                if model_args.model_type == "gpt-3":
+                    sys.path.append("./gpt-3")
+                    from modeling import GPTForCausalLM
+
+                    model = GPTForCausalLM.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        dtype=predictor_args.dtype,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
+                        tensor_parallel_output=False,
+                    )
+                elif model_args.model_type == "ernie-3.5-se":
+                    sys.path.append("./ernie-3.5-se")
+                    from modeling import Ernie35ForCausalLM
+
+                    tensor_parallel_degree = paddle.distributed.get_world_size()
+                    tensor_parallel_rank = paddle.distributed.get_rank()
+                    model = Ernie35ForCausalLM.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        dtype=predictor_args.dtype,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
+                        tensor_parallel_output=False,
+                    )
+                else:
+                    model = AutoModelForCausalLM.from_pretrained(
+                        predictor_args.model_name_or_path,
+                        dtype=predictor_args.dtype,
+                        use_flash_attention=predictor_args.use_flash_attention,
+                        tensor_parallel_degree=tensor_parallel_degree,
+                        tensor_parallel_rank=tensor_parallel_rank,
+                        tensor_parallel_output=False,
+                    )
+
+        predictor_class_name = execute_mode + inference_mode + "Predictor"
+
+        import_class = sys.modules[__name__]
+
+        # import class
+        predictor_class = getattr(import_class, predictor_class_name)
+
+        # instance
+        predictor = predictor_class(predictor_args, tokenizer=tokenizer, model=model, cache_kvs_shape=cache_kvs_shape)
+        return predictor
 
 
 def create_predictor(
@@ -1199,84 +1308,14 @@ def create_predictor(
         predictor_args.temperature = 1.0
 
     tensor_parallel_rank, tensor_parallel_degree = llm_utils.init_dist_env()
-    if not predictor_args.inference_model:
-        tokenizer.padding_side = "left"
-        if predictor_args.mode == "dynamic":
-            if model_args.model_type == "gpt-3":
-                sys.path.append("./gpt-3")
-                from modeling import GPTForCausalLM
-
-                model = GPTForCausalLM.from_pretrained(
-                    predictor_args.model_name_or_path,
-                    dtype=predictor_args.dtype,
-                    tensor_parallel_degree=tensor_parallel_degree,
-                    tensor_parallel_rank=tensor_parallel_rank,
-                    tensor_parallel_output=False,
-                )
-            elif model_args.model_type == "ernie-3.5-se":
-                sys.path.append("./ernie-3.5-se")
-                from modeling import Ernie35ForCausalLM
-
-                tensor_parallel_degree = paddle.distributed.get_world_size()
-                tensor_parallel_rank = paddle.distributed.get_rank()
-                model = Ernie35ForCausalLM.from_pretrained(
-                    predictor_args.model_name_or_path,
-                    dtype=predictor_args.dtype,
-                    tensor_parallel_degree=tensor_parallel_degree,
-                    tensor_parallel_rank=tensor_parallel_rank,
-                    tensor_parallel_output=False,
-                )
-            else:
-                model = AutoModelForCausalLM.from_pretrained(
-                    predictor_args.model_name_or_path,
-                    dtype=predictor_args.dtype,
-                    use_flash_attention=predictor_args.use_flash_attention,
-                    tensor_parallel_degree=tensor_parallel_degree,
-                    tensor_parallel_rank=tensor_parallel_rank,
-                    tensor_parallel_output=False,
-                )
-
-            predictor = DygraphPredictor(predictor_args, model=model, tokenizer=tokenizer)
-        elif predictor_args.mode == "static":
-            predictor = StaticGraphPredictor(predictor_args, tokenizer=tokenizer)
-        else:
-            raise ValueError("the `mode` should be one of [dynamic, static]")
-    else:
-        if predictor_args.mode == "dynamic":
-            model = AutoInferenceModelForCausalLM.from_pretrained(
-                predictor_args.model_name_or_path,
-                config=config,
-                predictor_args=predictor_args,
-                model_args=model_args,
-                dtype=predictor_args.dtype,
-                tensor_parallel_degree=tensor_parallel_degree,
-                tensor_parallel_rank=tensor_parallel_rank,
-            )
-            model.eval()
-            if predictor_args.block_attn:
-                predictor = DygraphBlockInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
-            else:
-                predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
-
-        elif predictor_args.mode == "static":
-            model = AutoInferenceModelForCausalLM.from_pretrained(
-                predictor_args.model_name_or_path,
-                config=config,
-                predictor_args=predictor_args,
-                model_args=model_args,
-                dtype=predictor_args.dtype,
-                tensor_parallel_degree=tensor_parallel_degree,
-                tensor_parallel_rank=tensor_parallel_rank,
-            )
-            cache_kvs_shape = model.get_cache_kvs_shape(
-                config, predictor_args.batch_size, predictor_args.total_max_length
-            )
-            if predictor_args.block_attn:
-                predictor = StaticBlockInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
-            else:
-                predictor = StaticInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
-        else:
-            raise ValueError("the `mode` should be one of [dynamic, static]")
+    predictor = AutoPredictor.create_predictor(
+        predictor_args,
+        config,
+        model_args,
+        tokenizer,
+        tensor_parallel_degree=tensor_parallel_degree,
+        tensor_parallel_rank=tensor_parallel_rank,
+    )
 
     return predictor
 
