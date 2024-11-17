@@ -518,7 +518,8 @@ class LlamaAttentionAuto(nn.Layer):
         if (paddle_version != 0.0) and (paddle_version <= 2.6):
             key_states = repeat_kv(key_states, self.num_key_value_groups)
             value_states = repeat_kv(value_states, self.num_key_value_groups)
-
+        attention_mask = dist.reshard(attention_mask, get_mesh(self.ipp), [dist.Shard(0), dist.Replicate()])
+        alibi = dist.reshard(alibi, get_mesh(self.ipp), [dist.Shard(0), dist.Shard(1)]) if alibi is not None else None
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
             self.enable_recompute
@@ -1049,16 +1050,6 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                 if alibi is not None:
                     pp_mesh = get_mesh(ipp)
                     alibi_place = [dist.Replicate() for _ in range(len(pp_mesh._shape))]
-                    alibi = dist.reshard(
-                        alibi,
-                        pp_mesh,
-                        alibi_place,
-                    )
-                    # NOTE(zhanagweilong) : pir temp no support [R,S,S] - > [S,S] , must [R,R,R] - > [R,R] - > [S,S]
-                    if "dp" in pp_mesh.dim_names:
-                        alibi_place[pp_mesh.dim_names.index("dp")] = dist.Shard(0)
-                    if "mp" in pp_mesh.dim_names:
-                        alibi_place[pp_mesh.dim_names.index("mp")] = dist.Shard(1)
                     alibi = dist.reshard(
                         alibi,
                         pp_mesh,
