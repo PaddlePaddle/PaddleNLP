@@ -123,7 +123,26 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train.py --do_tr
 
 
 ## 评估
-对上述训练模型在 MTEB 的DuRetrieval 上进行评估。对 RocketQA 的测试代码示例如下：
+在 T2Ranking 上评估，对 RocketQA 的测试代码示例如下：
+```
+export CUDA_VISIBLE_DEVICES=0   
+model_path=rocketqa-zh-base-query-encoder-duretrieval   
+python evaluation/benchmarks.py --model_type bert \
+    --query_model ${model_path} \
+    --passage_model ${model_path} \
+    --query_max_length 64 \
+    --passage_max_length 512 \
+```
+可配置参数包括：
+- `model_type`: 模型的类似，可选 bert 或 roberta 等等
+- `query_model`: query 向量模型的路径
+- `passage_model`: passage 向量模型的路径
+- `query_max_length`: query 的最大长度
+- `passage_max_length`: passage 的最大长度
+- `evaluate_all`: 是否评估所有的 checkpoint，默认为 False，即只评估指定的 checkpoint
+- `checkpoint_dir`: 与 evaluate_all 一起使用       
+
+在 MTEB 的 DuRetrieval 上评估，对 RocketQA 的测试代码示例如下：
 ```
 model_path=rocketqa-zh-base-query-encoder-duretrieval
 python -u evaluation/eval_mteb.py \
@@ -134,7 +153,8 @@ python -u evaluation/eval_mteb.py \
     --max_seq_length 2048 \
     --task_split dev
 ```
-对 RepLLaMA 和NV-Embed 的测试代码示例如下：
+
+对 RepLLaMA 和 NV-Embed 的测试代码示例如下：
 ```
 model_path=repllama-v1-7b-duretrieval 或 NV-Embed-v1-duretrieval
 python -u evaluation/eval_mteb.py \
