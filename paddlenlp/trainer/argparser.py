@@ -307,9 +307,7 @@ class PdArgumentParser(ArgumentParser):
             pdc_init_step = os.getenv("PDC_INIT_STEP")
             if pdc_init_step is not None:
                 assert not hasattr(args, "resume_from_checkpoint"), \
-                    "在 longjob 中通过 yaml 设置 resume_from_checkpoint 已被弃用，" \
-                    "请从 yaml 中移除 resume_from_checkpoint，并使用 " \
-                    "script/restart.sh 或 mpirun -x PDC_INIT_STEP=<value> bash script/train.sh ..."
+                    "resume_from_checkpoint miss, please check your train args"
             if pdc_init_step == "0":
                 # from_scratch train process launched by pdc longjob
                 logger.info(f"resume training process by pdc longjob with resume step: {pdc_init_step}")
@@ -317,7 +315,7 @@ class PdArgumentParser(ArgumentParser):
             elif pdc_init_step is not None:
                 # injected with mpirun by pdc longjob
                 logger.info(f"resume training process by pdc longjob with resume step: {pdc_init_step}")
-                return os.path.join(args.get("output_dir", None), f"checkpoint-{pdc_init_step}")
+                return os.path.join(args.get("output_dir", None), f"{PREFIX_CHECKPOINT_DIR}-{pdc_init_step}")
             else:
                 # user defined resume_from_checkpoint
                 user_defined_resume_from_checkpoint = args.get("resume_from_checkpoint", None)
