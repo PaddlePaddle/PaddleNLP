@@ -772,7 +772,25 @@ class ChatTemplateMixin:
             origin_msg.extend(round_role)
             conversation_dict.append(round_role)
 
+        # Get system str in ChatTemplate
+        # ChatTemplate contains Three parts: system, user, assistant.
+        # However, the system str can not be obtained with chat_template.render() function.
+        # Thus, Three steps is needed to get the system str.
+        # Step1: get the system + user str in the first round.
+        # Step2: get the special system str.
+        # Step3: get the special system + user str in the first round.
+        # Then user str = {special system and user str} - {special system str}
+        # system_str = { system and user str} - {user str}
+
         assert len(conversation_dict) > 0, "conversations is empty"
+
+        def replace_first_occurrence(original_string, to_find, to_replace):
+            index = original_string.find(to_find)
+            if index == -1:  # to_find not found in original_string
+                return original_string
+            else:
+                return original_string[:index] + to_replace + original_string[index + len(to_find) :]
+
         if system:
             system_str = self.chat_template.render([system])
         else:
@@ -792,7 +810,7 @@ class ChatTemplateMixin:
             )
 
             # get user str = {special system and user str} - {special system str}
-            user_str = round0_system_user_str.replace(round0_only_system_str, "")
+            user_str = replace_first_occurrence(round0_system_user_str, round0_only_system_str, "")
             # get system str = { system and user str} - {user str}
             system_str = round0_str.replace(user_str, "")
 
@@ -811,13 +829,6 @@ class ChatTemplateMixin:
 
             roundi_ans_str = roundi_str[len(roundi_no_ans_str) :]
             ans.append(roundi_ans_str)
-
-            def replace_first_occurrence(original_string, to_find, to_replace):
-                index = original_string.find(to_find)
-                if index == -1:  # to_find not found in original_string
-                    return original_string
-                else:
-                    return original_string[:index] + to_replace + original_string[index + len(to_find) :]
 
             roundi_no_ans_no_system_str = replace_first_occurrence(roundi_no_ans_str, system_str, "")
             assert (
