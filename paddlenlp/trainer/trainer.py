@@ -3306,13 +3306,14 @@ class Trainer:
         **kwargs,
     ):
         loss, _, labels = self.prediction_pipeline_step(*args, **kwargs)
-        logits = None
-        if "pp_logits" in infohub:
-            logits = paddle.concat(infohub["pp_logits"], axis=0)
-            logits = logits._copy_to(paddle.framework._current_expected_place(), False)
-            infohub["pp_logits"] = []
+        if "pp_preds" in infohub:
+            preds = paddle.concat(infohub["pp_preds"], axis=0)
+            weight = paddle.concat(infohub["pp_preds_w"], axis=0)
+            infohub["pp_preds"] = []
+            infohub["pp_preds_w"] = []
 
-        return (loss, logits, labels)
+            return (loss, (preds, weight), labels)
+        return (loss, None, labels)
 
     def prediction_step(
         self,
