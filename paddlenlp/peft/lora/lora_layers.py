@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import math
-from contextlib import nullcontext
 from typing import Optional
 
 import paddle
@@ -23,7 +22,6 @@ from paddle.distributed.fleet.layers.mpu import mp_ops
 from paddle.distributed.fleet.meta_parallel import (
     ColumnParallelLinear,
     RowParallelLinear,
-    get_rng_state_tracker,
 )
 
 from ...transformers import linear_utils
@@ -50,10 +48,7 @@ from ...transformers.mc2_parallel_linear import (
     MC2RowSeqParallelCoreLinear,
 )
 from .lora_quick_layers import quick_lora
-
-
-def rng_ctx(is_mp: bool, in_dynamic_mode: bool):
-    return get_rng_state_tracker().rng_state() if (is_mp and in_dynamic_mode) else nullcontext()
+from .utils import rng_ctx
 
 
 class LoRALinear(nn.Linear):
