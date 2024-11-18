@@ -1320,7 +1320,7 @@ class TrainingArguments:
 
                         if "enable_release_grads" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].release_gradients = True
-                            strategy.release_gradients = True
+                            strategy.sharding.release_gradients = True
 
                         if self.pipeline_parallel_degree == 1:
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
