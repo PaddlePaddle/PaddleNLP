@@ -101,7 +101,7 @@ function llm_gpt_case_list_auto() {
 
     llm_gpt_pir_auto_bs4_TP2
     llm_gpt_pir_auto_bs4_TP2_PP2
-    track_case_status $FUNCNAME "llm_gpt__auto_"
+    track_case_status $FUNCNAME "llm_gpt_auto_"
 }
 
 function llm_qwen_case_list_auto() {
