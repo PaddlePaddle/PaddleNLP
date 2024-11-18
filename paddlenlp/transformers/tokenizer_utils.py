@@ -772,15 +772,15 @@ class ChatTemplateMixin:
             origin_msg.extend(round_role)
             conversation_dict.append(round_role)
 
-        # Get system str in ChatTemplate
-        # ChatTemplate contains Three parts: system, user, assistant.
-        # However, the system str can not be obtained with chat_template.render() function.
-        # Thus, Three steps is needed to get the system str.
-        # Step1: get the system + user str in the first round.
-        # Step2: get the special system str.
-        # Step3: get the special system + user str in the first round.
-        # Then user str = {special system and user str} - {special system str}
-        # system_str = { system and user str} - {user str}
+        # Get system string in ChatTemplate
+        # ChatTemplate contains three parts: system, user, and assistant.
+        # However, the system string cannot be obtained directly with the chat_template.render() function.
+        # Thus, three steps are needed to extract the system string.
+        # Step 1: Obtain the combined system and user string in the first round.
+        # Step 2: Obtain the special system string.
+        # Step 3: Obtain the special combined system and user string in the first round.
+        # Then, user string = (special system and user string) - (special system string)
+        # And, system string = (initial system and user string) - (user string)
 
         assert len(conversation_dict) > 0, "conversations is empty"
 
