@@ -79,6 +79,7 @@ from ..data import (
     DataCollatorWithPadding,
     DistDataLoader,
     default_data_collator,
+    init_dataloader_comm_group,
 )
 from ..peft import LoRAModel, PrefixModelForCausalLM, VeRAModel
 
@@ -421,6 +422,10 @@ class Trainer:
                     layer.enable_recompute = True
 
             model.apply(fn)
+
+        self._pp_data_group = None
+        if self.args.pipeline_parallel_degree > 1 and self.args.distributed_dataloader:
+            self._pp_data_group = init_dataloader_comm_group()
 
         default_label_names = (
             ["start_positions", "end_positions"]
@@ -1505,6 +1510,7 @@ class Trainer:
             train_dataset = self._remove_unused_columns(train_dataset, description="training")
         _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
+        additional_configs = {}
         if is_iterable_dataset:  # For iterable dataset
             if self.args.dataset_world_size > 1 and train_dataset is not None:
                 train_dataset = IterableDatasetShard(
@@ -1517,9 +1523,7 @@ class Trainer:
 
             if self.args.distributed_dataloader:
                 logger.info("Training using DistDataLoader.")
-                additional_configs = {"is_iterable_dataset": True}
-            else:
-                additional_configs = {}
+                additional_configs = {"is_iterable_dataset": True, "pp_data_group": self._pp_data_group}
             return _DataLoader(
                 train_dataset,
                 batch_size=self.args.per_device_train_batch_size,
@@ -1531,11 +1535,13 @@ class Trainer:
             train_sampler = self._get_train_sampler()
             if self.args.distributed_dataloader:
                 logger.info("Training using DistDataLoader.")
+                additional_configs = {"pp_data_group": self._pp_data_group}
             return _DataLoader(
                 train_dataset,
                 batch_sampler=train_sampler,
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
+                **additional_configs,
             )
 
     def _get_eval_sampler(self, eval_dataset: Dataset):
@@ -1591,6 +1597,7 @@ class Trainer:
             eval_dataset = self._remove_unused_columns(eval_dataset, description="evaluation")
         _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
+        additional_configs = {}
         if is_iterable_dataset:
             if self.args.dataset_world_size > 1 and eval_dataset is not None:
                 eval_dataset = IterableDatasetShard(
@@ -1600,11 +1607,10 @@ class Trainer:
                     num_processes=self.args.dataset_world_size,
                     process_index=self.args.dataset_rank,
                 )
+
             if self.args.distributed_dataloader:
                 logger.info("Eval using DistDataLoader.")
-                additional_configs = {"eval": True, "is_iterable_dataset": True}
-            else:
-                additional_configs = {}
+                additional_configs = {"eval": True, "is_iterable_dataset": True, "pp_data_group": self._pp_data_group}
             return _DataLoader(
                 eval_dataset,
                 batch_size=self.args.per_device_eval_batch_size,
@@ -1616,9 +1622,7 @@ class Trainer:
             eval_sampler = self._get_eval_sampler(eval_dataset)
             if self.args.distributed_dataloader:
                 logger.info("Eval using DistDataLoader.")
-                additional_configs = {"eval": True}
-            else:
-                additional_configs = {}
+                additional_configs = {"eval": True, "pp_data_group": self._pp_data_group}
             return _DataLoader(
                 eval_dataset,
                 batch_sampler=eval_sampler,
@@ -1651,6 +1655,7 @@ class Trainer:
             test_dataset = self._remove_unused_columns(test_dataset, description="test")
         _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
+        additional_config = {}
         if is_iterable_dataset:
             if self.args.dataset_world_size > 1 and test_dataset is not None:
                 test_dataset = IterableDatasetShard(
@@ -1663,9 +1668,7 @@ class Trainer:
 
             if self.args.distributed_dataloader:
                 logger.info("Test using DistDataLoader.")
-                additional_config = {"eval": True, "is_iterable_dataset": True}
-            else:
-                additional_config = {}
+                additional_config = {"eval": True, "is_iterable_dataset": True, "pp_data_group": self._pp_data_group}
             return _DataLoader(
                 test_dataset,
                 batch_size=self.args.per_device_eval_batch_size * self.world_size,
@@ -1677,9 +1680,7 @@ class Trainer:
             test_sampler = self._get_eval_sampler(test_dataset)
             if self.args.distributed_dataloader:
                 logger.info("Test using DistDataLoader.")
-                additional_config = {"eval": True}
-            else:
-                additional_config = {}
+                additional_config = {"eval": True, "pp_data_group": self._pp_data_group}
             # We use the same batch_size as for eval.
             return _DataLoader(
                 test_dataset,
