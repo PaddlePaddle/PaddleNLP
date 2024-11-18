@@ -133,7 +133,7 @@ function llm_gpt_case_list_auto() {
         for fun in "${fun_list[@]}"; do
             eval "$fun"
         done
-        track_case_status $FUNCNAME "llm_gpt_dygraph_auto_"
+        track_case_status $FUNCNAME "llm_gpt"
     else 
         echo -e "\033[31m ---- Invalid status $1 \033[0m"
         return 1
