@@ -140,7 +140,7 @@ python evaluation/benchmarks.py --model_type bert \
 - `query_max_length`: query 的最大长度
 - `passage_max_length`: passage 的最大长度
 - `evaluate_all`: 是否评估所有的 checkpoint，默认为 False，即只评估指定的 checkpoint
-- `checkpoint_dir`: 与 `evaluate_all` 一起使用       
+- `checkpoint_dir`: 与`evaluate_all`一起使用       
 
 在 MTEB 的 DuRetrieval 上评估，对 RocketQA 的测试代码示例如下：
 ```
