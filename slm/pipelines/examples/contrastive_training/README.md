@@ -210,7 +210,7 @@ python evaluation/eval_mteb.py \
 评估 RepLLaMA 向量检索模型（[repllama-v1-7b-lora-passage](https://huggingface.co/castorini/repllama-v1-7b-lora-passage)）：
 ```
 export CUDA_VISIBLE_DEVICES=0
-python evaluation/mteb/eval_mteb.py \
+python evaluation/eval_mteb.py \
        --base_model_name_or_path castorini/repllama-v1-7b-lora-passage \
        --output_folder en_results/repllama-v1-7b-lora-passage \
        --task_name SciFact \
@@ -239,7 +239,7 @@ python evaluation/mteb/eval_mteb.py \
 评估 BGE 向量检索模型（[bge-large-en-v1.5](https://huggingface.co/BAAI/bge-large-en-v1.5)）：
 ```
 export CUDA_VISIBLE_DEVICES=0
-python evaluation/mteb/eval_mteb.py \
+python evaluation/eval_mteb.py \
        --base_model_name_or_path BAAI/bge-large-en-v1.5 \
        --output_folder en_results/bge-large-en-v1.5 \
        --task_name SciFact \
