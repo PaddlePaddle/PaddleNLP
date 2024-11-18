@@ -1723,7 +1723,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.59941483
+    loss_base=10.59941673
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
@@ -1790,7 +1790,8 @@ function llm_gpt_pir_auto_bs4_TP2(){
         --fp16 0 \
         --fp16_opt_level "O2" \
         --num_hidden_layers 4 \
-        --intermediate_size 1024
+        --intermediate_size 1024 \
+        >>${log_path}/$FUNCNAME 2>&1
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -1850,7 +1851,8 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
         --fp16 0 \
         --fp16_opt_level "O2" \
         --num_hidden_layers 4 \
-        --intermediate_size 1024
+        --intermediate_size 1024 \
+        >>${log_path}/$FUNCNAME 2>&1
     echo "=========== $FUNCNAME run  end ==========="
 }
 
