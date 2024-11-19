@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import os
 from shutil import copyfile
@@ -247,7 +248,7 @@ class LlamaTokenizer(PretrainedTokenizer):
 
 import base64
 import unicodedata
-from typing import Collection, List, Optional, Set, Tuple
+from typing import Any, Collection, Set
 
 from ...utils.import_utils import is_tiktoken_available
 from .. import PretrainedTokenizer
@@ -289,9 +290,10 @@ class Llama3Tokenizer(PretrainedTokenizer):
         vocab_file,
         errors="replace",
         padding_side="left",
+        add_bos_token=True,
+        add_eos_token=False,
         **kwargs,
     ):
-        super().__init__(**kwargs)
         if not is_tiktoken_available():
             raise ValueError("tiktoken is not installed, please install it use: pip install tiktoken")
 
@@ -320,6 +322,9 @@ class Llama3Tokenizer(PretrainedTokenizer):
 
         self.tokenizer = enc  # type: tiktoken.Encoding
 
+        self.add_bos_token = add_bos_token
+        self.add_eos_token = add_eos_token
+
         self.bod_id = self.special_tokens[BEGINOFTEXT]
         self.eod_id = self.special_tokens[ENDOFTEXT]
         self.start_header_id = self.special_tokens[IMSTART]
@@ -331,11 +336,19 @@ class Llama3Tokenizer(PretrainedTokenizer):
         if "eos_token_id" in kwargs:
             self.eos_token_id = kwargs["eos_token_id"]
 
+        self.bos_token = BEGINOFTEXT
+        self.eos_token = ENDOFTEXT
+        self.bos_token_id = self.bod_id
+        self.eos_token_id = self.eod_id
+        self.pad_token = self.convert_ids_to_tokens(self.eos_token_id)
+
+        super().__init__(pad_token=self.pad_token, **kwargs)
+
     def __len__(self) -> int:
         return self.tokenizer.n_vocab
 
     def get_vocab(self) -> Dict[bytes, int]:
-        return self.mergeable_ranks
+        return {**self.mergeable_ranks, **self.special_tokens}
 
     def convert_tokens_to_ids(self, tokens: Union[bytes, str, List[Union[bytes, str]]]) -> List[int]:
         ids = []
@@ -351,13 +364,44 @@ class Llama3Tokenizer(PretrainedTokenizer):
                 ids.append(self.mergeable_ranks.get(token))
         return ids
 
+    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
+        if isinstance(ids, int):
+            return self.decoder[ids]
+        tokens = []
+        for index in ids:
+            index = int(index)
+            if skip_special_tokens and index >= len(self.mergeable_ranks):
+                continue
+            if index in self.decoder:
+                tokens.append(self.decoder[index])
+        return tokens
+
     def _add_tokens(self, new_tokens: Union[List[str], List[AddedToken]], special_tokens: bool = False) -> int:
         if not special_tokens and new_tokens:
             raise ValueError("Adding regular tokens is not supported")
         for token in new_tokens:
             surface_form = token.content if isinstance(token, AddedToken) else token
             if surface_form not in SPECIAL_TOKENS:
-                raise ValueError("Adding unknown special tokens is not supported")
+                logger.info(f"adding a special token '{surface_form}'.")
+                token_id = len(self.mergeable_ranks) + len(self.special_tokens)
+                self.special_tokens[surface_form] = token_id
+                self.decoder[token_id] = surface_form
+
+        import tiktoken as tk
+
+        tiktoken = tk
+        enc = tiktoken.Encoding(
+            "Llama3",
+            pat_str=PAT_STR,
+            mergeable_ranks=self.mergeable_ranks,
+            special_tokens=self.special_tokens,
+        )
+        assert (
+            len(self.mergeable_ranks) + len(self.special_tokens) == enc.n_vocab
+        ), f"{len(self.mergeable_ranks) + len(self.special_tokens)} != {enc.n_vocab} in encoding"
+
+        self.tokenizer = enc  # type: tiktoken.Encoding
+
         return 0
 
     def save_vocabulary(self, save_directory: str, **kwargs) -> Tuple[str]:
@@ -432,28 +476,16 @@ class Llama3Tokenizer(PretrainedTokenizer):
     def vocab_size(self):
         return self.tokenizer.n_vocab
 
-    def _convert_id_to_token(self, index: int) -> Union[bytes, str]:
-        """Converts an id to a token, special tokens included"""
-        if index in self.decoder:
-            return self.decoder[index]
-        raise ValueError("unknown ids")
+    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        bos_token_id = [self.bod_id] if self.add_bos_token else []
+        eos_token_id = [self.eod_id] if self.add_eos_token else []
 
-    def _convert_token_to_id(self, token: Union[bytes, str]) -> int:
-        """Converts a token to an id using the vocab, special tokens included"""
-        if token in self.special_tokens:
-            return self.special_tokens[token]
-        if token in self.mergeable_ranks:
-            return self.mergeable_ranks[token]
-        raise ValueError("unknown token")
+        output = bos_token_id + token_ids_0 + eos_token_id
 
-    def _tokenize(self, text: str, **kwargs):
-        """
-        Converts a string in a sequence of tokens (string), using the tokenizer. Split in words for word-based
-        vocabulary or sub-words for sub-word-based vocabularies (BPE/SentencePieces/WordPieces).
+        if token_ids_1 is not None:
+            output = output + bos_token_id + token_ids_1 + eos_token_id
 
-        Do NOT take care of added tokens.
-        """
-        raise NotImplementedError
+        return output
 
     def _decode(
         self,
@@ -465,5 +497,68 @@ class Llama3Tokenizer(PretrainedTokenizer):
         if isinstance(token_ids, int):
             token_ids = [token_ids]
         if skip_special_tokens:
-            token_ids = [i for i in token_ids if i < self.eod_id]
+            token_ids = [i for i in token_ids if i <= len(self.mergeable_ranks)]
         return self.tokenizer.decode(token_ids, errors=errors or self.errors)
+
+    # override ChatTemplateMixin function
+    def _encode_chat_inputs(
+        self,
+        conversations: List[List[str, str]],
+        context_data: Dict[str, Any] = {},
+        system: str = None,
+        add_generation_prompt=True,
+    ):
+        result = {}
+
+        chat_template_prefix = self.bos_token
+        chat_template_suffix = "<|start_header_id|>assistant<|end_header_id|>\n\n"
+
+        # Some template do not support system msg, so we need to check it first.
+        if system:
+            try:
+                self.chat_template.render(messages={"role": "system", "content": system})
+            except Exception as e:
+                raise ValueError("System is not supported in this tokenizer.", e)
+
+        # convert list msg to role dict msg
+        conversation_dict = []
+        origin_msg = []
+        for round in conversations:
+            round_role = [
+                {"role": "user", "content": round[0]},
+                {"role": "assistant", "content": round[1]},
+            ]
+            origin_msg.extend(round_role)
+            conversation_dict.append(round_role)
+
+        no_ans = []
+        ans = []
+        for conv in conversation_dict:
+            roundi_no_ans = [system] + [conv[0]] if system else [conv[0]]
+            roundi_no_ans_str = self.chat_template.render(
+                messages=roundi_no_ans, add_generation_prompt=add_generation_prompt, **self.special_tokens_map
+            )[len(chat_template_prefix) : -len(chat_template_suffix)]
+
+            roundi_ans = [system] + [conv[1]] if system else [conv[1]]
+            roundi_ans_str = self.chat_template.render(
+                messages=roundi_ans, add_generation_prompt=add_generation_prompt, **self.special_tokens_map
+            )[len(chat_template_prefix) : -len(chat_template_suffix)]
+
+            no_ans.append(roundi_no_ans_str)
+            ans.append(roundi_ans_str)
+
+        # the first round is special, we need to add system_str
+        no_ans[0] = chat_template_prefix + no_ans[0]
+        ans[-1] = ans[-1] + chat_template_suffix
+        conversation_ids = []
+        for i in range(len(no_ans)):
+            conversation_ids.append(
+                self.batch_encode(
+                    [no_ans[i], ans[i]],
+                    add_special_tokens=False,
+                    padding=False,
+                )["input_ids"]
+            )
+
+        result["conversations"] = conversation_ids
+        return result
