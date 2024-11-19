@@ -27,7 +27,6 @@ from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
 from paddlenlp.transformers.model_utils import PretrainedModel
-
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
 from .argparser import strtobool
