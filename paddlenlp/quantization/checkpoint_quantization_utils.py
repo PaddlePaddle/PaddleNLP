@@ -17,8 +17,17 @@ import numpy as np
 import paddle
 
 
-# cal part adam update ratio
 def cal_ratio(m, v, eps=1e-8):
+    """
+    cal part adam update ratio.
+    Args:
+        m (`paddle.Tensor`):
+            moment in Adam optimizer.
+        v (`paddle.Tensor`):
+            variance in Adam optimizer.
+        eps (`int`):
+            epsilon in Adam optimizer.
+    """
     return 1 / (np.sqrt(v) + eps)
 
 
@@ -152,16 +161,28 @@ def group_wise_quant_dequant(
         return dequant_tensor
 
 
-# merge 2 signed int4 to 1 int8
 def merge_int4(x, y):
+    """
+    merge 2 signed int4 to 1 int8
+    Args:
+        x (`numpy.array`):
+            4bits signed int x.
+        y (`numpy.array`):
+            4bits signed int y.
+    """
     int4_high = x << 4
     int4_low = y & 0x0F
     final = int4_high | int4_low
     return final.astype("int8")
 
 
-# split an int8 to 2 int4 elems
 def split_int8(final):
+    """
+    split an int8 to 2 int4 elems
+    Args:
+        final (`numpy.array`):
+            8bits signed int.
+    """
     int4_high = final >> 4
     int4_low = final & 0x0F
 
@@ -173,8 +194,15 @@ def split_int8(final):
     return high_tensor, low_tensor
 
 
-# channel-wise min max scales calculation
 def cal_abs_min_max_channel(inputs, quant_axis=1):
+    """
+    channel-wise min max scales calculation
+    Args:
+        inputs (`numpy.array`):
+            input tensor for quantization.
+        quant_axis (`int`):
+            dimension where calulating inputs' abs min and max scales on.
+    """
     eps = 1e-8
     reduce_axis = tuple([i for i in range(len(inputs.shape)) if i != quant_axis])
     abs_max_values = np.max(inputs, axis=reduce_axis)
@@ -253,8 +281,15 @@ def asymmetry_qdq_weight(
             return qdq_x.astype(paddle.float32), scales
 
 
-# channel-wise abs max calculation
 def cal_abs_max_channel(inputs, quant_axis=1):
+    """
+    channel-wise abs max calculation
+    Args:
+        inputs (`numpy.array`):
+            input tensor for quantization.
+        quant_axis (`int`):
+            dimension where calulating inputs' abs max scales on.
+    """
     epsilon = 1e-8
     reduce_axis = tuple([i for i in range(len(inputs.shape)) if i != quant_axis])
     abs_max_values = np.max(np.abs(inputs), axis=reduce_axis)
