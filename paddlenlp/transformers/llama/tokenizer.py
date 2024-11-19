@@ -248,7 +248,7 @@ class LlamaTokenizer(PretrainedTokenizer):
 
 import base64
 import unicodedata
-from typing import Any, Collection, Set
+from typing import Collection, Set
 
 from ...utils.import_utils import is_tiktoken_available
 from .. import PretrainedTokenizer
@@ -499,66 +499,3 @@ class Llama3Tokenizer(PretrainedTokenizer):
         if skip_special_tokens:
             token_ids = [i for i in token_ids if i <= len(self.mergeable_ranks)]
         return self.tokenizer.decode(token_ids, errors=errors or self.errors)
-
-    # override ChatTemplateMixin function
-    def _encode_chat_inputs(
-        self,
-        conversations: List[List[str, str]],
-        context_data: Dict[str, Any] = {},
-        system: str = None,
-        add_generation_prompt=True,
-    ):
-        result = {}
-
-        chat_template_prefix = self.bos_token
-        chat_template_suffix = "<|start_header_id|>assistant<|end_header_id|>\n\n"
-
-        # Some template do not support system msg, so we need to check it first.
-        if system:
-            try:
-                self.chat_template.render(messages={"role": "system", "content": system})
-            except Exception as e:
-                raise ValueError("System is not supported in this tokenizer.", e)
-
-        # convert list msg to role dict msg
-        conversation_dict = []
-        origin_msg = []
-        for round in conversations:
-            round_role = [
-                {"role": "user", "content": round[0]},
-                {"role": "assistant", "content": round[1]},
-            ]
-            origin_msg.extend(round_role)
-            conversation_dict.append(round_role)
-
-        no_ans = []
-        ans = []
-        for conv in conversation_dict:
-            roundi_no_ans = [system] + [conv[0]] if system else [conv[0]]
-            roundi_no_ans_str = self.chat_template.render(
-                messages=roundi_no_ans, add_generation_prompt=add_generation_prompt, **self.special_tokens_map
-            )[len(chat_template_prefix) : -len(chat_template_suffix)]
-
-            roundi_ans = [system] + [conv[1]] if system else [conv[1]]
-            roundi_ans_str = self.chat_template.render(
-                messages=roundi_ans, add_generation_prompt=add_generation_prompt, **self.special_tokens_map
-            )[len(chat_template_prefix) : -len(chat_template_suffix)]
-
-            no_ans.append(roundi_no_ans_str)
-            ans.append(roundi_ans_str)
-
-        # the first round is special, we need to add system_str
-        no_ans[0] = chat_template_prefix + no_ans[0]
-        ans[-1] = ans[-1] + chat_template_suffix
-        conversation_ids = []
-        for i in range(len(no_ans)):
-            conversation_ids.append(
-                self.batch_encode(
-                    [no_ans[i], ans[i]],
-                    add_special_tokens=False,
-                    padding=False,
-                )["input_ids"]
-            )
-
-        result["conversations"] = conversation_ids
-        return result
