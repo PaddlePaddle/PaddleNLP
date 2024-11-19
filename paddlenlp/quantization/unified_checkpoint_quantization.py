@@ -34,6 +34,16 @@ from paddlenlp.utils.log import logger
 
 
 def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
+    """
+    dequantize unified optimizer state dict.
+    Args:
+        state_dict (`dict`):
+            unified checkpoint optimizer state dict.
+        ckpt_quant_stage (`str`):
+            checkpoint quantization stage, chosen in ["O0", "O1", "O2"].
+        scale_dict (`int`):
+            compression checkpoint scale dict.
+    """
     rank, world_size = -1, 1
     if paddle.distributed.get_world_size() > 1:
         hcg = fleet.get_hybrid_communicate_group()
@@ -85,6 +95,8 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
         eps = 1e-8
         m1_state_dict = {}
         for quant_key in state_dict.keys():
+            # not all optimizer weights in O2 stage were quantized to int8,
+            # the norm-like weights were still remain in float32.
             if state_dict[quant_key].dtype != paddle.int8:
                 logger.info(f"{quant_key} skip.")
                 continue
@@ -128,6 +140,18 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
 
 
 def quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage, async_save=False):
+    """
+    quantize unified optimizer state dict.
+    Args:
+        state_dict (`dict`):
+            unified checkpoint optimizer state dict.
+        state_dict_type (`str`):
+            state_dict type, chosen in ["model_weight", "master_weight", "optimizer_weight"].
+        ckpt_quant_stage (`str`):
+            checkpoint quantization stage, chosen in ["O0", "O1", "O2"].
+        async_save (`bool`):
+            whether use async_save.
+    """
     quant = False
     if ckpt_quant_stage != "O0":
         quant = True
