@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tokenization classes for Qwen2."""
+from __future__ import annotations
 
 import json
 import os
