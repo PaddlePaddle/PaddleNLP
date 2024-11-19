@@ -14,10 +14,10 @@ finetune:
     src_length: 1024
     max_length: 2048
     use_long_sequence_strategies: true
-    rope_scaling_type: "yarn"
     rope_scaling_factor: 8
     strategy_type: "embedding_strategies"
     strategy_name: "YaRNScalingRotaryEmbedding"
+    autoregressive: true
     use_pose_convert: true
     fp16: true
     fp16_opt_level: "O2"

@@ -144,6 +144,7 @@ python merge_lora_params.py \
 - `src_length`: 模型输入上下文最大 token 长度，默认为1024。
 - `max_length`:模型输入（上下文+生成内容）的最大 token 长度, 默认为2048。当`zero_padding`设为 True 的时候，同时也为 Zero Padding 数据流模型训练输入最大长度，通常建议设为模型允许输入最大长度，同时`per_device_train_batch_size`设为1，使用`gradient_accumulation_steps`控制 batch size。
 - `lazy`:设置为 False 则使用`MapDataset`，设置为 True 则使用`IterDataset`，默认为 False。对于数据量较大的时候建议设为 True，`IterDataset`可以避免一次性将所有数据读入内存，注意需要设置`max_steps`并且`evaluation_strategy`和`save_strategy`设为`steps`
+- `autoregressive`: 是否使用自回归生成，即训练数据为无监督数据，默认为 False。
 - `use_pose_convert`: 是否使用 PoSE 算法的数据处理，默认为 False。
 
 </div>

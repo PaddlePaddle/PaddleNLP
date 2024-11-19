@@ -132,12 +132,16 @@ class DataArgument:
             "help": "@deprecated Please use `zero_padding`. Whether to use InTokens data stream, same as `zero_padding`."
         },
     )  # Alias for zero_padding
-    # Pose ralated parameters
-    use_pose_convert: bool = field(default=False, metadata={"help": "Whether to use PoSE data conversion function"})
     pad_to_max_length: bool = field(
         default=False,
         metadata={"help": "Pad the input sequence to `max_length`."},
     )
+    autoregressive: bool = field(
+        default=False,
+        metadata={"help": "Whether to use autoregressive mode."},
+    )
+    # Pose ralated parameters
+    use_pose_convert: bool = field(default=False, metadata={"help": "Whether to use PoSE data conversion function"})
 
     def __post_init__(self):
         if self.task_name_or_path is not None:
