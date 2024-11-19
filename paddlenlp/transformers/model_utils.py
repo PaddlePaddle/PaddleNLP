@@ -2883,10 +2883,14 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     level = 2
                 if ShardingOption.FULL_SHARD in sharding:
                     level = 3
+<<<<<<< HEAD
             final_config["dp_config"] = {
                 "sharding_level": level,
                 "sharding_mesh_dim": auto_dist_degree.get("sharding_mesh_dim", None),
             }
+=======
+            final_config["dp_config"] = {"level": level}
+>>>>>>> New version of auto config
 
         return final_config
 
