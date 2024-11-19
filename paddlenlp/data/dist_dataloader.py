@@ -205,6 +205,7 @@ def init_dataloader_comm_group():
     hcg = fleet.get_hybrid_communicate_group()
     topo = hcg._topo
     parallel_groups = topo.get_comm_list("pipe")
+    parallel_comm_group = None
 
     for group in parallel_groups:
         ranks = [group[0], group[-1]]
