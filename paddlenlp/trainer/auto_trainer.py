@@ -130,8 +130,8 @@ class AutoTrainer(Trainer):
             self.optimizer = dist.shard_optimizer(
                 self.optimizer, dist.ShardingStage3(), self.args.gradient_accumulation_steps
             )
-        else:
-            self.optimizer = dist.shard_optimizer(self.optimizer, None, self.args.gradient_accumulation_steps)
+        # else:
+        #     self.optimizer = dist.shard_optimizer(self.optimizer, None, self.args.gradient_accumulation_steps)
 
         if self.args.to_static:
             unified_strategy = dist.Strategy()
