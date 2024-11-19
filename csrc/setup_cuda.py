@@ -17,19 +17,14 @@ import subprocess
 
 import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
+import subprocess
 
-
-def clone_git_repo(version, repo_url, destination_path):
+def update_git_submodule():
     try:
-        subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path, "--depth=1"], check=True)
-        return True
+        subprocess.run(["git", "submodule", "update", "--init"], check=True)
     except subprocess.CalledProcessError as e:
-        print(f"Git clone {repo_url} operation failed with the following error: {e}")
-        print("Please check your network connection or access rights to the repository.")
-        print(
-            "If the problem persists, please refer to the README file for instructions on how to manually download and install the necessary components."
-        )
-        return False
+        print(f"Error occurred while updating git submodule: {str(e)}")
+        raise
 
 
 def find_end_files(directory, end_str):
@@ -107,23 +102,18 @@ sources = [
     "./gpu/dequant_int8.cu",
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
+    "./gpu/append_attention.cu",
+    "./gpu/append_attn/get_block_shape_and_split_kv_block.cu",
+    "./gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
+    "./gpu/append_attn/speculate_write_cache_with_rope_kernel.cu",
     "./gpu/sample_kernels/top_p_sampling_reject.cu",
+    "./gpu/update_inputs_v2.cu",
+    "./gpu/set_preids_token_penalty_multi_scores.cu",
 ]
+sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
 
-cutlass_dir = "third_party/cutlass"
 nvcc_compile_args = gencode_flags
-
-if not os.path.exists(cutlass_dir) or not os.listdir(cutlass_dir):
-    if not os.path.exists(cutlass_dir):
-        os.makedirs(cutlass_dir)
-    clone_git_repo("v3.5.0", "https://github.com/NVIDIA/cutlass.git", cutlass_dir)
-
-json_dir = "third_party/nlohmann_json"
-if not os.path.exists(json_dir) or not os.listdir(json_dir):
-    if not os.path.exists(json_dir):
-        os.makedirs(json_dir)
-    clone_git_repo("v3.11.3", "https://github.com/nlohmann/json.git", json_dir)
-
+update_git_submodule()
 nvcc_compile_args += [
     "-O3",
     "-U__CUDA_NO_HALF_OPERATORS__",
@@ -142,16 +132,17 @@ nvcc_compile_args += [
 ]
 
 cc = get_sm_version()
+cuda_version = float(paddle.version.cuda())
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
-if cc >= 89:
+if cc >= 89 and cuda_version >= 12.4:
+    os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels.py")
+    os.system("python utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels.py")
     sources += find_end_files("gpu/cutlass_kernels/fp8_gemm_fused/autogen", ".cu")
     sources += [
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
-        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.cu",
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
-        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_dual_gemm_scale_bias_act.cu",
     ]
 
 setup(

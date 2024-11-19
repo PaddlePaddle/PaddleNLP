@@ -242,7 +242,12 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
                 attn_mask_startend_row_indices = None
 
         has_gradient = not hidden_states.stop_gradient
-        if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
+        if (
+            self.enable_recompute
+            and self.layerwise_recompute
+            and self.config.recompute_granularity == "full"
+            and has_gradient
+        ):
             if attention_mask is not None or alibi is not None or attn_mask_startend_row_indices is not None:
                 hidden_states = recompute(
                     super().forward,
@@ -340,8 +345,6 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.recompute_granularity = self.config.recompute_granularity
         self.pp_recompute_interval = self.config.pp_recompute_interval
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
-        if self.recompute_granularity == "full":
-            assert len(self.no_recompute_layers) == 0, "for pp with full recompute, no_recompute_layers is not support"
 
         virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
 

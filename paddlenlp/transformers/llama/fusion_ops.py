@@ -64,18 +64,32 @@ def fusion_rope(
     rotary_emb,
     context_parallel_degree=-1,
 ):
-    if get_env_device() != "gcu":
+    if get_env_device() not in ["gcu", "intel_hpu"]:
         assert past_key_value is None, "fuse rotary not support cache kv for now"
     batch_size, seq_length, num_heads, head_dim = query_states.shape
     _, kv_seq_len, num_key_value_heads, _ = key_states.shape
     if context_parallel_degree > 1:
         assert get_env_device() == "gpu", "context parallel only support cuda device for now"
         kv_seq_len *= context_parallel_degree
-    if get_env_device() != "gcu":
+    if get_env_device() not in ["gcu", "intel_hpu"]:
         cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
     if get_env_device() == "npu":
         query_states = core.eager._run_custom_op("fused_rope", query_states, cos, sin)[0]
         key_states = core.eager._run_custom_op("fused_rope", key_states, cos, sin)[0]
+    elif get_env_device() == "intel_hpu":
+        if past_key_value is not None:
+            kv_seq_len += past_key_value[0].shape[-3]
+        cos, sin = rotary_emb(value_states, seq_len=kv_seq_len)
+        cos = cos.squeeze().unsqueeze(0).unsqueeze(0)
+        sin = sin.squeeze().unsqueeze(0).unsqueeze(0)
+        query_states, _, _ = paddle.incubate.nn.functional.fused_rotary_position_embedding(
+            paddle.transpose(query_states, [0, 2, 1, 3]), None, None, sin=sin, cos=cos, position_ids=position_ids
+        )
+        key_states, _, _ = paddle.incubate.nn.functional.fused_rotary_position_embedding(
+            paddle.transpose(key_states, [0, 2, 1, 3]), None, None, sin=sin, cos=cos, position_ids=position_ids
+        )
+        query_states = paddle.transpose(query_states, [0, 2, 1, 3])
+        key_states = paddle.transpose(key_states, [0, 2, 1, 3])
     elif get_env_device() == "gcu":
         cos_sin = rotary_emb.get_fused_cos_sin(value_states, seq_len=kv_seq_len)
         query_states, key_states = core.eager._run_custom_op(
@@ -132,6 +146,10 @@ def fusion_rms_norm(hidden_states, weight, variance_epsilon, use_fast_ln=False):
         return core.eager._run_custom_op("rms_norm_mlu", hidden_states, weight, variance_epsilon)[0]
     elif get_env_device() == "gcu":
         return core.eager._run_custom_op("rms_norm_gcu", hidden_states, weight, variance_epsilon)[0]
+    elif get_env_device() == "intel_hpu":
+        return paddle.incubate.nn.functional.fused_rms_norm(
+            hidden_states, weight, None, variance_epsilon, hidden_states.dim() - 1
+        )[0]
     elif get_env_device() == "xpu":
         try:
             import paddle_xpu_nn  # noqa: F821
@@ -205,6 +223,24 @@ def fusion_flash_attention(
                 attention_mask is None,
                 True,
             )[0]
+        elif get_env_device() == "intel_hpu":
+            if config.context_parallel_degree > 1:
+                raise ValueError("Context parallel is not implemented for intel_hpu")
+            scaling_factor = query_states.shape[3] ** -0.5
+            attention_mask = attention_mask.astype(query_states.dtype)
+            attn_output = paddle.incubate.nn.functional.fused_dot_product_attention(
+                query_states,
+                key_states,
+                value_states,
+                attention_mask,
+                scaling_factor,
+                0.0,
+                False,
+                attention_mask is None,
+                None,
+                False,
+            )
+            attn_output = paddle.transpose(attn_output, [0, 2, 1, 3])
         else:
             if config.context_parallel_degree > 1:
                 attn_output = RingFlashAttention.apply(

@@ -1,34 +1,32 @@
-# 标题
+# No.103：新增 tie_weights 能力
 
-标题如：paddle.io.dataset 设计文档
-
-|API名称 | 新增API名称                                            |
-|---|----------------------------------------------------|
-|提交作者<input type="checkbox" class="rowselector hidden"> | 丘文波, 刘旺旺                                           |
-|提交时间<input type="checkbox" class="rowselector hidden"> | 2022-03-10                                         |
-|版本号 | V3                                                 |
-|依赖飞桨版本<input type="checkbox" class="rowselector hidden"> | 如无特殊情况，都应基于develop版本开发                             |
-|文件名 | 20230304_api_design_for_tie_weight_task_103.md<br> |
+| API 名称      | 新增 API 名称                                        |
+|--------------|----------------------------------------------------|
+| 提交作者     | 丘文波, 刘旺旺                                     |
+| 提交时间     | 2022-03-10                                         |
+| 版本号       | V3                                                 |
+| 依赖飞桨版本 | 如无特殊情况，都应基于 develop 版本开发              |
+| 文件名       | 20230304_api_design_for_tie_weight_task_103.md<br> |
 
 
 # 一、概述
 ## 1、相关背景
-对应任务是 No.103：新增tie_weights能力 
+对应任务是 No.103：新增 tie_weights 能力
 
-权重绑定, 一般是指将输入层embedding和 输出层embeding共享权重, 从而在减少网络的参数量, 使得embeding层参数训练更加充分.
+权重绑定, 一般是指将输入层 embedding 和 输出层 embeding 共享权重, 从而在减少网络的参数量, 使得 embeding 层参数训练更加充分.
 
-其中《attention is all you need》中的提到的transformer模型也使用到了tie weigh这个技巧, 论文3.4节提到将encoder输入embedding与decoder输入embedding以及输出线性层权重共享 这个技巧的有效性在论文《Using the output embedding to improve language models》进行了验证 .
+其中《attention is all you need》中的提到的 transformer 模型也使用到了 tie weigh 这个技巧, 论文3.4节提到将 encoder 输入 embedding 与 decoder 输入 embedding 以及输出线性层权重共享 这个技巧的有效性在论文《Using the output embedding to improve language models》进行了验证 .
 
-所以预训练语言模型需要实现一个输入层embedding和 输出层embeding共享权重共享功能,方便使用者进行调用.
+所以预训练语言模型需要实现一个输入层 embedding 和 输出层 embeding 共享权重共享功能,方便使用者进行调用.
 
-相关issue:
+相关 issue:
 * [https://github.com/PaddlePaddle/PaddleNLP/issues/4740](https://github.com/PaddlePaddle/PaddleNLP/issues/4740)
 
 
 ## 2、功能目标
-给预训练语言模型增加一个基础函数, 实现输入层embeding和输出层embedding的权重共享绑定:
+给预训练语言模型增加一个基础函数, 实现输入层 embeding 和输出层 embedding 的权重共享绑定:
 
-- 为PaddleNLP新增tie_weights功能，能够对齐HuggingFace Transformers中的[tie_weights](https://huggingface.co/docs/transformers/main_classes/model#transformers.PreTrainedModel.tie_weights)功能
+- 为 PaddleNLP 新增 tie_weights 功能，能够对齐 HuggingFace Transformers 中的[tie_weights](https://huggingface.co/docs/transformers/main_classes/model#transformers.PreTrainedModel.tie_weights)功能
 - 参考: [https://github.com/huggingface/transformers/blob/v4.26.1/src/transformers/modeling_utils.py#L1172](https://github.com/huggingface/transformers/blob/v4.26.1/src/transformers/modeling_utils.py#L1172)
 
 
@@ -39,11 +37,11 @@
 
 
 # 二、飞桨现状
-对飞桨框架目前支持此功能的现状调研，如果不支持此功能，如是否可以有替代实现的API，是否有其他可绕过的方式，或者用其他API组合实现的方式；
+对飞桨框架目前支持此功能的现状调研，如果不支持此功能，如是否可以有替代实现的 API，是否有其他可绕过的方式，或者用其他 API 组合实现的方式；
 
-paddle 中并没有对tie weight的统一实现,调用者需自己写代码实现这部分功能.
+paddle 中并没有对 tie weight 的统一实现,调用者需自己写代码实现这部分功能.
 
-paddleNLP中的一些示例代码中也找到了一个tie weight的实现.
+paddleNLP 中的一些示例代码中也找到了一个 tie weight 的实现.
 
 (1) [代码链接1](https://github.com/qiuwenbogdut/PaddleNLP/blob/develop/examples/language_model/transformer-xl/mem_transformer.py#L811)
 
@@ -112,22 +110,22 @@ class ErnieLMPredictionHead(nn.Layer):
 ```
 
 
-其实paddlenlp内大部分的tie_weights实现是直接在模型layer定义层面实现的，见[代码](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/transformers/ernie/modeling.py#L748)
-，而不是类似transformers一样在模型以外统一实现的。这个项目的目标就是看一下能否在模型外统一实现，而不用每个模型都自己实现一次
+其实 paddlenlp 内大部分的 tie_weights 实现是直接在模型 layer 定义层面实现的，见[代码](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/transformers/ernie/modeling.py#L748)
+，而不是类似 transformers 一样在模型以外统一实现的。这个项目的目标就是看一下能否在模型外统一实现，而不用每个模型都自己实现一次
 
-paddle里面tie_weghts实现主要有两种方式:
-* 一种在modeling.py中定义了tie_weghts函数，相应的模型也实现了get_input_embeding()和get_output_embeding()来获取输入和输出embeding层权重,然后通过赋值方式进行绑定。如上面的代码链接(1)(2) 
-* 另外一种是 在定义模型层的时候 直接将输入input_embeding的weight，赋值给输出层weight. 将embedding的weight直接传给head来构建linear输出层，期望是在get_input_embeding()拿到weight，然后传给head层，如上面代码链接(3) 
+paddle 里面 tie_weghts 实现主要有两种方式:
+* 一种在 modeling.py 中定义了 tie_weghts 函数，相应的模型也实现了 get_input_embeding()和 get_output_embeding()来获取输入和输出 embeding 层权重,然后通过赋值方式进行绑定。如上面的代码链接(1)(2)
+* 另外一种是 在定义模型层的时候 直接将输入 input_embeding 的 weight，赋值给输出层 weight. 将 embedding 的 weight 直接传给 head 来构建 linear 输出层，期望是在 get_input_embeding()拿到 weight，然后传给 head 层，如上面代码链接(3)
 
 
 
-最好是在模型[基类里面model_utils.py#L897](https://github.com/PaddlePaddle/PaddleNLP/blob/be80a3e30fb681e53773c265babe611d4df62ead/paddlenlp/transformers/model_utils.py#L897)
+最好是在模型[基类里面 model_utils.py#L897](https://github.com/PaddlePaddle/PaddleNLP/blob/be80a3e30fb681e53773c265babe611d4df62ead/paddlenlp/transformers/model_utils.py#L897)
 去统一实现 tie_weights,减少调用者的开发.
 
 # 三、业内方案调研
-描述业内深度学习框架如何实现此功能，包括与此功能相关的现状、未来趋势；调研的范围包括不限于TensorFlow、PyTorch、NumPy等
+描述业内深度学习框架如何实现此功能，包括与此功能相关的现状、未来趋势；调研的范围包括不限于 TensorFlow、PyTorch、NumPy 等
 
-(1)目前huggingface的transformers库中实现了这个tieweight 这个基础函数. [代码链接](https://github.com/huggingface/transformers/blob/v4.26.1/src/transformers/modeling_utils.py#L1172)
+(1)目前 huggingface 的 transformers 库中实现了这个 tieweight 这个基础函数. [代码链接](https://github.com/huggingface/transformers/blob/v4.26.1/src/transformers/modeling_utils.py#L1172)
 ```python
 def tie_weights(self):
         """
@@ -151,7 +149,7 @@ def tie_weights(self):
 ```
 
 
-(2) tensor2tensor库 tieweight 实现代码 [代码链接](https://github.com/tensorflow/tensor2tensor/blob/316c9ce2f2b2373f44f5be0da712dda3e5861a75/tensor2tensor/layers/modalities.py#L1106)
+(2) tensor2tensor 库 tieweight 实现代码 [代码链接](https://github.com/tensorflow/tensor2tensor/blob/316c9ce2f2b2373f44f5be0da712dda3e5861a75/tensor2tensor/layers/modalities.py#L1106)
 ```python
 def symbol_top(body_output, targets, model_hparams, vocab_size):
   del targets  # unused arg
@@ -177,7 +175,7 @@ def symbol_top(body_output, targets, model_hparams, vocab_size):
 ```
 
 
-(3) fairseq库 中 tie weight实现函数 [代码链接](https://github.com/facebookresearch/fairseq/blob/main/fairseq/models/fconv.py#L480)
+(3) fairseq 库 中 tie weight 实现函数 [代码链接](https://github.com/facebookresearch/fairseq/blob/main/fairseq/models/fconv.py#L480)
 ```python
 self.fc2 = Linear(in_channels, out_embed_dim)
             if share_embed:
@@ -192,33 +190,33 @@ self.fc2 = Linear(in_channels, out_embed_dim)
 ```
 
 # 四、对比分析
-paddle和 huggingface的transformers 都是基于动态图进行开发, 所以准备参照huggingface的transformers  的 tie weight 函数思路去实现功能.
+paddle 和 huggingface 的 transformers 都是基于动态图进行开发, 所以准备参照 huggingface 的 transformers  的 tie weight 函数思路去实现功能.
 
 # 五、设计思路与实现方案
-参考huggingface的 transformers中的实现思路来基于paddle进行开发
+参考 huggingface 的 transformers 中的实现思路来基于 paddle 进行开发
 
-实现tie_weight函数步骤:
-1. 获取模型input embedding  权重对象 A
+实现 tie_weight 函数步骤:
+1. 获取模型 input embedding  权重对象 A
 2. 获取模型 output embedding 权重对象 B
-3. 让A和B 都指向同一个权重值
+3. 让 A 和 B 都指向同一个权重值
 
 
 
 
 ## 命名与参数设计
-参考：[飞桨API 设计及命名规范](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/dev_guides/api_contributing_guides/api_design_guidelines_standard_cn.html)
-## 底层OP设计
-## API实现方案
+参考：[飞桨 API 设计及命名规范](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/dev_guides/api_contributing_guides/api_design_guidelines_standard_cn.html)
+## 底层 OP 设计
+## API 实现方案
 
 # 六、测试和验收的考量
-参考：[新增API 测试及验收规范](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/dev_guides/api_contributing_guides/api_accpetance_criteria_cn.html)
+参考：[新增 API 测试及验收规范](https://www.paddlepaddle.org.cn/documentation/docs/zh/develop/dev_guides/api_contributing_guides/api_accpetance_criteria_cn.html)
 
-测试tie_weight有两个办法:
-* 直接判断输出层weight和输入层weight的id，如果一致即通过，否则Failed.
-* 训练几个step，经过几个反向后，看下输出层weight和输入层weight是否一致，如果一致即通过，否则Failed.
+测试 tie_weight 有两个办法:
+* 直接判断输出层 weight 和输入层 weight 的 id，如果一致即通过，否则 Failed.
+* 训练几个 step，经过几个反向后，看下输出层 weight 和输入层 weight 是否一致，如果一致即通过，否则 Failed.
 
-用过id的一致性判断是否绑定成功, 简单高效,后面准备采用这种方式进行单侧:
-构建单元测试, 测试模型的get_input_embeding得到的权重的id 和get_output_embeding 得到的权重id 是都一致, 如果是一致就通过,都则不通过
+用过 id 的一致性判断是否绑定成功, 简单高效,后面准备采用这种方式进行单侧:
+构建单元测试, 测试模型的 get_input_embeding 得到的权重的 id 和 get_output_embeding 得到的权重 id 是都一致, 如果是一致就通过,都则不通过
 
 
 
@@ -257,7 +255,7 @@ print("BB.weight:",BB.weight)
 
 ```
 
-时间和开发排期规划，主要milestone
+时间和开发排期规划，主要 milestone
 - 3.10 跟官方确认好开发思路
 - 3.17 提交实现代码
 

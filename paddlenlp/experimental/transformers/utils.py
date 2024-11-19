@@ -103,7 +103,7 @@ class EmptyWeightScale:
         self,
         key_map_dict,
         num_of_layers,
-        num_head,
+        num_heads,
         dim_head,
         ffn_hidden_size,
         num_key_value_heads=-1,
@@ -114,9 +114,8 @@ class EmptyWeightScale:
         self.key_map = key_map_dict
         self.scale = {}
 
-        num_key_value_heads = num_key_value_heads
         qkv_out_size = (
-            3 * num_head * dim_head if num_key_value_heads <= 0 else (num_head + 2 * num_key_value_heads) * dim_head
+            3 * num_heads * dim_head if num_key_value_heads <= 0 else (num_heads + 2 * num_key_value_heads) * dim_head
         )
 
         for scale_type, key_template in self.key_map.items():
@@ -125,7 +124,7 @@ class EmptyWeightScale:
             elif "ffn1" in scale_type:
                 n = ffn_hidden_size * 2 // mp_size
             else:
-                n = num_head * dim_head
+                n = num_heads * dim_head
             self.scale[scale_type] = np.full([num_of_layers, n], fill_value=0.1, dtype="float32")
 
         # concat qkv and ffn1

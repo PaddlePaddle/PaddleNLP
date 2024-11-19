@@ -125,14 +125,41 @@ class QWenTokenizer(PretrainedTokenizer):
                 ids.append(self.mergeable_ranks.get(token))
         return ids
 
+    def _update_tiktoken(self, tokens: List[str], special_tokens: bool = False) -> int:
+        if special_tokens:
+            added_tokens = []
+            for token in tokens:
+                if token in self.special_tokens:
+                    continue
+
+                token_id = len(self.mergeable_ranks) + len(self.special_tokens)
+                self.special_tokens[token] = token_id
+                self.decoder[token_id] = token
+
+                added_tokens.append(token)
+
+            import tiktoken
+
+            self.tokenizer = tiktoken.Encoding(
+                "Qwen",
+                pat_str=PAT_STR,
+                mergeable_ranks=self.mergeable_ranks,
+                special_tokens=self.special_tokens,
+            )
+
+            return len(added_tokens)
+        else:
+            raise ValueError("Adding regular tokens is not supported")
+
     def _add_tokens(self, new_tokens: Union[List[str], List[AddedToken]], special_tokens: bool = False) -> int:
         if not special_tokens and new_tokens:
             raise ValueError("Adding regular tokens is not supported")
+        new_tokens_str = []
         for token in new_tokens:
             surface_form = token.content if isinstance(token, AddedToken) else token
-            if surface_form not in SPECIAL_TOKENS:
-                raise ValueError("Adding unknown special tokens is not supported")
-        return 0
+            new_tokens_str.append(surface_form)
+
+        return self._update_tiktoken(new_tokens_str, special_tokens)
 
     def save_vocabulary(self, save_directory: str, **kwargs) -> Tuple[str]:
         """

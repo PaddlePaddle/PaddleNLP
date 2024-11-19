@@ -13,6 +13,7 @@
 # limitations under the License.
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
 import copy
 import gc
@@ -319,6 +320,65 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
     return last_dtype
 
 
+def _split_keys_evenly(keys: list, n: int) -> list:
+    """Split a list into n lists with an equal number of elements.
+
+    Args:
+        keys (list): the list to be split
+        n (int): number of splits
+
+    Returns:
+        result: list of lists
+    """
+
+    total_len = len(keys)
+    base_size = total_len // n
+    extra = total_len % n
+
+    result = []
+    index = 0
+    for _ in range(n):
+        part_size = base_size + 1 if extra > 0 else base_size
+        extra -= 1
+        result.append(keys[index : index + part_size])
+        index += part_size
+
+    return result
+
+
+def _load_part_state_dict(
+    keys, checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping, fliter_dict_keys, device
+):
+    """load part state dict from checkpoint file.
+
+    Args:
+        keys (list): the keys of part state dict
+        checkpoint_file (str): the path of checkpoint file
+        tensor_parallel_split_mapping (dict): mapping from key to function
+        fliter_dict_keys (list): filter keys in state dict
+
+    Returns:
+        part_state_dict (dict): the part state dict
+
+    """
+    part_state_dict = {}
+    with safe_open(checkpoint_file, framework="np") as f:
+        for key in keys:
+            if fliter_dict_keys is not None and key not in fliter_dict_keys:
+                continue
+            py_safe_slice_ = f.get_slice(key)
+            if key in tensor_parallel_split_mapping:
+                weight = tensor_parallel_split_mapping[key](py_safe_slice_)
+            else:
+                weight = py_safe_slice_[:]
+            if device == "expected":
+                with device_guard():
+                    weight = paddle.Tensor(weight, zero_copy=True)
+                weight = weight._copy_to(paddle.framework._current_expected_place(), False)
+            part_state_dict[key] = weight
+    return part_state_dict
+
+
 def load_state_dict(
     checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None, device="cpu"
 ):
@@ -343,21 +403,36 @@ def load_state_dict(
         if metadata.get("format", "np") == "pd":
             raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
         if metadata.get("format", "np") == "np":
+            thread_num = int(os.environ.get("LOAD_STATE_DICT_THREAD_NUM", "1"))
             state_dict = {}
-            with safe_open(checkpoint_file, framework="np") as f:
-                for key in f.keys():
-                    if fliter_dict_keys is not None and key not in fliter_dict_keys:
-                        continue
-                    py_safe_slice_ = f.get_slice(key)
-                    if key in tensor_parallel_split_mapping:
-                        weight = tensor_parallel_split_mapping[key](py_safe_slice_)
-                    else:
-                        weight = py_safe_slice_[:]
-                    if device == "expected":
-                        with device_guard():
-                            weight = paddle.Tensor(weight, zero_copy=True)
-                        weight = weight._copy_to(paddle.framework._current_expected_place(), False)
-                    state_dict[key] = weight
+            if thread_num <= 1:
+                with safe_open(checkpoint_file, framework="np") as f:
+                    state_dict = _load_part_state_dict(
+                        list(f.keys()),
+                        checkpoint_file,
+                        tensor_parallel_split_mapping,
+                        fliter_dict_keys,
+                        device,
+                    )
+            else:
+                # Load state dict in multi-thread to speed up loading
+                with safe_open(checkpoint_file, framework="np") as f:
+                    keys_groups = _split_keys_evenly(list(f.keys()), thread_num)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=thread_num) as executor:
+                    future_to_key = {
+                        executor.submit(
+                            _load_part_state_dict,
+                            keys,
+                            checkpoint_file,
+                            tensor_parallel_split_mapping,
+                            fliter_dict_keys,
+                            device,
+                        ): keys
+                        for keys in keys_groups
+                    }
+                    for future in concurrent.futures.as_completed(future_to_key):
+                        result = future.result()
+                        state_dict.update(result)
 
             if device == "cpu":
                 for k in list(state_dict.keys()):
@@ -1032,6 +1107,66 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 Override the default `paddle.dtype` and load the model under this dtype.
         """
         return cls._from_config(config, **kwargs)
+
+    @classmethod
+    def set_inference_config(cls, config, predictor_args, **kwargs):
+        """
+        All inference config can set here.
+        Args:
+            config : PretrainedConfig
+                The config of the model.
+            predictor_args : PredictorArgument
+                The args of the predictor.
+        """
+        tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
+        tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
+
+        if predictor_args.mode == "dynamic":
+            config.tensor_parallel_degree = tensor_parallel_degree
+            config.tensor_parallel_rank = tensor_parallel_rank
+            config.model_name_or_path = predictor_args.model_name_or_path
+            config.quant_type = predictor_args.quant_type
+            config.cachekv_int8_type = predictor_args.cachekv_int8_type
+            config.use_fake_parameter = predictor_args.use_fake_parameter
+            config.single_card_ptq = not predictor_args.use_fake_parameter
+        config.append_attn = predictor_args.append_attn
+
+        if config.quantization_config.quant_type is not None:
+            if predictor_args.mode == "dynamic":
+                predictor_args.quant_type = config.quantization_config.quant_type
+                config.quant_type = config.quantization_config.quant_type
+            if "c8" in config.quant_type:
+                predictor_args.cachekv_int8_type = "static"
+                if predictor_args.mode == "dynamic":
+                    config.cachekv_int8_type = "static"
+
+            if predictor_args.mode == "dynamic":
+                ptq_multicards_num = 0
+                if os.path.exists(config.model_name_or_path):
+                    prefix = "act_scales_"
+                    for filename in os.listdir(config.model_name_or_path):
+                        if filename.startswith(prefix):
+                            ptq_multicards_num += 1
+
+                logger.info(f"PTQ from {ptq_multicards_num} cards, so we will not split")
+                if ptq_multicards_num > 1:
+                    config.single_card_ptq = False
+
+        if predictor_args.block_attn:
+            config.block_size = predictor_args.block_size
+            config.max_seq_len = predictor_args.total_max_length
+
+    @classmethod
+    def confirm_inference_model(cls, predictor_args, **kwargs):
+        """
+        Confirm the inference model whether it need to change the AVX inference Model
+        Args:
+            model : PretrainedModel
+                The model for inference.
+            predictor_args : PredictorArgument
+                The args of the predictor.
+        """
+        return cls
 
     @property
     def base_model(self):
@@ -1811,7 +1946,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             for name, param in model.named_parameters():
                 if any(module_to_keep_in_fp32 in name for module_to_keep_in_fp32 in keep_in_fp32_modules):
                     if param.dtype != paddle.float32:
-                        param = param.to(dtype=paddle.float32)
+                        param_fp32 = param.cast(dtype=paddle.float32)
+                        param_fp32_tensor = param_fp32.value().get_tensor()
+                        param_tensor = param.value().get_tensor()
+                        param_tensor._share_data_with(param_fp32_tensor)
 
         # Make sure we are able to load base models as well as derived models (with heads)
         start_prefix = ""
@@ -1963,7 +2101,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
                 if config.quantization_config.is_weight_quantize():
                     filter_dict_keys = None
-
                 state_dict = load_state_dict(
                     shard_file, tp_actions if pre_tensor_parallel_split else None, filter_dict_keys
                 )
@@ -2279,7 +2416,6 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             else:
                 raise ValueError(f"Unexpected file: {resolved_archive_file} for weight conversion.")
             # load pt weights early so that we know which dtype to init the model under
-
         if not is_sharded and state_dict is None:
             # 4. loading non-sharded ckpt from the state dict
             if config.tensor_parallel_degree > 1 and resolved_archive_file.endswith("model_state.pdparams"):
