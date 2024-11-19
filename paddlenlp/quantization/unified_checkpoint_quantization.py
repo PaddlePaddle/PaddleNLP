@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import paddle
-import paddle.distributed as dist
 from paddle.distributed import fleet
 
 from paddlenlp.quantization.checkpoint_quantization_utils import (
