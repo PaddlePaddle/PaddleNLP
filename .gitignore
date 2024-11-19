@@ -129,3 +129,6 @@ FETCH_HEAD
 csrc/third_party/
 dataset/
 output/
+
+# gen codes
+autogen/

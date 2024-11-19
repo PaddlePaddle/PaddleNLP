@@ -48,11 +48,11 @@
 ### <a href=#高效易用的预训练> 🚀 高效易用的预训练 </a>
 
 支持纯数据并行策略、分组参数切片的数据并行策略、张量模型并行策略和流水线模型并行策略的4D 高性能训练，Trainer 支持分布式策略配置化，降低复杂分布式组合带来的使用成本；
-Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩缩容训练，降低硬件切换带来的迁移成本。
+[Unified Checkpoint 大模型存储格式](./llm/docs/unified_checkpoint.md)在模型参数分布上支持动态扩缩容训练，降低硬件切换带来的迁移成本。
 
 ### <a href=#高效精调> 🤗 高效精调 </a>
 
-精调算法深度结合零填充数据流和 FlashMask 高性能算子，降低训练无效数据填充和计算，大幅提升精调训练吞吐。
+精调算法深度结合零填充数据流和 [FlashMask](./llm/docs/flashmask.md) 高性能算子，降低训练无效数据填充和计算，大幅提升精调训练吞吐。
 
 ### <a href=#无损压缩和高性能推理> 🎛️ 无损压缩和高性能推理 </a>
 
@@ -70,6 +70,7 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 |    [LLama2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/llama)     | meta-llama/Llama-2-7b, meta-llama/Llama-2-7b-chat, meta-llama/Llama-2-13b, meta-llama/Llama-2-13b-chat, meta-llama/Llama-2-70b, meta-llama/Llama-2-70b-chat                                                                                                                                                                                                                                   |
 |    [LLama3](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/llama)     | meta-llama/Meta-Llama-3-8B, meta-llama/Meta-Llama-3-8B-Instruct, meta-llama/Meta-Llama-3-70B, meta-llama/Meta-Llama-3-70B-Instruct                                                                                                                                                                                                                                                            |
 |   [LLama3.1](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/llama)    | meta-llama/Meta-Llama-3.1-8B, meta-llama/Meta-Llama-3.1-8B-Instruct, meta-llama/Meta-Llama-3.1-70B, meta-llama/Meta-Llama-3.1-70B-Instruct, meta-llama/Meta-Llama-3.1-405B, meta-llama/Meta-Llama-3.1-405B-Instruct, meta-llama/Llama-Guard-3-8B                                                                                                                                              |
+|   [LLama3.2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/llama)    | meta-llama/Llama-3.2-1B, meta-llama/Llama-3.2-1B-Instruct, meta-llama/Llama-3.2-3B, meta-llama/Llama-3.2-3B-Instruct, meta-llama/Llama-Guard-3-1B                                                                                                                                                                                                                                             |
 |  [Baichuan](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/baichuan)  | baichuan-inc/Baichuan-7B, baichuan-inc/Baichuan-13B-Base, baichuan-inc/Baichuan-13B-Chat                                                                                                                                                                                                                                                                                                      |
 | [Baichuan2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/baichuan)  | baichuan-inc/Baichuan2-7B-Base, baichuan-inc/Baichuan2-7B-Chat, baichuan-inc/Baichuan2-13B-Base, baichuan-inc/Baichuan2-13B-Chat                                                                                                                                                                                                                                                              |
 |     [Bloom](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/bloom)     | bigscience/bloom-560m, bigscience/bloom-560m-bf16, bigscience/bloom-1b1, bigscience/bloom-3b, bigscience/bloom-7b1, bigscience/bloomz-560m, bigscience/bloomz-1b1, bigscience/bloomz-3b, bigscience/bloomz-7b1-mt, bigscience/bloomz-7b1-p3, bigscience/bloomz-7b1, bellegroup/belle-7b-2m                                                                                                    |
@@ -85,7 +86,7 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 |     [Qwen2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/)     | Qwen/Qwen2-0.5B, Qwen/Qwen2-0.5B-Instruct, Qwen/Qwen2-1.5B, Qwen/Qwen2-1.5B-Instruct, Qwen/Qwen2-7B, Qwen/Qwen2-7B-Instruct, Qwen/Qwen2-72B, Qwen/Qwen2-72B-Instruct, Qwen/Qwen2-57B-A14B, Qwen/Qwen2-57B-A14B-Instruct                                                                                                                                                                       |
 |  [Qwen2-Math](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/)   | Qwen/Qwen2-Math-1.5B, Qwen/Qwen2-Math-1.5B-Instruct, Qwen/Qwen2-Math-7B, Qwen/Qwen2-Math-7B-Instruct, Qwen/Qwen2-Math-72B, Qwen/Qwen2-Math-72B-Instruct, Qwen/Qwen2-Math-RM-72B                                                                                                                                                                                                               |
 |    [Qwen2.5](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/)    | Qwen/Qwen2.5-0.5B, Qwen/Qwen2.5-0.5B-Instruct, Qwen/Qwen2.5-1.5B, Qwen/Qwen2.5-1.5B-Instruct, Qwen/Qwen2.5-3B, Qwen/Qwen2.5-3B-Instruct, Qwen/Qwen2.5-7B, Qwen/Qwen2.5-7B-Instruct, Qwen/Qwen2.5-14B, Qwen/Qwen2.5-14B-Instruct, Qwen/Qwen2.5-32B, Qwen/Qwen2.5-32B-Instruct, Qwen/Qwen2.5-72B, Qwen/Qwen2.5-72B-Instruct                                                                     |
-| [Qwen2.5-Math](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/)  | Qwen/Qwen2.5-Math-1.5B, Qwen/Qwen2.5-Math-1.5B-Instruct, Qwen/Qwen2.5-Math-7B, Qwen/Qwen2.5-Math-7B-Instruct, Qwen/Qwen2.5-Math-72B, Qwen/Qwen2.5-Math-72B-Instruct, Qwen/Qwen2.5-Math-RM-72B                                                                                                                                                                                                                                |
+| [Qwen2.5-Math](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/)  | Qwen/Qwen2.5-Math-1.5B, Qwen/Qwen2.5-Math-1.5B-Instruct, Qwen/Qwen2.5-Math-7B, Qwen/Qwen2.5-Math-7B-Instruct, Qwen/Qwen2.5-Math-72B, Qwen/Qwen2.5-Math-72B-Instruct, Qwen/Qwen2.5-Math-RM-72B                                                                                                                                                                                                 |
 | [Qwen2.5-Coder](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/qwen/) | Qwen/Qwen2.5-Coder-1.5B, Qwen/Qwen2.5-Coder-1.5B-Instruct, Qwen/Qwen2.5-Coder-7B, Qwen/Qwen2.5-Coder-7B-Instruct                                                                                                                                                                                                                                                                              |
 |     [Yuan2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/llm/config/yuan/)     | IEITYuan/Yuan2-2B, IEITYuan/Yuan2-51B, IEITYuan/Yuan2-102B                                                                                                                                                                                                                                                                                                                                    |
 
@@ -96,9 +97,6 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 |:---------------------:|:--------:|:------------:|:--------:|:------------:|:------:|:------:|:----------:|
 |                       |          |   基础能力   | 序列并行 |    stage1    | stage2 | stage3 |            |
 |         Llama         |    ✅     |      ✅       |    ✅     |      ✅       |   ✅    |   ✅    |     ✅      |
-|        Llama2         |    ✅     |      ✅       |    ✅     |      ✅       |   ✅    |   ✅    |     ✅      |
-|        Llama3         |    ✅     |      ✅       |    ✅     |      ✅       |   ✅    |   ✅    |     ✅      |
-|       Llama3.1        |    ✅     |      ✅       |    ✅     |      ✅       |   ✅    |   ✅    |     ✅      |
 |         Qwen          |    ✅     |      ✅       |    ✅     |      ✅       |   ✅    |   ✅    |     ✅      |
 |        Qwen1.5        |    ✅     |      ✅       |    ✅     |      ✅       |   ✅    |   ✅    |     ✅      |
 |         Qwen2         |    ✅     |      ✅       |    ✅     |      ✅       |   ✅    |   ✅    |     ✅      |
@@ -117,20 +115,20 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 
 * 大模型预训练、精调（包含 SFT、PEFT 技术）、对齐、量化已支持 LLaMA 系列、Baichuan 系列、Bloom 系列、ChatGLM 系列、Mistral 系列、OPT 系列和 Qwen 系列，【LLM】模型预训练、精调、对齐、量化支持列表如下：
 
-| 模型名称/能力支持  | Pretrain | SFT | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Torch convert |
-|:------------------:|:--------:|:---:|:----:|:-------------:|:---:|:----:|:------------:|:-------------:|
-|       LLaMA        |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  ✅   |      ✅       |       ✅       |
-|        Qwen        |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      🚧      |       ✅       |
-|      Mixtral       |    ✅     |  ✅  |  ✅   |       ❌       | 🚧  |  🚧  |      🚧      |      🚧       |
-|      Mistral       |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      🚧      |       ✅       |
-| Baichuan/Baichuan2 |    ✅     |  ✅  |  ✅   |       ✅       |  ✅  |  🚧  |      ✅       |       ✅       |
-|     ChatGLM-6B     |    ✅     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ❌       |
-| ChatGLM2/ChatGLM3  |    ✅     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅       |
-|       Bloom        |    ✅     |  ✅  |  ✅   |       ✅       | 🚧  |  🚧  |      ✅       |       ✅       |
-|       GPT-3        |    ✅     |  ✅  |  🚧  |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
-|        OPT         |    ✅     |  ✅  |  ✅   |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
-|       Yuan2        |    ✅     |  ✅  |  ✅   |      🚧       | 🚧  |  🚧  |      🚧      |       ✅       |
-------------------------------------------------------------------------------------------
+| Model                                      | Pretrain | SFT | LoRA | FlashMask | Prefix Tuning | DPO/SimPO/ORPO | RLHF | Quantization |
+|--------------------------------------------|:--------:|:---:|:----:|:---------:|:-------------:|:--------------:|:----:|:------------:|
+| [Llama](./llm/config/llama)                |    ✅     |  ✅  |  ✅   |     ✅     |       ✅       |       ✅        |  ✅   |      ✅       |
+| [Qwen](./llm/config/qwen)                  |    ✅     |  ✅  |  ✅   |     ✅     |       ✅       |       ✅        |  🚧  |      🚧      |
+| [Mixtral](./llm/config/mixtral)            |    ✅     |  ✅  |  ✅   |    🚧     |      🚧       |       ✅        |  🚧  |      🚧      |
+| [Mistral](./llm/config/mistral)            |    ✅     |  ✅  |  ✅   |    🚧     |       ✅       |       ✅        |  🚧  |      🚧      |
+| [Baichuan/Baichuan2](./llm/config/llama)   |    ✅     |  ✅  |  ✅   |     ✅     |       ✅       |       ✅        |  🚧  |      ✅       |
+| [ChatGLM-6B](./llm/config/chatglm)         |    ✅     |  ✅  |  ✅   |    🚧     |       ✅       |       🚧       |  🚧  |      ✅       |
+| [ChatGLM2/ChatGLM3](./llm/config/chatglm2) |    ✅     |  ✅  |  ✅   |    🚧     |       ✅       |       ✅        |  🚧  |      ✅       |
+| [Bloom](./llm/config/bloom)                |    ✅     |  ✅  |  ✅   |    🚧     |       ✅       |       🚧       |  🚧  |      ✅       |
+| [GPT-3](./llm/config/gpt-3)                |    ✅     |  ✅  |  🚧  |    🚧     |      🚧       |       🚧       |  🚧  |      🚧      |
+| [OPT](./llm/config/opt)                    |    ✅     |  ✅  |  ✅   |    🚧     |      🚧       |       🚧       |  🚧  |      🚧      |
+| [Gemma](./llm/config/gemma)                |    ✅     |  ✅  |  ✅   |    🚧     |      🚧       |       ✅        |  🚧  |      🚧      |
+| [Yuan](./llm/config/yuan)                  |    ✅     |  ✅  |  ✅   |    🚧     |      🚧       |       ✅        |  🚧  |      🚧      |
 
 * [大模型推理](./llm/docs/predict/inference.md)已支持 LLaMA 系列、Qwen 系列、Mistral 系列、ChatGLM 系列、Bloom 系列和 Baichuan 系列，支持 Weight Only INT8及 INT4推理，支持 WAC（权重、激活、Cache KV）进行 INT8、FP8量化的推理，【LLM】模型推理支持列表如下：
 
@@ -151,12 +149,12 @@ Unified Checkpoint 大模型存储格式在模型参数分布上支持动态扩�
 * python >= 3.8
 * paddlepaddle >= 3.0.0b0
 
-如果您尚未安装PaddlePaddle，请参考 [飞桨官网](https://www.paddlepaddle.org.cn/) 进行安装。
+如果您尚未安装 PaddlePaddle，请参考 [飞桨官网](https://www.paddlepaddle.org.cn/) 进行安装。
 
 ### pip 安装
 
 ```shell
-pip install --upgrade paddlenlp==3.0.0b1
+pip install --upgrade paddlenlp==3.0.0b2
 ```
 
 或者可通过以下命令安装最新 develop 分支代码：
@@ -210,8 +208,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py 
 
 更多 PaddleNLP 内容可参考：
 
-* [精选模型库](./legacy/model_zoo)，包含优质预训练模型的端到端全流程使用。
-* [多场景示例](./legacy/examples)，了解如何使用 PaddleNLP 解决 NLP 多种技术问题，包含基础技术、系统应用与拓展应用。
+* [精选模型库](./slm/model_zoo)，包含优质预训练模型的端到端全流程使用。
+* [多场景示例](./slm/examples)，了解如何使用 PaddleNLP 解决 NLP 多种技术问题，包含基础技术、系统应用与拓展应用。
 * [交互式教程](https://aistudio.baidu.com/aistudio/personalcenter/thirdview/574995)，在🆓免费算力平台 AI Studio 上快速学习 PaddleNLP。
 
 ------------------------------------------------------------------------------------------
@@ -221,7 +219,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py 
 * 微信扫描二维码并填写问卷，即可加入交流群与众多社区开发者以及官方团队深度交流.
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/11987277/245085922-0aa68d24-00ff-442e-9c53-2f1e898151ce.png" width="150" height="150" />
+    <img src="https://github.com/user-attachments/assets/3a58cc9f-69c7-4ccb-b6f5-73e966b8051a" width="150" height="150" />
 </div>
 
 ## Citation

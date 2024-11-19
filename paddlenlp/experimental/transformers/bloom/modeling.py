@@ -45,7 +45,7 @@ __all__ = [
     "BloomModelInferenceModel",
     "BloomForCausalLMInferenceModel",
     "BloomBlockInferenceModel",
-    "BlommForCausalBlockLMInferenceModel",
+    "BloomForCausalLMBlockInferenceModel",
 ]
 
 
@@ -293,6 +293,7 @@ class BloomModelInferenceModel(BloomPreTrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict, use_structured_name=True):
+        self.transformer_block.init_weight()
         for k, v in state_dict.items():
             if k.find("word_embeddings.weight") >= 0:
                 self.word_embeddings.weight.set_value(paddle.to_tensor(v))
@@ -652,7 +653,7 @@ class BloomBlockInferenceModel(BloomModelInferenceModel):
         )
 
 
-class BlommForCausalBlockLMInferenceModel(GenerationBlockInferenceModel, BloomPreTrainedModel):
+class BloomForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, BloomPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.bloom = BloomBlockInferenceModel(config)

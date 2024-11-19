@@ -22,7 +22,7 @@ import copy
 import json
 import os
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 import tokenizers.pre_tokenizers as pre_tokenizers_fast
 from tokenizers import Encoding as EncodingFast
@@ -35,7 +35,7 @@ from tokenizers.trainers import (
     WordPieceTrainer,
 )
 
-from ..utils.env import ADDED_TOKENS_NAME, FULL_TOKENIZER_NAME
+from ..utils.env import ADDED_TOKENS_NAME, FULL_TOKENIZER_NAME, TIKTOKEN_VOCAB_FILE
 from .convert_slow_tokenizer import convert_slow_tokenizer
 from .tokenizer_utils import ChatTemplateMixin, PretrainedTokenizer
 from .tokenizer_utils_base import (
@@ -60,7 +60,7 @@ MODEL_TO_TRAINER_MAPPING = {
     "WordPiece": WordPieceTrainer,
 }
 
-VOCAB_FILES_NAMES = {"tokenizer_file": FULL_TOKENIZER_NAME}
+VOCAB_FILES_NAMES = {"tokenizer_file": FULL_TOKENIZER_NAME, "vocab_file": TIKTOKEN_VOCAB_FILE}
 
 
 class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
@@ -97,13 +97,19 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         elif fast_tokenizer_file is not None and not from_slow:
             # We have a serialization from tokenizers which let us directly build the backend
             fast_tokenizer = TokenizerFast.from_file(fast_tokenizer_file)
-        elif slow_tokenizer is not None:
+        elif slow_tokenizer:
             # We need to convert a slow tokenizer to build the backend
             fast_tokenizer = convert_slow_tokenizer(slow_tokenizer)
-        elif self.slow_tokenizer_class is not None:
+        elif self.slow_tokenizer_class is not None and slow_tokenizer is not False:
             # We need to create and convert a slow tokenizer to build the backend
             slow_tokenizer = self.slow_tokenizer_class(*args, **kwargs)
             fast_tokenizer = convert_slow_tokenizer(slow_tokenizer)
+        elif not slow_tokenizer:
+            # We try to load with tiktoken
+            self.vocab_file = kwargs.get("vocab_file", None)
+            self.additional_special_tokens = kwargs.get("additional_special_tokens", [])
+            fast_tokenizer = convert_slow_tokenizer(self, from_tiktoken=True)
+            slow_tokenizer = None
         else:
             raise ValueError(
                 "Couldn't instantiate the backend tokenizer from one of: \n"
@@ -398,6 +404,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         max_length: int,
         stride: int,
         pad_to_multiple_of: Optional[int],
+        padding_side: Optional[Literal["right", "left"]],
     ):
         """
         Define the truncation and the padding strategies for fast tokenizers (provided by PaddleNLP's fast_tokenizer
@@ -419,6 +426,9 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             pad_to_multiple_of (`int`, *optional*):
                 If set will pad the sequence to a multiple of the provided value. This is especially useful to enable
                 the use of Tensor Cores on NVIDIA hardware with compute capability `>= 7.5` (Volta).
+            padding_side (`str`, *optional*):
+                The side on which the model should have padding applied. Should be selected between ['right', 'left'].
+                Default value is picked from the class attribute of the same name.
         """
         _truncation = self._tokenizer.truncation
         _padding = self._tokenizer.padding
@@ -453,7 +463,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             length = max_length if padding_strategy == PaddingStrategy.MAX_LENGTH else None
             target = {
                 "length": length,
-                "direction": self.padding_side,
+                "direction": padding_side if padding_side is not None else self.padding_side,
                 "pad_id": self.pad_token_id,
                 "pad_token": self.pad_token,
                 "pad_type_id": self.pad_token_type_id,
@@ -479,6 +489,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[bool] = None,
         return_tensors: Optional[str] = None,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
@@ -504,6 +515,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             max_length=max_length,
             stride=stride,
             pad_to_multiple_of=pad_to_multiple_of,
+            padding_side=padding_side,
         )
 
         if self._tokenizer.encode_special_tokens != split_special_tokens:
@@ -571,6 +583,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
         stride: int = 0,
         is_split_into_words: bool = False,
         pad_to_multiple_of: Optional[int] = None,
+        padding_side: Optional[Literal["right", "left"]] = None,
         return_position_ids: Optional[bool] = None,
         return_tensors: Optional[bool] = None,
         return_token_type_ids: Optional[bool] = None,
@@ -593,6 +606,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             max_length=max_length,
             stride=stride,
             pad_to_multiple_of=pad_to_multiple_of,
+            padding_side=padding_side,
             return_position_ids=return_position_ids,
             return_tensors=return_tensors,
             return_token_type_ids=return_token_type_ids,
@@ -618,7 +632,6 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
             )
 
         self._eventual_warn_about_too_long_sequence(batched_output["input_ids"], max_length, verbose)
-
         return batched_output
 
     def convert_tokens_to_string(self, tokens: List[str]) -> str:
@@ -737,7 +750,7 @@ class PretrainedTokenizerFast(ChatTemplateMixin, PretrainedTokenizerBase):
                 Additional keyword arguments passed along to the trainer from the 🤗 Tokenizers library.
 
         Returns:
-            [`PreTrainedTokenizerFast`]: A new tokenizer of the same type as the original one, trained on
+            [`PretrainedTokenizerFast`]: A new tokenizer of the same type as the original one, trained on
             `text_iterator`.
 
         """
