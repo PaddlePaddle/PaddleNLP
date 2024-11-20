@@ -1341,6 +1341,10 @@ class TrainingArguments:
                             strategy.hybrid_configs["sharding_configs"].comm_buffer_size_MB = int(
                                 self.sharding_comm_buffer_size_MB
                             )
+                            # The `comm_buffer_size_MB` is added directly to sharding properties
+                            # for semi-auto mode, avoiding potential confusion with strategy config,
+                            # as parameters in semi-auto mode are managed via strategy.
+                            strategy.sharding.comm_buffer_size_MB = int(self.sharding_comm_buffer_size_MB)
 
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
@@ -1348,6 +1352,10 @@ class TrainingArguments:
 
                         if "enable_release_grads" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].release_gradients = True
+                            # `release_gradients` is set directly in sharding properties for the same
+                            # reason as `comm_buffer_size_MB`, to avoid confusion with centralized
+                            # strategy management in semi-auto mode.
+                            strategy.sharding.release_gradients = True
 
                         if self.pipeline_parallel_degree == 1:
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (

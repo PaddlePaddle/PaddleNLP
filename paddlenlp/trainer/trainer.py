@@ -3284,6 +3284,14 @@ class Trainer:
             else:
                 labels = None
             inputs = inputs.pop("input_ids")
+        # consider no drop_last case
+        model_config_backup = model.micro_batch_size, model.accumulate_steps
+        if isinstance(inputs, tuple):
+            actual_batch_size = inputs[0].shape[0]
+        else:
+            actual_batch_size = inputs.shape[0]
+        model.micro_batch_size = 1
+        model.accumulate_steps = actual_batch_size
 
         with paddle.no_grad():
             if has_labels:
@@ -3293,6 +3301,7 @@ class Trainer:
                 loss = loss.mean().detach()
             else:
                 raise ValueError("pipeline mode eval need label!")
+        model.micro_batch_size, model.accumulate_steps = model_config_backup
 
         return (loss, None, labels)
 
