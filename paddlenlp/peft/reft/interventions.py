@@ -54,7 +54,8 @@ class LoreftIntervention(nn.Layer):
             kwargs["low_rank_dimension"],
             weight_attr=ParamAttr(initializer=nn.initializer.Orthogonal()),
         )
-        self.learned_source = self.learned_source.astype(kwargs["dtype"])
+        self.data_type = kwargs["dtype"]
+        self.learned_source = self.learned_source.astype(self.data_type)
         self.dropout = nn.Dropout(kwargs["dropout"] if "dropout" in kwargs else 0.0)
         self.act_fn = (
             ACT2FN["linear"] if "act_fn" not in kwargs or kwargs["act_fn"] is None else ACT2FN[kwargs["act_fn"]]
@@ -79,9 +80,9 @@ class LoreftIntervention(nn.Layer):
         return self.dropout(output.astype(base.dtype))
 
     def load_state_dict(self, state_dict, *args, **kwargs):
-        self.learned_source.weight.data = state_dict["learned_source.weight"]
-        self.learned_source.bias.data = state_dict["learned_source.bias"]
-        overload_w = state_dict["rotate_layer.weight"]
+        self.learned_source.weight.data = state_dict["learned_source.weight"].astype(self.data_type)
+        self.learned_source.bias.data = state_dict["learned_source.bias"].astype(self.data_type)
+        overload_w = state_dict["rotate_layer.weight"].astype(self.data_type)
         overload_w_width = overload_w.shape[-1]
         with paddle.no_grad():
             self.rotate_layer.weight[:, :overload_w_width] = paddle.to_tensor(overload_w)
