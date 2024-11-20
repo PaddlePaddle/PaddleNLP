@@ -404,6 +404,8 @@ def load_state_dict(
             raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
         if metadata.get("format", "np") == "np":
             thread_num = int(os.environ.get("LOAD_STATE_DICT_THREAD_NUM", "1"))
+            if thread_num > 1:
+                logger.info(f"Set loading state_dict thread num to {thread_num}")
             state_dict = {}
             if thread_num <= 1:
                 with safe_open(checkpoint_file, framework="np") as f:
