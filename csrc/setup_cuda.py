@@ -17,21 +17,14 @@ import subprocess
 
 import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
+import subprocess
 
-
-def clone_git_repo(version, repo_url, destination_path):
+def update_git_submodule():
     try:
-        subprocess.run(
-            ["git", "clone", "-b", version, "--single-branch", repo_url, destination_path, "--depth=1"], check=True
-        )
-        return True
+        subprocess.run(["git", "submodule", "update", "--init"], check=True)
     except subprocess.CalledProcessError as e:
-        print(f"Git clone {repo_url} operation failed with the following error: {e}")
-        print("Please check your network connection or access rights to the repository.")
-        print(
-            "If the problem persists, please refer to the README file for instructions on how to manually download and install the necessary components."
-        )
-        return False
+        print(f"Error occurred while updating git submodule: {str(e)}")
+        raise
 
 
 def find_end_files(directory, end_str):
@@ -114,23 +107,13 @@ sources = [
     "./gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
     "./gpu/append_attn/speculate_write_cache_with_rope_kernel.cu",
     "./gpu/sample_kernels/top_p_sampling_reject.cu",
+    "./gpu/update_inputs_v2.cu",
+    "./gpu/set_preids_token_penalty_multi_scores.cu",
 ]
 sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
 
-cutlass_dir = "third_party/cutlass"
 nvcc_compile_args = gencode_flags
-
-if not os.path.exists(cutlass_dir) or not os.listdir(cutlass_dir):
-    if not os.path.exists(cutlass_dir):
-        os.makedirs(cutlass_dir)
-    clone_git_repo("v3.5.0", "https://github.com/NVIDIA/cutlass.git", cutlass_dir)
-
-json_dir = "third_party/nlohmann_json"
-if not os.path.exists(json_dir) or not os.listdir(json_dir):
-    if not os.path.exists(json_dir):
-        os.makedirs(json_dir)
-    clone_git_repo("v3.11.3", "https://github.com/nlohmann/json.git", json_dir)
-
+update_git_submodule()
 nvcc_compile_args += [
     "-O3",
     "-U__CUDA_NO_HALF_OPERATORS__",

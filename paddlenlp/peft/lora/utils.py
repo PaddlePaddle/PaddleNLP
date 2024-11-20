@@ -1,7 +1,7 @@
-# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
-# you smay not use this file except in compliance with the License.
+# you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .dpo_criterion import DPOCriterion
-from .dpo_trainer import DPOTrainer
-from .kto_criterion import KTOCriterion
-from .kto_trainer import KTOTrainer
-from .sft_trainer import *
-from .trl_data import *
-from .trl_utils import *
+from contextlib import nullcontext
+
+from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+
+
+def rng_ctx(is_mp: bool, in_dynamic_mode: bool):
+    return get_rng_state_tracker().rng_state() if (is_mp and in_dynamic_mode) else nullcontext()

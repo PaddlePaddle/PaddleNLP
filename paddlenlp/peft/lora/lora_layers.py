@@ -48,6 +48,7 @@ from ...transformers.mc2_parallel_linear import (
     MC2RowSeqParallelCoreLinear,
 )
 from .lora_quick_layers import quick_lora
+from .utils import rng_ctx
 
 
 class LoRALinear(nn.Linear):
@@ -198,14 +199,15 @@ class RowParallelLoRALinear(RowParallelLinear):
         self.name = self._name
 
         # Actual trainable parameters
-        self.lora_A = self.create_parameter(
-            shape=[self.input_size_per_partition, r],
-            dtype=self._dtype,
-            is_bias=False,
-            attr=paddle.ParamAttr(
-                initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
-            ),
-        )
+        with rng_ctx(self.is_mp, paddle.in_dynamic_mode()):
+            self.lora_A = self.create_parameter(
+                shape=[self.input_size_per_partition, r],
+                dtype=self._dtype,
+                is_bias=False,
+                attr=paddle.ParamAttr(
+                    initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
+                ),
+            )
         self.lora_B = self.create_parameter(
             shape=[r, self.out_features],
             dtype=self._dtype,
@@ -345,14 +347,15 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
         self.name = self._name
 
         # Actual trainable parameters
-        self.lora_A = self.create_parameter(
-            shape=[self.input_size_per_partition, r],
-            dtype=self._dtype,
-            is_bias=False,
-            attr=paddle.ParamAttr(
-                initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
-            ),
-        )
+        with rng_ctx(self.is_mp, paddle.in_dynamic_mode()):
+            self.lora_A = self.create_parameter(
+                shape=[self.input_size_per_partition, r],
+                dtype=self._dtype,
+                is_bias=False,
+                attr=paddle.ParamAttr(
+                    initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
+                ),
+            )
         self.lora_B = self.create_parameter(
             shape=[r, self.out_features],
             dtype=self._dtype,
@@ -468,15 +471,16 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             attr=lora_A_weight_attr,
         )
         self.lora_A.is_distributed = False
-        self.lora_B = self.create_parameter(
-            shape=[r, self.output_size_per_partition],
-            dtype=self._dtype,
-            is_bias=False,
-            attr=paddle.ParamAttr(
-                initializer=paddle.nn.initializer.Constant(value=0.0),
-                learning_rate=lora_plus_scale,
-            ),
-        )
+        with rng_ctx(self.is_mp, paddle.in_dynamic_mode()):
+            self.lora_B = self.create_parameter(
+                shape=[r, self.output_size_per_partition],
+                dtype=self._dtype,
+                is_bias=False,
+                attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=0.0),
+                    learning_rate=lora_plus_scale,
+                ),
+            )
 
         self.lora_B.is_distributed = True
         self.lora_B.split_axis = 1
@@ -599,15 +603,16 @@ class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear):
         self.lora_A.is_distributed = False
         mark_as_sequence_parallel_parameter(self.lora_A)
 
-        self.lora_B = self.create_parameter(
-            shape=[r, self.output_size_per_partition],
-            dtype=self._dtype,
-            is_bias=False,
-            attr=paddle.ParamAttr(
-                initializer=paddle.nn.initializer.Constant(value=0.0),
-                learning_rate=lora_plus_scale,
-            ),
-        )
+        with rng_ctx(self.is_mp, paddle.in_dynamic_mode()):
+            self.lora_B = self.create_parameter(
+                shape=[r, self.output_size_per_partition],
+                dtype=self._dtype,
+                is_bias=False,
+                attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=0.0),
+                    learning_rate=lora_plus_scale,
+                ),
+            )
 
         self.lora_B.is_distributed = True
         self.lora_B.split_axis = 1
