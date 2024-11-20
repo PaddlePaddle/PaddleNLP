@@ -24,7 +24,11 @@ from paddle.distributed import fleet
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.trainer.trainer_utils import ExplicitEnum, ShardingOption
 from paddlenlp.trainer.utils.helper import distributed_isfile
-from paddlenlp.transformers.model_utils import PretrainedModel, get_parameter_dtype
+from paddlenlp.transformers.model_utils import (
+    PretrainedModel,
+    get_parameter_dtype,
+    unwrap_model,
+)
 from paddlenlp.transformers.utils import dtype_byte_size
 from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
 from paddlenlp.utils.env import (
@@ -193,6 +197,8 @@ def get_expected_state_dict(model_to_save):
     """
     Get trainable state_dict of model_to_save.
     """
+    model_to_save = unwrap_model(model_to_save)
+
     if isinstance(model_to_save, PretrainedModel):
         state_dict = model_to_save.state_dict()
         if (
@@ -221,7 +227,7 @@ def get_expected_keys(args, sharded_metadata, model, optimizer, is_master_weight
         params2rank = optimizer._param2rank
 
     model_state_dict = get_expected_state_dict(model)
-    struct2static_name_mappings = {k: v.name for k, v in get_expected_state_dict(model).items()}
+    struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}
 
     expected_keys = []
     for key in list(sharded_metadata["all_optimizer_keys"]):

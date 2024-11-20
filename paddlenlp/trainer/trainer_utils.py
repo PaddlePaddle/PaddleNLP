@@ -1126,3 +1126,11 @@ def should_skip_data(global_step, skip_data_intervals):
             skip_flag = True
             break
     return skip_flag
+
+
+def split_parallel_config(parallel_config):
+    if "," in parallel_config:
+        parallel_config = set(parallel_config.split(","))
+    else:
+        parallel_config = set(parallel_config.split(" "))
+    return parallel_config

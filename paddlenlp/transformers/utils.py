@@ -167,6 +167,8 @@ def adapt_stale_fwd_patch(self, name, value):
             "StaticFunction"
         ):
             return value
+        if type(value).__name__.endswith("WeakMethod") or self.forward.__class__.__name__.endswith("WeakMethod"):
+            return value
 
         # NOTE(changwenbin & zhoukangkang):
         # When use model = paddle.incubate.jit.inference(model), it reportes errors, we fix it here.

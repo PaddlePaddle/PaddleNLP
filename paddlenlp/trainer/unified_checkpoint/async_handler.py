@@ -77,6 +77,11 @@ class AsyncCheckpointHandler:
                     state_dict[k] = state_dict.pop(k).cpu().numpy()
             safe_save_file(state_dict, path, metadata={"format": "np"})
         else:
+            if len(state_dict.keys()) == 0:
+                saved_signal_path = os.path.join(signal_path, f".{state_dict_type}.done.{self.global_rank}")
+                paddle.save(self.global_rank, saved_signal_path)
+                return
+
             if state_dict_type == "model_weight":
                 if self._shm_model_weight is None:
                     self._meta_dict_model, buffer_size = create_meta_dict(state_dict)

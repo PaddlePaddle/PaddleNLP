@@ -13,12 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tokenization classes for Qwen2."""
+from __future__ import annotations
 
 import json
 import os
 import unicodedata
 from functools import lru_cache
-from typing import Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import regex as re
 
@@ -338,3 +339,110 @@ class Qwen2Tokenizer(PretrainedTokenizer):
     def prepare_for_tokenization(self, text, **kwargs):
         text = unicodedata.normalize("NFC", text)
         return (text, kwargs)
+
+    def _encode_chat_inputs(
+        self,
+        conversations: List[List[str, str]],
+        context_data: Dict[str, Any] = {},
+        system: str = None,
+        add_generation_prompt=True,
+    ):
+        result = {}
+
+        # Some template do not support system msg, so we need to check it first.
+        if system:
+            try:
+                self.chat_template.render(messages={"role": "system", "content": system})
+            except Exception as e:
+                raise ValueError("System is not supported in this tokenizer.", e)
+
+        # convert list msg to role dict msg
+        conversation_dict = []
+        origin_msg = []
+        for round in conversations:
+            round_role = [
+                {"role": "user", "content": round[0]},
+                {"role": "assistant", "content": round[1]},
+            ]
+            origin_msg.extend(round_role)
+            conversation_dict.append(round_role)
+
+        # Get system string in ChatTemplate
+        # ChatTemplate contains three parts: system, user, and assistant.
+        # However, the system string cannot be obtained directly with the chat_template.render() function.
+        # Thus, three steps are needed to extract the system string.
+        # Step 1: Obtain the combined system and user string in the first round.
+        # Step 2: Obtain the special system string.
+        # Step 3: Obtain the special combined system and user string in the first round.
+        # Then, user string = (special system and user string) - (special system string)
+        # And, system string = (initial system and user string) - (user string)
+
+        assert len(conversation_dict) > 0, "conversations is empty"
+
+        def replace_first_occurrence(original_string, to_find, to_replace):
+            index = original_string.find(to_find)
+            if index == -1:  # to_find not found in original_string
+                return original_string
+            else:
+                return original_string[:index] + to_replace + original_string[index + len(to_find) :]
+
+        if system:
+            system_str = self.chat_template.render([system])
+        else:
+            # get system and user str
+            round0_str = self.chat_template.render(
+                messages=conversation_dict[0][:1], add_generation_prompt=False, **self.special_tokens_map
+            )
+            # get special system str
+            round0_only_system_str = self.chat_template.render(
+                messages=[{"role": "system", "content": ""}], add_generation_prompt=False, **self.special_tokens_map
+            )
+            # get special system and user str
+            round0_system_user_str = self.chat_template.render(
+                messages=[{"role": "system", "content": ""}] + conversation_dict[0][:1],
+                add_generation_prompt=False,
+                **self.special_tokens_map,
+            )
+
+            # get user str = {special system and user str} - {special system str}
+            user_str = replace_first_occurrence(round0_system_user_str, round0_only_system_str, "")
+            # get system str = { system and user str} - {user str}
+            system_str = round0_str.replace(user_str, "")
+
+        no_ans = []
+        ans = []
+        for conv in conversation_dict:
+            roundi = [system] + conv if system else conv
+            roundi_str = self.chat_template.render(
+                messages=roundi, add_generation_prompt=False, **self.special_tokens_map
+            )
+
+            roundi_no_ans = [system] + [conv[0]] if system else [conv[0]]
+            roundi_no_ans_str = self.chat_template.render(
+                messages=roundi_no_ans, add_generation_prompt=add_generation_prompt, **self.special_tokens_map
+            )
+
+            roundi_ans_str = roundi_str[len(roundi_no_ans_str) :]
+            ans.append(roundi_ans_str)
+
+            roundi_no_ans_no_system_str = replace_first_occurrence(roundi_no_ans_str, system_str, "")
+            assert (
+                roundi_no_ans_str == system_str + roundi_no_ans_no_system_str
+            ), f"the src string contains system str: {system_str}"
+            no_ans.append(roundi_no_ans_no_system_str)
+
+        # the first round is special, we need to add system_str
+        no_ans[0] = system_str + no_ans[0]
+
+        conversation_ids = []
+        for i in range(len(no_ans)):
+            conversation_ids.append(
+                self.batch_encode(
+                    [no_ans[i], ans[i]],
+                    add_special_tokens=False,
+                    padding=False,
+                )["input_ids"]
+            )
+
+        result["conversations"] = conversation_ids
+        return result

@@ -43,13 +43,16 @@ from paddlenlp.peft import (
     VeRAConfig,
     VeRAModel,
 )
+
 from paddlenlp.peft.reft import (
     ReFTConfig,
     ReftDataCollator,
     ReFTModel,
     intervention_mapping,
 )
-from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
+
+from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed
+
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,

@@ -138,6 +138,7 @@ class LlamaAvxInferenceModel(LlamaPretrainedModel):
         self.max_position_embeddings = config.max_position_embeddings
         self.quant_type = config.quant_type
         self.dtype = config.dtype
+        self.rope_theta = config.rope_theta
         self.embed_tokens = nn.Embedding(
             self.vocab_size,
             self.hidden_size,
@@ -1519,6 +1520,12 @@ class LlamaForCausalLMAvxInferenceModel(GenerationAvxInferenceModel, LlamaPretra
             )
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
 
+    @classmethod
+    def set_inference_config(cls, config, predictor_args, **kwargs):
+        super().set_inference_config(config, predictor_args, **kwargs)
+        config.avx_type = predictor_args.avx_type
+        config.avx_cachekv_type = predictor_args.avx_cachekv_type
+
 
 class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedModel):
     """
@@ -1677,6 +1684,21 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
                 paddle.to_tensor(state_dict["lm_head.weight"]).cast(self.lm_head.weight.dtype)
             )
         self.llama.set_state_dict({k: state_dict[k] for k in state_dict.keys()})
+
+    @classmethod
+    def confirm_inference_model(cls, predictor_args, **kwargs):
+        if predictor_args.device == "xpu":
+            raise ValueError(
+                "you should run xpu dynamic model with --block_attn flag"
+                "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/inference.md"
+            )
+        elif predictor_args.device == "cpu" and predictor_args.avx_model:
+            import importlib
+
+            import_class = importlib.import_module("paddlenlp.experimental.transformers.llama.modeling")
+            model_class = getattr(import_class, "LlamaForCausalLMAvxInferenceModel")
+            return model_class
+        return cls
 
 
 class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPretrainedModel):

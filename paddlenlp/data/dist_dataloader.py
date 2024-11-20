@@ -66,6 +66,7 @@ class DistDataLoader(paddle.io.DataLoader):
 
         eval = kwargs.pop("eval", False)
         is_iterable_dataset = kwargs.pop("is_iterable_dataset", False)
+        self._pp_data_group = kwargs.pop("pp_data_group", None)
 
         if dataset is None:
             dataset = DummyDataset() if not is_iterable_dataset else IterableDummyDataset()
@@ -78,10 +79,8 @@ class DistDataLoader(paddle.io.DataLoader):
 
         # Init pp data comm group.
         if self._hcg.get_pipe_parallel_world_size() > 1:
-            self._pp_data_group = self._init_dataloader_comm_group()
             self._pp_group = self._hcg.get_pipe_parallel_group()
         else:
-            self._pp_data_group = None
             self._pp_group = None
 
         self.mp_group = self._hcg.get_model_parallel_group()
@@ -131,18 +130,6 @@ class DistDataLoader(paddle.io.DataLoader):
             return super().__len__()
         else:
             raise ValueError("raise error for `paddlenlp.trainer.trainer_utils.has_length`")
-
-    def _init_dataloader_comm_group(self):
-        topo = self._hcg._topo
-        parallel_comm_group = None
-        parallel_groups = topo.get_comm_list("pipe")
-
-        for group in parallel_groups:
-            ranks = [group[0], group[-1]]
-            comm_group = paddle.distributed.new_group(ranks=ranks)
-            if paddle.distributed.get_rank() in ranks:
-                parallel_comm_group = comm_group
-        return parallel_comm_group
 
     def __iter__(self):
         return self
@@ -212,3 +199,17 @@ class DistDataLoader(paddle.io.DataLoader):
                 logger.debug(e)
         data = self._broadcast_data(data)
         return data
+
+
+def init_dataloader_comm_group():
+    hcg = fleet.get_hybrid_communicate_group()
+    topo = hcg._topo
+    parallel_groups = topo.get_comm_list("pipe")
+    parallel_comm_group = None
+
+    for group in parallel_groups:
+        ranks = [group[0], group[-1]]
+        comm_group = paddle.distributed.new_group(ranks=ranks)
+        if paddle.distributed.get_rank() in ranks:
+            parallel_comm_group = comm_group
+    return parallel_comm_group
