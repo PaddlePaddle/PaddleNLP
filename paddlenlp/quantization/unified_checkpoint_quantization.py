@@ -44,11 +44,11 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
         scale_dict (`int`):
             compression checkpoint scale dict.
     """
-    rank, world_size = -1, 1
+    tp_rank, tp_degree = -1, 1
     if paddle.distributed.get_world_size() > 1:
         hcg = fleet.get_hybrid_communicate_group()
         tp_group = hcg.get_model_parallel_group()
-        rank, world_size = tp_group.rank, tp_group.nranks
+        tp_rank, tp_degree = tp_group.rank, tp_group.nranks
 
     if ckpt_quant_stage == "O1":
         # set eps
@@ -66,8 +66,8 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
                     scales=scales,
                     quant_bit=8,
                     dequant=True,
-                    rank=rank,
-                    world_size=world_size,
+                    tp_rank=tp_rank,
+                    tp_degree=tp_degree,
                     use_pd=True,
                 )
                 state_dict[quant_key] = weight
@@ -83,8 +83,8 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
                     maxs=maxs,
                     quant_bit=8,
                     dequant=True,
-                    rank=rank,
-                    world_size=world_size,
+                    tp_rank=tp_rank,
+                    tp_degree=tp_degree,
                     use_pd=True,
                 )
                 # cal m2
@@ -115,8 +115,8 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
                 maxs=None,
                 quant_bits=4,
                 quant=False,
-                rank=rank,
-                world_size=world_size,
+                tp_rank=tp_rank,
+                tp_degree=tp_degree,
                 use_pd=True,
                 symmetry=True,
             )
@@ -126,8 +126,8 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
                 maxs=ratio_maxs,
                 quant_bits=4,
                 quant=False,
-                rank=rank,
-                world_size=world_size,
+                tp_rank=tp_rank,
+                tp_degree=tp_degree,
                 use_pd=True,
             )
 
