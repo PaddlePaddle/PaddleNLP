@@ -83,6 +83,7 @@ class TestBasicUtils(unittest.TestCase):
 
     def test_set_seed(self):
         set_seed(42)
+        set_seed(19)
 
     def test_count_param(self):
         model = AutoModelForCausalLM.from_pretrained("__internal_testing__/tiny-random-llama")
