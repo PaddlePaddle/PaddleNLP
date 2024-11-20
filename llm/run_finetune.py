@@ -26,7 +26,7 @@ from utils.argument import (
     ReftArgument,
     TrainingArguments,
 )
-from utils.data import convert_example_for_reft, get_convert_example, set_seed
+from utils.data import convert_example_for_reft, get_convert_example
 
 from paddlenlp.data import DataCollatorForSeq2Seq
 from paddlenlp.datasets import (
@@ -49,7 +49,7 @@ from paddlenlp.peft.reft import (
     ReFTModel,
     intervention_mapping,
 )
-from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint
+from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
