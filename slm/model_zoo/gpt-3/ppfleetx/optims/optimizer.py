@@ -107,7 +107,7 @@ class FusedOffloadAdamW(paddle.optimizer.AdamW):
             dtype=acc_dtype,
             fill_value=0.9 if isinstance(self._beta1, Variable) else self._beta1,
             shape=[1],
-            type=core.VarDesc.VarType.LOD_TENSOR,
+            type=core.VarDesc.VarType.DENSE_TENSOR,
             device="cpu",
         )
         self._add_accumulator(
@@ -116,7 +116,7 @@ class FusedOffloadAdamW(paddle.optimizer.AdamW):
             dtype=acc_dtype,
             fill_value=0.999 if isinstance(self._beta2, Variable) else self._beta2,
             shape=[1],
-            type=core.VarDesc.VarType.LOD_TENSOR,
+            type=core.VarDesc.VarType.DENSE_TENSOR,
             device="cpu",
         )
 
