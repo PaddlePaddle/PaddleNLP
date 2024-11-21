@@ -81,6 +81,18 @@ class TestMosLoraLayer(unittest.TestCase):
             self.assertTrue(paddle.allclose(lora_layer_r8(x), regular_linear(x)))
             self.assertTrue(paddle.allclose(lora_layer_r4(x), regular_linear(x)))
 
+    def test_merge(self):
+        lora_layer_r8 = LoRALinear(in_features=16, out_features=8, r=8, lora_use_mixer=True)
+        lora_layer_r8.merge()
+
+    def test_unmerge(self):
+        lora_layer_r8 = LoRALinear(in_features=16, out_features=8, r=8, lora_use_mixer=True)
+        lora_layer_r8.merged = True
+        lora_layer_r8.unmerge()
+        lora_layer_r8 = LoRALinear(in_features=16, out_features=8, r=8)
+        lora_layer_r8.merged = True
+        lora_layer_r8.unmerge()
+
 
 class TestMosLoraModel(unittest.TestCase):
     def test_lora_model_restore(self):
@@ -104,6 +116,21 @@ class TestMosLoraModel(unittest.TestCase):
         self.assertIsNotNone(original_results_2)
         self.assertIsInstance(restored_model, BertModel)
         self.assertTrue(paddle.allclose(original_results_1[0], original_results_2[0]))
+
+    def test_parallel_support(self):
+        lora_config = LoRAConfig(
+            target_modules=[".*q_proj.*", ".*v_proj.*"],
+            r=4,
+            lora_alpha=8,
+            enable_lora_list=[None, [True, False]],
+            head_dim=2,
+            lora_use_mixer=True,
+            tensor_parallel_degree=2,
+        )
+        model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert")
+        model.eval()
+        with self.assertRaises(NotImplementedError):
+            LoRAModel(model, lora_config)
 
     @parameterized.expand([(None,), ("all",), ("lora",)])
     def test_lora_model_constructor(self, bias):
@@ -182,3 +209,7 @@ class TestMosLoRAConfig(unittest.TestCase):
             lora_config.save_pretrained(tempdir)
             loaded_lora_config = LoRAConfig.from_pretrained(tempdir)
             self.assertEqual(lora_config, loaded_lora_config)
+
+
+if __name__ == "__main__":
+    unittest.main()
