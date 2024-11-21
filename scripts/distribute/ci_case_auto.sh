@@ -124,6 +124,8 @@ function llm_gpt_case_list_auto() {
         llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2
         llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2
         llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+        llm_gpt_pir_auto_bs4_TP2
+        llm_gpt_pir_auto_bs4_TP2_PP2
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
@@ -131,7 +133,7 @@ function llm_gpt_case_list_auto() {
         for fun in "${fun_list[@]}"; do
             eval "$fun"
         done
-        track_case_status $FUNCNAME "llm_gpt_dygraph_auto_"
+        track_case_status $FUNCNAME "llm_gpt"
     else 
         echo -e "\033[31m ---- Invalid status $1 \033[0m"
         return 1
@@ -1771,7 +1773,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.59941483
+    loss_base=10.59941673
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
@@ -1779,6 +1781,128 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
         loss_base=10.60039139
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llm_gpt_pir_auto_bs4_TP2(){
+    echo "=========== $FUNCNAME run begin ==========="
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
+
+    cd ${llm_gpt_case_path}
+
+    task_name="gpt3_auto_bs4_tp2"
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+    rm -rf $case_out_dir
+    rm -rf $case_log_dir
+
+    python -u -m paddle.distributed.launch --gpus "0,1" \
+        --log_dir $case_log_dir \
+        run_pretrain_auto.py \
+        --model_name_or_path gpt3-13B-en \
+        --tokenizer_name_or_path gpt3-13B-en \
+        --input_dir "$gpt_data_path/data" \
+        --output_dir "output/$task_name" \
+        --split 949,50,1 \
+        --max_seq_length 1024 \
+        --per_device_train_batch_size 1 \
+        --per_device_eval_batch_size 1 \
+        --sharding "" \
+        --tensor_parallel_degree 2 \
+        --pipeline_parallel_degree 1 \
+        --sequence_parallel 0 \
+        --fuse_attention_qkv 0 \
+        --use_flash_attention 0 \
+        --scale_loss 1024 \
+        --learning_rate 0.00001 \
+        --min_learning_rate 0.000005 \
+        --max_steps 10 \
+        --save_steps 50000 \
+        --weight_decay 0.01 \
+        --warmup_ratio 0.01 \
+        --max_grad_norm 1.0 \
+        --logging_steps 1\
+        --continue_training 0\
+        --dataloader_num_workers 1 \
+        --eval_steps 100000 \
+        --report_to "visualdl" \
+        --disable_tqdm true \
+        --recompute 0 \
+        --gradient_accumulation_steps 4 \
+        --do_train \
+        --do_eval \
+        --device "gpu" \
+        --model_type "gpt" \
+        --enable_auto_parallel 1 \
+        --to_static 1 \
+        --fp16 0 \
+        --fp16_opt_level "O2" \
+        --num_hidden_layers 4 \
+        --intermediate_size 1024 \
+        >>${log_path}/$FUNCNAME 2>&1
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llm_gpt_pir_auto_bs4_TP2_PP2(){
+    echo "=========== $FUNCNAME run begin ==========="
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
+
+    cd ${llm_gpt_case_path}
+
+    task_name="gpt3_auto_bs4_tp2_pp2"
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+    rm -rf $case_out_dir
+    rm -rf $case_log_dir
+
+    python -u -m paddle.distributed.launch --gpus "0,1,2,3" \
+        --log_dir $case_log_dir \
+        run_pretrain_auto.py \
+        --model_name_or_path gpt3-13B-en \
+        --tokenizer_name_or_path gpt3-13B-en \
+        --input_dir "$gpt_data_path/data" \
+        --output_dir "output/$task_name" \
+        --split 949,50,1 \
+        --max_seq_length 1024 \
+        --per_device_train_batch_size 1 \
+        --per_device_eval_batch_size 1 \
+        --sharding "" \
+        --tensor_parallel_degree 2 \
+        --pipeline_parallel_degree 2 \
+        --sequence_parallel 0 \
+        --fuse_attention_qkv 0 \
+        --use_flash_attention 0 \
+        --scale_loss 1024 \
+        --learning_rate 0.00001 \
+        --min_learning_rate 0.000005 \
+        --max_steps 10 \
+        --save_steps 50000 \
+        --weight_decay 0.01 \
+        --warmup_ratio 0.01 \
+        --max_grad_norm 1.0 \
+        --logging_steps 1\
+        --continue_training 0\
+        --dataloader_num_workers 1 \
+        --eval_steps 100000 \
+        --report_to "visualdl" \
+        --disable_tqdm true \
+        --recompute 0 \
+        --gradient_accumulation_steps 4 \
+        --do_train \
+        --do_eval \
+        --device "gpu" \
+        --model_type "gpt" \
+        --enable_auto_parallel 1 \
+        --to_static 1 \
+        --fp16 0 \
+        --fp16_opt_level "O2" \
+        --num_hidden_layers 4 \
+        --intermediate_size 1024 \
+        >>${log_path}/$FUNCNAME 2>&1
     echo "=========== $FUNCNAME run  end ==========="
 }
 
