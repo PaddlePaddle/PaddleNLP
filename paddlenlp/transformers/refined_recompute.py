@@ -528,7 +528,7 @@ def create_skip_config_for_refined_recompute(layer_idx, config):
         # is pp model
         if pp_size > 1:
             vp_size = max(config.virtual_pp_degree, 1)
-            layer_num = config.num_layers
+            layer_num = config.num_layers if hasattr(config, "num_layers") else config.num_hidden_layers
             no_recompute_layers = get_pp_vp_split_layers(layer_num, pp_size, vp_size, skip_num)
             if layer_idx in no_recompute_layers:
                 skip_config[op_name] = True
