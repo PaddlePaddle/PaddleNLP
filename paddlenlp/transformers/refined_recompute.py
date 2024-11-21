@@ -60,6 +60,12 @@ global_rr_queue_dict = {}
 recompute_suffix = "@recompute"
 _recompute_id = -1
 
+# https://github.com/PaddlePaddle/community/blob/master/hackathon/hackathon_7th/%E3%80%90Hackathon%207th%E3%80%91FundableProject%E4%BB%BB%E5%8A%A1%E5%90%88%E9%9B%86.md#%E4%B9%9Dpaddle-lod-%E9%80%80%E5%9C%BA%E6%B8%85%E7%90%86
+if hasattr(core.VarDesc.VarType, "DENSETENSOR_TENSOR"):
+    DENSE_TENSOR = core.VarDesc.VarType.DENSETENSOR_TENSOR
+else:
+    DENSE_TENSOR = core.VarDesc.VarType.LOD_TENSOR
+
 
 def set_recompute_id(value=-1):
     """switch recompute id to the given value"""
@@ -267,7 +273,7 @@ def share_buffer_to_tensor_or_param(inner_x):
                 inner_x.dtype,
                 inner_x.shape,
                 inner_x.name + "cpy",
-                core.VarDesc.VarType.LOD_TENSOR,
+                DENSE_TENSOR,
                 inner_x.persistable,
                 inner_x.process_mesh,
                 inner_x.placements,
@@ -277,7 +283,7 @@ def share_buffer_to_tensor_or_param(inner_x):
                 inner_x.dtype,
                 inner_x.shape,
                 inner_x.name + "cpy",
-                core.VarDesc.VarType.LOD_TENSOR,
+                DENSE_TENSOR,
                 inner_x.persistable,
             )
         inner_x._unsafe_share_buffer_to(tmp_tensor)
