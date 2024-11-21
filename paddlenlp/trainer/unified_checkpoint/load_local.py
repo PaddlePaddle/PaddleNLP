@@ -184,6 +184,13 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
     if len(resolved_archive_file) > 1:
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
 
+    with open(os.path.join(resume_from_checkpoint, index_filename), "r") as f:
+        index = json.loads(f.read())
+
+    ckpt_quant_stage = "O0"
+    if "ckpt_quant_stage" in index:
+        ckpt_quant_stage = index["ckpt_quant_stage"]
+
     # update has_master_weights and index_filename_master_weights
     # 1. if the master weight exists, only has_master_weights is set True and loaded when needed
     # 2. if master weight does not exist, convert model weight to master weight when needed
@@ -253,13 +260,6 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             gc.collect()
         return returned_state_dict
 
-    with open(os.path.join(resume_from_checkpoint, index_filename), "r") as f:
-        index = json.loads(f.read())
-
-    ckpt_quant_stage = "O0"
-    if "ckpt_quant_stage" in index:
-        ckpt_quant_stage = index["ckpt_quant_stage"]
-
     state_dict_optim = load_resolved_archive_file(
         resolved_archive_file, sharded_metadata, expected_keys, ckpt_quant_stage=ckpt_quant_stage
     )
@@ -270,9 +270,10 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
     # rename optimizer param
     for key in list(state_dict_optim.keys()):
         key_name = key.split("/")
-        static_name = struct2static_name_mappings[key_name[0]]
+        model_weight_key = key_name[0]
+        static_name = struct2static_name_mappings[model_weight_key]
         if has_master_weights:
-            if model_state_dict[key_name[0]].dtype != paddle.float32:
+            if model_state_dict[model_weight_key].dtype != paddle.float32:
                 key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
             else:
                 key_name = "_".join([static_name, key_name[1]])
@@ -280,6 +281,12 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             key_name = "_".join([static_name, key_name[1]])
         returned_optim_state_dict[key_name] = state_dict_optim.pop(key)
         returned_optim_state_dict[key_name].name = key_name
+
+        # master weight cast (only in remove_master_weight)
+        if has_master_weights and state_dict_master_weight[model_weight_key].dtype != paddle.float32:
+            state_dict_master_weight[model_weight_key] = paddle.cast(
+                state_dict_master_weight[model_weight_key], dtype=paddle.float32
+            )
 
     if has_master_weights:
         for key in list(state_dict_master_weight.keys()):
