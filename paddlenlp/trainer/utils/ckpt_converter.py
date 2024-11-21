@@ -990,7 +990,7 @@ class CheckpointConverter:
         if self.use_dist:
             paddle.distributed.all_gather_object(all_rank_objects, cur_rank_object)
         else:
-            all_rank_objects = [all_rank_objects]
+            all_rank_objects = [cur_rank_object]
 
         if isinstance(cur_rank_object, list):
             for obj in all_rank_objects:
