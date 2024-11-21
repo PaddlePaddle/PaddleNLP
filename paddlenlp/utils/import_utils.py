@@ -18,17 +18,109 @@ import os
 import shutil
 import site
 import sys
-from typing import Optional, Type
+from typing import Optional, Tuple, Type, Union
 
 import pip
 
 from paddlenlp.utils.log import logger
 
 
+# TODO: This doesn't work for all packages (`bs4`, `faiss`, etc.) Talk to Sylvain to see how to do with it better.
+def _is_package_available(pkg_name: str, return_version: bool = False) -> Union[Tuple[bool, str], bool]:
+    # Check if the package spec exists and grab its version to avoid importing a local directory
+    package_exists = importlib.util.find_spec(pkg_name) is not None
+    package_version = "N/A"
+    if package_exists:
+        try:
+            # Primary method to get the package version
+            package_version = importlib.metadata.version(pkg_name)
+        except importlib.metadata.PackageNotFoundError:
+            # Fallback method: Only for "torch" and versions containing "dev"
+            if pkg_name == "torch":
+                try:
+                    package = importlib.import_module(pkg_name)
+                    temp_version = getattr(package, "__version__", "N/A")
+                    # Check if the version contains "dev"
+                    if "dev" in temp_version:
+                        package_version = temp_version
+                        package_exists = True
+                    else:
+                        package_exists = False
+                except ImportError:
+                    # If the package can't be imported, it's not available
+                    package_exists = False
+            else:
+                # For packages other than "torch", don't attempt the fallback and set as not available
+                package_exists = False
+    if return_version:
+        return package_exists, package_version
+    else:
+        return package_exists
+
+
+_g2p_en_available = _is_package_available("g2p_en")
+_sentencepiece_available = _is_package_available("sentencepiece")
+_sklearn_available = importlib.util.find_spec("sklearn") is not None
+if _sklearn_available:
+    try:
+        importlib.metadata.version("scikit-learn")
+    except importlib.metadata.PackageNotFoundError:
+        _sklearn_available = False
+
+
+# TODO: This doesn't work for all packages (`bs4`, `faiss`, etc.) Talk to Sylvain to see how to do with it better.
+def _is_package_available(pkg_name: str, return_version: bool = False) -> Union[Tuple[bool, str], bool]:
+    # Check if the package spec exists and grab its version to avoid importing a local directory
+    package_exists = importlib.util.find_spec(pkg_name) is not None
+    package_version = "N/A"
+    if package_exists:
+        try:
+            # Primary method to get the package version
+            package_version = importlib.metadata.version(pkg_name)
+        except importlib.metadata.PackageNotFoundError:
+            # Fallback method: Only for "torch" and versions containing "dev"
+            if pkg_name == "torch":
+                try:
+                    package = importlib.import_module(pkg_name)
+                    temp_version = getattr(package, "__version__", "N/A")
+                    # Check if the version contains "dev"
+                    if "dev" in temp_version:
+                        package_version = temp_version
+                        package_exists = True
+                    else:
+                        package_exists = False
+                except ImportError:
+                    # If the package can't be imported, it's not available
+                    package_exists = False
+            else:
+                # For packages other than "torch", don't attempt the fallback and set as not available
+                package_exists = False
+    if return_version:
+        return package_exists, package_version
+    else:
+        return package_exists
+
+
+_g2p_en_available = _is_package_available("g2p_en")
+_sentencepiece_available = _is_package_available("sentencepiece")
+_sklearn_available = importlib.util.find_spec("sklearn") is not None
+if _sklearn_available:
+    try:
+        importlib.metadata.version("scikit-learn")
+    except importlib.metadata.PackageNotFoundError:
+        _sklearn_available = False
+
+
 def is_datasets_available():
     import importlib
 
     return importlib.util.find_spec("datasets") is not None
+
+
+def is_protobuf_available():
+    if importlib.util.find_spec("google") is None:
+        return False
+    return importlib.util.find_spec("google.protobuf") is not None
 
 
 def is_paddle_cuda_available() -> bool:
@@ -40,6 +132,14 @@ def is_paddle_cuda_available() -> bool:
         return False
 
 
+def is_g2p_en_available():
+    return _g2p_en_available
+
+
+def is_sentencepiece_available():
+    return _sentencepiece_available
+
+
 def is_paddle_available() -> bool:
     """check if `torch` package is installed
     Returns:
@@ -48,12 +148,12 @@ def is_paddle_available() -> bool:
     return is_package_available("paddle")
 
 
-def is_psutil_available():
-    return importlib.util.find_spec("psutil") is not None
-
-
 def is_tiktoken_available():
     return importlib.util.find_spec("tiktoken") is not None
+
+
+def is_psutil_available():
+    return importlib.util.find_spec("psutil") is not None
 
 
 def is_torch_available() -> bool:

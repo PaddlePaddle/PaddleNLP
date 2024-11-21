@@ -98,7 +98,7 @@ class FusedOffloadAdamW(paddle.optimizer.AdamW):
     def _add_moments_pows(self, p):
         acc_dtype = p.dtype
         if self._is_dtype_fp16_or_bf16(acc_dtype):
-            acc_dtype = core.VarDesc.VarType.FP32
+            acc_dtype = paddle.float32
         self._add_accumulator(self._moment1_acc_str, p, dtype=acc_dtype, device="cpu")
         self._add_accumulator(self._moment2_acc_str, p, dtype=acc_dtype, device="cpu")
         self._add_accumulator(
@@ -107,7 +107,7 @@ class FusedOffloadAdamW(paddle.optimizer.AdamW):
             dtype=acc_dtype,
             fill_value=0.9 if isinstance(self._beta1, Variable) else self._beta1,
             shape=[1],
-            type=core.VarDesc.VarType.LOD_TENSOR,
+            type=core.VarDesc.VarType.DENSE_TENSOR,
             device="cpu",
         )
         self._add_accumulator(
@@ -116,7 +116,7 @@ class FusedOffloadAdamW(paddle.optimizer.AdamW):
             dtype=acc_dtype,
             fill_value=0.999 if isinstance(self._beta2, Variable) else self._beta2,
             shape=[1],
-            type=core.VarDesc.VarType.LOD_TENSOR,
+            type=core.VarDesc.VarType.DENSE_TENSOR,
             device="cpu",
         )
 

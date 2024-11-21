@@ -30,11 +30,6 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.nested import flatten_list
 
-try:
-    from paddle.base import core
-except:
-    core = None
-
 from .utils import (
     get_expected_state_dict,
     is_sharding_split_param_mode,
@@ -155,7 +150,8 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
     sharding_group = hcg.get_sharding_parallel_group()
     sharding_rank = sharding_group.rank
     dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
-    struct2static_name_mappings = {k: v.name for k, v in model.state_dict().items()}
+    model_state_dict = get_expected_state_dict(model)
+    struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}
 
     if is_sharding_split_param_mode(args):
         # We do not check optimizer files completion for split_param, since it is very complicated. Directly support local resume.
@@ -200,7 +196,7 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
                 if args.use_expert_parallel and dp_rank > 0 and not getattr(state_dict[key], "no_sync", False):
                     continue
 
-                if is_master_weights and state_dict[key].dtype == core.VarDesc.VarType.FP32:
+                if is_master_weights and state_dict[key].dtype == paddle.float32:
                     continue
 
                 if not is_master_weights:

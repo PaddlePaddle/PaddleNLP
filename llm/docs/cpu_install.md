@@ -3,9 +3,9 @@ PaddleNLP 在支持 AVX 指令的 CPU 上对 llama 系列模型进行了深度�
 
 ### 检查硬件：
 
- | 芯片类型 | GCC 版本 |
- | --- | --- |
- | Intel(R) Xeon(R) Platinum 8463B | 9.4.0|
+ | 芯片类型 | GCC 版本 |cmake 版本 |
+ | --- | --- | --- |
+ | Intel(R) Xeon(R) Platinum 8463B | 9.4.0| >=3.18 |
 
 **注：如果要验证您的机器是否支持 AVX 指令，只需系统环境下输入命令，看是否有输出：**
 ```

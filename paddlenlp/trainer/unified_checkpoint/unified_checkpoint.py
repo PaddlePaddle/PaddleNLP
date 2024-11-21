@@ -15,15 +15,9 @@
 import copy
 import json
 import os
-import sys
 
 import paddle
 from paddle.distributed import fleet
-
-try:
-    from paddle.base import core
-except:
-    core = None
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.trainer.argparser import strtobool
@@ -31,13 +25,10 @@ from paddlenlp.trainer.utils.helper import distributed_isfile
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
     _add_variant,
+    load_state_dict,
     unwrap_model,
 )
-from paddlenlp.transformers.utils import (
-    device_guard,
-    dtype_byte_size,
-    is_safetensors_available,
-)
+from paddlenlp.transformers.utils import dtype_byte_size
 from paddlenlp.utils.env import (
     LORA_WEIGHTS_NAME,
     PADDLE_MASTER_WEIGHTS_NAME,
@@ -55,12 +46,6 @@ from paddlenlp.utils.env import (
 )
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.nested import nested_copy
-
-if is_safetensors_available():
-    if sys.platform.startswith("win"):
-        from safetensors.numpy import load_file
-    else:
-        from paddlenlp.utils.safetensors import fast_load_file as load_file
 
 from .async_handler import AsyncCheckpointHandler
 from .check_completion import check_unified_checkpoint, check_unified_optimizer
@@ -282,35 +267,29 @@ class UnifiedCheckpointHandler:
 
         model_state_dict = get_expected_state_dict(model)
         struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}  # get optimizer param mappings
-        optimizer_state_dict = load_file(optimizer_path)
+        optimizer_state_dict = load_state_dict(optimizer_path, None, None, device="expected")
         if has_master_weights:
-            master_weights = load_file(master_weights_path)
+            master_weights = load_state_dict(master_weights_path, None, None, device="expected")
 
         # rename and move to paddle.Tensor
         for key in list(optimizer_state_dict.keys()):
             key_name = key.split("/")
             static_name = struct2static_name_mappings[key_name[0]]
             if has_master_weights:
-                if model_state_dict[key_name[0]].dtype != core.VarDesc.VarType.FP32:
+                if model_state_dict[key_name[0]].dtype != paddle.float32:
                     key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
                 else:
                     key_name = "_".join([static_name, key_name[1]])
             else:
                 key_name = "_".join([static_name, key_name[1]])
-            with device_guard():
-                weight = paddle.Tensor(optimizer_state_dict.pop(key), zero_copy=True)
-            weight = weight._copy_to(paddle.framework._current_expected_place(), False)
-            returned_optim_state_dict[key_name] = weight
+            returned_optim_state_dict[key_name] = optimizer_state_dict.pop(key)
             returned_optim_state_dict[key_name].name = key_name
 
         if has_master_weights:
             returned_optim_state_dict["master_weights"] = {}
             for key in list(master_weights.keys()):
                 static_name = struct2static_name_mappings[key]
-                with device_guard():
-                    weight = paddle.Tensor(master_weights.pop(key), zero_copy=True)
-                weight = weight._copy_to(paddle.framework._current_expected_place(), False)
-                returned_optim_state_dict["master_weights"][static_name] = weight
+                returned_optim_state_dict["master_weights"][static_name] = master_weights.pop(key)
                 returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, FP32_MASTER])
 
         return returned_optim_state_dict
@@ -545,7 +524,7 @@ def unified_optimizer_into_shards(
     fp32_weight = {}
     for k, v in state_dict.items():
         static2struct_name_mappings[v.name] = k
-        if master_weights is not None and v.dtype == core.VarDesc.VarType.FP32:
+        if master_weights is not None and v.dtype == paddle.float32:
             if args.dataset_rank > 0:  # deal with different dataset rank.
                 continue
             fp32_weight[k] = v

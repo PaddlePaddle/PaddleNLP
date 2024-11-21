@@ -725,6 +725,9 @@ Trainer 是一个简单，但功能完整的 Paddle 训练和评估模块，并�
                            async_save, enable asynchronous saving checkpoints to disk.
                            enable_all_options, enable all unified checkpoint optimization configs.
 
+  --ordered_save_group_size
+                       选择同时轮流save checkpoint的进程数量。如果设置为0，则不使用轮流save checkpoint功能。
+
   --skip_memory_metrics
                        是否跳过内存profiler检测。（可选，默认为True，跳过）
                        Whether or not to skip adding of memory profiler reports

@@ -37,7 +37,6 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
     GroupShardedScaler,
 )
-from paddle.framework import core
 from paddle.incubate.distributed.models import moe
 from utils import get_timers, set_timers
 from visualdl import LogWriter
@@ -158,12 +157,8 @@ def initialize_mp_dp_parameters(model, hcg):
 def unscale_method(self, optimizer):
     if not self._enable:
         return
-    if paddle.framework.use_pir_api():
-        type_float16 = core.DataType.FLOAT16
-        type_float32 = core.DataType.FLOAT32
-    else:
-        type_float16 = core.VarDesc.VarType.FP16
-        type_float32 = core.VarDesc.VarType.FP32
+    type_float16 = paddle.float16
+    type_float32 = paddle.float32
 
     if getattr(optimizer, "_param_groups", None) and isinstance(optimizer._param_groups[0], dict):
         param_grads_fp16 = []

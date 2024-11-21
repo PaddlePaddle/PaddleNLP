@@ -16,12 +16,8 @@
 import gc
 import os
 
+import paddle
 from tqdm.auto import tqdm
-
-try:
-    from paddle.base import core
-except:
-    core = None
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.transformers.model_utils import (
@@ -154,7 +150,7 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
 def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
     # Special process with split param.
     if is_sharding_split_param_mode(args):
-        returned_optim_state_dict = load_unified_optimizer_split_param(model, optimizer, resume_from_checkpoint)
+        returned_optim_state_dict = load_unified_optimizer_split_param(args, model, optimizer, resume_from_checkpoint)
         return returned_optim_state_dict
 
     # init and get optimizer LR_Scheduler
@@ -252,7 +248,7 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         key_name = key.split("/")
         static_name = struct2static_name_mappings[key_name[0]]
         if has_master_weights:
-            if model_state_dict[key_name[0]].dtype != core.VarDesc.VarType.FP32:
+            if model_state_dict[key_name[0]].dtype != paddle.float32:
                 key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
             else:
                 key_name = "_".join([static_name, key_name[1]])

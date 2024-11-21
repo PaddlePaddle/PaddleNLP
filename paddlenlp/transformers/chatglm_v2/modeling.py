@@ -957,6 +957,11 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
 
         return mappings
 
+    @classmethod
+    def set_inference_config(cls, config, predictor_args, **kwargs):
+        super().set_inference_config(config, predictor_args, **kwargs)
+        predictor_args.total_max_length = config.seq_length
+
 
 class Embedding(nn.Layer):
     """Language model embeddings."""
