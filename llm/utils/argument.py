@@ -136,6 +136,12 @@ class DataArgument:
         default=False,
         metadata={"help": "Pad the input sequence to `max_length`."},
     )
+    autoregressive: bool = field(
+        default=False,
+        metadata={"help": "Whether to use autoregressive mode."},
+    )
+    # Pose ralated parameters
+    use_pose_convert: bool = field(default=False, metadata={"help": "Whether to use PoSE data conversion function"})
 
     def __post_init__(self):
         if self.task_name_or_path is not None:
@@ -231,6 +237,14 @@ class ModelArgument:
     neftune: bool = field(default=False, metadata={"help": "Whether to apply NEFT"})
     neftune_noise_alpha: float = field(default=5.0, metadata={"help": "NEFT noise alpha"})
     flash_mask: bool = field(default=False, metadata={"help": "Whether to use flash_mask in flash attention."})
+
+    # long sequence strategy
+    use_long_sequence_strategies: bool = field(
+        default=False, metadata={"help": "Whether to use long sequence strategy"}
+    )
+    rope_scaling_factor: float = field(default=1.0, metadata={"help": "Rope extension scaling factor"})
+    strategy_type: str = field(default=None, metadata={"help": "Long sequence strategy type"})
+    strategy_name: str = field(default=None, metadata={"help": "Long sequence strategy name"})
 
 
 @dataclass

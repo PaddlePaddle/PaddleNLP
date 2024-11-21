@@ -227,6 +227,9 @@ class TrainingArguments:
             Sharding parameter in certain cards group. For example, aussume we use 2 machines each with 8 cards,
             then set sharding_parallel_degree=8, sharding will only communication inside machine.
             default -1 means sharding parameters between all workers.
+        sharding_parallel_mesh_dimension (`str`, *optional*, defaults to `dp`)
+            Specifies the name of the dimension in a multi-dimensional parallelism mesh that is responsible for sharding.
+            default `dp` for default parallelism mesh.
         tensor_parallel_degree (`int`, *optional*, defaults to `-1`)
             Tensor parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism).
             This technique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
@@ -559,6 +562,15 @@ class TrainingArguments:
                 "Sharding parameter in certain cards group. For example, aussume we use 2 machines each with 8 cards, "
                 "then set sharding_degree=8, sharding will only communication inside machine. "
                 "default -1 means sharding parameters between all workers."
+            )
+        },
+    )
+    sharding_parallel_mesh_dimension: str = field(
+        default="dp",
+        metadata={
+            "help": (
+                "Specifies the name of the dimension in a multi-dimensional parallelism mesh that is responsible for sharding. "
+                "default `dp` for default parallelism mesh. "
             )
         },
     )

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# import inspect
 import json
 import logging
 import os
@@ -172,6 +173,22 @@ def main():
         model_config.fuse_attention_ffn = model_args.fuse_attention_ffn
 
     model_config.seq_length = data_args.max_length
+
+    # Config for model useing long sequence strategy
+    if model_args.use_long_sequence_strategies:
+        data_args.scaled_max_length = int(data_args.max_length * model_args.rope_scaling_factor)
+        model_config.use_long_sequence_strategies = True
+        model_config.long_sequence_strategy_type = model_args.strategy_type
+        model_config.long_sequence_strategy_name = model_args.strategy_name
+        model_config.rope_scaling_factor = model_args.rope_scaling_factor
+        model_config.long_sequence_init_args = {
+            "dim": int(model_config.hidden_size / model_config.num_attention_heads),
+            "max_position_embeddings": data_args.scaled_max_length,  # extended context window
+            "base": model_config.rope_theta,
+            "scaling_factor": model_args.rope_scaling_factor,
+        }
+        if model_args.strategy_name == "YaRNScalingRotaryEmbedding":
+            model_config.long_sequence_init_args["original_max_position_embeddings"] = data_args.max_length
 
     logger.info(f"Final model config: {model_config}")
 
@@ -394,6 +411,7 @@ def main():
         if ptq_ds is not None
         else None
     )
+
     eval_zero_padding = data_args.zero_padding
     if data_args.zero_padding and data_args.eval_with_do_generation:
         logger.warning(

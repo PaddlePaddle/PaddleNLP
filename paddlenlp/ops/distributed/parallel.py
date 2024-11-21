@@ -17,6 +17,7 @@ import paddle.nn as nn
 
 try:
     from paddle.distributed.fleet import fleet
+    from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 except Exception:
     import warnings
 
@@ -88,8 +89,16 @@ class ParallelEmbedding(nn.Layer):
         self._weight_attr = weight_attr
         self._name = name
 
-        self.weight = self.create_parameter(attr=self._weight_attr, shape=self._size, dtype=self._dtype, is_bias=False)
-        self.weight.is_distributed = True
+        if self.is_mp and paddle.in_dynamic_mode():
+            with get_rng_state_tracker().rng_state():
+                self.weight = self.create_parameter(
+                    attr=self._weight_attr, shape=self._size, dtype=self._dtype, is_bias=False
+                )
+        else:
+            self.weight = self.create_parameter(
+                attr=self._weight_attr, shape=self._size, dtype=self._dtype, is_bias=False
+            )
+        self.weight.is_distributed = True if self.is_mp else False
 
         startup_block = paddle.static.default_startup_program().global_block()
         main_block = paddle.static.default_main_program().global_block()
