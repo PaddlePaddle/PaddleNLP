@@ -22,11 +22,11 @@ from paddle.distributed.fleet.meta_parallel import (
     PipelineLayer,
     SharedLayerDesc,
 )
-from paddle.distributed.fleet.utils import recompute
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
 from paddlenlp.transformers.refined_recompute import (
     create_skip_config_for_refined_recompute,
+    recompute,
 )
 from paddlenlp.utils.tools import get_env_device
 
