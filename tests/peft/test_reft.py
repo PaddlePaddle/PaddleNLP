@@ -268,7 +268,7 @@ class TestReFTModelPredict(unittest.TestCase):
         trans_func = partial(
             convert_example_for_reft,
             tokenizer=tokenizer,
-            data_args=SimpleNamespace(**{"max_length": 64, "src_length": 32}),
+            data_args=SimpleNamespace(**{"max_length": 64, "src_length": 32, "autoregressive": False}),
             positions="f7",
             num_interventions=1,
         )

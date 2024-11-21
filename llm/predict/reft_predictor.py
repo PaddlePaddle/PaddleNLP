@@ -49,7 +49,11 @@ def reft_predict(predictor_args):
         convert_example_for_reft,
         tokenizer=tokenizer,
         data_args=SimpleNamespace(
-            **{"max_length": predictor_args.max_length, "src_length": predictor_args.src_length}
+            **{
+                "max_length": predictor_args.max_length,
+                "src_length": predictor_args.src_length,
+                "autoregressive": False,
+            }
         ),
         positions=intervention_info["position"],
         num_interventions=intervention_info["num_interventions"],

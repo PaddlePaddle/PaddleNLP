@@ -14,6 +14,7 @@ reft:
     save_strategy: "epoch"
     src_length: 1024
     max_length: 512
+    autoregressive: false
     bf16: true
     fp16_opt_level: "O2"
     do_train: true
