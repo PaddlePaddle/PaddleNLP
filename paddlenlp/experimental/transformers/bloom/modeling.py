@@ -45,7 +45,7 @@ __all__ = [
     "BloomModelInferenceModel",
     "BloomForCausalLMInferenceModel",
     "BloomBlockInferenceModel",
-    "BlommForCausalBlockLMInferenceModel",
+    "BloomForCausalLMBlockInferenceModel",
 ]
 
 
@@ -653,7 +653,7 @@ class BloomBlockInferenceModel(BloomModelInferenceModel):
         )
 
 
-class BlommForCausalBlockLMInferenceModel(GenerationBlockInferenceModel, BloomPreTrainedModel):
+class BloomForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, BloomPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.bloom = BloomBlockInferenceModel(config)

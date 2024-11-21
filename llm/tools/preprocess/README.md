@@ -126,12 +126,9 @@ head -1 baike_sample.jsonl
 ```
 optional arguments:
   -h, --help            show this help message and exit
-  --model_name MODEL_NAME
+  --model_name_or_path MODEL_NAME_OR_PATH
                         What model to use.
                         必须设置，如：idea-ccnl/ziya-llama-13b-v1, 可以参考已有的模型名称 https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm
-  --tokenizer_name {LlamaTokenizer}
-                        What type of tokenizer to use.
-                        模型对应的tokenizer, Llama模型需使用LlamaTokenizer
 data input/output:
   --input_path INPUT_PATH
                         Path to input JSON files.
@@ -183,8 +180,7 @@ common config:
 * 针对 llama 模型
 ```shell
 python -u  create_pretraining_data.py \
-    --model_name "idea-ccnl/ziya-llama-13b-v1" \
-    --tokenizer_name "LlamaTokenizer" \
+    --model_name_or_path "idea-ccnl/ziya-llama-13b-v1" \
     --input_path "baike_sample.jsonl" \
     --output_prefix "baike_sample"  \
     --data_format "JSON" \
@@ -199,8 +195,7 @@ python -u  create_pretraining_data.py \
 * 针对 ernie 模型
 ```shell
 python -u  create_pretraining_data.py \
-    --model_name "ernie-3.0-base-zh" \
-    --tokenizer_name "ErnieTokenizer" \
+    --model_name_or_path "ernie-3.0-base-zh" \
     --input_path "baike_sample.jsonl" \
     --output_prefix "baike_sample"  \
     --data_format "JSON" \

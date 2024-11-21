@@ -52,7 +52,7 @@
     "virtual_pp_degree": 5,
     "pipeline_schedule_mode": "VPP", 
     "data_parallel_config": "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate",
-    "sharding_parallel_config": "split_param enable_stage1_overlap",
+    "sharding_parallel_config": "enable_stage1_overlap",
     "tensor_parallel_config": "enable_mp_async_allreduce",
     "max_seq_length": 4096,
     "to_static": true,

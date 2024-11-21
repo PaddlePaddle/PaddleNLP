@@ -37,6 +37,7 @@ from .trainer_utils import (
     OptimizerNames,
     SchedulerType,
     ShardingOption,
+    split_parallel_config,
 )
 
 try:
@@ -226,6 +227,9 @@ class TrainingArguments:
             Sharding parameter in certain cards group. For example, aussume we use 2 machines each with 8 cards,
             then set sharding_parallel_degree=8, sharding will only communication inside machine.
             default -1 means sharding parameters between all workers.
+        sharding_parallel_mesh_dimension (`str`, *optional*, defaults to `dp`)
+            Specifies the name of the dimension in a multi-dimensional parallelism mesh that is responsible for sharding.
+            default `dp` for default parallelism mesh.
         tensor_parallel_degree (`int`, *optional*, defaults to `-1`)
             Tensor parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism).
             This technique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
@@ -561,6 +565,15 @@ class TrainingArguments:
             )
         },
     )
+    sharding_parallel_mesh_dimension: str = field(
+        default="dp",
+        metadata={
+            "help": (
+                "Specifies the name of the dimension in a multi-dimensional parallelism mesh that is responsible for sharding. "
+                "default `dp` for default parallelism mesh. "
+            )
+        },
+    )
     sharding_comm_buffer_size_MB: int = field(
         default=-1,
         metadata={
@@ -882,6 +895,14 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Enable MoE (Mixture of Experts) expert parallel training"},
     )
+    expert_max_capacity: Optional[int] = field(
+        default=pow(2, 32),
+        metadata={"help": "Enable MoE (Mixture of Experts) expert max token capacity"},
+    )
+    expert_min_capacity: Optional[int] = field(
+        default=1,
+        metadata={"help": "Enable MoE (Mixture of Experts) expert min token capacity"},
+    )
     release_grads: Optional[bool] = field(
         default=False, metadata={"help": "Whether to release gradients during training. Default is `False`."}
     )
@@ -1096,13 +1117,6 @@ class TrainingArguments:
                 logger.warning("set amp_master_grad to false since amp is disabled.")
                 self.amp_master_grad = False
 
-        def split_parallel_config(parallel_config):
-            if "," in parallel_config:
-                parallel_config = set(parallel_config.split(","))
-            else:
-                parallel_config = set(parallel_config.split(" "))
-            return parallel_config
-
         # use_hybrid_parallel
         if self.use_hybrid_parallel:
 
@@ -1155,29 +1169,20 @@ class TrainingArguments:
                         or "enable_dp_comm_overlap" in pipeline_parallel_config
                     )
                     enable_dp_comm_overlap = using_comm_overlap and self.data_parallel_degree > 1
-                    enable_sharding_comm_overlap = using_comm_overlap and self.sharding_parallel_degree > 1
+                    self.enable_sharding_comm_overlap = using_comm_overlap and self.sharding_parallel_degree > 1
                     assert not (
-                        enable_dp_comm_overlap and enable_sharding_comm_overlap
+                        enable_dp_comm_overlap and self.enable_sharding_comm_overlap
                     ), "dp_comm_overlap and sharding_comm_overlap cannot be enabled at the same time"
 
-                    if enable_sharding_comm_overlap and not self.amp_master_grad:
+                    if self.enable_sharding_comm_overlap and not self.amp_master_grad:
                         raise ValueError(
                             "If `enable_sharding_comm_overlap` in pipeline_parallel_configs, `amp_master_grad` must be True."
                         )
-                    if (
-                        enable_sharding_comm_overlap
-                        and self.unified_checkpoint
-                        and "split_param" in split_parallel_config(self.sharding_parallel_config)
-                    ):
-                        logger.warning(
-                            "Currently unified checkpoint do not support using `sharding_comm_overlap` and `split_param` at the same time, delete `sharding_comm_overlap`."
-                        )
-                        enable_sharding_comm_overlap = False
 
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
                         "dp_comm_overlap": enable_dp_comm_overlap,
-                        "sharding_comm_overlap": enable_sharding_comm_overlap,
+                        "sharding_comm_overlap": self.enable_sharding_comm_overlap,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
                         "release_gradients": "enable_release_grads" in pipeline_parallel_config or self.release_grads,
                         "overlap_p2p_comm": "enable_overlap_p2p_comm" in pipeline_parallel_config,
@@ -1356,6 +1361,10 @@ class TrainingArguments:
                             strategy.hybrid_configs["sharding_configs"].comm_buffer_size_MB = int(
                                 self.sharding_comm_buffer_size_MB
                             )
+                            # The `comm_buffer_size_MB` is added directly to sharding properties
+                            # for semi-auto mode, avoiding potential confusion with strategy config,
+                            # as parameters in semi-auto mode are managed via strategy.
+                            strategy.sharding.comm_buffer_size_MB = int(self.sharding_comm_buffer_size_MB)
 
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
@@ -1363,6 +1372,10 @@ class TrainingArguments:
 
                         if "enable_release_grads" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].release_gradients = True
+                            # `release_gradients` is set directly in sharding properties for the same
+                            # reason as `comm_buffer_size_MB`, to avoid confusion with centralized
+                            # strategy management in semi-auto mode.
+                            strategy.sharding.release_gradients = True
 
                         if self.pipeline_parallel_degree == 1:
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (

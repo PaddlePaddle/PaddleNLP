@@ -263,7 +263,7 @@ class MultiHeadAttentionAuto(nn.Layer):
             attention_mask = get_triangle_upper_mask(product, attention_mask)
 
         if attention_mask is not None:
-            product = product + attention_mask.astype(product.dtype)
+            product = product + paddle.cast(attention_mask, product.dtype)
             weights = F.softmax(product)
         else:
             weights = incubate.softmax_mask_fuse_upper_triangle(product)
