@@ -295,6 +295,7 @@ class MultiHeadAttentionAuto(nn.Layer):
         if not paddle.is_compiled_with_cuda():
             attention_mask = get_triangle_upper_mask(product, attention_mask)
         if attention_mask is not None:
+            attention_mask = dist.reshard(attention_mask, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
             product = product + attention_mask.astype(product.dtype)
             weights = F.softmax(product)
         else:
@@ -450,7 +451,9 @@ class TransformerDecoder(nn.Layer):
         for i, decoder_layer in enumerate(self.layers):
             if decoder_layer.ipp is not None and pre_ipp != decoder_layer.ipp:
                 output = dist.reshard(output, get_mesh(decoder_layer.ipp), [dist.Shard(0), dist.Replicate()])
-                attention_mask = dist.reshard(attention_mask,get_mesh(decoder_layer.ipp), [dist.Replicate(), dist.Replicate()])
+                attention_mask = dist.reshard(
+                    attention_mask, get_mesh(decoder_layer.ipp), [dist.Replicate(), dist.Replicate()]
+                )
             has_gradient = not output.stop_gradient
             if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full":
                 outputs = self.recompute_training(
