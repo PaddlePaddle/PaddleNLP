@@ -613,7 +613,8 @@ class LlamaMLP(nn.Layer):
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
             RowParallelLinear = linear_utils.RowSequenceParallelLinear
 
-            if config.recompute:
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
                 if config.skip_recompute_ops.get("mlp_column_ln", False):
                     ColumnParallelLinear = RRColumnSequenceParallelLinear
                 if config.skip_recompute_ops.get("mlp_row_ln", False):
@@ -733,7 +734,8 @@ class LlamaAttention(nn.Layer):
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
             RowParallelLinear = linear_utils.RowSequenceParallelLinear
 
-            if config.recompute:
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
                 if config.skip_recompute_ops.get("attention_column_ln", False):
                     ColumnParallelLinear = RRColumnSequenceParallelLinear
                 if config.skip_recompute_ops.get("attention_row_ln", False):
@@ -840,7 +842,12 @@ class LlamaAttention(nn.Layer):
 
         self.attn_func = scaled_dot_product_attention
 
-        if config.recompute and config.skip_recompute_ops.get("flash_attn", False):
+        # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+        if (
+            config.recompute
+            and not config.recompute_use_reentrant
+            and config.skip_recompute_ops.get("flash_attn", False)
+        ):
             self.attn_func = partial(scaled_dot_product_attention, skip_recompute=True)
 
     def _init_rope(self):
