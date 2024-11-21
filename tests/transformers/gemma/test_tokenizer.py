@@ -223,3 +223,29 @@ class GemmaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 self.assertEqual(encoded, input_encoded + special_token_id)
                 decoded = tokenizer.decode(encoded, skip_special_tokens=True)
                 self.assertTrue(special_token not in decoded)
+
+    def test_extract_non_learnable_parts(self):
+        models_with_templates = ["google/gemma-2b-it", "google/gemma-7b-it"]
+        dummy_conversastions = [
+            ["Q.", "A."],
+            ["Q.A.", "A."],
+            ["Q?", "A!"],
+        ]
+        decode_outputs = [
+            ["<bos><start_of_turn>user\nQ.<end_of_turn>\n<start_of_turn>model\n", "A.<end_of_turn>\n"],
+            ["<start_of_turn>user\nQ.A.<end_of_turn>\n<start_of_turn>model\n", "A.<end_of_turn>\n"],
+            ["<start_of_turn>user\nQ?<end_of_turn>\n<start_of_turn>model\n", "A!<end_of_turn>\n"],
+        ]
+        context_data = {}
+        context_data["is_training"] = True
+        for model_id in models_with_templates:
+            tokenizer = GemmaTokenizer.from_pretrained(model_id)
+            if tokenizer.chat_template is None:
+                continue
+            conversation_result: list[tuple[list[int], list[int]]] = tokenizer.encode_chat_inputs(
+                dummy_conversastions,
+                context_data=context_data,
+            )
+            for idx, round in enumerate(conversation_result["conversations"]):
+                self.assertEquals(tokenizer.decode(round[0]), decode_outputs[idx][0])
+                self.assertEquals(tokenizer.decode(round[1]), decode_outputs[idx][1])
