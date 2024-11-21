@@ -23,7 +23,7 @@ from __future__ import annotations
 import math
 import warnings
 from functools import partial
-from typing import List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
@@ -1605,3 +1605,88 @@ class Qwen2ForTokenClassification(Qwen2PretrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
+
+class Qwen2SentenceEmbedding(Qwen2PretrainedModel):
+    def __init__(
+        self,
+        config: Qwen2Config,
+        model: Qwen2Model,
+        embedding_temperature: float = 0.02,
+    ):
+        """Qwen2SentenceEmbedding
+        For getting larger batch_size, we use tensor parallel to get larger batch_size.
+
+        Args:
+            config (Qwen2Config): _description_
+            model (Qwen2Model): _description_
+            embedding_temperature (float, optional): _description_. Defaults to 0.02.
+        """
+        super(Qwen2SentenceEmbedding, self).__init__(config)
+        self.config = config
+        self.model = model
+        self.cross_entropy = nn.CrossEntropyLoss(reduction="mean")
+        self.embedding_temperature = embedding_temperature
+
+    def forward(
+        self,
+        query: Optional[Dict[str, paddle.Tensor]] = None,
+        passages: Optional[Dict[str, paddle.Tensor]] = None,
+    ):
+        """forward"""
+        q_reps = self.encode(**query)
+        p_reps = self.encode(**passages)
+
+        loss = self.in_batch_negative_loss(q_reps, p_reps)
+        return loss
+
+    def encode(
+        self,
+        input_ids,
+        position_ids=None,
+        embedding_indices=None,
+        attention_mask=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+        **kwargs,
+    ):
+        """encode"""
+        input_type = type(input_ids)
+        outputs = self.model(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+            **kwargs,
+        )
+        if isinstance(outputs, input_type):
+            hidden_states = outputs
+        else:
+            hidden_states = outputs[0]
+        last_hidden_states = hidden_states.gather_nd(embedding_indices)
+        return last_hidden_states
+
+    def compute_similarity(self, q_reps, p_reps):
+        """compute_similarity"""
+        return paddle.matmul(q_reps, p_reps.transpose([1, 0]))
+
+    def in_batch_negative_loss(self, q_reps, p_reps):
+        """in_batch_negative_loss"""
+        scores = self.compute_similarity(q_reps, p_reps)
+        scores = scores / self.embedding_temperature
+
+        group_size = p_reps.shape[0] // q_reps.shape[0]
+        batch_size = q_reps.shape[0]
+
+        target = paddle.arange(batch_size, dtype="int64")
+        target = target * group_size
+
+        loss = self.cross_entropy(scores, target)
+        return loss
+
+    def state_dict(self, destination=None, include_sublayers=True, structured_name_prefix="", use_hook=True):
+        """state_dict"""
+        return self.model.state_dict(destination, include_sublayers, structured_name_prefix, use_hook)
