@@ -86,9 +86,7 @@ def lora_process(name, lora_config, state_dict, device, lora_state_dict=None):
         return
 
     weight = state_dict.pop(name + ".weight")
-    lora_use_mixer = (lora_state_dict is not None and name + ".lora_AB" in lora_state_dict) or (
-        state_dict is not None and name + ".lora_AB" in state_dict
-    )
+    lora_use_mixer = lora_config.lora_use_mixer
     if lora_state_dict is None:
         lora_A = state_dict.pop(name + ".lora_A")
         lora_B = state_dict.pop(name + ".lora_B")
@@ -115,10 +113,10 @@ def lora_process(name, lora_config, state_dict, device, lora_state_dict=None):
         lora_A = lora_A.astype("float32")
         lora_B = lora_B.astype("float32")
         if lora_use_mixer:
-            lora_AB = lora_AB.astype("float32")
-            out = (weight + lora_A @ lora_AB @ lora_B * scaling).astype("bfloat16")
+            lora_AB = lora_AB.astype(lora_config.dtype)
+            out = (weight + lora_A @ lora_AB @ lora_B * scaling).astype(lora_config.dtype)
         else:
-            out = (weight + lora_A @ lora_B * scaling).astype("bfloat16")
+            out = (weight + lora_A @ lora_B * scaling).astype(lora_config.dtype)
     else:
         if lora_use_mixer:
             out = (weight + lora_A @ lora_AB @ lora_B * scaling).cpu()

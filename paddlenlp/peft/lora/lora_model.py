@@ -159,6 +159,8 @@ class LoRAModel(nn.Layer):
             logger.warning(
                 f"Reset tensor_parallel_degree of lora_config to {self.model.config.tensor_parallel_degree}."
             )
+        if self.lora_config.tensor_parallel_degree > 1 and lora_config.lora_use_mixer:
+            raise NotImplementedError("lora_use_mixer is not supported in tensor parallel mode.")
         self.forward = self.model.forward
 
         logger.info("Mark only lora and trainable_module as trainable.")
