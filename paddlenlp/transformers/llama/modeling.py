@@ -21,6 +21,7 @@ import warnings
 from functools import partial
 from typing import Optional, Tuple
 
+import numpy as np
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
@@ -100,14 +101,14 @@ __all__ = [
 
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
-        start = 2 ** (-(2 ** -(math.log2(n) - 3)))
+        start = 2 ** (-(2 ** -(np.log2(n) - 3)))
         ratio = start
         return [start * ratio**i for i in range(n)]
 
-    if math.log2(n).is_integer():
+    if np.log2(n).is_integer():
         return _get_interleave_power_of_2(n)
     else:
-        closest_power_of_2 = 2 ** math.floor(math.log2(n))
+        closest_power_of_2 = int(2 ** np.floor(np.log2(n)))
         return (
             _get_interleave_power_of_2(closest_power_of_2)
             + _get_interleave(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]

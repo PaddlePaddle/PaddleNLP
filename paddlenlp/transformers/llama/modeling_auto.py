@@ -164,7 +164,8 @@ def scaled_dot_product_attention(
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
         # then add alibi bias
         if alibi is not None:
-            attn_weights = attn_weights + alibi
+            # attn_weights = attn_weights + alibi
+            pass
         if list(attn_weights.shape) != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
                 f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
@@ -999,7 +1000,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             alibi = dist.shard_tensor(alibi, global_mesh, alibi_place)
         else:
             alibi = None
-        if self.config.use_flash_attention:
+        if self.config.use_flash_attention and not self.config.alibi:
             # attention_mask in flash_attn is always None for pretrain
             # atttenton_mask is used in scaled_dot_product_attention with alibi_tensor
             attention_mask = None
