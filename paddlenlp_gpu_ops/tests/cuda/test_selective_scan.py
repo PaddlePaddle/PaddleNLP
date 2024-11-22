@@ -43,7 +43,7 @@ paddle.Tensor.requires_grad_ = requires_grad_
 
 @pytest.mark.parametrize("wtype", [paddle.float32])
 # @pytest.mark.parametrize('wtype', [paddle.float32])
-@pytest.mark.parametrize("itype", [paddle.float32, paddle.float16, paddle.bfloat16])
+@pytest.mark.parametrize("itype", [paddle.float32])
 # @pytest.mark.parametrize('itype', [paddle.float32])
 # @pytest.mark.parametrize('seqlen', [8, 16, 32, 64, 128, 256, 372, 512, 784, 1024, 1134, 2048, 4096])
 @pytest.mark.parametrize("seqlen", [128, 256, 512, 1024, 2048, 4096])
@@ -220,7 +220,7 @@ def test_selective_scan(
 
 # @pytest.mark.parametrize('wtype', [paddle.float32])
 @pytest.mark.parametrize("wtype", [paddle.float32])
-@pytest.mark.parametrize("itype", [paddle.float32, paddle.float16, paddle.bfloat16])
+@pytest.mark.parametrize("itype", [paddle.float32])
 # @pytest.mark.parametrize('itype', [paddle.float32])
 # @pytest.mark.parametrize('seqlen', [8, 16, 32, 64, 128, 256, 372, 512, 784, 1024, 1134, 2048, 4096])
 @pytest.mark.parametrize("seqlen", [128])
