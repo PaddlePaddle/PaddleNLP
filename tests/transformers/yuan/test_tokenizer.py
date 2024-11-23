@@ -21,6 +21,8 @@ class YuanTokenizationTest(unittest.TestCase):
     def test_extract_non_learnable_parts(self):
         models_with_templates = [
             "IEITYuan/Yuan2-2B",
+            "IEITYuan/Yuan2-51B",
+            "IEITYuan/Yuan2-102B",
         ]
         dummy_conversastions = [
             ["Q.", "A."],
