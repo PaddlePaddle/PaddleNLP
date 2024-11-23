@@ -154,11 +154,14 @@ class LoRAModel(nn.Layer):
         if issubclass(type(self.model), PipelineLayer):
             self.is_pipelinemodel = True
             self.model._single_to_pp_mapping = None
+        if (self.lora_config.tensor_parallel_degree > 1 or self.is_pipelinemodel) and self.lora_config.lora_use_mixer:
+            raise NotImplementedError("lora_use_mixer is not supported in tensor parallel mode.")
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
             logger.warning(
                 f"Reset tensor_parallel_degree of lora_config to {self.model.config.tensor_parallel_degree}."
             )
+
         self.forward = self.model.forward
 
         logger.info("Mark only lora and trainable_module as trainable.")
@@ -443,6 +446,7 @@ class LoRAModel(nn.Layer):
                 pissa=lora_config.pissa,
                 bias_attr=False if module.bias is None else None,
                 use_quick_lora=lora_config.use_quick_lora,
+                lora_use_mixer=lora_config.lora_use_mixer,
             )
         if isinstance(module, nn.Conv2D):
             lora_module = LoRAConv2D(

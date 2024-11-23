@@ -48,6 +48,7 @@ from ...transformers.mc2_parallel_linear import (
     MC2RowSeqParallelCoreLinear,
 )
 from .lora_quick_layers import quick_lora
+from .utils import rng_ctx
 
 
 class LoRALinear(nn.Linear):
@@ -63,6 +64,7 @@ class LoRALinear(nn.Linear):
         rslora: bool = False,
         lora_plus_scale: float = 1.0,
         pissa: bool = False,
+        lora_use_mixer: bool = False,
         **kwargs
     ):
         nn.Linear.__init__(self, in_features, out_features, **kwargs)
@@ -78,6 +80,7 @@ class LoRALinear(nn.Linear):
         # Mark the weight as unmerged
         self.merged = False
         self.pissa = pissa
+        self.lora_use_mixer = lora_use_mixer
 
         # Actual trainable parameters
         self.lora_A = self.create_parameter(
@@ -86,6 +89,15 @@ class LoRALinear(nn.Linear):
             is_bias=False,
             default_initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu"),
         )
+        if self.lora_use_mixer:
+            self.lora_AB = self.create_parameter(
+                shape=[r, r],
+                dtype=self._dtype,
+                is_bias=False,
+                default_initializer=nn.initializer.KaimingUniform(
+                    negative_slope=math.sqrt(5), nonlinearity="leaky_relu"
+                ),
+            )
         self.lora_B = self.create_parameter(
             shape=[r, out_features],
             dtype=self._dtype,
@@ -134,13 +146,19 @@ class LoRALinear(nn.Linear):
 
     def merge(self):
         if not self.merged:
-            new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
+            if self.lora_use_mixer:
+                new_weight = self.weight + self.lora_A @ self.lora_AB @ self.lora_B * self.scaling
+            else:
+                new_weight = self.weight + self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = True
 
     def unmerge(self):
         if self.merged:
-            new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
+            if self.lora_use_mixer:
+                new_weight = self.weight - self.lora_A @ self.lora_AB @ self.lora_B * self.scaling
+            else:
+                new_weight = self.weight - self.lora_A @ self.lora_B * self.scaling
             self.weight.set_value(new_weight)
             self.merged = False
 
@@ -155,7 +173,10 @@ class LoRALinear(nn.Linear):
             result = quick_lora(input, self.lora_A, self.lora_B, self.weight, self.bias, self.scaling)
         else:
             result = F.linear(x=input, weight=self.weight, bias=self.bias, name=self.name)
-            result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
+            if self.lora_use_mixer:
+                result += (self.lora_dropout(input) @ self.lora_A @ self.lora_AB @ self.lora_B) * self.scaling
+            else:
+                result += (self.lora_dropout(input) @ self.lora_A @ self.lora_B) * self.scaling
         return result
 
     def extra_repr(self):
@@ -198,14 +219,15 @@ class RowParallelLoRALinear(RowParallelLinear):
         self.name = self._name
 
         # Actual trainable parameters
-        self.lora_A = self.create_parameter(
-            shape=[self.input_size_per_partition, r],
-            dtype=self._dtype,
-            is_bias=False,
-            attr=paddle.ParamAttr(
-                initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
-            ),
-        )
+        with rng_ctx(self.is_mp, paddle.in_dynamic_mode()):
+            self.lora_A = self.create_parameter(
+                shape=[self.input_size_per_partition, r],
+                dtype=self._dtype,
+                is_bias=False,
+                attr=paddle.ParamAttr(
+                    initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
+                ),
+            )
         self.lora_B = self.create_parameter(
             shape=[r, self.out_features],
             dtype=self._dtype,
@@ -345,14 +367,15 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
         self.name = self._name
 
         # Actual trainable parameters
-        self.lora_A = self.create_parameter(
-            shape=[self.input_size_per_partition, r],
-            dtype=self._dtype,
-            is_bias=False,
-            attr=paddle.ParamAttr(
-                initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
-            ),
-        )
+        with rng_ctx(self.is_mp, paddle.in_dynamic_mode()):
+            self.lora_A = self.create_parameter(
+                shape=[self.input_size_per_partition, r],
+                dtype=self._dtype,
+                is_bias=False,
+                attr=paddle.ParamAttr(
+                    initializer=nn.initializer.KaimingUniform(negative_slope=math.sqrt(5), nonlinearity="leaky_relu")
+                ),
+            )
         self.lora_B = self.create_parameter(
             shape=[r, self.out_features],
             dtype=self._dtype,
@@ -468,15 +491,16 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
             attr=lora_A_weight_attr,
         )
         self.lora_A.is_distributed = False
-        self.lora_B = self.create_parameter(
-            shape=[r, self.output_size_per_partition],
-            dtype=self._dtype,
-            is_bias=False,
-            attr=paddle.ParamAttr(
-                initializer=paddle.nn.initializer.Constant(value=0.0),
-                learning_rate=lora_plus_scale,
-            ),
-        )
+        with rng_ctx(self.is_mp, paddle.in_dynamic_mode()):
+            self.lora_B = self.create_parameter(
+                shape=[r, self.output_size_per_partition],
+                dtype=self._dtype,
+                is_bias=False,
+                attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=0.0),
+                    learning_rate=lora_plus_scale,
+                ),
+            )
 
         self.lora_B.is_distributed = True
         self.lora_B.split_axis = 1
@@ -599,15 +623,16 @@ class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear):
         self.lora_A.is_distributed = False
         mark_as_sequence_parallel_parameter(self.lora_A)
 
-        self.lora_B = self.create_parameter(
-            shape=[r, self.output_size_per_partition],
-            dtype=self._dtype,
-            is_bias=False,
-            attr=paddle.ParamAttr(
-                initializer=paddle.nn.initializer.Constant(value=0.0),
-                learning_rate=lora_plus_scale,
-            ),
-        )
+        with rng_ctx(self.is_mp, paddle.in_dynamic_mode()):
+            self.lora_B = self.create_parameter(
+                shape=[r, self.output_size_per_partition],
+                dtype=self._dtype,
+                is_bias=False,
+                attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=0.0),
+                    learning_rate=lora_plus_scale,
+                ),
+            )
 
         self.lora_B.is_distributed = True
         self.lora_B.split_axis = 1

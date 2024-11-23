@@ -1433,6 +1433,8 @@ struct StoreFunc {
       const AlignedVector<T, VEC_SIZE>& shift_bias_vec,
       const AlignedVector<T, VEC_SIZE>& smooth_weight_vec,
       AlignedVector<OutT, VEC_SIZE>& out_vec,
+      const float quant_max_bound,
+      const float quant_min_bound,
       const float in_scale,
       const int i) {
     out_vec[i] = static_cast<OutT>(ori_out_vec[i]);
@@ -1447,17 +1449,38 @@ struct StoreFunc<T, VEC_SIZE, int8_t> {
       const AlignedVector<T, VEC_SIZE>& shift_bias_vec,
       const AlignedVector<T, VEC_SIZE>& smooth_weight_vec,
       AlignedVector<int8_t, VEC_SIZE>& out_vec,
+      const float quant_max_bound,
+      const float quant_min_bound,
       const float in_scale,
       const int i) {
     float quant_value =
-        127.0f *
+        quant_max_bound *
         static_cast<float>((ori_out_vec[i] + shift_bias_vec[i]) *
                            smooth_weight_vec[i]) *
         in_scale;
     quant_value = rintf(quant_value);
-    quant_value = quant_value > 127.0f ? 127.0f : quant_value;
-    quant_value = quant_value < -127.0f ? -127.0f : quant_value;
+    quant_value = quant_value > quant_max_bound ? quant_max_bound : quant_value;
+    quant_value = quant_value < quant_min_bound ? quant_min_bound : quant_value;
     out_vec[i] = static_cast<int8_t>(quant_value);
+  }
+};
+
+template <typename T, int VEC_SIZE>
+struct StoreFunc<T, VEC_SIZE, __nv_fp8_e4m3> {
+  __device__ __forceinline__ void operator()(
+      const AlignedVector<T, VEC_SIZE>& ori_out_vec,
+      const AlignedVector<T, VEC_SIZE>& shift_bias_vec,
+      const AlignedVector<T, VEC_SIZE>& smooth_weight_vec,
+      AlignedVector<__nv_fp8_e4m3, VEC_SIZE>& out_vec,
+      const float quant_max_bound,
+      const float quant_min_bound,
+      const float in_scale,
+      const int i) {
+    float quant_value =
+        quant_max_bound * static_cast<float>(ori_out_vec[i]) * in_scale;
+    quant_value = quant_value > quant_max_bound ? quant_max_bound : quant_value;
+    quant_value = quant_value < quant_min_bound ? quant_min_bound : quant_value;
+    out_vec[i] = static_cast<__nv_fp8_e4m3>(quant_value);
   }
 };
 
@@ -1468,6 +1491,8 @@ struct StoreFunc<T, VEC_SIZE, T> {
       const AlignedVector<T, VEC_SIZE>& shift_bias_vec,
       const AlignedVector<T, VEC_SIZE>& smooth_weight_vec,
       AlignedVector<T, VEC_SIZE>& out_vec,
+      const float quant_max_bound,
+      const float quant_min_bound,
       const float in_scale,
       const int i) {
     out_vec[i] = ori_out_vec[i];
@@ -1488,6 +1513,8 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
     const T* smooth_weight,
     uint32_t o_idx_base,
     const uint32_t q_head_idx_base,
+    const float quant_max_bound,
+    const float quant_min_bound,
     const float in_scale,
     const uint32_t qo_upper_bound,
     const uint32_t qo_n_stride,
@@ -1565,6 +1592,8 @@ __device__ __forceinline__ void write_o_reg_gmem_multi_warps_shift_smooth_quant(
                                            shift_bias_vec,
                                            smooth_weight_vec,
                                            out_vec,
+                                           quant_max_bound,
+                                           quant_min_bound,
                                            in_scale,
                                            i);
           }
@@ -1598,6 +1627,8 @@ __device__ __forceinline__ void write_o_reg_gmem_shift_smooth_quant(
     const T* smooth_weight,
     uint32_t o_idx_base,
     const uint32_t q_head_idx_base,
+    const float quant_max_bound,
+    const float quant_min_bound,
     const float in_scale,
     const uint32_t qo_upper_bound,
     const uint32_t qo_n_stride,
@@ -1668,6 +1699,8 @@ __device__ __forceinline__ void write_o_reg_gmem_shift_smooth_quant(
                                              shift_bias_vec,
                                              smooth_weight_vec,
                                              out_vec,
+                                             quant_max_bound,
+                                             quant_min_bound,
                                              in_scale,
                                              i);
             }
@@ -1791,6 +1824,8 @@ __global__ void merge_multi_chunks_kernel(
     const T* __restrict__ shift_bias,     // [q_num_heads * HEAD_DIM]
     const T* __restrict__ smooth_weight,  // [q_num_heads * HEAD_DIM]
     T* __restrict__ out,
+    const float quant_max_bound,
+    const float quant_min_bound,
     const float in_scale,
     const int max_seq_len,
     const int num_chunks,
@@ -2048,6 +2083,8 @@ __global__ void merge_multi_chunks_decoder_kernel(
     const T *__restrict__ shift_bias,     // [q_num_heads * HEAD_DIM]
     const T *__restrict__ smooth_weight,  // [q_num_heads * HEAD_DIM]
     OutT *__restrict__ out,
+    const float quant_max_bound,
+    const float quant_min_bound,
     const float in_scale,
     const int max_seq_len,
     const int num_chunks,
@@ -2149,7 +2186,7 @@ __global__ void merge_multi_chunks_decoder_kernel(
 #pragma unroll
     for (int i = 0; i < vec_size; ++i) {
       StoreFunc<T, vec_size, OutT>()(
-          st.o, shift_bias_vec, smooth_weight_vec, out_vec, in_scale, i);
+          st.o, shift_bias_vec, smooth_weight_vec, out_vec, quant_max_bound, quant_min_bound, in_scale, i);
     }
     Store<OutT, vec_size>(
         out_vec,
@@ -2175,6 +2212,8 @@ __global__ void merge_multi_chunks_v2_kernel(
     const T *__restrict__ shift_bias,     // [q_num_heads * HEAD_DIM]
     const T *__restrict__ smooth_weight,  // [q_num_heads * HEAD_DIM]
     OutT *__restrict__ out,
+    const float quant_max_bound,
+    const float quant_min_bound,
     const float in_scale,
     const int max_seq_len,
     const int num_chunks,
@@ -2299,7 +2338,7 @@ __global__ void merge_multi_chunks_v2_kernel(
 #pragma unroll
       for (int i = 0; i < vec_size; ++i) {
         StoreFunc<T, vec_size, OutT>()(
-            st.o, shift_bias_vec, smooth_weight_vec, out_vec, in_scale, i);
+            st.o, shift_bias_vec, smooth_weight_vec, out_vec, quant_max_bound, quant_min_bound, in_scale, i);
       }
       Store<OutT, vec_size>(
           out_vec, &out[(qid * num_heads + hid) * head_dim + vid * vec_size]);
