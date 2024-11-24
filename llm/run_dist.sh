@@ -36,6 +36,7 @@ cd ../model_zoo/gpt-3/external_ops/ &&  ${python} setup.py install && cd -
 
 export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libtcmalloc.so.4
 export MCCL_PROTOS=2
+
 master_ip=$1
 local_ip=`ifconfig eth0 | grep 'inet ' | awk '{print $2}'`
 
