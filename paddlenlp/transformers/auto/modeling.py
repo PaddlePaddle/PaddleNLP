@@ -799,8 +799,6 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
     AutoInferenceModelForCausalLM.
     """
 
-    _name_mapping = get_name_mapping("ForCausalLM")
-
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         """
@@ -836,9 +834,7 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
             model_name = f"{config.architectures[0]}{attn_type}"
 
         # Import the InferenceModel
-        import_class = importlib.import_module(
-            f"paddlenlp.experimental.transformers.{cls._name_mapping[config.architectures[0]]}.modeling"
-        )
+        import_class = importlib.import_module(f"paddlenlp.experimental.transformers.{config.model_type}.modeling")
 
         model_class_name = f"{model_name}InferenceModel"
         model_class = getattr(import_class, model_class_name)

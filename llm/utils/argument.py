@@ -136,6 +136,12 @@ class DataArgument:
         default=False,
         metadata={"help": "Pad the input sequence to `max_length`."},
     )
+    autoregressive: bool = field(
+        default=False,
+        metadata={"help": "Whether to use autoregressive mode."},
+    )
+    # Pose ralated parameters
+    use_pose_convert: bool = field(default=False, metadata={"help": "Whether to use PoSE data conversion function"})
 
     def __post_init__(self):
         if self.task_name_or_path is not None:
@@ -209,6 +215,9 @@ class ModelArgument:
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
     lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+ technique"})
     pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
+    lora_use_mixer: bool = field(
+        default=False, metadata={"help": "Whether to use MosLoRA: https://arxiv.org/pdf/2406.11909"}
+    )
 
     # vera related parameters
     vera: bool = field(default=False, metadata={"help": "Whether to use vera technique"})
@@ -219,6 +228,9 @@ class ModelArgument:
     prefix_path: str = field(default=None, metadata={"help": "Initialize prefix state dict."})
     num_prefix_tokens: int = field(default=128, metadata={"help": "Number of prefix tokens"})
 
+    # reft related parameter
+    reft: bool = field(default=False, metadata={"help": "Whether using reft method"})
+
     from_aistudio: bool = field(default=False, metadata={"help": "Whether to load model from aistudio"})
     save_to_aistudio: bool = field(default=False, metadata={"help": "Whether to save model to aistudio"})
     aistudio_repo_id: str = field(default=None, metadata={"help": "The id of aistudio repo"})
@@ -228,6 +240,25 @@ class ModelArgument:
     neftune: bool = field(default=False, metadata={"help": "Whether to apply NEFT"})
     neftune_noise_alpha: float = field(default=5.0, metadata={"help": "NEFT noise alpha"})
     flash_mask: bool = field(default=False, metadata={"help": "Whether to use flash_mask in flash attention."})
+
+    # long sequence strategy
+    use_long_sequence_strategies: bool = field(
+        default=False, metadata={"help": "Whether to use long sequence strategy"}
+    )
+    rope_scaling_factor: float = field(default=1.0, metadata={"help": "Rope extension scaling factor"})
+    strategy_type: str = field(default=None, metadata={"help": "Long sequence strategy type"})
+    strategy_name: str = field(default=None, metadata={"help": "Long sequence strategy name"})
+
+
+@dataclass
+class ReftArgument:
+    layers: str = field(default="all", metadata={"help": "Layer configuration for the model."})
+    position: str = field(default="f7+l7", metadata={"help": "Position parameter for model."})
+    intervention_type: str = field(default="LoreftIntervention", metadata={"help": "Type of intervention."})
+    rank: int = field(default=8, metadata={"help": "Rank parameter for model."})
+    act_fn: str = field(default="linear", metadata={"help": "Activation function."})
+    add_bias: bool = field(default=False, metadata={"help": "Flag indicating whether to add bias."})
+    dropout: float = field(default=0.0, metadata={"help": "Dropout rate."})
 
 
 @dataclass
@@ -300,7 +331,7 @@ class QuantArgument:
     )
     shift_step: int = field(default=32, metadata={"help": "Sample steps when shift"})
 
-    # Pre-quant methos Smooth related parameters
+    # Pre-quant methods Smooth related parameters
     smooth: bool = field(default=False, metadata={"help": "Whether to use Smooth"})
     smooth_all_linears: bool = field(default=False, metadata={"help": "Whether to smooth all linears"})
     smooth_sampler: str = field(
