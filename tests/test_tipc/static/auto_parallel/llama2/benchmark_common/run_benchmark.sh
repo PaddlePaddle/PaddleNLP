@@ -229,7 +229,7 @@ export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 # 如不设置参数为1,则默认选择不带tensor fusion的sharding stage1版本
 export FLAGS_enable_sharding_stage1_tensor_fusion=1
 
-export CUDA_DEVICE_MAX_CONNECTIONS=1
+# export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PARALLEL_CROSS_ENTROPY=true
 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
