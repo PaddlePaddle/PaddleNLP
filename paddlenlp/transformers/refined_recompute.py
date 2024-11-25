@@ -652,97 +652,97 @@ class RRRowSequenceParallelLinear(RowSequenceParallelLinear):
         return output
 
 
-if __name__ == "__main__":
-    # test flashmask_attention
-    paddle.seed(2024)
-    from paddle.nn.functional.flash_attention import flashmask_attention
+# if __name__ == "__main__":
+#     # test flashmask_attention
+#     paddle.seed(2024)
+#     from paddle.nn.functional.flash_attention import flashmask_attention
 
-    dtype = "float16"
-    paddle.set_default_dtype(dtype)
+#     dtype = "float16"
+#     paddle.set_default_dtype(dtype)
 
-    in_weight_shape = (32, 3 * 2 * 32)
-    linear1 = paddle.nn.Linear(
-        in_weight_shape[0],
-        in_weight_shape[-1],
-    )
-    paddle.seed(2024)
-    in_weight = paddle.create_parameter(shape=in_weight_shape, dtype=dtype, name="in_weight")
-    in_weight.set_value(paddle.normal(0, 0.02, in_weight_shape))
-    in_weight.main_grad = paddle.normal(0, 0.02, in_weight.shape).cast("float32")
-    linear1.weight.set_value(in_weight)
-    in_bias = paddle.create_parameter(shape=(in_weight.shape[-1],), dtype=dtype, name="in_bias", is_bias=True)
-    in_bias.main_grad = paddle.normal(0, 0.02, in_bias.shape).cast("float32")
-    linear1.bias.set_value(in_bias)
-    linear1.weight.main_grad = in_weight.main_grad
-    linear1.bias.main_grad = in_bias.main_grad
+#     in_weight_shape = (32, 3 * 2 * 32)
+#     linear1 = paddle.nn.Linear(
+#         in_weight_shape[0],
+#         in_weight_shape[-1],
+#     )
+#     paddle.seed(2024)
+#     in_weight = paddle.create_parameter(shape=in_weight_shape, dtype=dtype, name="in_weight")
+#     in_weight.set_value(paddle.normal(0, 0.02, in_weight_shape))
+#     in_weight.main_grad = paddle.normal(0, 0.02, in_weight.shape).cast("float32")
+#     linear1.weight.set_value(in_weight)
+#     in_bias = paddle.create_parameter(shape=(in_weight.shape[-1],), dtype=dtype, name="in_bias", is_bias=True)
+#     in_bias.main_grad = paddle.normal(0, 0.02, in_bias.shape).cast("float32")
+#     linear1.bias.set_value(in_bias)
+#     linear1.weight.main_grad = in_weight.main_grad
+#     linear1.bias.main_grad = in_bias.main_grad
 
-    out_weight_shape = (2 * 32, 32)
-    out_weight = paddle.create_parameter(shape=out_weight_shape, dtype=dtype, name="out_weight")
-    out_weight.set_value(paddle.normal(0, 0.02, out_weight_shape))
-    out_weight.main_grad = paddle.normal(0, 0.02, out_weight.shape).cast("float32")
+#     out_weight_shape = (2 * 32, 32)
+#     out_weight = paddle.create_parameter(shape=out_weight_shape, dtype=dtype, name="out_weight")
+#     out_weight.set_value(paddle.normal(0, 0.02, out_weight_shape))
+#     out_weight.main_grad = paddle.normal(0, 0.02, out_weight.shape).cast("float32")
 
-    class cus_multiply(paddle.autograd.PyLayer):
-        @staticmethod
-        def forward(ctx, a, b):
-            y = paddle.multiply(a, b)
-            ctx.save_for_backward(a, b)
-            return y
+#     class cus_multiply(paddle.autograd.PyLayer):
+#         @staticmethod
+#         def forward(ctx, a, b):
+#             y = paddle.multiply(a, b)
+#             ctx.save_for_backward(a, b)
+#             return y
 
-        @staticmethod
-        def backward(ctx, dy):
-            a, b = ctx.saved_tensor()
-            grad_a = dy * a
-            grad_b = dy * b
-            return grad_a, grad_b
+#         @staticmethod
+#         def backward(ctx, dy):
+#             a, b = ctx.saved_tensor()
+#             grad_a = dy * a
+#             grad_b = dy * b
+#             return grad_a, grad_b
 
-    multiply = cus_multiply.apply
+#     multiply = cus_multiply.apply
 
-    def fwd(x, startend_row_indices, enable=True):
-        def fwd_linear(x):
-            weight = multiply(linear1.weight, linear1.weight * 0.1)
-            bias = multiply(linear1.bias, linear1.bias * 0.1)
-            qkv = paddle.nn.functional.silu(paddle.nn.functional.linear(x, weight, bias))
-            q, k, v = paddle.chunk(qkv, 3, axis=-1)
-            q = q.reshape([q.shape[0], q.shape[1], 2, q.shape[2] // 2])
-            k = k.reshape([k.shape[0], k.shape[1], 2, v.shape[2] // 2])
-            v = v.reshape([v.shape[0], k.shape[1], 2, v.shape[2] // 2])
-            return q, k, v
+#     def fwd(x, startend_row_indices, enable=True):
+#         def fwd_linear(x):
+#             weight = multiply(linear1.weight, linear1.weight * 0.1)
+#             bias = multiply(linear1.bias, linear1.bias * 0.1)
+#             qkv = paddle.nn.functional.silu(paddle.nn.functional.linear(x, weight, bias))
+#             q, k, v = paddle.chunk(qkv, 3, axis=-1)
+#             q = q.reshape([q.shape[0], q.shape[1], 2, q.shape[2] // 2])
+#             k = k.reshape([k.shape[0], k.shape[1], 2, v.shape[2] // 2])
+#             v = v.reshape([v.shape[0], k.shape[1], 2, v.shape[2] // 2])
+#             return q, k, v
 
-        q, k, v = no_recompute(fwd_linear, x, enable=enable)
+#         q, k, v = no_recompute(fwd_linear, x, enable=enable)
 
-        q, k, v = q * q, k * k, v * v
-        out = no_recompute(
-            flashmask_attention,
-            q,
-            k,
-            v,
-            startend_row_indices=startend_row_indices,
-            causal=True,
-            enable=enable,
-        )
-        out = out.flatten(-2, -1)
-        out = paddle.matmul(out, out_weight)
-        return out
+#         q, k, v = q * q, k * k, v * v
+#         out = no_recompute(
+#             flashmask_attention,
+#             q,
+#             k,
+#             v,
+#             startend_row_indices=startend_row_indices,
+#             causal=True,
+#             enable=enable,
+#         )
+#         out = out.flatten(-2, -1)
+#         out = paddle.matmul(out, out_weight)
+#         return out
 
-    x = paddle.normal(0, 0.02, (1, 128, 32))
-    x.stop_gradient = False
-    x_input = x
-    startend_row_indices = paddle.randint(0, 128, (1, 2, 128, 1), dtype="int32")
+#     x = paddle.normal(0, 0.02, (1, 128, 32))
+#     x.stop_gradient = False
+#     x_input = x
+#     startend_row_indices = paddle.randint(0, 128, (1, 2, 128, 1), dtype="int32")
 
-    enable = True
-    # 第一层
-    o1 = recompute(
-        fwd,
-        x,
-        startend_row_indices,
-        enable=enable,
-    )
-    # 第二层
-    o2 = recompute(fwd, o1 + x, startend_row_indices, enable=enable)
-    # 第三层
-    o3 = recompute(fwd, o2 + x, startend_row_indices, enable=enable)
+#     enable = True
+#     # 第一层
+#     o1 = recompute(
+#         fwd,
+#         x,
+#         startend_row_indices,
+#         enable=enable,
+#     )
+#     # 第二层
+#     o2 = recompute(fwd, o1 + x, startend_row_indices, enable=enable)
+#     # 第三层
+#     o3 = recompute(fwd, o2 + x, startend_row_indices, enable=enable)
 
-    o3.sum().backward()
-    print(x_input.grad.mean())
-    print(linear1.weight.grad.mean())
-    print(out_weight.grad.mean())
+#     o3.sum().backward()
+#     print(x_input.grad.mean())
+#     print(linear1.weight.grad.mean())
+#     print(out_weight.grad.mean())
