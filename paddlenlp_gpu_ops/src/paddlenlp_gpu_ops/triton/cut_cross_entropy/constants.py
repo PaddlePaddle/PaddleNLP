@@ -12,5 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .flash import cal_flash_loss
-from .ring import cal_inf_loss, cal_ring_loss
+# Copyright (C) 2024 Apple Inc. All Rights Reserved.
+IGNORE_INDEX: int = -100

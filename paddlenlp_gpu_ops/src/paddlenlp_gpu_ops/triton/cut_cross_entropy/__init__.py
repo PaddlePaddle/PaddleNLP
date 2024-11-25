@@ -11,6 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from .flash import cal_flash_loss
-from .ring import cal_inf_loss, cal_ring_loss
+'''
+the code in this folder is adapted from https://github.com/apple/ml-cross-entropy
+'''
+from .linear_cross_entropy import (
+    LinearCrossEntropy,
+    LinearCrossEntropyImpl,
+    linear_cross_entropy,
+)
