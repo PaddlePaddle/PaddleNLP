@@ -1,6 +1,7 @@
 # Copyright (C) 2024 Apple Inc. All Rights Reserved.
 from typing import Union
 
+import numpy as np
 import paddle
 
 
@@ -49,7 +50,7 @@ def handle_reduction_none(
     if valids is None:
         return loss.reshape(batch_shape)
 
-    full_loss = paddle.zeros((batch_shape.numel(),), dtype=loss.dtype)
+    full_loss = paddle.zeros(np.prod(batch_shape), dtype=loss.dtype)
     full_loss[(valids + 1) if shift else valids] = loss
 
     return full_loss.reshape(batch_shape)

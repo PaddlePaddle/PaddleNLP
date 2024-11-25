@@ -250,7 +250,7 @@ def cce_backward_kernel(
     vocab_ordering: Union[paddle.Tensor, None] = None,
     grad_scale: float = 1.0,
 ) -> tuple[paddle.Tensor, paddle.Tensor]:
-    assert do.numel() in (e.shape[0], 1)
+    assert do.numel().item() in (e.shape[0], 1)
     assert c.shape[1] == e.shape[1]
     assert lse.shape[0] == e.shape[0] or (valids is not None and lse.shape[0] == valids.shape[0])
     assert e.dtype in (
@@ -277,7 +277,7 @@ def cce_backward_kernel(
     else:
         B = e.shape[0]
 
-    if do.numel() > 1:
+    if do.numel().item() > 1:
         do = do.contiguous()
         lse = lse.contiguous()
         assert do.strides[0] == lse.strides[0], f"{do.strides=}, {lse.strides=}"
@@ -287,7 +287,7 @@ def cce_backward_kernel(
 
     if vocab_ordering is not None:
         assert vocab_ordering.ndim == 1
-        assert vocab_ordering.numel() == dc.shape[0]
+        assert vocab_ordering.numel().item() == dc.shape[0]
         assert vocab_ordering.strides[0] == 1
 
     nd_locks = triton.cdiv(c.shape[1], 64)

@@ -162,19 +162,19 @@ def cce_lse_forward_kernel(
     assert e.is_contiguous(), "Matrix A must be contiguous"
     if valids is not None:
         assert valids.ndim == 1
-        B = valids.numel()
+        B = valids.numel().item()
     else:
         B, _ = e.shape
 
     V, D = c.shape
     # Allocates output.
     lse = paddle.full((B,), -float("inf"), dtype=paddle.float32)
+
     locks = paddle.full(
         (triton.cdiv(B, 128),),
         0,
-        dtype=paddle.int32,  # paddle donot support uint32, so we use int32
+        dtype="int32",  # paddle donot support uint32, so we use int32
     )
-
     if return_logit_avg:
         logit_avg = paddle.full((V,), 0.0, dtype=paddle.float32)
     else:
