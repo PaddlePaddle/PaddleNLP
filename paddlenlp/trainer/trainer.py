@@ -2616,6 +2616,7 @@ class Trainer:
                 "world_size": world_size,
                 "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
                 "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
+                "remove_master_weight": "remove_master_weight" in self.args.unified_checkpoint_config,
             }
             if os.path.exists(
                 os.path.join(self.args.output_signal_dir, "async_save_info.json")

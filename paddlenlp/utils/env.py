@@ -111,3 +111,12 @@ SAFE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.safetensors.index.json"
 
 SAFE_PEFT_WEIGHTS_NAME = "peft_model.safetensors"
 SAFE_PEFT_WEIGHTS_INDEX_NAME = "peft_model.safetensors.index.json"
+
+# Checkpoint quantization
+MOMENT1_KEYNAME = "moment1_0"
+MOMENT2_KEYNAME = "moment2_0"
+BETA1_KEYNAME = "beta1_pow_acc_0"
+BETA2_KEYNAME = "beta2_pow_acc_0"
+SYMMETRY_QUANT_SCALE = "@scales"
+ASYMMETRY_QUANT_SCALE_MIN = "@min_scales"
+ASYMMETRY_QUANT_SCALE_MAX = "@max_scales"

@@ -841,10 +841,15 @@ class TrainingArguments:
                 "- skip_save_model_weight: do not save model weights when the masters weight exist\n"
                 "- master_weight_compatible: 1. if the master weights exist, only load when needed\n"
                 "                            2. if master weights does not exist, convert model weights to master weights when needed\n"
+                "- remove_master_weight: same with `master_weight_compatible`, use in checkpoint quantization.\n"
                 "- async_save: enable asynchronous saving checkpoints to disk\n"
                 "- enable_all_options: enable all optimization configurations\n"
             )
         },
+    )
+    ckpt_quant_stage: str = field(
+        default="O0",
+        metadata={"help": "checkpoint quantization stage."},
     )
     ignore_load_lr_and_optim: Optional[bool] = field(
         default=False,
@@ -1629,6 +1634,7 @@ class TrainingArguments:
                     if x not in [
                         "skip_save_model_weight",
                         "master_weight_compatible",
+                        "remove_master_weight",
                         "async_save",
                         "enable_all_options",
                         "ignore_merge_optimizer",
