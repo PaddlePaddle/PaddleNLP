@@ -13,7 +13,7 @@ import triton
 import triton.language as tl
 from einops import rearrange, repeat
 
-from ..utils import custom_bwd, custom_fwd
+from ...utils import custom_bwd, custom_fwd
 from .math import softplus
 
 

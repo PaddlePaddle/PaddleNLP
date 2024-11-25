@@ -16,7 +16,7 @@ import paddle.nn.functional as F
 import triton
 import triton.language as tl
 
-from ..utils import custom_bwd, custom_fwd, get_autocast_gpu_dtype, is_autocast_enabled
+from ...utils import custom_bwd, custom_fwd, get_autocast_gpu_dtype, is_autocast_enabled
 
 
 def layer_norm_ref(

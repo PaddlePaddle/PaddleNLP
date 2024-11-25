@@ -13,7 +13,7 @@ import triton
 import triton.language as tl
 from einops import rearrange, repeat
 
-from ..utils import compare_version, custom_bwd, custom_fwd
+from ...utils import compare_version, custom_bwd, custom_fwd
 from .ssd_bmm import _bmm_chunk_bwd, _bmm_chunk_fwd
 
 TRITON_22 = compare_version("triton", operator.ge, "2.2.0")

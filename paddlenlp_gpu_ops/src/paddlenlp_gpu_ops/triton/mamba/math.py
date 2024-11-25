@@ -17,7 +17,7 @@ import operator
 import triton
 import triton.language as tl
 
-from ..utils import compare_version
+from ...utils import compare_version
 
 __all__ = ["softplus", "tanh", "rsqrt"]
 

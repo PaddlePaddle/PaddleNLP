@@ -15,7 +15,7 @@ import triton
 import triton.language as tl
 from einops import rearrange
 
-from ..utils import custom_bwd, custom_fwd
+from ...utils import custom_bwd, custom_fwd
 
 
 def rms_norm_ref(x, weight, bias, z=None, eps=1e-6, group_size=None, norm_before_gate=True, upcast=True, epsilon=None):

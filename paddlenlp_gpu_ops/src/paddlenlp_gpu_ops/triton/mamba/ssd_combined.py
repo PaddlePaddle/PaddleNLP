@@ -12,7 +12,7 @@ import triton
 import triton.language as tl
 from einops import rearrange, repeat
 
-from ..utils import (
+from ...utils import (
     compare_version,
     custom_bwd,
     custom_fwd,
