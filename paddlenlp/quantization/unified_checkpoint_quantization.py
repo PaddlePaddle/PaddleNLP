@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 import paddle
 from paddle.distributed import fleet
 
@@ -33,7 +34,7 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 
 
-def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
+def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict, use_pd=False):
     """
     dequantize unified optimizer state dict.
     Args:
@@ -68,7 +69,7 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
                     dequant=True,
                     tp_rank=tp_rank,
                     tp_degree=tp_degree,
-                    use_pd=True,
+                    use_pd=use_pd,
                 )
                 state_dict[quant_key] = weight
             elif is_moment2:
@@ -85,10 +86,13 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
                     dequant=True,
                     tp_rank=tp_rank,
                     tp_degree=tp_degree,
-                    use_pd=True,
+                    use_pd=use_pd,
                 )
                 # cal m2
-                weight = paddle.square(1.0 / weight - eps)
+                if use_pd:
+                    weight = paddle.square(1.0 / weight - eps)
+                else:
+                    weight = np.square(1.0 / weight - eps)
                 state_dict[quant_key] = weight
     elif ckpt_quant_stage == "O2":
         # set eps
@@ -117,7 +121,7 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
                 quant=False,
                 tp_rank=tp_rank,
                 tp_degree=tp_degree,
-                use_pd=True,
+                use_pd=use_pd,
                 symmetry=True,
             )
             ratio_weight = group_wise_quant_dequant(
@@ -128,10 +132,13 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
                 quant=False,
                 tp_rank=tp_rank,
                 tp_degree=tp_degree,
-                use_pd=True,
+                use_pd=use_pd,
             )
 
-            ratio_weight = paddle.square(1.0 / ratio_weight - eps)
+            if use_pd:
+                ratio_weight = paddle.square(1.0 / ratio_weight - eps)
+            else:
+                ratio_weight = np.square(1.0 / ratio_weight - eps)
             state_dict[quant_key] = ratio_weight
             m1_state_dict[quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME] = m1_weight
             state_dict.update(m1_state_dict)

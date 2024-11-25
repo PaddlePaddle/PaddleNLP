@@ -29,8 +29,10 @@ from paddlenlp.transformers.model_utils import (
     unwrap_model,
 )
 from paddlenlp.transformers.utils import dtype_byte_size
+from paddlenlp.utils import infohub
 from paddlenlp.utils.env import (
     LORA_WEIGHTS_NAME,
+    MAX_QUANTIZATION_TIMES,
     PADDLE_MASTER_WEIGHTS_NAME,
     PADDLE_OPTIMIZER_NAME,
     PADDLE_WEIGHTS_NAME,
@@ -241,7 +243,12 @@ class UnifiedCheckpointHandler:
 
         # save opt index json if checkpoint quantization is on.
         if self.args.ckpt_quant_stage != "O0":
-            sharded_optim_index = {"ckpt_quant_stage": self.args.ckpt_quant_stage}
+            sharded_optim_index = {
+                "ckpt_quant_stage": self.args.ckpt_quant_stage,
+                "quant_ckpt_resume_times": infohub["quant_ckpt_resume_times"]
+                if "quant_ckpt_resume_times" in infohub
+                else 0,
+            }
             optimizer_index_name = SAFE_OPTIMIZER_INDEX_NAME
             path = os.path.join(output_dir, optimizer_index_name)
             if self.args.should_save:
@@ -429,9 +436,20 @@ class UnifiedCheckpointHandler:
             with open(os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME), "r") as f:
                 index = json.loads(f.read())
 
+        # get quant ckpt info `ckpt_quant_stage` and `quant_ckpt_resume_times`
         ckpt_quant_stage = "O0"
         if "ckpt_quant_stage" in index:
             ckpt_quant_stage = index["ckpt_quant_stage"]
+
+        quant_ckpt_resume_times = 0
+        if "quant_ckpt_resume_times" in index:
+            quant_ckpt_resume_times = index["quant_ckpt_resume_times"]
+        # increment and save resume times in infohub
+        infohub["quant_ckpt_resume_times"] = quant_ckpt_resume_times + 1
+
+        # Quantization times exceeds the limit. Turn off the quantization strategy.
+        if quant_ckpt_resume_times > MAX_QUANTIZATION_TIMES:
+            ckpt_quant_stage = "O0"
 
         # If not having merge optimizer, then load non-merge optimizer.
         if "weight_map" not in index:
@@ -649,6 +667,9 @@ def unified_optimizer_into_shards(
 
     if args.should_save and args.ckpt_quant_stage in ["O1", "O2"]:
         sharded_optim_index["ckpt_quant_stage"] = args.ckpt_quant_stage
+        sharded_optim_index["quant_ckpt_resume_times"] = (
+            infohub["quant_ckpt_resume_times"] if "quant_ckpt_resume_times" in infohub else 0
+        )
 
     if master_weights is not None:
         index_master_weight_filelist, total_master_weight_size_list = gather_sharded_object(
