@@ -1309,11 +1309,6 @@ class AutoPredictor:
         model = kwargs.pop("model", None)
         cache_kvs_shape = None
 
-        if predictor_args.mode == "static":
-            cache_kvs_shape = model.get_cache_kvs_shape(
-                config, predictor_args.batch_size, predictor_args.total_max_length
-            )
-
         # static or dynamic
         execute_mode = "Dygraph" if predictor_args.mode == "dynamic" else "StaticGraph"
 
@@ -1322,6 +1317,11 @@ class AutoPredictor:
             # block/no block
             attn_type = get_attention_type(predictor_args.block_attn)
             inference_mode = f"{attn_type}Inference"
+
+            if predictor_args.mode == "static":
+                cache_kvs_shape = model.get_cache_kvs_shape(
+                    config, predictor_args.batch_size, predictor_args.total_max_length
+                )
         else:
             inference_mode = ""
 
