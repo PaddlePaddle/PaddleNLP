@@ -18,6 +18,7 @@ import os
 import sys
 import time
 from abc import abstractmethod
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from threading import Thread
 
@@ -48,6 +49,34 @@ from paddlenlp.trl import llm_utils
 from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
+
+ATTENTION_TYPE_FOR_PREDICTOR_MAPPING_NAMES = OrderedDict(
+    [
+        ((True,), "Block"),
+        ((False,), ""),
+    ]
+)
+
+
+def get_attention_type(*args):
+    """
+    It must be passed in the follow order.
+    (block_attn)
+    """
+    count = 0
+    res = []
+    for attn_type in args:
+        if attn_type:
+            res.append(True)
+            count += 1
+        else:  # handle None and False case
+            res.append(False)
+    if count > 1:
+        raise ValueError("Only one attention type can be used")
+    try:
+        return ATTENTION_TYPE_FOR_PREDICTOR_MAPPING_NAMES[tuple(res)]
+    except KeyError:
+        raise ValueError("Unknown attention type")
 
 
 @dataclass
@@ -122,6 +151,7 @@ class PredictorArgument:
     )
 
     append_attn: bool = field(default=False, metadata={"help": "whether use append attention"})
+    speculate_attn: bool = field(default=False, metadata={"help": "whether use append attention"})
 
     chat_template: str = field(
         default=None,
@@ -1277,7 +1307,12 @@ class AutoPredictor:
             Predictor: The predictor.
         """
         model = kwargs.pop("model", None)
-        cache_kvs_shape = kwargs.pop("cache_kvs_shape", None)
+        cache_kvs_shape = None
+
+        if predictor_args.mode == "static":
+            cache_kvs_shape = model.get_cache_kvs_shape(
+                config, predictor_args.batch_size, predictor_args.total_max_length
+            )
 
         # static or dynamic
         execute_mode = "Dygraph" if predictor_args.mode == "dynamic" else "StaticGraph"
@@ -1285,7 +1320,8 @@ class AutoPredictor:
         # infer/ no infer
         if predictor_args.inference_model:
             # block/no block
-            inference_mode = f"{'Block' if predictor_args.block_attn else ''}Inference"
+            attn_type = get_attention_type(predictor_args.block_attn)
+            inference_mode = f"{attn_type}Inference"
         else:
             inference_mode = ""
 
@@ -1304,8 +1340,6 @@ class AutoPredictor:
 def create_predictor(
     predictor_args: PredictorArgument,
     model_args: ModelArgument,
-    tensor_parallel_degree: int = 1,
-    tensor_parallel_rank: int = 0,
 ):
     tokenizer = AutoTokenizer.from_pretrained(
         predictor_args.model_name_or_path,
@@ -1341,36 +1375,18 @@ def create_predictor(
     tensor_parallel_rank, tensor_parallel_degree = llm_utils.init_dist_env()
 
     model = None
-    cache_kvs_shape = None
 
     # model loading
     if predictor_args.inference_model:
-        if predictor_args.mode == "dynamic":
-            # AutoInferenceModel
-            model = AutoInferenceModelForCausalLM.from_pretrained(
-                predictor_args.model_name_or_path,
-                config=config,
-                predictor_args=predictor_args,
-                model_args=model_args,
-                dtype=predictor_args.dtype,
-                tensor_parallel_degree=tensor_parallel_degree,
-                tensor_parallel_rank=tensor_parallel_rank,
-            )
-            model.eval()
-        else:
-            # cache_kvs_shape compute
-            model = AutoInferenceModelForCausalLM.from_pretrained(
-                predictor_args.model_name_or_path,
-                config=config,
-                predictor_args=predictor_args,
-                model_args=model_args,
-                dtype=predictor_args.dtype,
-                tensor_parallel_degree=tensor_parallel_degree,
-                tensor_parallel_rank=tensor_parallel_rank,
-            )
-            cache_kvs_shape = model.get_cache_kvs_shape(
-                config, predictor_args.batch_size, predictor_args.total_max_length
-            )
+        model = AutoInferenceModelForCausalLM.from_pretrained(
+            predictor_args.model_name_or_path,
+            config=config,
+            predictor_args=predictor_args,
+            model_args=model_args,
+            dtype=predictor_args.dtype,
+            tensor_parallel_degree=tensor_parallel_degree,
+            tensor_parallel_rank=tensor_parallel_rank,
+        )
     else:
         if predictor_args.mode == "dynamic":
             # model import (gpt-3,ernie) or AutoModel
@@ -1408,9 +1424,7 @@ def create_predictor(
                     tensor_parallel_output=False,
                 )
 
-    predictor = AutoPredictor.create_predictor(
-        predictor_args, config, model_args, tokenizer, model=model, cache_kvs_shape=cache_kvs_shape
-    )
+    predictor = AutoPredictor.create_predictor(predictor_args, config, model_args, tokenizer, model=model)
 
     return predictor
 

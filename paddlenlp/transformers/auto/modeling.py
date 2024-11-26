@@ -161,6 +161,36 @@ MODEL_FOR_CAUSAL_LM_INFERENCE_MAPPING_NAMES = OrderedDict(
 )
 
 
+ATTENTION_TYPE_FOR_MODEL_MAPPING_NAMES = OrderedDict(
+    [
+        ((True, False), "Block"),
+        ((False, True), "Speculate"),
+        ((False, False), ""),
+    ]
+)
+
+
+def get_attention_type(*args):
+    """
+    It must be passed in the follow order.
+    (block_attn, speculate_attn)
+    """
+    count = 0
+    res = []
+    for attn_type in args:
+        if attn_type:
+            res.append(True)
+            count += 1
+        else:  # handle None and False case
+            res.append(False)
+    if count > 1:
+        raise ValueError("Only one attention type can be True")
+    try:
+        return ATTENTION_TYPE_FOR_MODEL_MAPPING_NAMES[tuple(res)]
+    except KeyError:
+        raise ValueError("Unknown attention type")
+
+
 def get_name_mapping(task="Model"):
     """
     Task can be 'Backbone', 'Model', 'ForPretraining', 'ForSequenceClassification', 'ForTokenClassification',
@@ -830,12 +860,7 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
                 )
         else:
             # Check whether the model use block attention
-            if predictor_args.block_attn and predictor_args.speculate_method is None:
-                attn_type = "Block"
-            elif predictor_args.speculate_method is not None:
-                attn_type = "Speculate"
-            else:
-                attn_type = ""
+            attn_type = get_attention_type(predictor_args.block_attn, predictor_args.speculate_attn)
             model_name = f"{config.architectures[0]}{attn_type}"
 
         # Import the InferenceModel
@@ -858,7 +883,9 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         )
 
         if predictor_args.mode == "dynamic":
-            return model_class.from_pretrained(predictor_args.model_name_or_path, config=config, dtype=dtype)
+            model = model_class.from_pretrained(predictor_args.model_name_or_path, config=config, dtype=dtype)
+            model.eval()
+            return model
 
         return model_class
 
