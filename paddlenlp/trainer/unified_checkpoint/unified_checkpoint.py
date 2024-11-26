@@ -241,14 +241,17 @@ class UnifiedCheckpointHandler:
         optimizer_name = _add_variant(SAFE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
         master_weights_name = _add_variant(SAFE_MASTER_WEIGHTS_NAME, self.args.optimizer_name_suffix)
 
+        sharded_optim_index = {}
         # save opt index json if checkpoint quantization is on.
         if self.args.ckpt_quant_stage != "O0":
-            sharded_optim_index = {
-                "ckpt_quant_stage": self.args.ckpt_quant_stage,
-                "quant_ckpt_resume_times": infohub["quant_ckpt_resume_times"]
-                if "quant_ckpt_resume_times" in infohub
-                else 0,
-            }
+            sharded_optim_inde["ckpt_quant_stage"] = self.args.ckpt_quant_stage
+
+        if "quant_ckpt_resume_times" in infohub:
+            sharded_optim_index["quant_ckpt_resume_times"] = (
+                infohub["quant_ckpt_resume_times"] if "quant_ckpt_resume_times" in infohub else 0
+            )
+
+        if len(sharded_optim_index) > 0:
             optimizer_index_name = SAFE_OPTIMIZER_INDEX_NAME
             path = os.path.join(output_dir, optimizer_index_name)
             if self.args.should_save:
@@ -445,7 +448,9 @@ class UnifiedCheckpointHandler:
         if "quant_ckpt_resume_times" in index:
             quant_ckpt_resume_times = index["quant_ckpt_resume_times"]
         # increment and save resume times in infohub
-        infohub["quant_ckpt_resume_times"] = quant_ckpt_resume_times + 1
+        if ckpt_quant_stage != "O0":
+            quant_ckpt_resume_times += 1
+        infohub["quant_ckpt_resume_times"] = quant_ckpt_resume_times
 
         # Quantization times exceeds the limit. Turn off the quantization strategy.
         if quant_ckpt_resume_times > MAX_QUANTIZATION_TIMES:
@@ -665,8 +670,9 @@ def unified_optimizer_into_shards(
     )
     sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
 
-    if args.should_save and args.ckpt_quant_stage in ["O1", "O2"]:
-        sharded_optim_index["ckpt_quant_stage"] = args.ckpt_quant_stage
+    if args.should_save:
+        if args.ckpt_quant_stage in ["O1", "O2"]:
+            sharded_optim_index["ckpt_quant_stage"] = args.ckpt_quant_stage
         sharded_optim_index["quant_ckpt_resume_times"] = (
             infohub["quant_ckpt_resume_times"] if "quant_ckpt_resume_times" in infohub else 0
         )
