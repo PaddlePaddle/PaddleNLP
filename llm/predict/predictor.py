@@ -1182,10 +1182,8 @@ class AutoPredictor:
         Returns:
             Predictor: The predictor.
         """
-        tensor_parallel_degree = kwargs.pop("tensor_parallel_degree", 1)
-        tensor_parallel_rank = kwargs.pop("tensor_parallel_rank", 0)
-        model = None
-        cache_kvs_shape = None
+        model = kwargs.pop("model",None)
+        cache_kvs_shape = kwargs.pop("cache_kvs_shape",None)
 
         # static or dynamic
         execute_mode = "Dygraph" if predictor_args.mode == "dynamic" else "StaticGraph"
@@ -1194,70 +1192,9 @@ class AutoPredictor:
         if predictor_args.inference_model:
             # block/no block
             inference_mode = f"{'Block' if predictor_args.block_attn else ''}Inference"
-            if execute_mode == "Dygraph":
-                # AutoInferenceModel
-                model = AutoInferenceModelForCausalLM.from_pretrained(
-                    predictor_args.model_name_or_path,
-                    config=config,
-                    predictor_args=predictor_args,
-                    model_args=model_args,
-                    dtype=predictor_args.dtype,
-                    tensor_parallel_degree=tensor_parallel_degree,
-                    tensor_parallel_rank=tensor_parallel_rank,
-                )
-                model.eval()
-            else:
-                # cache_kvs_shape compute
-                model = AutoInferenceModelForCausalLM.from_pretrained(
-                    predictor_args.model_name_or_path,
-                    config=config,
-                    predictor_args=predictor_args,
-                    model_args=model_args,
-                    dtype=predictor_args.dtype,
-                    tensor_parallel_degree=tensor_parallel_degree,
-                    tensor_parallel_rank=tensor_parallel_rank,
-                )
-                cache_kvs_shape = model.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
         else:
             inference_mode = ""
-            if execute_mode == "Dygraph":
-                # model import (gpt-3,ernie) or AutoModel
-                if model_args.model_type == "gpt-3":
-                    sys.path.append("./gpt-3")
-                    from modeling import GPTForCausalLM
-
-                    model = GPTForCausalLM.from_pretrained(
-                        predictor_args.model_name_or_path,
-                        dtype=predictor_args.dtype,
-                        tensor_parallel_degree=tensor_parallel_degree,
-                        tensor_parallel_rank=tensor_parallel_rank,
-                        tensor_parallel_output=False,
-                    )
-                elif model_args.model_type == "ernie-3.5-se":
-                    sys.path.append("./ernie-3.5-se")
-                    from modeling import Ernie35ForCausalLM
-
-                    tensor_parallel_degree = paddle.distributed.get_world_size()
-                    tensor_parallel_rank = paddle.distributed.get_rank()
-                    model = Ernie35ForCausalLM.from_pretrained(
-                        predictor_args.model_name_or_path,
-                        dtype=predictor_args.dtype,
-                        tensor_parallel_degree=tensor_parallel_degree,
-                        tensor_parallel_rank=tensor_parallel_rank,
-                        tensor_parallel_output=False,
-                    )
-                else:
-                    model = AutoModelForCausalLM.from_pretrained(
-                        predictor_args.model_name_or_path,
-                        dtype=predictor_args.dtype,
-                        use_flash_attention=predictor_args.use_flash_attention,
-                        tensor_parallel_degree=tensor_parallel_degree,
-                        tensor_parallel_rank=tensor_parallel_rank,
-                        tensor_parallel_output=False,
-                    )
-
+            
         predictor_class_name = execute_mode + inference_mode + "Predictor"
 
         import_class = sys.modules[__name__]
@@ -1308,13 +1245,82 @@ def create_predictor(
         predictor_args.temperature = 1.0
 
     tensor_parallel_rank, tensor_parallel_degree = llm_utils.init_dist_env()
+
+    model = None
+    cache_kvs_shape = None
+
+    # model loading
+    if predictor_args.inference_model:
+        if predictor_args.mode == "dynamic":
+            # AutoInferenceModel
+            model = AutoInferenceModelForCausalLM.from_pretrained(
+                predictor_args.model_name_or_path,
+                config=config,
+                predictor_args=predictor_args,
+                model_args=model_args,
+                dtype=predictor_args.dtype,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=tensor_parallel_rank,
+            )
+            model.eval()
+        else:
+            # cache_kvs_shape compute
+            model = AutoInferenceModelForCausalLM.from_pretrained(
+                predictor_args.model_name_or_path,
+                config=config,
+                predictor_args=predictor_args,
+                model_args=model_args,
+                dtype=predictor_args.dtype,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=tensor_parallel_rank,
+            )
+            cache_kvs_shape = model.get_cache_kvs_shape(
+                config, predictor_args.batch_size, predictor_args.total_max_length
+            )
+    else:
+        if predictor_args.mode == "dynamic":
+            # model import (gpt-3,ernie) or AutoModel
+            if model_args.model_type == "gpt-3":
+                sys.path.append("./gpt-3")
+                from modeling import GPTForCausalLM
+
+                model = GPTForCausalLM.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    dtype=predictor_args.dtype,
+                    tensor_parallel_degree=tensor_parallel_degree,
+                    tensor_parallel_rank=tensor_parallel_rank,
+                    tensor_parallel_output=False,
+                )
+            elif model_args.model_type == "ernie-3.5-se":
+                sys.path.append("./ernie-3.5-se")
+                from modeling import Ernie35ForCausalLM
+
+                tensor_parallel_degree = paddle.distributed.get_world_size()
+                tensor_parallel_rank = paddle.distributed.get_rank()
+                model = Ernie35ForCausalLM.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    dtype=predictor_args.dtype,
+                    tensor_parallel_degree=tensor_parallel_degree,
+                    tensor_parallel_rank=tensor_parallel_rank,
+                    tensor_parallel_output=False,
+                )
+            else:
+                model = AutoModelForCausalLM.from_pretrained(
+                    predictor_args.model_name_or_path,
+                    dtype=predictor_args.dtype,
+                    use_flash_attention=predictor_args.use_flash_attention,
+                    tensor_parallel_degree=tensor_parallel_degree,
+                    tensor_parallel_rank=tensor_parallel_rank,
+                    tensor_parallel_output=False,
+                )
+
     predictor = AutoPredictor.create_predictor(
         predictor_args,
         config,
         model_args,
         tokenizer,
-        tensor_parallel_degree=tensor_parallel_degree,
-        tensor_parallel_rank=tensor_parallel_rank,
+        model=model,
+        cache_kvs_shape=cache_kvs_shape
     )
 
     return predictor

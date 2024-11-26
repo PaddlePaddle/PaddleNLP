@@ -837,7 +837,7 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
 
         # Import the InferenceModel
         import_class = importlib.import_module(
-            f"paddlenlp.experimental.transformers.{cls._name_mapping[config.architectures[0]]}.modeling"
+            f"paddlenlp.experimental.transformers.{config.model_type}.modeling"
         )
 
         model_class_name = f"{model_name}InferenceModel"
