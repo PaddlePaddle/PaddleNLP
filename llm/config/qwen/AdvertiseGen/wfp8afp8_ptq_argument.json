@@ -17,6 +17,5 @@
   "unified_checkpoint": false,
   "smooth": false,
   "weight_quant_method": "abs_max",
-  "act_quant_method": "abs_max",
-  "skip_list_names": ["down_proj"]
+  "act_quant_method": "abs_max"
   }

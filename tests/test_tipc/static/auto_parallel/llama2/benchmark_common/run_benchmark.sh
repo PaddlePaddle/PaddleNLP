@@ -57,6 +57,57 @@ function _set_params(){
     OUTPUT_PATH=${run_log_path}/output
 }
 
+# 循环监控文件写入状态和进程状态
+monitor_log_file() {
+    local log_file="$1"  # 获取日志文件路径
+    local training_pid="$2"  # 获取训练进程的 PID
+    local no_update_duration=0  # 初始化无更新时长计数
+    local last_size=0
+
+    echo "开始监控进程 $training_pid 和日志文件 $log_file..."
+
+    while true; do
+        sleep 5  # 每隔 5 秒检查一次日志文件
+
+        # 判断日志文件是否存在
+        if [ ! -f "$log_file" ]; then
+            echo "日志文件 $log_file 不存在，检查进程状态..."
+            # 如果日志文件不存在，直接判断进程是否结束
+            if ! ps -p $training_pid > /dev/null; then
+                echo "进程 $training_pid 已经结束。"
+                break
+            fi
+            continue  # 如果文件不存在，跳过后续逻辑，继续循环
+        fi
+
+        # 获取当前日志文件的大小
+        new_size=$(stat -c %s "$log_file")
+
+        if [ "$last_size" -eq "$new_size" ]; then
+            # 文件大小未变化，增加无更新时长计数
+            no_update_duration=$((no_update_duration + 5))
+
+            if [ "$no_update_duration" -ge 180 ]; then
+                echo "文件在过去的 3 分钟内没有继续写入，准备杀掉进程 $training_pid."
+                kill -9 $training_pid  # 杀掉进程
+                echo "进程 $training_pid 已经被杀掉。"
+                break
+            fi
+        else
+            # 文件大小有变化，重置无更新时长计数
+            echo "文件仍在写入..."
+            no_update_duration=0
+            last_size=$new_size
+        fi
+
+        # 如果训练进程已经结束，退出监控
+        if ! ps -p $training_pid > /dev/null; then
+            echo "进程 $training_pid 已经结束。"
+            break
+        fi
+    done
+}
+
 function _train(){
     batch_size=${per_device_train_batch_size}  # 如果模型跑多卡单进程时,请在_train函数中计算出多卡需要的bs
 
@@ -140,9 +191,25 @@ function _train(){
     rm -rf mylog && rm -rf checkpoints
     
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
-    timeout 40m ${train_cmd} > ${log_file} 2>&1
+    timeout 40m ${train_cmd} > ${log_file} 2>&1 &
+    training_pid=$!  # 获取后台进程的 PID
 
-    if [ $? -ne 0 ];then
+    # 监控进程和日志的更新状态
+    monitor_log_file "$log_file" "$training_pid" & 
+    monitor_log_file_pid=$!  # 获取日志监控进程的 PID
+
+    # 等待训练进程完成
+    wait $training_pid
+    exit_code=$?
+
+    # 获取训练进程的退出码
+    echo "训练进程 $training_pid 的退出码是 $exit_code"
+
+    # 清理后台日志监控进程
+    kill $monitor_log_file_pid
+
+
+    if [ ${exit_code} -ne 0 ];then
         echo -e "${model_name}, FAIL"
     else
         echo -e "${model_name}, SUCCESS"
@@ -158,6 +225,9 @@ function _train(){
 export FLAGS_selected_gpus="0,1,2,3,4,5,6,7"
 export NCCL_IB_DISABLE=0
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
+# https://github.com/PaddlePaddle/Paddle/pull/69410 合入影响
+# 如不设置参数为1,则默认选择不带tensor fusion的sharding stage1版本
+export FLAGS_enable_sharding_stage1_tensor_fusion=1
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PARALLEL_CROSS_ENTROPY=true

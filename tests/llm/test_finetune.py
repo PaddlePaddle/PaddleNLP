@@ -18,6 +18,7 @@ import unittest
 
 from parameterized import parameterized_class
 
+from tests.parallel_launch import TestMultipleGpus
 from tests.testing_utils import argv_context_guard, load_test_config
 
 from .testing_utils import LLMTest
@@ -63,3 +64,38 @@ class FinetuneTest(LLMTest, unittest.TestCase):
             self.run_predictor({"inference_model": True})
 
         self.run_predictor({"inference_model": False})
+
+
+@parameterized_class(
+    ["model_dir"],
+    [
+        ["llama"],
+    ],
+)
+class CkptQuantTest(LLMTest, TestMultipleGpus):
+    config_path: str = "./tests/fixtures/llm/finetune.yaml"
+    model_dir: str = None
+
+    def setUp(self) -> None:
+        LLMTest.setUp(self)
+
+        sys.path.insert(0, self.model_dir)
+        self.run_sft = "llm/run_finetune.py"
+
+    def tearDown(self) -> None:
+        LLMTest.tearDown(self)
+
+    def test_ckpt_quant(self):
+        finetune_config = load_test_config(self.config_path, "ckpt_quant", self.model_dir)
+
+        finetune_config["dataset_name_or_path"] = self.data_dir
+        finetune_config["output_dir"] = self.output_dir
+
+        self.runfirst(finetune_config)
+        self.rerun(finetune_config)
+
+    def runfirst(self, train_args):
+        self.run_n1c2(self.run_sft, **train_args)
+
+    def rerun(self, train_args):
+        self.run_n1c2(self.run_sft, **train_args)

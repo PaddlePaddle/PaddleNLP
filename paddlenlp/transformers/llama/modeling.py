@@ -21,6 +21,7 @@ import warnings
 from functools import partial
 from typing import Optional, Tuple
 
+import numpy as np
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
@@ -100,14 +101,14 @@ __all__ = [
 
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
-        start = 2 ** (-(2 ** -(math.log2(n) - 3)))
+        start = 2 ** (-(2 ** -(np.log2(n) - 3)))
         ratio = start
         return [start * ratio**i for i in range(n)]
 
-    if math.log2(n).is_integer():
+    if np.log2(n).is_integer():
         return _get_interleave_power_of_2(n)
     else:
-        closest_power_of_2 = 2 ** math.floor(math.log2(n))
+        closest_power_of_2 = int(2 ** np.floor(np.log2(n)))
         return (
             _get_interleave_power_of_2(closest_power_of_2)
             + _get_interleave(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
@@ -1545,8 +1546,9 @@ class LlamaModel(LlamaPretrainedModel):
             expanded_attn_mask = expanded_attn_mask.astype("float32")
             expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
         elif get_env_device() in ["xpu", "gcu"]:
+            min_val = paddle.finfo(dtype).min if get_env_device() == "gcu" else -1e37  # mask value for xpu
             x = paddle.to_tensor(0.0, dtype=dtype)
-            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype=dtype)
+            y = paddle.to_tensor(min_val, dtype=dtype)
             expanded_attn_mask = expanded_attn_mask.astype(dtype)
             expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
         else:

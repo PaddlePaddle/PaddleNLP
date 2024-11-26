@@ -15,19 +15,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "paddle/extension.h"
+#include "helper.h"
 #include <stdio.h>
-
-
-bool is_in_end(const int64_t id, const int64_t* end_ids, int length) {
-  bool flag = false;
-  for (int i = 0; i < length; i++) {
-    if (id == end_ids[i]) {
-      return true;
-    }
-  }
-  return flag;
-}
 
 void set_value_by_flags(const bool* stop_flags,
                         const int64_t* end_ids,

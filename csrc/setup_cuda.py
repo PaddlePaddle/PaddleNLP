@@ -17,7 +17,7 @@ import subprocess
 
 import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
-import subprocess
+
 
 def update_git_submodule():
     try:
@@ -109,8 +109,10 @@ sources = [
     "./gpu/sample_kernels/top_p_sampling_reject.cu",
     "./gpu/update_inputs_v2.cu",
     "./gpu/set_preids_token_penalty_multi_scores.cu",
+    "./gpu/speculate_decoding_kernels/ngram_match.cc",
 ]
 sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
+sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
 
 nvcc_compile_args = gencode_flags
 update_git_submodule()
@@ -142,6 +144,7 @@ if cc >= 89 and cuda_version >= 12.4:
     sources += find_end_files("gpu/cutlass_kernels/fp8_gemm_fused/autogen", ".cu")
     sources += [
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_cuda_core_gemm.cu",
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
     ]
 
