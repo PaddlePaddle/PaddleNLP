@@ -249,7 +249,7 @@ class QWenAttention(nn.Layer):
                     return_softmax=self.config.attn_dropout_prob > 0.0,
                 )
             else:
-                enable_no_recompute = (
+                skip_recompute = (
                     self.config.recompute
                     and not self.config.recompute_use_reentrant
                     and self.config.skip_recompute_ops.get("flash_attn", False)
@@ -261,7 +261,7 @@ class QWenAttention(nn.Layer):
                     value,
                     attn_mask=attention_mask,
                     is_causal=attention_mask is None,
-                    enable=enable_no_recompute,
+                    enable=skip_recompute,
                 )
                 attn_weights = None
 
