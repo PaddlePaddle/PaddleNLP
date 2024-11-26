@@ -243,7 +243,7 @@ class UnifiedCheckpointHandler:
 
         sharded_optim_index = {}
         # save opt index json if checkpoint quantization is on.
-        if self.args.ckpt_quant_stage != "O0":
+        if self.args.ckpt_quant_stage != "O0" and "quant_reach_limit" not in infohub:
             sharded_optim_index["ckpt_quant_stage"] = self.args.ckpt_quant_stage
 
         if "quant_ckpt_resume_times" in infohub:
@@ -267,7 +267,7 @@ class UnifiedCheckpointHandler:
             signal_path=signal_dir,
             is_sync=is_sync_save,
             state_dict_type="optimizer_weight",
-            ckpt_quant_stage=self.args.ckpt_quant_stage,
+            ckpt_quant_stage=self.args.ckpt_quant_stage if "quant_reach_limit" not in infohub else "O0",
         )
         if master_weights is not None:
             self.async_handler._file_save_async_or_sync(
@@ -389,7 +389,7 @@ class UnifiedCheckpointHandler:
             signal_path=signal_dir,
             is_sync=is_sync_save,
             state_dict_type="optimizer_weight",
-            ckpt_quant_stage=self.args.ckpt_quant_stage,
+            ckpt_quant_stage=self.args.ckpt_quant_stage if "quant_reach_limit" not in infohub else "O0",
         )
         if master_weight_state_dict is not None:
             self.async_handler._file_save_async_or_sync(
@@ -455,6 +455,8 @@ class UnifiedCheckpointHandler:
         # Quantization times exceeds the limit. Turn off the quantization strategy.
         if quant_ckpt_resume_times > MAX_QUANTIZATION_TIMES:
             ckpt_quant_stage = "O0"
+            infohub["quant_reach_limit"] = True
+            logger.info("Checkpoint quantization time reach limit and will be closed.")
 
         # If not having merge optimizer, then load non-merge optimizer.
         if "weight_map" not in index:
@@ -671,7 +673,7 @@ def unified_optimizer_into_shards(
     sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
 
     if args.should_save:
-        if args.ckpt_quant_stage in ["O1", "O2"]:
+        if args.ckpt_quant_stage in ["O1", "O2"] and "quant_reach_limit" not in infohub:
             sharded_optim_index["ckpt_quant_stage"] = args.ckpt_quant_stage
         sharded_optim_index["quant_ckpt_resume_times"] = (
             infohub["quant_ckpt_resume_times"] if "quant_ckpt_resume_times" in infohub else 0
