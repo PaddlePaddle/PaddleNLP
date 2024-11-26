@@ -1,5 +1,5 @@
 {
-    "model_name_or_path": "/home/dist/baidu_test/__internal_testing__/mthreads-llama-13b-5k/",
+    "model_name_or_path": "/home/dist/baidu_test/__internal_testing__/mthreads-llama-13b-5k-64",
     "tokenizer_name_or_path": "facebook/llama-13b",
     "input_dir": "/home/dist/baidu_test/",
     "output_dir": "./checkpoints/llama_benchmark_ckpts",
