@@ -18,6 +18,10 @@ import time
 import paddle
 
 from paddlenlp.utils.log import logger
+try:
+    from paddle.distributed.fleet.utils.timer_helper import _GPUEventTimer
+except ImportError:
+    _GPUEventTimer = None
 
 
 class _Timer:
@@ -67,6 +71,10 @@ class _Timer:
         return elapsed_
 
 
+if _GPUEventTimer is None:
+    _GPUEventTimer = _Timer
+
+
 class RuntimeTimer:
     """A timer that can be dynamically adjusted during runtime."""
 
@@ -99,10 +107,17 @@ class Timers:
     def __init__(self):
         self.timers = {}
 
-    def __call__(self, name):
-        if name not in self.timers:
-            self.timers[name] = _Timer(name)
-        return self.timers[name]
+    def __call__(self, name, use_event=False):
+        clazz = _GPUEventTimer if use_event else _Timer
+        timer = self.timers.get(name)
+        if timer is None:
+            timer = clazz(name)
+            self.timers[name] = timer
+        else:
+            assert (
+                type(timer) == clazz
+            ), "Invalid timer type: {clazz} vs {type(timer)}"
+        return timer
 
     def write(self, names, writer, iteration, normalizer=1.0, reset=True):
         """Write timers to a tensorboard writer"""
