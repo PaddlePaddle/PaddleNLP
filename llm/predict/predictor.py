@@ -903,6 +903,8 @@ class BlockInferencePredictorMixin(BasePredictor):
             input_text = [input_text] if isinstance(input_text, str) else input_text
             input_text = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in input_text]
 
+        input_text_batch_size = len(input_text)
+
         input_ids = []
         for text in input_text:
             tokens = self.tokenizer(
@@ -922,28 +924,24 @@ class BlockInferencePredictorMixin(BasePredictor):
 
         self.model_inputs["block_tables"][:][:] = -1
         free_list = list(range(self.max_block_nums))
-        for i in range(self.config.batch_size):
+        for i in range(input_text_batch_size):
             for j in range(
                 (seq_lens[i] + self.config.max_length + self.config.block_size - 1) // self.config.block_size
             ):
                 used_block_id = free_list.pop()
                 self.model_inputs["block_tables"][i, j] = used_block_id
 
+        # fmt:off
         self.model_inputs["seq_lens_this_time"] = paddle.to_tensor(np.array(seq_lens).astype("int32").reshape(-1, 1))
         self.model_inputs["seq_lens_encoder"] = paddle.to_tensor(np.array(seq_lens).astype("int32").reshape(-1, 1))
-        self.model_inputs["seq_lens_decoder"] = paddle.full(
-            shape=[self.config.batch_size, 1], fill_value=0, dtype="int32"
-        )
-        self.model_inputs["step_idx"] = paddle.full(shape=[self.config.batch_size, 1], fill_value=0, dtype="int64")
+        self.model_inputs["seq_lens_decoder"] = paddle.full(shape=[input_text_batch_size, 1], fill_value=0, dtype="int32")
+        self.model_inputs["step_idx"] = paddle.full(shape=[input_text_batch_size, 1], fill_value=0, dtype="int64")
         self.model_inputs["not_need_stop"] = paddle.full(shape=[1], fill_value=True, dtype="bool")
-        self.model_inputs["stop_flags"] = paddle.full(
-            shape=[self.config.batch_size, 1], fill_value=False, dtype="bool"
-        )
-        self.model_inputs["stop_nums"] = paddle.full(shape=[1], fill_value=self.config.batch_size, dtype="int64")
-        self.model_inputs["pre_ids"] = paddle.full(
-            shape=[self.config.batch_size, self.config.max_length], fill_value=-1, dtype="int64"
-        )
-        self.model_inputs["next_tokens"] = paddle.full(shape=[self.config.batch_size, 1], fill_value=-1, dtype="int64")
+        self.model_inputs["stop_flags"] = paddle.full(shape=[input_text_batch_size, 1], fill_value=False, dtype="bool")
+        self.model_inputs["stop_nums"] = paddle.full(shape=[1], fill_value=input_text_batch_size, dtype="int64")
+        self.model_inputs["pre_ids"] = paddle.full(shape=[input_text_batch_size, self.config.max_length], fill_value=-1, dtype="int64")
+        self.model_inputs["next_tokens"] = paddle.full(shape=[input_text_batch_size, 1], fill_value=-1, dtype="int64")
+        # fmt:on
 
         if self.config.mode == "static":
             for k, v in self.model_inputs.items():
@@ -1007,8 +1005,8 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         if self.tensor_parallel_rank == 0:
             outputs = []
             output_tokens = []
-            while len(outputs) < self.batch_size:
-                result = result_queue.get(timeout=1)
+            while len(outputs) < len(input_texts):
+                result = result_queue.get(timeout=10)
                 outputs.append(result[-1])
                 output_tokens.append(result[-2])
 
