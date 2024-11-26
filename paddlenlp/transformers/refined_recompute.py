@@ -23,6 +23,7 @@ import weakref
 from copy import deepcopy
 
 import paddle
+import paddle.autograd
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel.parallel_layers.random import (
     get_rng_state_tracker,
@@ -35,8 +36,12 @@ try:
     from paddle.distributed.fleet.utils import sequence_parallel_utils
 except ImportError:
     sequence_parallel_utils = None
+from paddle.distributed.fleet.layers.mpu import mp_layers, mp_ops
+
 from paddlenlp.transformers.linear_utils import (
+    ColumnParallelLinear,
     ColumnSequenceParallelLinear,
+    RowParallelLinear,
     RowSequenceParallelLinear,
 )
 from paddlenlp.utils.log import logger
@@ -54,6 +59,8 @@ __all__ = [
     "update_refined_recompute",
     "RRColumnSequenceParallelLinear",
     "RRRowSequenceParallelLinear",
+    "RRColumnParallelLinear",
+    "RRRowParallelLinear",
 ]
 _in_no_recompute = False
 global_rr_queue_dict = {}
@@ -554,7 +561,7 @@ def create_skip_config_for_refined_recompute(layer_idx, config):
     return config
 
 
-def update_refined_recompute(rr, sequence_parallel, lora=False):
+def update_refined_recompute(rr, lora=False):
     """update refined recompute dict."""
     if rr == "":
         return {}
@@ -577,12 +584,6 @@ def update_refined_recompute(rr, sequence_parallel, lora=False):
                 raise ValueError(f"Refined recompute do not support {op_name}, please check.")
 
             if op_name in ["mlp_row_ln", "attention_row_ln", "attention_column_ln", "mlp_column_ln"]:
-                if not sequence_parallel:
-                    logger.warning(
-                        f"Currently, the `{op_name}` op is only supported "
-                        "when `sequence_parallel=True`. This refined recompute op will be ignored."
-                    )
-                    continue
                 if lora:
                     logger.warning(
                         "Currently, LoRA does not support refined recompute "
@@ -596,6 +597,82 @@ def update_refined_recompute(rr, sequence_parallel, lora=False):
         if not enable_rr:
             rr_res = {}
         return rr_res
+
+
+class RRColumnParallelLinear(ColumnParallelLinear):
+    def forward(self, x):
+        # use inner api to process identity
+        def _overlap_linear():
+            return mp_layers.InnerOverlapLinear.apply(
+                x,
+                self.weight,
+                self.bias,
+                self.fuse_matmul_bias,
+                self.mp_async_allreduce,
+                self.mp_skip_c_identity,
+                self.mp_fused_linear_param_grad_add,
+                self.model_parallel_group,
+            )
+
+        if self.mp_async_allreduce:
+            output_parallel = _overlap_linear()
+        else:
+            if self.is_mp:
+                input_parallel = mp_ops._c_identity(
+                    x,
+                    group=self.model_parallel_group,
+                    skip_c_identity_dynamic=self.mp_skip_c_identity,
+                )
+            else:
+                input_parallel = x
+
+            def fwd(input_parallel):
+                return self.linear(input_parallel, self.weight, self.bias, name=self._name)
+
+            output_parallel = no_recompute(fwd, input_parallel)
+
+        if self.gather_output and self.is_mp:
+            output = mp_ops._c_concat(output_parallel, group=self.model_parallel_group)
+        else:
+            output = output_parallel
+        return output
+
+
+class RRRowParallelLinear(RowParallelLinear):
+    def forward(self, x):
+        if self.input_is_parallel or (not self.is_mp):
+            input_parallel = x
+        else:
+            # split last dim
+            input_parallel = mp_ops._c_split(x, group=self.model_parallel_group)
+
+        if self.is_mp:
+            if self.fuse_matmul_bias:
+                bias = mp_layers.MPScale.apply(self.bias, self.world_size)
+            else:
+                bias = None
+
+            def fwd(input_parallel):
+                output_parallel = self.linear(input_parallel, self.weight, bias, name=self._name)
+                output_ = mp_ops._mp_allreduce(
+                    output_parallel,
+                    group=self.model_parallel_group,
+                    use_calc_stream=True,
+                    use_model_parallel=True,
+                    skip_c_identity_dynamic=self.mp_skip_c_identity,
+                )
+                return output_
+
+            output_ = no_recompute(fwd, input_parallel)
+
+            if not self.fuse_matmul_bias and self.bias is not None:
+                output = output_ + self.bias
+            else:
+                output = output_
+        else:
+            output = self.linear(input_parallel, self.weight, self.bias, name=self._name)
+
+        return output
 
 
 class RRColumnSequenceParallelLinear(ColumnSequenceParallelLinear):

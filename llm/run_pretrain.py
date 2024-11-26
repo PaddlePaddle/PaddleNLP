@@ -416,7 +416,6 @@ def main():
     LlmMetaConfig.set_llm_config(config, training_args)
     config.refined_recompute = update_refined_recompute(
         training_args.refined_recompute,
-        training_args.sequence_parallel,
     )
     config.use_fast_layer_norm = model_args.use_fast_layer_norm
 

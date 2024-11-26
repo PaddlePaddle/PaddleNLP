@@ -27,7 +27,9 @@ from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
 from paddle.utils import try_import
 
 from paddlenlp.transformers.refined_recompute import (
+    RRColumnParallelLinear,
     RRColumnSequenceParallelLinear,
+    RRRowParallelLinear,
     RRRowSequenceParallelLinear,
     create_skip_config_for_refined_recompute,
     no_recompute,
@@ -171,6 +173,12 @@ class QWenAttention(nn.Layer):
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("attention_column_ln", False):
+                    ColumnParallelLinear = RRColumnParallelLinear
+                if config.skip_recompute_ops.get("attention_row_ln", False):
+                    RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             if config.num_attention_heads % config.tensor_parallel_degree != 0:
@@ -419,6 +427,12 @@ class QWenMLP(nn.Layer):
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                    ColumnParallelLinear = RRColumnParallelLinear
+                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                    RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             if self.fuse_attention_ffn:
