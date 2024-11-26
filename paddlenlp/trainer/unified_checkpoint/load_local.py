@@ -14,6 +14,7 @@
 """Unfied checkpoint locally loading functions."""
 
 import gc
+import json
 import os
 
 import paddle
@@ -150,7 +151,7 @@ def load_unified_checkpoint_locally(args, model, resume_from_checkpoint: str, sa
 def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoint, safe_serialization=False):
     # Special process with split param.
     if is_sharding_split_param_mode(args):
-        returned_optim_state_dict = load_unified_optimizer_split_param(model, optimizer, resume_from_checkpoint)
+        returned_optim_state_dict = load_unified_optimizer_split_param(args, model, optimizer, resume_from_checkpoint)
         return returned_optim_state_dict
 
     # init and get optimizer LR_Scheduler
@@ -183,6 +184,13 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
     if len(resolved_archive_file) > 1:
         resolved_archive_file = tqdm(resolved_archive_file, desc="Loading optimizer shards")
 
+    with open(os.path.join(resume_from_checkpoint, index_filename), "r") as f:
+        index = json.loads(f.read())
+
+    ckpt_quant_stage = "O0"
+    if "ckpt_quant_stage" in index:
+        ckpt_quant_stage = index["ckpt_quant_stage"]
+
     # update has_master_weights and index_filename_master_weights
     # 1. if the master weight exists, only has_master_weights is set True and loaded when needed
     # 2. if master weight does not exist, convert model weight to master weight when needed
@@ -204,7 +212,9 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         if len(resolved_archive_file_mw) > 1:
             resolved_archive_file_mw = tqdm(resolved_archive_file_mw, desc="Loading master weights shards")
 
-    def load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys, is_master_weights=False):
+    def load_resolved_archive_file(
+        resolved_archive_file, sharded_metadata, expected_keys, is_master_weights=False, ckpt_quant_stage="O0"
+    ):
         returned_state_dict = {}
         # load optimizer
         for shard_file in resolved_archive_file:
@@ -227,10 +237,22 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
                         tp_actions = mapping_optimizer_tp_actions(tp_actions, expected_keys)
 
                     # Here we use expected_keys to optimize weights loading for pipeline model. Only works for safetensors
-                    state_dict = load_state_dict(shard_file, tp_actions, expected_keys, device="expected")
+                    state_dict = load_state_dict(
+                        shard_file,
+                        tp_actions,
+                        expected_keys,
+                        device="expected",
+                        ckpt_quant_stage=ckpt_quant_stage,
+                    )
                 else:
                     # for pipeline model, we don't need to use tp_actions
-                    state_dict = load_state_dict(shard_file, None, expected_keys, device="expected")
+                    state_dict = load_state_dict(
+                        shard_file,
+                        None,
+                        expected_keys,
+                        device="expected",
+                        ckpt_quant_stage=ckpt_quant_stage,
+                    )
 
             returned_state_dict.update(state_dict)
             # force memory release
@@ -238,7 +260,9 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             gc.collect()
         return returned_state_dict
 
-    state_dict_optim = load_resolved_archive_file(resolved_archive_file, sharded_metadata, expected_keys)
+    state_dict_optim = load_resolved_archive_file(
+        resolved_archive_file, sharded_metadata, expected_keys, ckpt_quant_stage=ckpt_quant_stage
+    )
     if has_master_weights:
         state_dict_master_weight = load_resolved_archive_file(
             resolved_archive_file_mw, sharded_metadata_mw, expected_keys_mw, is_master_weights=True
@@ -246,9 +270,10 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
     # rename optimizer param
     for key in list(state_dict_optim.keys()):
         key_name = key.split("/")
-        static_name = struct2static_name_mappings[key_name[0]]
+        model_weight_key = key_name[0]
+        static_name = struct2static_name_mappings[model_weight_key]
         if has_master_weights:
-            if model_state_dict[key_name[0]].dtype != paddle.float32:
+            if model_state_dict[model_weight_key].dtype != paddle.float32:
                 key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
             else:
                 key_name = "_".join([static_name, key_name[1]])
@@ -256,6 +281,12 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
             key_name = "_".join([static_name, key_name[1]])
         returned_optim_state_dict[key_name] = state_dict_optim.pop(key)
         returned_optim_state_dict[key_name].name = key_name
+
+        # master weight cast (only in remove_master_weight)
+        if has_master_weights and state_dict_master_weight[model_weight_key].dtype != paddle.float32:
+            state_dict_master_weight[model_weight_key] = paddle.cast(
+                state_dict_master_weight[model_weight_key], dtype=paddle.float32
+            )
 
     if has_master_weights:
         for key in list(state_dict_master_weight.keys()):

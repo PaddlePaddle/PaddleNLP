@@ -86,6 +86,10 @@ class LoRAConfig:
             "help": "Whether to use quick lora, The use of Quick LoRa will only take effect when lora_dropout is set to 0."
         },
     )
+    lora_use_mixer: bool = field(
+        default=False,
+        metadata={"help": "Whether to use mos lora."},
+    )
 
     def __post_init__(self):
         if self.use_quick_lora and self.lora_dropout > 0:

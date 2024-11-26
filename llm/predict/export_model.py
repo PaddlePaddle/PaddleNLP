@@ -18,11 +18,10 @@ from dataclasses import dataclass, field
 
 import paddle
 from paddle.distributed import fleet
+from predict.predictor import ModelArgument, PredictorArgument, create_predictor
 
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.trl import llm_utils
-
-from .predictor import ModelArgument, PredictorArgument, create_predictor
 
 
 @dataclass
@@ -68,6 +67,7 @@ def main():
             "dtype": predictor_args.dtype,
             "export_precache": predictor_args.export_precache,
             "cachekv_int8_type": predictor_args.cachekv_int8_type,
+            "speculate_method": predictor_args.speculate_method,
         },
     )
     add_inference_args_to_config(predictor.model.config, predictor_args)

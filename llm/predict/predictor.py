@@ -27,12 +27,14 @@ import paddle.incubate.multiprocessing as mp
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode, use_pir_api
 from paddle.distributed import fleet
 
+from paddlenlp.experimental.transformers import InferenceWithReferenceProposer
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.transformers import (
     AutoConfig,
+    AutoInferenceModelForCausalLM,
     AutoModelForCausalLM,
     AutoTokenizer,
     ChatGLMTokenizer,
@@ -43,11 +45,9 @@ from paddlenlp.transformers import (
     PretrainedTokenizer,
 )
 from paddlenlp.trl import llm_utils
+from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
-
-# Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
-MAX_BSZ = 512
 
 
 @dataclass
@@ -137,8 +137,25 @@ class PredictorArgument:
     total_max_length: int = field(
         default=4096, metadata={"help": "Super parameter. Maximum sequence length(encoder+decoder)."}
     )
+    speculate_method: str = field(
+        default=None,
+        metadata={
+            "help": "speculate method, it should be one of ['None', 'autoregressive', 'inference_with_reference']"
+        },
+    )
+    speculate_max_draft_token_num: int = field(
+        default=1,
+        metadata={"help": "the max length of draft tokens for speculate method."},
+    )
+    speculate_max_ngram_size: int = field(default=1, metadata={"help": "the max ngram size of speculate method."})
+    speculate_verify_window: int = field(
+        default=2, metadata={"help": "the max length of verify window for speculate method."}
+    )
+    speculate_max_candidate_len: int = field(default=5, metadata={"help": "the max length of candidate tokens."})
 
     def __post_init__(self):
+        if self.speculate_method is not None:
+            self.append_attn = True
         if self.append_attn:
             self.block_attn = True
         assert (
@@ -945,6 +962,29 @@ class BlockInferencePredictorMixin(BasePredictor):
         )
         self.model_inputs["next_tokens"] = paddle.full(shape=[self.config.batch_size, 1], fill_value=-1, dtype="int64")
 
+        # speculative decoding related parameters
+        if self.config.speculate_method is not None:
+            self.model_inputs["accept_tokens"] = paddle.full(
+                shape=[self.config.batch_size, self.config.speculate_max_draft_token_num + 1],
+                fill_value=0,
+                dtype="int64",
+            )
+            self.model_inputs["accept_num"] = paddle.full(shape=[self.config.batch_size], fill_value=0, dtype="int32")
+            self.model_inputs["draft_tokens"] = paddle.full(
+                shape=[self.config.batch_size, self.config.speculate_max_draft_token_num + 1],
+                fill_value=0,
+                dtype="int64",
+            )
+            self.model_inputs["actual_draft_token_num"] = paddle.full(
+                shape=[self.config.batch_size], fill_value=self.config.speculate_max_draft_token_num, dtype="int32"
+            )
+
+            self.proposer.input_ids_cpu = self.model_inputs["input_ids"].to("cpu", blocking=False)
+            for bid in range(self.config.batch_size):
+                self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
+                    seq_lens[bid] - 1
+                ]  # get the last token before padding of this batch
+
         if self.config.mode == "static":
             for k, v in self.model_inputs.items():
                 v.name = k
@@ -976,6 +1016,17 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         self.model_inputs["cache_kvs"] = self.cache_kvs
 
+        # init speculate components
+        if config.speculate_method == "inference_with_reference":
+            self.proposer = InferenceWithReferenceProposer(
+                config.speculate_max_draft_token_num,
+                config.speculate_max_ngram_size,
+                config.batch_size,
+                config.max_length,
+            )
+        else:
+            self.proposer = None
+
     @paddle.no_grad()
     def _infer(self, inputs: dict[str, paddle.Tensor]):
         self.model.generate(
@@ -989,18 +1040,35 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
         done_event = mp.Event()
+
+        # whether speculative decoding
+        if self.proposer is None:
+            read_res_func = llm_utils.read_res
+            output_tensor_shape = [MAX_BSZ + 2, 1]
+        else:
+            read_res_func = llm_utils.speculate_read_res
+            output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
+
         read_res_process = mp.Process(
-            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
+            target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
         )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
 
-        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
+        output_tensor = paddle.full(shape=output_tensor_shape, fill_value=2, dtype="int64").cpu()
+
         tensor_queue.put(output_tensor)
         if self.tensor_parallel_rank == 0:
             done_event.wait()
         s_time = time.time()
         while self.model_inputs["not_need_stop"]:
+            # whether speculative decoding
+            if self.proposer is not None:
+                self.proposer.run(
+                    self.model_inputs,
+                    real_batch_size=self.batch_size,
+                    seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
+                )
             self._infer(self.model_inputs)
         logger.info(f"running spend {time.time()  -  s_time}")
 
@@ -1053,6 +1121,17 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
                 self.model_inputs["v_quant_scales_" + str(i)] = self.v_quant_scales[i]
                 self.model_inputs["k_dequant_scales_" + str(i)] = self.k_dequant_scales[i]
                 self.model_inputs["v_dequant_scales_" + str(i)] = self.v_dequant_scales[i]
+
+        # init speculate components
+        if config.speculate_method == "inference_with_reference":
+            self.proposer = InferenceWithReferenceProposer(
+                config.speculate_max_draft_token_num,
+                config.speculate_max_ngram_size,
+                config.batch_size,
+                config.max_length,
+            )
+        else:
+            self.proposer = None
 
     def _create_predictor(self, predictor_args: PredictorArgument):
         if not is_paddlenlp_ops_available():
@@ -1119,18 +1198,34 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
         tensor_queue = mp.Queue()
         done_event = mp.Event()
 
-        read_res_process = mp.Process(
-            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
-        )
+        # whether speculative decoding
+        if self.proposer is None:
+            read_res_func = llm_utils.read_res
+            output_tensor_shape = [MAX_BSZ + 2, 1]
+        else:
+            read_res_func = llm_utils.speculate_read_res
+            output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
+        read_res_process = mp.Process(
+            target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
+        )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
-        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
+
+        output_tensor = paddle.full(shape=output_tensor_shape, fill_value=2, dtype="int64").cpu()
+
         tensor_queue.put(output_tensor)
         if self.tensor_parallel_rank == 0:
             done_event.wait()
         s_time = time.time()
         while self.model_inputs["not_need_stop"]:
+            # whether speculative decoding
+            if self.proposer is not None:
+                self.proposer.run(
+                    self.model_inputs,
+                    real_batch_size=self.batch_size,
+                    seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
+                )
             self.predictor.run(list(self.model_inputs.values()))
         logger.info(f"running spend {time.time()  -  s_time}")
 
@@ -1242,377 +1337,34 @@ def create_predictor(
             raise ValueError("the `mode` should be one of [dynamic, static]")
     else:
         if predictor_args.mode == "dynamic":
-            # TODO(wj-Mcat): complete AutoInferenceModel & AutoPredictor
-            config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
-            config.tensor_parallel_degree = tensor_parallel_degree
-            config.tensor_parallel_rank = tensor_parallel_rank
-            config.model_name_or_path = predictor_args.model_name_or_path
-            config.quant_type = predictor_args.quant_type
-            config.append_attn = predictor_args.append_attn
-            config.cachekv_int8_type = predictor_args.cachekv_int8_type
-            config.use_fake_parameter = predictor_args.use_fake_parameter
-            config.single_card_ptq = not predictor_args.use_fake_parameter
-            if config.quantization_config.quant_type is not None:
-                predictor_args.quant_type = config.quantization_config.quant_type
-                config.quant_type = config.quantization_config.quant_type
-                if "c8" in config.quant_type:
-                    predictor_args.cachekv_int8_type = "static"
-                    config.cachekv_int8_type = "static"
-
-                ptq_multicards_num = get_ptq_multicards_num(config.model_name_or_path)
-                logger.info(f"PTQ from {ptq_multicards_num} cards, so we will not split")
-                if ptq_multicards_num > 1:
-                    config.single_card_ptq = False
-
-            if "llama" in config.architectures[0].lower():
-                if model_args.model_type == "llama-img2txt":
-                    # we use llama for img2txt.
-                    from paddlenlp.experimental.transformers import (
-                        LlamaForMiniGPT4InferenceModel as LlamaInferenceModel,
-                    )
-                elif predictor_args.block_attn:
-                    config.max_seq_len = predictor_args.total_max_length
-                    config.block_size = predictor_args.block_size
-                    from paddlenlp.experimental.transformers import (
-                        LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
-                    )
-
-                    model = LlamaInferenceModel.from_pretrained(
-                        predictor_args.model_name_or_path,
-                        config=config,
-                        dtype=predictor_args.dtype,
-                        tensor_parallel_degree=tensor_parallel_degree,
-                        tensor_parallel_rank=tensor_parallel_rank,
-                    )
-                else:
-                    if predictor_args.device == "xpu":
-                        raise ValueError(
-                            "you should run xpu dynamic model with --block_attn flag"
-                            "https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/inference.md"
-                        )
-                    elif predictor_args.device == "cpu" and predictor_args.avx_model:
-                        config.avx_type = predictor_args.avx_type
-                        config.avx_cachekv_type = predictor_args.avx_cachekv_type
-                        from paddlenlp.experimental.transformers import (
-                            LlamaForCausalLMAvxInferenceModel as LlamaInferenceModel,
-                        )
-                    else:
-                        from paddlenlp.experimental.transformers import (
-                            LlamaForCausalLMInferenceModel as LlamaInferenceModel,
-                        )
-
-                    model = LlamaInferenceModel.from_pretrained(
-                        predictor_args.model_name_or_path,
-                        config=config,
-                        dtype=predictor_args.dtype,
-                    )
-                model.eval()
-
-            elif "mixtral" in config.architectures[0].lower():
-                if predictor_args.block_attn:
-                    config.max_seq_len = predictor_args.total_max_length
-                    config.block_size = predictor_args.block_size
-                    from paddlenlp.experimental.transformers import (
-                        MixtralForCausalLMBlockInferenceModel as MixtralInferenceModel,
-                    )
-
-                    model = MixtralInferenceModel.from_pretrained(
-                        predictor_args.model_name_or_path,
-                        config=config,
-                        dtype=predictor_args.dtype,
-                        tensor_parallel_degree=tensor_parallel_degree,
-                        tensor_parallel_rank=tensor_parallel_rank,
-                    )
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        MixtralForCausalLMInferenceModel as MixtralInferenceModel,
-                    )
-
-                    model = MixtralInferenceModel.from_pretrained(
-                        predictor_args.model_name_or_path,
-                        config=config,
-                        dtype=predictor_args.dtype,
-                        tensor_parallel_degree=tensor_parallel_degree,
-                        tensor_parallel_rank=tensor_parallel_rank,
-                    )
-                model.eval()
-
-            elif "opt" in config.architectures[0].lower():
-                if model_args.model_type == "opt-img2txt":
-                    # we use opt for img2txt.
-                    from paddlenlp.experimental.transformers import (
-                        OPTForBlip2InferenceModel as OPTInferenceModel,
-                    )
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        OPTForCausalLMInferenceModel as OPTInferenceModel,
-                    )
-
-                model = OPTInferenceModel.from_pretrained(
-                    predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
-                )
-                model.eval()
-            elif "chatglmv2forcausallm" in config.architectures[0].lower():
-                predictor_args.total_max_length = config.seq_length
-                if predictor_args.block_attn:
-                    config.block_size = predictor_args.block_size
-                    config.max_seq_len = predictor_args.total_max_length
-                    from paddlenlp.experimental.transformers import (
-                        ChatGLMv2ForCausalLMBlockInferenceModel as ChatGLMv2InferenceModel,
-                    )
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        ChatGLMv2ForCausalLMInferenceModel as ChatGLMv2InferenceModel,
-                    )
-                model = ChatGLMv2InferenceModel.from_pretrained(
-                    predictor_args.model_name_or_path, config=config, dtype=predictor_args.dtype
-                )
-                model.eval()
-            elif "chatglmforcausallm" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    ChatGLMForCausalLMInferenceModel,
-                )
-
-                model = ChatGLMForCausalLMInferenceModel.from_pretrained(
-                    predictor_args.model_name_or_path,
-                    config=config,
-                    dtype=predictor_args.dtype,
-                )
-                model.eval()
-            elif "bloom" in config.architectures[0].lower():
-                if predictor_args.block_attn:
-                    from paddlenlp.experimental.transformers import (
-                        BlommForCausalBlockLMInferenceModel as BloomInferenceModel,
-                    )
-
-                    config.block_size = predictor_args.block_size
-                    config.max_seq_len = predictor_args.total_max_length
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        BloomForCausalLMInferenceModel as BloomInferenceModel,
-                    )
-                model = BloomInferenceModel.from_pretrained(
-                    predictor_args.model_name_or_path,
-                    config=config,
-                    dtype=predictor_args.dtype,
-                )
-                cache_kvs_shape = BloomInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
-                model.eval()
-            elif "gpt" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    GPTForCausalLMInferenceModel,
-                )
-
-                model = GPTForCausalLMInferenceModel.from_pretrained(
-                    predictor_args.model_name_or_path,
-                    config=config,
-                    dtype=predictor_args.dtype,
-                )
-                model.eval()
-            elif "qwen2moe" in config.architectures[0].lower():
-                if predictor_args.block_attn:
-                    config.max_seq_len = predictor_args.total_max_length
-                    config.block_size = predictor_args.block_size
-                    from paddlenlp.experimental.transformers import (
-                        Qwen2MoeForCausalLMBlockInferenceModel as Qwen2MoeInferenceModel,
-                    )
-
-                    model = Qwen2MoeInferenceModel.from_pretrained(
-                        predictor_args.model_name_or_path,
-                        config=config,
-                        dtype=predictor_args.dtype,
-                        tensor_parallel_degree=tensor_parallel_degree,
-                        tensor_parallel_rank=tensor_parallel_rank,
-                    )
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        Qwen2MoeForCausalLMInferenceModel as Qwen2MoeInferenceModel,
-                    )
-
-                    model = Qwen2MoeInferenceModel.from_pretrained(
-                        predictor_args.model_name_or_path,
-                        config=config,
-                        dtype=predictor_args.dtype,
-                    )
-                model.eval()
-            elif "qwen2" in config.architectures[0].lower():
-                if predictor_args.block_attn:
-                    config.max_seq_len = predictor_args.total_max_length
-                    config.block_size = predictor_args.block_size
-                    from paddlenlp.experimental.transformers import (
-                        Qwen2ForCausalLMBlockInferenceModel as Qwen2InferenceModel,
-                    )
-
-                    model = Qwen2InferenceModel.from_pretrained(
-                        predictor_args.model_name_or_path,
-                        config=config,
-                        dtype=predictor_args.dtype,
-                        tensor_parallel_degree=tensor_parallel_degree,
-                        tensor_parallel_rank=tensor_parallel_rank,
-                    )
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        Qwen2ForCausalLMInferenceModel as Qwen2InferenceModel,
-                    )
-
-                    model = Qwen2InferenceModel.from_pretrained(
-                        predictor_args.model_name_or_path,
-                        config=config,
-                        dtype=predictor_args.dtype,
-                    )
-                model.eval()
-            elif "qwen" in config.architectures[0].lower():
-                if model_args.model_type == "qwen-img2txt":
-                    # we use qwen for img2txt.
-                    from paddlenlp.experimental.transformers import (
-                        QWenForQWenVLInferenceModel as QWenInferenceModel,
-                    )
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        QWenForCausalLMInferenceModel as QWenInferenceModel,
-                    )
-                model = QWenInferenceModel.from_pretrained(
-                    predictor_args.model_name_or_path,
-                    config=config,
-                    dtype=predictor_args.dtype,
-                )
-                model.eval()
-            else:
-                raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt, qwen]")
+            model = AutoInferenceModelForCausalLM.from_pretrained(
+                predictor_args.model_name_or_path,
+                config=config,
+                predictor_args=predictor_args,
+                model_args=model_args,
+                dtype=predictor_args.dtype,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=tensor_parallel_rank,
+            )
+            model.eval()
             if predictor_args.block_attn:
                 predictor = DygraphBlockInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
             else:
                 predictor = DygraphInferencePredictor(predictor_args, model=model, tokenizer=tokenizer)
 
         elif predictor_args.mode == "static":
-            config = AutoConfig.from_pretrained(predictor_args.model_name_or_path)
-            config.append_attn = predictor_args.append_attn
-
-            if config.quantization_config.quant_type is not None:
-                if "c8" in config.quantization_config.quant_type:
-                    predictor_args.cachekv_int8_type = "static"
-
-            if "llama" in config.architectures[0].lower():
-                if predictor_args.block_attn:
-                    config.block_size = predictor_args.block_size
-                    config.max_seq_len = predictor_args.total_max_length
-                    from paddlenlp.experimental.transformers import (
-                        LlamaForCausalLMBlockInferenceModel as LlamaInferenceModel,
-                    )
-                elif predictor_args.avx_model and predictor_args.device == "cpu":
-                    from paddlenlp.experimental.transformers import (
-                        LlamaForCausalLMAvxInferenceModel as LlamaInferenceModel,
-                    )
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        LlamaForCausalLMInferenceModel as LlamaInferenceModel,
-                    )
-
-                cache_kvs_shape = LlamaInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
-            elif "mixtral" in config.architectures[0].lower():
-                if predictor_args.block_attn:
-                    config.block_size = predictor_args.block_size
-                    config.max_seq_len = predictor_args.total_max_length
-                    from paddlenlp.experimental.transformers import (
-                        MixtralForCausalLMBlockInferenceModel as MixtralInferenceModel,
-                    )
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        MixtralForCausalLMInferenceModel as MixtralInferenceModel,
-                    )
-                cache_kvs_shape = MixtralInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
-            elif "chatglmv2forcausallm" in config.architectures[0].lower():
-                predictor_args.total_max_length = config.seq_length
-                if predictor_args.block_attn:
-                    config.block_size = predictor_args.block_size
-                    config.max_seq_len = predictor_args.total_max_length
-                    from paddlenlp.experimental.transformers import (
-                        ChatGLMv2ForCausalLMBlockInferenceModel as ChatGLMv2InferenceModel,
-                    )
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        ChatGLMv2ForCausalLMInferenceModel as ChatGLMv2InferenceModel,
-                    )
-
-                cache_kvs_shape = ChatGLMv2InferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
-            elif "chatglmforcausallm" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    ChatGLMForCausalLMInferenceModel,
-                )
-
-                cache_kvs_shape = ChatGLMForCausalLMInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
-            elif "bloom" in config.architectures[0].lower():
-                if predictor_args.block_attn:
-                    from paddlenlp.experimental.transformers import (
-                        BlommForCausalBlockLMInferenceModel as BloomInferenceModel,
-                    )
-
-                    config.block_size = predictor_args.block_size
-                    config.max_seq_len = predictor_args.total_max_length
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        BloomForCausalLMInferenceModel as BloomInferenceModel,
-                    )
-                cache_kvs_shape = BloomInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
-            elif "gpt" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    GPTForCausalLMInferenceModel,
-                )
-
-                cache_kvs_shape = GPTForCausalLMInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
-            elif "qwen2moe" in config.architectures[0].lower():
-                if predictor_args.block_attn:
-                    config.block_size = predictor_args.block_size
-                    config.max_seq_len = predictor_args.total_max_length
-                    from paddlenlp.experimental.transformers import (
-                        Qwen2MoeForCausalLMBlockInferenceModel as Qwen2MoeInferenceModel,
-                    )
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        Qwen2MoeForCausalLMInferenceModel as Qwen2MoeInferenceModel,
-                    )
-                cache_kvs_shape = Qwen2MoeInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
-            elif "qwen2" in config.architectures[0].lower():
-                if predictor_args.block_attn:
-                    config.block_size = predictor_args.block_size
-                    config.max_seq_len = predictor_args.total_max_length
-                    from paddlenlp.experimental.transformers import (
-                        Qwen2ForCausalLMBlockInferenceModel as Qwen2InferenceModel,
-                    )
-                else:
-                    from paddlenlp.experimental.transformers import (
-                        Qwen2ForCausalLMInferenceModel as Qwen2InferenceModel,
-                    )
-                cache_kvs_shape = Qwen2InferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
-
-            elif "qwen" in config.architectures[0].lower():
-                from paddlenlp.experimental.transformers import (
-                    QWenForCausalLMInferenceModel,
-                )
-
-                cache_kvs_shape = QWenForCausalLMInferenceModel.get_cache_kvs_shape(
-                    config, predictor_args.batch_size, predictor_args.total_max_length
-                )
-            else:
-                raise ValueError("the `model type` should be one of [llama, chatglm, bloom, gpt, qwen]")
+            model = AutoInferenceModelForCausalLM.from_pretrained(
+                predictor_args.model_name_or_path,
+                config=config,
+                predictor_args=predictor_args,
+                model_args=model_args,
+                dtype=predictor_args.dtype,
+                tensor_parallel_degree=tensor_parallel_degree,
+                tensor_parallel_rank=tensor_parallel_rank,
+            )
+            cache_kvs_shape = model.get_cache_kvs_shape(
+                config, predictor_args.batch_size, predictor_args.total_max_length
+            )
             if predictor_args.block_attn:
                 predictor = StaticBlockInferencePredictor(predictor_args, cache_kvs_shape, tokenizer=tokenizer)
             else:

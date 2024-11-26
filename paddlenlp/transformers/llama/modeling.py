@@ -21,6 +21,7 @@ import warnings
 from functools import partial
 from typing import Optional, Tuple
 
+import numpy as np
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
@@ -100,14 +101,14 @@ __all__ = [
 
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
-        start = 2 ** (-(2 ** -(math.log2(n) - 3)))
+        start = 2 ** (-(2 ** -(np.log2(n) - 3)))
         ratio = start
         return [start * ratio**i for i in range(n)]
 
-    if math.log2(n).is_integer():
+    if np.log2(n).is_integer():
         return _get_interleave_power_of_2(n)
     else:
-        closest_power_of_2 = 2 ** math.floor(math.log2(n))
+        closest_power_of_2 = int(2 ** np.floor(np.log2(n)))
         return (
             _get_interleave_power_of_2(closest_power_of_2)
             + _get_interleave(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
@@ -647,20 +648,6 @@ class LlamaMLP(nn.Layer):
 
     def forward(self, x):
         if self.fuse_attention_ffn:
-            # FIXME(yangjianbang): use paddle's native swiglu
-            if get_env_device() == "xpu":
-                try:
-                    import paddle_xpu_nn  # noqa: F821
-
-                    out = self.gate_up_fused_proj(x)
-                    out = paddle_xpu_nn.xpu_swiglu(out, axis=-1, turn=True)
-                    out = self.down_proj(out)
-                    return out
-                except ImportError:
-                    gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
-                    out = self.down_proj(F.silu(gate_out) * up_out)
-                    return out
-
             x = swiglu(self.gate_up_fused_proj(x))
         else:
             x = swiglu(self.gate_proj(x), self.up_proj(x))
@@ -1559,8 +1546,9 @@ class LlamaModel(LlamaPretrainedModel):
             expanded_attn_mask = expanded_attn_mask.astype("float32")
             expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
         elif get_env_device() in ["xpu", "gcu"]:
+            min_val = paddle.finfo(dtype).min if get_env_device() == "gcu" else -1e37  # mask value for xpu
             x = paddle.to_tensor(0.0, dtype=dtype)
-            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype=dtype)
+            y = paddle.to_tensor(min_val, dtype=dtype)
             expanded_attn_mask = expanded_attn_mask.astype(dtype)
             expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
         else:

@@ -178,7 +178,12 @@ def tokenizer_class_from_name(class_name: str):
 
                     return getattr(module, class_name)
                 except AttributeError:
-                    raise ValueError(f"Tokenizer class {class_name} is not currently imported.")
+                    try:
+                        module = importlib.import_module(f".{module_name}.tokenizer_fast", "paddlenlp.transformers")
+
+                        return getattr(module, class_name)
+                    except AttributeError:
+                        raise ValueError(f"Tokenizer class {class_name} is not currently imported.")
 
     for config, tokenizers in TOKENIZER_MAPPING._extra_content.items():
         for tokenizer in tokenizers:
