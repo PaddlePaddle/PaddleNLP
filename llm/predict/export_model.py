@@ -67,6 +67,7 @@ def main():
             "dtype": predictor_args.dtype,
             "export_precache": predictor_args.export_precache,
             "cachekv_int8_type": predictor_args.cachekv_int8_type,
+            "speculate_method": predictor_args.speculate_method,
         },
     )
     add_inference_args_to_config(predictor.model.config, predictor_args)

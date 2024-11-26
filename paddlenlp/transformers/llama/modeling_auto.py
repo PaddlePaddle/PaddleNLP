@@ -1003,7 +1003,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             alibi = dist.shard_tensor(alibi, global_mesh, alibi_place)
         else:
             alibi = None
-        if self.config.use_flash_attention:
+        if self.config.use_flash_attention and not self.config.alibi:
             # attention_mask in flash_attn is always None for pretrain
             # atttenton_mask is used in scaled_dot_product_attention with alibi_tensor
             attention_mask = None
