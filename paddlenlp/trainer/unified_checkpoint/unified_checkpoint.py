@@ -244,7 +244,7 @@ class UnifiedCheckpointHandler:
         sharded_optim_index = {}
         # save opt index json if checkpoint quantization is on.
         if self.args.ckpt_quant_stage != "O0":
-            sharded_optim_inde["ckpt_quant_stage"] = self.args.ckpt_quant_stage
+            sharded_optim_index["ckpt_quant_stage"] = self.args.ckpt_quant_stage
 
         if "quant_ckpt_resume_times" in infohub:
             sharded_optim_index["quant_ckpt_resume_times"] = (
