@@ -42,8 +42,6 @@ import paddle.nn as nn
 from packaging import version
 from paddle import framework
 
-from paddlenlp.utils import infohub
-
 try:
     from paddle.base import core
 except:
@@ -3314,21 +3312,6 @@ class Trainer:
 
         return (loss, None, labels)
 
-    def prediction_pipeline_step_with_logits_acc(
-        self,
-        *args,
-        **kwargs,
-    ):
-        loss, _, labels = self.prediction_pipeline_step(*args, **kwargs)
-        if "pp_preds" in infohub:
-            preds = paddle.concat(infohub["pp_preds"], axis=0)
-            weight = paddle.concat(infohub["pp_preds_w"], axis=0)
-            infohub["pp_preds"] = []
-            infohub["pp_preds_w"] = []
-
-            return (loss, (preds, weight), labels)
-        return (loss, None, labels)
-
     def prediction_step(
         self,
         model: nn.Layer,
@@ -3362,8 +3345,6 @@ class Trainer:
         if self.args.pipeline_parallel_degree > 1:
             # hack for pipeline mode
             inputs = self._prepare_inputs(inputs)
-            if self.args.metric_for_best_model == "accuracy":
-                return self.prediction_pipeline_step_with_logits_acc(model, inputs, prediction_loss_only, ignore_keys)
             return self.prediction_pipeline_step(model, inputs, prediction_loss_only, ignore_keys)
 
         has_labels = all(inputs.get(k) is not None for k in self.label_names)
