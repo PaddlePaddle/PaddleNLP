@@ -260,6 +260,7 @@ from .nystromformer.tokenizer import *
 from .bloom.configuration import *
 from .bloom.modeling import *
 from .bloom.tokenizer import *
+from .bloom.tokenizer_fast import *
 from .clipseg.configuration import *
 from .clipseg.modeling import *
 from .clipseg.processing import *

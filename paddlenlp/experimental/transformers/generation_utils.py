@@ -530,6 +530,15 @@ class GenerationBlockInferenceModel(GenerationMixin):
             cache_v_dequant_scales,
             tgt_mask_spec,
         ]
+        if config.get("speculate_method", None) is not None:
+            speculate_spec = [
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="draft_tokens"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="accept_tokens"),
+                paddle.static.InputSpec(shape=[None], dtype="int32", name="accept_num"),
+                paddle.static.InputSpec(shape=[None], dtype="int32", name="actual_draft_token_num"),
+            ]
+            input_spec.extend(speculate_spec)
+
         model = paddle.jit.to_static(self.generate, input_spec=input_spec)
         paddle.jit.save(
             model, output_path, skip_prune_program=True
@@ -579,6 +588,10 @@ class GenerationBlockInferenceModel(GenerationMixin):
         k_dequant_scales=None,
         v_dequant_scales=None,
         tgt_mask=None,
+        draft_tokens=None,
+        accept_tokens=None,
+        accept_num=None,
+        actual_draft_token_num=None,
         **model_kwargs,
     ):
 
@@ -609,6 +622,11 @@ class GenerationBlockInferenceModel(GenerationMixin):
         model_kwargs["is_block_step"] = is_block_step
         model_kwargs["src_mask"] = src_mask
         model_kwargs["tgt_mask"] = tgt_mask
+        # speculate decoding related parameters
+        model_kwargs["draft_tokens"] = draft_tokens
+        model_kwargs["accept_tokens"] = accept_tokens
+        model_kwargs["accept_num"] = accept_num
+        model_kwargs["actual_draft_token_num"] = actual_draft_token_num
 
         ret = self.sample(
             eos_token_id,
@@ -700,7 +718,12 @@ class GenerationBlockInferenceModel(GenerationMixin):
             )
             from paddlenlp_ops import save_output
 
-            save_output(next_tokens, model_kwargs["not_need_stop"], self.config.tensor_parallel_rank)
+            save_output(
+                next_tokens,
+                model_kwargs["not_need_stop"],
+                model_kwargs.get("accept_tokens", None),  # only initialized in speculative decoding
+                self.config.tensor_parallel_rank,
+            )
             return next_tokens
 
         # encoder

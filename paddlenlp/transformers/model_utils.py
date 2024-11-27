@@ -54,6 +54,8 @@ from paddle.utils.download import is_url as is_remote_url
 from tqdm.auto import tqdm
 
 from paddlenlp.utils.env import (
+    ASYMMETRY_QUANT_SCALE_MAX,
+    ASYMMETRY_QUANT_SCALE_MIN,
     CONFIG_NAME,
     LEGACY_CONFIG_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
@@ -64,10 +66,12 @@ from paddlenlp.utils.env import (
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
+    SYMMETRY_QUANT_SCALE,
 )
 from paddlenlp.utils.log import logger
 
 from ..generation import GenerationConfig, GenerationMixin
+from ..quantization.unified_checkpoint_quantization import dequant_unified_optimizer
 from ..utils import device_guard
 from ..utils.download import resolve_file_path
 from .configuration_utils import PretrainedConfig
@@ -362,10 +366,21 @@ def _load_part_state_dict(
 
     """
     part_state_dict = {}
+    scale_dict = {}
     with safe_open(checkpoint_file, framework="np") as f:
         for key in keys:
+            # 1. non-merge ckpt loading dont have filter key.
+            # 2. merge ckpt will skip quant scale by `fliter_dict_keys`
+            if (
+                key.endswith(SYMMETRY_QUANT_SCALE)
+                or key.endswith(ASYMMETRY_QUANT_SCALE_MIN)
+                or key.endswith(ASYMMETRY_QUANT_SCALE_MAX)
+            ):
+                continue
+
             if fliter_dict_keys is not None and key not in fliter_dict_keys:
                 continue
+
             py_safe_slice_ = f.get_slice(key)
             if key in tensor_parallel_split_mapping:
                 weight = tensor_parallel_split_mapping[key](py_safe_slice_)
@@ -376,15 +391,31 @@ def _load_part_state_dict(
                     weight = paddle.Tensor(weight, zero_copy=True)
                 weight = weight._copy_to(paddle.framework._current_expected_place(), False)
             part_state_dict[key] = weight
-    return part_state_dict
+        for key in keys:
+            if (
+                key.endswith(SYMMETRY_QUANT_SCALE)
+                or key.endswith(ASYMMETRY_QUANT_SCALE_MIN)
+                or key.endswith(ASYMMETRY_QUANT_SCALE_MAX)
+            ):
+                scale = f.get_tensor(key)
+                with device_guard():
+                    scale = paddle.Tensor(scale, zero_copy=True)
+                scale = scale._copy_to(paddle.framework._current_expected_place(), False)
+                scale_dict[key] = scale
+    return part_state_dict, scale_dict
 
 
 def load_state_dict(
-    checkpoint_file: Union[str, os.PathLike], tensor_parallel_split_mapping=None, fliter_dict_keys=None, device="cpu"
+    checkpoint_file: Union[str, os.PathLike],
+    tensor_parallel_split_mapping=None,
+    fliter_dict_keys=None,
+    device="cpu",
+    ckpt_quant_stage="O0",
 ):
     """
     Reads a PaddlePaddle checkpoint file, returning properly formatted errors if they arise.
     """
+
     if tensor_parallel_split_mapping is None:
         tensor_parallel_split_mapping = {}
 
@@ -404,10 +435,9 @@ def load_state_dict(
             raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
         if metadata.get("format", "np") == "np":
             thread_num = int(os.environ.get("LOAD_STATE_DICT_THREAD_NUM", "1"))
-            state_dict = {}
             if thread_num <= 1:
                 with safe_open(checkpoint_file, framework="np") as f:
-                    state_dict = _load_part_state_dict(
+                    state_dict, scale_dict = _load_part_state_dict(
                         list(f.keys()),
                         checkpoint_file,
                         tensor_parallel_split_mapping,
@@ -431,13 +461,19 @@ def load_state_dict(
                         for keys in keys_groups
                     }
                     for future in concurrent.futures.as_completed(future_to_key):
-                        result = future.result()
-                        state_dict.update(result)
+                        state_dict, scale_dict = future.result()
+                        state_dict.update(state_dict)
+                        scale_dict.update(scale_dict)
 
             if device == "cpu":
                 for k in list(state_dict.keys()):
                     with device_guard():
                         state_dict[k] = paddle.Tensor(state_dict.pop(k), zero_copy=True)
+
+            if len(scale_dict) != 0:
+                if ckpt_quant_stage == "O0":
+                    raise ValueError('optimizer weight has quantization scales but `ckpt_quant_stage` is set to "O0"')
+                state_dict = dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict)
 
             return state_dict
 
@@ -1155,6 +1191,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if predictor_args.block_attn:
             config.block_size = predictor_args.block_size
             config.max_seq_len = predictor_args.total_max_length
+
+        if predictor_args.speculate_method is not None:
+            config.speculate_method = predictor_args.speculate_method
+            config.speculate_max_draft_token_num = predictor_args.speculate_max_draft_token_num
+            config.speculate_max_ngram_size = predictor_args.speculate_max_ngram_size
+            config.speculate_verify_window = predictor_args.speculate_verify_window
+            config.speculate_max_candidate_len = predictor_args.speculate_max_candidate_len
 
     @classmethod
     def confirm_inference_model(cls, predictor_args, **kwargs):
@@ -2102,7 +2145,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 if config.quantization_config.is_weight_quantize():
                     filter_dict_keys = None
                 state_dict = load_state_dict(
-                    shard_file, tp_actions if pre_tensor_parallel_split else None, filter_dict_keys
+                    shard_file,
+                    tp_actions if pre_tensor_parallel_split else None,
+                    filter_dict_keys,
                 )
 
                 # convert for fusing or splitting weights
