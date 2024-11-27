@@ -246,10 +246,9 @@ class UnifiedCheckpointHandler:
         if self.args.ckpt_quant_stage != "O0" and "quant_reach_limit" not in infohub:
             sharded_optim_index["ckpt_quant_stage"] = self.args.ckpt_quant_stage
 
-        if "quant_ckpt_resume_times" in infohub:
-            sharded_optim_index["quant_ckpt_resume_times"] = (
-                infohub["quant_ckpt_resume_times"] if "quant_ckpt_resume_times" in infohub else 0
-            )
+        sharded_optim_index["quant_ckpt_resume_times"] = (
+            infohub["quant_ckpt_resume_times"] if "quant_ckpt_resume_times" in infohub else 0
+        )
 
         if len(sharded_optim_index) > 0:
             optimizer_index_name = SAFE_OPTIMIZER_INDEX_NAME
@@ -287,7 +286,7 @@ class UnifiedCheckpointHandler:
         optimizer_path = os.path.join(resume_from_checkpoint, optimizer_name)
         master_weights_path = os.path.join(resume_from_checkpoint, master_weights_name)
         # no quantization & no master weight represent O1 AMP strategy.
-        is_amp_o1 = True if not os.path.isfile(master_weights_path) and ckpt_quant_stage == "O0" else False
+        is_amp_o1 = self.args.fp16_opt_level == "O1"
 
         model_state_dict = get_expected_state_dict(model)
         struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}  # get optimizer param mappings
@@ -453,8 +452,7 @@ class UnifiedCheckpointHandler:
         infohub["quant_ckpt_resume_times"] = quant_ckpt_resume_times
 
         # Quantization times exceeds the limit. Turn off the quantization strategy.
-        if quant_ckpt_resume_times > MAX_QUANTIZATION_TIMES:
-            ckpt_quant_stage = "O0"
+        if quant_ckpt_resume_times >= MAX_QUANTIZATION_TIMES:
             infohub["quant_reach_limit"] = True
             logger.info("Checkpoint quantization time reach limit and will be closed.")
 
