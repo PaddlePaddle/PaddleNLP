@@ -26,6 +26,7 @@ from functools import partial
 from typing import Dict, List, Optional, Tuple, Union
 
 import paddle
+import paddle.distributed as dist
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
 from paddle import Tensor, nn
@@ -1624,9 +1625,12 @@ class Qwen2SentenceEmbedding(Qwen2PretrainedModel):
         """
         super(Qwen2SentenceEmbedding, self).__init__(config)
         self.config = config
-        self.model = model
+        self.qwen2 = model
         self.cross_entropy = nn.CrossEntropyLoss(reduction="mean")
         self.embedding_temperature = embedding_temperature
+        self.word_size = dist.get_world_size()
+        self.process_rank = dist.get_rank()
+        self.embedding_negatives_cross_device = config.embedding_negatives_cross_device
 
     def forward(
         self,
@@ -1636,6 +1640,10 @@ class Qwen2SentenceEmbedding(Qwen2PretrainedModel):
         """forward"""
         q_reps = self.encode(**query)
         p_reps = self.encode(**passages)
+
+        if self.embedding_negatives_cross_device:
+            q_reps = self._dist_gather_tensor(q_reps)
+            p_reps = self._dist_gather_tensor(p_reps)
 
         loss = self.in_batch_negative_loss(q_reps, p_reps)
         return loss
@@ -1653,7 +1661,7 @@ class Qwen2SentenceEmbedding(Qwen2PretrainedModel):
     ):
         """encode"""
         input_type = type(input_ids)
-        outputs = self.model(
+        outputs = self.qwen2(
             input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
@@ -1686,6 +1694,17 @@ class Qwen2SentenceEmbedding(Qwen2PretrainedModel):
 
         loss = self.cross_entropy(scores, target)
         return loss
+
+    def _dist_gather_tensor(self, tensor: Optional[paddle.Tensor]):
+        # This usage only within data parallelism only.
+        if tensor is None:
+            return None
+
+        all_tensors = [paddle.empty_like(tensor) for _ in range(self.world_size)]
+        dist.all_gather(all_tensors, tensor.contiguous())
+        all_tensors[self.process_rank] = tensor
+        all_tensors = paddle.concat(all_tensors, axis=0)
+        return all_tensors
 
     def state_dict(self, destination=None, include_sublayers=True, structured_name_prefix="", use_hook=True):
         """state_dict"""
