@@ -86,6 +86,9 @@ PREFIX_CONFIG_NAME = "prefix_config.json"
 PREFIX_WEIGHTS_NAME = "prefix_model_state.pdparams"
 PADDLE_PEFT_WEIGHTS_INDEX_NAME = "peft_model.pdparams.index.json"
 
+LOKR_WEIGHTS_NAME = "lokr_model_state.pdparams"
+LOKR_CONFIG_NAME = "lokr_config.json"
+
 PAST_KEY_VALUES_FILE_NAME = "pre_caches.npy"
 
 PADDLE_WEIGHTS_NAME = "model_state.pdparams"

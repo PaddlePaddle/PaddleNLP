@@ -81,7 +81,7 @@ from ..data import (
     default_data_collator,
     init_dataloader_comm_group,
 )
-from ..peft import LoRAModel, PrefixModelForCausalLM, ReFTModel, VeRAModel
+from ..peft import LoKrModel, LoRAModel, PrefixModelForCausalLM, ReFTModel, VeRAModel
 
 try:
     from ..quantization.quantization_linear import QuantizationLinear
@@ -98,6 +98,7 @@ from ..transformers.segment_parallel_utils import split_inputs_sequence_dim
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
+    LOKR_WEIGHTS_NAME,
     LORA_WEIGHTS_NAME,
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_PEFT_WEIGHTS_INDEX_NAME,
@@ -418,6 +419,7 @@ class Trainer:
             isinstance(self.model, LoRAModel)
             or isinstance(self.model, PrefixModelForCausalLM)
             or isinstance(self.model, VeRAModel)
+            or isinstance(self.model, LoKrModel)
             or isinstance(self.model, ReFTModel)
         ):
             if self.args.unified_checkpoint and "skip_save_model_weight" in self.args.unified_checkpoint_config:
@@ -564,9 +566,12 @@ class Trainer:
                     convert_tp = True
             elif isinstance(self.model, VeRAModel):
                 weights_file = os.path.join(resume_from_checkpoint, VERA_WEIGHTS_NAME)
+            elif isinstance(self.model, LoKrModel):
+                weights_file = os.path.join(resume_from_checkpoint, LOKR_WEIGHTS_NAME)
             elif isinstance(self.model, ReFTModel):
                 self.model.from_pretrained(resume_from_checkpoint, self.model.model)
                 return
+
             if self.args.dataset_rank == 0:
                 logger.info(f"Loading model from {resume_from_checkpoint} .")
 
@@ -625,6 +630,7 @@ class Trainer:
             isinstance(self.model, LoRAModel)
             or isinstance(self.model, PrefixModelForCausalLM)
             or isinstance(self.model, VeRAModel)
+            or isinstance(self.model, LoKrModel)
             or isinstance(self.model, ReFTModel)
         ):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
@@ -2736,6 +2742,7 @@ class Trainer:
             isinstance(self.model, LoRAModel)
             or isinstance(self.model, PrefixModelForCausalLM)
             or isinstance(self.model, VeRAModel)
+            or isinstance(self.model, LoKrModel)
             or isinstance(self.model, ReFTModel)
         ):
             self.model.save_pretrained(
@@ -3293,6 +3300,8 @@ class Trainer:
             actual_batch_size = inputs.shape[0]
         model.micro_batch_size = 1
         model.accumulate_steps = actual_batch_size
+        # train & eval share the same p2p_helper, so clear it before and after each step
+        model._p2p_helper.clear_meta_cache()
 
         with paddle.no_grad():
             if has_labels:
@@ -3303,6 +3312,8 @@ class Trainer:
             else:
                 raise ValueError("pipeline mode eval need label!")
         model.micro_batch_size, model.accumulate_steps = model_config_backup
+        # train & eval share the same p2p_helper, so clear it before and after each step
+        model._p2p_helper.clear_meta_cache()
 
         return (loss, None, labels)
 
