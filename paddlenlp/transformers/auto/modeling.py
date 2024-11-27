@@ -170,12 +170,10 @@ ATTENTION_TYPE_FOR_MODEL_MAPPING_NAMES = OrderedDict(
 )
 
 
-def get_attention_type(*args):
-    """
-    It must be passed in the follow order.
-    (block_attn, speculate_attn)
-    """
+def get_attention_type(predictor_args):
     count = 0
+    # It must follow this order
+    args = (predictor_args.block_attn, predictor_args.speculate_attn)
     res = []
     for attn_type in args:
         if attn_type:
@@ -185,10 +183,7 @@ def get_attention_type(*args):
             res.append(False)
     if count > 1:
         raise ValueError("Only one attention type can be True")
-    try:
-        return ATTENTION_TYPE_FOR_MODEL_MAPPING_NAMES[tuple(res)]
-    except KeyError:
-        raise ValueError("Unknown attention type")
+    return ATTENTION_TYPE_FOR_MODEL_MAPPING_NAMES[tuple(res)]
 
 
 def get_name_mapping(task="Model"):
@@ -860,7 +855,7 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
                 )
         else:
             # Check whether the model use block attention
-            attn_type = get_attention_type(predictor_args.block_attn, predictor_args.speculate_attn)
+            attn_type = get_attention_type(predictor_args)
             model_name = f"{config.architectures[0]}{attn_type}"
 
         # Import the InferenceModel

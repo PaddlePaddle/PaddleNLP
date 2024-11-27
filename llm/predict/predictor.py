@@ -58,12 +58,10 @@ ATTENTION_TYPE_FOR_PREDICTOR_MAPPING_NAMES = OrderedDict(
 )
 
 
-def get_attention_type(*args):
-    """
-    It must be passed in the follow order.
-    (block_attn)
-    """
+def get_attention_type(predictor_args):
     count = 0
+    # It must follow this order
+    args = predictor_args.block_attn
     res = []
     for attn_type in args:
         if attn_type:
@@ -73,10 +71,7 @@ def get_attention_type(*args):
             res.append(False)
     if count > 1:
         raise ValueError("Only one attention type can be used")
-    try:
-        return ATTENTION_TYPE_FOR_PREDICTOR_MAPPING_NAMES[tuple(res)]
-    except KeyError:
-        raise ValueError("Unknown attention type")
+    return ATTENTION_TYPE_FOR_PREDICTOR_MAPPING_NAMES[tuple(res)]
 
 
 @dataclass
@@ -1315,7 +1310,7 @@ class AutoPredictor:
         # infer/ no infer
         if predictor_args.inference_model:
             # block/no block
-            attn_type = get_attention_type(predictor_args.block_attn)
+            attn_type = get_attention_type(predictor_args)
             inference_mode = f"{attn_type}Inference"
 
             if predictor_args.mode == "static":
