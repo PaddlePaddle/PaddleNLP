@@ -3293,6 +3293,8 @@ class Trainer:
             actual_batch_size = inputs.shape[0]
         model.micro_batch_size = 1
         model.accumulate_steps = actual_batch_size
+        # train & eval share the same p2p_helper, so clear it before and after each step
+        model._p2p_helper.clear_meta_cache()
 
         with paddle.no_grad():
             if has_labels:
@@ -3303,6 +3305,8 @@ class Trainer:
             else:
                 raise ValueError("pipeline mode eval need label!")
         model.micro_batch_size, model.accumulate_steps = model_config_backup
+        # train & eval share the same p2p_helper, so clear it before and after each step
+        model._p2p_helper.clear_meta_cache()
 
         return (loss, None, labels)
 
