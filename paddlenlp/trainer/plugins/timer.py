@@ -116,7 +116,7 @@ class Timers:
         else:
             assert (
                 type(timer) == clazz
-            ), "Invalid timer type: {clazz} vs {type(timer)}"
+            ), f"Invalid timer type: {clazz} vs {type(timer)}"
         return timer
 
     def write(self, names, writer, iteration, normalizer=1.0, reset=True):
