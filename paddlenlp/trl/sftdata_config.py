@@ -20,7 +20,6 @@ __all__ = ["DataConfig"]
 @dataclass
 class DataConfig:
 
-    # for data part
     dataset_name_or_path: str = field(default=None, metadata={"help": "Name or path for dataset"})
     task_name: str = field(default=None, metadata={"help": "Additional name to select a more specific task."})
     zero_padding: bool = field(default=False, metadata={"help": "Whether to use Zero Padding data stream"})
@@ -61,3 +60,9 @@ class DataConfig:
         default=False,
         metadata={"help": "Pad the input sequence to `max_length`."},
     )
+    autoregressive: bool = field(
+        default=False,
+        metadata={"help": "Whether to use autoregressive mode."},
+    )
+    # Pose ralated parameters
+    use_pose_convert: bool = field(default=False, metadata={"help": "Whether to use PoSE data conversion function"})

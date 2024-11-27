@@ -88,7 +88,7 @@ class QuantConfig:
     )
     shift_step: int = field(default=32, metadata={"help": "Sample steps when shift"})
 
-    # Pre-quant methos Smooth related parameters
+    # Pre-quant methods Smooth related parameters
     smooth: bool = field(default=False, metadata={"help": "Whether to use Smooth"})
     smooth_all_linears: bool = field(default=False, metadata={"help": "Whether to smooth all linears"})
     smooth_sampler: str = field(

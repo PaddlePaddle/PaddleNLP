@@ -19,7 +19,6 @@ __all__ = ["ModelConfig"]
 
 
 @dataclass
-@dataclass
 class ModelConfig:
     model_name_or_path: str = field(
         default=None, metadata={"help": "Build-in pretrained model name or the path to local model."}
@@ -81,6 +80,9 @@ class ModelConfig:
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
     lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+ technique"})
     pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
+    lora_use_mixer: bool = field(
+        default=False, metadata={"help": "Whether to use MosLoRA: https://arxiv.org/pdf/2406.11909"}
+    )
 
     # vera related parameters
     vera: bool = field(default=False, metadata={"help": "Whether to use vera technique"})
@@ -91,6 +93,9 @@ class ModelConfig:
     prefix_path: str = field(default=None, metadata={"help": "Initialize prefix state dict."})
     num_prefix_tokens: int = field(default=128, metadata={"help": "Number of prefix tokens"})
 
+    # reft related parameter
+    reft: bool = field(default=False, metadata={"help": "Whether using reft method"})
+
     from_aistudio: bool = field(default=False, metadata={"help": "Whether to load model from aistudio"})
     save_to_aistudio: bool = field(default=False, metadata={"help": "Whether to save model to aistudio"})
     aistudio_repo_id: str = field(default=None, metadata={"help": "The id of aistudio repo"})
@@ -100,3 +105,11 @@ class ModelConfig:
     neftune: bool = field(default=False, metadata={"help": "Whether to apply NEFT"})
     neftune_noise_alpha: float = field(default=5.0, metadata={"help": "NEFT noise alpha"})
     flash_mask: bool = field(default=False, metadata={"help": "Whether to use flash_mask in flash attention."})
+
+    # long sequence strategy
+    use_long_sequence_strategies: bool = field(
+        default=False, metadata={"help": "Whether to use long sequence strategy"}
+    )
+    rope_scaling_factor: float = field(default=1.0, metadata={"help": "Rope extension scaling factor"})
+    strategy_type: str = field(default=None, metadata={"help": "Long sequence strategy type"})
+    strategy_name: str = field(default=None, metadata={"help": "Long sequence strategy name"})

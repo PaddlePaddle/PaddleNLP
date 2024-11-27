@@ -28,7 +28,7 @@ __all__ = ["SFTConfig"]
 @add_start_docstrings(TrainingArguments.__doc__)
 class SFTConfig(TrainingArguments):
     benchmark: bool = field(default=False, metadata={"help": "Whether runs benchmark"})
-
+    # NOTE(gongenlei): new add autotuner_benchmark
     autotuner_benchmark: bool = field(
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
@@ -45,6 +45,10 @@ class SFTConfig(TrainingArguments):
         default=False,
         metadata={"help": "Unify hybrid parallel checkpoint."},
     )
+    unified_checkpoint_config: Optional[str] = field(
+        default="",
+        metadata={"help": "Configs to unify hybrid parallel checkpoint.\n"},
+    )
 
     def __post_init__(self):
         super().__post_init__()
@@ -60,7 +64,6 @@ class SFTConfig(TrainingArguments):
             self.report_to = []
             self.save_strategy = IntervalStrategy.NO
             self.evaluation_strategy = IntervalStrategy.NO
-            self.unified_checkpoint = False
         if self.benchmark:
             self.do_train = True
             self.do_export = False
@@ -71,4 +74,3 @@ class SFTConfig(TrainingArguments):
             self.report_to = []
             self.save_strategy = IntervalStrategy.NO
             self.evaluation_strategy = IntervalStrategy.NO
-            self.unified_checkpoint = False
