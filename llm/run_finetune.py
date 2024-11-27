@@ -237,7 +237,8 @@ def main():
             layers = [int(l) for l in layers.split(";")]
         else:
             layers = [l for l in range(model_config.num_hidden_layers)]
-        logging.info("Using ReFT with layers: ", layers)
+        reft_layers = layers
+        logging.info("Using ReFT with layers: ", reft_layers)
     # init chat_template for tokenizer
     init_chat_template(tokenizer, model_args.model_name_or_path, data_args.chat_template)
 
@@ -248,59 +249,7 @@ def main():
     if isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
-    if data_args.dataset_name_or_path is None:
-        raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
-    elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) or os.path.exists(
-        os.path.join(data_args.dataset_name_or_path, "dev.json")
-    ):
-        if training_args.do_train:
-            train_ds = load_dataset(
-                "json",
-                data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
-                lazy=data_args.lazy,
-            )[0]
-        else:
-            train_ds = None
-        if training_args.do_eval:
-            dev_ds = load_dataset(
-                "json",
-                data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
-                lazy=data_args.lazy,
-            )[0]
-        else:
-            dev_ds = None
-
-    elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")) or os.path.exists(
-        os.path.join(data_args.dataset_name_or_path, "dev")
-    ):
-        import glob
-
-        if training_args.do_train:
-            train_ds = load_dataset(
-                "json",
-                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
-                lazy=data_args.lazy,
-            )[0]
-        else:
-            train_ds = None
-        if training_args.do_eval:
-            dev_ds = load_dataset(
-                "json",
-                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "dev", "*.json")),
-                lazy=data_args.lazy,
-            )[0]
-        else:
-            dev_ds = None
-
-    else:
-        if training_args.do_train:
-            train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
-        else:
-            train_ds = None
-        if training_args.do_eval:
-            dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
-        else:
-            dev_ds = None
+    train_ds, dev_ds = create_dataset(data_args, training_args)
 
     # TODO(ZHUI & sijunhe): Temporary implementation. Generalize this logic and move to Trainer later.
     if training_args.resume_from_checkpoint is not None and data_args.lazy:
@@ -333,18 +282,10 @@ def main():
             tokenizer=tokenizer,
             data_args=data_args,
             positions=reft_args.position,
-            num_interventions=len(layers),
+            num_interventions=len(reft_layers),
         )
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
-
-    train_ds = (
-        train_ds.map(
-            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
-        )
-        if train_ds is not None
-        else None
-    )
 
     eval_zero_padding = data_args.zero_padding
     if data_args.zero_padding and data_args.eval_with_do_generation:
@@ -352,46 +293,183 @@ def main():
             "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
         )
         eval_zero_padding = False
-    dev_ds = (
-        dev_ds.map(
-            partial(
-                trans_func,
-                is_test=data_args.eval_with_do_generation,
-                zero_padding=eval_zero_padding,
-                flash_mask=model_args.flash_mask,
-            )
-        )
-        if dev_ds is not None
-        else None
-    )
+
+    train_ds, dev_ds = trans_dataset_to_ids(train_ds, dev_ds, model_args, data_args, trans_func, eval_zero_padding)
+
     if data_args.zero_padding:
         if data_args.lazy:
             intoken_dataset = ZeroPaddingIterableDataset
         else:
             intoken_dataset = ZeroPaddingMapDataset
         logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
-        train_ds = (
-            intoken_dataset(
+        if train_ds is not None:
+            train_ds = intoken_dataset(
                 train_ds,
                 tokenizer=tokenizer,
                 max_length=data_args.max_length,
                 greedy_zero_padding=data_args.greedy_zero_padding,
             )
-            if train_ds is not None
-            else None
-        )
+        if eval_zero_padding and dev_ds is not None:
+            dev_ds = intoken_dataset(dev_ds, tokenizer=tokenizer, max_length=data_args.max_length)
 
-        if eval_zero_padding:
-            dev_ds = (
-                intoken_dataset(
-                    dev_ds,
-                    tokenizer=tokenizer,
-                    max_length=data_args.max_length,
-                )
-                if dev_ds is not None
-                else None
+    model = create_peft_model(model_args, reft_args, training_args, dtype, model_config, model, reft_layers)
+
+    def compute_metrics_do_generation(eval_preds):
+        rouge1 = Rouge1()
+        rouge2 = Rouge2()
+        rougel = RougeL()
+        bleu4 = BLEU(n_size=4)
+
+        predictions = [x[x != -100].tolist() for x in eval_preds.predictions]
+        references = [x[x != -100].tolist() for x in eval_preds.label_ids]
+
+        predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        references = tokenizer.batch_decode(references, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        if data_args.save_generation_output:
+            with open(os.path.join(training_args.output_dir, "generated_output.json"), "w", encoding="utf-8") as f:
+                for pred, ref in zip(predictions, references):
+                    out = {"output": pred, "tgt": ref}
+                    f.write(json.dumps(out, ensure_ascii=False) + "\n")
+
+        # for pred in predictions:
+        rouge1_score = rouge1.score(predictions, references)
+        rouge2_score = rouge2.score(predictions, references)
+        for pred, ref in zip(predictions, references):
+            rougel.add_inst(pred, [ref])
+            bleu4.add_inst(pred, [ref])
+        return {
+            "rouge1": rouge1_score,
+            "rouge2": rouge2_score,
+            "rougel": rougel.score(),
+            "bleu4": bleu4.score(),
+        }
+
+    # Create trainer
+
+    if (
+        training_args.pipeline_parallel_degree > 1
+        or training_args.sequence_parallel
+        or training_args.autotuner_benchmark
+        or data_args.zero_padding
+        or data_args.pad_to_max_length
+    ):
+        # NOTE(gongenlei): new add autotuner_benchmark
+        max_length = data_args.max_length
+        padding = "max_length"
+    else:
+        max_length = None
+        padding = True
+
+    if training_args.pipeline_parallel_degree > 1:
+        metrics = None
+    elif data_args.eval_with_do_generation:
+        metrics = compute_metrics_do_generation
+    else:
+        metrics = compute_metrics
+
+    data_collator_fn = DataCollatorForSeq2Seq(
+        tokenizer=tokenizer,
+        max_length=max_length,
+        padding=padding,
+        max_label_length=max_length,
+        return_tensors="np",
+        return_attention_mask=not model_args.flash_mask,
+        pad_to_multiple_of=data_args.pad_to_multiple_of,
+    )
+    trainer = SFTTrainer(
+        model=model,
+        args=training_args,
+        train_dataset=train_ds,
+        eval_dataset=dev_ds,
+        tokenizer=tokenizer,
+        compute_metrics=metrics,
+        data_collator=data_collator_fn if not model_args.reft else ReftDataCollator(data_collator=data_collator_fn),
+        do_generation=data_args.eval_with_do_generation,
+        callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
+        gen_args=gen_args,
+        data_args=data_args,
+    )
+    trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
+    trainer.set_optimizer_grouped_parameters(trainable_parameters)
+
+    # Train
+    if training_args.do_train:
+        checkpoint = None
+        if training_args.resume_from_checkpoint is not None:
+            checkpoint = training_args.resume_from_checkpoint
+        elif last_checkpoint is not None:
+            checkpoint = last_checkpoint
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        if model_args.neftune:
+            neft_post_hook_handle.remove()
+        if training_args.benchmark:
+            total_effective_tokens = (
+                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * train_result.metrics["progress_or_epoch"]
             )
+            effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
+            logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
+            logger.info("Benchmark done.")
+        else:
+            if model_args.save_to_aistudio:
+                save_to_aistudio(model_args, training_args, trainer)
 
+            if not training_args.autotuner_benchmark:
+                trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
+                trainer.log_metrics("train", train_result.metrics)
+                trainer.save_metrics("train", train_result.metrics)
+                trainer.save_state()
+
+    # Evaluation test set
+    if training_args.do_predict:
+        test_ds = load_dataset(
+            "json",
+            data_files=os.path.join(data_args.dataset_name_or_path, "test.json"),
+            lazy=data_args.lazy,
+        )[0]
+
+        test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
+        if eval_zero_padding:
+            test_ds = intoken_dataset(
+                test_ds,
+                tokenizer=tokenizer,
+                max_length=data_args.max_length,
+            )
+        eval_result = trainer.predict(test_ds).metrics
+        trainer.log_metrics("test", eval_result)
+
+    # Evaluation dev set
+    if training_args.do_eval:
+        logger.info("*** Evaluate result after train ***")
+        eval_result = trainer.evaluate(dev_ds)
+        trainer.log_metrics("eval", eval_result)
+
+
+def save_to_aistudio(model_args, training_args, trainer):
+    kwargs = {}
+    if model_args.aistudio_token is not None:
+        kwargs["token"] = model_args.aistudio_token
+        # PEFT Model only save PEFT parameters, if pretrained model obtains from aistudio
+    if model_args.from_aistudio and (model_args.lora or model_args.prefix_tuning):
+        kwargs["base_model"] = model_args.model_name_or_path
+    else:
+        trainer.tokenizer.save_to_aistudio(
+            repo_id=model_args.aistudio_repo_id,
+            private=model_args.aistudio_repo_private,
+            license=model_args.aistudio_repo_license,
+            exist_ok=True,
+            **kwargs,
+        )
+    trainer.model.save_to_aistudio(
+        repo_id=model_args.aistudio_repo_id,
+        private=model_args.aistudio_repo_private,
+        license=model_args.aistudio_repo_license,
+        merge_tensor_parallel=training_args.tensor_parallel_degree > 1,
+        exist_ok=True,
+        **kwargs,
+    )
+
+
+def create_peft_model(model_args, reft_args, training_args, dtype, model_config, model, reft_layers):
     if model_args.prefix_tuning:
         if training_args.pipeline_parallel_degree > 1:
             raise NotImplementedError("Prefix tuning is not implemented for pipeline parallelism.")
@@ -464,7 +542,7 @@ def main():
                 "low_rank_dimension": reft_args.rank,
                 "intervention": intervention_mapping[reft_args.intervention_type](**intervention_params),
             }
-            for l in layers
+            for l in reft_layers
         ]
         reft_config = ReFTConfig(
             representations=representations, intervention_params=intervention_params, position=reft_args.position
@@ -474,36 +552,6 @@ def main():
         # disable origianl model gradients
         model.disable_model_gradients()
         model.print_trainable_parameters()
-
-    def compute_metrics_do_generation(eval_preds):
-        rouge1 = Rouge1()
-        rouge2 = Rouge2()
-        rougel = RougeL()
-        bleu4 = BLEU(n_size=4)
-
-        predictions = [x[x != -100].tolist() for x in eval_preds.predictions]
-        references = [x[x != -100].tolist() for x in eval_preds.label_ids]
-
-        predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-        references = tokenizer.batch_decode(references, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-        if data_args.save_generation_output:
-            with open(os.path.join(training_args.output_dir, "generated_output.json"), "w", encoding="utf-8") as f:
-                for pred, ref in zip(predictions, references):
-                    out = {"output": pred, "tgt": ref}
-                    f.write(json.dumps(out, ensure_ascii=False) + "\n")
-
-        # for pred in predictions:
-        rouge1_score = rouge1.score(predictions, references)
-        rouge2_score = rouge2.score(predictions, references)
-        for pred, ref in zip(predictions, references):
-            rougel.add_inst(pred, [ref])
-            bleu4.add_inst(pred, [ref])
-        return {
-            "rouge1": rouge1_score,
-            "rouge2": rouge2_score,
-            "rougel": rougel.score(),
-            "bleu4": bleu4.score(),
-        }
 
     if model_args.vera:
         target_modules = get_lora_target_modules(model)
@@ -519,125 +567,74 @@ def main():
         model.mark_only_vera_as_trainable(notfreezeB=True)
         model.print_trainable_parameters()
 
-    # Create trainer
+    return model
 
-    if (
-        training_args.pipeline_parallel_degree > 1
-        or training_args.sequence_parallel
-        or training_args.autotuner_benchmark
-        or data_args.zero_padding
-        or data_args.pad_to_max_length
+
+def trans_dataset_to_ids(train_ds, dev_ds, model_args, data_args, trans_func, eval_zero_padding):
+    if train_ds is not None:
+        train_ds = train_ds.map(
+            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
+        )
+    if dev_ds is not None:
+        dev_ds = dev_ds.map(
+            partial(
+                trans_func,
+                is_test=data_args.eval_with_do_generation,
+                zero_padding=eval_zero_padding,
+                flash_mask=model_args.flash_mask,
+            )
+        )
+
+    return train_ds, dev_ds
+
+
+def create_dataset(data_args, training_args):
+    if data_args.dataset_name_or_path is None:
+        raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
+
+    train_ds = None
+    dev_ds = None
+    if os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) or os.path.exists(
+        os.path.join(data_args.dataset_name_or_path, "dev.json")
     ):
-        # NOTE(gongenlei): new add autotuner_benchmark
-        max_length = data_args.max_length
-        padding = "max_length"
+        if training_args.do_train:
+            train_ds = load_dataset(
+                "json",
+                data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
+                lazy=data_args.lazy,
+            )[0]
+        if training_args.do_eval:
+            dev_ds = load_dataset(
+                "json",
+                data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
+                lazy=data_args.lazy,
+            )[0]
+
+    elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")) or os.path.exists(
+        os.path.join(data_args.dataset_name_or_path, "dev")
+    ):
+        import glob
+
+        if training_args.do_train:
+            train_ds = load_dataset(
+                "json",
+                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
+                lazy=data_args.lazy,
+            )[0]
+        if training_args.do_eval:
+            dev_ds = load_dataset(
+                "json",
+                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "dev", "*.json")),
+                lazy=data_args.lazy,
+            )[0]
     else:
-        max_length = None
-        padding = True
+        if training_args.do_train:
+            train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
 
-    if training_args.pipeline_parallel_degree > 1:
-        metrics = None
-    elif data_args.eval_with_do_generation:
-        metrics = compute_metrics_do_generation
-    else:
-        metrics = compute_metrics
+        if training_args.do_eval:
+            dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
 
-    data_collator_fn = DataCollatorForSeq2Seq(
-        tokenizer=tokenizer,
-        max_length=max_length,
-        padding=padding,
-        max_label_length=max_length,
-        return_tensors="np",
-        return_attention_mask=not model_args.flash_mask,
-        pad_to_multiple_of=data_args.pad_to_multiple_of,
-    )
-    trainer = SFTTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_ds,
-        eval_dataset=dev_ds,
-        tokenizer=tokenizer,
-        compute_metrics=metrics,
-        data_collator=data_collator_fn if not model_args.reft else ReftDataCollator(data_collator=data_collator_fn),
-        do_generation=data_args.eval_with_do_generation,
-        callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
-        gen_args=gen_args,
-        data_args=data_args,
-    )
-    trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
-    trainer.set_optimizer_grouped_parameters(trainable_parameters)
-
-    # Train
-    if training_args.do_train:
-        checkpoint = None
-        if training_args.resume_from_checkpoint is not None:
-            checkpoint = training_args.resume_from_checkpoint
-        elif last_checkpoint is not None:
-            checkpoint = last_checkpoint
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        if model_args.neftune:
-            neft_post_hook_handle.remove()
-        if training_args.benchmark:
-            total_effective_tokens = (
-                sum([len(i["input_ids"]) for i in trainer.train_dataset]) * train_result.metrics["progress_or_epoch"]
-            )
-            effective_tokens_per_second = total_effective_tokens / train_result.metrics["train_runtime"]
-            logger.info(f"Effective_Tokens_per_second: {effective_tokens_per_second} ")
-            logger.info("Benchmark done.")
-        else:
-            if model_args.save_to_aistudio:
-                kwargs = {}
-                if model_args.aistudio_token is not None:
-                    kwargs["token"] = model_args.aistudio_token
-                # PEFT Model only save PEFT parameters, if pretrained model obtains from aistudio
-                if model_args.from_aistudio and (model_args.lora or model_args.prefix_tuning):
-                    kwargs["base_model"] = model_args.model_name_or_path
-                else:
-                    trainer.tokenizer.save_to_aistudio(
-                        repo_id=model_args.aistudio_repo_id,
-                        private=model_args.aistudio_repo_private,
-                        license=model_args.aistudio_repo_license,
-                        exist_ok=True,
-                        **kwargs,
-                    )
-                trainer.model.save_to_aistudio(
-                    repo_id=model_args.aistudio_repo_id,
-                    private=model_args.aistudio_repo_private,
-                    license=model_args.aistudio_repo_license,
-                    merge_tensor_parallel=training_args.tensor_parallel_degree > 1,
-                    exist_ok=True,
-                    **kwargs,
-                )
-
-            if not training_args.autotuner_benchmark:
-                trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
-                trainer.log_metrics("train", train_result.metrics)
-                trainer.save_metrics("train", train_result.metrics)
-                trainer.save_state()
-
-    # Evaluation test set
-    if training_args.do_predict:
-        test_ds = load_dataset(
-            "json",
-            data_files=os.path.join(data_args.dataset_name_or_path, "test.json"),
-            lazy=data_args.lazy,
-        )[0]
-
-        test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
-        if eval_zero_padding:
-            test_ds = intoken_dataset(
-                test_ds,
-                tokenizer=tokenizer,
-                max_length=data_args.max_length,
-            )
-        eval_result = trainer.predict(test_ds).metrics
-        trainer.log_metrics("test", eval_result)
-
-    # Evaluation dev set
-    if training_args.do_eval:
-        logger.info("*** Evaluate result after train ***")
-        eval_result = trainer.evaluate(dev_ds)
-        trainer.log_metrics("eval", eval_result)
+    return train_ds, dev_ds
 
 
 if __name__ == "__main__":
