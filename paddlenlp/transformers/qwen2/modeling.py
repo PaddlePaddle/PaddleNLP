@@ -31,7 +31,15 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-from paddle.distributed.fleet.utils import recompute
+
+from paddlenlp.transformers.refined_recompute import (
+    RRColumnParallelLinear,
+    RRColumnSequenceParallelLinear,
+    RRRowParallelLinear,
+    RRRowSequenceParallelLinear,
+    create_skip_config_for_refined_recompute,
+    recompute,
+)
 
 from .. import linear_utils
 from ..activations import ACT2FN
@@ -160,6 +168,7 @@ def scaled_dot_product_attention(
     attn_mask_startend_row_indices=None,
     training=True,
     sequence_parallel=False,
+    skip_recompute=False,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -177,6 +186,7 @@ def scaled_dot_product_attention(
             output_attentions,
             attn_mask_startend_row_indices=attn_mask_startend_row_indices,
             sequence_parallel=sequence_parallel,
+            skip_recompute=skip_recompute,
         )
     else:
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
@@ -363,9 +373,23 @@ class Qwen2MLP(nn.Layer):
         if config.sequence_parallel:
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
             RowParallelLinear = linear_utils.RowSequenceParallelLinear
+
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                    ColumnParallelLinear = RRColumnSequenceParallelLinear
+                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                    RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
+
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                    ColumnParallelLinear = RRColumnParallelLinear
+                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                    RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             self.gate_proj = ColumnParallelLinear(
@@ -465,9 +489,23 @@ class Qwen2Attention(nn.Layer):
         if config.sequence_parallel:
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
             RowParallelLinear = linear_utils.RowSequenceParallelLinear
+
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("attention_column_ln", False):
+                    ColumnParallelLinear = RRColumnSequenceParallelLinear
+                if config.skip_recompute_ops.get("attention_row_ln", False):
+                    RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
+
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("attention_column_ln", False):
+                    ColumnParallelLinear = RRColumnParallelLinear
+                if config.skip_recompute_ops.get("attention_row_ln", False):
+                    RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             self.q_proj = ColumnParallelLinear(self.hidden_size, self.hidden_size, has_bias=True, gather_output=False)
@@ -487,6 +525,14 @@ class Qwen2Attention(nn.Layer):
         )
 
         self.attn_func = scaled_dot_product_attention
+
+        # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+        if (
+            config.recompute
+            and not config.recompute_use_reentrant
+            and config.skip_recompute_ops.get("flash_attn", False)
+        ):
+            self.attn_func = partial(scaled_dot_product_attention, skip_recompute=True)
 
     def forward(
         self,
@@ -901,7 +947,10 @@ class Qwen2Model(Qwen2PretrainedModel):
 
         self.layers = nn.LayerList(
             [
-                Qwen2DecoderLayer(config, layerwise_recompute=layer_idx not in self.no_recompute_layers)
+                Qwen2DecoderLayer(
+                    create_skip_config_for_refined_recompute(layer_idx, config),
+                    layerwise_recompute=layer_idx not in self.no_recompute_layers,
+                )
                 for layer_idx in range(config.num_hidden_layers)
             ]
         )

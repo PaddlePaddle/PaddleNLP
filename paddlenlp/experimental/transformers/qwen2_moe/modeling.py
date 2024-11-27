@@ -292,7 +292,10 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         self.embed_tokens.weight.set_value(embed_tokens_weight)
         self.norm.weight.set_value(norm_weight)
 
+        if self.use_weight_only:
+            logger.info("weight only is enabled")
         for idx in range(self.num_layers):
+            logger.info(f"set state for layer {idx}")
             unfused_state_dict = {}
             ln_scale = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.input_layernorm.weight".format(idx)]).cast(
                 self.transformer_block.ln_scales[idx].dtype
