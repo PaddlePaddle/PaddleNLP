@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import os
+import re
 from shutil import copyfile
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -310,3 +311,33 @@ class GemmaTokenizer(PretrainedTokenizer):
             output += [1] * len(bos_token_id + token_ids_1 + eos_token_id)
 
         return output
+
+    def _extract_non_learnable_parts(self, origin_msg: List[Dict[str, str]], split_s: List[str]):
+        regex_pattern = "|".join(map(re.escape, split_s))
+        rendered_messages = self.chat_template.render(
+            messages=origin_msg, add_generation_prompt=False, **self.special_tokens_map
+        )
+        pattern = re.compile(r"(?:%s)" % regex_pattern)
+        split_positions = [match.span() for match in pattern.finditer(rendered_messages)]
+
+        filtered_positions = []
+        for start, end in split_positions:
+            # Find the last occurrence of '<start_of_turn>' before the split index
+            last_start = rendered_messages.rfind("<start_of_turn>", 0, start)
+            if last_start == -1:
+                continue  # Skip if '<start_of_turn>' is not found
+            model_start = last_start + len("<start_of_turn>")
+
+            # Get the text following 'model_start' and check if it starts with 'model'
+            following_text = rendered_messages[model_start:].lstrip()
+            if following_text.startswith("model"):
+                filtered_positions.append((start, end))
+        non_learnable_parts = []
+        last_end = 0
+        for start, end in filtered_positions:
+            non_learnable_parts.append(rendered_messages[last_end:start])
+            last_end = end
+        remaining_part = rendered_messages[last_end:]
+        if remaining_part:
+            non_learnable_parts.append(remaining_part)
+        return non_learnable_parts

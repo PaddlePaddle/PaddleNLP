@@ -23,8 +23,8 @@ import time
 import numpy as np
 from tqdm import tqdm
 
-import paddlenlp.transformers as tfs
 from paddlenlp.data import indexed_dataset
+from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
 
 try:
@@ -44,23 +44,7 @@ def print_datetime(string):
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name", type=str, required=True, help="What model to use.")
-    parser.add_argument(
-        "--tokenizer_name",
-        type=str,
-        required=True,
-        choices=[
-            "ErnieTokenizer",
-            "BertTokenizer",
-            "GPTTokenizer",
-            "GPTChineseTokenizer",
-            "LlamaTokenizer",
-            "ElectraTokenizer",
-            "T5Tokenizer",
-            "Qwen2Tokenizer"
-        ],
-        help="What type of tokenizer to use.",
-    )
+    parser.add_argument("--model_name_or_path", type=str, required=True, help="What model to use.")
     group = parser.add_argument_group(title="data input/output")
     group.add_argument("--input_path", type=str, required=True, help="Path to input JSON files.")
     group.add_argument("--output_prefix", type=str, required=True, help="Output prefix to store output file.")
@@ -227,7 +211,7 @@ class Converter(object):
         self.args = args
 
     def initializer(self):
-        Converter.tokenizer = getattr(tfs, self.args.tokenizer_name).from_pretrained(self.args.model_name)
+        Converter.tokenizer = AutoTokenizer.from_pretrained(self.args.model_name_or_path)
         if self.args.cn_whole_word_segment:
             # Extend chinese char vocab for ErnieTokinzer
             Converter.tokenizer.extend_chinese_char()
@@ -333,7 +317,7 @@ def main():
     convert = Converter(args)
 
     # Try tokenizer is availiable
-    sample_tokenizer = getattr(tfs, args.tokenizer_name).from_pretrained(args.model_name)
+    sample_tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
     if sample_tokenizer.vocab_size < 2**16 - 1:
         save_dtype = np.uint16
     else:

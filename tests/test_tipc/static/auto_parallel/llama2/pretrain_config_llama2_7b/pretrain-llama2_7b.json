@@ -10,7 +10,7 @@
   "pipeline_parallel_degree": 1,
   "sharding": "stage1",
   "data_parallel_config": "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate",
-  "sharding_parallel_config": "enable_stage2_overlap",
+  "sharding_parallel_config": "enable_stage1_overlap",
   "tensor_parallel_config": "enable_mp_async_allreduce",
   "pipeline_parallel_config": "",
   "virtual_pp_degree": 1,

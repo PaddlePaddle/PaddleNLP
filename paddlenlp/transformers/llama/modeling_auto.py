@@ -142,18 +142,17 @@ def scaled_dot_product_attention(
             )
         else:
             if alibi is not None:
-                alibi = alibi.reshape([bsz, num_heads, 1, -1])
                 attention_mask = attention_mask.cast(alibi.dtype) + alibi
             attn_output = F.scaled_dot_product_attention(
                 query_states,
                 key_states,
                 value_states,
                 attn_mask=attention_mask,
-                is_causal=attention_mask is None,
+                is_causal=attention_mask is None and query_states.shape[1] != 1,
             )
             attn_weights = None
 
-        attn_output = attn_output.reshape([bsz, q_len, head_dim * num_heads])
+        attn_output = attn_output.reshape([bsz, q_len, head_dim * query_states.shape[-2]])
         return (attn_output, attn_weights) if output_attentions else attn_output
     else:
         #  [ bz, seqlen, nhead, head_dim] -> [bs, nhead, seq_len, head_dim]
@@ -161,14 +160,11 @@ def scaled_dot_product_attention(
         # merge with the next tranpose
         key_states = paddle.transpose(key_states, [0, 2, 1, 3])
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
-
         # matmul and devide by sqrt(head_dim)
         attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
         # then add alibi bias
         if alibi is not None:
-            alibi = alibi.reshape([bsz, num_heads, 1, -1])
             attn_weights = attn_weights + alibi
-
         if list(attn_weights.shape) != [bsz, num_heads, q_len, kv_seq_len]:
             raise ValueError(
                 f"Attention weights should be of shape {(bsz, num_heads, q_len, kv_seq_len)}, but is"
@@ -199,13 +195,19 @@ def scaled_dot_product_attention(
 
 
 class LlamaRMSNormAuto(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config, ipp):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.weight = paddle.create_parameter(
             shape=[self.hidden_size],
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(1.0),
+        )
+        self.ipp = ipp
+        self.weight = dist.shard_tensor(
+            self.weight,
+            get_mesh(self.ipp),
+            [dist.Replicate(), dist.Replicate()],
         )
         self.variance_epsilon = config.rms_norm_eps
         self.config = config
@@ -516,7 +518,12 @@ class LlamaAttentionAuto(nn.Layer):
         if (paddle_version != 0.0) and (paddle_version <= 2.6):
             key_states = repeat_kv(key_states, self.num_key_value_groups)
             value_states = repeat_kv(value_states, self.num_key_value_groups)
-
+        attention_mask = (
+            dist.reshard(attention_mask, get_mesh(self.ipp), [dist.Shard(0), dist.Replicate()])
+            if attention_mask is not None
+            else None
+        )
+        alibi = dist.reshard(alibi, get_mesh(self.ipp), [dist.Shard(0), dist.Shard(1)]) if alibi is not None else None
         has_gradient = not (query_states.stop_gradient and key_states.stop_gradient and value_states.stop_gradient)
         if (
             self.enable_recompute
@@ -588,8 +595,8 @@ class LlamaDecoderLayerAuto(nn.Layer):
         self.hidden_size = config.hidden_size
         self.self_attn = LlamaAttentionAuto(config, layerwise_recompute, ipp)
         self.mlp = LlamaMLPAuto(config, ipp)
-        self.input_layernorm = LlamaRMSNormAuto(config)
-        self.post_attention_layernorm = LlamaRMSNormAuto(config)
+        self.input_layernorm = LlamaRMSNormAuto(config, ipp)
+        self.post_attention_layernorm = LlamaRMSNormAuto(config, ipp)
         # Note that we will actually perform a recompute only if both enable_recompute and layerwise_recompute are set to True
         # Enable_recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
@@ -620,7 +627,6 @@ class LlamaDecoderLayerAuto(nn.Layer):
                 (see `cache`).
             cache (`Tuple(paddle.Tensor)`, *optional*): cached past key and value projection states
         """
-
         # [bs, seq_len, embed_dim] or [seq_len / n, bs, embed_dim] (if sequence_parallel)
         residual = hidden_states
 
@@ -852,7 +858,6 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         self.hidden_size = config.hidden_size
         self.recompute_granularity = config.recompute_granularity
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
-
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
         self.embed_tokens = nn.Embedding(
@@ -860,10 +865,15 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             self.hidden_size,
         )
 
+        embedding_placements = (
+            [dist.Replicate(), dist.Shard(1)]
+            if self.config.tensor_parallel_degree > 1
+            else [dist.Replicate(), dist.Replicate()]
+        )
         self.embed_tokens.weight = dist.shard_tensor(
             self.embed_tokens.weight,
             get_mesh(),
-            [dist.Replicate(), dist.Shard(1)],
+            embedding_placements,
         )
 
         def get_layer_pp_info(layer_index):
@@ -885,7 +895,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                 self.next_pp_stage_indexes.append(i)
 
         self.layers = nn.LayerList(decoder_layers)
-        self.norm = LlamaRMSNormAuto(config)
+        self.norm = LlamaRMSNormAuto(config, pp_stage_id)
 
         self.gradient_checkpointing = False
 
@@ -964,7 +974,8 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             seq_length_with_past += cache_length
 
         if inputs_embeds is None:
-            inputs_embeds = self.embed_tokens(input_ids)
+            with paddle.amp.auto_cast(False):
+                inputs_embeds = self.embed_tokens(input_ids)
 
         if self.config.sequence_parallel:
             # [B, S, H] -> [S, B, H]
@@ -979,20 +990,22 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                 global_mesh,
                 [dist.Replicate() for _ in range(len(global_mesh._shape))],
             )
-
         # embed positions
         if not self.config.use_flash_attention and attention_mask is None:
             # [bs, seq_len]
             attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
 
         if self.config.alibi:
+            if attention_mask is None:
+                attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+            alibi_place = [dist.Replicate() for _ in range(len(global_mesh._shape))]
             alibi = build_alibi_tensor(attention_mask, self.config.num_attention_heads, dtype=inputs_embeds.dtype)
-            alibi = alibi.reshape([batch_size * self.config.num_attention_heads, 1, seq_length_with_past])
+            alibi = dist.shard_tensor(alibi, global_mesh, alibi_place)
         else:
             alibi = None
-
-        if self.config.use_flash_attention:
+        if self.config.use_flash_attention and not self.config.alibi:
             # attention_mask in flash_attn is always None for pretrain
+            # atttenton_mask is used in scaled_dot_product_attention with alibi_tensor
             attention_mask = None
         else:
             attention_mask = self._prepare_decoder_attention_mask(
@@ -1003,7 +1016,6 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                 global_mesh,
                 [dist.Replicate() for _ in range(len(global_mesh._shape))],
             )
-
         hidden_states = inputs_embeds
         hidden_states = dist.reshard(hidden_states, get_mesh(), self.placements)
 
@@ -1011,7 +1023,6 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
         next_decoder_cache = () if use_cache else None
-
         for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
@@ -1040,7 +1051,14 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                     if attention_mask is not None
                     else None
                 )
-
+                if alibi is not None:
+                    pp_mesh = get_mesh(ipp)
+                    alibi_place = [dist.Replicate() for _ in range(len(pp_mesh._shape))]
+                    alibi = dist.reshard(
+                        alibi,
+                        pp_mesh,
+                        alibi_place,
+                    )
             if idx in self.next_pp_stage_indexes:
                 hidden_states = dist.reshard(
                     hidden_states,
