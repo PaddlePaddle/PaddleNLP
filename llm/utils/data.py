@@ -200,7 +200,6 @@ def tokenize_rounds_example(tokenizer, example, data_args, **kwargs):
 
 
 def convert_example_common(example, tokenizer, data_args, is_test=True, zero_padding=False, flash_mask=False):
-    print("data args", data_args)
     if data_args.autoregressive:
         tokenized_source = tokenize_unsupervised_example(
             tokenizer, example, data_args, is_test=True, zero_padding=False, flash_mask=False

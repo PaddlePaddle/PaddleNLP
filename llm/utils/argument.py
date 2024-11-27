@@ -215,6 +215,9 @@ class ModelArgument:
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
     lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+ technique"})
     pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
+    lora_use_mixer: bool = field(
+        default=False, metadata={"help": "Whether to use MosLoRA: https://arxiv.org/pdf/2406.11909"}
+    )
 
     # vera related parameters
     vera: bool = field(default=False, metadata={"help": "Whether to use vera technique"})
@@ -328,7 +331,7 @@ class QuantArgument:
     )
     shift_step: int = field(default=32, metadata={"help": "Sample steps when shift"})
 
-    # Pre-quant methos Smooth related parameters
+    # Pre-quant methods Smooth related parameters
     smooth: bool = field(default=False, metadata={"help": "Whether to use Smooth"})
     smooth_all_linears: bool = field(default=False, metadata={"help": "Whether to smooth all linears"})
     smooth_sampler: str = field(

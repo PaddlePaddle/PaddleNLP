@@ -134,6 +134,7 @@ python merge_lora_params.py \
 - `strategy_type`: 长序列扩展策略的类型，默认为 None。
 - `strategy_name`: 长序列扩展策略的具体名称，默认为 None。
 - `rope_scaling_factor`: 应用 RoPE 扩展策略时的缩放因子。
+- `lora_use_mixer`: 是否开启 MosLoRA 策略。
 </div>
 
 <summary>&emsp; 数据参数（DataArgument）</summary><div>

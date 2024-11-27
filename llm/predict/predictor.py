@@ -27,6 +27,7 @@ import paddle.incubate.multiprocessing as mp
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode, use_pir_api
 from paddle.distributed import fleet
 
+from paddlenlp.experimental.transformers import InferenceWithReferenceProposer
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
@@ -44,11 +45,9 @@ from paddlenlp.transformers import (
     PretrainedTokenizer,
 )
 from paddlenlp.trl import llm_utils
+from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
-
-# Note(@RochardWooSJTU): MAX_BSZ must be the same as definition in get_output / save_output
-MAX_BSZ = 512
 
 
 @dataclass
@@ -138,8 +137,25 @@ class PredictorArgument:
     total_max_length: int = field(
         default=4096, metadata={"help": "Super parameter. Maximum sequence length(encoder+decoder)."}
     )
+    speculate_method: str = field(
+        default=None,
+        metadata={
+            "help": "speculate method, it should be one of ['None', 'autoregressive', 'inference_with_reference']"
+        },
+    )
+    speculate_max_draft_token_num: int = field(
+        default=1,
+        metadata={"help": "the max length of draft tokens for speculate method."},
+    )
+    speculate_max_ngram_size: int = field(default=1, metadata={"help": "the max ngram size of speculate method."})
+    speculate_verify_window: int = field(
+        default=2, metadata={"help": "the max length of verify window for speculate method."}
+    )
+    speculate_max_candidate_len: int = field(default=5, metadata={"help": "the max length of candidate tokens."})
 
     def __post_init__(self):
+        if self.speculate_method is not None:
+            self.append_attn = True
         if self.append_attn:
             self.block_attn = True
         assert (
@@ -946,6 +962,29 @@ class BlockInferencePredictorMixin(BasePredictor):
         )
         self.model_inputs["next_tokens"] = paddle.full(shape=[self.config.batch_size, 1], fill_value=-1, dtype="int64")
 
+        # speculative decoding related parameters
+        if self.config.speculate_method is not None:
+            self.model_inputs["accept_tokens"] = paddle.full(
+                shape=[self.config.batch_size, self.config.speculate_max_draft_token_num + 1],
+                fill_value=0,
+                dtype="int64",
+            )
+            self.model_inputs["accept_num"] = paddle.full(shape=[self.config.batch_size], fill_value=0, dtype="int32")
+            self.model_inputs["draft_tokens"] = paddle.full(
+                shape=[self.config.batch_size, self.config.speculate_max_draft_token_num + 1],
+                fill_value=0,
+                dtype="int64",
+            )
+            self.model_inputs["actual_draft_token_num"] = paddle.full(
+                shape=[self.config.batch_size], fill_value=self.config.speculate_max_draft_token_num, dtype="int32"
+            )
+
+            self.proposer.input_ids_cpu = self.model_inputs["input_ids"].to("cpu", blocking=False)
+            for bid in range(self.config.batch_size):
+                self.model_inputs["pre_ids"][bid, 0] = self.model_inputs["input_ids"][bid][
+                    seq_lens[bid] - 1
+                ]  # get the last token before padding of this batch
+
         if self.config.mode == "static":
             for k, v in self.model_inputs.items():
                 v.name = k
@@ -977,6 +1016,17 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
 
         self.model_inputs["cache_kvs"] = self.cache_kvs
 
+        # init speculate components
+        if config.speculate_method == "inference_with_reference":
+            self.proposer = InferenceWithReferenceProposer(
+                config.speculate_max_draft_token_num,
+                config.speculate_max_ngram_size,
+                config.batch_size,
+                config.max_length,
+            )
+        else:
+            self.proposer = None
+
     @paddle.no_grad()
     def _infer(self, inputs: dict[str, paddle.Tensor]):
         self.model.generate(
@@ -990,18 +1040,35 @@ class DygraphBlockInferencePredictor(BlockInferencePredictorMixin):
         result_queue = mp.Queue()
         tensor_queue = mp.Queue()
         done_event = mp.Event()
+
+        # whether speculative decoding
+        if self.proposer is None:
+            read_res_func = llm_utils.read_res
+            output_tensor_shape = [MAX_BSZ + 2, 1]
+        else:
+            read_res_func = llm_utils.speculate_read_res
+            output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
+
         read_res_process = mp.Process(
-            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
+            target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
         )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
 
-        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
+        output_tensor = paddle.full(shape=output_tensor_shape, fill_value=2, dtype="int64").cpu()
+
         tensor_queue.put(output_tensor)
         if self.tensor_parallel_rank == 0:
             done_event.wait()
         s_time = time.time()
         while self.model_inputs["not_need_stop"]:
+            # whether speculative decoding
+            if self.proposer is not None:
+                self.proposer.run(
+                    self.model_inputs,
+                    real_batch_size=self.batch_size,
+                    seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
+                )
             self._infer(self.model_inputs)
         logger.info(f"running spend {time.time()  -  s_time}")
 
@@ -1054,6 +1121,17 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
                 self.model_inputs["v_quant_scales_" + str(i)] = self.v_quant_scales[i]
                 self.model_inputs["k_dequant_scales_" + str(i)] = self.k_dequant_scales[i]
                 self.model_inputs["v_dequant_scales_" + str(i)] = self.v_dequant_scales[i]
+
+        # init speculate components
+        if config.speculate_method == "inference_with_reference":
+            self.proposer = InferenceWithReferenceProposer(
+                config.speculate_max_draft_token_num,
+                config.speculate_max_ngram_size,
+                config.batch_size,
+                config.max_length,
+            )
+        else:
+            self.proposer = None
 
     def _create_predictor(self, predictor_args: PredictorArgument):
         if not is_paddlenlp_ops_available():
@@ -1120,18 +1198,34 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
         tensor_queue = mp.Queue()
         done_event = mp.Event()
 
-        read_res_process = mp.Process(
-            target=llm_utils.read_res, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
-        )
+        # whether speculative decoding
+        if self.proposer is None:
+            read_res_func = llm_utils.read_res
+            output_tensor_shape = [MAX_BSZ + 2, 1]
+        else:
+            read_res_func = llm_utils.speculate_read_res
+            output_tensor_shape = [SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS + SPECULATE_MAX_BSZ + 2, 1]
 
+        read_res_process = mp.Process(
+            target=read_res_func, args=[self.model_name_or_path, tensor_queue, result_queue, done_event]
+        )
         if self.tensor_parallel_rank == 0:
             read_res_process.start()
-        output_tensor = paddle.full(shape=[MAX_BSZ + 2, 1], fill_value=2, dtype="int64").cpu()
+
+        output_tensor = paddle.full(shape=output_tensor_shape, fill_value=2, dtype="int64").cpu()
+
         tensor_queue.put(output_tensor)
         if self.tensor_parallel_rank == 0:
             done_event.wait()
         s_time = time.time()
         while self.model_inputs["not_need_stop"]:
+            # whether speculative decoding
+            if self.proposer is not None:
+                self.proposer.run(
+                    self.model_inputs,
+                    real_batch_size=self.batch_size,
+                    seq_lens_this_time=self.model_inputs["seq_lens_this_time"],
+                )
             self.predictor.run(list(self.model_inputs.values()))
         logger.info(f"running spend {time.time()  -  s_time}")
 

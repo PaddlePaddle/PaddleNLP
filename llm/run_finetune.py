@@ -23,7 +23,6 @@ from utils.argument import (
     DataArgument,
     GenerateArgument,
     ModelArgument,
-    QuantArgument,
     ReftArgument,
     TrainingArguments,
 )
@@ -44,7 +43,6 @@ from paddlenlp.peft import (
     VeRAConfig,
     VeRAModel,
 )
-
 from paddlenlp.peft.reft import (
     ReFTConfig,
     ReftDataCollator,
@@ -52,7 +50,6 @@ from paddlenlp.peft.reft import (
     intervention_mapping,
 )
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed
-
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
     AutoConfig,
@@ -86,23 +83,15 @@ flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe, Qwen2ForCausa
 
 
 def main():
-    parser = PdArgumentParser(
-        (GenerateArgument, QuantArgument, ModelArgument, ReftArgument, DataArgument, TrainingArguments)
-    )
+    parser = PdArgumentParser((GenerateArgument, ModelArgument, ReftArgument, DataArgument, TrainingArguments))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        gen_args, quant_args, model_args, reft_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
+        gen_args, model_args, reft_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
-        gen_args, quant_args, model_args, reft_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        gen_args, model_args, reft_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
-    training_args.print_config(quant_args, "Quant")
     training_args.print_config(gen_args, "Generation")
-
-    if sum([quant_args.do_ptq, quant_args.do_qat, quant_args.do_gptq, training_args.do_train]) > 1:
-        raise ValueError(
-            "--do_train, --do_ptq, --do_gptq and --do_qat cannot work at the same time. Please choose only one at a time"
-        )
 
     # Setup GPU & distributed training
     paddle.set_device(training_args.device)
@@ -261,12 +250,10 @@ def main():
 
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
-    elif (
-        os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json"))
-        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev.json"))
-        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json"))
+    elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) or os.path.exists(
+        os.path.join(data_args.dataset_name_or_path, "dev.json")
     ):
-        if training_args.do_train or quant_args.do_qat:
+        if training_args.do_train:
             train_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
@@ -282,36 +269,13 @@ def main():
             )[0]
         else:
             dev_ds = None
-        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
-            if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant.json")):
-                ptq_ds = load_dataset(
-                    "json",
-                    data_files=os.path.join(data_args.dataset_name_or_path, "quant.json"),
-                    lazy=data_args.lazy,
-                )[0]
-            elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")):
-                ptq_ds = load_dataset(
-                    "json",
-                    data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
-                    lazy=data_args.lazy,
-                )[0]
-                logger.info(
-                    f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
-                )
-            else:
-                raise ValueError(
-                    f"Quant strategy requires quant.json or train.json in {data_args.dataset_name_or_path}"
-                )
-        else:
-            ptq_ds = None
-    elif (
-        os.path.exists(os.path.join(data_args.dataset_name_or_path, "train"))
-        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "dev"))
-        or os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant"))
+
+    elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")) or os.path.exists(
+        os.path.join(data_args.dataset_name_or_path, "dev")
     ):
         import glob
 
-        if training_args.do_train or quant_args.do_qat:
+        if training_args.do_train:
             train_ds = load_dataset(
                 "json",
                 data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
@@ -327,28 +291,9 @@ def main():
             )[0]
         else:
             dev_ds = None
-        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
-            if os.path.exists(os.path.join(data_args.dataset_name_or_path, "quant")):
-                ptq_ds = load_dataset(
-                    "json",
-                    data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "quant", "*.json")),
-                    lazy=data_args.lazy,
-                )[0]
-            elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")):
-                ptq_ds = load_dataset(
-                    "json",
-                    data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
-                    lazy=data_args.lazy,
-                )[0]
-                logger.info(
-                    f"Not found quant.json in {data_args.dataset_name_or_path}. Set train dataset as PTQ calibration dataset."
-                )
-            else:
-                raise ValueError(f"Quant strategy requires quant or train folder in {data_args.dataset_name_or_path}")
-        else:
-            ptq_ds = None
+
     else:
-        if training_args.do_train or quant_args.do_qat:
+        if training_args.do_train:
             train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
         else:
             train_ds = None
@@ -356,11 +301,7 @@ def main():
             dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
         else:
             dev_ds = None
-        if quant_args.do_ptq or quant_args.do_gptq or quant_args.load_quant_model:
-            ptq_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
-            logger.info("Set train dataset as PTQ calibration dataset.")
-        else:
-            ptq_ds = None
+
     # TODO(ZHUI & sijunhe): Temporary implementation. Generalize this logic and move to Trainer later.
     if training_args.resume_from_checkpoint is not None and data_args.lazy:
         logger.info(
@@ -404,13 +345,6 @@ def main():
         if train_ds is not None
         else None
     )
-    ptq_ds = (
-        ptq_ds.map(
-            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
-        )
-        if ptq_ds is not None
-        else None
-    )
 
     eval_zero_padding = data_args.zero_padding
     if data_args.zero_padding and data_args.eval_with_do_generation:
@@ -444,16 +378,6 @@ def main():
                 greedy_zero_padding=data_args.greedy_zero_padding,
             )
             if train_ds is not None
-            else None
-        )
-        ptq_ds = (
-            intoken_dataset(
-                ptq_ds,
-                tokenizer=tokenizer,
-                max_length=data_args.max_length,
-                greedy_zero_padding=data_args.greedy_zero_padding,
-            )
-            if ptq_ds is not None
             else None
         )
 
@@ -512,9 +436,9 @@ def main():
                 merge_weights=False,
                 tensor_parallel_degree=training_args.tensor_parallel_degree,
                 dtype=dtype,
-                do_qat=quant_args.do_qat,
                 base_model_name_or_path=model_args.model_name_or_path,
                 use_quick_lora=model_args.use_quick_lora,
+                lora_use_mixer=model_args.lora_use_mixer,
             )
             model = LoRAModel(model, lora_config)
         else:
@@ -691,65 +615,6 @@ def main():
                 trainer.save_metrics("train", train_result.metrics)
                 trainer.save_state()
 
-    # QAT
-    if quant_args.do_qat:
-        from utils.quant import create_qat_model
-
-        trainer.model = create_qat_model(quant_args, trainer.model, dtype)
-        train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
-        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
-        trainer.log_metrics("qat", train_result.metrics)
-        trainer.save_metrics("qat", train_result.metrics)
-        trainer.save_state()
-
-    # PTQ
-    if quant_args.do_ptq:
-        if isinstance(model, LoRAModel):
-            raise NotImplementedError(
-                "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
-            )
-        from utils.quant import (
-            apply_autoclip,
-            apply_ptq,
-            apply_shift,
-            apply_smooth,
-            get_ptq_model_config,
-        )
-
-        trainer.model.eval()
-        trainer.model.config.quantization_config.quant_type = quant_args.quant_type
-        trainer.model.config.quantization_config.smooth = quant_args.smooth
-        trainer.model.config.quantization_config.shift = quant_args.shift
-        trainer.model.config.quantization_config.shift_smooth_all_linears = (
-            quant_args.smooth_all_linears or quant_args.shift_all_linears
-        )
-        ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
-        if quant_args.shift or quant_args.smooth:
-            ptq_model_config = get_ptq_model_config(trainer.model)
-
-        if quant_args.shift:
-            apply_shift(quant_args, trainer, ptq_dataloader, ptq_model_config)
-
-        if quant_args.smooth:
-            apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config)
-
-        if quant_args.auto_clip:
-            apply_autoclip(quant_args, trainer, ptq_dataloader)
-
-        apply_ptq(quant_args, trainer, ptq_dataloader)
-        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
-
-    if quant_args.do_gptq:
-        if isinstance(model, LoRAModel):
-            raise NotImplementedError(
-                "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
-            )
-        from utils.quant import apply_gptq
-
-        ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
-        apply_gptq(quant_args, trainer, ptq_dataloader)
-        trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
-
     # Evaluation test set
     if training_args.do_predict:
         test_ds = load_dataset(
@@ -768,43 +633,9 @@ def main():
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
 
-    if quant_args.load_quant_model and not quant_args.do_ptq:
-        if isinstance(model, LoRAModel):
-            raise NotImplementedError(
-                "PTQ strategy not supported for LoRA model. Please merge lora parameters to pretrain model first."
-            )
-        from utils.quant import (
-            apply_autoclip,
-            apply_ptq,
-            apply_shift,
-            apply_smooth,
-            get_ptq_model_config,
-            load_quant_model,
-        )
-
-        trainer.model.eval()
-        trainer.model.config.quantization_config.quant_type = quant_args.quant_type
-        trainer.model.config.quantization_config.smooth = quant_args.smooth
-        trainer.model.config.quantization_config.shift = quant_args.shift
-        trainer.model.config.quantization_config.shift_smooth_all_linears = (
-            quant_args.smooth_all_linears or quant_args.shift_all_linears
-        )
-        ptq_dataloader = trainer.get_ptq_dataloader(ptq_ds)
-        if quant_args.shift or quant_args.smooth:
-            ptq_model_config = get_ptq_model_config(trainer.model)
-
-        if quant_args.shift:
-            apply_shift(quant_args, trainer, ptq_dataloader, ptq_model_config)
-
-        if quant_args.smooth:
-            apply_smooth(quant_args, trainer, ptq_dataloader, ptq_model_config)
-
-        load_quant_model(trainer.model, quant_args, training_args.output_dir)
-
     # Evaluation dev set
     if training_args.do_eval:
-
-        logger.info("*** Evaluate result after train/ptq/qat/ etc.***")
+        logger.info("*** Evaluate result after train ***")
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
 
