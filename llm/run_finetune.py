@@ -223,6 +223,7 @@ def main():
             neft_post_hook_handle = model.get_input_embeddings().register_forward_post_hook(neft_post_hook)
         else:
             raise NotImplementedError("Only support neftune for model with get_input_embeddings")
+
     if training_args.sequence_parallel:
         register_sequence_parallel_allreduce_hooks(
             model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
@@ -249,7 +250,7 @@ def main():
     if isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
-    train_ds, dev_ds = create_dataset(data_args, training_args)
+    train_ds, dev_ds, test_ds = create_dataset(data_args, training_args)
 
     # TODO(ZHUI & sijunhe): Temporary implementation. Generalize this logic and move to Trainer later.
     if training_args.resume_from_checkpoint is not None and data_args.lazy:
@@ -294,7 +295,9 @@ def main():
         )
         eval_zero_padding = False
 
-    train_ds, dev_ds = trans_dataset_to_ids(train_ds, dev_ds, model_args, data_args, trans_func, eval_zero_padding)
+    train_ds, dev_ds, test_ds = trans_dataset_to_ids(
+        train_ds, dev_ds, test_ds, model_args, data_args, trans_func, eval_zero_padding
+    )
 
     if data_args.zero_padding:
         if data_args.lazy:
@@ -311,6 +314,8 @@ def main():
             )
         if eval_zero_padding and dev_ds is not None:
             dev_ds = intoken_dataset(dev_ds, tokenizer=tokenizer, max_length=data_args.max_length)
+        if eval_zero_padding and test_ds is not None:
+            test_ds = intoken_dataset(test_ds, tokenizer=tokenizer, max_length=data_args.max_length)
 
     model = create_peft_model(model_args, reft_args, training_args, dtype, model_config, model, reft_layers)
 
@@ -421,19 +426,6 @@ def main():
 
     # Evaluation test set
     if training_args.do_predict:
-        test_ds = load_dataset(
-            "json",
-            data_files=os.path.join(data_args.dataset_name_or_path, "test.json"),
-            lazy=data_args.lazy,
-        )[0]
-
-        test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
-        if eval_zero_padding:
-            test_ds = intoken_dataset(
-                test_ds,
-                tokenizer=tokenizer,
-                max_length=data_args.max_length,
-            )
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
 
@@ -570,7 +562,7 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
     return model
 
 
-def trans_dataset_to_ids(train_ds, dev_ds, model_args, data_args, trans_func, eval_zero_padding):
+def trans_dataset_to_ids(train_ds, dev_ds, test_ds, model_args, data_args, trans_func, eval_zero_padding):
     if train_ds is not None:
         train_ds = train_ds.map(
             partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
@@ -584,6 +576,8 @@ def trans_dataset_to_ids(train_ds, dev_ds, model_args, data_args, trans_func, ev
                 flash_mask=model_args.flash_mask,
             )
         )
+    if test_ds is not None:
+        test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
 
     return train_ds, dev_ds
 
@@ -594,6 +588,7 @@ def create_dataset(data_args, training_args):
 
     train_ds = None
     dev_ds = None
+    test_ds = None
     if os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) or os.path.exists(
         os.path.join(data_args.dataset_name_or_path, "dev.json")
     ):
@@ -607,6 +602,12 @@ def create_dataset(data_args, training_args):
             dev_ds = load_dataset(
                 "json",
                 data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
+                lazy=data_args.lazy,
+            )[0]
+        if training_args.do_predict:
+            test_ds = load_dataset(
+                "json",
+                data_files=os.path.join(data_args.dataset_name_or_path, "test.json"),
                 lazy=data_args.lazy,
             )[0]
 
@@ -627,6 +628,12 @@ def create_dataset(data_args, training_args):
                 data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "dev", "*.json")),
                 lazy=data_args.lazy,
             )[0]
+        if training_args.do_predict:
+            test_ds = load_dataset(
+                "json",
+                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "test", "*.json")),
+                lazy=data_args.lazy,
+            )[0]
     else:
         if training_args.do_train:
             train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
@@ -634,7 +641,10 @@ def create_dataset(data_args, training_args):
         if training_args.do_eval:
             dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
 
-    return train_ds, dev_ds
+        if training_args.do_predict:
+            test_ds = load_dataset(data_args.dataset_name_or_path, splits=["test"])[0]
+
+    return train_ds, dev_ds, test_ds
 
 
 if __name__ == "__main__":
