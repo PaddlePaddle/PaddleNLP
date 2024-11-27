@@ -457,6 +457,8 @@ class BertRefinedRecomputeTest(unittest.TestCase):
 
     @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute only support on gpu")
     def test_refined_recompute(self):
+        raw_dtype = paddle.get_default_dtype()
+
         model1, mem_usage_forward1, max_mem_usage_forward1 = self.no_pp_fwd_bwd(
             recompute=True, use_rr_recompute=False
         )  # with recompute
@@ -488,6 +490,7 @@ class BertRefinedRecomputeTest(unittest.TestCase):
 
         del model1, model2, model3
         paddle.device.cuda.empty_cache()
+        paddle.set_default_dtype(raw_dtype)
 
     def pp_fwd_bwd(
         self,
@@ -526,6 +529,7 @@ class BertRefinedRecomputeTest(unittest.TestCase):
 
     @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute-pp only support on gpu")
     def test_refined_recompute_pp(self):
+        raw_dtype = paddle.get_default_dtype()
         grad1, layer1 = self.pp_fwd_bwd(recompute=True, use_rr_recompute=False)
         grad2, layer2 = self.pp_fwd_bwd(recompute=True, use_rr_recompute=True)
         grad3, layer3 = self.pp_fwd_bwd(recompute=False, use_rr_recompute=False)
@@ -552,3 +556,4 @@ class BertRefinedRecomputeTest(unittest.TestCase):
         del grad1, grad2, grad3
         del layer1, layer2, layer3
         paddle.device.cuda.empty_cache()
+        paddle.set_default_dtype(raw_dtype)
