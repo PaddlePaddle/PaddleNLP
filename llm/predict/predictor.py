@@ -61,7 +61,7 @@ ATTENTION_TYPE_FOR_PREDICTOR_MAPPING_NAMES = OrderedDict(
 def get_attention_type(predictor_args):
     count = 0
     # It must follow this order
-    args = predictor_args.block_attn
+    args = [predictor_args.block_attn]
     res = []
     for attn_type in args:
         if attn_type:
