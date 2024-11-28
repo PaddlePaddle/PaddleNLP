@@ -240,7 +240,7 @@ class EmbeddingIterableDataset(EmbeddingDatasetMixin, IterableDataset):
     def iter_one_epoch(self):
         """Iterates through one epoch of the dataset."""
 
-        num_sequences = 0, 0
+        num_sequences = 0
         for index, example in enumerate(self.example_dataset):
             example = self.convert_example(example)
             sequence = self._postprocess_sequence(example)
