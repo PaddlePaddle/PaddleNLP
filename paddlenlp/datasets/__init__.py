@@ -25,6 +25,7 @@ from .dataset import *
 from .drcd import *
 from .drcd_cn import *
 from .dureader_robust import *
+from .embedding_dataset import *
 from .glue import *
 from .imdb import *
 from .lcqmc import *

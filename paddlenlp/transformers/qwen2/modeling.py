@@ -76,6 +76,7 @@ __all__ = [
     "Qwen2PretrainingCriterion",
     "Qwen2ForSequenceClassification",
     "Qwen2ForTokenClassification",
+    "Qwen2SentenceEmbedding",
 ]
 
 
@@ -1612,7 +1613,6 @@ class Qwen2SentenceEmbedding(Qwen2PretrainedModel):
     def __init__(
         self,
         config: Qwen2Config,
-        model: Qwen2Model,
         embedding_temperature: float = 0.02,
     ):
         """Qwen2SentenceEmbedding
@@ -1625,12 +1625,14 @@ class Qwen2SentenceEmbedding(Qwen2PretrainedModel):
         """
         super(Qwen2SentenceEmbedding, self).__init__(config)
         self.config = config
-        self.qwen2 = model
+        self.qwen2 = Qwen2Model(config)
         self.cross_entropy = nn.CrossEntropyLoss(reduction="mean")
         self.embedding_temperature = embedding_temperature
-        self.word_size = dist.get_world_size()
+        self.world_size = dist.get_world_size()
         self.process_rank = dist.get_rank()
         self.embedding_negatives_cross_device = config.embedding_negatives_cross_device
+        if self.world_size <= 1:
+            self.embedding_negatives_cross_device = False
 
     def forward(
         self,
@@ -1705,7 +1707,3 @@ class Qwen2SentenceEmbedding(Qwen2PretrainedModel):
         all_tensors[self.process_rank] = tensor
         all_tensors = paddle.concat(all_tensors, axis=0)
         return all_tensors
-
-    def state_dict(self, destination=None, include_sublayers=True, structured_name_prefix="", use_hook=True):
-        """state_dict"""
-        return self.model.state_dict(destination, include_sublayers, structured_name_prefix, use_hook)

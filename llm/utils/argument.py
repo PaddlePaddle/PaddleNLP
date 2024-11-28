@@ -372,3 +372,50 @@ class GenerateArgument:
     top_p: float = field(
         default=1.0, metadata={"help": "The cumulative probability for top-p-filtering in the sampling strategy."}
     )
+
+
+@dataclass
+class EmbeddingArgument:
+    max_query_len: int = field(
+        default=1,
+        metadata={
+            "help": "The number of highest probability tokens to keep for top-k-filtering in the sampling strategy"
+        },
+    )
+    max_passage_len: float = field(
+        default=1.0, metadata={"help": "The cumulative probability for top-p-filtering in the sampling strategy."}
+    )
+    group_size: int = field(
+        default=8,
+        metadata={
+            "help": (
+                "Number of total positive and negative samples associated with " "each query for embedding training."
+            )
+        },
+    )
+    query_template: str = field(
+        default="Query: {text}\nUse one word to summarize the query's relevant information. The word is: \"",
+        metadata={
+            "help": (
+                "Query template. Ensure the template includes the placeholder "
+                "'{text}' to insert the actual query text."
+            )
+        },
+    )
+    passage_template: str = field(
+        default="Text: {text}\nUse one word to summarize the text's content. The word is: \"",
+        metadata={
+            "help": (
+                "Passage template. Ensure the template includes the placeholder "
+                "'{text}' to insert the actual passage text."
+            )
+        },
+    )
+    embedding_temperature: float = field(
+        default=0.02,
+        metadata={"help": "The temperature used in embedding learning."},
+    )
+    embedding_negatives_cross_device: bool = field(
+        default=True,
+        metadata={"help": "Whether to share the negatives across all GPUs."},
+    )
