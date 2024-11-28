@@ -593,7 +593,7 @@ def trans_dataset_to_ids(train_ds, dev_ds, test_ds, model_args, data_args, trans
     if test_ds is not None:
         test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
 
-    return train_ds, dev_ds
+    return train_ds, dev_ds, test_ds
 
 
 def create_dataset(data_args, training_args):
