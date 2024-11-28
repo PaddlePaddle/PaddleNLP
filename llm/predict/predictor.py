@@ -18,7 +18,6 @@ import os
 import sys
 import time
 from abc import abstractmethod
-from collections import OrderedDict
 from dataclasses import dataclass, field
 from threading import Thread
 
@@ -49,29 +48,6 @@ from paddlenlp.trl import llm_utils
 from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 from paddlenlp.utils.import_utils import is_paddlenlp_ops_available
 from paddlenlp.utils.log import logger
-
-ATTENTION_TYPE_FOR_PREDICTOR_MAPPING_NAMES = OrderedDict(
-    [
-        ((True,), "Block"),
-        ((False,), ""),
-    ]
-)
-
-
-def get_attention_type(predictor_args):
-    count = 0
-    # It must follow this order
-    args = [predictor_args.block_attn]
-    res = []
-    for attn_type in args:
-        if attn_type:
-            res.append(True)
-            count += 1
-        else:  # handle None and False case
-            res.append(False)
-    if count > 1:
-        raise ValueError("Only one attention type can be used")
-    return ATTENTION_TYPE_FOR_PREDICTOR_MAPPING_NAMES[tuple(res)]
 
 
 @dataclass
@@ -146,7 +122,6 @@ class PredictorArgument:
     )
 
     append_attn: bool = field(default=False, metadata={"help": "whether use append attention"})
-    speculate_attn: bool = field(default=False, metadata={"help": "whether use append attention"})
 
     chat_template: str = field(
         default=None,
@@ -1310,7 +1285,10 @@ class AutoPredictor:
         # infer/ no infer
         if predictor_args.inference_model:
             # block/no block
-            attn_type = get_attention_type(predictor_args)
+            if predictor_args.block_attn:
+                attn_type = "Block"
+            else:
+                attn_type = ""
             inference_mode = f"{attn_type}Inference"
 
             if predictor_args.mode == "static":

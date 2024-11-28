@@ -161,31 +161,6 @@ MODEL_FOR_CAUSAL_LM_INFERENCE_MAPPING_NAMES = OrderedDict(
 )
 
 
-ATTENTION_TYPE_FOR_MODEL_MAPPING_NAMES = OrderedDict(
-    [
-        ((True, False), "Block"),
-        ((False, True), "Speculate"),
-        ((False, False), ""),
-    ]
-)
-
-
-def get_attention_type(predictor_args):
-    count = 0
-    # It must follow this order
-    args = (predictor_args.block_attn, predictor_args.speculate_attn)
-    res = []
-    for attn_type in args:
-        if attn_type:
-            res.append(True)
-            count += 1
-        else:  # handle None and False case
-            res.append(False)
-    if count > 1:
-        raise ValueError("Only one attention type can be True")
-    return ATTENTION_TYPE_FOR_MODEL_MAPPING_NAMES[tuple(res)]
-
-
 def get_name_mapping(task="Model"):
     """
     Task can be 'Backbone', 'Model', 'ForPretraining', 'ForSequenceClassification', 'ForTokenClassification',
@@ -855,7 +830,12 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
                 )
         else:
             # Check whether the model use block attention
-            attn_type = get_attention_type(predictor_args)
+            if predictor_args.block_attn and predictor_args.speculate_method is None:
+                attn_type = "Block"
+            elif predictor_args.speculate_method is not None:
+                attn_type = "Speculate"
+            else:
+                attn_type = ""
             model_name = f"{config.architectures[0]}{attn_type}"
 
         # Import the InferenceModel
