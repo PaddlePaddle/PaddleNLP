@@ -231,6 +231,7 @@ def main():
         )
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
+    reft_layers = None
     if model_args.reft:
         # reft requires padding side right
         tokenizer.padding_side = "right"
