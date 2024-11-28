@@ -659,18 +659,6 @@ class StaticInferencePredictor(InferencePredictorMixin):
             config.enable_use_gpu(100, device_id)
         config.enable_new_executor()
 
-        if self.tensor_parallel_degree > 1:
-            trainer_endpoints = fleet.worker_endpoints()
-            current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
-
-            dist_config = config.dist_config()
-            dist_config.set_ranks(self.tensor_parallel_degree, self.tensor_parallel_rank)
-            dist_config.set_endpoints(trainer_endpoints, current_endpoint)
-            dist_config.enable_dist_model(True)
-
-            dist_config.set_comm_init_config(os.path.join(predictor_args.model_name_or_path, "rank_mapping.csv"))
-            config.set_dist_config(dist_config)
-
         predictor = paddle.inference.create_predictor(config)
         return predictor
 
@@ -1096,18 +1084,6 @@ class StaticBlockInferencePredictor(BlockInferencePredictorMixin):
             config.switch_ir_optim(True)
             pass_builder = config.pass_builder()
             passes.addPasses(pass_builder, self.model_config.model_type, self.model_config.quant_type)
-
-        if self.tensor_parallel_degree > 1:
-            trainer_endpoints = fleet.worker_endpoints()
-            current_endpoint = trainer_endpoints[self.tensor_parallel_rank]
-
-            dist_config = config.dist_config()
-            dist_config.set_ranks(self.tensor_parallel_degree, self.tensor_parallel_rank)
-            dist_config.set_endpoints(trainer_endpoints, current_endpoint)
-            dist_config.enable_dist_model(True)
-
-            dist_config.set_comm_init_config(os.path.join(predictor_args.model_name_or_path, "rank_mapping.csv"))
-            config.set_dist_config(dist_config)
 
         self.predictor = paddle.inference.create_predictor(config)
 
