@@ -18,6 +18,7 @@ import time
 import paddle
 
 from paddlenlp.utils.log import logger
+
 try:
     from paddle.distributed.fleet.utils.timer_helper import _GPUEventTimer
 except ImportError:
@@ -114,9 +115,7 @@ class Timers:
             timer = clazz(name)
             self.timers[name] = timer
         else:
-            assert (
-                type(timer) == clazz
-            ), f"Invalid timer type: {clazz} vs {type(timer)}"
+            assert type(timer) == clazz, f"Invalid timer type: {clazz} vs {type(timer)}"
         return timer
 
     def write(self, names, writer, iteration, normalizer=1.0, reset=True):
