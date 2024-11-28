@@ -28,16 +28,20 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.safetensors import fast_safe_open
 
+from .merge_dare import MergeDare
+from .merge_della import MergeDella
 from .merge_linear import MergeLinear
+from .merge_slerp import MergeSlerp
+from .merge_ties import MergeTies
 from .merge_utils import divide_positions
 
-MERGE_MAPIING = {"linear": MergeLinear}
+MERGE_MAPIING = {"linear": MergeLinear, "slerp": MergeSlerp, "ties": MergeTies, "dare": MergeDare, "della": MergeDella}
 
 
 class MergeModel:
     def __init__(self, merge_config):
         self.merge_config = merge_config
-        self.merge_method = MERGE_MAPIING[self.merge_config.merge_type]
+        self.merge_method = MERGE_MAPIING[self.merge_config.merge_type](self.merge_config)
 
     def merge_model(self, model_path0, model_path1, output_path):
         is_safetensor0 = self.check_model_path(model_path0)
@@ -48,9 +52,9 @@ class MergeModel:
             raise NotImplementedError("Not support non safetensors models.")
 
     def merge_safetensor_model(self, model_path0, model_path1, output_path):
-        with open(os.path.join(model_path0, self.safe_index_name), "r", encoding="utf-8") as f:
+        with open(os.path.join(model_path0, self.safe_index_name()), "r", encoding="utf-8") as f:
             index0 = json.load(f)
-        with open(os.path.join(model_path1, self.safe_index_name), "r", encoding="utf-8") as f:
+        with open(os.path.join(model_path1, self.safe_index_name()), "r", encoding="utf-8") as f:
             index1 = json.load(f)
         if index0["metadata"]["total_size"] != index1["metadata"]["total_size"]:
             raise ValueError("Weights total_size mismatch. " "Please make sure you load the correct weight file")
@@ -86,17 +90,19 @@ class MergeModel:
             t.join()
 
         # save safe index file
-        save_index_file = os.path.join(output_path, self.safe_index_name)
+        save_index_file = os.path.join(output_path, self.safe_index_name())
+        if save_index_file and not os.path.exists(output_path):
+            os.makedirs(output_path)
         with open(save_index_file, "w", encoding="utf-8") as f:
             content = json.dumps(index, indent=2) + "\n"
             f.write(content)
 
     def merge_safetensor_model_with_base(self, model_path0, model_path1, model_path_base, output_path):
-        with open(os.path.join(model_path0, self.safe_index_name), "r", encoding="utf-8") as f:
+        with open(os.path.join(model_path0, self.safe_index_name()), "r", encoding="utf-8") as f:
             index0 = json.load(f)
-        with open(os.path.join(model_path1, self.safe_index_name), "r", encoding="utf-8") as f:
+        with open(os.path.join(model_path1, self.safe_index_name()), "r", encoding="utf-8") as f:
             index1 = json.load(f)
-        with open(os.path.join(model_path_base, self.safe_index_name), "r", encoding="utf-8") as f:
+        with open(os.path.join(model_path_base, self.safe_index_name()), "r", encoding="utf-8") as f:
             index_base = json.load(f)
 
         if (
@@ -145,7 +151,9 @@ class MergeModel:
             t.join()
 
         # save safe index file
-        save_index_file = os.path.join(output_path, self.safe_index_name)
+        save_index_file = os.path.join(output_path, self.safe_index_name())
+        if save_index_file and not os.path.exists(output_path):
+            os.makedirs(output_path)
         with open(save_index_file, "w", encoding="utf-8") as f:
             content = json.dumps(index, indent=2) + "\n"
             f.write(content)
@@ -155,13 +163,22 @@ class MergeModel:
         for k in key_list:
             with fast_safe_open(os.path.join(model_path0, weight_map0[k]), framework="np") as w:
                 v0 = w.get_tensor(k)
+                # print("v0:",v0)
+                # print("v0的type",type(v0))
+                # print("v0 shape:", v0.shape)
+                # print("k的值",k)
             with fast_safe_open(os.path.join(model_path1, weight_map1[k]), framework="np") as w:
                 v1 = w.get_tensor(k)
+            # print("v1:",v1)
             # dtype==bfloat16: numpy(uint16) -> paddle(bfloat16) -> paddle(float32) -> numpy(float32)
             if v0.dtype == np.uint16:
                 v0 = paddle.to_tensor(v0, dtype="bfloat16").astype("float32").numpy()
             if v1.dtype == np.uint16:
                 v1 = paddle.to_tensor(v1, dtype="bfloat16").astype("float32").numpy()
+            print("merge method:", self.merge_method)
+            print("k的值:", k)
+            print("v0", v0)
+            print("v1", v1)
             merge_state_dict[k] = self.merge_method.merge_op(v0, v1)
             # dtype==bfloat16: numpy(float32) -> paddle(float32) -> paddle(bfloat16) -> numpy(uint16)
             if self.merge_config.dtype == "bfloat16":
@@ -212,8 +229,8 @@ class MergeModel:
 
     def check_model_path(self, model_path):
 
-        if os.path.exists(os.path.join(model_path, self.safe_index_name)):
-            with open(os.path.join(model_path, self.safe_index_name), "r", encoding="utf-8") as f:
+        if os.path.exists(os.path.join(model_path, self.safe_index_name())):
+            with open(os.path.join(model_path, self.safe_index_name()), "r", encoding="utf-8") as f:
                 index = json.load(f)
                 safe_file_list = list(set(index["weight_map"][k] for k in index["weight_map"]))
                 for i in range(len(safe_file_list)):
