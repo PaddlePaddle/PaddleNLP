@@ -84,9 +84,9 @@ function _train(){
     fi
 
     case ${run_stage} in
-    sft) train_cmd="run_finetune.py benchmark_json/sft.json" ;;
-    lora) train_cmd="run_finetune.py benchmark_json/lora.json" ;;
-    dpo) train_cmd="alignment/dpo/run_dpo.py benchmark_json/dpo.json" ;;
+    sft) train_cmd="run_finetune.py benchmark_json/${model_item%_*}/sft.json" ;;
+    lora) train_cmd="run_finetune.py benchmark_json/${model_item%_*}/lora.json" ;;
+    dpo) train_cmd="alignment/dpo/run_dpo.py benchmark_json/${model_item%_*}/dpo.json" ;;
     *) echo "choose run_stage(sft | lora | dpo)"; exit 1;
     esac
 
