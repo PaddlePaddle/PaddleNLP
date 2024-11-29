@@ -4,11 +4,7 @@ paddlenlp_gpu_ops 是一个专为 PaddleNLP 设计的 GPU 算子库，它囊括�
 目前支持：
 - mamba1 && mamba2 算子
 - fast_ln && fused_ln 算子
-<<<<<<< HEAD
 - ml-cross-entropy 算子
-=======
-- fused_linear_cross_entropy 算子
->>>>>>> e5f9ef50be6acaabeb24dcadb72d38b6025cab41
 - inf_cl 算子
 
 # 安装指南

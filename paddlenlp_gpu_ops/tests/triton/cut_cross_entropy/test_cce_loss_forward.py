@@ -3,7 +3,7 @@ from typing import Union
 
 import paddle
 import pytest
-from typing import Union
+
 from paddlenlp_gpu_ops.triton.cut_cross_entropy import linear_cross_entropy
 from paddlenlp_gpu_ops.triton.cut_cross_entropy.constants import IGNORE_INDEX
 from paddlenlp_gpu_ops.triton.cut_cross_entropy.utils import softcapping
