@@ -29,7 +29,7 @@ python setup_cuda.py install
 cd -
 
 cd ../llm
-cp -r ../tests/test_tipc/llm/qwen2_5-7b/benchmark_common/benchmark_json ./
+cp -r ../tests/test_tipc/llm/qwen2_5/benchmark_common/benchmark_json ./
 
 mkdir -p data/dpo_benchmark_train
 wget -P data/dpo_benchmark_train https://paddlenlp.bj.bcebos.com/llm_benchmark_data/qwen2.5-7b/dpo_benchmark_train/dev.json
