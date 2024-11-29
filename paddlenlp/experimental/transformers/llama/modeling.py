@@ -23,14 +23,6 @@ import paddle.nn.functional as F
 from paddle import nn
 from paddle.distributed import fleet
 from paddle.nn.quant import weight_quantize
-from paddlenlp_ops import (
-    save_output,
-    speculate_get_output_padding_offset,
-    speculate_get_seq_lens_output,
-    speculate_set_value_by_flags_and_idx,
-    speculate_verify_and_update,
-    top_p_candidates,
-)
 
 from paddlenlp.experimental.model_utils import (
     ActScalesLoader,
@@ -2000,6 +1992,11 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
         In the senerio of speculate decoding, the length of output token after rebuild_padding is no longer bsz.
         So we need to calculate the output_padding_offset after rebuild_padding.
         """
+        from paddlenlp_ops import (
+            speculate_get_output_padding_offset,
+            speculate_get_seq_lens_output,
+        )
+
         seq_lens_output = speculate_get_seq_lens_output(seq_lens_this_time, seq_lens_encoder, seq_lens_decoder)
         out_token_num = paddle.sum(seq_lens_output)
         output_cum_offsets_tmp = paddle.cumsum(self.max_seq_len - seq_lens_output)
@@ -2081,6 +2078,12 @@ class LlamaForCausalLMSpeculateInferenceModel(LlamaForCausalLMBlockInferenceMode
             logits = paddle.cast(outputs, paddle.float32)
 
             # TODO(Wanglongzhi2001): get_token_penalty_multi_scores_v2 don't support seqlen > 1
+            from paddlenlp_ops import (
+                save_output,
+                speculate_set_value_by_flags_and_idx,
+                speculate_verify_and_update,
+                top_p_candidates,
+            )
 
             # sample
             probs = F.softmax(logits)

@@ -54,7 +54,8 @@ void GetOutputFunc(MsgData<SIZE>& msg_rcv,  // NOLINT
     return;
   }
 
-  for (int64_t i = 0; i < SIZE; i++) {
+  int bsz = msg_rcv.mtext[1];
+  for (int64_t i = 0; i < bsz + 2; i++) {
     out_data[i] = (int64_t)msg_rcv.mtext[i];
   }
 
