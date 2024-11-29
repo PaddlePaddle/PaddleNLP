@@ -120,3 +120,10 @@ BETA2_KEYNAME = "beta2_pow_acc_0"
 SYMMETRY_QUANT_SCALE = "@scales"
 ASYMMETRY_QUANT_SCALE_MIN = "@min_scales"
 ASYMMETRY_QUANT_SCALE_MAX = "@max_scales"
+MAX_QUANTIZATION_TIMES = 1
+
+# LLM Inference related environment variables
+# Note(@Wanglongzhi2001): MAX_BSZ, SPECULATE_MAX_BSZ, MAX_DRAFT_TOKENS must be the same as definition in get_output / save_output
+MAX_BSZ = 512
+SPECULATE_MAX_BSZ = 256
+MAX_DRAFT_TOKENS = 6
