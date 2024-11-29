@@ -3099,7 +3099,9 @@ class Trainer:
 
         # Metrics!
         if self.compute_metrics is not None and all_preds is not None and all_labels is not None:
-            metrics = self.compute_metrics(EvalPrediction(predictions=all_preds, label_ids=all_labels))
+            # all_labels maybe is a tuple when prediction_steps output label_mask
+            batch_labels = all_labels[0] if isinstance(all_labels, (list, tuple)) else all_labels
+            metrics = self.compute_metrics(EvalPrediction(predictions=all_preds, label_ids=batch_labels))
         else:
             metrics = {}
 
