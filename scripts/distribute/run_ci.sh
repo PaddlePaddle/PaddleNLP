@@ -35,6 +35,14 @@ target_lists_for_gpt=(
     "scripts/distribute"
 )
 
+target_lists_for_qwen=(
+    "llm/auto_parallel/qwen"
+    "paddlenlp/transformers/qwen/modeling.py"
+    "paddlenlp/transformers/qwen/modeling_pp.py"
+    "paddlenlp/transformers/qwen/modeling_3D_auto.py"
+    "scripts/distribute"
+)
+
 target_lists_for_llama=(
     "llm/auto_parallel/llama"
     "paddlenlp/trainer/auto_trainer.py"
@@ -111,6 +119,11 @@ get_diff_TO_case(){
                         case_list[${#case_list[*]}]=gpt-3_dygraph
                     fi
                 done
+                for ((i=0; i<${#target_lists_for_qwen[@]}; i++)); do
+                    if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_qwen[i]}* ]];then
+                        case_list[${#case_list[*]}]=qwen_auto
+                    fi
+                done
                 for ((i=0; i<${#target_lists_for_llama[@]}; i++)); do
                     if [[ ${file_item} == *${target_lists_for_llama[i]}* ]];then
                         case_list[${#case_list[*]}]=llama_auto
@@ -120,6 +133,7 @@ get_diff_TO_case(){
         done
     else
         case_list[${#case_list[*]}]=gpt-3_auto
+        case_list[${#case_list[*]}]=qwen_auto
         case_list[${#case_list[*]}]=llama_auto
         for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
             arr_file_name=(${file_name//// })
@@ -249,6 +263,15 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         export FLAGS_install_deps=1
         export FLAGS_download_data="gpt ""$FLAGS_download_data"
         let case_num++
+    fi
+    if [[ $(contain_case qwen_auto ${case_list[@]}; echo $?) -eq 1 ]];then
+        echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: qwen_auto \033"
+        cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh 
+        bash $cmd prepare_case llm_qwen_case_list_auto $FLAGS_install_deps $FLAGS_download_data
+        execute_func_list $cmd qwen_auto
+        export FLAGS_install_deps=1
+        export FLAGS_download_data="qwen ""$FLAGS_download_data"
+        let case_num++        
     fi
     echo -e "\033[31m ---- end run case  \033"
 
