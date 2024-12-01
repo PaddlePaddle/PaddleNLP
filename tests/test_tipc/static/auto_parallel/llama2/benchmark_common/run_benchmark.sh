@@ -63,8 +63,9 @@ monitor_log_file() {
     local training_pid="$2"  # 获取训练进程的 PID
     local no_update_duration=0  # 初始化无更新时长计数
     local last_size=0
+    local kill_flag_file="/tmp/monitor_killed_$training_pid"
 
-    echo "开始监控进程 $training_pid 和日志文件 $log_file..."
+    echo "$(date '+%Y-%m-%d %H:%M:%S') 开始监控进程 $training_pid 和日志文件 $log_file..."
 
     while true; do
         sleep 5  # 每隔 5 秒检查一次日志文件
@@ -74,7 +75,7 @@ monitor_log_file() {
             echo "日志文件 $log_file 不存在，检查进程状态..."
             # 如果日志文件不存在，直接判断进程是否结束
             if ! ps -p $training_pid > /dev/null; then
-                echo "进程 $training_pid 已经结束。"
+                echo "$(date '+%Y-%m-%d %H:%M:%S') 进程 $training_pid 已经结束。"
                 break
             fi
             continue  # 如果文件不存在，跳过后续逻辑，继续循环
@@ -86,23 +87,26 @@ monitor_log_file() {
         if [ "$last_size" -eq "$new_size" ]; then
             # 文件大小未变化，增加无更新时长计数
             no_update_duration=$((no_update_duration + 5))
-
+            echo "$(date '+%Y-%m-%d %H:%M:%S') 文件未写入..."
             if [ "$no_update_duration" -ge 180 ]; then
-                echo "文件在过去的 3 分钟内没有继续写入，准备杀掉进程 $training_pid."
+                echo "$(date '+%Y-%m-%d %H:%M:%S') 文件在过去的 3 分钟内没有继续写入，准备杀掉进程 $training_pid."
+                # 创建标志文件
+                touch "$kill_flag_file"
+                ls -l "$kill_flag_file"
                 kill -9 $training_pid  # 杀掉进程
-                echo "进程 $training_pid 已经被杀掉。"
+                echo "$(date '+%Y-%m-%d %H:%M:%S') 进程 $training_pid 已经被杀掉。"
                 break
             fi
         else
             # 文件大小有变化，重置无更新时长计数
-            echo "文件仍在写入..."
+            echo "$(date '+%Y-%m-%d %H:%M:%S') 文件仍在写入..."
             no_update_duration=0
             last_size=$new_size
         fi
 
         # 如果训练进程已经结束，退出监控
         if ! ps -p $training_pid > /dev/null; then
-            echo "进程 $training_pid 已经结束。"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') 进程 $training_pid 已经结束。"
             break
         fi
     done
@@ -126,8 +130,8 @@ function _train(){
         log_file=${train_log_file}
     fi
     
-    # 70b需要关闭这个开关，否则会hang
-    if [[ "${MODEL_TYPE}" =~ "70b" ]]; then
+    # 70b和7b需要关闭这个开关
+    if [[ "${MODEL_TYPE}" =~ "70b" || "${MODEL_TYPE}" =~ "7b" ]]; then
         unset CUDA_DEVICE_MAX_CONNECTIONS
     fi
     # Disable for hanging bug
@@ -211,6 +215,16 @@ function _train(){
 
     if [ ${exit_code} -ne 0 ];then
         echo -e "${model_name}, FAIL"
+        # 如果程序是主动报错退出，不是monitor_log_file函数kill掉的情况下，需要等待其它机器被kill
+        # 标志文件位置
+        kill_flag_file="/tmp/monitor_killed_$training_pid"
+        if [ -f "$kill_flag_file" ]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') 训练进程 $training_pid 是被 monitor_log_file 函数杀掉的。"
+            rm -f "$kill_flag_file"  # 清理标志文件
+        else
+            echo "$(date '+%Y-%m-%d %H:%M:%S') 训练进程 $training_pid 是主动报错退出的。"
+            sleep 120
+        fi
     else
         echo -e "${model_name}, SUCCESS"
     fi
@@ -229,6 +243,7 @@ export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 # 如不设置参数为1,则默认选择不带tensor fusion的sharding stage1版本
 export FLAGS_enable_sharding_stage1_tensor_fusion=1
 
+# 只有13b的任务需要打开CUDA_DEVICE_MAX_CONNECTIONS,7b与13b关闭
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export PARALLEL_CROSS_ENTROPY=true
 

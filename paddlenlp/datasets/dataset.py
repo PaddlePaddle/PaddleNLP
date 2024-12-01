@@ -113,7 +113,10 @@ def load_from_hf(path, name=None, splits=None, **kwargs):
     from datasets.features import ClassLabel
 
     try:
-        hf_datasets = load_hf_dataset(path, name=name, split=splits, **kwargs)
+        if "split" in kwargs:
+            hf_datasets = load_hf_dataset(path, name=name, **kwargs)
+        else:
+            hf_datasets = load_hf_dataset(path, name=name, split=splits, **kwargs)
     except FileNotFoundError:
         raise FileNotFoundError("Couldn't find the dataset script for '" + path + "' on PaddleNLP or HuggingFace")
     else:

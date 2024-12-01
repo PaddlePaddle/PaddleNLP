@@ -1421,6 +1421,7 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1() {
         --sharding "" \
         --to_static 0 \
         --num_hidden_layers 2 \
+        --unified_checkpoint false \
         >>${log_path}/$FUNCNAME 2>&1
     dy_loss=`cat $dy_case_log_dir/workerlog.0 | grep 'global_step: 4' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
     dy_ips=-1
