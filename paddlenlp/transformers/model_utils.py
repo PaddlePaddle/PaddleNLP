@@ -1019,6 +1019,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
     _keys_to_ignore_on_save = None
     _tied_weights_keys = None
 
+    # Has support for a `Cache` instance as `past_key_values`
+    _supports_cache_class = False
+
     def __init__(self, *args, **kwargs):
         super(PretrainedModel, self).__init__()
 

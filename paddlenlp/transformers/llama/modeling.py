@@ -39,6 +39,8 @@ from paddlenlp.transformers.refined_recompute import (
     recompute,
 )
 
+from ..cache_utils import Cache, DynamicCache
+
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
 except ImportError:
@@ -682,10 +684,17 @@ class LlamaMLP(nn.Layer):
 class LlamaAttention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config: LlamaConfig, layerwise_recompute: bool = False):
+    def __init__(self, config: LlamaConfig, layer_idx: Optional[int] = None, layerwise_recompute: bool = False):
         super().__init__()
 
         self.config = config
+        self.layer_idx = layer_idx
+        if layer_idx is None:
+            logger.warning_once(
+                f"Instantiating {self.__class__.__name__} without passing `layer_idx` is not recommended and will "
+                "to errors during the forward call, if caching is used. Please make sure to provide a `layer_idx` "
+                "when creating this class."
+            )
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
 
@@ -915,7 +924,7 @@ class LlamaAttention(nn.Layer):
         self,
         hidden_states,
         position_ids: Optional[Tuple[paddle.Tensor]] = None,
-        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+        past_key_value: Optional[Cache] = None,
         attention_mask: Optional[paddle.Tensor] = None,
         output_attentions: bool = False,
         use_cache: bool = False,
@@ -1039,8 +1048,14 @@ class LlamaAttention(nn.Layer):
         kv_seq_len = key_states.shape[-3]
 
         if past_key_value is not None:
-            kv_seq_len += past_key_value[0].shape[-3]
-
+            if self.layer_idx is None:
+                raise ValueError(
+                    f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
+                    "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
+                    "with a layer index."
+                )
+            kv_seq_len += past_key_value.get_seq_length(self.layer_idx)
+        sin = cos = None
         if self.config.rope:
             if self.reshard_layer is not None:
                 batch_size, seq_length, _, _ = query_states.shape
@@ -1083,17 +1098,14 @@ class LlamaAttention(nn.Layer):
                     cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
 
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
-
+        cache_kwargs = {}
         # [bs, seq_len, num_head, head_dim]
         if past_key_value is not None:
             # reuse k, v, self_attention
-            key_states = paddle.concat([past_key_value[0], key_states], axis=1)
-            value_states = paddle.concat([past_key_value[1], value_states], axis=1)
-            if self.config.immediate_clear_past_key_value:
-                past_key_value[0]._clear_data()
-                past_key_value[1]._clear_data()
+            if sin is not None and cos is not None:
+                cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
+            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
-        past_key_value = (key_states, value_states) if use_cache else None
         if self.kv_indices is not None:
             key_states = paddle.index_select(key_states, self.kv_indices, axis=2)
             value_states = paddle.index_select(value_states, self.kv_indices, axis=2)
@@ -1168,11 +1180,11 @@ class LlamaAttention(nn.Layer):
 
 
 class LlamaDecoderLayer(nn.Layer):
-    def __init__(self, config, layerwise_recompute: bool = False):
+    def __init__(self, config, layer_idx: int, layerwise_recompute: bool = False):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
-        self.self_attn = LlamaAttention(config, layerwise_recompute)
+        self.self_attn = LlamaAttention(config, layer_idx=layer_idx, layerwise_recompute=layerwise_recompute)
         self.mlp = LlamaMLP(config)
         self.input_layernorm = LlamaRMSNorm(config)
         self.post_attention_layernorm = LlamaRMSNorm(config)
@@ -1189,7 +1201,7 @@ class LlamaDecoderLayer(nn.Layer):
         position_ids: Optional[Tuple[paddle.Tensor]] = None,
         attention_mask: Optional[paddle.Tensor] = None,
         output_attentions: Optional[bool] = False,
-        past_key_value: Optional[Tuple[paddle.Tensor]] = None,
+        past_key_value: Optional[Cache] = None,
         use_cache: Optional[bool] = False,
         alibi: Optional[paddle.Tensor] = None,
         attn_mask_startend_row_indices: Optional[paddle.Tensor] = None,
@@ -1286,6 +1298,7 @@ class LlamaPretrainedModel(PretrainedModel):
     pretrained_init_configuration = LLAMA_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = LLAMA_PRETRAINED_RESOURCE_FILES_MAP
     _keys_to_ignore_on_load_unexpected = [r"self_attn.rotary_emb.inv_freq"]
+    _supports_cache_class = True
 
     @classmethod
     def _get_name_mappings(cls, config: LlamaConfig) -> list[StateDictNameMapping]:
@@ -1518,7 +1531,7 @@ class LlamaModel(LlamaPretrainedModel):
         self.layers = nn.LayerList(
             [
                 LlamaDecoderLayer(
-                    create_skip_config_for_refined_recompute(i, config), i not in self.no_recompute_layers
+                    create_skip_config_for_refined_recompute(i, config), i, i not in self.no_recompute_layers
                 )
                 for i in range(config.num_hidden_layers)
             ]
@@ -1674,16 +1687,15 @@ class LlamaModel(LlamaPretrainedModel):
         else:
             raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
 
-        if past_key_values is None:
-            past_key_values = tuple([None] * len(self.layers))
-        # NOTE: to make cache can be clear in-time
-        past_key_values = list(past_key_values)
+        past_key_values_length = 0
 
-        seq_length_with_past = seq_length
-        cache_length = 0
-        if past_key_values[0] is not None:
-            cache_length = past_key_values[0][0].shape[1]
-            seq_length_with_past += cache_length
+        use_legacy_cache = not isinstance(past_key_values, Cache)
+        if use_legacy_cache:
+            past_key_values = DynamicCache.from_legacy_cache(past_key_values)
+        past_key_values_length = past_key_values.get_seq_length()
+        if seq_length == 6:
+            raise UnboundLocalError
+
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
@@ -1702,7 +1714,7 @@ class LlamaModel(LlamaPretrainedModel):
             attention_mask = None
         elif attn_mask_startend_row_indices is None and attention_mask is None:
             # [bs, seq_len]
-            attention_mask = paddle.ones((batch_size, seq_length_with_past), dtype=paddle.bool)
+            attention_mask = paddle.ones((batch_size, seq_length + past_key_values_length), dtype=paddle.bool)
         if attn_mask_startend_row_indices is None and self.config.alibi:
             if self.config.use_long_sequence_strategies:
                 alibi_layer = LongSequenceStrategies.build_long_sequence_strategy(
@@ -1721,9 +1733,11 @@ class LlamaModel(LlamaPretrainedModel):
                     * block_size : (self.config.tensor_parallel_rank + 1)
                     * block_size,
                 ]
-                alibi = alibi.reshape([batch_size * block_size, 1, seq_length_with_past])
+                alibi = alibi.reshape([batch_size * block_size, 1, seq_length + past_key_values_length])
             else:
-                alibi = alibi.reshape([batch_size * self.config.num_attention_heads, 1, seq_length_with_past])
+                alibi = alibi.reshape(
+                    [batch_size * self.config.num_attention_heads, 1, seq_length + past_key_values_length]
+                )
         else:
             alibi = None
 
@@ -1736,7 +1750,7 @@ class LlamaModel(LlamaPretrainedModel):
             attention_mask = None
         elif attn_mask_startend_row_indices is None:
             attention_mask = self._prepare_decoder_attention_mask(
-                attention_mask, (batch_size, seq_length), cache_length, inputs_embeds.dtype
+                attention_mask, (batch_size, seq_length), past_key_values_length, inputs_embeds.dtype
             )  # [bs, 1, seq_len, seq_len]
 
         is_casual = False
@@ -1759,12 +1773,11 @@ class LlamaModel(LlamaPretrainedModel):
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
-        next_decoder_cache = () if use_cache else None
+        next_decoder_cache = None
 
         for idx, (decoder_layer) in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
-            past_key_value = past_key_values[idx] if past_key_values is not None else None
 
             has_gradient = not hidden_states.stop_gradient
             if (
@@ -1779,7 +1792,7 @@ class LlamaModel(LlamaPretrainedModel):
                     position_ids,
                     attention_mask,
                     output_attentions,
-                    past_key_value,
+                    past_key_values,
                     use_cache,
                     alibi=alibi,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
@@ -1790,7 +1803,7 @@ class LlamaModel(LlamaPretrainedModel):
                     position_ids,
                     attention_mask,
                     output_attentions,
-                    past_key_value,
+                    past_key_values,
                     use_cache,
                     alibi=alibi,
                     attn_mask_startend_row_indices=attn_mask_startend_row_indices,
@@ -1798,7 +1811,6 @@ class LlamaModel(LlamaPretrainedModel):
                 )
 
             # NOTE: clear outdate cache after it has been used for memory saving
-            past_key_value = past_key_values[idx] = None
             if type(layer_outputs) is tuple:
                 hidden_states = layer_outputs[0]
             else:
@@ -1808,7 +1820,7 @@ class LlamaModel(LlamaPretrainedModel):
                 all_self_attns += (layer_outputs[1],)
 
             if use_cache:
-                next_decoder_cache += (layer_outputs[2 if output_attentions else 1],)
+                next_decoder_cache = layer_outputs[2 if output_attentions else 1]
 
         if self.config.use_last_token_for_generation:
             hidden_states = paddle.unsqueeze(hidden_states[:, -1, :], 1)
@@ -1819,7 +1831,9 @@ class LlamaModel(LlamaPretrainedModel):
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
 
-        next_cache = next_decoder_cache if use_cache else None
+        next_cache = None
+        if use_cache:
+            next_cache = next_decoder_cache.to_legacy_cache() if use_legacy_cache else next_decoder_cache
 
         if not return_dict:
             return tuple(v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None)
@@ -2020,9 +2034,28 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
         attention_mask = kwargs.get("attention_mask", None)
         if past_key_values:
-            input_ids = input_ids[:, -1].unsqueeze(axis=-1)
+            if isinstance(past_key_values, Cache):
+                cache_length = past_key_values.get_seq_length()
+                past_length = past_key_values.seen_tokens
+                cache_length = past_length = past_key_values[0][0].shape[1]
+                # Keep only the unprocessed tokens:
+                # 1 - If the length of the attention_mask exceeds the length of input_ids, then we are in a setting where
+                # some of the inputs are exclusivelly passed as part of the cache (e.g. when passing input_embeds as
+                # input)
+                if attention_mask is not None and attention_mask.shape[1] > input_ids.shape[1]:
+                    input_ids = input_ids[:, -(attention_mask.shape[1] - past_length) :]
+                # 2 - If the past_length is smaller than input_ids', then input_ids holds all input tokens. We can discard
+                # input_ids based on the past_length.
+                elif past_length < input_ids.shape[1]:
+                    input_ids = input_ids[:, past_length:]
+                # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
+                # If the cache has seen more tokens than it can hold, then the cache has a size limit. Let's discard the
+                # older attention values, as their corresponding values are not part of the input.
+                if cache_length < past_length and attention_mask is not None:
+                    attention_mask = attention_mask[:, -(cache_length + input_ids.shape[1]) :]
+            else:
+                input_ids = input_ids[:, -1].unsqueeze(axis=-1)
             position_ids = position_ids[:, -1].unsqueeze(-1)
-
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and past_key_values is None:
             model_inputs = {"inputs_embeds": inputs_embeds}

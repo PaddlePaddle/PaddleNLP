@@ -14,9 +14,12 @@
 # limitations under the License.
 from __future__ import annotations
 
+import random
 import unittest
 
+import numpy as np
 import paddle
+from parameterized import parameterized
 
 from paddlenlp.generation import (
     BeamSearchScorer,
@@ -39,7 +42,15 @@ from paddlenlp.transformers import (  # import gpt model
     PretrainedConfig,
     PretrainedTokenizer,
 )
+from paddlenlp.transformers.cache_utils import DynamicCache
 from tests.testing_utils import slow
+
+
+def set_seed(seed):
+    """sets random seed"""
+    random.seed(seed)
+    np.random.seed(seed)
+    paddle.seed(seed)
 
 
 def top_k_top_p_filtering(
@@ -627,6 +638,64 @@ class GenerationTesterMixin:
                 logits_process_kwargs=logits_process_kwargs,
             )
             self.assertListEqual(output_generate[0].tolist(), output_group_beam_search[0].tolist())
+
+    @parameterized.expand([(1, False), (1, True), (4, False)])
+    def test_new_cache_format(self, num_beams, do_sample):
+        # Tests that generating with the new format is exactly the same as the legacy one (for models that support it).
+        # 👉 tests with and without beam search so that we can test with and without cache reordering.
+        # 👉 tests with and without sampling so we can cover the most common use cases.
+        for model_class in self.all_generative_model_classes:
+            if not model_class._supports_cache_class:
+                self.skipTest("This model does not support the new cache format")
+            config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
+            config.use_cache = True
+            model = self._make_model_instance(config, model_class)
+            model.eval()
+
+            generation_kwargs = {
+                "max_new_tokens": 5,
+                "do_sample": do_sample,
+                "num_beams": num_beams,
+                "num_return_sequences": 1,  # `num_return_sequences` has to be 1 when doing greedy search
+                "return_dict_in_generate": True,  # Required to return `past_key_values`
+            }
+            # Sets seed before calling `generate` for the case with do_sample=True
+            seed = paddle.randint(0, 1000000, (1,)).item()
+            set_seed(seed)
+            legacy_results = model.generate(input_ids, attention_mask=attention_mask, **generation_kwargs)
+            set_seed(seed)
+            new_results = model.generate(
+                input_ids, attention_mask=attention_mask, past_key_values=DynamicCache(), **generation_kwargs
+            )
+            # The two sets of generated sequences must match, despite the cache format between forward passes being
+            # different
+
+            self.assertListEqual(legacy_results[0].tolist(), new_results[0].tolist())
+            self.assertTrue(isinstance(legacy_results.past_key_values, tuple))
+            self.assertTrue(isinstance(new_results.past_key_values, DynamicCache))
+            # The contents of the two caches, when converted to the same format (in both directions!), must match
+            legacy_cache = legacy_results.past_key_values
+            # print(f"legacy_cache: {legacy_cache}")
+            new_cache_converted = new_results.past_key_values.to_legacy_cache()
+            # print(f"new_cache_converted: {new_cache_converted[:,:8,:,:]}")
+            for layer_idx in range(len(legacy_cache)):
+                for kv_idx in range(len(legacy_cache[layer_idx])):
+                    self.assertTrue(
+                        paddle.allclose(
+                            legacy_cache[layer_idx][kv_idx],
+                            new_cache_converted[layer_idx][kv_idx],
+                        )
+                    )
+            new_cache = new_results.past_key_values
+            legacy_cache_converted = DynamicCache.from_legacy_cache(legacy_results.past_key_values)
+            for layer_idx in range(len(new_cache)):
+                for kv_idx in range(len(new_cache[layer_idx])):
+                    self.assertTrue(
+                        paddle.allclose(
+                            new_cache[layer_idx][kv_idx],
+                            legacy_cache_converted[layer_idx][kv_idx],
+                        )
+                    )
 
     def _check_sequence_inside_sequence(self, tensor_1, tensor_2):
         # check if tensor_1 inside tensor_2 or tensor_2 inside tensor_1.

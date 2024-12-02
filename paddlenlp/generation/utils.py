@@ -16,7 +16,8 @@ from __future__ import annotations
 
 import copy
 import inspect
-from typing import Optional, Union
+from dataclasses import dataclass
+from typing import Optional, Tuple, Union
 
 import paddle
 import paddle.distributed as dist
@@ -26,6 +27,7 @@ from paddle import Tensor
 from paddle.common_ops_import import convert_dtype
 from paddle.utils import map_structure
 
+from paddlenlp.transformers.cache_utils import Cache, DynamicCache
 from paddlenlp.transformers.model_outputs import ModelOutput
 from paddlenlp.transformers.utils import get_scale_by_dtype
 from paddlenlp.utils.log import logger
@@ -62,6 +64,33 @@ __all__ = [
     "TopPProcess",
     "get_unfinished_flag",
 ]
+
+
+@dataclass
+class GreedySearchOutput(ModelOutput):
+    """
+    Base class for outputs of generation models using greedy search.
+
+    Args:
+        sequences (`paddle.Tensor` of shape `(batch_size, sequence_length)`):
+            The generated sequences. The second dimension (sequence_length) is either equal to `max_length` or shorter
+            if all batches finished early due to the `eos_token_id`.
+        scores (`tuple(paddle.Tensor)` *optional*, returned when `output_scores=True` is passed or when `config.output_scores=True`):
+            Processed prediction scores of the language modeling head (scores for each vocabulary token before SoftMax)
+            at each generation step. Tuple of `paddle.Tensor` with up to `max_new_tokens` elements (one element for
+            each generated token), with each tensor of shape `(batch_size, config.vocab_size)`.
+        past_key_values (`tuple(tuple(paddle.Tensor)))`, *optional*, returned when `use_cache=True` is passed or when `config.use_cache=True`):
+            NOTE: some models have a different `past_key_values` format, confirm with the model's documentation.
+            Usually a Tuple (one element for each layer of the decoder) of tuples (two elements, key tensor and value
+            tensor). The first Tuple is of length `config.n_layers`, with each tuple having 2 tensors of shape
+            `(batch_size, num_heads, sequence_length, embed_size_per_head)`) and optionally if
+            `config.is_encoder_decoder=True` 2 additional tensors of shape `(batch_size, num_heads,
+            encoder_sequence_length, embed_size_per_head)`.
+    """
+
+    sequences: paddle.Tensor = None
+    scores: Optional[Tuple[paddle.Tensor]] = None
+    past_key_values: Optional[Tuple[Tuple[Tuple[paddle.Tensor]]]] = None
 
 
 def get_unfinished_flag(
@@ -861,6 +890,14 @@ class GenerationMixin(object):
             model_kwargs["attention_mask"] = self.prepare_attention_mask_for_generation(
                 input_ids, pad_token_id, eos_token_id
             )
+
+        # If a `Cache` instance is passed, checks whether the model is compatible with it
+        if isinstance(model_kwargs.get("past_key_values", None), Cache) and not self._supports_cache_class:
+            raise ValueError(
+                f"{self.__class__.__name__} does not support an instance of `Cache` as `past_key_values`. Please "
+                "check the model documentation for supported cache formats."
+            )
+
         self.is_encoder_decoder = self.config.is_encoder_decoder
 
         if self.is_encoder_decoder:
@@ -1045,6 +1082,7 @@ class GenerationMixin(object):
         fast_ptq_sampling=False,
         trunc_input=True,
         synced_gpus=False,
+        return_dict_in_generate: Optional[bool] = None,
         **model_kwargs
     ):
         model_kwargs["use_cache"] = model_kwargs.get("use_cache", True)
@@ -1119,19 +1157,25 @@ class GenerationMixin(object):
                 if not paddle.any(unfinished_flag):
                     generate_end = True
 
+            model_kwargs = self.update_model_kwargs_for_generation(
+                outputs, model_kwargs, is_encoder_decoder=self.config.is_encoder_decoder
+            )
+
             # Stop when there is a </s> in all sentences
             if generate_end and not synced_gpus:
                 break
 
-            model_kwargs = self.update_model_kwargs_for_generation(
-                outputs, model_kwargs, is_encoder_decoder=self.config.is_encoder_decoder
-            )
             if fast_ptq_sampling:
                 break
 
         if streamer is not None:
             streamer.end()
-
+        if return_dict_in_generate:
+            return GreedySearchOutput(
+                sequences=input_ids[:, origin_len:] if trunc_input else input_ids,
+                scores=scores,
+                past_key_values=model_kwargs["past_key_values"],
+            )
         return input_ids[:, origin_len:] if trunc_input else input_ids, scores
 
     def sample(
@@ -1493,6 +1537,31 @@ class GenerationMixin(object):
         cache = map_structure(lambda x: paddle.index_select(x, beam_idx), cache)
         return cache
 
+    def _temporary_reorder_cache(self, past_key_values, beam_idx):
+        """
+        Temporary function to handle the different types of cache reordering processes while we roll out `Cache`.
+        TODO: standardize cache formats and make all models compatible with `Cache`. It would remove the need
+        for this function, with `Cache.reorder_cache` being the sole remaining code path
+        """
+        model_class = self.__class__.__name__.lower()
+        # Exception 1: code path for models using the legacy cache format
+        if isinstance(past_key_values, (tuple, list)):
+            past_key_values = self.reorder_cache(past_key_values, beam_idx)
+        # Exception 2: models with different cache formats. These are limited to `DynamicCache` until their
+        # cache format is standardized, to avoid adding complexity to the codebase.
+        elif "bloom" in model_class or "gptbigcode" in model_class:
+            if not isinstance(past_key_values, DynamicCache):
+                raise ValueError(
+                    f"Using an unsupported cache format with {model_class}. Currently, it only supports the "
+                    "legacy tuple format or `DynamicCache`"
+                )
+            past_key_values = self.reorder_cache(past_key_values, beam_idx)
+            past_key_values = DynamicCache.from_legacy_cache(past_key_values)
+        # Standard code path: use the `Cache.reorder_cache`
+        else:
+            past_key_values.reorder_cache(beam_idx)
+        return past_key_values
+
     def beam_search(
         self,
         input_ids,
@@ -1642,10 +1711,12 @@ class GenerationMixin(object):
             )
             if "cache" in model_kwargs:
                 # reorder the cache
-                model_kwargs["cache"] = self.reorder_cache(model_kwargs["cache"], beam_idx)
+                model_kwargs["cache"] = self._temporary_reorder_cache(model_kwargs["cache"], beam_idx)
             if "past_key_values" in model_kwargs:
                 # reorder the cache
-                model_kwargs["past_key_values"] = self.reorder_cache(model_kwargs["past_key_values"], beam_idx)
+                model_kwargs["past_key_values"] = self._temporary_reorder_cache(
+                    model_kwargs["past_key_values"], beam_idx
+                )
             if fast_ptq_sampling:
                 break
 
@@ -1816,10 +1887,10 @@ class GenerationMixin(object):
 
             if "cache" in model_kwargs:
                 # reorder the cache
-                model_kwargs["cache"] = self.reorder_cache(model_kwargs["cache"], reordering_indices)
+                model_kwargs["cache"] = self._temporary_reorder_cache(model_kwargs["cache"], reordering_indices)
             if "past_key_values" in model_kwargs:
                 # reorder the cache
-                model_kwargs["past_key_values"] = self.reorder_cache(
+                model_kwargs["past_key_values"] = self._temporary_reorder_cache(
                     model_kwargs["past_key_values"], reordering_indices
                 )
 

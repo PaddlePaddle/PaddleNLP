@@ -15,6 +15,7 @@
 
 from .configuration_utils import PretrainedConfig
 from .model_utils import PretrainedModel, register_base_model
+from .cache_utils import Cache, DynamicCache
 from .tokenizer_utils import (
     PretrainedTokenizer,
     BPETokenizer,
