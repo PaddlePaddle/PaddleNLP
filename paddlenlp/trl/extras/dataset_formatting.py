@@ -18,7 +18,8 @@ import logging
 from typing import Callable, Literal, Optional, Union
 
 from datasets import Dataset, Value
-from transformers import AutoTokenizer
+
+from ...transformers import AutoTokenizer
 
 FORMAT_MAPPING = {
     "chatml": [{"content": Value(dtype="string", id=None), "role": Value(dtype="string", id=None)}],
