@@ -2322,7 +2322,7 @@ function llm_qwen_pir_auto_bs1_bf16_TP2(){
         --model_name_or_path "qwen/qwen-14b" \
         --tokenizer_name_or_path "qwen/qwen-14b" \
         --input_dir "./data" \
-        --output_dir "./checkpoints/qwen_pretrain_ckpts" \
+        --output_dir "output/$task_name/" \
         --per_device_train_batch_size 1\
         --gradient_accumulation_steps 2\
         --per_device_eval_batch_size 16\
@@ -2401,7 +2401,7 @@ function llm_qwen_pir_auto_bs1_bf16_TP2_PP2(){
         --model_name_or_path "qwen/qwen-14b" \
         --tokenizer_name_or_path "qwen/qwen-14b" \
         --input_dir "./data" \
-        --output_dir "./checkpoints/qwen_pretrain_ckpts" \
+        --output_dir "output/$task_name/" \
         --per_device_train_batch_size 1\
         --gradient_accumulation_steps 4\
         --per_device_eval_batch_size 16\
