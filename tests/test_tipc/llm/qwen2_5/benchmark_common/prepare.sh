@@ -31,10 +31,5 @@ cd -
 cd ../llm
 cp -r ../tests/test_tipc/llm/qwen2_5/benchmark_common/benchmark_json ./
 
-mkdir -p data/dpo_benchmark_train
-wget -P data/dpo_benchmark_train https://paddlenlp.bj.bcebos.com/llm_benchmark_data/qwen2.5-7b/dpo_benchmark_train/dev.json
-wget -P data/dpo_benchmark_train https://paddlenlp.bj.bcebos.com/llm_benchmark_data/qwen2.5-7b/dpo_benchmark_train/train.json
-
-mkdir -p data/sft_benchmark_train
-wget -P data/sft_benchmark_train https://paddlenlp.bj.bcebos.com/llm_benchmark_data/qwen2.5-7b/sft_benchmark_train/dev.json
-wget -P data/sft_benchmark_train https://paddlenlp.bj.bcebos.com/llm_benchmark_data/qwen2.5-7b/sft_benchmark_train/train.json
+wget https://paddlenlp.bj.bcebos.com/llm_benchmark_data/qwen2_5_paddle_data.tar.gz
+tar zxvf qwen2_5_paddle_data.tar.gz && rm -rf qwen2_5_paddle_data.tar.gz
