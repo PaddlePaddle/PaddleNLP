@@ -305,21 +305,27 @@ class PdArgumentParser(ArgumentParser):
             get resume checkpoint path from mpirun env
             """
             pdc_init_step = os.getenv("PDC_INIT_STEP")
-            if pdc_init_step is not None and "resume_from_checkpoint" not in args:
-                raise AssertionError("resume_from_checkpoint is missing, please check your train args")
-            if pdc_init_step == "0":
-                # from_scratch train process launched by pdc longjob
-                logger.info("resume training process from scratch (step 0)")
-                return None
-            elif pdc_init_step is not None:
-                # injected with mpirun by pdc longjob
-                logger.info(f"resume training process by pdc longjob with resume step: {pdc_init_step}")
-                return os.path.join(args.get("output_dir", None), f"checkpoint-{pdc_init_step}")
-            else:
-                # user defined resume_from_checkpoint
-                user_defined_resume_from_checkpoint = args.get("resume_from_checkpoint", None)
+            # user defined resume_from_checkpoint
+            user_defined_resume_from_checkpoint = args.get("resume_from_checkpoint", None)
+            if pdc_init_step is None:
                 logger.info(f"user has defined resume_from_checkpoint: {user_defined_resume_from_checkpoint}")
                 return user_defined_resume_from_checkpoint
+            else:
+                if pdc_init_step == "0":
+                    # from_scratch train process launched by pdc longjob
+                    if user_defined_resume_from_checkpoint is None:
+                        logger.info("resume training process from scratch (step 0)")
+                        return None
+                    else:
+                        logger.info(f"init_step == 0 and user has defined resume_from_checkpoint: {user_defined_resume_from_checkpoint}")
+                        return user_defined_resume_from_checkpoint
+                else:
+                    # pdc_init_step > 0
+                    logger.info(f"resume training process by pdc longjob with resume step: {pdc_init_step}")
+                    if user_defined_resume_from_checkpoint is not None:
+                        logger.warning(f"pdc_init_step:{pdc_init_step} and user_defined_resume_from_checkpoint:{user_defined_resume_from_checkpoint} exist together, use pdc_init_step:{pdc_init_step}")
+                    return os.path.join(args.get("output_dir", None), f"checkpoint-{pdc_init_step}")
+
 
         args["resume_from_checkpoint"] = get_resume_checkpoint_path(args)
         args_for_json = to_regular_dict(args)
