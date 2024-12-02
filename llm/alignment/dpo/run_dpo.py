@@ -41,6 +41,7 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     LlamaForCausalLM,
     LlamaForCausalLMPipe,
+    Qwen2ForCausalLM,
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.trl import (
@@ -52,7 +53,7 @@ from paddlenlp.trl import (
 from paddlenlp.trl.llm_utils import get_lora_target_modules
 from paddlenlp.utils.log import logger
 
-flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe]
+flash_mask_support_list = [Qwen2ForCausalLM, LlamaForCausalLM, LlamaForCausalLMPipe]
 
 
 def main():
