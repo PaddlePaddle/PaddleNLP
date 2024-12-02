@@ -733,10 +733,9 @@ class DygraphInferencePredictor(InferencePredictorMixin):
                 inputs[key] = paddle.to_tensor(inputs[key])
 
         inputs["cache_kvs"] = self.cache_kvs
-        self.model.generate(
+        return self.model.generate(
             **inputs,
         )
-        return None
 
 
 class BlockInferencePredictorMixin(BasePredictor):
