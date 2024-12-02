@@ -305,10 +305,8 @@ class PdArgumentParser(ArgumentParser):
             get resume checkpoint path from mpirun env
             """
             pdc_init_step = os.getenv("PDC_INIT_STEP")
-            if pdc_init_step is not None:
-                # 检查 'resume_from_checkpoint' 是否在 args 字典中
-                if "resume_from_checkpoint" not in args:
-                    raise AssertionError("resume_from_checkpoint is missing, please check your train args")
+            if pdc_init_step is not None and "resume_from_checkpoint" not in args:
+                raise AssertionError("resume_from_checkpoint is missing, please check your train args")
             if pdc_init_step == "0":
                 # from_scratch train process launched by pdc longjob
                 logger.info("resume training process from scratch (step 0)")
