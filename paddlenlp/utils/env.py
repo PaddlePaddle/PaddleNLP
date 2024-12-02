@@ -86,6 +86,9 @@ PREFIX_CONFIG_NAME = "prefix_config.json"
 PREFIX_WEIGHTS_NAME = "prefix_model_state.pdparams"
 PADDLE_PEFT_WEIGHTS_INDEX_NAME = "peft_model.pdparams.index.json"
 
+LOKR_WEIGHTS_NAME = "lokr_model_state.pdparams"
+LOKR_CONFIG_NAME = "lokr_config.json"
+
 PAST_KEY_VALUES_FILE_NAME = "pre_caches.npy"
 
 PADDLE_WEIGHTS_NAME = "model_state.pdparams"
@@ -120,6 +123,7 @@ BETA2_KEYNAME = "beta2_pow_acc_0"
 SYMMETRY_QUANT_SCALE = "@scales"
 ASYMMETRY_QUANT_SCALE_MIN = "@min_scales"
 ASYMMETRY_QUANT_SCALE_MAX = "@max_scales"
+MAX_QUANTIZATION_TIMES = 1
 
 # LLM Inference related environment variables
 # Note(@Wanglongzhi2001): MAX_BSZ, SPECULATE_MAX_BSZ, MAX_DRAFT_TOKENS must be the same as definition in get_output / save_output

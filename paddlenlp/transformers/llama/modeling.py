@@ -29,7 +29,15 @@ from paddle import Tensor, nn
 from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-from paddle.distributed.fleet.utils import recompute
+
+from paddlenlp.transformers.refined_recompute import (
+    RRColumnParallelLinear,
+    RRColumnSequenceParallelLinear,
+    RRRowParallelLinear,
+    RRRowSequenceParallelLinear,
+    create_skip_config_for_refined_recompute,
+    recompute,
+)
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -216,6 +224,7 @@ def scaled_dot_product_attention(
     sequence_parallel=False,
     reshard_layer=None,
     npu_is_casual=False,
+    skip_recompute=False,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -233,6 +242,7 @@ def scaled_dot_product_attention(
             sequence_parallel,
             reshard_layer,
             npu_is_casual,
+            skip_recompute=skip_recompute,
         )
 
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
@@ -605,9 +615,23 @@ class LlamaMLP(nn.Layer):
         if config.sequence_parallel:
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
             RowParallelLinear = linear_utils.RowSequenceParallelLinear
+
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                    ColumnParallelLinear = RRColumnSequenceParallelLinear
+                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                    RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
+
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                    ColumnParallelLinear = RRColumnParallelLinear
+                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                    RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             if config.fuse_attention_ffn:
@@ -719,9 +743,22 @@ class LlamaAttention(nn.Layer):
         if config.sequence_parallel:
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
             RowParallelLinear = linear_utils.RowSequenceParallelLinear
+
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("attention_column_ln", False):
+                    ColumnParallelLinear = RRColumnSequenceParallelLinear
+                if config.skip_recompute_ops.get("attention_row_ln", False):
+                    RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("attention_column_ln", False):
+                    ColumnParallelLinear = RRColumnParallelLinear
+                if config.skip_recompute_ops.get("attention_row_ln", False):
+                    RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             if self.fuse_attention_qkv:
@@ -820,6 +857,14 @@ class LlamaAttention(nn.Layer):
         self.config = config
 
         self.attn_func = scaled_dot_product_attention
+
+        # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+        if (
+            config.recompute
+            and not config.recompute_use_reentrant
+            and config.skip_recompute_ops.get("flash_attn", False)
+        ):
+            self.attn_func = partial(scaled_dot_product_attention, skip_recompute=True)
 
     def _init_rope(self):
         if (
@@ -1471,7 +1516,12 @@ class LlamaModel(LlamaPretrainedModel):
             )
 
         self.layers = nn.LayerList(
-            [LlamaDecoderLayer(config, i not in self.no_recompute_layers) for i in range(config.num_hidden_layers)]
+            [
+                LlamaDecoderLayer(
+                    create_skip_config_for_refined_recompute(i, config), i not in self.no_recompute_layers
+                )
+                for i in range(config.num_hidden_layers)
+            ]
         )
         self.norm = LlamaRMSNorm(config)
 

@@ -139,9 +139,7 @@ class PredictorArgument:
     )
     speculate_method: str = field(
         default=None,
-        metadata={
-            "help": "speculate method, it should be one of ['None', 'autoregressive', 'inference_with_reference']"
-        },
+        metadata={"help": "speculate method, it should be one of ['None', 'inference_with_reference']"},
     )
     speculate_max_draft_token_num: int = field(
         default=1,

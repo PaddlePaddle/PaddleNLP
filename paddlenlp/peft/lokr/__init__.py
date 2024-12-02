@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .lokr import LoKrConfig, LoKrModel
-from .lora import LoRAConfig, LoRAModel
-from .prefix import PrefixConfig, PrefixModelForCausalLM
-from .reft import ReFTModel
-from .vera import VeRAConfig, VeRAModel
+from .lokr_config import LoKrConfig
+from .lokr_layers import LoKrLinear
+from .lokr_model import LoKrModel
+
+__all__ = ["LoKrConfig", "LoKrModel", "LoKrLinear"]
