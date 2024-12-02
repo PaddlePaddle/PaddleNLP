@@ -24,8 +24,17 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
-from paddle.distributed.fleet.utils import recompute
 from paddle.utils import try_import
+
+from paddlenlp.transformers.refined_recompute import (
+    RRColumnParallelLinear,
+    RRColumnSequenceParallelLinear,
+    RRRowParallelLinear,
+    RRRowSequenceParallelLinear,
+    create_skip_config_for_refined_recompute,
+    no_recompute,
+    recompute,
+)
 
 try:
     from paddle.incubate.nn.functional import swiglu
@@ -154,9 +163,22 @@ class QWenAttention(nn.Layer):
         if config.sequence_parallel:
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
             RowParallelLinear = linear_utils.RowSequenceParallelLinear
+
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("attention_column_ln", False):
+                    ColumnParallelLinear = RRColumnSequenceParallelLinear
+                if config.skip_recompute_ops.get("attention_row_ln", False):
+                    RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("attention_column_ln", False):
+                    ColumnParallelLinear = RRColumnParallelLinear
+                if config.skip_recompute_ops.get("attention_row_ln", False):
+                    RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             if config.num_attention_heads % config.tensor_parallel_degree != 0:
@@ -227,12 +249,19 @@ class QWenAttention(nn.Layer):
                     return_softmax=self.config.attn_dropout_prob > 0.0,
                 )
             else:
-                attn_output = F.scaled_dot_product_attention(
+                skip_recompute = (
+                    self.config.recompute
+                    and not self.config.recompute_use_reentrant
+                    and self.config.skip_recompute_ops.get("flash_attn", False)
+                )
+                attn_output = no_recompute(
+                    F.scaled_dot_product_attention,
                     query,
                     key,
                     value,
                     attn_mask=attention_mask,
                     is_causal=attention_mask is None,
+                    enable=skip_recompute,
                 )
                 attn_weights = None
 
@@ -388,9 +417,22 @@ class QWenMLP(nn.Layer):
         if config.sequence_parallel:
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
             RowParallelLinear = linear_utils.RowSequenceParallelLinear
+
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                    ColumnParallelLinear = RRColumnSequenceParallelLinear
+                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                    RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                    ColumnParallelLinear = RRColumnParallelLinear
+                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                    RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             if self.fuse_attention_ffn:
@@ -684,7 +726,7 @@ class QWenModel(QWenPretrainedModel):
         self.h = nn.LayerList(
             [
                 QWenBlock(
-                    config,
+                    create_skip_config_for_refined_recompute(i, config),
                 )
                 for i in range(config.num_hidden_layers)
             ]

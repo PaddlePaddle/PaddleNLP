@@ -23,7 +23,11 @@ from paddle.distributed.fleet.meta_parallel import (
     PipelineLayer,
     SharedLayerDesc,
 )
-from paddle.distributed.fleet.utils import recompute
+
+from paddlenlp.transformers.refined_recompute import (
+    create_skip_config_for_refined_recompute,
+    recompute,
+)
 
 from ...utils.tools import get_env_device
 from ..model_utils import PipelinePretrainedModel
@@ -294,7 +298,11 @@ class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
-                LayerDesc(Qwen2DecoderLayerPipe, config=config, layerwise_recompute=i not in self.no_recompute_layers),
+                LayerDesc(
+                    Qwen2DecoderLayerPipe,
+                    config=create_skip_config_for_refined_recompute(i, config),
+                    layerwise_recompute=i not in self.no_recompute_layers,
+                ),
                 f"qwen2.layers.{i}",
             )
         self.add_sequential_layer(LayerDesc(Qwen2RMSNormPipe, config=config), "qwen2")

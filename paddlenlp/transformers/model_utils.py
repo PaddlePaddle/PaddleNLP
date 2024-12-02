@@ -473,7 +473,7 @@ def load_state_dict(
             if len(scale_dict) != 0:
                 if ckpt_quant_stage == "O0":
                     raise ValueError('optimizer weight has quantization scales but `ckpt_quant_stage` is set to "O0"')
-                state_dict = dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict)
+                state_dict = dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict, use_pd=True)
 
             return state_dict
 
@@ -1191,6 +1191,13 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if predictor_args.block_attn:
             config.block_size = predictor_args.block_size
             config.max_seq_len = predictor_args.total_max_length
+
+        if predictor_args.speculate_method is not None:
+            config.speculate_method = predictor_args.speculate_method
+            config.speculate_max_draft_token_num = predictor_args.speculate_max_draft_token_num
+            config.speculate_max_ngram_size = predictor_args.speculate_max_ngram_size
+            config.speculate_verify_window = predictor_args.speculate_verify_window
+            config.speculate_max_candidate_len = predictor_args.speculate_max_candidate_len
 
     @classmethod
     def confirm_inference_model(cls, predictor_args, **kwargs):

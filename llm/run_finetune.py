@@ -19,13 +19,7 @@ import sys
 from functools import partial
 
 import paddle
-from utils.argument import (
-    DataArgument,
-    GenerateArgument,
-    ModelArgument,
-    ReftArgument,
-    TrainingArguments,
-)
+from utils.argument import GenerateArgument, ReftArgument
 from utils.data import convert_example_for_reft, get_convert_example
 
 from paddlenlp.data import DataCollatorForSeq2Seq
@@ -36,6 +30,8 @@ from paddlenlp.datasets import (
 )
 from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import (
+    LoKrConfig,
+    LoKrModel,
     LoRAConfig,
     LoRAModel,
     PrefixConfig,
@@ -65,7 +61,8 @@ from paddlenlp.transformers import (
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.trl import SFTTrainer
+from paddlenlp.transformers.refined_recompute import update_refined_recompute
+from paddlenlp.trl import DataConfig, ModelConfig, SFTConfig, SFTTrainer
 from paddlenlp.trl.llm_utils import (
     ZeroPaddingIterDatasetCallback,
     compute_metrics,
@@ -83,7 +80,7 @@ flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe, Qwen2ForCausa
 
 
 def main():
-    parser = PdArgumentParser((GenerateArgument, ModelArgument, ReftArgument, DataArgument, TrainingArguments))
+    parser = PdArgumentParser((GenerateArgument, ModelConfig, ReftArgument, DataConfig, SFTConfig))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         gen_args, model_args, reft_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
     else:
@@ -146,6 +143,10 @@ def main():
     )
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
+    model_config.refined_recompute = update_refined_recompute(
+        training_args.refined_recompute,
+        model_args.lora,
+    )
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     # Config for model using dropout, such as GPT.
@@ -223,12 +224,14 @@ def main():
             neft_post_hook_handle = model.get_input_embeddings().register_forward_post_hook(neft_post_hook)
         else:
             raise NotImplementedError("Only support neftune for model with get_input_embeddings")
+
     if training_args.sequence_parallel:
         register_sequence_parallel_allreduce_hooks(
             model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
         )
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
+    reft_layers = None
     if model_args.reft:
         # reft requires padding side right
         tokenizer.padding_side = "right"
@@ -237,7 +240,8 @@ def main():
             layers = [int(l) for l in layers.split(";")]
         else:
             layers = [l for l in range(model_config.num_hidden_layers)]
-        logging.info("Using ReFT with layers: ", layers)
+        reft_layers = layers
+        logging.info("Using ReFT with layers: ", reft_layers)
     # init chat_template for tokenizer
     init_chat_template(tokenizer, model_args.model_name_or_path, data_args.chat_template)
 
@@ -248,59 +252,7 @@ def main():
     if isinstance(tokenizer, LlamaTokenizer) or isinstance(tokenizer, Llama3Tokenizer):
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
-    if data_args.dataset_name_or_path is None:
-        raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
-    elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) or os.path.exists(
-        os.path.join(data_args.dataset_name_or_path, "dev.json")
-    ):
-        if training_args.do_train:
-            train_ds = load_dataset(
-                "json",
-                data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
-                lazy=data_args.lazy,
-            )[0]
-        else:
-            train_ds = None
-        if training_args.do_eval:
-            dev_ds = load_dataset(
-                "json",
-                data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
-                lazy=data_args.lazy,
-            )[0]
-        else:
-            dev_ds = None
-
-    elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")) or os.path.exists(
-        os.path.join(data_args.dataset_name_or_path, "dev")
-    ):
-        import glob
-
-        if training_args.do_train:
-            train_ds = load_dataset(
-                "json",
-                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
-                lazy=data_args.lazy,
-            )[0]
-        else:
-            train_ds = None
-        if training_args.do_eval:
-            dev_ds = load_dataset(
-                "json",
-                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "dev", "*.json")),
-                lazy=data_args.lazy,
-            )[0]
-        else:
-            dev_ds = None
-
-    else:
-        if training_args.do_train:
-            train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
-        else:
-            train_ds = None
-        if training_args.do_eval:
-            dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
-        else:
-            dev_ds = None
+    train_ds, dev_ds, test_ds = create_dataset(data_args, training_args)
 
     # TODO(ZHUI & sijunhe): Temporary implementation. Generalize this logic and move to Trainer later.
     if training_args.resume_from_checkpoint is not None and data_args.lazy:
@@ -333,18 +285,10 @@ def main():
             tokenizer=tokenizer,
             data_args=data_args,
             positions=reft_args.position,
-            num_interventions=len(layers),
+            num_interventions=len(reft_layers),
         )
     else:
         trans_func = partial(get_convert_example(model), tokenizer=tokenizer, data_args=data_args)
-
-    train_ds = (
-        train_ds.map(
-            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
-        )
-        if train_ds is not None
-        else None
-    )
 
     eval_zero_padding = data_args.zero_padding
     if data_args.zero_padding and data_args.eval_with_do_generation:
@@ -352,128 +296,30 @@ def main():
             "`zero_padding` conflicts with `eval_with_do_generation`. Setting zero_padding to False for the eval_dataset."
         )
         eval_zero_padding = False
-    dev_ds = (
-        dev_ds.map(
-            partial(
-                trans_func,
-                is_test=data_args.eval_with_do_generation,
-                zero_padding=eval_zero_padding,
-                flash_mask=model_args.flash_mask,
-            )
-        )
-        if dev_ds is not None
-        else None
+
+    train_ds, dev_ds, test_ds = trans_dataset_to_ids(
+        train_ds, dev_ds, test_ds, model_args, data_args, trans_func, eval_zero_padding
     )
+
     if data_args.zero_padding:
         if data_args.lazy:
             intoken_dataset = ZeroPaddingIterableDataset
         else:
             intoken_dataset = ZeroPaddingMapDataset
         logger.info("Creating Zero Padding Data Stream. This may take a few minutes.")
-        train_ds = (
-            intoken_dataset(
+        if train_ds is not None:
+            train_ds = intoken_dataset(
                 train_ds,
                 tokenizer=tokenizer,
                 max_length=data_args.max_length,
                 greedy_zero_padding=data_args.greedy_zero_padding,
             )
-            if train_ds is not None
-            else None
-        )
+        if eval_zero_padding and dev_ds is not None:
+            dev_ds = intoken_dataset(dev_ds, tokenizer=tokenizer, max_length=data_args.max_length)
+        if eval_zero_padding and test_ds is not None:
+            test_ds = intoken_dataset(test_ds, tokenizer=tokenizer, max_length=data_args.max_length)
 
-        if eval_zero_padding:
-            dev_ds = (
-                intoken_dataset(
-                    dev_ds,
-                    tokenizer=tokenizer,
-                    max_length=data_args.max_length,
-                )
-                if dev_ds is not None
-                else None
-            )
-
-    if model_args.prefix_tuning:
-        if training_args.pipeline_parallel_degree > 1:
-            raise NotImplementedError("Prefix tuning is not implemented for pipeline parallelism.")
-
-        prefix_tuning_params = get_prefix_tuning_params(model)
-        prefix_config = PrefixConfig(
-            num_prefix_tokens=model_args.num_prefix_tokens,
-            num_attention_heads=prefix_tuning_params["num_attention_heads"],
-            num_hidden_layers=prefix_tuning_params["num_hidden_layers"],
-            hidden_size=prefix_tuning_params["hidden_size"],
-            multi_query_group_num=prefix_tuning_params["multi_query_group_num"],
-            dtype=dtype,
-        )
-        if model_args.prefix_path is None:
-            model = PrefixModelForCausalLM(
-                model=model,
-                prefix_config=prefix_config,
-                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
-            )
-        else:
-            model = PrefixModelForCausalLM.from_pretrained(
-                model=model,
-                prefix_path=model_args.prefix_path,
-                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
-            )
-        model.print_trainable_parameters()
-
-    if model_args.lora:
-        if training_args.sharding_parallel_degree > 1:
-            assert (
-                "enable_stage1_overlap" not in training_args.sharding_parallel_config
-            ), "Currently not support enabling sharding_stage1_overlap in lora mode."
-        if model_args.lora_path is None:
-            target_modules = get_lora_target_modules(model)
-            lora_config = LoRAConfig(
-                target_modules=target_modules,
-                r=model_args.lora_rank,
-                lora_alpha=2 * model_args.lora_rank if not model_args.rslora else 4,
-                rslora=model_args.rslora,
-                lora_plus_scale=model_args.lora_plus_scale,
-                pissa=model_args.pissa,
-                merge_weights=False,
-                tensor_parallel_degree=training_args.tensor_parallel_degree,
-                dtype=dtype,
-                base_model_name_or_path=model_args.model_name_or_path,
-                use_quick_lora=model_args.use_quick_lora,
-                lora_use_mixer=model_args.lora_use_mixer,
-            )
-            model = LoRAModel(model, lora_config)
-        else:
-            model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
-
-        model.print_trainable_parameters()
-
-    if model_args.reft:
-        intervention_dtype = dtype
-        intervention_params = {
-            "embed_dim": model_config.hidden_size,
-            "low_rank_dimension": reft_args.rank,
-            "dropout": reft_args.dropout,
-            "dtype": intervention_dtype,
-            "act_fn": reft_args.act_fn,
-            "device": "gpu",
-            "add_bias": reft_args.add_bias,
-        }
-        representations = [
-            {
-                "layer": l,
-                "component": "block_output",
-                "low_rank_dimension": reft_args.rank,
-                "intervention": intervention_mapping[reft_args.intervention_type](**intervention_params),
-            }
-            for l in layers
-        ]
-        reft_config = ReFTConfig(
-            representations=representations, intervention_params=intervention_params, position=reft_args.position
-        )
-        # get reft model
-        model = ReFTModel(reft_config, model)
-        # disable origianl model gradients
-        model.disable_model_gradients()
-        model.print_trainable_parameters()
+    model = create_peft_model(model_args, reft_args, training_args, dtype, model_config, model, reft_layers)
 
     def compute_metrics_do_generation(eval_preds):
         rouge1 = Rouge1()
@@ -504,20 +350,6 @@ def main():
             "rougel": rougel.score(),
             "bleu4": bleu4.score(),
         }
-
-    if model_args.vera:
-        target_modules = get_lora_target_modules(model)
-        vera_config = VeRAConfig(
-            target_modules=target_modules,
-            r=model_args.vera_rank,
-            vera_alpha=model_args.vera_rank,
-            dtype=dtype,
-            base_model_name_or_path=model_args.model_name_or_path,
-            pissa_init=True,
-        )
-        model = VeRAModel(model, vera_config)
-        model.mark_only_vera_as_trainable(notfreezeB=True)
-        model.print_trainable_parameters()
 
     # Create trainer
 
@@ -586,28 +418,7 @@ def main():
             logger.info("Benchmark done.")
         else:
             if model_args.save_to_aistudio:
-                kwargs = {}
-                if model_args.aistudio_token is not None:
-                    kwargs["token"] = model_args.aistudio_token
-                # PEFT Model only save PEFT parameters, if pretrained model obtains from aistudio
-                if model_args.from_aistudio and (model_args.lora or model_args.prefix_tuning):
-                    kwargs["base_model"] = model_args.model_name_or_path
-                else:
-                    trainer.tokenizer.save_to_aistudio(
-                        repo_id=model_args.aistudio_repo_id,
-                        private=model_args.aistudio_repo_private,
-                        license=model_args.aistudio_repo_license,
-                        exist_ok=True,
-                        **kwargs,
-                    )
-                trainer.model.save_to_aistudio(
-                    repo_id=model_args.aistudio_repo_id,
-                    private=model_args.aistudio_repo_private,
-                    license=model_args.aistudio_repo_license,
-                    merge_tensor_parallel=training_args.tensor_parallel_degree > 1,
-                    exist_ok=True,
-                    **kwargs,
-                )
+                save_to_aistudio(model_args, training_args, trainer)
 
             if not training_args.autotuner_benchmark:
                 trainer.save_model(merge_tensor_parallel=training_args.tensor_parallel_degree > 1)
@@ -617,19 +428,6 @@ def main():
 
     # Evaluation test set
     if training_args.do_predict:
-        test_ds = load_dataset(
-            "json",
-            data_files=os.path.join(data_args.dataset_name_or_path, "test.json"),
-            lazy=data_args.lazy,
-        )[0]
-
-        test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
-        if eval_zero_padding:
-            test_ds = intoken_dataset(
-                test_ds,
-                tokenizer=tokenizer,
-                max_length=data_args.max_length,
-            )
         eval_result = trainer.predict(test_ds).metrics
         trainer.log_metrics("test", eval_result)
 
@@ -638,6 +436,230 @@ def main():
         logger.info("*** Evaluate result after train ***")
         eval_result = trainer.evaluate(dev_ds)
         trainer.log_metrics("eval", eval_result)
+
+
+def save_to_aistudio(model_args, training_args, trainer):
+    kwargs = {}
+    if model_args.aistudio_token is not None:
+        kwargs["token"] = model_args.aistudio_token
+        # PEFT Model only save PEFT parameters, if pretrained model obtains from aistudio
+    if model_args.from_aistudio and (model_args.lora or model_args.prefix_tuning):
+        kwargs["base_model"] = model_args.model_name_or_path
+    else:
+        trainer.tokenizer.save_to_aistudio(
+            repo_id=model_args.aistudio_repo_id,
+            private=model_args.aistudio_repo_private,
+            license=model_args.aistudio_repo_license,
+            exist_ok=True,
+            **kwargs,
+        )
+    trainer.model.save_to_aistudio(
+        repo_id=model_args.aistudio_repo_id,
+        private=model_args.aistudio_repo_private,
+        license=model_args.aistudio_repo_license,
+        merge_tensor_parallel=training_args.tensor_parallel_degree > 1,
+        exist_ok=True,
+        **kwargs,
+    )
+
+
+def create_peft_model(model_args, reft_args, training_args, dtype, model_config, model, reft_layers):
+    if model_args.prefix_tuning:
+        if training_args.pipeline_parallel_degree > 1:
+            raise NotImplementedError("Prefix tuning is not implemented for pipeline parallelism.")
+
+        prefix_tuning_params = get_prefix_tuning_params(model)
+        prefix_config = PrefixConfig(
+            num_prefix_tokens=model_args.num_prefix_tokens,
+            num_attention_heads=prefix_tuning_params["num_attention_heads"],
+            num_hidden_layers=prefix_tuning_params["num_hidden_layers"],
+            hidden_size=prefix_tuning_params["hidden_size"],
+            multi_query_group_num=prefix_tuning_params["multi_query_group_num"],
+            dtype=dtype,
+        )
+        if model_args.prefix_path is None:
+            model = PrefixModelForCausalLM(
+                model=model,
+                prefix_config=prefix_config,
+                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
+            )
+        else:
+            model = PrefixModelForCausalLM.from_pretrained(
+                model=model,
+                prefix_path=model_args.prefix_path,
+                postprocess_past_key_value=prefix_tuning_params["postprocess_past_key_value"],
+            )
+        model.print_trainable_parameters()
+
+    if model_args.lora:
+        if training_args.sharding_parallel_degree > 1:
+            assert (
+                "enable_stage1_overlap" not in training_args.sharding_parallel_config
+            ), "Currently not support enabling sharding_stage1_overlap in lora mode."
+        if model_args.lora_path is None:
+            target_modules = get_lora_target_modules(model)
+            lora_config = LoRAConfig(
+                target_modules=target_modules,
+                r=model_args.lora_rank,
+                lora_alpha=2 * model_args.lora_rank if not model_args.rslora else 4,
+                rslora=model_args.rslora,
+                lora_plus_scale=model_args.lora_plus_scale,
+                pissa=model_args.pissa,
+                merge_weights=False,
+                tensor_parallel_degree=training_args.tensor_parallel_degree,
+                dtype=dtype,
+                base_model_name_or_path=model_args.model_name_or_path,
+                use_quick_lora=model_args.use_quick_lora,
+                lora_use_mixer=model_args.lora_use_mixer,
+            )
+            model = LoRAModel(model, lora_config)
+        else:
+            model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
+
+        model.print_trainable_parameters()
+
+    if model_args.lokr:
+        if model_args.lokr_path is None:
+            target_modules = get_lora_target_modules(model)
+            lokr_config = LoKrConfig(
+                target_modules=target_modules,
+                lokr_dim=model_args.lokr_dim,
+                dtype=dtype,
+                base_model_name_or_path=model_args.model_name_or_path,
+            )
+            model = LoKrModel(model, lokr_config)
+        else:
+            model = LoKrModel.from_pretrained(model=model, lokr_path=model_args.lokr_path)
+
+    if model_args.reft:
+        intervention_dtype = dtype
+        intervention_params = {
+            "embed_dim": model_config.hidden_size,
+            "low_rank_dimension": reft_args.rank,
+            "dropout": reft_args.dropout,
+            "dtype": intervention_dtype,
+            "act_fn": reft_args.act_fn,
+            "device": "gpu",
+            "add_bias": reft_args.add_bias,
+        }
+        representations = [
+            {
+                "layer": l,
+                "component": "block_output",
+                "low_rank_dimension": reft_args.rank,
+                "intervention": intervention_mapping[reft_args.intervention_type](**intervention_params),
+            }
+            for l in reft_layers
+        ]
+        reft_config = ReFTConfig(
+            representations=representations, intervention_params=intervention_params, position=reft_args.position
+        )
+        # get reft model
+        model = ReFTModel(reft_config, model)
+        # disable origianl model gradients
+        model.disable_model_gradients()
+        model.print_trainable_parameters()
+
+    if model_args.vera:
+        target_modules = get_lora_target_modules(model)
+        vera_config = VeRAConfig(
+            target_modules=target_modules,
+            r=model_args.vera_rank,
+            vera_alpha=model_args.vera_rank,
+            dtype=dtype,
+            base_model_name_or_path=model_args.model_name_or_path,
+            pissa_init=True,
+        )
+        model = VeRAModel(model, vera_config)
+        model.mark_only_vera_as_trainable(notfreezeB=True)
+        model.print_trainable_parameters()
+
+    return model
+
+
+def trans_dataset_to_ids(train_ds, dev_ds, test_ds, model_args, data_args, trans_func, eval_zero_padding):
+    if train_ds is not None:
+        train_ds = train_ds.map(
+            partial(trans_func, is_test=False, zero_padding=data_args.zero_padding, flash_mask=model_args.flash_mask)
+        )
+    if dev_ds is not None:
+        dev_ds = dev_ds.map(
+            partial(
+                trans_func,
+                is_test=data_args.eval_with_do_generation,
+                zero_padding=eval_zero_padding,
+                flash_mask=model_args.flash_mask,
+            )
+        )
+    if test_ds is not None:
+        test_ds = test_ds.map(partial(trans_func, is_test=data_args.eval_with_do_generation))
+
+    return train_ds, dev_ds, test_ds
+
+
+def create_dataset(data_args, training_args):
+    if data_args.dataset_name_or_path is None:
+        raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
+
+    train_ds = None
+    dev_ds = None
+    test_ds = None
+    if os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) or os.path.exists(
+        os.path.join(data_args.dataset_name_or_path, "dev.json")
+    ):
+        if training_args.do_train:
+            train_ds = load_dataset(
+                "json",
+                data_files=os.path.join(data_args.dataset_name_or_path, "train.json"),
+                lazy=data_args.lazy,
+            )[0]
+        if training_args.do_eval:
+            dev_ds = load_dataset(
+                "json",
+                data_files=os.path.join(data_args.dataset_name_or_path, "dev.json"),
+                lazy=data_args.lazy,
+            )[0]
+        if training_args.do_predict:
+            test_ds = load_dataset(
+                "json",
+                data_files=os.path.join(data_args.dataset_name_or_path, "test.json"),
+                lazy=data_args.lazy,
+            )[0]
+
+    elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train")) or os.path.exists(
+        os.path.join(data_args.dataset_name_or_path, "dev")
+    ):
+        import glob
+
+        if training_args.do_train:
+            train_ds = load_dataset(
+                "json",
+                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "train", "*.json")),
+                lazy=data_args.lazy,
+            )[0]
+        if training_args.do_eval:
+            dev_ds = load_dataset(
+                "json",
+                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "dev", "*.json")),
+                lazy=data_args.lazy,
+            )[0]
+        if training_args.do_predict:
+            test_ds = load_dataset(
+                "json",
+                data_files=glob.glob(os.path.join(data_args.dataset_name_or_path, "test", "*.json")),
+                lazy=data_args.lazy,
+            )[0]
+    else:
+        if training_args.do_train:
+            train_ds = load_dataset(data_args.dataset_name_or_path, splits=["train"])[0]
+
+        if training_args.do_eval:
+            dev_ds = load_dataset(data_args.dataset_name_or_path, splits=["dev"])[0]
+
+        if training_args.do_predict:
+            test_ds = load_dataset(data_args.dataset_name_or_path, splits=["test"])[0]
+
+    return train_ds, dev_ds, test_ds
 
 
 if __name__ == "__main__":
