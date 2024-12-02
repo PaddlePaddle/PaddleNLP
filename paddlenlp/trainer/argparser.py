@@ -317,6 +317,8 @@ class PdArgumentParser(ArgumentParser):
                         logger.info("resume training process from scratch (step 0)")
                         return None
                     else:
+                        # Launching the sft_base training process using an initial checkpoint with the starting step set to 0.
+                        # For instance, resume training from the checkpoint located at ‘./output/eb/checkpoint-init’.
                         logger.info(
                             f"init_step == 0 and user has defined resume_from_checkpoint: {user_defined_resume_from_checkpoint}"
                         )
@@ -324,11 +326,12 @@ class PdArgumentParser(ArgumentParser):
                 else:
                     # pdc_init_step > 0
                     logger.info(f"resume training process by pdc longjob with resume step: {pdc_init_step}")
+                    resume_checkpoint = os.path.join(args.get("output_dir", None), f"checkpoint-{pdc_init_step}")
                     if user_defined_resume_from_checkpoint is not None:
                         logger.warning(
-                            f"pdc_init_step:{pdc_init_step} and user_defined_resume_from_checkpoint:{user_defined_resume_from_checkpoint} exist together, use pdc_init_step:{pdc_init_step}"
+                            f"pdc_init_step:{pdc_init_step} and resume_ckpt:{user_defined_resume_from_checkpoint} exist together, use resume_checkpoint:{resume_checkpoint}"
                         )
-                    return os.path.join(args.get("output_dir", None), f"checkpoint-{pdc_init_step}")
+                    return resume_checkpoint
 
         args["resume_from_checkpoint"] = get_resume_checkpoint_path(args)
         args_for_json = to_regular_dict(args)
