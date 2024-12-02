@@ -66,7 +66,7 @@ install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
     python -m pip install --user -r scripts/regression/requirements_ci.txt
     python -m pip uninstall paddlepaddle -y
-    python -m pip install --user ${paddle};
+    python -m pip install --user ${paddle} --no-cache-dir
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
     python -c 'from visualdl import LogWriter'
 }
