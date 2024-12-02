@@ -306,15 +306,12 @@ class PdArgumentParser(ArgumentParser):
             """
             pdc_init_step = os.getenv("PDC_INIT_STEP")
             if pdc_init_step is not None:
-                assert not hasattr(
-                    args, "resume_from_checkpoint"
-                ), "resume_from_checkpoint miss, please check your train args"
-            user_defined_resume_from_checkpoint = args.get("resume_from_checkpoint", None)
-            if pdc_init_step == "0" and user_defined_resume_from_checkpoint != "":
-                return user_defined_resume_from_checkpoint
+                # 检查 'resume_from_checkpoint' 是否在 args 字典中
+                if "resume_from_checkpoint" not in args:
+                    raise AssertionError("resume_from_checkpoint is missing, please check your train args")
             if pdc_init_step == "0":
                 # from_scratch train process launched by pdc longjob
-                logger.info(f"resume training process by pdc longjob with resume step: {pdc_init_step}")
+                logger.info("resume training process from scratch (step 0)")
                 return None
             elif pdc_init_step is not None:
                 # injected with mpirun by pdc longjob
