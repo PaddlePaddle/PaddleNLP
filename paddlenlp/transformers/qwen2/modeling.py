@@ -1687,14 +1687,21 @@ class Qwen2SentenceEmbedding(Qwen2PretrainedModel):
         self,
         query: Optional[Dict[str, paddle.Tensor]] = None,
         passages: Optional[Dict[str, paddle.Tensor]] = None,
+        return_encode=False,
     ):
         """forward"""
         q_reps = self.encode(**query)
         p_reps = self.encode(**passages)
 
+        q_reps = nn.functional.normalize(q_reps, axis=-1)
+        p_reps = nn.functional.normalize(p_reps, axis=-1)
+
         if self.embedding_negatives_cross_device:
             q_reps = self._dist_gather_tensor(q_reps)
             p_reps = self._dist_gather_tensor(p_reps)
+
+        if return_encode:
+            return q_reps, p_reps
 
         loss = self.in_batch_negative_loss(q_reps, p_reps)
         return loss

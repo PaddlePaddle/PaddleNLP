@@ -423,7 +423,6 @@ class DataCollatorForEmbedding:
     tokenizer: PretrainedTokenizerBase
     model: Optional[Any] = None
     padding: Union[bool, str, PaddingStrategy] = True
-    max_length: Optional[int] = None
     pad_to_multiple_of: Optional[int] = None
     label_pad_token_id: int = -100
     return_tensors: str = "pd"
@@ -487,16 +486,6 @@ class DataCollatorForEmbedding:
             "query": queries,
             "passages": passages,
         }
-
-    def pad(self, batch, return_tensors=None):
-        return self.tokenizer.pad(
-            batch,
-            padding=self.padding,
-            max_length=self.max_length,
-            pad_to_multiple_of=self.pad_to_multiple_of,
-            return_tensors=return_tensors,
-            return_attention_mask=self.return_attention_mask,
-        )
 
     def process_data(self, data, pad_idx, max_len):
         """padding token_ids & position_ids."""

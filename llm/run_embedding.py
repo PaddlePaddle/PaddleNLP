@@ -16,20 +16,10 @@ import os
 import sys
 
 import paddle
-from utils.argument import (
-    DataArgument,
-    EmbeddingArgument,
-    GenerateArgument,
-    ModelArgument,
-    TrainingArguments,
-)
+from utils.argument import EmbeddingArgument, GenerateArgument
 
 from paddlenlp.data import DataCollatorForEmbedding
-from paddlenlp.datasets import (
-    EmbeddingIterableDataset,
-    ZeroPaddingIterableDataset,
-    load_dataset,
-)
+from paddlenlp.datasets import EmbeddingIterableDataset, load_dataset
 from paddlenlp.trainer import PdArgumentParser, get_last_checkpoint, set_seed
 from paddlenlp.trainer.trainer_callback import TrainerState
 from paddlenlp.transformers import (
@@ -39,12 +29,9 @@ from paddlenlp.transformers import (
     Qwen2SentenceEmbedding,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.trl import SFTTrainer
-from paddlenlp.trl.llm_utils import (
-    ZeroPaddingIterDatasetCallback,
-    compute_metrics,
-    init_chat_template,
-)
+from paddlenlp.transformers.refined_recompute import update_refined_recompute
+from paddlenlp.trl import DataConfig, EmbeddingTrainer, ModelConfig, SFTConfig
+from paddlenlp.trl.llm_utils import compute_metrics, init_chat_template
 from paddlenlp.utils.log import logger
 
 # Fine-tune Environment Variables to support sharding stage1 overlap optimization.
@@ -52,7 +39,7 @@ os.environ["USE_CASUAL_MASK"] = "False"
 
 
 def main():
-    parser = PdArgumentParser((GenerateArgument, ModelArgument, DataArgument, TrainingArguments, EmbeddingArgument))
+    parser = PdArgumentParser((GenerateArgument, ModelConfig, DataConfig, SFTConfig, EmbeddingArgument))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         gen_args, model_args, data_args, training_args, embedding_args = parser.parse_json_file_and_cmd_lines()
     else:
@@ -106,6 +93,7 @@ def main():
     assert isinstance(model_config, Qwen2Config), "Now only qwen2 supported"
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
+    model_config.refined_recompute = update_refined_recompute(training_args.refined_recompute)
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     # Config for model using dropout, such as GPT.
@@ -265,18 +253,9 @@ def main():
         )
 
     # Create trainer
-    if (
-        training_args.pipeline_parallel_degree > 1
-        or training_args.sequence_parallel
-        or training_args.autotuner_benchmark
-        or data_args.zero_padding
-        or data_args.pad_to_max_length
-    ):
-        # NOTE(gongenlei): new add autotuner_benchmark
-        max_length = data_args.max_length
+    if data_args.pad_to_max_length:
         padding = "max_length"
     else:
-        max_length = None
         padding = True
 
     if training_args.pipeline_parallel_degree > 1:
@@ -286,25 +265,22 @@ def main():
 
     data_collator_fn = DataCollatorForEmbedding(
         tokenizer=tokenizer,
-        max_length=max_length,
+        max_query_len=embedding_args.max_query_len,
         padding=padding,
-        max_label_length=max_length,
+        max_passage_len=embedding_args.max_passage_len,
         return_tensors="np",
         return_attention_mask=not model_args.flash_mask,
         pad_to_multiple_of=data_args.pad_to_multiple_of,
     )
-    trainer = SFTTrainer(
+    trainer = EmbeddingTrainer(
         model=model,
+        model_args=embedding_args,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=dev_ds,
         tokenizer=tokenizer,
         compute_metrics=metrics,
         data_collator=data_collator_fn,
-        do_generation=data_args.eval_with_do_generation,
-        callbacks=[ZeroPaddingIterDatasetCallback()] if isinstance(train_ds, ZeroPaddingIterableDataset) else None,
-        gen_args=gen_args,
-        data_args=data_args,
     )
     trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
     trainer.set_optimizer_grouped_parameters(trainable_parameters)

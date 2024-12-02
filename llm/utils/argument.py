@@ -46,7 +46,7 @@ class EmbeddingArgument:
             "help": "The number of highest probability tokens to keep for top-k-filtering in the sampling strategy"
         },
     )
-    max_passage_len: float = field(
+    max_passage_len: int = field(
         default=1.0, metadata={"help": "The cumulative probability for top-p-filtering in the sampling strategy."}
     )
     group_size: int = field(
