@@ -101,6 +101,7 @@ function llama_case_list_auto() {
         llama_align_dygraph_dy2st_pir_auto_grad_merge_bs2_fp32_DP1-MP1-PP1
         llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
         llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4
+        llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
@@ -126,6 +127,7 @@ function llm_gpt_case_list_auto() {
         llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2
         llm_gpt_pir_auto_bs4_TP2
         llm_gpt_pir_auto_bs4_TP2_PP2
+        llm_gpt_pir_auto_bs8_DP2_TP2_PP2
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
@@ -1506,7 +1508,65 @@ function llama_convert_hybrid_ckpt_to_auto_parallel_bs2_fp32_DP2-MP1-PP1() {
     check_result $FUNCNAME ${dy_loss} ${auto_loss} ${dy_ips} ${auto_ips} ${dy_mem} ${auto_mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
+function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2(){
+    echo "=========== $FUNCNAME run begin ==========="
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_enable_pir_api=1
 
+    task_name="llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2"
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+    rm -rf $case_out_dir
+    rm -rf $case_log_dir
+
+    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
+        --model_type "llama" \
+        --model_name_or_path "baichuan-inc/Baichuan2-13B-Base" \
+        --tokenizer_name_or_path "baichuan-inc/Baichuan2-13B-Base" \
+        --input_dir "./data" \
+        --output_dir $case_out_dir \
+        --split 949,50,1 \
+        --max_seq_length 2048 \
+        --hidden_size 1024 \
+        --intermediate_size 3072 \
+        --num_hidden_layers 8 \
+        --num_attention_heads 32 \
+        --per_device_train_batch_size 1 \
+        --per_device_eval_batch_size 4 \
+        --gradient_accumulation_steps 4 \
+        --use_flash_attention 1 \
+        --use_fused_rms_norm 0 \
+        --fp16 1 \
+        --fp16_opt_level "O2" \
+        --amp_master_grad 1 \
+        --scale_loss 1024 \
+        --pipeline_parallel_degree 2 \
+        --tensor_parallel_degree 2 \
+        --learning_rate 0.0001 \
+        --min_learning_rate 0.00001 \
+        --max_steps 10 \
+        --save_steps 5000 \
+        --weight_decay 0.01 \
+        --warmup_ratio 0.01 \
+        --logging_steps 1 \
+        --dataloader_num_workers 1 \
+        --sharding "stage1" \
+        --eval_steps 1000000 \
+        --disable_tqdm true \
+        --continue_training 0 \
+        --recompute 0 \
+        --do_train \
+        --do_eval \
+        --device "gpu" \
+        --data_impl "mmap" \
+        --enable_auto_parallel 1 \
+        --to_static 1 \
+        --max_grad_norm 1.0 \
+        >>${log_path}/$FUNCNAME 2>&1
+    echo "=========== $FUNCNAME run  end ==========="
+}
 function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
@@ -1801,7 +1861,7 @@ function llm_gpt_pir_auto_bs4_TP2(){
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
-
+    export FLAGS_enable_pir_api=1
     cd ${llm_gpt_case_path}
 
     task_name="gpt3_auto_bs4_tp2"
@@ -1862,7 +1922,7 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
-
+    export FLAGS_enable_pir_api=1
     cd ${llm_gpt_case_path}
 
     task_name="gpt3_auto_bs4_tp2_pp2"
@@ -1914,6 +1974,72 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
         --fp16_opt_level "O2" \
         --num_hidden_layers 4 \
         --intermediate_size 1024 \
+        >>${log_path}/$FUNCNAME 2>&1
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llm_gpt_pir_auto_bs8_DP2_TP2_PP2(){
+        echo "=========== $FUNCNAME run begin ==========="
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_enable_pir_api=1
+    cd ${llm_gpt_case_path}
+
+    task_name="gpt3_auto_bs8_dp2_tp2_pp2"
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+    rm -rf $case_out_dir
+    rm -rf $case_log_dir
+
+    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
+        --log_dir $case_log_dir \
+        run_pretrain_auto.py \
+        --model_name_or_path gpt3-13B-en \
+        --tokenizer_name_or_path gpt3-13B-en \
+        --input_dir "$gpt_data_path/data" \
+        --output_dir "output/$task_name" \
+        --split 949,50,1 \
+        --max_seq_length 1024 \
+        --per_device_train_batch_size 1 \
+        --per_device_eval_batch_size 1 \
+        --sharding "" \
+        --tensor_parallel_degree 2 \
+        --pipeline_parallel_degree 2 \
+        --pipeline_schedule_mode "1F1B" \
+        --sequence_parallel 0 \
+        --fuse_attention_qkv 1 \
+        --use_flash_attention 1 \
+        --scale_loss 1024 \
+        --learning_rate 0.00001 \
+        --min_learning_rate 0.000005 \
+        --max_steps 10 \
+        --save_steps 50000 \
+        --weight_decay 0.01 \
+        --warmup_ratio 0.01 \
+        --max_grad_norm 1.0 \
+        --logging_steps 1\
+        --continue_training 0\
+        --dataloader_num_workers 1 \
+        --eval_steps 100000 \
+        --report_to "visualdl" \
+        --disable_tqdm true \
+        --recompute 0 \
+        --gradient_accumulation_steps 4 \
+        --do_train \
+        --do_eval \
+        --device "gpu" \
+        --model_type "gpt" \
+        --enable_auto_parallel 1 \
+        --to_static 1 \
+        --fp16 0 \
+        --fp16_opt_level "O2" \
+        --num_hidden_layers 4 \
+        --intermediate_size 1024 \
+        --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
+        --tensor_parallel_config "enable_mp_async_allreduce" \
+        --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
+        --pipeline_parallel_config "enable_send_recv_overlap enable_split_backward" \
         >>${log_path}/$FUNCNAME 2>&1
     echo "=========== $FUNCNAME run  end ==========="
 }
