@@ -2365,7 +2365,7 @@ function llm_qwen_pir_auto_bs1_bf16_TP2(){
         --enable_auto_parallel 1\
         --to_static 1 \
         --num_hidden_layers 4 \
-
+        >>${log_path}/$FUNCNAME 2>&1
     echo "=========== $FUNCNAME run  end ==========="
 }
 
@@ -2442,7 +2442,7 @@ function llm_qwen_pir_auto_bs1_bf16_TP2_PP2(){
         --enable_auto_parallel 1\
         --to_static 1 \
         --num_hidden_layers 4 \
-
+        >>${log_path}/$FUNCNAME 2>&1
     echo "=========== $FUNCNAME run  end ==========="
 }
 
