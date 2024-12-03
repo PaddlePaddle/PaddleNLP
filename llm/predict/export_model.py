@@ -58,7 +58,7 @@ def main():
         tensor_parallel_rank = hcg.get_model_parallel_rank()
 
     # set predictor type
-    predictor = create_predictor(predictor_args, model_args, tensor_parallel_degree, tensor_parallel_rank)
+    predictor = create_predictor(predictor_args, model_args)
     predictor.model.eval()
 
     predictor.model.to_static(
