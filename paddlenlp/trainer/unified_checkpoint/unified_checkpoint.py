@@ -29,8 +29,10 @@ from paddlenlp.transformers.model_utils import (
     unwrap_model,
 )
 from paddlenlp.transformers.utils import dtype_byte_size
+from paddlenlp.utils import infohub
 from paddlenlp.utils.env import (
     LORA_WEIGHTS_NAME,
+    MAX_QUANTIZATION_TIMES,
     PADDLE_MASTER_WEIGHTS_NAME,
     PADDLE_OPTIMIZER_NAME,
     PADDLE_WEIGHTS_NAME,
@@ -164,6 +166,7 @@ class UnifiedCheckpointHandler:
                 "world_size": world_size,
                 "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
                 "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
+                "remove_master_weight": "remove_master_weight" in self.args.unified_checkpoint_config,
             }
             paddle.save(save_info, os.path.join(save_directory, ".saving_info"))
 
@@ -210,6 +213,7 @@ class UnifiedCheckpointHandler:
             static_name, type_name = generate_base_static_name(key)
             new_name = static2struct_name_mappings[static_name] + "/" + type_name
             optim_state_dict[new_name] = optim_state_dict.pop(key)
+
         if master_weights is not None:
             for key in list(master_weights.keys()):
                 master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
@@ -237,6 +241,22 @@ class UnifiedCheckpointHandler:
         optimizer_name = _add_variant(SAFE_OPTIMIZER_NAME, self.args.optimizer_name_suffix)
         master_weights_name = _add_variant(SAFE_MASTER_WEIGHTS_NAME, self.args.optimizer_name_suffix)
 
+        sharded_optim_index = {}
+        # save opt index json if checkpoint quantization is on.
+        if self.args.ckpt_quant_stage != "O0" and "quant_reach_limit" not in infohub:
+            sharded_optim_index["ckpt_quant_stage"] = self.args.ckpt_quant_stage
+
+        sharded_optim_index["quant_ckpt_resume_times"] = (
+            infohub["quant_ckpt_resume_times"] if "quant_ckpt_resume_times" in infohub else 0
+        )
+
+        if len(sharded_optim_index) > 0:
+            optimizer_index_name = SAFE_OPTIMIZER_INDEX_NAME
+            path = os.path.join(output_dir, optimizer_index_name)
+            if self.args.should_save:
+                with open(path, "w") as f:
+                    json.dump(sharded_optim_index, f, indent=4)
+
         is_sync_save = True
         if "async_save" in self.args.unified_checkpoint_config:
             is_sync_save = False
@@ -246,16 +266,18 @@ class UnifiedCheckpointHandler:
             signal_path=signal_dir,
             is_sync=is_sync_save,
             state_dict_type="optimizer_weight",
+            ckpt_quant_stage=self.args.ckpt_quant_stage if "quant_reach_limit" not in infohub else "O0",
         )
-        self.async_handler._file_save_async_or_sync(
-            master_weights,
-            path=os.path.join(output_dir, master_weights_name),
-            signal_path=signal_dir,
-            is_sync=is_sync_save,
-            state_dict_type="master_weight",
-        )
+        if master_weights is not None:
+            self.async_handler._file_save_async_or_sync(
+                master_weights,
+                path=os.path.join(output_dir, master_weights_name),
+                signal_path=signal_dir,
+                is_sync=is_sync_save,
+                state_dict_type="master_weight",
+            )
 
-    def load_non_merge_optimizer(self, model, optimizer, resume_from_checkpoint):
+    def load_non_merge_optimizer(self, model, optimizer, resume_from_checkpoint, ckpt_quant_stage="O0"):
         # init and get optimizer LR_Scheduler
         returned_optim_state_dict = nested_copy(optimizer.state_dict())
 
@@ -263,19 +285,25 @@ class UnifiedCheckpointHandler:
         master_weights_name = _add_variant(SAFE_MASTER_WEIGHTS_NAME, self.args.optimizer_name_suffix)
         optimizer_path = os.path.join(resume_from_checkpoint, optimizer_name)
         master_weights_path = os.path.join(resume_from_checkpoint, master_weights_name)
-        has_master_weights = True if os.path.isfile(master_weights_path) else False
+        # no quantization & no master weight represent O1 AMP strategy.
+        is_amp_o1 = self.args.fp16_opt_level == "O1"
 
         model_state_dict = get_expected_state_dict(model)
         struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}  # get optimizer param mappings
-        optimizer_state_dict = load_state_dict(optimizer_path, None, None, device="expected")
-        if has_master_weights:
+        optimizer_state_dict = load_state_dict(
+            optimizer_path, None, None, device="expected", ckpt_quant_stage=ckpt_quant_stage
+        )
+        master_weights = {}
+        # normal AMP O2
+        if not is_amp_o1 and os.path.isfile(master_weights_path):
             master_weights = load_state_dict(master_weights_path, None, None, device="expected")
 
         # rename and move to paddle.Tensor
         for key in list(optimizer_state_dict.keys()):
             key_name = key.split("/")
+            model_weight_key = key_name[0]
             static_name = struct2static_name_mappings[key_name[0]]
-            if has_master_weights:
+            if not is_amp_o1:
                 if model_state_dict[key_name[0]].dtype != paddle.float32:
                     key_name = "_".join([static_name, FP32_MASTER, key_name[1]])
                 else:
@@ -285,7 +313,13 @@ class UnifiedCheckpointHandler:
             returned_optim_state_dict[key_name] = optimizer_state_dict.pop(key)
             returned_optim_state_dict[key_name].name = key_name
 
-        if has_master_weights:
+            # master weight cast (only in AMP O2 + remove_master_weight)
+            if not is_amp_o1 and not os.path.isfile(master_weights_path):
+                master_weights[model_weight_key] = paddle.cast(
+                    model_state_dict[model_weight_key], dtype=paddle.float32
+                )
+
+        if not is_amp_o1:
             returned_optim_state_dict["master_weights"] = {}
             for key in list(master_weights.keys()):
                 static_name = struct2static_name_mappings[key]
@@ -320,6 +354,10 @@ class UnifiedCheckpointHandler:
             if "LR_Scheduler" in optim_state_dict.keys():
                 optim_state_dict.pop("LR_Scheduler")
 
+        if UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value in self.args.unified_checkpoint_config:
+            logger.info("Skip master weight saving.")
+            master_weights = None
+
         if "ignore_merge_optimizer" in self.args.unified_checkpoint_config:
             self.save_non_merge_optimizer(model, optim_state_dict, master_weights, output_dir, signal_dir)
             return
@@ -350,6 +388,7 @@ class UnifiedCheckpointHandler:
             signal_path=signal_dir,
             is_sync=is_sync_save,
             state_dict_type="optimizer_weight",
+            ckpt_quant_stage=self.args.ckpt_quant_stage if "quant_reach_limit" not in infohub else "O0",
         )
         if master_weight_state_dict is not None:
             self.async_handler._file_save_async_or_sync(
@@ -391,16 +430,40 @@ class UnifiedCheckpointHandler:
             optim_state_dict = load_single_card_optimizer(model, optimizer, resume_from_checkpoint)
             return optim_state_dict
 
+        index = {}
         has_merge_optimizer_safetensors = distributed_isfile(
             os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME)
         )
+        if has_merge_optimizer_safetensors:
+            with open(os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME), "r") as f:
+                index = json.loads(f.read())
+
+        # get quant ckpt info `ckpt_quant_stage` and `quant_ckpt_resume_times`
+        ckpt_quant_stage = "O0"
+        if "ckpt_quant_stage" in index:
+            ckpt_quant_stage = index["ckpt_quant_stage"]
+
+        quant_ckpt_resume_times = 0
+        if "quant_ckpt_resume_times" in index:
+            quant_ckpt_resume_times = index["quant_ckpt_resume_times"]
+        # increment and save resume times in infohub
+        if ckpt_quant_stage != "O0":
+            quant_ckpt_resume_times += 1
+        infohub["quant_ckpt_resume_times"] = quant_ckpt_resume_times
+
+        # Quantization times exceeds the limit. Turn off the quantization strategy.
+        if quant_ckpt_resume_times >= MAX_QUANTIZATION_TIMES:
+            infohub["quant_reach_limit"] = True
+            logger.info("Checkpoint quantization time reach limit and will be closed.")
+
         # If not having merge optimizer, then load non-merge optimizer.
-        if not has_merge_optimizer_safetensors:
+        if "weight_map" not in index:
             if self.args.data_parallel_rank == 0 or self.args.use_expert_parallel:
                 returned_optim_state_dict = self.load_non_merge_optimizer(
                     model,
                     optimizer,
                     resume_from_checkpoint,
+                    ckpt_quant_stage=ckpt_quant_stage,
                 )
                 return returned_optim_state_dict
             else:
@@ -445,7 +508,7 @@ def unified_checkpoint_into_shards(
     assert hasattr(model_to_save, "config")
 
     state_dict = get_expected_state_dict(model_to_save)
-    all_filter_keys = filter_params(model_to_save, state_dict)
+    all_filter_keys = filter_params(model_to_save, state_dict, args)
 
     config_to_save = copy.deepcopy(model_to_save.config)
 
@@ -534,6 +597,7 @@ def unified_optimizer_into_shards(
         static_name, type_name = generate_base_static_name(key)
         new_name = static2struct_name_mappings[static_name] + "/" + type_name
         optim_state_dict[new_name] = optim_state_dict.pop(key)
+
     if master_weights is not None:
         for key in list(master_weights.keys()):
             master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
@@ -541,8 +605,8 @@ def unified_optimizer_into_shards(
 
     # filter optimizer param
     if master_weights is not None:
-        filter_master_keys = filter_params(model, master_weights, is_optimizer=True)
-    filter_optim_keys = filter_params(model, optim_state_dict, is_optimizer=True)
+        filter_master_keys = filter_params(model, master_weights, args, is_optimizer=True)
+    filter_optim_keys = filter_params(model, optim_state_dict, args, is_optimizer=True)
 
     tp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
     tp_size = tp_group.nranks
@@ -605,6 +669,14 @@ def unified_optimizer_into_shards(
         use_expert_parallel=args.use_expert_parallel,
     )
     sharded_optim_index = get_sharded_index(index_optimizer_filelist, total_optim_size_list)
+
+    if args.should_save:
+        if args.ckpt_quant_stage in ["O1", "O2"] and "quant_reach_limit" not in infohub:
+            sharded_optim_index["ckpt_quant_stage"] = args.ckpt_quant_stage
+        sharded_optim_index["quant_ckpt_resume_times"] = (
+            infohub["quant_ckpt_resume_times"] if "quant_ckpt_resume_times" in infohub else 0
+        )
+
     if master_weights is not None:
         index_master_weight_filelist, total_master_weight_size_list = gather_sharded_object(
             index_master_weight_file,

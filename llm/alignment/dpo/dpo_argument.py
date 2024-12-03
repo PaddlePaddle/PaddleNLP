@@ -18,16 +18,7 @@ from typing import Optional
 
 from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import IntervalStrategy
-
-
-def add_start_docstrings(*docstr):
-    """Adds docstrings for a function."""
-
-    def docstring_decorator(fn):
-        fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
-        return fn
-
-    return docstring_decorator
+from paddlenlp.trainer.utils.doc import add_start_docstrings
 
 
 @dataclass

@@ -292,7 +292,10 @@ class Qwen2MoeInferenceModel(Qwen2MoePretrainedModel):
         self.embed_tokens.weight.set_value(embed_tokens_weight)
         self.norm.weight.set_value(norm_weight)
 
+        if self.use_weight_only:
+            logger.info("weight only is enabled")
         for idx in range(self.num_layers):
+            logger.info(f"set state for layer {idx}")
             unfused_state_dict = {}
             ln_scale = paddle.to_tensor(state_dict["qwen2_moe.layers.{}.input_layernorm.weight".format(idx)]).cast(
                 self.transformer_block.ln_scales[idx].dtype
@@ -774,13 +777,13 @@ class Qwen2MoeBlockInferenceModel(Qwen2MoeInferenceModel):
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
-    def remove_padding(self, input_ids, seq_lens_this_time):
+    def remove_padding(self, input_ids, seq_lens_this_time, draft_tokens=None, seq_lens_encoder=None):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
         from paddlenlp_ops import get_padding_offset_v2
 
         ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
-            input_ids, cum_offsets_now, token_num, seq_lens_this_time
+            input_ids, cum_offsets_now, token_num, seq_lens_this_time, draft_tokens, seq_lens_encoder
         )
         return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
 

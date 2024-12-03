@@ -16,6 +16,10 @@ from .dpo_criterion import DPOCriterion
 from .dpo_trainer import DPOTrainer
 from .kto_criterion import KTOCriterion
 from .kto_trainer import KTOTrainer
+from .model_config import *
+from .quant_config import *
+from .sft_config import *
 from .sft_trainer import *
+from .sftdata_config import *
 from .trl_data import *
 from .trl_utils import *

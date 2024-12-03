@@ -20,6 +20,12 @@ mkdir -p /workspace/case_logs
 export log_path=/workspace/case_logs
 export case_list=()
 
+galobal_total_count=0
+galobal_success_count=0
+galobal_exit_250_arr=()
+galobal_runtime_fail_arr=()
+galobal_verification_fail_arr=()
+
 target_lists_for_gpt=(
     "slm/model_zoo/gpt-3"
     "llm/auto_parallel/gpt-3"
@@ -84,58 +90,58 @@ IS_A100=$(is_a100)
 
 ####################################
 get_diff_TO_case(){
-cd ${nlp_dir}
-if [ $IS_A100 -ne 0 ];then
-    for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
-        arr_file_name=(${file_name//// })
-        dir1=${arr_file_name[0]}
-        dir2=${arr_file_name[1]}
-        dir3=${arr_file_name[2]}
-        dir4=${arr_file_name[3]}
-        file_item=$dir1/$dir2/$dir3/$dir4
-        echo "file_name:"${file_name}, "path:"${file_item}
-        if [ ! -f ${file_name} ];then # 针对pr删掉文件
-            continue
-        elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
-            continue
-        else
-            for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
-                if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
-                    case_list[${#case_list[*]}]=gpt-3_auto
-                    case_list[${#case_list[*]}]=gpt-3_dygraph
-                fi
-            done
-            for ((i=0; i<${#target_lists_for_llama[@]}; i++)); do
-                if [[ ${file_item} == *${target_lists_for_llama[i]}* ]];then
-                    case_list[${#case_list[*]}]=llama_auto
-                fi
-            done
-        fi
-    done
-else
-    case_list[${#case_list[*]}]=gpt-3_auto
-    case_list[${#case_list[*]}]=llama_auto
-    for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
-        arr_file_name=(${file_name//// })
-        dir1=${arr_file_name[0]}
-        dir2=${arr_file_name[1]}
-        dir3=${arr_file_name[2]}
-        dir4=${arr_file_name[3]}
-        file_item=$dir1/$dir2/$dir3/$dir4
-        echo "file_name:"${file_name}, "path:"${file_item}
-        if [ ! -f ${file_name} ];then # 针对pr删掉文件
-            continue
-        elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
-            continue
-        else
-            for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
-                if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
-                    case_list[${#case_list[*]}]=gpt-3_dygraph
-                fi
-            done
-        fi
-    done
-fi
+    cd ${nlp_dir}
+    if [ $IS_A100 -ne 0 ];then
+        for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+            arr_file_name=(${file_name//// })
+            dir1=${arr_file_name[0]}
+            dir2=${arr_file_name[1]}
+            dir3=${arr_file_name[2]}
+            dir4=${arr_file_name[3]}
+            file_item=$dir1/$dir2/$dir3/$dir4
+            echo "file_name:"${file_name}, "path:"${file_item}
+            if [ ! -f ${file_name} ];then # 针对pr删掉文件
+                continue
+            elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
+                continue
+            else
+                for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
+                    if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
+                        case_list[${#case_list[*]}]=gpt-3_auto
+                        case_list[${#case_list[*]}]=gpt-3_dygraph
+                    fi
+                done
+                for ((i=0; i<${#target_lists_for_llama[@]}; i++)); do
+                    if [[ ${file_item} == *${target_lists_for_llama[i]}* ]];then
+                        case_list[${#case_list[*]}]=llama_auto
+                    fi
+                done
+            fi
+        done
+    else
+        case_list[${#case_list[*]}]=gpt-3_auto
+        case_list[${#case_list[*]}]=llama_auto
+        for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+            arr_file_name=(${file_name//// })
+            dir1=${arr_file_name[0]}
+            dir2=${arr_file_name[1]}
+            dir3=${arr_file_name[2]}
+            dir4=${arr_file_name[3]}
+            file_item=$dir1/$dir2/$dir3/$dir4
+            echo "file_name:"${file_name}, "path:"${file_item}
+            if [ ! -f ${file_name} ];then # 针对pr删掉文件
+                continue
+            elif [[ ${file_name##*.} == "md" ]] || [[ ${file_name##*.} == "rst" ]] || [[ ${dir1} == "docs" ]];then
+                continue
+            else
+                for ((i=0; i<${#target_lists_for_gpt[@]}; i++)); do
+                    if [[ ! ${dir3} =~ "benchmarks" ]] && [[ ${file_item} == *${target_lists_for_gpt[i]}* ]];then
+                        case_list[${#case_list[*]}]=gpt-3_dygraph
+                    fi
+                done
+            fi
+        done
+    fi
 }
 ####################################
 function contain_case(){
@@ -157,31 +163,36 @@ function execute_func_list(){
     exit_250_count=0
     while IFS= read -r func_name; do
         let total_count++
-        excute_num=1
+        let galobal_total_count++
+        execute_num=1
         while true; do
             bash $1 exec_case $func_name $FLAGS_install_deps $FLAGS_download_data  
             result=$?
             if [ $result -eq 0 ]; then
                 echo -e "\033[32m test success!"
                 let success_count++
+                let galobal_success_count++
             elif [ $result -eq 2 ]; then
                 echo -e "\033[31m verification failed!"
                 let verification_fail_count++
+                galobal_verification_fail_arr+=("$func_name")
             elif [ $result -eq 250 ]; then
-                if [ $excute_num -eq 1 ]; then
+                if [ $execute_num -eq 1 ]; then
                     echo -e "\033[31m fist time execute failed, try again!"
-                    let excute_num++
+                    let execute_num++
                     continue
                 else
                     echo -e "\033[31m second time execute failed, exit!"
                     let exit_250_count++
+                    galobal_exit_250_arr+=("$func_name")
                 fi
             else
                 echo "test failed!"
-                mv ${log_path}/$func_name ${log_path}/$func_name_FAIL.log
+                mv ${log_path}/$func_name ${log_path}/${func_name}_FAIL.log
                 echo -e "\033[31m ${log_path}/$func_name_FAIL \033"
-                tail -15 ${log_path}/$func_name_FAIL.log
-                let runtime_fail_count++  
+                tail -15 ${log_path}/${func_name}_FAIL.log
+                let runtime_fail_count++ 
+                galobal_runtime_fail_arr+=("$func_name") 
             fi
             break
         done
@@ -193,36 +204,7 @@ function execute_func_list(){
     echo -e "\033[31m $(printf '\t')  verification fail tests :  $verification_fail_count \033"
     echo -e "\033[31m $(printf '\t')  exit 250 tests(intermittent issue) :  $exit_250_count \033"
 }
-####################################
-function track_case_status() {  
-    local case_name="$1"  
-    local prefix="$2"  
-    local original_path  
-  
-    original_path=$(pwd)  
-    cd ${log_path} || { echo "Failed to enter log_path: $log_path"; return 1; }  
-  
-    total_count=$(ls -1 "$prefix"* 2>/dev/null | grep -Ev 'result\.log|functions\.txt' | wc -l)
-    run_fail_count=$(ls -1 "$prefix"*_FAIL* 2>/dev/null | wc -l)  
-    loss_fail_count=$(grep 'check failed! ' result.log | awk -v prefix="$prefix" '{if ($2 ~ "^" prefix) print $2}'| wc -l)
-    
-    echo -e "\033[31m ---- $case_name total tests :  $total_count \033"
-    if [ $run_fail_count -eq 0 ] && [ $loss_fail_count  -eq 0 ]; then
-        echo -e "\033[32m ---- all cases Success  \033"
-    else
-        if [[ $run_fail_count -ne 0 ]] ; then
-            echo -e "\033[31m ---- $case_name runtime failed test  :  $run_fail_count \033"
-            ls -1 "$prefix"*_FAIL* 2>/dev/null | awk -v OFS="\t" '{print "\t" $0 "(failed)"}'
-        fi
-        if [[ $loss_fail_count -ne 0 ]] ; then
-            echo -e "\033[31m ---- $case_name verification failed test  :  $loss_fail_count \033"
-            grep 'check failed! ' result.log | awk -v prefix="$prefix" 'BEGIN {OFS="\t"} {if ($2 ~ "^" prefix) print "\t" $2 "(failed)"}'
-        fi
-        return 2
-    fi
-    cd "$original_path" || { echo "Failed to return to original path: $original_path"; return 1; }  
-    return 0
-} 
+
 ####################################
 get_diff_TO_case # 获取待执行case列表
 case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${case_list[*]}))  # 去重并将结果存储回原列表
@@ -270,8 +252,28 @@ if [[ ${#case_list[*]} -ne 0 ]];then
     fi
     echo -e "\033[31m ---- end run case  \033"
 
-    track_case_status  $FUNCNAME ""
-    EXCODE=$?
+    echo -e "\033[31m ---- total tests :  $galobal_total_count \033"
+    if [ ${#galobal_exit_250_arr[@]} -ne 0 ]; then
+        echo -e "\033[32m ---- exit 250 test  :  ${#galobal_exit_250_arr[@]} \033"
+        for case in "${galobal_exit_250_arr[@]}"; do
+            echo -e "\t$case(exit 250)"
+        done
+    fi
+
+    if [ ${#galobal_runtime_fail_arr[@]} -eq 0 ] && [ ${#galobal_verification_fail_arr[@]} -eq 0 ]; then
+        echo -e "\033[32m ---- all cases Success  \033"
+        EXCODE=0
+    else 
+        echo -e "\033[32m ---- runtime failed test  :  ${#galobal_runtime_fail_arr[@]} \033"
+        for case in "${galobal_runtime_fail_arr[@]}"; do
+            echo -e "\t$case(failed)"
+        done
+        echo -e "\033[32m ---- verification failed test  :  ${#galobal_verification_fail_arr[@]} \033"
+        for case in "${galobal_verification_fail_arr[@]}"; do
+            echo -e "\t$case(failed)"
+        done
+        EXCODE=1
+    fi
 else
     echo -e "\033[32m Changed Not CI case, Skips \033"
     EXCODE=0

@@ -48,6 +48,10 @@ class AutoTokenizerTest(unittest.TestCase):
             # check against double appending model_name in cache_dir
             self.assertFalse(os.path.exists(os.path.join(tempdir, model_name, model_name)))
 
+    def test_from_pretrained_tokenizer_fast(self):
+        tokenizer = AutoTokenizer.from_pretrained("intfloat/e5-base-v2", use_fast=True)
+        self.assertIsInstance(tokenizer, BertTokenizerFast)
+
     def test_new_tokenizer_registration(self):
         try:
             AutoConfig.register("custom", CustomConfig)

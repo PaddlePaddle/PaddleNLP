@@ -44,6 +44,7 @@ from paddlenlp.transformers import (
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig, llmmetaclass
+from paddlenlp.transformers.refined_recompute import update_refined_recompute
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
@@ -52,12 +53,7 @@ from paddlenlp.utils.tools import get_env_device
 os.environ["USE_CASUAL_MASK"] = "True"
 
 
-def add_start_docstrings(*docstr):
-    def docstring_decorator(fn):
-        fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
-        return fn
-
-    return docstring_decorator
+from paddlenlp.trainer.utils.doc import add_start_docstrings
 
 
 @dataclass
@@ -86,12 +82,8 @@ class PreTrainingArguments(TrainingArguments):
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
     )
     unified_checkpoint: bool = field(
-        default=False,
+        default=True,
         metadata={"help": "Enable fused linear grad add strategy."},
-    )
-    unified_checkpoint_config: Optional[str] = field(
-        default="",
-        metadata={"help": "Configs to unify hybrid parallel checkpoint.\n"},
     )
 
     def __post_init__(self):
@@ -110,6 +102,7 @@ class PreTrainingArguments(TrainingArguments):
             self.report_to = []
             self.save_strategy = IntervalStrategy.NO
             self.evaluation_strategy = IntervalStrategy.NO
+            self.unified_checkpoint = False
 
 
 @dataclass
@@ -413,6 +406,9 @@ def main():
     config = AutoConfig.from_pretrained(model_args.model_name_or_path)
     # set all llm config
     LlmMetaConfig.set_llm_config(config, training_args)
+    config.refined_recompute = update_refined_recompute(
+        training_args.refined_recompute,
+    )
     config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     config.seq_length = data_args.max_seq_length
