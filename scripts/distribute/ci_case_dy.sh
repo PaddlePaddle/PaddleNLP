@@ -69,8 +69,26 @@ function restore_func() {
     done
 }
 
+function executable_fun_list() {
+    fun_list_origin=$1
+    fun_list=()
+    if [ ! -f "$root_path/blacklist.csv" ];then
+        wget -P $root_path/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
+    fi
+    mapfile -t blacklist < $root_path/blacklist.csv
+    for fun in "${fun_list_origin[@]}"; do
+        # 检查函数是否在黑名单中
+        if [[ ! " ${blacklist[@]} " == *" $fun "* ]]; then
+            # 如果不在黑名单中，添加到可执行函数列表
+            fun_list+=("$fun")
+        else
+            echo "$fun is in the blacklist. Not added to executable list."
+        fi
+    done
+}
+
 function gpt_case_list_dygraph() {
-    fun_list=(
+    fun_list_origin=(
         # The test name must have "gpt_" as a prefix, which will 
         # be used for tracking the execution status of the case.
         gpt_preprocess_data
@@ -96,6 +114,7 @@ function gpt_case_list_dygraph() {
         gpt_eval_WikiText
         gpt_eval_LAMBADA
     )
+    executable_fun_list $fun_list_origin
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
@@ -110,11 +129,12 @@ function gpt_case_list_dygraph() {
 }
 
 function llm_gpt_case_list_dygraph() {
-    fun_list=(
+    fun_list_origin=(
         # The test name must have "llm_gpt_" as a prefix, which will 
         # be used for tracking the execution status of the case.
         llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1
     )
+    executable_fun_list $fun_list_origin
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then

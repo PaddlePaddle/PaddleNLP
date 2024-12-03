@@ -80,11 +80,28 @@ function restore_func() {
     done
 }
 
+function executable_fun_list() {
+    fun_list_origin=$1
+    fun_list=()
+    if [ ! -f "$root_path/blacklist.csv" ];then
+        wget -P $root_path/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
+    fi
+    mapfile -t blacklist < $root_path/blacklist.csv
+    for fun in "${fun_list_origin[@]}"; do
+        # 检查函数是否在黑名单中
+        if [[ ! " ${blacklist[@]} " == *" $fun "* ]]; then
+            # 如果不在黑名单中，添加到可执行函数列表
+            fun_list+=("$fun")
+        else
+            echo "$fun is in the blacklist. Not added to executable list."
+        fi
+    done
+}
 
 
 # NOTE: Please place the new tests as much as possible after the existing tests
 function llama_case_list_auto() {
-    fun_list=(
+    fun_list_origin=(
         # The test name must have "llama_" as a prefix, which will 
         # be used for tracking the execution status of the case.
         llama_dygraph_auto_bs8_fp32_DP2
@@ -102,6 +119,7 @@ function llama_case_list_auto() {
         llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
         llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4
     )
+    executable_fun_list $fun_list_origin
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
@@ -117,7 +135,7 @@ function llama_case_list_auto() {
 
 
 function llm_gpt_case_list_auto() {
-    fun_list=(
+    fun_list_origin=(
         # The test name must have "llm_gpt_dygraph_auto_" as a prefix, 
         # which will be used for tracking the execution status of the case.
         llm_gpt_dygraph_auto_bs8_fp32_DP2
@@ -127,6 +145,7 @@ function llm_gpt_case_list_auto() {
         llm_gpt_pir_auto_bs4_TP2
         llm_gpt_pir_auto_bs4_TP2_PP2
     )
+    executable_fun_list $fun_list_origin
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
@@ -141,7 +160,7 @@ function llm_gpt_case_list_auto() {
 }
 
 function llm_qwen_case_list_auto() {
-    fun_list=(
+    fun_list_origin=(
         # The test name must have "llm_qwen_dygraph_auto_" as a prefix, 
         # which will be used for tracking the execution status of the case.
         llm_qwen_dygraph_auto_bs1_fp32_DP2
@@ -149,6 +168,7 @@ function llm_qwen_case_list_auto() {
         llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2-PP2
         llm_qwen_dygraph_auto_bs1_bf16_DP2-MP2-PP2
     )
+    executable_fun_list $fun_list_origin
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then

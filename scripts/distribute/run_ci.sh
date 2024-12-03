@@ -220,6 +220,8 @@ if [[ ${#case_list[*]} -ne 0 ]];then
     install_paddlenlp
     # Install external_ops
     install_external_ops
+    # wget blacklist
+    wget -P $root_path/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
     
     case_num=1
     export FLAGS_install_deps=0
