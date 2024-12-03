@@ -464,9 +464,9 @@ def load_state_dict(
                         for keys in keys_groups
                     }
                     for future in concurrent.futures.as_completed(future_to_key):
-                        state_dict, scale_dict = future.result()
-                        state_dict.update(state_dict)
-                        scale_dict.update(scale_dict)
+                        res_state_dict, res_scale_dict = future.result()
+                        state_dict.update(res_state_dict)
+                        scale_dict.update(res_scale_dict)
 
             if device == "cpu":
                 for k in list(state_dict.keys()):
