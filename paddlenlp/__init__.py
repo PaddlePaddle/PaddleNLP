@@ -48,6 +48,7 @@ from . import (
     experimental,
     layers,
     losses,
+    mergekit,
     metrics,
     ops,
     peft,
