@@ -156,7 +156,7 @@
 ### pip 安装
 
 ```shell
-pip install --upgrade paddlenlp==3.0.0b2
+pip install --upgrade paddlenlp==3.0.0b3
 ```
 
 或者可通过以下命令安装最新 develop 分支代码：
