@@ -995,7 +995,7 @@ class GPTForCausalLMNet(GPTPretrainedModelNet):
     def __init__(self, config: GPTConfig):
         super(GPTForCausalLMNet, self).__init__(config)
         self.gpt = GPTModelNet(config)
-        self.lm_head = GPTLMHeadNet(config, embedding_weights=self.gpt.embeddings.word_embeddings.weight)
+        self.lm_head = GPTLMHeadNet(config, embedding_weights=None)
 
         self.tie_weights()
         self.criterion = GPTPretrainingCriterionNet(config)
@@ -1140,6 +1140,7 @@ class GPTForCausalLMNet(GPTPretrainedModelNet):
                     f"{prefix}gpt.decoder.layers.*.self_attn.out_proj": dist.RowWiseParallel(),
                     f"{prefix}gpt.decoder.layers.*.linear1": dist.ColWiseParallel(),
                     f"{prefix}gpt.decoder.layers.*.linear2": dist.RowWiseParallel(),
+                    f"{prefix}lm_head.weight": dist.RowWiseParallel(),
                     f"{prefix}lm_head.weight": dist.RowWiseParallel(),
                 }
             },
