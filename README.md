@@ -207,6 +207,22 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py 
 ```
 
 更多大模型全流程步骤，请参考[飞桨大模型套件](./llm)介绍。
+另外我们还提供了快速微调方式, 无需 clone 源代码：
+
+```python
+from paddlenlp.trl import SFTConfig, SFTTrainer
+from datasets import load_dataset
+
+dataset = load_dataset("ZHUI/alpaca_demo", split="train")
+
+training_args = SFTConfig(output_dir="Qwen/Qwen2.5-0.5B-SFT", device="gpu")
+trainer = SFTTrainer(
+    args=training_args,
+    model="Qwen/Qwen2.5-0.5B",
+    train_dataset=dataset,
+)
+trainer.train()
+```
 
 更多 PaddleNLP 内容可参考：
 

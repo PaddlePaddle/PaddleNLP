@@ -112,6 +112,7 @@ from ..utils.env import (
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
+from ..utils.tools import get_env_device
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import RuntimeTimer, get_timers, set_timers
@@ -1773,10 +1774,6 @@ class Trainer:
         return self.optimizer
 
     def _apply_to_optimizer(self, action):
-        if "gpu" not in paddle.device.get_device():
-            logger.warning("offload/reload optimizer's states is only supported on GPU devices.")
-            return
-
         attributes = [
             ("_accumulators", "_moment1_acc_str"),
             ("_accumulators", "_moment2_acc_str"),
@@ -1791,13 +1788,22 @@ class Trainer:
                     target_attr = target_attr[getattr(self.optimizer, attr[1])]
 
                 for key, value in target_attr.items():
-                    target_attr[key] = getattr(value, action)()
+                    if get_env_device() == "gpu":
+                        target_attr[key] = getattr(value, action)()
+                    else:
+                        target_attr[key] = getattr(value, "to")(action)
 
     def _offload_optimizer(self):
-        self._apply_to_optimizer("pin_memory")
+        if get_env_device() == "gpu":
+            self._apply_to_optimizer("pin_memory")
+        else:
+            self._apply_to_optimizer("cpu")
 
     def _reload_optimizer(self):
-        self._apply_to_optimizer("cuda")
+        if get_env_device() == "gpu":
+            self._apply_to_optimizer("cuda")
+        else:
+            self._apply_to_optimizer(get_env_device())
 
     def _load_rng_state(self, checkpoint):
         # Load RNG states from `checkpoint`
@@ -3197,7 +3203,9 @@ class Trainer:
 
         # Metrics!
         if self.compute_metrics is not None and all_preds is not None and all_labels is not None:
-            metrics = self.compute_metrics(EvalPrediction(predictions=all_preds, label_ids=all_labels))
+            # all_labels maybe is a tuple when prediction_steps output label_mask
+            batch_labels = all_labels[0] if isinstance(all_labels, (list, tuple)) else all_labels
+            metrics = self.compute_metrics(EvalPrediction(predictions=all_preds, label_ids=batch_labels))
         else:
             metrics = {}
 

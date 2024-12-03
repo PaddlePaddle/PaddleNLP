@@ -269,7 +269,7 @@ class CheckpointConverter:
 
             malloc_size = 0
             for opt_state_name, opt_state_value in optimizer_state_dict.items():
-                malloc_size += opt_state_value.numel() * opt_state_value.element_size()
+                malloc_size += opt_state_value.numel().numpy() * opt_state_value.element_size()
             malloc_size = malloc_size / 2**20
             logger.debug(f"{malloc_size} MB of GPU memory were allocated.")
 
@@ -529,6 +529,7 @@ class CheckpointConverter:
             rank_access_files[self.cur_rank] = self.cur_rank_optimizer_state_file_names
 
         global_rank_access_files = self.gather_global_object(rank_access_files)
+        logger.info(f"The file(s) to be loaded for the global rank are: {global_rank_access_files}")
         need_read_files = get_rank_to_read_files(global_rank_access_files, global_rank_access_files)
         logger.info(f"The file(s) to be loaded for the current rank are: {need_read_files}")
         self.cur_rank_loaded_state_dict = {}
@@ -553,8 +554,7 @@ class CheckpointConverter:
         memory_size = 0
         for file, state_dict in self.cur_rank_loaded_state_dict.items():
             for k, v in state_dict.items():
-                memory_size += v.numel() * v.element_size()
-
+                memory_size += v.numel().numpy() * v.element_size()
         memory_size = memory_size / 2**20
         logger.debug(
             f"The current rank has finished loading the checkpoint file and has allocated {memory_size} MB of GPU memory."

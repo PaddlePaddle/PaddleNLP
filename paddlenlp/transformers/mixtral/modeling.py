@@ -299,7 +299,7 @@ def scaled_dot_product_attention(
 
 def masked_fill(x, mask, value):
     y = paddle.full(x.shape, value, x.dtype)
-    return paddle.where(mask, y, x)
+    return paddle.where(mask.to("bool"), y, x)
 
 
 def is_casual_mask(attention_mask):
@@ -519,7 +519,7 @@ class MixtralSparseMoeBlock(nn.Layer):
         # this will be used to easily index which expert is going to be sollicitated.
         # shape: [num_experts, top_k, batch_size * seq_len]
         expert_mask = F.one_hot(selected_experts, num_classes=self.num_experts).transpose([2, 1, 0])
-
+        expert_mask = expert_mask.to("bool")
         # Loop over all available experts in the model and perform the computation on each expert.
         for expert_id in range(self.num_experts):
             expert_layer = self.experts[expert_id]
@@ -1098,7 +1098,7 @@ class MixtralModel(MixtralPretrainedModel):
                 past_key_values_length=past_key_values_length,
             )
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
-        expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+        expanded_attn_mask = paddle.where(expanded_attn_mask.to("bool"), 0.0, paddle.finfo(dtype).min).astype(dtype)
         return expanded_attn_mask
 
     @paddle.jit.not_to_static
