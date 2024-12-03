@@ -79,7 +79,18 @@ os.environ["USE_CASUAL_MASK"] = "False"
 flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe, Qwen2ForCausalLM, Qwen2ForCausalLMPipe]
 
 
+def paddlenlp_verison_check():
+    import paddlenlp
+    from paddlenlp.utils.tools import compare_version
+
+    if not compare_version(paddlenlp.__version__, "3.0.0.b2"):
+        raise ValueError(
+            "This scripts require paddlenlp >= 3.0.0b3, please reinstall: pip install paddlenlp >= 3.0.0b3 "
+        )
+
+
 def main():
+    paddlenlp_verison_check()
     parser = PdArgumentParser((GenerateArgument, ModelConfig, ReftArgument, DataConfig, SFTConfig))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         gen_args, model_args, reft_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()

@@ -20,7 +20,7 @@ PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
 
 # this version is used for develop and test.
 # release version will be added fixed version by setup.py.
-__version__ = "3.0.0b2.post"
+__version__ = "3.0.0b3.post"
 if os.getenv(PADDLENLP_STABLE_VERSION):
     __version__ = __version__.replace(".post", "")
 else:
