@@ -1528,11 +1528,8 @@ function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2(){
         --input_dir "./data" \
         --output_dir $case_out_dir \
         --split 949,50,1 \
-        --max_seq_length 2048 \
-        --hidden_size 1024 \
-        --intermediate_size 3072 \
+        --max_seq_length 4096 \
         --num_hidden_layers 8 \
-        --num_attention_heads 32 \
         --per_device_train_batch_size 1 \
         --per_device_eval_batch_size 4 \
         --gradient_accumulation_steps 4 \
