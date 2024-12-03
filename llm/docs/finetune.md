@@ -36,7 +36,7 @@
 ### 3.1 环境准备
 
 - PaddlePaddle 3.0-beta
-- PaddleNLP   3.0.0b2
+- PaddleNLP   3.0.0b3
 - PaddleSlim develop
 
 git clone 代码到本地，即可开始。

@@ -1,0 +1,1 @@
+../../../../llm/docs/predict/speculative_decoding.md
