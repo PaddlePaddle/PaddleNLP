@@ -262,6 +262,7 @@ class TrainingArguments:
               enable_overlap_p2p_comm, overlap p2p communication with computation.
               enable_clear_every_step_cache, clear every step cache for pipeline parallel.
               disable_non_batch_p2p_comm, disable batched send/recv in pipeline parallel mode.
+              enable_balanced_memory_fthenb, using balanced memory fthenb.
         sharding_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
@@ -657,6 +658,7 @@ class TrainingArguments:
                 "enable_clear_every_step_cache, clear every step cache for pipeline parallel. \n"
                 "disable_batch_p2p_comm, disable batched send/recv in pipeline parallel mode. \n"
                 "enable_split_backward, only can be used in StaticGraph-AutoParallel! split the `backward` program into `backward_b` and `backward_w` to decrease the bubble in VPP pipeline mode when `acc_step == pp_degree`. it increase the memory! \n"
+                "enable_balanced_memory_fthenb, using balanced memory fthenb. \n"
             )
         },
     )
@@ -1090,6 +1092,7 @@ class TrainingArguments:
                                 "enable_overlap_p2p_comm",
                                 "disable_batch_p2p_comm",
                                 "best_unbalanced_scheduler",
+                                "enable_memory_efficient_fthenb",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -1099,6 +1102,7 @@ class TrainingArguments:
                         "accumulate_steps": self.gradient_accumulation_steps,
                         "micro_batch_size": self.per_device_train_batch_size,
                         "enable_partial_send_recv": "disable_partial_send_recv" not in pipeline_parallel_config,
+                        "enable_balanced_memory_fthenb": "enable_balanced_memory_fthenb" in pipeline_parallel_config,
                         "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
                         # "delay_scale_loss": True, Fix ME
                     }
