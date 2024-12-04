@@ -1530,9 +1530,9 @@ function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2(){
         --split 949,50,1 \
         --to_static true \
         --pipeline_parallel_degree 2 \
-        --tensor_parallel_degree 4 \
+        --tensor_parallel_degree 2 \
         --virtual_pp_degree 2\
-        --pipeline_schedule_mode "VPP" \
+        --pipeline_schedule_mode "1F1B" \
         --weight_decay 0.01 \
         --warmup_ratio 0.01 \
         --max_grad_norm 0.0 \
@@ -1575,7 +1575,7 @@ function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2(){
         --tensor_parallel_config "enable_mp_async_allreduce" \
         --pipeline_parallel_config "enable_send_recv_overlap" \
         --auto_parallel_resume_form_hybrid_parallel true \
-        --num_hidden_layers 4 \
+        --num_hidden_layers 2 \
         >>${log_path}/$FUNCNAME 2>&1
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -1923,8 +1923,7 @@ function llm_gpt_pir_auto_bs4_TP2(){
         --to_static 1 \
         --fp16 0 \
         --fp16_opt_level "O2" \
-        --num_hidden_layers 4 \
-        --intermediate_size 1024 \
+        --num_hidden_layers 2 \
         >>${log_path}/$FUNCNAME 2>&1
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -1984,8 +1983,7 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
         --to_static 1 \
         --bf16 1 \
         --fp16_opt_level "O2" \
-        --num_hidden_layers 4 \
-        --intermediate_size 1024 \
+        --num_hidden_layers 2 \
         >>${log_path}/$FUNCNAME 2>&1
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -2046,8 +2044,7 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2(){
         --to_static 1 \
         --bf16 1 \
         --fp16_opt_level "O2" \
-        --num_hidden_layers 4 \
-        --intermediate_size 1024 \
+        --num_hidden_layers 2 \
         --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
         --tensor_parallel_config "enable_mp_async_allreduce" \
         --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
