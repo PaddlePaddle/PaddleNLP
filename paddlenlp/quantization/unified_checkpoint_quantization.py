@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 import paddle
 from paddle.distributed import fleet
 
@@ -33,7 +34,7 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 
 
-def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
+def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict, use_pd=False):
     """
     dequantize unified optimizer state dict.
     Args:
@@ -44,6 +45,7 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
         scale_dict (`int`):
             compression checkpoint scale dict.
     """
+    logger.info(f"Start unified checkpoint dequantization, stage {ckpt_quant_stage}.")
     tp_rank, tp_degree = -1, 1
     if paddle.distributed.get_world_size() > 1:
         hcg = fleet.get_hybrid_communicate_group()
@@ -68,7 +70,7 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
                     dequant=True,
                     tp_rank=tp_rank,
                     tp_degree=tp_degree,
-                    use_pd=True,
+                    use_pd=use_pd,
                 )
                 state_dict[quant_key] = weight
             elif is_moment2:
@@ -85,10 +87,13 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
                     dequant=True,
                     tp_rank=tp_rank,
                     tp_degree=tp_degree,
-                    use_pd=True,
+                    use_pd=use_pd,
                 )
                 # cal m2
-                weight = paddle.square(1.0 / weight - eps)
+                if use_pd:
+                    weight = paddle.square(1.0 / weight - eps)
+                else:
+                    weight = np.square(1.0 / weight - eps)
                 state_dict[quant_key] = weight
     elif ckpt_quant_stage == "O2":
         # set eps
@@ -117,7 +122,7 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
                 quant=False,
                 tp_rank=tp_rank,
                 tp_degree=tp_degree,
-                use_pd=True,
+                use_pd=use_pd,
                 symmetry=True,
             )
             ratio_weight = group_wise_quant_dequant(
@@ -128,13 +133,18 @@ def dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict):
                 quant=False,
                 tp_rank=tp_rank,
                 tp_degree=tp_degree,
-                use_pd=True,
+                use_pd=use_pd,
             )
 
-            ratio_weight = paddle.square(1.0 / ratio_weight - eps)
+            if use_pd:
+                ratio_weight = paddle.square(1.0 / ratio_weight - eps)
+            else:
+                ratio_weight = np.square(1.0 / ratio_weight - eps)
             state_dict[quant_key] = ratio_weight
             m1_state_dict[quant_key[: -len(MOMENT2_KEYNAME)] + MOMENT1_KEYNAME] = m1_weight
             state_dict.update(m1_state_dict)
+
+    logger.info(f"Unified checkpoint dequantization done, stage {ckpt_quant_stage}.")
 
     return state_dict
 
@@ -152,14 +162,15 @@ def quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage, async
         async_save (`bool`):
             whether use async_save.
     """
+    logger.info(f"Start unified checkpoint quantization, stage {ckpt_quant_stage}.")
+
     quant = False
     if ckpt_quant_stage != "O0":
         quant = True
     del_key = []
     if quant and state_dict_type == "optimizer_weight":
         scales_dict = {}
-        opt_keys = state_dict.keys()
-        for k in opt_keys:
+        for k in state_dict.keys():
             momentum1 = k.endswith(MOMENT1_KEYNAME)
             momentum2 = k.endswith(MOMENT2_KEYNAME)
 
@@ -205,5 +216,6 @@ def quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage, async
             state_dict.pop(k, None)
 
         state_dict.update(scales_dict)
+    logger.info(f"Unified checkpoint quantization done, stage {ckpt_quant_stage}.")
 
     return state_dict

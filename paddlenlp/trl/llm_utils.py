@@ -267,29 +267,6 @@ def get_infer_model_path(input_dir, model_prefix):
         return os.path.join(input_dir, model_prefix)
 
 
-def generate_rank_mapping(output_filename):
-    ring_id = -1
-    try:
-        hcg = fleet.get_hybrid_communicate_group()
-        model_parallel_group = hcg.get_model_parallel_group()
-        ring_id = model_parallel_group.id
-    except Exception:
-        pass
-
-    if ring_id == -1:
-        return
-
-    world_size = dist.get_world_size()
-    with open(output_filename, "w") as f:
-        f.write("[ring_id -> ranks]\n")
-        f.write(",".join(map(str, [0] + list(range(world_size)))) + "\n")
-        f.write(",".join(map(str, [ring_id] + list(range(world_size)))) + "\n")
-
-        f.write("[rank -> ring_ids]\n")
-        for i in range(world_size):
-            f.write("{},0,{}\n".format(i, ring_id))
-
-
 def deserialize_from_file(fp):
     x_type = fp.read(1)
     x_type_out = struct.unpack("c", x_type)[0]

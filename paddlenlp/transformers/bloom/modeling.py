@@ -855,7 +855,7 @@ class BloomModel(BloomPreTrainedModel):
         # Attention score will be cast to float32 in the following calculation, therefore we set attention_mask dtype as float32
         zero = paddle.zeros(expanded_attn_mask.shape, dtype=paddle.float32)
         neg_inf = paddle.full(expanded_attn_mask.shape, paddle.finfo(paddle.float32).min, dtype=paddle.float32)
-        expanded_attn_mask = paddle.where(expanded_attn_mask, zero, neg_inf)
+        expanded_attn_mask = paddle.where(expanded_attn_mask.to("bool"), zero, neg_inf)
         batch_size, num_heads, sq_len, kv_len = expanded_attn_mask.shape
         return expanded_attn_mask.reshape([batch_size * num_heads, sq_len, kv_len])
 

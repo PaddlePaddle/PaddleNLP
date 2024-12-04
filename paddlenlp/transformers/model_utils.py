@@ -435,6 +435,9 @@ def load_state_dict(
             raise ValueError("Currently unsupport paddle weights file, use numpy instead.")
         if metadata.get("format", "np") == "np":
             thread_num = int(os.environ.get("LOAD_STATE_DICT_THREAD_NUM", "1"))
+            if thread_num > 1:
+                logger.info(f"Set loading state_dict thread num to {thread_num}")
+            state_dict, scale_dict = {}, {}
             if thread_num <= 1:
                 with safe_open(checkpoint_file, framework="np") as f:
                     state_dict, scale_dict = _load_part_state_dict(
@@ -461,9 +464,9 @@ def load_state_dict(
                         for keys in keys_groups
                     }
                     for future in concurrent.futures.as_completed(future_to_key):
-                        state_dict, scale_dict = future.result()
-                        state_dict.update(state_dict)
-                        scale_dict.update(scale_dict)
+                        res_state_dict, res_scale_dict = future.result()
+                        state_dict.update(res_state_dict)
+                        scale_dict.update(res_scale_dict)
 
             if device == "cpu":
                 for k in list(state_dict.keys()):
@@ -473,7 +476,7 @@ def load_state_dict(
             if len(scale_dict) != 0:
                 if ckpt_quant_stage == "O0":
                     raise ValueError('optimizer weight has quantization scales but `ckpt_quant_stage` is set to "O0"')
-                state_dict = dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict)
+                state_dict = dequant_unified_optimizer(state_dict, ckpt_quant_stage, scale_dict, use_pd=True)
 
             return state_dict
 

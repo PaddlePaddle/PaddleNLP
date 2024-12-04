@@ -858,7 +858,9 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         )
 
         if predictor_args.mode == "dynamic":
-            return model_class.from_pretrained(predictor_args.model_name_or_path, config=config, dtype=dtype)
+            model = model_class.from_pretrained(predictor_args.model_name_or_path, config=config, dtype=dtype)
+            model.eval()
+            return model
 
         return model_class
 

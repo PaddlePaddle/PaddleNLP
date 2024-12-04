@@ -152,7 +152,7 @@ class GPTJAttention(Layer):
         # Need to be a tensor, otherwise we get error: `RuntimeError: expected scalar type float but found double`.
         # Need to be on the same device, otherwise `RuntimeError: ..., x and y to be on the same device`
         mask_value = paddle.to_tensor(mask_value, dtype=attn_weights.dtype, place=attn_weights.place)
-        attn_weights = paddle.where(causal_mask, attn_weights, mask_value)
+        attn_weights = paddle.where(causal_mask.to("bool"), attn_weights, mask_value)
 
         attn_weights = attn_weights / self.scale_attn
 

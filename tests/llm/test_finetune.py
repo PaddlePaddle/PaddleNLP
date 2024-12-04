@@ -13,11 +13,14 @@
 # limitations under the License.
 from __future__ import annotations
 
+import json
+import os
 import sys
 import unittest
 
 from parameterized import parameterized_class
 
+from paddlenlp.utils.env import SAFE_OPTIMIZER_INDEX_NAME
 from tests.parallel_launch import TestMultipleGpus
 from tests.testing_utils import argv_context_guard, load_test_config
 
@@ -92,7 +95,15 @@ class CkptQuantTest(LLMTest, TestMultipleGpus):
         finetune_config["output_dir"] = self.output_dir
 
         self.runfirst(finetune_config)
+
+        # get `quant_ckpt_resume_times`
+        with open(os.path.join(self.output_dir, "checkpoint-1", SAFE_OPTIMIZER_INDEX_NAME), "r") as r:
+            index = json.loads(r.read())
+        quant_ckpt_resume_times = index["quant_ckpt_resume_times"]
+
         self.rerun(finetune_config)
+
+        self.assertEqual(quant_ckpt_resume_times, 0)
 
     def runfirst(self, train_args):
         self.run_n1c2(self.run_sft, **train_args)
