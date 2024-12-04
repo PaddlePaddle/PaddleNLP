@@ -13,6 +13,8 @@
 # limitations under the License.
 import numpy as np
 
+from .merge_sparsify import SparsificationMethod
+
 
 class MergeTies:
     def __init__(self, merge_config):
@@ -25,11 +27,13 @@ class MergeTies:
         # Pruning
         assert v0.shape == v1.shape
         drop_rate = self.merge_config.drop_rate
-        if sparsify_method is None:
+        if self.merge_config.sparsify_type is not None:
+            sparsify = SparsificationMethod(self.merge_config)
+            v0 = sparsify.sparsify_method(v0)
+            v1 = sparsify.sparsify_method(v1)
+        else:
             v0 = self.pruning(v0, drop_rate)
             v1 = self.pruning(v1, drop_rate)
-        else:
-            v0, v1, mask0, mask1 = sparsify_method(v0, v1, self.merge_config.drop_rate, self.merge_config.della_rate)
         # np.sign （+1, -1 或 0）
         sign_diff = np.sign(v0) != np.sign(v1)
 

@@ -32,7 +32,8 @@ def parse_arguments():
         choices=["gpu", "npu", "cpu"],
         help="Device for selecting for merging lora weights, currently only supports gpu/npu/cpu.",
     )
-    parser.add_argument("--merge_type", default="linear", type=str, help="The type of merge strategy.")
+    parser.add_argument("--merge_type", default="slerp", type=str, help="The type of merge strategy.")
+    parser.add_argument("--sparsify_type", default=None, type=str, help="The type of sparsify strategy.")
     parser.add_argument(
         "--dot_threshold",
         default=0.99,
@@ -68,6 +69,7 @@ def merge_model():
     model_path1 = args.model_name_or_path1
     base_path = args.model_name_or_path_base
     output_path = args.output_path
+
     mergekit.merge_model(model_path0, model_path1, output_path, base_path)
     merge_config.save_pretrained(output_path)
 

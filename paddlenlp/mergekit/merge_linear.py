@@ -12,25 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # import numpy as np
+from .merge_sparsify import SparsificationMethod
 
 
 class MergeLinear:
     def __init__(self, merge_config):
         self.merge_config = merge_config
 
-    def merge_op(self, v_0, v_1, sparsify_method=None):
+    def merge_op(self, v_0, v_1):
         """
         Linear interpolation between two values.
         """
-        if sparsify_method is not None:
-            v_0, v_1, mask_0, mask_1 = sparsify_method(
-                v_0, v_1, self.merge_config.drop_rate, della_rate=self.merge_config.della_rate
-            )
-            v_merge = (
-                1 - self.merge_config.linear_ratio
-            ) * v_0 * mask_0 + self.merge_config.linear_ratio * v_1 * mask_1
+        if self.merge_config.sparsify_type is not None:
+            sparsify = SparsificationMethod(self.merge_config)
+            v_0 = sparsify.sparsify_method(v_0)
+            v_1 = sparsify.sparsify_method(v_1)
+            v_merge = (1 - self.merge_config.linear_ratio) * v_0 + self.merge_config.linear_ratio * v_1
 
-        v_merge = (1 - self.merge_config.linear_ratio) * v_0 + self.merge_config.linear_ratio * v_1
+        else:
+            v_merge = (1 - self.merge_config.linear_ratio) * v_0 + self.merge_config.linear_ratio * v_1
+
         return v_merge
 
     def merge_dict(self, dict1, dict2):

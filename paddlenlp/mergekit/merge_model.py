@@ -30,7 +30,6 @@ from paddlenlp.utils.safetensors import fast_safe_open
 
 from .merge_linear import MergeLinear
 from .merge_slerp import MergeSlerp
-from .merge_sparsify import SparsificationMethod
 from .merge_ties import MergeTies
 from .merge_utils import divide_positions
 
@@ -48,25 +47,10 @@ class MergeModel:
         self.merge_config = merge_config
         if self.merge_config.merge_type == "linear":
             self.merge_method = MergeLinear(self.merge_config)
-            self.sparsification_method = None
         elif self.merge_config.merge_type == "slerp":
             self.merge_method = MergeSlerp(self.merge_config)
-            self.sparsification_method = None
         elif self.merge_config.merge_type == "ties":
             self.merge_method = MergeTies(self.merge_config)
-            self.sparsification_method = None
-        elif self.merge_config.merge_type == "dare":
-            self.merge_method = MergeLinear(self.merge_config)
-            self.sparsification_method = SparsificationMethod(self.merge_config).sparsify_dare
-        elif self.merge_config.merge_type == "della":
-            self.merge_method = MergeTies(self.merge_config)
-            self.sparsification_method = SparsificationMethod(self.merge_config).sparsify_della
-        elif self.merge_config.merge_type == "dare_ties":
-            self.merge_method = MergeTies(self.merge_config)
-            self.sparsification_method = SparsificationMethod(self.merge_config).sparsify_dare
-        elif self.merge_config.merge_type == "della_linear":
-            self.merge_method = MergeLinear(self.merge_config)
-            self.sparsification_method = SparsificationMethod(self.merge_config).sparsify_della
         else:
             raise ValueError("Merge type must be one of linear, slerp, della, dare, della_linear, dare_ties.")
 
@@ -155,7 +139,7 @@ class MergeModel:
                 v0 = w.get_tensor(k)
             with fast_safe_open(os.path.join(model_path1, weight_map1[k]), framework="np") as w:
                 v1 = w.get_tensor(k)
-            if self.merge_config.merge_type in {"ties", "dare", "della", "dare_ties", "della_linear"}:
+            if self.merge_config.merge_type in {"ties", "dare", "della"}:
                 with fast_safe_open(os.path.join(model_path_base, weight_map_base[k]), framework="np") as w:
                     vb = w.get_tensor(k)
                 if vb.dtype == np.uint16:
@@ -164,12 +148,10 @@ class MergeModel:
                 v0 = paddle.to_tensor(v0, dtype="bfloat16").astype("float32").numpy()
             if v1.dtype == np.uint16:
                 v1 = paddle.to_tensor(v1, dtype="bfloat16").astype("float32").numpy()
-            if self.merge_config.merge_type in {"ties", "dare", "della", "dare_ties", "della_linear"}:
-                merge_state_dict[k] = (
-                    self.merge_method.merge_op(v0 - vb, v1 - vb, sparsify_method=self.sparsification_method) + vb
-                )
+            if self.merge_config.merge_type in {"ties", "dare", "della"}:
+                merge_state_dict[k] = self.merge_method.merge_op(v0 - vb, v1 - vb) + vb
             else:
-                merge_state_dict[k] = self.merge_method.merge_op(v0, v1, sparsify_method=self.sparsification_method)
+                merge_state_dict[k] = self.merge_method.merge_op(v0, v1)
             # dtype==bfloat16: numpy(float32) -> paddle(float32) -> paddle(bfloat16) -> numpy(uint16)
             if self.merge_config.dtype == "bfloat16":
                 merge_state_dict[k] = paddle.to_tensor(merge_state_dict[k], dtype="float32").astype("bfloat16").numpy()

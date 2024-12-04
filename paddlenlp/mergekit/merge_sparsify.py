@@ -18,11 +18,15 @@ class SparsificationMethod:
     def __init__(self, merge_config):
         self.merge_config = merge_config
 
-    def sparsify_dare(self, v0, v1, drop_rate, della_rate):
-        v0, mask0 = self.apply_bernoulli_mask(v0, drop_rate)
-        v1, mask1 = self.apply_bernoulli_mask(v1, drop_rate)
+    def sparsify_method(self, v0):
+        if self.merge_config.sparsify_type == "dare":
+            return self.sparsify_dare(v0, self.merge_config.drop_rate, self.merge_config.della_rate)
+        elif self.merge_config.sparsify_type == "della":
+            return self.sparsify_della(v0, self.merge_config.drop_rate, self.merge_config.della_rate)
 
-        return v0, v1, mask0, mask1
+    def sparsify_dare(self, v0, drop_rate, della_rate):
+        v0 = self.apply_bernoulli_mask(v0, drop_rate)
+        return v0
 
     def apply_bernoulli_mask(self, delta_t, p):
         # m^t
@@ -31,13 +35,11 @@ class SparsificationMethod:
         delta_t_tilde = (1 - m_t) * delta_t
         # δ̃^t / (1 - p)
         delta_t_hat = delta_t_tilde / (1 - p)
-        return delta_t_hat, 1 - m_t
+        return delta_t_hat
 
-    def sparsify_della(self, v0, v1, drop_rate, della_rate):
-        v0, mask0 = self.magprune(v0, drop_rate, della_rate)
-        v1, mask1 = self.magprune(v1, drop_rate, della_rate)
-
-        return v0, v1, mask0, mask1
+    def sparsify_della(self, v0, drop_rate, della_rate):
+        v0 = self.magprune(v0, drop_rate, della_rate)
+        return v0
 
     def magprune(self, delta, p, epsilon):
         if np.all(delta == 0):
@@ -64,4 +66,4 @@ class SparsificationMethod:
         retained_mask = m_i == 0  # mask for retained parameters
         adjusted_delta = delta * retained_mask
         adjusted_delta = adjusted_delta / (1 - p_i)
-        return adjusted_delta, retained_mask
+        return adjusted_delta

@@ -14,6 +14,7 @@
 import numpy as np
 
 from .merge_linear import MergeLinear
+from .merge_sparsify import SparsificationMethod
 
 
 class MergeSlerp:
@@ -26,6 +27,10 @@ class MergeSlerp:
         """
         if dot_threshold is None:
             dot_threshold = self.merge_config.dot_threshold
+        if self.merge_config.sparsify_type is not None:
+            sparsify = SparsificationMethod(self.merge_config)
+            v0 = sparsify.sparsify_method(v0)
+            v1 = sparsify.sparsify_method(v1)
         # Copy the vectors to reuse them later
         v0_copy = np.copy(v0)
         v1_copy = np.copy(v1)
