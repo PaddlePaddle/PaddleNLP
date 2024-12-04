@@ -31,7 +31,6 @@ from paddle.distributed.fleet.recompute import recompute as original_recompute
 
 from paddlenlp.transformers.refined_recompute import no_recompute as rr_no_recompute
 from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
-from paddlenlp.utils.import_utils import is_paddle_cuda_available
 
 ACT2FN = {
     "relu": F.relu,
@@ -122,10 +121,6 @@ class BertEmbeddings(nn.Layer):
         self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.register_buffer(
-            "position_ids", paddle.arange(config.max_position_embeddings, dtype="int64").reshape((1, -1))
-        )
-
     def forward(
         self,
         input_ids: Optional[paddle.Tensor] = None,
@@ -133,18 +128,13 @@ class BertEmbeddings(nn.Layer):
         position_ids: Optional[paddle.Tensor] = None,
     ) -> paddle.Tensor:
         input_shape = input_ids.shape
-        seq_length = input_ids.shape[1]
-
-        if position_ids is None:
-            position_ids = self.position_ids[:, :seq_length]
 
         if token_type_ids is None:
             token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64)
 
         inputs_embeds = self.word_embeddings(input_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
-        position_embeddings = self.position_embeddings(position_ids)
-        embeddings = inputs_embeds + token_type_embeddings + position_embeddings
+        embeddings = inputs_embeds + token_type_embeddings
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -431,7 +421,6 @@ class BertRefinedRecomputeTest(unittest.TestCase):
         num_hidden_layers=4,
         shape=[2, 64],
     ):
-        paddle.set_default_dtype(dtype)
         paddle.seed(42)
         config = BertConfig(
             num_hidden_layers=num_hidden_layers,
@@ -440,6 +429,7 @@ class BertRefinedRecomputeTest(unittest.TestCase):
             recompute_use_reentrant=recompute_use_reentrant,
         )
         model = BertModel(config)
+        model.to(dtype=dtype)
         model.train()
         input_ids = paddle.randint(10, config.vocab_size, shape=shape)
         gpu_mem_used_before = paddle.device.cuda.memory_allocated()
@@ -455,10 +445,8 @@ class BertRefinedRecomputeTest(unittest.TestCase):
             round(paddle.device.cuda.max_memory_allocated() / div, 2),
         )
 
-    @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute only support on gpu")
+    @unittest.skipIf("gpu" not in paddle.get_device(), "refined-recompute only support on gpu")
     def test_refined_recompute(self):
-        raw_dtype = paddle.get_default_dtype()
-
         model1, mem_usage_forward1, max_mem_usage_forward1 = self.no_pp_fwd_bwd(
             recompute=True, use_rr_recompute=False
         )  # with recompute
@@ -490,7 +478,6 @@ class BertRefinedRecomputeTest(unittest.TestCase):
 
         del model1, model2, model3
         paddle.device.cuda.empty_cache()
-        paddle.set_default_dtype(raw_dtype)
 
     def pp_fwd_bwd(
         self,
@@ -500,7 +487,6 @@ class BertRefinedRecomputeTest(unittest.TestCase):
         num_iter=4,
         shape=[2, 64],
     ):
-        paddle.set_default_dtype(dtype)
         paddle.seed(42)
         config = BertConfig(
             num_hidden_layers=1,
@@ -509,9 +495,10 @@ class BertRefinedRecomputeTest(unittest.TestCase):
             recompute_use_reentrant=recompute_use_reentrant,
         )
         layer = BertLayer(config)
+        layer.to(dtype=dtype)
         layer.train()
 
-        x = paddle.randn([*shape, config.hidden_size])
+        x = paddle.randn([*shape, config.hidden_size], dtype="float32").cast(dtype)
         x.stop_gradient = False
         x_copy = x
 
@@ -527,9 +514,8 @@ class BertRefinedRecomputeTest(unittest.TestCase):
 
         return x_copy.grad, layer
 
-    @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute-pp only support on gpu")
+    @unittest.skipIf("gpu" not in paddle.get_device(), "refined-recompute-pp only support on gpu")
     def test_refined_recompute_pp(self):
-        raw_dtype = paddle.get_default_dtype()
         grad1, layer1 = self.pp_fwd_bwd(recompute=True, use_rr_recompute=False)
         grad2, layer2 = self.pp_fwd_bwd(recompute=True, use_rr_recompute=True)
         grad3, layer3 = self.pp_fwd_bwd(recompute=False, use_rr_recompute=False)
@@ -556,4 +542,3 @@ class BertRefinedRecomputeTest(unittest.TestCase):
         del grad1, grad2, grad3
         del layer1, layer2, layer3
         paddle.device.cuda.empty_cache()
-        paddle.set_default_dtype(raw_dtype)
