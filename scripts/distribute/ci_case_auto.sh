@@ -1528,39 +1528,54 @@ function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2(){
         --input_dir "./data" \
         --output_dir $case_out_dir \
         --split 949,50,1 \
-        --max_seq_length 4096 \
-        --num_hidden_layers 8 \
-        --per_device_train_batch_size 1 \
-        --per_device_eval_batch_size 4 \
-        --gradient_accumulation_steps 4 \
-        --use_flash_attention 1 \
-        --use_fused_rms_norm 0 \
-        --fp16 1 \
-        --fp16_opt_level "O2" \
-        --amp_master_grad 1 \
-        --scale_loss 1024 \
+        --to_static true \
         --pipeline_parallel_degree 2 \
-        --tensor_parallel_degree 2 \
-        --learning_rate 0.0001 \
-        --min_learning_rate 0.00001 \
-        --max_steps 10 \
-        --save_steps 5000 \
+        --tensor_parallel_degree 4 \
+        --virtual_pp_degree 2\
+        --pipeline_schedule_mode "VPP" \
         --weight_decay 0.01 \
         --warmup_ratio 0.01 \
+        --max_grad_norm 0.0 \
+        --learning_rate 3e-05 \
+        --min_learning_rate 3e-06 \
+        --max_steps 10000 \
         --logging_steps 1 \
-        --dataloader_num_workers 1 \
-        --sharding "stage1" \
-        --eval_steps 1000000 \
-        --disable_tqdm true \
+        --eval_steps 10000 \
+        --save_steps 1000 \
         --continue_training 0 \
-        --recompute 0 \
-        --do_train \
-        --do_eval \
-        --device "gpu" \
-        --data_impl "mmap" \
+        --do_train true \
+        --do_eval false \
+        --do_predict false \
+        --disable_tqdm true \
+        --save_total_limit 2 \
+        --device gpu \
+        --dataloader_num_workers 4 \
+        --distributed_dataloader 0 \
         --enable_auto_parallel 1 \
-        --to_static 1 \
-        --max_grad_norm 1.0 \
+        --per_device_train_batch_size 1 \
+        --gradient_accumulation_steps 32 \
+        --per_device_eval_batch_size 1 \
+        --recompute false \
+        --recompute_use_reentrant true \
+        --recompute_granularity full \
+        --pp_recompute_interval 0 \
+        --bf16 true \
+        --fp16_opt_level "O2"  \
+        --amp_master_grad true \
+        --fuse_attention_ffn true \
+        --fuse_attention_qkv true \
+        --use_flash_attention true \
+        --use_fused_rope true \
+        --use_fused_rms_norm false \
+        --max_seq_length 4096 \
+        --sequence_parallel false \
+        --sharding "stage1" \
+        --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate " \
+        --sharding_parallel_config "enable_stage1_overlap" \
+        --tensor_parallel_config "enable_mp_async_allreduce" \
+        --pipeline_parallel_config "enable_send_recv_overlap" \
+        --auto_parallel_resume_form_hybrid_parallel true \
+        --num_hidden_layers 4 \
         >>${log_path}/$FUNCNAME 2>&1
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -1769,7 +1784,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.59993172     # note: need to debug
-    loss_base=10.59891224
+    loss_base=10.58103752
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
@@ -1842,7 +1857,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.59941673
+    loss_base=10.58146572
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
@@ -1943,8 +1958,8 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
         --tensor_parallel_degree 2 \
         --pipeline_parallel_degree 2 \
         --sequence_parallel 0 \
-        --fuse_attention_qkv 0 \
-        --use_flash_attention 0 \
+        --fuse_attention_qkv 1 \
+        --use_flash_attention 1 \
         --scale_loss 1024 \
         --learning_rate 0.00001 \
         --min_learning_rate 0.000005 \
@@ -1967,7 +1982,7 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
         --model_type "gpt" \
         --enable_auto_parallel 1 \
         --to_static 1 \
-        --fp16 0 \
+        --bf16 1 \
         --fp16_opt_level "O2" \
         --num_hidden_layers 4 \
         --intermediate_size 1024 \
@@ -2029,7 +2044,7 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2(){
         --model_type "gpt" \
         --enable_auto_parallel 1 \
         --to_static 1 \
-        --fp16 0 \
+        --bf16 1 \
         --fp16_opt_level "O2" \
         --num_hidden_layers 4 \
         --intermediate_size 1024 \
