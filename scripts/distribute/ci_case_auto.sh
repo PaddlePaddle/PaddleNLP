@@ -2445,14 +2445,8 @@ function before_hook_for_llama() {
     fi
 }
 
-function clean_for_case_path() {
-    rm -rf ${gpt_case_path}/data*
-    rm -rf ${gpt_case_path}/output
-    rm -rf ${llama_case_path}/data*
-    rm -rf ${llama_case_path}/*output*
-    rm -rf ${llm_gpt_case_path}/data
-    rm -rf ${llm_gpt_case_path}/output
-}
+
+
 
 export status=$1
 if [[ $status = "prepare_case" ]];then
@@ -2493,5 +2487,3 @@ else
     fi
     $1 exec_case
 fi
-
-clean_for_case_path
