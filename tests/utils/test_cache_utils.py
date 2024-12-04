@@ -1,27 +1,44 @@
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import copy
 import random
 import unittest
 
 import numpy as np
-from parameterized import parameterized
 import paddle
+from parameterized import parameterized
 
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.transformers import (
-        AutoModelForCausalLM,
-        AutoTokenizer,
-        DynamicCache,
-        LlamaConfig,
-        RobertaForCausalLM,
-
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    DynamicCache,
+    LlamaConfig,
+    RobertaForCausalLM,
 )
 from paddlenlp.transformers.cache_utils import StaticCache
 from tests.testing_utils import slow
+
+
 def set_seed(seed):
     """sets random seed"""
     random.seed(seed)
     np.random.seed(seed)
     paddle.seed(seed)
+
+
 class CacheTest(unittest.TestCase):
     def test_dynamic_cache_retrocompatibility(self):
         """Tests that we can convert back and forth between the legacy cache format and DynamicCache"""
@@ -71,7 +88,6 @@ class CacheTest(unittest.TestCase):
                     paddle.allclose(to_legacy[layer_idx][key_value_idx], new_cache[layer_idx][key_value_idx])
                 )
 
-
     def test_static_cache_mha_mqa_gqa(self):
         """
         Tests that static cache works with multi-head attention (MHA), grouped query attention (GQA), and multi-query
@@ -112,7 +128,8 @@ class CacheTest(unittest.TestCase):
         )
         self.assertTrue(cached_keys.shape == [1, 1, 10, 128])
         self.assertTrue(cached_values.shape == [1, 1, 10, 128])
-        
+
+
 class CacheIntegrationTest(unittest.TestCase):
     def test_offloaded_cache_equivalent_to_dynamic_cache(self):
         """Tests that OffloadedCache produces the same result as the default DynamicCache"""

@@ -816,8 +816,8 @@ class StaticCache(Cache):
         value_states = value_states.to(v_out.dtype)
 
         if cache_position is None:
-            k_out.copy_(key_states,False)
-            v_out.copy_(value_states,False)
+            k_out.copy_(key_states, False)
+            v_out.copy_(value_states, False)
         else:
             k_out[:, :, cache_position] = key_states
             v_out[:, :, cache_position] = value_states
@@ -1518,13 +1518,13 @@ class OffloadedStaticCache(StaticCache):
 
         cache_position = cache_kwargs.get("cache_position") if cache_kwargs is not None else None
         if cache_position is None:
-            k_out.copy_(key_states,False)
-            v_out.copy_(value_states,False)
+            k_out.copy_(key_states, False)
+            v_out.copy_(value_states, False)
 
             # Copy the values to the offloaded device as well.
             if layer_idx == 0:
-                self.key_cache[layer_idx].copy_(key_states.to(self.offload_device),False)
-                self.value_cache[layer_idx].copy_(value_states.to(self.offload_device),False)
+                self.key_cache[layer_idx].copy_(key_states.to(self.offload_device), False)
+                self.value_cache[layer_idx].copy_(value_states.to(self.offload_device), False)
         else:
             # Note: here we use `tensor.index_copy_(dim, index, tensor)` that is equivalent to
             # `tensor[:, :, index] = tensor`, but the first one is compile-friendly and it does
@@ -1623,5 +1623,5 @@ class OffloadedStaticCache(StaticCache):
     def _prefetch_layer_in_context(self, layer_idx: int) -> None:
         """Performs the actual copy of the layer to device cache."""
 
-        self._device_key_cache[layer_idx & 1].copy_(self.key_cache[layer_idx],False, non_blocking=True)
-        self._device_value_cache[layer_idx & 1].copy_(self.value_cache[layer_idx],False, non_blocking=True)
+        self._device_key_cache[layer_idx & 1].copy_(self.key_cache[layer_idx], False, non_blocking=True)
+        self._device_value_cache[layer_idx & 1].copy_(self.value_cache[layer_idx], False, non_blocking=True)

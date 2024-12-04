@@ -23,7 +23,14 @@ from huggingface_hub import hf_hub_download
 from paddle.common_ops_import import convert_dtype
 
 from paddlenlp import __version__
-from paddlenlp.transformers.cache_utils import StaticCache, StaticCacheConfig, OffloadedStaticCache, SlidingWindowCache, HybridCache, MambaCache
+from paddlenlp.transformers.cache_utils import (
+    HybridCache,
+    MambaCache,
+    OffloadedStaticCache,
+    SlidingWindowCache,
+    StaticCache,
+    StaticCacheConfig,
+)
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.utils.download import resolve_file_path
 from paddlenlp.utils.log import logger
@@ -45,8 +52,9 @@ NEED_SETUP_CACHE_CLASSES_MAPPING = {
 }
 NEED_SETUP_CACHE_CLASSES_MAPPING = {}
 ALL_CACHE_IMPLEMENTATIONS = (
-        list(NEED_SETUP_CACHE_CLASSES_MAPPING.keys()) + list(NEEDS_CACHE_CONFIG.keys()) + ["offloaded"]
-    )
+    list(NEED_SETUP_CACHE_CLASSES_MAPPING.keys()) + list(NEEDS_CACHE_CONFIG.keys()) + ["offloaded"]
+)
+
 
 def resolve_hf_generation_config_path(repo_id: str, cache_dir: str, subfolder=None) -> str:
     """resolve config file from hf hub
