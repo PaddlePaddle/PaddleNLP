@@ -231,6 +231,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         execute_func_list $cmd llama_auto
         export FLAGS_download_data="llama ""$FLAGS_download_data"
         let case_num++
+        rm -rf $nlp_dir/llm/auto_parallel/llama/*data* && rm -rf $nlp_dir/llm/auto_parallel/llama/*output*
     fi
     if [[ $(contain_case gpt-3_auto ${case_list[@]}; echo $?) -eq 1 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_auto \033"
@@ -240,6 +241,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         export FLAGS_install_deps=1
         export FLAGS_download_data="gpt ""$FLAGS_download_data"
         let case_num++        
+        rm -rf $nlp_dir/llm/auto_parallel/gpt-3/*data* && rm -rf $nlp_dir/llm/auto_parallel/gpt-3/*output*
     fi
     if [[ $(contain_case gpt-3_dygraph ${case_list[@]}; echo $?) -eq 1 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_dygraph \033"
@@ -249,6 +251,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         export FLAGS_install_deps=1
         export FLAGS_download_data="gpt ""$FLAGS_download_data"
         let case_num++
+        rm -rf $nlp_dir/slm/model_zoo/gpt-3/*data* && rm -rf $nlp_dir/slm/model_zoo/gpt-3/*output*
     fi
     echo -e "\033[31m ---- end run case  \033"
 
