@@ -18,17 +18,18 @@ class MergeTies:
     def __init__(self, merge_config):
         self.merge_config = merge_config
 
-    def merge_op(self, v0, v1, k=0.9, sparsify_method=None):
+    def merge_op(self, v0, v1, sparsify_method=None):
         """
         Ties between two task vectors.
         """
         # Pruning
         assert v0.shape == v1.shape
+        drop_rate = self.merge_config.drop_rate
         if sparsify_method is None:
-            v0 = self.pruning(v0, k)
-            v1 = self.pruning(v1, k)
+            v0 = self.pruning(v0, drop_rate)
+            v1 = self.pruning(v1, drop_rate)
         else:
-            v0, v1, mask0, mask1 = sparsify_method(v0, v1, self.merge_config.drop_rate)
+            v0, v1, mask0, mask1 = sparsify_method(v0, v1, self.merge_config.drop_rate, self.merge_config.della_rate)
         # np.sign （+1, -1 或 0）
         sign_diff = np.sign(v0) != np.sign(v1)
 
@@ -72,7 +73,6 @@ class MergeTies:
         flat_v0 = v0.flatten()  # Flatten the input array
         abs_v0 = np.abs(flat_v0)  # Compute the absolute values
         threshold = np.quantile(abs_v0, 1 - k)  # Determine the pruning threshold
-        print("阈值：{}".format(threshold))
         mask = abs_v0 > threshold  # Create a mask for elements above the threshold
         flat_v0 = flat_v0 * mask.astype(flat_v0.dtype)  # Apply the mask
         return flat_v0.reshape(v0.shape)  # Reshape back to the original shape

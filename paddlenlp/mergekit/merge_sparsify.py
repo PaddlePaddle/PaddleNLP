@@ -18,7 +18,7 @@ class SparsificationMethod:
     def __init__(self, merge_config):
         self.merge_config = merge_config
 
-    def sparsify_dare(self, v0, v1, drop_rate):
+    def sparsify_dare(self, v0, v1, drop_rate, della_rate):
         v0, mask0 = self.apply_bernoulli_mask(v0, drop_rate)
         v1, mask1 = self.apply_bernoulli_mask(v1, drop_rate)
 
@@ -33,15 +33,15 @@ class SparsificationMethod:
         delta_t_hat = delta_t_tilde / (1 - p)
         return delta_t_hat, 1 - m_t
 
-    def sparsify_della(self, v0, v1, drop_rate):
-        v0, mask0 = self.magprune(v0, drop_rate)
-        v1, mask1 = self.magprune(v1, drop_rate)
+    def sparsify_della(self, v0, v1, drop_rate, della_rate):
+        v0, mask0 = self.magprune(v0, drop_rate, della_rate)
+        v1, mask1 = self.magprune(v1, drop_rate, della_rate)
 
         return v0, v1, mask0, mask1
 
     def magprune(self, delta, p, epsilon):
         if np.all(delta == 0):
-            return np.zeros_like(delta)
+            return delta, np.zeros_like(delta)
         # 1: ranking
         # abs
         abs_tensor = np.abs(delta)

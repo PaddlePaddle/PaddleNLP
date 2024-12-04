@@ -54,7 +54,7 @@ class MergeModel:
             self.sparsification_method = None
         elif self.merge_config.merge_type == "ties":
             self.merge_method = MergeTies(self.merge_config)
-            self.sparsification_method = "ties"
+            self.sparsification_method = None
         elif self.merge_config.merge_type == "dare":
             self.merge_method = MergeLinear(self.merge_config)
             self.sparsification_method = SparsificationMethod(self.merge_config).sparsify_dare
@@ -70,23 +70,34 @@ class MergeModel:
         else:
             raise ValueError("Merge type must be one of linear, slerp, della, dare, della_linear, dare_ties.")
 
-    def merge_model(self, model_path0, model_path1, output_path):
+    def merge_model(self, model_path0, model_path1, output_path, base_path=None):
         is_safetensor0 = self.check_model_path(model_path0)
         is_safetensor1 = self.check_model_path(model_path1)
         if is_safetensor0 and is_safetensor1:
-            self.merge_safetensor_model(model_path0, model_path1, output_path)
+            self.merge_safetensor_model(model_path0, model_path1, output_path, base_path)
         else:
             raise NotImplementedError("Not support non safetensors models.")
 
-    def merge_safetensor_model(self, model_path0, model_path1, output_path):
+    def merge_safetensor_model(self, model_path0, model_path1, output_path, base_path=None):
         with open(os.path.join(model_path0, self.safe_index_name()), "r", encoding="utf-8") as f:
             index0 = json.load(f)
         with open(os.path.join(model_path1, self.safe_index_name()), "r", encoding="utf-8") as f:
             index1 = json.load(f)
+        if self.merge_config.merge_type in {"ties", "dare", "della", "dare_ties", "della_linear"}:
+            with open(os.path.join(base_path, self.safe_index_name()), "r", encoding="utf-8") as f:
+                index_base = json.load(f)
+        else:
+            index_base = {}  # 初始化为一个空字典
+            index_base["weight_map"] = 0
         if index0["metadata"]["total_size"] != index1["metadata"]["total_size"]:
             raise ValueError("Weights total_size mismatch. " "Please make sure you load the correct weight file")
         if index0["weight_map"].keys() != index1["weight_map"].keys():
             raise ValueError("Weights weight_map mismatch. Please make sure you load the correct weight file")
+        if self.merge_config.merge_type in {"ties", "dare", "della", "dare_ties", "della_linear"}:
+            if index0["metadata"]["total_size"] != index_base["metadata"]["total_size"]:
+                raise ValueError("Weights total_size mismatch. " "Please make sure you load the correct weight file")
+            if index0["weight_map"].keys() != index_base["weight_map"].keys():
+                raise ValueError("Weights weight_map mismatch")
         key_list = list(index0["weight_map"].keys())
         positions = divide_positions(len(key_list), self.merge_config.n_process)
         index = {}
@@ -102,69 +113,10 @@ class MergeModel:
                     key_list[positions[i] : positions[i + 1]],  # key_list
                     index0["weight_map"],  # weight_map0
                     index1["weight_map"],  # weight_map1
-                    model_path0,  # model_path0
-                    model_path1,  # model_path1
-                    shard_file,
-                    output_path,
-                ),
-            )
-            threads.append(t)
-            for k in key_list[positions[i] : positions[i + 1]]:
-                index["weight_map"][k] = shard_file
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        # save safe index file
-        save_index_file = os.path.join(output_path, self.safe_index_name())
-        if save_index_file and not os.path.exists(output_path):
-            os.makedirs(output_path)
-        with open(save_index_file, "w", encoding="utf-8") as f:
-            content = json.dumps(index, indent=2) + "\n"
-            f.write(content)
-
-    def merge_safetensor_model_with_base(self, model_path0, model_path1, model_path_base, output_path):
-        with open(os.path.join(model_path0, self.safe_index_name()), "r", encoding="utf-8") as f:
-            index0 = json.load(f)
-        with open(os.path.join(model_path1, self.safe_index_name()), "r", encoding="utf-8") as f:
-            index1 = json.load(f)
-        with open(os.path.join(model_path_base, self.safe_index_name()), "r", encoding="utf-8") as f:
-            index_base = json.load(f)
-
-        if (
-            index0["metadata"]["total_size"]
-            != index1["metadata"]["total_size"] | index0["metadata"]["total_size"]
-            != index_base["metadata"]["total_size"] | index1["metadata"]["total_size"]
-            != index_base["metadata"]["total_size"]
-        ):
-            raise ValueError("Weights total_size mismatch. " "Please make sure you load the correct weight file")
-        if (
-            index0["weight_map"].keys()
-            != index1["weight_map"].keys() | index0["weight_map"].keys()
-            != index_base["weight_map"].keys() | index1["weight_map"].keys()
-            != index_base["weight_map"].keys()
-        ):
-            raise ValueError("Weights weight_map mismatch. Please make sure you load the correct weight file")
-        key_list = list(index0["weight_map"].keys())
-        positions = divide_positions(len(key_list), self.merge_config.n_process)
-        index = {}
-        index["metadata"] = index0["metadata"]
-        index["weight_map"] = {}
-        # Multi-process update
-        threads = []
-        for i in range(len(positions) - 1):
-            shard_file = f"{self.merge_config.merge_preifx}-{i+1:05d}-of-{self.merge_config.n_process:05d}.safetensors"
-            t = Process(
-                target=self.shard_merge_with_base,
-                args=(
-                    key_list[positions[i] : positions[i + 1]],  # key_list
-                    index0["weight_map"],  # weight_map0
-                    index1["weight_map"],  # weight_map1
                     index_base["weight_map"],
                     model_path0,  # model_path0
                     model_path1,  # model_path1
-                    model_path_base,
+                    base_path,
                     shard_file,
                     output_path,
                 ),
@@ -185,39 +137,7 @@ class MergeModel:
             content = json.dumps(index, indent=2) + "\n"
             f.write(content)
 
-    def shard_merge(self, key_list, weight_map0, weight_map1, model_path0, model_path1, shard_file, output_path):
-        merge_state_dict = {}
-        for k in key_list:
-            with fast_safe_open(os.path.join(model_path0, weight_map0[k]), framework="np") as w:
-                v0 = w.get_tensor(k)
-                # print("v0:",v0)
-                # print("v0的type",type(v0))
-                # print("v0 shape:", v0.shape)
-                # print("k的值",k)
-            with fast_safe_open(os.path.join(model_path1, weight_map1[k]), framework="np") as w:
-                v1 = w.get_tensor(k)
-            # print("v1:",v1)
-            # dtype==bfloat16: numpy(uint16) -> paddle(bfloat16) -> paddle(float32) -> numpy(float32)
-            if v0.dtype == np.uint16:
-                v0 = paddle.to_tensor(v0, dtype="bfloat16").astype("float32").numpy()
-            if v1.dtype == np.uint16:
-                v1 = paddle.to_tensor(v1, dtype="bfloat16").astype("float32").numpy()
-            print("merge method:", self.merge_method)
-            print("k的值:", k)
-            print("v0", v0)
-            print("v1", v1)
-            merge_state_dict[k] = self.merge_method.merge_op(v0, v1, self.sparsification_method)
-            # dtype==bfloat16: numpy(float32) -> paddle(float32) -> paddle(bfloat16) -> numpy(uint16)
-            if self.merge_config.dtype == "bfloat16":
-                merge_state_dict[k] = paddle.to_tensor(merge_state_dict[k], dtype="float32").astype("bfloat16").numpy()
-        save_file(
-            merge_state_dict,
-            os.path.join(output_path, shard_file),
-            metadata={"format": "np"},
-        )
-
-    # 这个是用于有base_model
-    def shard_merge_with_base(
+    def shard_merge(
         self,
         key_list,
         weight_map0,
@@ -235,16 +155,21 @@ class MergeModel:
                 v0 = w.get_tensor(k)
             with fast_safe_open(os.path.join(model_path1, weight_map1[k]), framework="np") as w:
                 v1 = w.get_tensor(k)
-            with fast_safe_open(os.path.join(model_path_base, weight_map_base[k]), framework="np") as w:
-                vb = w.get_tensor(k)
-            # dtype==bfloat16: numpy(uint16) -> paddle(bfloat16) -> paddle(float32) -> numpy(float32)
+            if self.merge_config.merge_type in {"ties", "dare", "della", "dare_ties", "della_linear"}:
+                with fast_safe_open(os.path.join(model_path_base, weight_map_base[k]), framework="np") as w:
+                    vb = w.get_tensor(k)
+                if vb.dtype == np.uint16:
+                    vb = paddle.to_tensor(vb, dtype="bfloat16").astype("float32").numpy()
             if v0.dtype == np.uint16:
                 v0 = paddle.to_tensor(v0, dtype="bfloat16").astype("float32").numpy()
             if v1.dtype == np.uint16:
                 v1 = paddle.to_tensor(v1, dtype="bfloat16").astype("float32").numpy()
-            if vb.dtype == np.uint16:
-                vb = paddle.to_tensor(vb, dtype="bfloat16").astype("float32").numpy()
-            merge_state_dict[k] = self.merge_method.merge_op(v0 - vb, v1 - vb, self.sparsification_method) + vb
+            if self.merge_config.merge_type in {"ties", "dare", "della", "dare_ties", "della_linear"}:
+                merge_state_dict[k] = (
+                    self.merge_method.merge_op(v0 - vb, v1 - vb, sparsify_method=self.sparsification_method) + vb
+                )
+            else:
+                merge_state_dict[k] = self.merge_method.merge_op(v0, v1, sparsify_method=self.sparsification_method)
             # dtype==bfloat16: numpy(float32) -> paddle(float32) -> paddle(bfloat16) -> numpy(uint16)
             if self.merge_config.dtype == "bfloat16":
                 merge_state_dict[k] = paddle.to_tensor(merge_state_dict[k], dtype="float32").astype("bfloat16").numpy()

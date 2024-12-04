@@ -23,13 +23,14 @@ class MergeLinear:
         Linear interpolation between two values.
         """
         if sparsify_method is not None:
-            v_0, v_1, mask_0, mask_1 = sparsify_method(v_0, v_1, self.merge_config.drop_rate)
+            v_0, v_1, mask_0, mask_1 = sparsify_method(
+                v_0, v_1, self.merge_config.drop_rate, della_rate=self.merge_config.della_rate
+            )
             v_merge = (
                 1 - self.merge_config.linear_ratio
             ) * v_0 * mask_0 + self.merge_config.linear_ratio * v_1 * mask_1
 
         v_merge = (1 - self.merge_config.linear_ratio) * v_0 + self.merge_config.linear_ratio * v_1
-        print("v_merge", v_merge)
         return v_merge
 
     def merge_dict(self, dict1, dict2):

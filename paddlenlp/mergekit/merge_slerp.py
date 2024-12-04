@@ -20,7 +20,7 @@ class MergeSlerp:
     def __init__(self, merge_config):
         self.merge_config = merge_config
 
-    def merge_op(self, v0, v1, eps=1e-8, dot_threshold=None):
+    def merge_op(self, v0, v1, eps=float(1e-8), dot_threshold=None, sparsify_method=None):
         """
         Spherical linear interpolation between two values.
         """
@@ -29,6 +29,7 @@ class MergeSlerp:
         # Copy the vectors to reuse them later
         v0_copy = np.copy(v0)
         v1_copy = np.copy(v1)
+
         # Normalize the vectors to get the directions and angles
         v0 = v0 / (np.linalg.norm(v0) + eps)
         v1 = v1 / (np.linalg.norm(v1) + eps)

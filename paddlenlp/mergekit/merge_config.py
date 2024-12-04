@@ -41,6 +41,9 @@ class MergeConfig:
     )
     scaling: bool = field(default=False, metadata={"help": "Whether to scale the weights."})
     normalize: bool = field(default=True, metadata={"help": "Whether to normalize the weights."})
+    drop_rate: float = field(default=0.7, metadata={"help": "Drop rate for the merge."})
+    della_rate: float = field(default=0.2, metadata={"help": "Della rate for the merge."})
+    tensor_type: str = field(default="np", metadata={"help": "Tensor type to use for the merge. Choose np or pd"})
 
     def __post_init__(self):
         if self.device != "cpu":
