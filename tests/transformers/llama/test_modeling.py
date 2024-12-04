@@ -21,7 +21,8 @@ import numpy as np
 import paddle
 from parameterized import parameterized
 
-from paddlenlp.transformers import LlamaConfig, LlamaForCausalLM, LlamaModel
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer, LlamaConfig, LlamaForCausalLM, LlamaModel
+from paddlenlp.transformers.cache_utils import StaticCache
 from tests.testing_utils import require_package, slow
 from tests.transformers.test_configuration_common import ConfigTester
 from tests.transformers.test_generation_utils import GenerationTesterMixin
@@ -340,6 +341,27 @@ class LlamaModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase)
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_gqa_model(*config_and_inputs)
 
+    def test_static_cache_for_llama(self):
+        model_name = "__internal_testing__/tiny-random-llama"  # A tiny model suitable for testing
+        model = AutoModelForCausalLM.from_pretrained(model_name)
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+        inputs = tokenizer(text="My name is Llama")["input_ids"]
+        inputs = paddle.to_tensor(inputs).unsqueeze(0)
+
+        # Prepare a cache class and pass it to the model's forward
+        max_generated_length = inputs.shape[1] + 10
+        past_key_values = StaticCache(
+            config=model.config,
+            batch_size=inputs.shape[0],
+            max_cache_len=max_generated_length,
+        )
+
+        outputs = model(
+            inputs,
+            past_key_values=past_key_values,
+            use_cache=True
+        )
 
 class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
     base_model_class = LlamaModel

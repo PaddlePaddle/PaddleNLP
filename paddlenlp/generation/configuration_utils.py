@@ -23,6 +23,7 @@ from huggingface_hub import hf_hub_download
 from paddle.common_ops_import import convert_dtype
 
 from paddlenlp import __version__
+from paddlenlp.transformers.cache_utils import StaticCache, StaticCacheConfig, OffloadedStaticCache, SlidingWindowCache, HybridCache, MambaCache
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.utils.download import resolve_file_path
 from paddlenlp.utils.log import logger
@@ -32,6 +33,20 @@ from ..utils.downloader import hf_file_exists
 
 DEFAULT_MAX_NEW_TOKENS = 20
 
+NEEDS_CACHE_CONFIG = {}
+
+NEEDS_CACHE_CONFIG["static"] = StaticCacheConfig
+NEED_SETUP_CACHE_CLASSES_MAPPING = {
+    "static": StaticCache,
+    "offloaded_static": OffloadedStaticCache,
+    "sliding_window": SlidingWindowCache,
+    "hybrid": HybridCache,
+    "mamba": MambaCache,
+}
+NEED_SETUP_CACHE_CLASSES_MAPPING = {}
+ALL_CACHE_IMPLEMENTATIONS = (
+        list(NEED_SETUP_CACHE_CLASSES_MAPPING.keys()) + list(NEEDS_CACHE_CONFIG.keys()) + ["offloaded"]
+    )
 
 def resolve_hf_generation_config_path(repo_id: str, cache_dir: str, subfolder=None) -> str:
     """resolve config file from hf hub
@@ -118,6 +133,14 @@ class GenerationConfig:
                 If not, this is the diversity_rate for DIVERSE BEAM SEARCH.
             use_cache: (bool, optional): Whether to use the model cache to
                 speed up decoding. Default to True.
+            cache_implementation (`str`, *optional*, default to `None`):
+                Name of the cache class that will be instantiated in `generate`, for faster decoding. Possible values are:
+
+                - `"static"`: [`StaticCache`]
+                - `"offloaded_static"`: [`OffloadedStaticCache`]
+                - `"sliding_window"`: [`SlidingWindowCache`]
+                - `"hybrid"`: [`HybridCache`]
+                - `"mamba"`: [`MambaCache`]
             use_fast: (bool, optional): Whether to use fast entry of model
                 for FastGeneration. Default to False.
             use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding.
@@ -166,6 +189,14 @@ class GenerationConfig:
         self.num_beams = kwargs.pop("num_beams", 1)
         self.num_beam_groups = kwargs.pop("num_beam_groups", 1)
         self.use_cache = kwargs.pop("use_cache", True)
+        self.cache_implementation = kwargs.pop("cache_implementation", None)
+        self.cache_config = kwargs.pop("cache_config", None)
+        if self.cache_implementation is not None and self.cache_implementation in NEEDS_CACHE_CONFIG:
+            cache_config_class = NEEDS_CACHE_CONFIG[self.cache_implementation]
+            if self.cache_config is None:
+                self.cache_config = cache_config_class()
+            elif isinstance(self.cache_config, dict):
+                self.cache_config = cache_config_class.from_dict(self.cache_config)
 
         # Parameters that define the output variables of `generate`
         self.num_return_sequences = kwargs.pop("num_return_sequences", 1)
@@ -288,6 +319,38 @@ class GenerationConfig:
                     "Greedy methods without beam search do not support `num_return_sequences` different than 1 "
                     f"(got {self.num_return_sequences})."
                 )
+
+        # 5. check cache-related arguments
+        if self.cache_implementation is not None and self.cache_implementation not in ALL_CACHE_IMPLEMENTATIONS:
+            raise ValueError(
+                f"Invalid `cache_implementation` ({self.cache_implementation}). Choose one of: "
+                f"{ALL_CACHE_IMPLEMENTATIONS}"
+            )
+        if self.cache_config is not None:
+            cache_class = NEEDS_CACHE_CONFIG.get(self.cache_implementation)
+            if cache_class is None:
+                raise ValueError(
+                    "You provided a `cache_config` but the cache implementation you are using "
+                    f"({self.cache_implementation}) does not require any config. Make sure to use the "
+                    "correct cache implementation matching your cache config."
+                )
+            if not isinstance(self.cache_config, cache_class):
+                self.cache_config = cache_class.from_dict(self.cache_config)
+            self.cache_config.validate()
+        if self.use_cache is False:
+            # In this case, all cache-related arguments should be unset. However, since `use_cache=False` is often used
+            # passed to `generate` directly to hot-fix cache issues, let's raise a warning instead of an error
+            # (otherwise a user might need to overwrite several parameters).
+            no_cache_warning = (
+                "You have set `use_cache` to `False`, but {cache_arg} is set to {cache_arg_value}. {cache_arg} will "
+                "have no effect."
+            )
+            for arg_name in ("cache_implementation", "cache_config"):
+                if getattr(self, arg_name) is not None:
+                    logger.warning_once(
+                        no_cache_warning.format(cache_arg=arg_name, cache_arg_value=getattr(self, arg_name)),
+                        UserWarning,
+                    )
 
     def save_pretrained(
         self,
