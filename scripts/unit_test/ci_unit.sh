@@ -31,7 +31,8 @@ install_requirements() {
     python -m pip install -r tests/requirements.txt
     python -m pip install -r paddlenlp/experimental/autonlp/requirements.txt 
     python -m pip uninstall paddlepaddle paddlepaddle_gpu -y
-    python -m pip install --no-cache-dir ${paddle}
+    # python -m pip install --no-cache-dir ${paddle}
+    python -m pip install --pre paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/nightly/cu118/
 
     python setup.py bdist_wheel > /dev/null
     python -m pip install  dist/p****.whl
