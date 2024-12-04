@@ -102,7 +102,7 @@ class DynamicCache(Cache):
     Example:
 
         ```python
-        >>> from transformers import AutoTokenizer, AutoModelForCausalLM, DynamicCache
+        >>> from paddlenlp import AutoTokenizer, AutoModelForCausalLM, DynamicCache
 
         >>> model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2-0.5B-Instruct")
         >>> tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2-0.5B-Instruct")
