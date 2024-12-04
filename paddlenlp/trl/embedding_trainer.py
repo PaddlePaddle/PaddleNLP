@@ -19,7 +19,10 @@ from paddle.base import core
 from paddle.distributed import fleet
 
 from paddlenlp.trainer import Trainer
-from paddlenlp.transformers.contrastive_loss import SimpleContrastiveLoss
+from paddlenlp.transformers.contrastive_loss import (
+    MatryoshkaContrastiveLoss,
+    SimpleContrastiveLoss,
+)
 
 __all__ = ["EmbeddingTrainer"]
 
@@ -29,6 +32,7 @@ class EmbeddingTrainer(Trainer):
         super().__init__(**kwargs)
 
         self.model_args = model_args
+        self.embedding_negatives_cross_device = model_args.embedding_negatives_cross_device
         self.use_gradient_cache = use_gradient_cache
         self.accum_data = []
         self.accum_freq = 0
@@ -38,7 +42,13 @@ class EmbeddingTrainer(Trainer):
         self.accum_rng_states["cpu"] = []
         self.accum_rng_states["cuda"] = []
         self.accum_rng_states["hybrid"] = []
-        self.loss_fn = SimpleContrastiveLoss(self.model_args.embedding_temperature)
+
+        if model_args.embedding_matryoshka_dims is not None and len(model_args.embedding_matryoshka_dims) > 0:
+            self.loss_fn = MatryoshkaContrastiveLoss(
+                model_args.embedding_temperature, model_args.embedding_matryoshka_dims
+            )
+        else:
+            self.loss_fn = SimpleContrastiveLoss(model_args.embedding_temperature)
 
     def clear_memory(self):
         self.accum_q_features.clear()
@@ -68,6 +78,10 @@ class EmbeddingTrainer(Trainer):
 
             query_reps, passage_reps = model(**inputs, return_encode=True)
 
+            if self.embedding_negatives_cross_device:
+                query_reps = self.dist_gather_tensor_with_gradient(query_reps)
+                passage_reps = self.dist_gather_tensor_with_gradient(passage_reps)
+
             self.accum_q_features.append(query_reps)
             self.accum_p_features.append(passage_reps)
 
@@ -77,7 +91,9 @@ class EmbeddingTrainer(Trainer):
         return {
             "cpu": [paddle.framework.core.default_cpu_generator().get_state()],
             "cuda": [paddle.get_rng_state()],
-            "hybrid": [fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()],
+            "hybrid": [fleet.meta_parallel.get_rng_state_tracker().get_states_tracker()]
+            if self.args.use_hybrid_parallel
+            else [],
         }
 
     def reset_rng_state(self, states, index=0):
@@ -86,13 +102,13 @@ class EmbeddingTrainer(Trainer):
             raise ValueError("The length of state should be 3")
         cpu_state = states["cpu"][index]
         cuda_state = states["cuda"][index]
-        hybrid_state = states["hybrid"][index]
         paddle.framework.core.default_cpu_generator().set_state(cpu_state)
         # TODO(daisiming): support xpu and other custom devices.
         if core.is_compiled_with_cuda():
             for j in range(core.get_cuda_device_count()):
                 core.default_cuda_generator(j).set_state(cuda_state[j])
         if self.args.use_hybrid_parallel:
+            hybrid_state = states["hybrid"][index]
             fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(hybrid_state)
 
     def accum_forward_backward(self, model):
@@ -130,6 +146,10 @@ class EmbeddingTrainer(Trainer):
                 with self.autocast_smart_context_manager():
                     query_reps, passage_reps = model(**inputs, return_encode=True)
 
+                if self.embedding_negatives_cross_device:
+                    query_reps = self.dist_gather_tensor_with_gradient(query_reps)
+                    passage_reps = self.dist_gather_tensor_with_gradient(passage_reps)
+
                 _loss = paddle.dot(query_reps.flatten(), accum_q_grads[i].flatten()) + paddle.dot(
                     passage_reps.flatten(), accum_p_grads[i].flatten()
                 )
@@ -159,3 +179,34 @@ class EmbeddingTrainer(Trainer):
 
             loss = self.accum_forward_backward(model)
         return loss
+
+    def dist_gather_tensor_with_gradient(self, tensor):
+        if tensor is None:
+            return None
+
+        if self.args.dataset_world_size == 1:
+            return tensor
+
+        hcg = fleet.get_hybrid_communicate_group()
+        sharding_group = hcg.get_sharding_parallel_group()
+        sharding_rank = sharding_group.rank
+        data_group = hcg.get_data_parallel_group()
+        data_rank = data_group.rank
+
+        if sharding_group.nranks > 1:
+            all_tensors = []
+            paddle.distributed.all_gather(all_tensors, tensor.contiguous(), group=sharding_group)
+            all_tensors[sharding_rank] = tensor
+            all_tensors = paddle.concat(all_tensors, axis=0)
+        else:
+            all_tensors = tensor
+
+        if data_group.nranks > 1:
+            final_tensors = []
+            paddle.distributed.all_gather(final_tensors, all_tensors.contiguous(), group=data_group)
+            final_tensors[data_rank] = all_tensors
+            final_tensors = paddle.concat(final_tensors, axis=0)
+        else:
+            final_tensors = all_tensors
+
+        return final_tensors
