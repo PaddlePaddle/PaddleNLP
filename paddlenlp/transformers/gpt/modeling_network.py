@@ -25,6 +25,10 @@ import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
+<<<<<<< HEAD
+=======
+from paddle.distributed import fleet
+>>>>>>> update api
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import try_import
