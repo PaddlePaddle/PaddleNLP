@@ -30,7 +30,7 @@ class MergeConfig:
         linear_ratio (`float`):
     """
 
-    merge_type: str = field(default="slerp", metadata={"help": "The type of merge strategy."})
+    merge_type: str = field(default=None, metadata={"help": "The type of merge strategy."})
     sparsify_type: str = field(default=None, metadata={"help": "The type of sparsify strategy."})
     linear_ratio: float = field(default=0.5, metadata={"help": "Linear merge ratio."})
     merge_preifx: str = field(default="model", metadata={"help": "Prefix name: model or master_weights"})
