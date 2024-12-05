@@ -364,6 +364,7 @@ class LlamaModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase)
         )
 
         outputs = model(inputs, past_key_values=past_key_values, use_cache=True)
+        print(outputs)
 
 
 class LlamaModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):

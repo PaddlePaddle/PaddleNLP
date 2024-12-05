@@ -767,10 +767,6 @@ class StaticCache(Cache):
         # Note: There will be significant perf decrease if switching to use 5D tensors instead.
         cache_shape = (self.batch_size, self.num_key_value_heads, self.max_cache_len, self.head_dim)
         for idx in range(config.num_hidden_layers):
-            if layer_device_map is not None:
-                layer_device = layer_device_map[idx]
-            else:
-                layer_device = device
             new_layer_key_cache = paddle.zeros(cache_shape, dtype=self.dtype)
             new_layer_value_cache = paddle.zeros(cache_shape, dtype=self.dtype)
 
@@ -1193,11 +1189,6 @@ class HybridCache(Cache):
             self.head_dim,
         )
         for i in range(config.num_hidden_layers):
-            if layer_device_map is not None:
-                layer_device = layer_device_map[i]
-            else:
-                layer_device = device
-
             cache_shape = global_cache_shape if not self.is_sliding[i] else sliding_cache_shape
             new_layer_key_cache = paddle.zeros(cache_shape, dtype=self.dtype)
             new_layer_value_cache = paddle.zeros(cache_shape, dtype=self.dtype)

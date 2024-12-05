@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import random
 import unittest
 
 import numpy as np
 import paddle
-from parameterized import parameterized
 
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.transformers import (
@@ -26,10 +24,8 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     DynamicCache,
     LlamaConfig,
-    RobertaForCausalLM,
 )
 from paddlenlp.transformers.cache_utils import StaticCache
-from tests.testing_utils import slow
 
 
 def set_seed(seed):
@@ -128,55 +124,3 @@ class CacheTest(unittest.TestCase):
         )
         self.assertTrue(cached_keys.shape == [1, 1, 10, 128])
         self.assertTrue(cached_values.shape == [1, 1, 10, 128])
-
-
-class CacheIntegrationTest(unittest.TestCase):
-    def test_offloaded_cache_equivalent_to_dynamic_cache(self):
-        """Tests that OffloadedCache produces the same result as the default DynamicCache"""
-        model_name = "microsoft/Phi-3-mini-4k-instruct"
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", paddle_dtype=paddle.float16)
-        device = model.device
-        input_text = "Fun fact:"
-        inputs = tokenizer(input_text, return_tensors="pt").to(device)
-        common = {
-            "num_beams": 4,
-            "num_beam_groups": 2,
-            "num_return_sequences": 4,
-            "diversity_penalty": 1.0,
-            "max_new_tokens": 20,
-            "early_stopping": True,
-        }
-        original = GenerationConfig(**common)
-        offloaded = GenerationConfig(cache_implementation="offloaded", **common)
-        original_outputs = model.generate(generation_config=original, **inputs)
-        offloaded_outputs = model.generate(generation_config=offloaded, **inputs)
-        for original_output, offloaded_output in zip(original_outputs, offloaded_outputs):
-            assert paddle.all(original_output == offloaded_output).item()
-
-    def test_offloaded_cache_uses_less_memory_than_dynamic_cache(self):
-        """Tests that OffloadedCache uses less memory than the default DynamicCache"""
-        model_name = "microsoft/Phi-3-mini-4k-instruct"
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto", paddle_dtype=paddle.float16)
-        device = model.device
-        input_text = "Fun fact:"
-        inputs = tokenizer(input_text, return_tensors="pt").to(device)
-        common = {
-            "num_beams": 4,
-            "num_beam_groups": 2,
-            "num_return_sequences": 4,
-            "diversity_penalty": 1.0,
-            "max_new_tokens": 20,
-            "early_stopping": True,
-        }
-        original = GenerationConfig(**common)
-        offloaded = GenerationConfig(cache_implementation="offloaded", **common)
-        paddle.cuda.reset_peak_memory_stats(device)
-        model.generate(generation_config=original, **inputs)
-        original_peak_memory = paddle.cuda.max_memory_allocated
-        (device)
-        paddle.cuda.reset_peak_memory_stats(device)
-        model.generate(generation_config=offloaded, **inputs)
-        offloaded_peak_memory = paddle.cuda.max_memory_allocated(device)
-        assert offloaded_peak_memory < original_peak_memory
