@@ -46,7 +46,7 @@ class MergeConfig:
     )
     base_model_name_or_path: str = field(default=None, metadata={"help": "Base model name or path."})
     output_path: str = field(default=None, metadata={"help": "Base model name or path."})
-
+    dtype: str = field(default=None, metadata={"help": "Data type of the model."})
     # merge parameters
     weight_list: Optional[List[float]] = field(
         default=None, metadata={"help": "Relative (or absolute if normalize=False) weighting of a given tensor"}
