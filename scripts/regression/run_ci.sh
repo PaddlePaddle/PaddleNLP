@@ -68,7 +68,7 @@ install_paddle(){
     python -m pip uninstall paddlepaddle -y
     python -m pip install pillow -y
     python -m pip install --user ${paddle} --no-cache-dir;
-    python -c "import paddle;print(paddle.__version__);print(paddle.version.show())" >> ${log_path}/commit_info.txt
+    python -c "import paddle;print('paddle')print(paddle.__version__);print(paddle.version.show())" >> ${log_path}/commit_info.txt
     python -c 'from visualdl import LogWriter'
 }
 ####################################
