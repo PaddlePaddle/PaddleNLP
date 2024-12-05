@@ -1564,7 +1564,7 @@ function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2(){
         --amp_master_grad true \
         --fuse_attention_ffn true \
         --fuse_attention_qkv true \
-        --use_flash_attention true \
+        --use_flash_attention false \
         --use_fused_rope true \
         --use_fused_rms_norm false \
         --max_seq_length 4096 \
@@ -1924,6 +1924,7 @@ function llm_gpt_pir_auto_bs4_TP2(){
         --fp16 0 \
         --fp16_opt_level "O2" \
         --num_hidden_layers 2 \
+        --intermediate_size 1024 \
         >>${log_path}/$FUNCNAME 2>&1
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -1984,6 +1985,7 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
         --bf16 1 \
         --fp16_opt_level "O2" \
         --num_hidden_layers 2 \
+        --intermediate_size 1024 \
         >>${log_path}/$FUNCNAME 2>&1
     echo "=========== $FUNCNAME run  end ==========="
 }
@@ -2045,6 +2047,7 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2(){
         --bf16 1 \
         --fp16_opt_level "O2" \
         --num_hidden_layers 2 \
+        --intermediate_size 1024 \
         --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
         --tensor_parallel_config "enable_mp_async_allreduce" \
         --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
