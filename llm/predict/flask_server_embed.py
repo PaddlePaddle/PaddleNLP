@@ -14,9 +14,11 @@
 """ Run embedding server. """
 
 import argparse
+import base64
 import threading
 from typing import List, Optional
 
+import numpy as np
 import paddle
 import uvicorn
 from fastapi import FastAPI
@@ -35,8 +37,9 @@ from paddlenlp.trl import llm_utils
 class Request(BaseModel):
     """Request"""
 
-    texts: List[str]
-    dimension: Optional[int] = None
+    input: List[str]
+    model: Optional[str] = None
+    encoding_format: Optional[str] = None
 
 
 class Response(BaseModel):
@@ -44,14 +47,17 @@ class Response(BaseModel):
 
     error_code: Optional[int] = 0
     error_msg: Optional[str] = "Success"
-    result: Optional[dict] = None
+    data: Optional[list] = None
+    model: Optional[str] = None
+    object: Optional[str] = "list"
+    usage: Optional[dict] = None
 
 
 def setup_args():
     """setup_args"""
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name_or_path", type=str, required=True, help="The directory of model.")
-    parser.add_argument("--dimension", type=int, default=2048, help="Default parameter for embedding inference.")
+    parser.add_argument("--dimension", type=int, default=768, help="Default parameter for embedding inference.")
     parser.add_argument("--dtype", type=str, help="Specify the data type for model computation.")
     parser.add_argument("--max_src_len", type=int, default=3072, help="The max length of src.")
     parser.add_argument("--port", type=int, default=8000, help="The port of embedding server.")
@@ -134,29 +140,42 @@ def create_app(args):
     predictor = Predictor(args)
     lock = threading.Lock()
 
-    @app.post("/v1/EMPTY")
+    @app.post("/v1/embeddings")
     def get_embeddings(req: Request) -> Response:
         with lock:
             try:
                 # [batch_size, embedding_dim]
-                embeddings, total_tokens = predictor(req.texts, req.dimension)
+                embeddings, total_tokens = predictor(req.input, predictor.args.dimension)
 
-                result = {
-                    "data": [
+                if req.encoding_format == "base64":
+                    data = [
+                        {
+                            "embedding": base64.b64encode(np.array(embedding).tobytes()).decode("utf-8"),
+                            "index": i,
+                            "object": "embedding",
+                        }  # 将numpy数组转换为列表
+                        for i, embedding in enumerate(embeddings)
+                    ]
+                else:
+                    data = [
                         {"embedding": embedding, "index": i, "object": "embedding"}  # 将numpy数组转换为列表
                         for i, embedding in enumerate(embeddings)
-                    ],
-                    "model": f"{args.model_name_or_path}",
-                    "object": "list",
-                    "usage": {
-                        "prompt_tokens": total_tokens,
-                        "total_tokens": total_tokens,
-                    },
+                    ]
+
+                usage = {
+                    "prompt_tokens": total_tokens,
+                    "total_tokens": total_tokens,
                 }
 
-                return Response(result=result)
+                return Response(data=data, model=args.model_name_or_path, object="list", usage=usage)
             except Exception as err:
-                return Response(error_code=1000, error_msg=f"Error type: {type(err).__name__}, Error message: {err!s}")
+                return Response(
+                    data=[],
+                    model=args.model_name_or_path,
+                    object="list",
+                    error_code=1000,
+                    error_msg=f"Error type: {type(err).__name__}, Error message: {err!s}",
+                )
 
     return app
 
@@ -164,7 +183,7 @@ def create_app(args):
 if __name__ == "__main__":
     args = setup_args()
     app = create_app(args)
-    uvicorn.run(app, host="0.0.0.0", port=args.port)
+    uvicorn.run(app, host="0.0.0.0", port=args.port, log_level="debug")
 
 
 # 使用方式
