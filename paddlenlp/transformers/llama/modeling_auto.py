@@ -143,13 +143,18 @@ def scaled_dot_product_attention(
         else:
             if alibi is not None:
                 attention_mask = attention_mask.cast(alibi.dtype) + alibi
-            attn_output = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                is_causal=attention_mask is None and query_states.shape[1] != 1,
-            )
+            with paddle.nn.functional.sdp_kernel(
+                enable_math=False,
+                enable_flash=True,
+                enable_mem_efficient=False,
+            ):
+                attn_output = F.scaled_dot_product_attention(
+                    query_states,
+                    key_states,
+                    value_states,
+                    attn_mask=attention_mask,
+                    is_causal=attention_mask is None and query_states.shape[1] != 1,
+                )
             attn_weights = None
 
         attn_output = attn_output.reshape([bsz, q_len, head_dim * query_states.shape[-2]])
