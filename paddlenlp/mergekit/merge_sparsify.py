@@ -14,56 +14,54 @@
 import numpy as np
 
 
-class SparsificationMethod:
+class SparsifyMethod:
     def __init__(self, merge_config):
         self.merge_config = merge_config
 
-    def sparsify_method(self, v0):
+    def sparsify(self, tensor):
         if self.merge_config.sparsify_type == "dare":
-            return self.sparsify_dare(v0, self.merge_config.drop_rate, self.merge_config.della_rate)
-        elif self.merge_config.sparsify_type == "della":
-            return self.sparsify_della(v0, self.merge_config.drop_rate, self.merge_config.della_rate)
+            return self.dare(tensor)
+        elif self.merge_config.sparsify_type == "magprune":
+            return self.magprune(tensor)
+        elif self.merge_config.sparsify_type == "trim":
+            self.trim(tensor)
+        else:
+            raise ValueError(f"Unknown sparsify method: {self.merge_config.sparsify_type}")
 
-    def sparsify_dare(self, v0, drop_rate, della_rate):
-        v0 = self.apply_bernoulli_mask(v0, drop_rate)
-        return v0
+    def dare(self, tensor):
+        mask = np.random.binomial(1, self.merge_config.reserve_p, size=tensor.shape).astype(tensor.dtype)
+        tensor *= mask
+        if self.merge_config.rescale:
+            tensor /= self.merge_config.reserve_p
+        return tensor
 
-    def apply_bernoulli_mask(self, delta_t, p):
-        # m^t
-        m_t = np.random.binomial(1, p, size=delta_t.shape).astype(delta_t.dtype)
-        # caculate (1 - m^t) ⊙ δ^t
-        delta_t_tilde = (1 - m_t) * delta_t
-        # δ̃^t / (1 - p)
-        delta_t_hat = delta_t_tilde / (1 - p)
-        return delta_t_hat
+    def magprune(self, tensor):
+        if np.all(tensor == 0):
+            return tensor
+        drop_p = 1 - self.merge_config.reserve_p
+        # 1: ranking(descending)
+        abs_tensor = np.abs(tensor)
+        sorted_indices = np.argsort(-abs_tensor.flatten())
 
-    def sparsify_della(self, v0, drop_rate, della_rate):
-        v0 = self.magprune(v0, drop_rate, della_rate)
-        return v0
-
-    def magprune(self, delta, p, epsilon):
-        if np.all(delta == 0):
-            return delta, np.zeros_like(delta)
-        # 1: ranking
-        # abs
-        abs_tensor = np.abs(delta)
-        # descent order
-        sorted_indices_flat = np.argsort(-abs_tensor.flatten())
-        # ranking
-        ranks_flat = np.empty_like(sorted_indices_flat)
-        ranks_flat[sorted_indices_flat] = np.arange(1, delta.size + 1)
-        # reshape original shape
-        ranks = ranks_flat.reshape(delta.shape)
         # 2: caclculate drop rate p_i
-        n = np.size(delta)
-        delta_p = ranks * epsilon / n  # Δ_i =  ε/n * r_i
-        p_min = p - epsilon / 2  # minimal drop rate
-        p_i = p_min + delta_p  # p_i for each parameter
-        p_i = np.clip(p_i, 0, 1)  # garantee that probability stays within [0, 1]
-        # 3: drop parameters according to their probabilities
+        probs = np.empty_like(sorted_indices)
+        probs[sorted_indices] = np.arange(tensor.size).astype(tensor.dtype)
+        probs = probs.reshape(tensor.shape)  # r_i ∈ {0，1，... ,n}
+        probs *= self.merge_config.epsilon / tensor.size  # Δ_i =  ε/n * r_i
+        p_min = drop_p - self.merge_config.epsilon / 2  # minimal drop rate
+        probs += p_min  # p_i for each parameter
 
-        m_i = np.random.binomial(1, p_i)
-        retained_mask = m_i == 0  # mask for retained parameters
-        adjusted_delta = delta * retained_mask
-        adjusted_delta = adjusted_delta / (1 - p_i)
-        return adjusted_delta
+        # 3: drop parameters according to their probabilities
+        mask = np.random.binomial(1, probs)
+        tensor *= (1 - mask).astype(tensor.dtype)
+        if self.merge_config.rescale:
+            tensor /= 1 - probs
+        return tensor
+
+    def trim(self, tensor):
+        shape = tensor.shape
+        tensor = tensor.flatten()
+        abs_tensor = np.abs(tensor)
+        threshold = np.quantile(abs_tensor, 1 - self.merge_config.reserve_p)
+        tensor[abs_tensor < threshold] = 0
+        return tensor.reshape(shape)
