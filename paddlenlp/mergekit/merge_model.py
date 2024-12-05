@@ -132,6 +132,7 @@ class MergeModel:
         with open(save_index_file, "w", encoding="utf-8") as f:
             content = json.dumps(index, indent=2) + "\n"
             f.write(content)
+        self.merge_config.save_pretrained(self.merge_config.output_path)
 
     def shard_merge_np(
         self,

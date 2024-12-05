@@ -40,7 +40,7 @@ class MergeConfig:
     merge_type: str = field(default=None, metadata={"help": "The type of merge process."})
     sparsify_type: str = field(default=None, metadata={"help": "The type of sparsify process."})
 
-    # Model
+    # Model parameters
     model_name_or_path_list: Optional[List[str]] = field(
         default=None, metadata={"help": "Merge model name or path list"}
     )
@@ -64,9 +64,7 @@ class MergeConfig:
     # Sparsify parameters
     rescale: bool = field(default=True, metadata={"help": "Rescale the weights after sparsifying."})
     reserve_p: float = field(default=0.7, metadata={"help": "Random reserve probability for the sparsify model."})
-    epsilon: float = field(default=0.14, metadata={"help": "Random reserve probability for the sparsify model."})
-    drop_rate: float = field(default=0.7, metadata={"help": "Drop rate for the merge."})
-    della_rate: float = field(default=0.2, metadata={"help": "Della rate for the merge."})
+    epsilon: float = field(default=0.14, metadata={"help": "Epsilon value for magprune."})
 
     def __post_init__(self):
         self.config_check()
