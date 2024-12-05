@@ -308,6 +308,9 @@ class BasePredictor:
 
     def predict(self, input_texts: str | list[str], return_tokens=False):
         tokenized_source = self._preprocess(input_texts)
+        # Synchronize the HPU device for the static graph predictor
+        # Ensure that configuration data read from the CPU is updated to the HPU device
+        paddle.device.synchronize()
         predictions = self._infer(tokenized_source)
         decoded_predictions = self._postprocess(predictions, return_tokens=return_tokens)
         return decoded_predictions
@@ -555,6 +558,7 @@ class InferencePredictorMixin(BasePredictor):
             eos_token_id=llm_utils.get_eos_token_id(self.tokenizer, self.generation_config),
             benchmark=self.config.benchmark,
             pre_caches_length=pre_caches_length,
+            pad_style="left" if paddle.is_compiled_with_custom_device("intel_hpu") else "None",
         )
 
         if "chatglmforcausallm" == self.architectures.lower():
@@ -650,29 +654,44 @@ class InferencePredictorMixin(BasePredictor):
             )
 
         else:
-            for i in range(inputs["input_ids"].shape[0]):
-                length = inputs["seq_len_encoder"][i][0]
-                if self.attention_mask is not None:
-                    self.attention_mask[i, 0, :length, :length] = paddle.tril(
-                        paddle.ones(shape=(length, length), dtype=self.config.dtype)
+            if "attention_mask" in inputs and inputs["attention_mask"] is not None:
+                bsz, src_len = inputs["attention_mask"].shape
+                causal_4d_mask = paddle.tril(
+                    paddle.ones(
+                        shape=(bsz, 1, self.config.total_max_length, self.config.total_max_length),
+                        dtype=self.config.dtype,
                     )
-
-                if pre_caches_length > 0:
-                    if self.config.prefix_path is None:
-                        prefix_attention_mask = paddle.zeros(
-                            [1, length, pre_caches_length], dtype=self.attention_mask.dtype
-                        )
-                    else:
-                        prefix_attention_mask = paddle.ones(
-                            [1, length, pre_caches_length], dtype=self.attention_mask.dtype
-                        )
-                    post_attention_mask = paddle.tril(
-                        paddle.ones(shape=(length, length), dtype=self.attention_mask.dtype)
-                    ).unsqueeze_(axis=0)
+                )
+                attention_mask_2d = paddle.ones(shape=(bsz, self.config.total_max_length), dtype="int64")
+                attention_mask_2d[:, 0:src_len] = inputs["attention_mask"]
+                bool_mask = attention_mask_2d != 1
+                expanded_attn_mask = bool_mask[:, None, None, :].expand(
+                    [bsz, 1, self.config.total_max_length, self.config.total_max_length]
+                )
+                self.attention_mask = causal_4d_mask.masked_fill(expanded_attn_mask, 0)
+            else:
+                for i in range(inputs["input_ids"].shape[0]):
+                    length = inputs["seq_len_encoder"][i][0]
                     if self.attention_mask is not None:
-                        self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
-                            [prefix_attention_mask, post_attention_mask], axis=2
+                        self.attention_mask[i, 0, :length, :length] = paddle.tril(
+                            paddle.ones(shape=(1, 1, length, length), dtype=self.config.dtype)
                         )
+                    if pre_caches_length > 0:
+                        if self.config.prefix_path is None:
+                            prefix_attention_mask = paddle.zeros(
+                                [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                            )
+                        else:
+                            prefix_attention_mask = paddle.ones(
+                                [1, length, pre_caches_length], dtype=self.attention_mask.dtype
+                            )
+                        post_attention_mask = paddle.tril(
+                            paddle.ones(shape=(length, length), dtype=self.attention_mask.dtype)
+                        ).unsqueeze_(axis=0)
+                        if self.attention_mask is not None:
+                            self.attention_mask[i, 0, :length, : length + pre_caches_length] = paddle.concat(
+                                [prefix_attention_mask, post_attention_mask], axis=2
+                            )
 
         inputs["pre_ids"] = self.pre_ids
         inputs["attention_mask"] = self.attention_mask

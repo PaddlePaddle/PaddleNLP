@@ -200,6 +200,11 @@ class MLAConfig:
         return self.qk_nope_head_dim + self.qk_rope_head_dim
 
 
+@dataclass
+class HpuConfig:
+    max_position_embeddings: int = 0
+
+
 class FusedMultiTransformerConfig:
     def __init__(
         self,
@@ -271,6 +276,7 @@ class FusedMultiTransformerConfig:
         avx_config=AvxConfig(),
         speculate_config=SpeculateConfig(),
         mla_config=MLAConfig(),
+        hpu_config=HpuConfig(),
     ):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -358,6 +364,7 @@ class FusedMultiTransformerConfig:
         self.avx_config = avx_config
         self.speculate_config = speculate_config
         self.mla_config = mla_config
+        self.hpu_config = hpu_config
 
 
 class FusedMultiTransformerBase(Layer):
@@ -5572,3 +5579,107 @@ class FusedBlockMultiTransformerFP8DynamicQuant(FusedBlockMultiTransformer):
             gate_out = paddle.nn.functional.sigmoid(gate_out)
             return gate_out * ffn2_out
         return ffn2_out
+
+
+class FusedMultiTransformerHPU(FusedMultiTransformerBase):
+    def __init__(self, config: FusedMultiTransformerConfig):
+        super().__init__(config)
+
+        self.config = config
+
+    def forward(
+        self,
+        input_ids,
+        src,
+        cum_offsets=None,
+        padding_offset=None,
+        attn_mask=None,
+        caches=None,
+        pre_caches=None,
+        pre_caches_length=0,
+        rotary_embs=None,
+        rotary_emb_dims=0,
+        seq_lens=None,
+        time_step=None,
+        **kwargs,
+    ):
+        if caches is not None:
+            assert len(caches) == len(self.qkv_weights) or len(caches) == 2 * len(self.qkv_weights)
+
+        assert self.num_layers == len(self.qkv_weights)
+
+        rotary_embs = rotary_embs.to(src.dtype)
+        prefill_length = src.shape[1]
+        position = paddle.max(seq_lens, axis=0)
+
+        if len(src.shape) == 2:
+            # src = src.unsqueeze(axis=1)
+            src = src.reshape((src.shape[0], 1, src.shape[1]))
+
+        import paddlenlp_ops
+
+        for i in range(self.num_layers):
+
+            residual_input = src
+            query_states, key_value_states = paddlenlp_ops.fused_rms_qkv_rope_v3(
+                src, self.ln_scales[i], self.qkv_weights[i], rotary_embs, self._epsilon, self.head_dim, self.num_heads
+            )
+            # Fused-OP-1 end
+
+            # Fused-OP-2 start
+            # write cache kv (inplace)
+            if time_step is None:  # context
+                caches[i][..., :prefill_length, :] = key_value_states
+                out_linear_out = paddlenlp_ops.fused_sdpa_proj_v2(
+                    query_states,
+                    # caches[i][0][:batch_size],
+                    # caches[i][1][:batch_size],
+                    caches[i],
+                    attn_mask,
+                    self.linear_weights[i],
+                    scaling_factor=self.head_dim**-0.5,
+                    causal=False,
+                )
+            else:
+                paddlenlp_ops.index_copy_(input=caches[i], dim=3, index=position, source=key_value_states)
+                out_linear_out = paddlenlp_ops.fused_sdpa_dec_proj(
+                    query_states,
+                    caches[i],
+                    attn_mask,
+                    self.linear_weights[i],
+                    scaling_factor=self.head_dim**-0.5,
+                )
+            # Fused-OP-2 end
+
+            # all_reduce
+            if self.tp_degree > 1:
+                dist.all_reduce(out_linear_out)
+            out_linear_out = residual_input + out_linear_out
+            residual_input = out_linear_out
+
+            # Fused-OP-4 start
+            ffn2_out = paddlenlp_ops.fused_rms_mlp(
+                out_linear_out,
+                self.ffn_ln_scales[i],
+                self.ffn1_weights[i],
+                self.ffn2_weights[i],
+                self._epsilon,
+            )
+            # Fused-OP-4 end
+
+            # all_reduce
+            if self.tp_degree > 1:
+                dist.all_reduce(ffn2_out)
+            src = residual_input + ffn2_out
+            # end LlamaDecoderLayer
+
+        kwargs["time_step"] = time_step
+        kwargs["multi_block_output"] = src
+        kwargs["seq_lens"] = seq_lens
+        kwargs["input_ids"] = input_ids
+
+        # hidden_states = [1, 34, 4096]
+        # out = [1, 4096]
+        out = src[:, -1:, :]
+        out = out.squeeze(axis=1)
+        return out, caches

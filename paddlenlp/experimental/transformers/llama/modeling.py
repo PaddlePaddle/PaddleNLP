@@ -39,7 +39,9 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerAvx,
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
+    FusedMultiTransformerHPU,
     FusedMultiTransformerWeightOnly,
+    HpuConfig,
     SpeculateConfig,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
@@ -616,6 +618,11 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             speculate_max_draft_token_num=config.get("speculate_max_draft_token_num", 5),
             return_full_hidden_states=config.get("return_full_hidden_states", False),
         )
+
+        hpu_config = HpuConfig(
+            max_position_embeddings=self.max_position_embeddings,
+        )
+
         transformer_config = FusedMultiTransformerConfig(
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
@@ -667,6 +674,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             trans_qkvw=(False if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type else True),
             append_attn=config.append_attn,
             speculate_config=speculate_config,
+            hpu_config=hpu_config,
         )
 
         self.set_transformer_block(transformer_config)
@@ -684,6 +692,8 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             self.transformer_block = FusedMultiTransformerWeightOnly(transformer_config)
         elif "a8w8" in self.quant_type:
             self.transformer_block = FusedMultiTransformerA8W8(transformer_config)
+        elif paddle.is_compiled_with_custom_device("intel_hpu"):
+            self.transformer_block = FusedMultiTransformerHPU(transformer_config)
         else:
             self.transformer_block = FusedMultiTransformerBase(transformer_config)
 
@@ -1698,11 +1708,22 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
         if cache is not None:
             input_ids = tgt_ids
             position_ids = tgt_pos
-            attention_mask = (tgt_generation_mask - 1) * 1e4
+            if paddle.is_compiled_with_custom_device("intel_hpu"):
+                attention_mask = paddle.index_select(
+                    x=attention_mask, index=paddle.max(seq_len_decoder, axis=0), axis=-2
+                )
+                attention_mask = (attention_mask - 1) * 1e4
+            else:
+                attention_mask = (tgt_generation_mask - 1) * 1e4
+
             # make inputs_embeds be none in decoder phase.
             # in forward function, it will be assigned according to input_ids.
             inputs_embeds = None
         else:
+            if paddle.is_compiled_with_custom_device("intel_hpu"):
+                q_seq_len = input_ids.shape[-1]
+                kv_seq_len = cache_kvs[0].shape[-2]
+                attention_mask = attention_mask[..., :q_seq_len, :kv_seq_len]
             attention_mask = (attention_mask - 1) * 1e4
         model_inputs = {
             "input_ids": input_ids,
