@@ -139,7 +139,7 @@ class AvxConfig:
 
 @dataclass
 class SpeculateConfig:
-    speculate_max_draft_token_num: int = (1,)
+    speculate_max_draft_token_num: int = 5
     speculate_method: str = None
 
 
@@ -1690,7 +1690,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         self.quant_round_type = config.quant_round_type
         self.quant_max_bound = config.quant_max_bound
         self.quant_min_bound = config.quant_min_bound
-        # self.use_gemm_dequant = False
+        self.use_gemm_dequant = False
 
         self.qkv_out_scales = []
         self.linear_out_scales = []
@@ -1928,7 +1928,6 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         if paddle.is_compiled_with_rocm():
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i])
         else:
-            # TODO: add gemm_dequant after qkv_out
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
         return qkv_out
 
@@ -2033,13 +2032,13 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
                 out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
                 out_linear_out = dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
             else:
-                try:
+                if self.use_gemm_dequant:
                     from paddlenlp_ops import gemm_dequant
 
                     out_linear_out = gemm_dequant(
                         fmha_out, self.linear_weights[i], self.linear_out_scales[i], self._dtype
                     )
-                except:
+                else:
                     out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
                     out_linear_out = dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
         return out_linear_out
@@ -2094,11 +2093,11 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
                 ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i])
                 ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
             else:
-                try:
+                if self.use_gemm_dequant:
                     from paddlenlp_ops import gemm_dequant
 
                     ffn2_out = gemm_dequant(ffn1_out, self.ffn2_weights[i], self.ffn2_out_scales[i], self._dtype)
-                except:
+                else:
                     ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i], False, True)
                     ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
         return ffn2_out

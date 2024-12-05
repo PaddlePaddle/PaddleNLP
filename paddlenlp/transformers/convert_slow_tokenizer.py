@@ -442,10 +442,7 @@ class LlamaConverter(SpmConverter):
         return None
 
 
-SLOW_TO_FAST_CONVERTERS = {
-    "LlamaTokenizer": LlamaConverter,
-    "BertTokenizer": BertConverter,
-}
+SLOW_TO_FAST_CONVERTERS = {"LlamaTokenizer": LlamaConverter, "BertTokenizer": BertConverter}
 
 
 def convert_slow_tokenizer(transformer_tokenizer, from_tiktoken=False) -> Tokenizer:
