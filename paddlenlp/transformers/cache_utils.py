@@ -81,11 +81,11 @@ class Cache(paddle.nn.Layer):
     def reorder_cache(self, beam_idx: paddle.Tensor):
         """Reorders the cache for beam search, given the selected beam indices."""
         for layer_idx in range(len(self.key_cache)):
-            if self.key_cache[layer_idx] != []:
-                device = self.key_cache[layer_idx].device
+            if self.key_cache[layer_idx].numel() != 0:
+                device = self.key_cache[layer_idx].place
                 self.key_cache[layer_idx] = self.key_cache[layer_idx].index_select(0, beam_idx.to(device))
-            if self.value_cache[layer_idx] != []:
-                device = self.value_cache[layer_idx].device
+            if self.value_cache[layer_idx].numel() != 0:
+                device = self.value_cache[layer_idx].place
                 self.value_cache[layer_idx] = self.value_cache[layer_idx].index_select(0, beam_idx.to(device))
 
     @property
@@ -520,7 +520,7 @@ class OffloadedCache(DynamicCache):
         elif len(self.key_cache) == layer_idx:
             self.key_cache.append(key_states)
             self.value_cache.append(value_states)
-            self.original_device.append(key_states.device)
+            self.original_device.append(key_states.place)
             self.evict_previous_layer(layer_idx)
         else:
             key_tensor, value_tensor = self[layer_idx]
@@ -933,7 +933,7 @@ class SlidingWindowCache(StaticCache):
             # into consideration when building kv cache instead of just throwing away tokens outside of the window
             return key_states, value_states
 
-        slicing = paddle.ones(self.max_cache_len, dtype=paddle.long, device=value_states.device).cumsum(0)
+        slicing = paddle.ones(self.max_cache_len, dtype=paddle.long).to(value_states.place).cumsum(0)
         cache_position = cache_position.clamp(0, self.max_cache_len - 1)
         to_shift = cache_position >= self.max_cache_len - 1
         indices = (slicing + to_shift[-1].int() - 1) % self.max_cache_len
@@ -1207,7 +1207,7 @@ class HybridCache(Cache):
             # into consideration when building kv cache instead of just throwing away tokens outside of the window
             return key_states, value_states
 
-        slicing = paddle.ones(max_cache_len, dtype=paddle.long, device=value_states.device).cumsum(0)
+        slicing = paddle.ones(max_cache_len, dtype=paddle.long).to(value_states.place).cumsum(0)
         cache_position = cache_position.clamp(0, max_cache_len - 1)
         to_shift = cache_position >= max_cache_len - 1
         indices = (slicing + to_shift[-1].int() - 1) % max_cache_len
@@ -1349,13 +1349,13 @@ class MambaCache:
         cache_position = cache_position.clamp(0, self.conv_kernel_size - 1)
 
         conv_state = conv_state.roll(shifts=-1, axis=-1)
-        conv_state[:, :, cache_position] = new_conv_state.to(device=conv_state.device, dtype=conv_state.dtype)
+        conv_state[:, :, cache_position] = new_conv_state.to(device=conv_state.place, dtype=conv_state.dtype)
         self.conv_states[layer_idx].zero_()
         self.conv_states[layer_idx] += conv_state
         return self.conv_states[layer_idx]
 
     def update_ssm_state(self, layer_idx: int, new_ssm_state: paddle.Tensor):
-        self.ssm_states[layer_idx] = new_ssm_state.to(self.ssm_states.device)
+        self.ssm_states[layer_idx] = new_ssm_state.to(self.ssm_states.place)
         return self.ssm_states[layer_idx]
 
     def reset(self):
