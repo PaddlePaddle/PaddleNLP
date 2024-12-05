@@ -1100,7 +1100,7 @@ class LlamaAttention(nn.Layer):
                 query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
         cache_kwargs = {}
         # [bs, seq_len, num_head, head_dim]
-        if past_key_value is not None:
+        if use_cache and past_key_value is not None:
             # reuse k, v, self_attention
             if sin is not None and cos is not None:
                 cache_kwargs = {"sin": sin, "cos": cos}  # Specific to RoPE models
