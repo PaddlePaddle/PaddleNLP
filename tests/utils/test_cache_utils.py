@@ -18,13 +18,7 @@ import unittest
 import numpy as np
 import paddle
 
-from paddlenlp.generation import GenerationConfig
-from paddlenlp.transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    DynamicCache,
-    LlamaConfig,
-)
+from paddlenlp.transformers import DynamicCache, LlamaConfig
 from paddlenlp.transformers.cache_utils import StaticCache
 
 
