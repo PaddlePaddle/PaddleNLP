@@ -13,9 +13,7 @@
 # limitations under the License.
 
 from .merge_config import *
-from .merge_linear import *
+from .merge_method import *
 from .merge_model import *
-from .merge_slerp import *
-from .merge_sparsify import *
-from .merge_ties import *
 from .merge_utils import *
+from .sparsify_method import *
