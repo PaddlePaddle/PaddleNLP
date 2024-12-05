@@ -28,12 +28,11 @@ __all__ = ["EmbeddingTrainer"]
 
 
 class EmbeddingTrainer(Trainer):
-    def __init__(self, model_args, use_gradient_cache=False, **kwargs):
+    def __init__(self, model_args, **kwargs):
         super().__init__(**kwargs)
 
         self.model_args = model_args
         self.embedding_negatives_cross_device = model_args.embedding_negatives_cross_device
-        self.use_gradient_cache = use_gradient_cache
         self.accum_data = []
         self.accum_freq = 0
         self.accum_q_features = []
@@ -168,7 +167,7 @@ class EmbeddingTrainer(Trainer):
         if self.args.pipeline_parallel_degree > 1:
             raise NotImplementedError("Cannot support pipeline parallel for Embedding training now.")
 
-        if self.args.gradient_accumulation_steps == 1 or not self.use_gradient_cache:
+        if self.args.gradient_accumulation_steps == 1:
             return super().training_step(model, inputs)
         else:
             self.forward_no_grad(model, inputs)

@@ -155,6 +155,11 @@ def main():
     if tokenizer.chat_template is not None:
         data_args.eval_with_do_generation = False
 
+    if training_args.do_eval:
+        logger.warning("Warning: 'do_eval' is set to True, but will be set to False for Embedding training currently.")
+        training_args.do_eval = False
+        training_args.evaluation_strategy = "no"
+
     if data_args.dataset_name_or_path is None:
         raise ValueError(f"Please specific dataset name or path (got {data_args.dataset_name_or_path})")
     elif os.path.exists(os.path.join(data_args.dataset_name_or_path, "train.json")) or os.path.exists(
@@ -259,7 +264,7 @@ def main():
         padding = True
 
     if training_args.pipeline_parallel_degree > 1:
-        metrics = None
+        raise NotImplementedError("Cannot support pipeline parallel for Embedding training now.")
     else:
         metrics = compute_metrics
 
