@@ -33,6 +33,7 @@ from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 
+from paddlenlp.transformers.contrastive_loss import SimpleContrastiveLoss
 from paddlenlp.transformers.refined_recompute import (
     RRColumnParallelLinear,
     RRColumnSequenceParallelLinear,
@@ -1675,8 +1676,7 @@ class Qwen2SentenceEmbedding(Qwen2PretrainedModel):
         super(Qwen2SentenceEmbedding, self).__init__(config)
         self.config = config
         self.qwen2 = Qwen2Model(config)
-        self.cross_entropy = nn.CrossEntropyLoss(reduction="mean")
-        self.embedding_temperature = embedding_temperature
+        self.in_batch_negative_loss = SimpleContrastiveLoss(embedding_temperature)
         self.world_size = dist.get_world_size()
         self.process_rank = dist.get_rank()
         self.embedding_negatives_cross_device = config.embedding_negatives_cross_device
@@ -1734,24 +1734,6 @@ class Qwen2SentenceEmbedding(Qwen2PretrainedModel):
             hidden_states = outputs[0]
         last_hidden_states = hidden_states.gather_nd(embedding_indices)
         return last_hidden_states
-
-    def compute_similarity(self, q_reps, p_reps):
-        """compute_similarity"""
-        return paddle.matmul(q_reps, p_reps.transpose([1, 0]))
-
-    def in_batch_negative_loss(self, q_reps, p_reps):
-        """in_batch_negative_loss"""
-        scores = self.compute_similarity(q_reps, p_reps)
-        scores = scores / self.embedding_temperature
-
-        group_size = p_reps.shape[0] // q_reps.shape[0]
-        batch_size = q_reps.shape[0]
-
-        target = paddle.arange(batch_size, dtype="int64")
-        target = target * group_size
-
-        loss = self.cross_entropy(scores, target)
-        return loss
 
     def _dist_gather_tensor(self, tensor: Optional[paddle.Tensor]):
         # This usage only within data parallelism only.
