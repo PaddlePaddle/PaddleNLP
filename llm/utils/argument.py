@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from dataclasses import dataclass, field
+from typing import List, Optional
 
 
 @dataclass
@@ -82,4 +83,8 @@ class EmbeddingArgument:
     embedding_negatives_cross_device: bool = field(
         default=True,
         metadata={"help": "Whether to share the negatives across all GPUs."},
+    )
+    embedding_matryoshka_dims: Optional[List[int]] = field(
+        default=None,
+        metadata={"help": "The dims for matryoshka training."},
     )
