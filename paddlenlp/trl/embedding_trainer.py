@@ -23,6 +23,7 @@ from paddlenlp.transformers.contrastive_loss import (
     MatryoshkaContrastiveLoss,
     SimpleContrastiveLoss,
 )
+from paddlenlp.transformers.embedding_utils import dist_gather_tensor_with_gradient
 
 __all__ = ["EmbeddingTrainer"]
 
@@ -178,38 +179,3 @@ class EmbeddingTrainer(Trainer):
 
             loss = self.accum_forward_backward(model)
         return loss
-
-
-def dist_gather_tensor_with_gradient(tensor):
-    if tensor is None:
-        return None
-
-    if paddle.distributed.get_world_size() <= 1:
-        return tensor
-
-    hcg = fleet.get_hybrid_communicate_group()
-    sharding_group = hcg.get_sharding_parallel_group()
-    sharding_rank = sharding_group.rank
-    data_group = hcg.get_data_parallel_group()
-    data_rank = data_group.rank
-
-    if sharding_group.nranks == 1 and data_group.nranks == 1:
-        return tensor
-
-    if sharding_group.nranks > 1:
-        all_tensors = []
-        paddle.distributed.all_gather(all_tensors, tensor.contiguous(), group=sharding_group)
-        all_tensors[sharding_rank] = tensor
-        all_tensors = paddle.concat(all_tensors, axis=0)
-    else:
-        all_tensors = tensor
-
-    if data_group.nranks > 1:
-        final_tensors = []
-        paddle.distributed.all_gather(final_tensors, all_tensors.contiguous(), group=data_group)
-        final_tensors[data_rank] = all_tensors
-        final_tensors = paddle.concat(final_tensors, axis=0)
-    else:
-        final_tensors = all_tensors
-
-    return final_tensors

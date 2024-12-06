@@ -42,11 +42,11 @@ from paddlenlp.transformers.refined_recompute import (
     create_skip_config_for_refined_recompute,
     recompute,
 )
-from paddlenlp.trl.embedding_trainer import dist_gather_tensor_with_gradient
 
 from .. import linear_utils
 from ..activations import ACT2FN
 from ..conversion_utils import StateDictNameMapping, init_name_mappings
+from ..embedding_utils import dist_gather_tensor_with_gradient
 from ..linear_utils import Linear
 from ..llama import fusion_ops
 from ..model_outputs import (
