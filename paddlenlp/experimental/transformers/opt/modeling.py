@@ -260,6 +260,7 @@ class OPTInferenceModel(OPTPretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        self.transformer_block.init_weight()
 
         self.embeddings.position_embeddings.weight.set_value(
             state_dict.pop("opt.embeddings.position_embeddings.weight")

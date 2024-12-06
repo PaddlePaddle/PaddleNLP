@@ -16,13 +16,13 @@ python -m pip install -r ../requirements.txt
 python -m pip install -r ../requirements-dev.txt
 
 # install fused_ln custom ops
-cd ../legacy/model_zoo/gpt-3/external_ops/
+cd ../slm/model_zoo/gpt-3/external_ops/
 python setup.py install
 cd -
 
 python -m pip install tiktoken
 
-# install tool_helpers
+# install fast_dataindex
 cd ../llm/
 mkdir data
 cd data

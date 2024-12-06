@@ -14,7 +14,14 @@
 
 #pragma once
 
-#include "paddle/extension.h"
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <stdio.h>
 #ifdef PADDLE_WITH_HIP
 #include <hip/hip_runtime.h>
 #include <hip/hip_fp16.h>
@@ -27,11 +34,30 @@ namespace cub = hipcub;
 #include <cub/cub.cuh>
 #include <curand_kernel.h>
 #endif
+#include <iostream>
+#include <fstream>
 
-constexpr int kBlockSize = 256; 
-constexpr int kNumWaves = 16; 
+#include "paddle/extension.h"
+#include "paddle/phi/core/dense_tensor.h"
+#include "paddle/phi/core/allocator.h"
+#include "nlohmann/json.hpp"
+
+using json = nlohmann::json;
+
+#define CUDA_CHECK(call)                           \
+  do {                                             \
+    const cudaError_t error_code = call;           \
+    if (error_code != cudaSuccess) {               \
+      std::printf("at %s:%d - %s.\n",              \
+                  __FILE__,                        \
+                  __LINE__,                        \
+                  cudaGetErrorString(error_code)); \
+      exit(1);                                     \
+    }                                              \
+  } while (0)
 
 #ifdef PADDLE_WITH_HIP
+template<size_t kBlockSize = 256, size_t kNumWaves = 16>
 inline hipError_t GetNumBlocks(int64_t n, int* num_blocks) {
   int dev;
   {
@@ -53,6 +79,7 @@ inline hipError_t GetNumBlocks(int64_t n, int* num_blocks) {
   return hipSuccess;
 }
 #else
+template<size_t kBlockSize = 256, size_t kNumWaves = 16>
 inline cudaError_t GetNumBlocks(int64_t n, int* num_blocks) {
   int dev;
   {
@@ -146,4 +173,51 @@ HOSTDEVICE inline void Store(const AlignedVector<T, Size>& vec, T* addr) {
   *addr_vec = vec;
 }
 
+#ifdef PADDLE_WITH_HIP
+template <int Size>
+HOSTDEVICE inline void Store(const AlignedVector<hip_bfloat16, Size>& vec, int8_t* addr) {
+  printf("Error: Store hip_bfloat16 to int8_t is not supported!");
+}
+#else
+template <int Size>
+HOSTDEVICE inline void Store(const AlignedVector<__nv_bfloat16, Size>& vec, int8_t* addr) {
+  printf("Error: Store __nv_bfloat16 to int8_t is not supported!");
+}
+#endif
+
+template <int Size>
+HOSTDEVICE inline void Store(const AlignedVector<half, Size>& vec, int8_t* addr) {
+  printf("Error: Store half to int8_t is not supported!");
+}
+
 constexpr int VEC_16B = 16;
+
+inline json ReadJsonFromFile(const std::string& filePath) {
+    std::ifstream file(filePath);
+    if (!file.is_open()) {
+        throw std::runtime_error("Unable to open file: " + filePath);
+    }
+
+    json j;
+    file >> j;
+    return j;
+}
+
+// place must be an existing place object and cannot use paddle::CPUPlace() or paddle::GPUPlace()
+inline paddle::Tensor GetEmptyTensor(const common::DDim& dims, const paddle::DataType& dtype, const paddle::Place& place){
+  auto* allocator = paddle::GetAllocator(place);
+  phi::DenseTensor dense_tensor;
+  dense_tensor.Resize(dims);
+  dense_tensor.AllocateFrom(allocator, dtype, dense_tensor.numel() * phi::SizeOf(dtype));
+  return paddle::Tensor(std::make_shared<phi::DenseTensor>(dense_tensor));
+}
+
+__device__ inline bool is_in_end(const int64_t id, const int64_t *end_ids, int length) {
+    bool flag = false;
+    for (int i = 0; i < length; i++) {
+        if (id == end_ids[i]) {
+            return true;
+        }
+    }
+    return flag;
+}

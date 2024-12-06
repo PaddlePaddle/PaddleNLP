@@ -1,111 +1,102 @@
 安装PaddleNLP
-^^^^^^^^
-以下安装过程默认用户已安装好paddlepaddle-gpu或paddlepaddle(版本大于或等于2.0)，paddlepaddle安装方式参照 飞桨官网_。
+~~~~~~~~~~~~~~~
 
-.. _飞桨官网: https://www.paddlepaddle.org.cn/install/quick?docurl=/documentation/docs/zh/2.0/install/pip/windows-pip.html
+以下指南将引导您完成安装过程，确保您能够轻松上手。请注意，本安装过程假设您已安装好`paddlepaddle-gpu`或`paddlepaddle`（版本大于或等于3.0）。如果您尚未安装PaddlePaddle，请参考 `飞桨官网`_ 进行安装。
+
+.. _飞桨官网: https://www.paddlepaddle.org.cn/
 
 pip安装
 --------
-.. code-block::
 
-  pip install --upgrade paddlenlp>=2.0.0rc -i https://pypi.org/simple
+最简单快捷的安装方式是使用pip。只需在命令行（终端）中运行以下命令：
 
-Anaconda安装
---------
-Anaconda是一个开源的Python发行版本，其包含了conda、Python等180多个科学包及其依赖项。使用Anaconda可以通过创建多个独立的Python环境，避免用户的Python环境安装太多不同版本依赖导致冲突。
+.. code-block:: bash
 
-1、windows安装Anaconda
->>>>>>>>>
+  pip install --upgrade --pre paddlenlp
 
-第一步 下载
-:::::::::
-* 在 Anaconda官网_ 选择下载Windows Python3.7 64-Bit版本。
+这将会自动安装最新版本的PaddleNLP。
 
-.. _Anaconda官网: https://www.anaconda.com/products/individual
+使用Anaconda或Miniconda安装
+--------------------------
 
-* 确保已经安装Visual C++ Build Tools(可以在开始菜单中找到)，如未安装，请点击 下载安装_。
+Anaconda和Miniconda是流行的Python发行版本，它们能够简化包管理和环境配置。
 
-.. _下载安装: https://go.microsoft.com/fwlink/?Linkid=691126
 
-第二步 安装
-:::::::::
-运行下载的安装包(以.exe为后辍)，根据引导完成安装, 用户可自行修改安装目录（如下图）。
+**Windows安装步骤**：
+^^^^^^^^^^^^^^^^^^^^^
 
-.. image:: ../imgs/anaconda_windows.png
+1. **下载**：访问 `Anaconda官网`_ 或 `Miniconda官网`_，下载适用于Windows 64-Bit的安装包。
 
-第三步 使用
-:::::::::
-* 点击Windows系统左下角的Windows图标，打开：所有程序->Anaconda3/2（64-bit）->Anaconda Prompt
-* 在命令行中执行下述命令
+.. _`Anaconda官网`: https://www.anaconda.com/download/success
+.. _`Miniconda官网`: https://docs.anaconda.com/miniconda/
 
-.. code-block::
+2. **安装**：运行下载的安装包，按照屏幕上的指示完成安装。
 
-  # 创建名为my_paddlenlp的环境，指定Python版本为3.7
-  conda create -n my_paddlenlp python=3.7
-  # 进入my_paddlenlp环境
-  conda activate my_paddlenlp
-  # 安装PaddleNLP
-  pip install --upgrade paddlenlp>=2.0.0rc -i https://pypi.org/simple
+3. **配置环境**：
 
-按如上方式配置后，即可在环境中使用PaddleNLP了，命令行输入python回车后，import paddlenlp试试吧，之后再次使用都可以通过打开'所有程序->Anaconda3/2（64-bit）->Anaconda Prompt'，再执行conda activate my_paddlenlp进入环境后，即可再次使用PaddleNLP。
+   - 打开“Anaconda Prompt”或“Miniconda Prompt”。
+   - 创建一个新的环境并安装PaddleNLP：
 
-2、Linux/Mac安装Anaconda
->>>>>>>>>
+    .. code-block:: bash
 
-第一步 下载
-:::::::::
-在 Anaconda官网_ 选择下载对应系统 Python3.7版本下载（Mac下载Command Line Installer版本即可)。
+      # 创建名为my_paddlenlp的环境，指定Python版本为3.9或3.10
+      conda create -n my_paddlenlp python=3.9
+      # 激活环境
+      conda activate my_paddlenlp
+      # 安装PaddleNLP
+      pip install --upgrade --pre paddlenlp
 
-.. _Anaconda官网: https://www.anaconda.com/products/individual
+    或者，如果您想安装nightly版本：
 
-第二步 安装
-:::::::::
-打开终端，在终端安装Anaconda
+    .. code-block:: bash
 
-.. code-block::
+      pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 
-  # ~/Downloads/Anaconda3-2019.07-Linux-x86_64.sh即下载的文件
-  bash ~/Downloads/Anaconda3-2019.07-Linux-x86_64.sh
-  
-安装过程中一直回车即可，如提示设置安装路径，可根据需求修改，一般默认即可。
+   现在，您可以在这个环境中使用PaddleNLP了。
 
-第三步 使用
-:::::::::
 
-.. code-block::
+**Linux/Mac安装步骤**：
+^^^^^^^^^^^^^^^^^^^^^
 
-  # 创建名为my_paddlenlp的环境，指定Python版本为3.7
-  conda create -n my_paddlenlp python=3.7
-  # 进入my_paddlenlp环境
-  conda activate my_paddlenlp
-  # 安装PaddleNLP
-  pip install --upgrade paddlenlp>=2.0.0rc -i https://pypi.org/simple
+1. **下载**：访问 `Anaconda官网`_ 或 `Miniconda官网`_，下载适用于Linux/Mac操作系统的安装包。
 
-按如上方式配置后，即可在环境中使用PaddleNLP了，命令行输入python回车后，import paddlenlp试试吧，之后再次使用都可以通过打开'所有程序->Anaconda3/2（64-bit）->Anaconda Prompt'，再执行conda activate my_paddlenlp进入环境后，即可再次使用PaddleNLP。
+.. _`Anaconda官网`: https://www.anaconda.com/download/success
+.. _`Miniconda官网`: https://docs.anaconda.com/miniconda/
+
+2. **安装**：打开终端，导航到下载文件的目录，并执行安装脚本。
+
+3. **配置环境**：
+
+   - 创建一个新的环境并安装PaddleNLP，步骤与Windows相同。
 
 代码安装
----------
-github代码会跟随开发进度不断更新
+--------
 
-.. code-block::
+如果您希望从源代码安装PaddleNLP，可以通过克隆GitHub仓库来实现：
+
+.. code-block:: bash
 
   git clone https://github.com/PaddlePaddle/PaddleNLP.git
   cd PaddleNLP
   git checkout develop
 
+然后，您可以按照仓库中的说明进行后续安装步骤。
+
 使用Docker镜像体验PaddleNLP
-^^^^^^^^
+-------------------
 
-如果您没有Docker运行环境，请参考 `Docker官网`_ 进行安装
+如果您想在一个隔离的环境中体验PaddleNLP，可以使用Docker。首先，请确保您已安装Docker。然后，您可以拉取PaddlePaddle提供的Docker镜像，并在其中安装PaddleNLP：
 
-.. _Docker官网: https://www.docker.com
+.. code-block:: bash
 
-PaddleNLP提供了带有最新代码的docker镜像供您使用，您只需要*拉取docker镜像*，然后*运行docker镜像*，无需其他任何额外操作，即可开始使用PaddleNLP的所有功能。
+  # 假设您已经拉取了PaddlePaddle的Docker镜像
+  # 进入Docker容器后
+  pip install --upgrade --pre paddlenlp
 
-在 `Docker Hub`_ 中获取这些镜像及相应的使用指南，包括CPU、GPU、ROCm版本。
+或者，如果您想安装开发版本：
 
-.. _Docker Hub: https://hub.docker.com/repository/docker/paddlecloud/paddlenlp
+.. code-block:: bash
 
-如果您对自动化制作docker镜像感兴趣，或有自定义需求，请访问 `PaddlePaddle/PaddleCloud`_ 做进一步了解。
+  pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 
-.. _PaddlePaddle/PaddleCloud: https://github.com/PaddlePaddle/PaddleCloud/tree/main/tekton
+这样，您就可以在Docker容器中轻松使用PaddleNLP了。

@@ -1,0 +1,1 @@
+../../../../llm/docs/predict/qwen.md

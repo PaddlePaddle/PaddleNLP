@@ -332,7 +332,7 @@ class ActScalesLoader:
         self.key_map = key_map_dict
         self.scale = {}
         for scale_type, key_template in self.key_map.items():
-            self.scale[scale_type] = np.full([num_of_layers], fill_value=-1.0)
+            self.scale[scale_type] = np.full([num_of_layers], fill_value=-1.0, dtype="float32")
             for i in range(num_of_layers):
                 if key_template.replace("#", str(i)) in self.scale_dict.keys():
                     self.scale[scale_type][i] = 1 / self.scale_dict[key_template.replace("#", str(i))]

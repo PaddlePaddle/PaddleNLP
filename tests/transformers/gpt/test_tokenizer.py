@@ -17,7 +17,7 @@ import json
 import os
 import unittest
 
-from paddlenlp.transformers import GPTTokenizer
+from paddlenlp.transformers import GPTTokenizer, GPTTokenizerFast
 
 from ..test_tokenizer_common import TokenizerTesterMixin
 
@@ -30,6 +30,8 @@ VOCAB_FILES_NAMES = {
 class GPTTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = GPTTokenizer
+    rust_tokenizer_class = GPTTokenizerFast
+    test_rust_tokenizer = True
     from_pretrained_kwargs = {"add_prefix_space": True}
     test_seq2seq = False
 
@@ -75,6 +77,10 @@ class GPTTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         kwargs.update(self.special_tokens_map)
         return GPTTokenizer.from_pretrained(self.tmpdirname, **kwargs)
 
+    def get_rust_tokenizer(self, **kwargs):
+        kwargs.update(self.special_tokens_map)
+        return GPTTokenizerFast.from_pretrained(self.tmpdirname, **kwargs)
+
     def get_input_output_texts(self, tokenizer):
         input_text = "lower newer"
         output_text = "lower newer"
@@ -89,7 +95,38 @@ class GPTTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
         input_tokens = tokens + [tokenizer.unk_token]
         input_bpe_tokens = [14, 15, 10, 9, 3, 2, 15, 19]
+
         self.assertListEqual(tokenizer.convert_tokens_to_ids(input_tokens), input_bpe_tokens)
+
+    def test_rust_and_python_full_tokenizers(self):
+        if not self.test_rust_tokenizer:
+            self.skipTest(reason="test_rust_tokenizer is set to False")
+
+        tokenizer = self.get_tokenizer()
+        rust_tokenizer = self.get_rust_tokenizer(add_prefix_space=True)
+
+        sequence = "lower newer"
+
+        # Testing tokenization
+        tokens = tokenizer.tokenize(sequence, add_prefix_space=True)
+        rust_tokens = rust_tokenizer.tokenize(sequence)
+        self.assertListEqual(tokens, rust_tokens)
+
+        # Testing conversion to ids without special tokens
+        ids = tokenizer.encode(sequence, add_special_tokens=False, add_prefix_space=True)["input_ids"]
+        rust_ids = rust_tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
+        self.assertListEqual(ids, rust_ids)
+
+        # Testing conversion to ids with special tokens
+        rust_tokenizer = self.get_rust_tokenizer(add_prefix_space=True)
+        ids = tokenizer.encode(sequence, add_prefix_space=True)["input_ids"]
+        rust_ids = rust_tokenizer.encode(sequence)["input_ids"]
+        self.assertListEqual(ids, rust_ids)
+
+        # Testing the unknown token
+        input_tokens = tokens + [rust_tokenizer.unk_token]
+        input_bpe_tokens = [14, 15, 10, 9, 3, 2, 15, 19]
+        self.assertListEqual(rust_tokenizer.convert_tokens_to_ids(input_tokens), input_bpe_tokens)
 
     def test_pretokenized_inputs(self, *args, **kwargs):
         pass

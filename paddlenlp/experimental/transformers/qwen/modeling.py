@@ -181,6 +181,7 @@ class QWenInferenceModel(QWenPretrainedModel):
 
     @paddle.no_grad()
     def set_state_dict(self, state_dict):
+        self.transformer_block.init_weight()
         dtype = paddle.get_default_dtype()
         wte_weight = paddle.to_tensor(state_dict["qwen.wte.weight"], dtype=dtype)
         ln_f_weight = paddle.to_tensor(state_dict["qwen.ln_f.weight"], dtype=self.ln_f.weight.dtype)

@@ -38,6 +38,7 @@ from paddlenlp.transformers.model_utils import (
 )
 from paddlenlp.transformers.utils import paddlenlp_load
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import get_env_device
 
 from . import reshard as reshard_util
 from .reshard import SHARDING_STRATEGY_V1, SHARDING_STRATEGY_V2, pp_reshard
@@ -51,6 +52,22 @@ SCHEDULER_NAME = "scheduler.pdparams"
 SCALER_NAME = "scaler.pdparams"
 MODEL_META_NAME = "model_meta.json"
 SHARDING_META_NAME = "shard_meta.json"
+
+
+def to_device(tensor, place=None):
+    if place is None:
+        place = get_env_device()
+
+    if isinstance(place, str):
+        place = paddle.device._convert_to_place(place)
+
+    if not tensor.place._equals(place):
+        new_t = tensor._copy_to(place, True)
+        dst_tensor = tensor.value().get_tensor()
+        src_tensor = new_t.value().get_tensor()
+        dst_tensor._share_data_with(src_tensor)
+
+    return tensor
 
 
 def filter_sharded_params(state_dict, optimizer, sharding_group):
@@ -83,7 +100,7 @@ def filter_sharded_params(state_dict, optimizer, sharding_group):
         for (k, v) in state_dict.items():
             if v.name in filtered_parameters:
                 filtered_state_dict[k] = v
-            else:
+            elif v.name not in [p.name for p in parameters]:
                 if sharding_rank == 0:
                     filtered_state_dict[k] = v
     return filtered_state_dict
@@ -239,6 +256,9 @@ class ShardingIO:
             param2rank = sharding_meta["param2rank"]
             optimizer = unwrap_optimizer(self.optimizer, DygraphShardingOptimizer)
             assert optimizer
+            if len(param2rank) == 0:
+                logger.warning("The param2rank is empty. Force reshard would be performed.")
+                return True
             assert len(param2rank) == len(optimizer._param2rank)
             for (k, v) in param2rank.items():
                 assert k in optimizer._param2rank
@@ -460,7 +480,7 @@ class ShardingIO:
         # cast to before
         for (k, v) in tmp.items():
             name = v.name
-            master_weights[k] = paddle.cast(v.cuda(), paddle.bfloat16).cpu()
+            master_weights[k] = paddle.cast(to_device(v), paddle.bfloat16).cpu()
             master_weights[k].name = name
 
         structure_name_map = {k: v.name for (k, v) in self.model.state_dict().items()}
@@ -491,7 +511,9 @@ class ShardingIO:
         for key, param in model_state_dict.items():
             if param.name in master_weights:
                 assert param.shape == master_weights[param.name].shape
-                paddle.assign(paddle.cast(master_weights[param.name].cuda(), paddle.bfloat16), model_state_dict[key])
+                paddle.assign(
+                    paddle.cast(to_device(master_weights[param.name]), paddle.bfloat16), model_state_dict[key]
+                )
             elif key in state_dict:
                 logger.info(f"key: {key} is in state_dict, but not in master_weights")
                 paddle.assign(state_dict[key], model_state_dict[key])

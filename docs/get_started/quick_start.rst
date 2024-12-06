@@ -19,7 +19,7 @@
 
 情感分析本质是一个文本分类任务。PaddleNLP内置了ERNIE、BERT、RoBERTa、Electra等丰富的预训练模型，并且内置了各种预训练模型对于不同下游任务的Fine-tune网络。用户可以使用PaddleNLP提供的模型，完成问答、序列分类、token分类等任务。查阅 预训练模型_ 了解更多。这里以ERNIE模型为例，介绍如何将预训练模型Fine-tune完成文本分类任务。
 
-.. _预训练模型: https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html
+.. _预训练模型: https://paddlenlp.readthedocs.io/zh/latest/model_zoo
 
 加载预训练模型ERNIE
 

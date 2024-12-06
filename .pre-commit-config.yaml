@@ -1,4 +1,4 @@
-exclude: 'legacy/model_zoo/gpt-3'
+exclude: 'slm/model_zoo/gpt-3;csrc/third_party'
 repos:
 # For Python files
 -   repo: https://github.com/psf/black.git
@@ -52,4 +52,13 @@ repos:
         entry: python scripts/codestyle/check_spaces.py
         language: python
         files: \.(md|markdown)$
+        pass_filenames: true
+# For dead links
+-   repo: local
+    hooks:
+    -   id: check-dead-links
+        name: Check dead links
+        entry: python scripts/codestyle/check_dead_links.py
+        language: python
+        files: \.(md|markdown|rst)$
         pass_filenames: true

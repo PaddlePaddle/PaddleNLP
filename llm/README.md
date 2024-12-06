@@ -15,18 +15,21 @@
 
 ## 🛠️ 支持模型列表 🛠️
 
-| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO | RLHF | Quantization | Torch convert |
+| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO | RLHF | Quantization | Torch convert |
 |----------------------------------------|----------|-----|------|---------------|-----|------|--------------|---------------|
 | [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅   | ✅    | ✅            | ✅             |
 | [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧   | 🚧           | ✅             |
-| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | 🚧  | 🚧   | 🚧           | 🚧            |
+| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | ✅   | 🚧   | 🚧           | 🚧            |
 | [Mistral](./config/mistral)            | ❌        | ✅   | ✅    | ✅             | ✅   | 🚧   | 🚧           | ✅             |
 | [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧   | ✅            | ✅             |
 | [ChatGLM-6B](./config/chatglm)         | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ❌             |
-| [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ✅             |
+| [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅    | ✅             | ✅   | 🚧   | ✅            | ✅             |
 | [Bloom](./config/bloom)                | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ✅             |
 | [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧  | 🚧   | 🚧           | ✅             |
 | [OPT](./config/opt)                    | 🚧       | ✅   | ✅    | 🚧            | 🚧  | 🚧   | 🚧           | ✅             |
+| [Gemma](./config/gemma)                | 🚧       | ✅   |🚧     | 🚧            | ✅  | 🚧   | 🚧           | 🚧             |
+| [Yuan](./config/yuan)                  | ✅       | ✅   |✅     | 🚧            | ✅  | 🚧   | 🚧           | 🚧             |
+
 
 - ✅: Supported
 - 🚧: In Progress
@@ -73,7 +76,7 @@ mv llama_openwebtext_100k.idx ./data
 
 ```shell
 # 编译自定义算子，可选
-cd ../legacy/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
+cd ../slm/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 
 # 模型预训练参考
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json
@@ -81,7 +84,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 
 注意：
 
-1. 建议使用 paddle develop 版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失 whl 包
+1. 建议使用 paddle develop 版本训练，需要安装`pip install fast_dataindex visualdl==2.5.3`等相关缺失 whl 包
 2. `use_flash_attention` 需要在 A100机器开启，建议使用 cuda11.8环境。
 3. `use_fused_rms_norm` 需要安装自定义算子。如果安装后仍然找不到算子，需要额外设置 PYTHONPATH
 4. `continue_training` 表示从现有的预训练模型加载训练。7b 模型初始 loss 大概为2.xx, 随机初始化模型 loss 从11.x 左右下降。
@@ -115,15 +118,15 @@ PaddleNLP 支持多个主流大模型的 SFT、LoRA、Prefix Tuning 等精调策
 样例数据：
 
 ```text
-{"src": "类型#裙*颜色#蓝色*风格#清新*图案#蝴蝶结", "tgt": "裙身处采用立体蝴蝶结装饰辅以蓝色条带点缀，令衣身造型饱满富有层次的同时为其注入一丝甜美气息。将女孩清新娇俏的一面衬托而出。"}
+{"src": "Give three tips for staying healthy.", "tgt": "1.Eat a balanced diet and make sure to include plenty of fruits and vegetables. \n2. Exercise regularly to keep your body active and strong. \n3. Get enough sleep and maintain a consistent sleep schedule."}
 ...
 ```
 
-为了方便测试，我们也提供了广告生成数据集可以直接使用：
+为了方便测试，我们也提供了[tatsu-lab/alpaca](https://huggingface.co/datasets/tatsu-lab/alpaca)demo 数据集可以直接使用：
 
 ```shell
-wget https://bj.bcebos.com/paddlenlp/datasets/examples/AdvertiseGen.tar.gz
-tar -zxvf AdvertiseGen.tar.gz
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/alpaca_demo.gz
+tar -xvf alpaca_demo.gz
 ```
 
 #### 2.2 全参精调：SFT
@@ -193,6 +196,7 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 # DPO 启动命令参考
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
+更多 DPO 技术细节和使用说明详见[DPO 文档](./docs/dpo.md)。
 
 #### 3.2 RLHF
 
@@ -224,16 +228,16 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo
 
 ```shell
 # PTQ 量化启动命令参考
-python run_finetune.py ./config/llama/ptq_argument.json
+python run_quantization.py ./config/llama/ptq_argument.json
 
 # GPTQ 量化启动命令参考
-python run_finetune.py ./config/llama/ptq_argument.json
+python run_quantization.py ./config/llama/gptq_argument.json
 
 # W8A8C8(INT)量化启动命令参考
-python run_finetune.py ./config/llama/ptq_c8_argument.json
+python run_quantization.py ./config/llama/ptq_c8_argument.json
 
 # W8A8(FP8)量化启动命令参考
-python run_finetune.py ./config/llama/fp8_ptq_argument.json
+python run_quantization.py ./config/llama/fp8_ptq_argument.json
 ```
 
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。

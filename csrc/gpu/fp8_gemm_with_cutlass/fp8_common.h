@@ -18,11 +18,13 @@
 #include "cuda.h"  // NOLINT
 
 #include "helper.h"
+#include "cutlass_helper.h"
 #include "paddle/extension.h"
 #include "paddle/phi/api/include/context_pool.h"
 #include "paddle/phi/common/data_type.h"
 #include "paddle/phi/common/place.h"
 #include "paddle/phi/core/allocator.h"
+#include "paddle/common/flags.h"
 
 
 typedef struct {
@@ -39,11 +41,12 @@ typedef struct {
   int batch_count = 1;
   const phi::GPUPlace &place;
   cudaStream_t stream;
-  int sm_version = 80;
+  int sm_version = 89;
   float leaky_alpha = 1.0;
-  const void *bias;
+  const void *bias = nullptr;
   std::vector<int64_t> &bias_dims;
-  std::string &gemm_config;
+  std::string &fuse_gemm_config;
+  int split_k = 1;
 } GemmEpilogueAllParams;
 
 typedef bool (*func)(GemmEpilogueAllParams);
@@ -52,6 +55,8 @@ typedef struct {
   const void *A;
   const void *B0;
   const void *B1;
+  void *D0 = nullptr;
+  void *D1 = nullptr;
   void *D;
   float scale0 = 1.0;
   float scale1 = 1.0;
@@ -65,13 +70,13 @@ typedef struct {
   int batch_count = 1;
   const phi::GPUPlace &place;
   cudaStream_t stream;
-  int sm_version = 80;
-  const void *bias0;
-  const void *bias1;
+  int sm_version = 89;
+  const void *bias0 = nullptr;
+  const void *bias1 = nullptr;
   std::vector<int64_t> &bias_dims0;
   std::vector<int64_t> &bias_dims1;
-  std::string &gemm_config;
+  std::string &fuse_gemm_config;
+  int split_k = 1;
 } DualGemmEpilogueAllParams;
 
 typedef bool (*func1)(DualGemmEpilogueAllParams);
-

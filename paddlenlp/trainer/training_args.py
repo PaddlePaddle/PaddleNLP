@@ -37,7 +37,19 @@ from .trainer_utils import (
     OptimizerNames,
     SchedulerType,
     ShardingOption,
+    split_parallel_config,
 )
+
+try:
+    from paddle.distributed import in_auto_parallel_align_mode
+except Exception:
+
+    def in_auto_parallel_align_mode():
+        """
+        hack for paddlenlp develop branch.
+        """
+        return False
+
 
 __all__ = [
     "default_logdir",
@@ -215,6 +227,9 @@ class TrainingArguments:
             Sharding parameter in certain cards group. For example, aussume we use 2 machines each with 8 cards,
             then set sharding_parallel_degree=8, sharding will only communication inside machine.
             default -1 means sharding parameters between all workers.
+        sharding_parallel_mesh_dimension (`str`, *optional*, defaults to `dp`)
+            Specifies the name of the dimension in a multi-dimensional parallelism mesh that is responsible for sharding.
+            default `dp` for default parallelism mesh.
         tensor_parallel_degree (`int`, *optional*, defaults to `-1`)
             Tensor parallelism is parallel technique proposed in (https://arxiv.org/pdf/2104.04473.pdf see 2.3 Tensor Model Parallelism).
             This technique splits one transformer layer into multi-cards (For examples, tensor_parallel_degree=4, will split a layer to 4-parts)
@@ -436,6 +451,7 @@ class TrainingArguments:
         },
     )
     logging_dir: Optional[str] = field(default=None, metadata={"help": "VisualDL log dir."})
+    output_signal_dir: Optional[str] = field(default=None, metadata={"help": "Asynchronous saving signal dir."})
     logging_strategy: IntervalStrategy = field(
         default="steps",
         metadata={"help": "The logging strategy to use."},
@@ -546,6 +562,15 @@ class TrainingArguments:
                 "Sharding parameter in certain cards group. For example, aussume we use 2 machines each with 8 cards, "
                 "then set sharding_degree=8, sharding will only communication inside machine. "
                 "default -1 means sharding parameters between all workers."
+            )
+        },
+    )
+    sharding_parallel_mesh_dimension: str = field(
+        default="dp",
+        metadata={
+            "help": (
+                "Specifies the name of the dimension in a multi-dimensional parallelism mesh that is responsible for sharding. "
+                "default `dp` for default parallelism mesh. "
             )
         },
     )
@@ -815,6 +840,12 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to use async_save instead of paddle.save."},
     )
+    ordered_save_group_size: int = field(
+        default=0,
+        metadata={
+            "help": "Select ordered_save_group_size to save checkpoint in ordered. if ordered_save_group_size=0, not used ordered save"
+        },
+    )
     skip_profile_timer: Optional[bool] = field(
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl."},
@@ -839,10 +870,15 @@ class TrainingArguments:
                 "- skip_save_model_weight: do not save model weights when the masters weight exist\n"
                 "- master_weight_compatible: 1. if the master weights exist, only load when needed\n"
                 "                            2. if master weights does not exist, convert model weights to master weights when needed\n"
+                "- remove_master_weight: same with `master_weight_compatible`, use in checkpoint quantization.\n"
                 "- async_save: enable asynchronous saving checkpoints to disk\n"
                 "- enable_all_options: enable all optimization configurations\n"
             )
         },
+    )
+    ckpt_quant_stage: str = field(
+        default="O0",
+        metadata={"help": "checkpoint quantization stage."},
     )
     ignore_load_lr_and_optim: Optional[bool] = field(
         default=False,
@@ -864,11 +900,33 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Enable MoE (Mixture of Experts) expert parallel training"},
     )
+    expert_max_capacity: Optional[int] = field(
+        default=pow(2, 32),
+        metadata={"help": "Enable MoE (Mixture of Experts) expert max token capacity"},
+    )
+    expert_min_capacity: Optional[int] = field(
+        default=1,
+        metadata={"help": "Enable MoE (Mixture of Experts) expert min token capacity"},
+    )
     release_grads: Optional[bool] = field(
         default=False, metadata={"help": "Whether to release gradients during training. Default is `False`."}
     )
+    skip_data_intervals: Optional[List[List[int]]] = field(
+        default=None,
+        metadata={"help": "The intervals to skip, pass start global step and end global step at each interval"},
+    )
+    offload_optim: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Offload optimizer after optimizer.step()"},
+    )
 
     def __post_init__(self):
+        if in_auto_parallel_align_mode():
+            self.max_grad_norm = 0.0
+            os.environ["FLAGS_max_inplace_grad_add"] = "65536"
+            os.environ["FLAGS_embedding_deterministic"] = "1"
+            os.environ["FLAGS_cudnn_deterministic"] = "1"
+
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
         if env_local_rank != -1 and env_local_rank != self.local_rank and paddle.distributed.get_world_size() > 1:
             self.local_rank = env_local_rank
@@ -893,6 +951,10 @@ class TrainingArguments:
             self.logging_dir = os.path.join(self.output_dir, default_logdir())
         if self.logging_dir is not None:
             self.logging_dir = os.path.expanduser(self.logging_dir)
+        if self.output_signal_dir is None and self.output_dir is not None:
+            self.output_signal_dir = self.output_dir
+        if self.output_signal_dir is not None:
+            self.output_signal_dir = os.path.expanduser(self.output_signal_dir)
 
         if self.disable_tqdm is None:
             self.disable_tqdm = False  # logger.getEffectiveLevel() > logging.WARN
@@ -1060,13 +1122,6 @@ class TrainingArguments:
                 logger.warning("set amp_master_grad to false since amp is disabled.")
                 self.amp_master_grad = False
 
-        def split_parallel_config(parallel_config):
-            if "," in parallel_config:
-                parallel_config = set(parallel_config.split(","))
-            else:
-                parallel_config = set(parallel_config.split(" "))
-            return parallel_config
-
         # use_hybrid_parallel
         if self.use_hybrid_parallel:
 
@@ -1099,6 +1154,7 @@ class TrainingArguments:
                                 "enable_clear_every_step_cache",
                                 "enable_overlap_p2p_comm",
                                 "disable_batch_p2p_comm",
+                                "best_unbalanced_scheduler",
                             ]:
                                 raise ValueError(
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
@@ -1118,12 +1174,12 @@ class TrainingArguments:
                         or "enable_dp_comm_overlap" in pipeline_parallel_config
                     )
                     enable_dp_comm_overlap = using_comm_overlap and self.data_parallel_degree > 1
-                    enable_sharding_comm_overlap = using_comm_overlap and self.sharding_parallel_degree > 1
+                    self.enable_sharding_comm_overlap = using_comm_overlap and self.sharding_parallel_degree > 1
                     assert not (
-                        enable_dp_comm_overlap and enable_sharding_comm_overlap
+                        enable_dp_comm_overlap and self.enable_sharding_comm_overlap
                     ), "dp_comm_overlap and sharding_comm_overlap cannot be enabled at the same time"
 
-                    if enable_sharding_comm_overlap and not self.amp_master_grad:
+                    if self.enable_sharding_comm_overlap and not self.amp_master_grad:
                         raise ValueError(
                             "If `enable_sharding_comm_overlap` in pipeline_parallel_configs, `amp_master_grad` must be True."
                         )
@@ -1131,12 +1187,13 @@ class TrainingArguments:
                     dygraph_pp_configs = {
                         "delay_scale_loss": True if "enable_delay_scale_loss" in pipeline_parallel_config else False,
                         "dp_comm_overlap": enable_dp_comm_overlap,
-                        "sharding_comm_overlap": enable_sharding_comm_overlap,
+                        "sharding_comm_overlap": self.enable_sharding_comm_overlap,
                         "enable_timer": "enable_timer" in pipeline_parallel_config,
-                        "release_gradients": "enable_release_grads" in pipeline_parallel_config,
+                        "release_gradients": "enable_release_grads" in pipeline_parallel_config or self.release_grads,
                         "overlap_p2p_comm": "enable_overlap_p2p_comm" in pipeline_parallel_config,
                         "clear_every_step_cache": "enable_clear_every_step_cache" in pipeline_parallel_config,
                         "use_batch_p2p_comm": "disable_batch_p2p_comm" not in pipeline_parallel_config,
+                        "best_unbalanced_scheduler": "best_unbalanced_scheduler" in pipeline_parallel_config,
                     }
                     if dygraph_pp_configs["dp_comm_overlap"]:
                         raise ValueError("overlap has accuracy issue")  # TODO: fix `overalap` + `delay_scale` issue
@@ -1312,6 +1369,7 @@ class TrainingArguments:
 
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
+                            assert self.amp_master_grad, "Currently sharding stage1 v2 only support amp_master_grad"
 
                         if "enable_release_grads" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].release_gradients = True
@@ -1373,6 +1431,13 @@ class TrainingArguments:
                             "The logging_steps should be greater than 1 for enable_stage1_allgather_overlap, "
                             f"but got logging_steps={self.logging_steps}."
                         )
+
+                    if "split_param" in sharding_parallel_config:
+                        if ShardingOption.SHARD_OP not in self.sharding:
+                            logger.warning("Only sharding stage1 support split_param.")
+                        assert (
+                            self.amp_master_grad
+                        ), "If `split_param` in sharding_parallel_config, `amp_master_grad` must be True."
 
                 fleet.init(is_collective=True, strategy=strategy)
                 logger.info(strategy)
@@ -1444,7 +1509,7 @@ class TrainingArguments:
                             "enable_send_recv_overlap",
                             # "disable_p2p_cache_shape",      # no need for auto_parallel
                             # "disable_partial_send_recv",    # no implemenation for auto_parallel
-                            # "enable_delay_scale_loss",      # default True in auto_parallel, non-configurable
+                            "enable_delay_scale_loss",
                             # "enable_dp_comm_overlap",       # no implemenation for auto_parallel
                             # "enable_sharding_comm_overlap", # no implemenation for auto_parallel
                             # "enable_timer",                 # no implemenation for auto_parallel
@@ -1493,6 +1558,7 @@ class TrainingArguments:
                     if len(x) > 0:
                         if x not in [
                             "enable_mp_async_allreduce",  # allreduce_matmul_grad_overlapping in auto_parallel
+                            "enable_delay_scale_loss",
                             # "enable_mp_skip_c_identity",
                             # "enable_mp_fused_linear_param_grad_add",
                         ]:
@@ -1519,6 +1585,8 @@ class TrainingArguments:
                     sharding.stage = 2
                 elif ShardingOption.FULL_SHARD in self.sharding:
                     sharding.stage = 3
+                if self.sharding_comm_buffer_size_MB > 0:
+                    sharding.comm_buffer_size_MB = int(self.sharding_comm_buffer_size_MB)
 
                 sharding_parallel_config = split_parallel_config(self.sharding_parallel_config)
                 for x in sharding_parallel_config:
@@ -1527,6 +1595,7 @@ class TrainingArguments:
                             "enable_stage1_tensor_fusion",
                             "enable_stage1_overlap",
                             "enable_stage2_overlap",
+                            "enable_release_grads",
                         ]:
                             raise ValueError(
                                 f"Found unknown pipeline mode config {x}, " f"accpet config is reduce_overlap."
@@ -1540,6 +1609,9 @@ class TrainingArguments:
 
                     if "enable_stage1_tensor_fusion" in sharding_parallel_config:
                         sharding.grad_bucket_size_numel = 210355872
+
+                    if "enable_release_grads" in sharding_parallel_config:
+                        sharding.release_gradients = True
 
             if self.bf16 or self.fp16:
                 amp = strategy.amp
@@ -1619,6 +1691,7 @@ class TrainingArguments:
                     if x not in [
                         "skip_save_model_weight",
                         "master_weight_compatible",
+                        "remove_master_weight",
                         "async_save",
                         "enable_all_options",
                         "ignore_merge_optimizer",

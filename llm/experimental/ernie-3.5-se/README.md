@@ -2,7 +2,7 @@
 
 ## 1. 模型介绍
 
-我们采用了Attention和FFN并行的Parallel Transformer的实现方式，将FFN和Attention层进行并行计算。通过这样的设计，我们可以把Attention和FFN需要的线形层计算进行算子融合，降低kernel调用以及通讯次数，提升并行训练的效率。并且我们发现第一层的FFN和最后一层的Attn作用不大，因此采用了“掐头去尾”策略，将底层的FFN的计算量挪到模型的顶层，在同FLOPs下效果和传统Transformer结构一致，但有更好的训练速度和吞吐。
+我们采用了 Attention 和 FFN 并行的 Parallel Transformer 的实现方式，将 FFN 和 Attention 层进行并行计算。通过这样的设计，我们可以把 Attention 和 FFN 需要的线形层计算进行算子融合，降低 kernel 调用以及通讯次数，提升并行训练的效率。并且我们发现第一层的 FFN 和最后一层的 Attn 作用不大，因此采用了“掐头去尾”策略，将底层的 FFN 的计算量挪到模型的顶层，在同 FLOPs 下效果和传统 Transformer 结构一致，但有更好的训练速度和吞吐。
 
 <table>
 <tr>
@@ -16,7 +16,7 @@
 </table>
 
 
-* Rope Embedding+[随机位置编码](https://aclanthology.org/2023.acl-short.161)：我们采用的旋转位置编码Rope，并且为了有较好的模型外推能力，我们保留了线形层的Bias。为了提供长文外推能力，我们通过随机间隔取Position Ids，让模型能够有训短推长的能力。
+* Rope Embedding+[随机位置编码](https://aclanthology.org/2023.acl-short.161)：我们采用的旋转位置编码 Rope，并且为了有较好的模型外推能力，我们保留了线形层的 Bias。为了提供长文外推能力，我们通过随机间隔取 Position Ids，让模型能够有训短推长的能力。
 
 <img src="https://github.com/PaddlePaddle/PaddleNLP/assets/20554008/423622c1-aed9-4ea9-83b0-d5d3efbaf35b" title="随机位置编码" height="300">
 
@@ -27,7 +27,7 @@
 
 预训练数据制作参考[此处](../../tools/preprocess/docs/OpenWebText2.md)
 
-为了方便用户运行测试本模型，本项目提供了处理好的100k条doc的训练样本：
+为了方便用户运行测试本模型，本项目提供了处理好的100k 条 doc 的训练样本：
 ```shell
 wget https://bj.bcebos.com/paddlenlp/models/transformers/ernie/data/ernie_openwebtext_100k_ids.npy
 wget https://bj.bcebos.com/paddlenlp/models/transformers/ernie/data/ernie_openwebtext_100k_idx.npz
@@ -86,11 +86,11 @@ python -u -m paddle.distributed.launch \
     --device "gpu"
 ```
 注意：
-1. 需要paddle develop版本训练，需要安装`pip install tool_helpers visualdl==2.5.3`等相关缺失whl包
-2. `use_flash_attention` 需要在A100机器开启，否则loss可能不正常（很快变成0.00x,非常小不正常）。建议使用cuda11.8环境。
+1. 需要 paddle develop 版本训练，需要安装`pip install fast_dataindex visualdl==2.5.3`等相关缺失 whl 包
+2. `use_flash_attention` 需要在 A100机器开启，否则 loss 可能不正常（很快变成0.00x,非常小不正常）。建议使用 cuda11.8环境。
 3. `continue_training` 表示从现有的预训练模型加载训练，如果需要从头开始预训练模型，则设置为0。
-4. `use_fused_ln` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/legacy/model_zoo/gpt-3/external_ops)下的自定义OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置PYTHONPATH
-5. 当前脚本为sharding版本，需要4D并行训练（数据、sharding、张量、流水线并行）的用户，可另外调整相关参数。
+4. `use_fused_ln` 需要安装[此目录](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/slm/model_zoo/gpt-3/external_ops)下的自定义 OP, `python setup.py install`。如果安装后仍然找不到算子，需要额外设置 PYTHONPATH
+5. 当前脚本为 sharding 版本，需要4D 并行训练（数据、sharding、张量、流水线并行）的用户，可另外调整相关参数。
 
 
 
@@ -184,10 +184,10 @@ python finetune_generation.py \
 - `do_train`: 是否训练模型。
 - `do_eval`: 是否评估模型。
 - `tensor_parallel_degree`: 模型并行数量。
-- `eval_with_do_generation`: 在评估的时候是否调用model.generate,默认为False。
+- `eval_with_do_generation`: 在评估的时候是否调用 model.generate,默认为 False。
 - `lora`: 是否使用 LoRA 技术。
 - `merge_weights`: 是否合并原始模型和 LoRA 模型的权重。
-- `lora_rank`: LoRA 算法中rank（秩）的值，默认为8。
+- `lora_rank`: LoRA 算法中 rank（秩）的值，默认为8。
 - `lora_path`: LoRA 参数和配置路径，对 LoRA 参数进行初始化。
 - `task_name`: 内置数据集任务名
 - `data_name`: 内置数据集名，定义数据集名必须同时定义数据集任务名

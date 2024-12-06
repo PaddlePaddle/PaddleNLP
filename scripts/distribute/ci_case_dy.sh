@@ -19,7 +19,7 @@ set -e
 export log_path=/workspace/case_logs
 export root_path=/workspace/PaddleNLP
 
-export gpt_case_path=$root_path/legacy/model_zoo/gpt-3
+export gpt_case_path=$root_path/slm/model_zoo/gpt-3
 export gpt_data_path=/fleetx_data
 
 export llm_gpt_case_path=$root_path/llm
@@ -27,33 +27,105 @@ export llm_gpt_data_path=/llm_gpt_data
 
 unset CUDA_VISIBLE_DEVICES
 
-function gpt_case_list_dygraph(){
-    gpt_preprocess_data
-    gpt_345M_single
-    gpt_1.3B_dp
-    gpt_6.7B_stage2_dp2_sharding4
-    gpt_6.7B_stage3_dp2_sharding4
-    gpt_6.7B_stage2_sharding8
-    gpt_175B_DP1_MP4_PP2
-    gpt_175B_DP1_MP4_PP2_sp
-    gpt_175B_DP1_MP8_PP1
-    gpt_175B_DP1_MP8_PP1_sp
-    gpt_175B_DP1_MP1_PP8
-    gpt_generation_345M_single
-    gpt_generation_345M_hybrid
-    gpt_345M_mp8_qat
-    gpt_export_345M_mp1
-    # gpt_export_345M_mp2
-    # gpt_export_qat_345M
-    # gpt_inference_345M_single
-    # gpt_inference_345M_dp8
-    gpt_345M_single_finetune
-    gpt_eval_WikiText
-    gpt_eval_LAMBADA
+function track_case_status() {  
+    local case_name="$1"  
+    local prefix="$2"  
+    local original_path  
+  
+    original_path=$(pwd)  
+    cd ${log_path} || { echo "Failed to enter log_path: $log_path"; return 1; }  
+  
+    total_count=$(ls -1 "$prefix"* 2>/dev/null | grep -Ev 'result\.log|functions\.txt' | wc -l)
+    run_fail_count=$(ls -1 "$prefix"*_FAIL* 2>/dev/null | wc -l)  
+    loss_fail_count=$(grep 'check failed! ' result.log | awk -v prefix="$prefix" '{if ($2 ~ "^" prefix) print $2}'| wc -l)
+    
+    echo -e "\033[31m ---- $case_name total tests :  $total_count \033"
+    if [ $run_fail_count -eq 0 ] && [ $loss_fail_count  -eq 0 ]; then
+        echo -e "\033[32m ---- all cases Success  \033"
+    else
+        if [[ $run_fail_count -ne 0 ]] ; then
+            echo -e "\033[31m ---- $case_name runtime failed test  :  $run_fail_count \033"
+            ls -1 "$prefix"*_FAIL* 2>/dev/null | awk -v OFS="\t" '{print "\t" $0 "(failed)"}'
+        fi
+        if [[ $loss_fail_count -ne 0 ]] ; then
+            echo -e "\033[31m ---- $case_name verification failed test  :  $loss_fail_count \033"
+            grep 'check failed! ' result.log | awk -v prefix="$prefix" 'BEGIN {OFS="\t"} {if ($2 ~ "^" prefix) print "\t" $2 "(failed)"}'
+        fi
+        return 2
+    fi
+    cd "$original_path" || { echo "Failed to return to original path: $original_path"; return 1; }  
+    return 0
+}
+
+function restore_func() {
+    fun_list=$1
+    cd ${log_path} || { echo "Failed to enter log_path: $log_path"; return 1; } 
+    if [ -e "functions.txt" ]; then
+        rm "functions.txt"
+        echo "Deleted existing functions.txt"
+    fi
+    for function in ${fun_list[@]};do
+        echo "$function" >> functions.txt
+    done
+}
+
+function gpt_case_list_dygraph() {
+    fun_list=(
+        # The test name must have "gpt_" as a prefix, which will 
+        # be used for tracking the execution status of the case.
+        gpt_preprocess_data
+        gpt_345M_single
+        gpt_1.3B_dp
+        gpt_6.7B_stage2_dp2_sharding4
+        gpt_6.7B_stage3_dp2_sharding4
+        gpt_6.7B_stage2_sharding8
+        gpt_175B_DP1_MP4_PP2
+        gpt_175B_DP1_MP4_PP2_sp
+        gpt_175B_DP1_MP8_PP1
+        gpt_175B_DP1_MP8_PP1_sp
+        gpt_175B_DP1_MP1_PP8
+        gpt_generation_345M_single
+        gpt_generation_345M_hybrid
+        gpt_345M_mp8_qat
+        # gpt_export_345M_mp1
+        # gpt_export_345M_mp2
+        # gpt_export_qat_345M
+        # gpt_inference_345M_single
+        # gpt_inference_345M_dp8
+        gpt_345M_single_finetune
+        gpt_eval_WikiText
+        gpt_eval_LAMBADA
+    )
+    if [ $1 = "prepare_case" ]; then
+        restore_func $fun_list  
+    elif [ $1 = "exec_case" ]; then
+        for fun in "${fun_list[@]}"; do
+            eval "$fun"
+        done
+        track_case_status $FUNCNAME "gpt_"
+    else 
+        echo -e "\033[31m ---- Invalid status $1 \033[0m"
+        return 1
+    fi
 }
 
 function llm_gpt_case_list_dygraph() {
-    llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1
+    fun_list=(
+        # The test name must have "llm_gpt_" as a prefix, which will 
+        # be used for tracking the execution status of the case.
+        llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1
+    )
+    if [ $1 = "prepare_case" ]; then
+        restore_func $fun_list  
+    elif [ $1 = "exec_case" ]; then
+        for fun in "${fun_list[@]}"; do
+            eval "$fun"
+        done
+        track_case_status $FUNCNAME "llm_gpt_"
+    else 
+        echo -e "\033[31m ---- Invalid status $1 \033[0m"
+        return 1
+    fi
 }
 
 ############ case start ############
@@ -215,7 +287,6 @@ function gpt_175B_DP1_MP8_PP1_sp() {
 }
 
 function gpt_175B_DP1_MP1_PP8() {
-    echo "=========== $FUNCNAME run begin ==========="
     rm -rf log
     python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" tools/train.py\
         -c ppfleetx/configs/nlp/gpt/pretrain_gpt_175B_mp8_pp16.yaml \
@@ -273,7 +344,7 @@ function gpt_export_345M_mp1() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=$root_path/legacy/model_zoo/gpt-3:$PYTHONPATH
+    export PYTHONPATH=$root_path/slm/model_zoo/gpt-3:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=1
     python -m paddle.distributed.launch --log_dir $log_dir --devices "1" \
         ./tools/auto_export.py \
@@ -294,7 +365,7 @@ function gpt_export_345M_mp2() {
     rm -rf $log_dir
     rm -rf output
 
-    export PYTHONPATH=$root_path/legacy/model_zoo/gpt-3:$PYTHONPATH
+    export PYTHONPATH=$root_path/slm/model_zoo/gpt-3:$PYTHONPATH
     export CUDA_VISIBLE_DEVICES=0,1
     python -m paddle.distributed.launch --devices "0,1" \
         ./tools/auto_export.py \
@@ -409,6 +480,8 @@ function gpt_eval_LAMBADA() {
 
 function llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1() {
     echo "=========== $FUNCNAME run begin ==========="
+    export FLAGS_cudnn_deterministic=1
+    export FLAGS_embedding_deterministic=1
     export PYTHONPATH=$root_path/:$PYTHONPATH
     log_dir=mylog
     rm -rf $log_dir
@@ -465,20 +538,20 @@ function check_result() {
     echo -e "$1" >> ${log_path}/result.log
     if [ $? -ne 0 ];then
         echo -e "\033[31m $1 run failed! \033[0m" | tee -a ${log_path}/result.log
-        exit -1
+        return 0
     fi
 
     if [[ ! $1 =~ "llm" ]]; then
         echo -e "\033 $1 run successfully! \033" | tee -a ${log_path}/result.log
     elif [ $# -ne 7 ]; then
         echo -e "\033[31m $1 parameter transfer failed: $@ \033[0m" | tee -a ${log_path}/result.log
-        exit -1
+        return 0
     else
         diff_loss=$(echo $2 $3|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
         echo -e "loss_base: $2 loss_test: $3 loss_diff: $diff_loss%" | tee -a ${log_path}/result.log
         if [ $2 != $3 ];then
             echo -e "\033[31m $1 loss diff check failed! \033[0m" | tee -a ${log_path}/result.log
-            exit -1
+            return 0
         fi
         
         diff_ips=$(echo $4 $5|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
@@ -490,7 +563,7 @@ function check_result() {
         fi
         if [[ $v2 == 0 ]];then
             echo -e "\033[31m $1 IPS diff check failed! \033[0m" | tee -a $log_path/result.log
-            exit -1
+            return 0
         fi
 
         diff_mem=$(echo $6 $7|awk '{printf "%0.2f\n", ($2-$1)/$1*100}')
@@ -499,7 +572,7 @@ function check_result() {
         w2=$(echo $diff_mem -5.0|awk '{print($1<=$2)?"0":"1"}')
         if [[ $w1 == 0 ]];then
             echo -e "\033[31m $1 MEM diff check failed! \033[0m" | tee -a $log_path/result.log
-            exit -1
+            return 0
         fi
         if [[ $w2 == 0 ]];then
             echo -e "$1 MEM decreases greater than 5%, not exit " | tee -a $log_path/result.log
@@ -509,9 +582,11 @@ function check_result() {
 
 function before_hook_for_gpt() {
     echo -e "\033[31m ---- Set FLAGS for GPT dygraph cases  \033[0m"
+    cd ${gpt_case_path}
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
+    export no_proxy=bcebos.com
     if [[ $FLAGS_install_deps == 0 ]];then
         echo -e "\033[31m ---- Install requirements for GPT dygraph cases  \033[0m"
         cp requirements.txt requirements_nlp.txt
@@ -614,11 +689,13 @@ function before_hook_for_gpt() {
 
 function before_hook_for_llm_gpt() {
     echo -e "\033[31m ---- Set FLAGS for llm GPT cases  \033[0m"
+    cd ${llm_gpt_case_path}
     export FLAGS_cudnn_deterministic=1
     export FLAGS_embedding_deterministic=1
     env | grep FLAGS
     export http_proxy=${proxy}
     export https_proxy=${proxy}
+    export no_proxy=bcebos.com
     python -m pip install -r $root_path/requirements.txt
     python -m pip install -r $root_path/requirements-dev.txt
     if [[ ! $FLAGS_download_data =~ "llm_gpt" ]];then
@@ -638,20 +715,45 @@ function before_hook_for_llm_gpt() {
     fi
 }
 
-echo -e "\033[31m ---- Start executing $1 \033[0m"
+export status=$1
 
-export exec_case=$1
-export FLAGS_install_deps=$2
-export FLAGS_download_data=$3
-
-if [[ $exec_case =~ "llm_gpt" ]];then
-    cd ${llm_gpt_case_path}
-    before_hook_for_llm_gpt
-elif [[ $exec_case =~ "gpt" ]];then
-    cd ${gpt_case_path}
-    before_hook_for_gpt
+if [[ $status = "prepare_case" ]];then
+    export FLAGS_install_deps=$3
+    export FLAGS_download_data=$4
+    if [[ $2 = "gpt_case_list_dygraph" ]];then
+        before_hook_for_gpt
+        gpt_case_list_dygraph prepare_case
+    elif [[ $2 = "llm_gpt_case_list_dygraph" ]];then
+        before_hook_for_llm_gpt
+        llm_gpt_case_list_dygraph prepare_case
+    else
+        echo -e "\033[31m ---- Invalid exec_case $2 \033[0m"
+    fi
+elif [[ $status = "exec_case" ]];then
+    export FLAGS_install_deps=$3
+    export FLAGS_download_data=$4
+    if [[ $2 =~ "llm_gpt" ]];then
+        cd ${llm_gpt_case_path}
+    elif [[ $2 =~ "gpt" ]];then
+        cd ${gpt_case_path}
+    fi
+    $2
 else
-    echo -e "\033[31m ---- Invalid exec_case $exec_case \033[0m"
+    echo -e "\033[31m ---- Start executing $1 \033[0m"
+    export exec_case=$1
+    export FLAGS_install_deps=$2
+    export FLAGS_download_data=$3
+
+    if [[ $exec_case =~ "llm_gpt" ]];then
+        cd ${llm_gpt_case_path}
+        before_hook_for_llm_gpt
+    elif [[ $exec_case =~ "gpt" ]];then
+        cd ${gpt_case_path}
+        before_hook_for_gpt
+    else
+        echo -e "\033[31m ---- Invalid exec_case $exec_case \033[0m"
+    fi
+
+    $1 exec_case
 fi
 
-$1

@@ -148,11 +148,8 @@ class CheckpointConverter:
 
             # In this scenario, the data type of the model state is bfloat16.
             for param_name, param_value in model_params.items():
-                if param_value.is_dist():
-                    master_weight = self.auto_parallel_state_dict[param_name + ".master_weight"]
-                    cast_master_weight = paddle.cast(master_weight._local_value(), param_value.dtype)
-                    paddle.assign(cast_master_weight, param_value._local_value())
-                else:
+                if param_value._is_initialized():
+                    # These codes are compatible for both dense tensor and dist tensor
                     master_weight = self.auto_parallel_state_dict[param_name + ".master_weight"]
                     cast_master_weight = paddle.cast(master_weight, param_value.dtype)
                     paddle.assign(cast_master_weight, param_value)
@@ -217,8 +214,8 @@ class CheckpointConverter:
             assert self.model_meta is not None
             global_model_state_shapes = []
             sharding_metas_keys = []
-            for i in range(self.pp_degree):
-                for j in range(self.tp_degree):
+            for i in range(self.tp_degree):
+                for j in range(self.pp_degree):
                     sharding_metas_keys.append("tp{:02d}_pp{:02d}".format(i, j))
             for key in sharding_metas_keys:
                 param_meta = self.model_meta["sharding_metas"][key]["param_meta"]
@@ -250,29 +247,30 @@ class CheckpointConverter:
             # Generate the optimizer states corresponding to the model weights.
             logger.info("Requesting GPU memory space to concatenate tensors split by sharding1 v2.")
             optimizer_state_dict = {}
-            for key in cur_rank_need_load_model_state_keys:
-                for tp_rank in range(self.tp_degree):
-                    tp_rank_suffix = "_tp{:02d}".format(tp_rank)
-                    optimizer_state_dict[key + ".moment1" + tp_rank_suffix] = paddle.zeros(
-                        (param_flattened_shapes[key],), "float32"
-                    )
-                    optimizer_state_dict[key + ".moment2" + tp_rank_suffix] = paddle.zeros(
-                        (param_flattened_shapes[key],), "float32"
-                    )
-                    if self.optimizer_state_with_master_weights:
-                        optimizer_state_dict[key + ".master_weight" + tp_rank_suffix] = paddle.zeros(
+            with paddle.base.dygraph.guard(place=paddle.CPUPlace()):
+                for key in cur_rank_need_load_model_state_keys:
+                    for tp_rank in range(self.tp_degree):
+                        tp_rank_suffix = "_tp{:02d}".format(tp_rank)
+                        optimizer_state_dict[key + ".moment1" + tp_rank_suffix] = paddle.zeros(
                             (param_flattened_shapes[key],), "float32"
                         )
-                    # When handling tensor parallelism (TP), if some tensors are replicated, we initially assume that they are partitioned.
-                    # Later, when these are compared with the global shape, we realize that they are replicated.
+                        optimizer_state_dict[key + ".moment2" + tp_rank_suffix] = paddle.zeros(
+                            (param_flattened_shapes[key],), "float32"
+                        )
+                        if self.optimizer_state_with_master_weights:
+                            optimizer_state_dict[key + ".master_weight" + tp_rank_suffix] = paddle.zeros(
+                                (param_flattened_shapes[key],), "float32"
+                            )
+                        # When handling tensor parallelism (TP), if some tensors are replicated, we initially assume that they are partitioned.
+                        # Later, when these are compared with the global shape, we realize that they are replicated.
 
-                    optimizer_state_dict[key + ".beta1_pow_acc" + tp_rank_suffix] = paddle.zeros((1,), "float32")
-                    optimizer_state_dict[key + ".beta2_pow_acc" + tp_rank_suffix] = paddle.zeros((1,), "float32")
+                        optimizer_state_dict[key + ".beta1_pow_acc" + tp_rank_suffix] = paddle.zeros((1,), "float32")
+                        optimizer_state_dict[key + ".beta2_pow_acc" + tp_rank_suffix] = paddle.zeros((1,), "float32")
 
             malloc_size = 0
             for opt_state_name, opt_state_value in optimizer_state_dict.items():
-                malloc_size += opt_state_value.numel() * opt_state_value.element_size()
-            malloc_size = malloc_size.numpy() / 2**20
+                malloc_size += opt_state_value.numel().numpy() * opt_state_value.element_size()
+            malloc_size = malloc_size / 2**20
             logger.debug(f"{malloc_size} MB of GPU memory were allocated.")
 
             # merge sharding
@@ -531,6 +529,7 @@ class CheckpointConverter:
             rank_access_files[self.cur_rank] = self.cur_rank_optimizer_state_file_names
 
         global_rank_access_files = self.gather_global_object(rank_access_files)
+        logger.info(f"The file(s) to be loaded for the global rank are: {global_rank_access_files}")
         need_read_files = get_rank_to_read_files(global_rank_access_files, global_rank_access_files)
         logger.info(f"The file(s) to be loaded for the current rank are: {need_read_files}")
         self.cur_rank_loaded_state_dict = {}
@@ -555,9 +554,8 @@ class CheckpointConverter:
         memory_size = 0
         for file, state_dict in self.cur_rank_loaded_state_dict.items():
             for k, v in state_dict.items():
-                memory_size += v.numel() * v.element_size()
-
-        memory_size = memory_size.numpy() / 2**20
+                memory_size += v.numel().numpy() * v.element_size()
+        memory_size = memory_size / 2**20
         logger.debug(
             f"The current rank has finished loading the checkpoint file and has allocated {memory_size} MB of GPU memory."
         )

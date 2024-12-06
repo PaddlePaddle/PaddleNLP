@@ -15,6 +15,8 @@
 #pragma once
 
 #include "fp8_common.h"
+#include "fuse_dual_gemm_swiglu_template.h"
+#include "fuse_dual_gemm_geglu_template.h"
 
 bool fp8_fp8_dual_gemm_scale_bias_act(
     DualGemmEpilogueAllParams params);

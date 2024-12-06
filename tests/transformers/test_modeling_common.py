@@ -926,6 +926,7 @@ class GenerationD2STestMixin:
         paddle.disable_static()
         super().setUp()
 
+    @unittest.skip("Paddle enable PIR API in Python")
     def test_to_static_use_top_k(self):
         tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
         if tokenizer.__class__.__name__ == "LlamaTokenizer":
@@ -1006,6 +1007,7 @@ class GenerationD2STestMixin:
         self.assertEqual(len(static_decoded_ids[0]), self.max_new_tokens)
         self.assertEqual(dygraph_decoded_ids, static_decoded_ids)
 
+    @unittest.skip("Paddle enable PIR API in Python")
     def test_to_static_use_top_p(self):
         tokenizer = self.TokenizerClass.from_pretrained(self.internal_testing_model)
         if tokenizer.__class__.__name__ == "LlamaTokenizer":

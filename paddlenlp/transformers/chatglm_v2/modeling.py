@@ -27,6 +27,7 @@ from paddle.distributed.fleet.utils import recompute
 from paddle.utils import map_structure
 
 from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
+from paddlenlp.utils.log import logger
 
 from ...utils.converter import StateDictNameMapping, init_name_mappings
 from .. import PretrainedModel, linear_utils, register_base_model
@@ -97,7 +98,7 @@ class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, original_impl=False):
         super().__init__()
         self.default_dtype = paddle.get_default_dtype()
-        inv_freq = 1.0 / (10000 ** (paddle.arange(0, dim, 2, dtype="float32") / dim))
+        inv_freq = 1.0 / (10000 ** (paddle.arange(0, dim, 2, dtype=self.default_dtype) / dim))
         self.register_buffer("inv_freq", inv_freq)
         self.dim = dim
         self.original_impl = original_impl
@@ -112,16 +113,16 @@ class RotaryEmbedding(nn.Layer):
         theta = 1.0 / (base ** (paddle.arange(0, n_elem, 2, dtype="float32") / n_elem))
 
         # Create position indexes `[0, 1, ..., seq_len - 1]`
-        seq_idx = paddle.arange(0, seq_len, dtype=theta.dtype)
+        seq_idx = paddle.arange(0, seq_len, dtype="float32")
 
         # Calculate the product of position index and $\theta_i$
-        idx_theta = paddle.outer(seq_idx, theta).astype(self.default_dtype)
+        idx_theta = paddle.outer(seq_idx, theta).astype("float32")
 
         cache = paddle.stack([paddle.cos(idx_theta), paddle.sin(idx_theta)], axis=-1)
 
         # this is to mimic the behaviour of complex32, else we will get different results
-        if self.default_dtype in (paddle.float16, paddle.bfloat16, paddle.int8):
-            cache = cache.astype(self.default_dtype)
+        if self.default_dtype in ("float16", "bfloat16", "int8"):
+            cache = cache.astype("bfloat16") if self.default_dtype == "bfloat16" else cache.astype("float16")
             # cache = cache.bfloat16() if dtype == paddle.bfloat16 else cache.astype("float16")
         return cache
 
@@ -147,7 +148,7 @@ def apply_rotary_pos_emb(x: paddle.Tensor, rope_cache: paddle.Tensor) -> paddle.
         -1,
     )
     x_out2 = x_out2.flatten(3)
-    return paddle.concat((x_out2, x_pass), axis=-1)
+    return paddle.concat((x_out2, x_pass.cast(x_out2.dtype)), axis=-1)
 
 
 class RMSNorm(nn.Layer):
@@ -395,25 +396,56 @@ class SelfAttention(nn.Layer):
         # ==================================
         # core attention computation
         # ==================================
-        attention_fuc = self._core_attention
-
-        has_gradient = (
-            (not query_layer.stop_gradient) or (not key_layer.stop_gradient) or (not value_layer.stop_gradient)
-        )
-        if self.enable_recompute and self.config.recompute_granularity == "core_attn" and has_gradient:
-            context_layer = recompute(
-                attention_fuc,
+        version = paddle.version.full_version
+        version_check = True
+        if self.config.use_flash_attention and version != "0.0.0" and version <= "2.5.2":
+            logger.warning(
+                "PaddlePaddle version 2.5.3 or higher is required, please upgrade your PaddlePaddle to 2.5.3 or other higher version."
+            )
+            version_check = False
+        if self.config.use_flash_attention and version_check:
+            query_layer = query_layer.transpose([1, 0, 2, 3])
+            key_layer = key_layer.transpose([1, 0, 2, 3])
+            value_layer = value_layer.transpose([1, 0, 2, 3])
+            # attention_mask = attention_mask
+            attn_output = F.scaled_dot_product_attention(
                 query_layer,
                 key_layer,
                 value_layer,
-                attention_mask,
-                output_attentions,
-                use_reentrant=False,
+                attn_mask=attention_mask,
+                dropout_p=self.config.attention_dropout,
+                training=self.training,
+                is_causal=False,
             )
+            batch_size, q_length, _, _ = query_layer.shape
+            if self.config.sequence_parallel:
+                context_layer = attn_output.reshape([batch_size * q_length, -1])
+            else:
+                context_layer = attn_output.reshape([q_length, batch_size, -1])
         else:
-            context_layer = attention_fuc(
-                query_layer, key_layer, value_layer, attention_mask=attention_mask, output_attentions=output_attentions
+            attention_fuc = self._core_attention
+
+            has_gradient = (
+                (not query_layer.stop_gradient) or (not key_layer.stop_gradient) or (not value_layer.stop_gradient)
             )
+            if self.enable_recompute and self.config.recompute_granularity == "core_attn" and has_gradient:
+                context_layer = recompute(
+                    attention_fuc,
+                    query_layer,
+                    key_layer,
+                    value_layer,
+                    attention_mask,
+                    output_attentions,
+                    use_reentrant=False,
+                )
+            else:
+                context_layer = attention_fuc(
+                    query_layer,
+                    key_layer,
+                    value_layer,
+                    attention_mask=attention_mask,
+                    output_attentions=output_attentions,
+                )
         # =================
         # Output. [seq_length, b, h]
         # =================
@@ -924,6 +956,11 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
         return mappings
+
+    @classmethod
+    def set_inference_config(cls, config, predictor_args, **kwargs):
+        super().set_inference_config(config, predictor_args, **kwargs)
+        predictor_args.total_max_length = config.seq_length
 
 
 class Embedding(nn.Layer):

@@ -1,6 +1,6 @@
 # RLHF
 
-提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。其中 PPO 代码实现细节参考了 [PKU-Alignment/safe-rlhf](https://github.com/PKU-Alignment/safe-rlhf)（PKU Beaver） 中的 PPO 实现，支持reward normalization、pretraining loss等常用的 PPO 稳定训练策略；示例使用 PKU-Alignment/safe-rlhf 提供的部分数据集和模型。后续将持续完善扩展，支持更好效果、更低成本、更高性能、更大规模的 RLHF 能力。
+提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。其中 PPO 代码实现细节参考了 [PKU-Alignment/safe-rlhf](https://github.com/PKU-Alignment/safe-rlhf)（PKU Beaver） 中的 PPO 实现，支持 reward normalization、pretraining loss 等常用的 PPO 稳定训练策略；示例使用 PKU-Alignment/safe-rlhf 提供的部分数据集和模型。后续将持续完善扩展，支持更好效果、更低成本、更高性能、更大规模的 RLHF 能力。
 
 ## 快速开始
 
@@ -57,7 +57,7 @@ PPO 训练包括 Supervised Fine-Tuning、Reward Model Fine-Tuning、RLHF 三个
 同[LLM 精调](finetune.md)，可以直接参考对应内容进行数据准备。
 
 #### Reward Model Fine-Tuning 数据
-Reward Model Fine-Tuning 阶段需要使用人类偏好数据。示例使用 PKU-Alignment/safe-rlhf 提供的 [PKU-Alignment/PKU-SafeRLHF-30K](https://huggingface.co/datasets/PKU-Alignment/PKU-SafeRLHF-30K) 数据集，下面是其中一条样本，这里使用其中的`prompt、response_0、response_1、better_response_id`字段来组织偏好数据（safe字段，该数据集将helpful 和 harmless 分开标注，示例这里使用其 helpful 标注）。
+Reward Model Fine-Tuning 阶段需要使用人类偏好数据。示例使用 PKU-Alignment/safe-rlhf 提供的 [PKU-Alignment/PKU-SafeRLHF-30K](https://huggingface.co/datasets/PKU-Alignment/PKU-SafeRLHF-30K) 数据集，下面是其中一条样本，这里使用其中的`prompt、response_0、response_1、better_response_id`字段来组织偏好数据（safe 字段，该数据集将 helpful 和 harmless 分开标注，示例这里使用其 helpful 标注）。
 
 ```json
 {
@@ -221,8 +221,8 @@ PYTHONPATH=../../ GLOG_minloglevel=2 python -u -m paddle.distributed.launch run_
 - `update_iters`：一次生成的数据被使用的次数。
 - `kl_coeff`：对 reward 进行 KL-Penalty 的系数。
 - `clip_range_score`：对 reward 进行裁剪的阈值。
-- `clip_range_value`：critic model（value function）对当前sequence的新值与Experience Buffer中旧值的差距超过该范围将进行裁剪。
-- `clip_range_ratio`：将当前sequence的新概率与Experience Buffer中旧概率比值裁剪到`(1-clip_range_ratio, 1+clip_range_ratio)`范围（PPO-Clip）。
+- `clip_range_value`：critic model（value function）对当前 sequence 的新值与 Experience Buffer 中旧值的差距超过该范围将进行裁剪。
+- `clip_range_ratio`：将当前 sequence 的新概率与 Experience Buffer 中旧概率比值裁剪到`(1-clip_range_ratio, 1+clip_range_ratio)`范围（PPO-Clip）。
 - `ptx_coeff`： 预训练损失项 ptx-loss 的系数。
 
 另外所有 [`TrainingArguments` 支持参数配置](https://paddlenlp.readthedocs.io/zh/latest/trainer.html#trainingarguments)将为 actor-model 和 critic-model 的训练复用（如`sharding_stage`），除单独提供了 `critic_learning_rate/critic_weight_decay/critic_lr_scheduler_type/critic_warmup_ratio/critic_recompute` 这些参数支持为 critic-model 训练单独指定相应配置。actor-model 和 critic-model 的 checkpoints 将分别保存在 `output_dir` 所指定目录的 policy 和 value 文件夹下。
@@ -232,14 +232,14 @@ PYTHONPATH=../../ GLOG_minloglevel=2 python -u -m paddle.distributed.launch run_
 - `eval_mode`：支持为空或者设置为 "single"、"tensor_parallel"；通常可以在使用流水线并行训练时设置为"tensor_parallel"，以此在 rollout 生成阶段使用非流水线并行模型并进行生成加速。
 - `offload_level`：支持设置为"freeze_model"、"optimizer"、"train_model"或者同时使用(空格分隔)，分别指示 reward+reference 两个冻结模型、actor+critic 两个训练模型的优化器状态和模型参数的 offload/reload，用于在不同阶段 model/optimizer 使用结束后及时 offload 并在下次使用时 reload 相应参数权重以节省显存。
 
-另外注意，在使用流水线并行时（pipeline_parallel_degree大于1）建议将 `dataloader_drop_last` 设置为 true, 以此避免不同batch size带来的问题。
+另外注意，在使用流水线并行时（pipeline_parallel_degree 大于1）建议将 `dataloader_drop_last` 设置为 true, 以此避免不同 batch size 带来的问题。
 
 
 
 
 ### 推理
 
-训练完成后可以直接使用 `output_dir` 所指定目录中 policy 文件夹下的 checkpoints 按照[LLM 推理](inference.md)部分的介绍来进行推理，请参考相应部分内容。
+训练完成后可以直接使用 `output_dir` 所指定目录中 policy 文件夹下的 checkpoints 按照[LLM 推理](predict/inference.md)部分的介绍来进行推理，请参考相应部分内容。
 
 ## Acknowledge
 

@@ -12,17 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import os
 from shutil import copyfile
 from typing import Dict, List, Optional, Tuple, Union
 
-import numpy as np
 import sentencepiece as spm
+
+from paddlenlp.transformers.convert_slow_tokenizer import import_protobuf
 
 from ...utils.log import logger
 from .. import PretrainedTokenizer
-from ..tokenizer_utils_base import BatchEncoding, EncodedInput, PaddingStrategy
 
 __all__ = ["LlamaTokenizer", "Llama3Tokenizer"]
 
@@ -72,8 +73,7 @@ class LlamaTokenizer(PretrainedTokenizer):
         self.add_bos_token = add_bos_token
         self.add_eos_token = add_eos_token
         self.decode_with_prefix_space = decode_with_prefix_space
-        self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
-        self.sp_model.Load(vocab_file)
+        self.sp_model = self.get_spm_processor(kwargs.pop("from_slow", True))
 
     @property
     def vocab_size(self):
@@ -99,6 +99,23 @@ class LlamaTokenizer(PretrainedTokenizer):
     @property
     def eos_token_id(self) -> Optional[int]:
         return self.sp_model.eos_id()
+
+    def get_spm_processor(self, from_slow=True):
+        tokenizer = spm.SentencePieceProcessor(**self.sp_model_kwargs)
+        if from_slow:  # no dependency on protobuf
+            tokenizer.Load(self.vocab_file)
+            return tokenizer
+
+        with open(self.vocab_file, "rb") as f:
+            sp_model = f.read()
+            model_pb2 = import_protobuf(f"The new behaviour of {self.__class__.__name__} (with `self.legacy = False`)")
+            model = model_pb2.ModelProto.FromString(sp_model)
+            normalizer_spec = model_pb2.NormalizerSpec()
+            normalizer_spec.add_dummy_prefix = False
+            model.normalizer_spec.MergeFrom(normalizer_spec)
+            sp_model = model.SerializeToString()
+            tokenizer.LoadFromSerializedProto(sp_model)
+        return tokenizer
 
     def get_vocab(self):
         """Returns vocab as a dict"""
@@ -226,79 +243,16 @@ class LlamaTokenizer(PretrainedTokenizer):
             return len(token_ids_0 + eos) * [0]
         return len(token_ids_0 + eos + token_ids_1 + eos) * [0]
 
-    def _pad(
-        self,
-        encoded_inputs: Union[Dict[str, EncodedInput], BatchEncoding],
-        max_length: Optional[int] = None,
-        padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
-        pad_to_multiple_of: Optional[int] = None,
-        return_attention_mask: Optional[bool] = None,
-    ) -> dict:
-        """
-        Pad encoded inputs (on left/right and up to predefined length or max length in the batch)
-
-        Args:
-            encoded_inputs:
-                Dictionary of tokenized inputs (`List[int]`) or batch of tokenized inputs (`List[List[int]]`).
-            max_length: maximum length of the returned list and optionally padding length (see below).
-                Will truncate by taking into account the special tokens.
-            padding_strategy: PaddingStrategy to use for padding.
-
-                - PaddingStrategy.LONGEST Pad to the longest sequence in the batch
-                - PaddingStrategy.MAX_LENGTH: Pad to the max length (default)
-                - PaddingStrategy.DO_NOT_PAD: Do not pad
-                The tokenizer padding sides are defined in self.padding_side:
-
-                    - 'left': pads on the left of the sequences
-                    - 'right': pads on the right of the sequences
-            pad_to_multiple_of: (optional) Integer if set will pad the sequence to a multiple of the provided value.
-                This is especially useful to enable the use of Tensor Core on NVIDIA hardware with compute capability
-                >= 7.5 (Volta).
-            return_attention_mask:
-                (optional) Set to False to avoid returning attention mask (default: set to model specifics)
-        """
-        # Load from model defaults
-
-        # attention_mask shape [1,seq_len,seq_len]
-        if "attention_mask" in encoded_inputs and len(np.shape(encoded_inputs["attention_mask"])) > 2:
-            attention_mask = encoded_inputs["attention_mask"]
-            encoded_inputs.pop("attention_mask")
-        else:
-            attention_mask = None
-
-        required_input = encoded_inputs[self.model_input_names[0]]
-        encoded_inputs = super()._pad(
-            encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, return_attention_mask
-        )
-        if attention_mask is not None and len(np.shape(attention_mask)) > 2:
-            encoded_inputs["attention_mask"] = attention_mask
-            needs_to_be_padded = padding_strategy != PaddingStrategy.DO_NOT_PAD and len(required_input) != max_length
-            if needs_to_be_padded:
-                difference = max_length - len(required_input)
-                if "attention_mask" in encoded_inputs:
-                    encoded_inputs["attention_mask"] = np.pad(
-                        encoded_inputs["attention_mask"],
-                        pad_width=[(0, 0), (difference, 0), (difference, 0)],
-                        mode="constant",
-                        constant_values=0,
-                    )
-        return encoded_inputs
-
 
 """Copied Tokenization classes for QWen."""
 
 import base64
 import unicodedata
-from typing import Collection, Dict, List, Optional, Set, Tuple, Union
+from typing import Collection, Set
 
 from ...utils.import_utils import is_tiktoken_available
 from .. import PretrainedTokenizer
-from ..tokenizer_utils_base import (
-    AddedToken,
-    BatchEncoding,
-    EncodedInput,
-    PaddingStrategy,
-)
+from ..tokenizer_utils_base import AddedToken
 
 VOCAB_FILES_NAMES = {"vocab_file": "tokenizer.model"}
 
@@ -336,9 +290,10 @@ class Llama3Tokenizer(PretrainedTokenizer):
         vocab_file,
         errors="replace",
         padding_side="left",
+        add_bos_token=True,
+        add_eos_token=False,
         **kwargs,
     ):
-        super().__init__(**kwargs)
         if not is_tiktoken_available():
             raise ValueError("tiktoken is not installed, please install it use: pip install tiktoken")
 
@@ -367,6 +322,9 @@ class Llama3Tokenizer(PretrainedTokenizer):
 
         self.tokenizer = enc  # type: tiktoken.Encoding
 
+        self.add_bos_token = add_bos_token
+        self.add_eos_token = add_eos_token
+
         self.bod_id = self.special_tokens[BEGINOFTEXT]
         self.eod_id = self.special_tokens[ENDOFTEXT]
         self.start_header_id = self.special_tokens[IMSTART]
@@ -378,11 +336,19 @@ class Llama3Tokenizer(PretrainedTokenizer):
         if "eos_token_id" in kwargs:
             self.eos_token_id = kwargs["eos_token_id"]
 
+        self.bos_token = BEGINOFTEXT
+        self.eos_token = ENDOFTEXT
+        self.bos_token_id = self.bod_id
+        self.eos_token_id = self.eod_id
+        self.pad_token = self.convert_ids_to_tokens(self.eos_token_id)
+
+        super().__init__(pad_token=self.pad_token, **kwargs)
+
     def __len__(self) -> int:
         return self.tokenizer.n_vocab
 
     def get_vocab(self) -> Dict[bytes, int]:
-        return self.mergeable_ranks
+        return {**self.mergeable_ranks, **self.special_tokens}
 
     def convert_tokens_to_ids(self, tokens: Union[bytes, str, List[Union[bytes, str]]]) -> List[int]:
         ids = []
@@ -398,13 +364,44 @@ class Llama3Tokenizer(PretrainedTokenizer):
                 ids.append(self.mergeable_ranks.get(token))
         return ids
 
+    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
+        if isinstance(ids, int):
+            return self.decoder[ids]
+        tokens = []
+        for index in ids:
+            index = int(index)
+            if skip_special_tokens and index >= len(self.mergeable_ranks):
+                continue
+            if index in self.decoder:
+                tokens.append(self.decoder[index])
+        return tokens
+
     def _add_tokens(self, new_tokens: Union[List[str], List[AddedToken]], special_tokens: bool = False) -> int:
         if not special_tokens and new_tokens:
             raise ValueError("Adding regular tokens is not supported")
         for token in new_tokens:
             surface_form = token.content if isinstance(token, AddedToken) else token
             if surface_form not in SPECIAL_TOKENS:
-                raise ValueError("Adding unknown special tokens is not supported")
+                logger.info(f"adding a special token '{surface_form}'.")
+                token_id = len(self.mergeable_ranks) + len(self.special_tokens)
+                self.special_tokens[surface_form] = token_id
+                self.decoder[token_id] = surface_form
+
+        import tiktoken as tk
+
+        tiktoken = tk
+        enc = tiktoken.Encoding(
+            "Llama3",
+            pat_str=PAT_STR,
+            mergeable_ranks=self.mergeable_ranks,
+            special_tokens=self.special_tokens,
+        )
+        assert (
+            len(self.mergeable_ranks) + len(self.special_tokens) == enc.n_vocab
+        ), f"{len(self.mergeable_ranks) + len(self.special_tokens)} != {enc.n_vocab} in encoding"
+
+        self.tokenizer = enc  # type: tiktoken.Encoding
+
         return 0
 
     def save_vocabulary(self, save_directory: str, **kwargs) -> Tuple[str]:
@@ -479,28 +476,16 @@ class Llama3Tokenizer(PretrainedTokenizer):
     def vocab_size(self):
         return self.tokenizer.n_vocab
 
-    def _convert_id_to_token(self, index: int) -> Union[bytes, str]:
-        """Converts an id to a token, special tokens included"""
-        if index in self.decoder:
-            return self.decoder[index]
-        raise ValueError("unknown ids")
+    def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
+        bos_token_id = [self.bod_id] if self.add_bos_token else []
+        eos_token_id = [self.eod_id] if self.add_eos_token else []
 
-    def _convert_token_to_id(self, token: Union[bytes, str]) -> int:
-        """Converts a token to an id using the vocab, special tokens included"""
-        if token in self.special_tokens:
-            return self.special_tokens[token]
-        if token in self.mergeable_ranks:
-            return self.mergeable_ranks[token]
-        raise ValueError("unknown token")
+        output = bos_token_id + token_ids_0 + eos_token_id
 
-    def _tokenize(self, text: str, **kwargs):
-        """
-        Converts a string in a sequence of tokens (string), using the tokenizer. Split in words for word-based
-        vocabulary or sub-words for sub-word-based vocabularies (BPE/SentencePieces/WordPieces).
+        if token_ids_1 is not None:
+            output = output + bos_token_id + token_ids_1 + eos_token_id
 
-        Do NOT take care of added tokens.
-        """
-        raise NotImplementedError
+        return output
 
     def _decode(
         self,
@@ -512,63 +497,5 @@ class Llama3Tokenizer(PretrainedTokenizer):
         if isinstance(token_ids, int):
             token_ids = [token_ids]
         if skip_special_tokens:
-            token_ids = [i for i in token_ids if i < self.eod_id]
+            token_ids = [i for i in token_ids if i <= len(self.mergeable_ranks)]
         return self.tokenizer.decode(token_ids, errors=errors or self.errors)
-
-    def _pad(
-        self,
-        encoded_inputs: Union[Dict[str, EncodedInput], BatchEncoding],
-        max_length: Optional[int] = None,
-        padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
-        pad_to_multiple_of: Optional[int] = None,
-        return_attention_mask: Optional[bool] = None,
-    ) -> dict:
-        """
-        Pad encoded inputs (on left/right and up to predefined length or max length in the batch)
-
-        Args:
-            encoded_inputs:
-                Dictionary of tokenized inputs (`List[int]`) or batch of tokenized inputs (`List[List[int]]`).
-            max_length: maximum length of the returned list and optionally padding length (see below).
-                Will truncate by taking into account the special tokens.
-            padding_strategy: PaddingStrategy to use for padding.
-
-                - PaddingStrategy.LONGEST Pad to the longest sequence in the batch
-                - PaddingStrategy.MAX_LENGTH: Pad to the max length (default)
-                - PaddingStrategy.DO_NOT_PAD: Do not pad
-                The tokenizer padding sides are defined in self.padding_side:
-
-                    - 'left': pads on the left of the sequences
-                    - 'right': pads on the right of the sequences
-            pad_to_multiple_of: (optional) Integer if set will pad the sequence to a multiple of the provided value.
-                This is especially useful to enable the use of Tensor Core on NVIDIA hardware with compute capability
-                >= 7.5 (Volta).
-            return_attention_mask:
-                (optional) Set to False to avoid returning attention mask (default: set to model specifics)
-        """
-        # Load from model defaults
-
-        # attention_mask shape [1,seq_len,seq_len]
-        if "attention_mask" in encoded_inputs and len(np.shape(encoded_inputs["attention_mask"])) > 2:
-            attention_mask = encoded_inputs["attention_mask"]
-            encoded_inputs.pop("attention_mask")
-        else:
-            attention_mask = None
-
-        required_input = encoded_inputs[self.model_input_names[0]]
-        encoded_inputs = super()._pad(
-            encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, return_attention_mask
-        )
-        if attention_mask is not None and len(np.shape(attention_mask)) > 2:
-            encoded_inputs["attention_mask"] = attention_mask
-            needs_to_be_padded = padding_strategy != PaddingStrategy.DO_NOT_PAD and len(required_input) != max_length
-            if needs_to_be_padded:
-                difference = max_length - len(required_input)
-                if "attention_mask" in encoded_inputs:
-                    encoded_inputs["attention_mask"] = np.pad(
-                        encoded_inputs["attention_mask"],
-                        pad_width=[(0, 0), (difference, 0), (difference, 0)],
-                        mode="constant",
-                        constant_values=0,
-                    )
-        return encoded_inputs

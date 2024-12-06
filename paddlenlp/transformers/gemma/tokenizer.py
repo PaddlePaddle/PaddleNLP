@@ -14,20 +14,15 @@
 # limitations under the License.
 
 import os
+import re
 from shutil import copyfile
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
-import numpy as np
 import sentencepiece as spm
 
 from ...utils.log import logger
 from .. import PretrainedTokenizer
-from ..tokenizer_utils_base import (
-    AddedToken,
-    BatchEncoding,
-    EncodedInput,
-    PaddingStrategy,
-)
+from ..tokenizer_utils_base import AddedToken
 
 __all__ = ["GemmaTokenizer"]
 
@@ -317,60 +312,32 @@ class GemmaTokenizer(PretrainedTokenizer):
 
         return output
 
-    def _pad(
-        self,
-        encoded_inputs: Union[Dict[str, EncodedInput], BatchEncoding],
-        max_length: Optional[int] = None,
-        padding_strategy: PaddingStrategy = PaddingStrategy.DO_NOT_PAD,
-        pad_to_multiple_of: Optional[int] = None,
-        return_attention_mask: Optional[bool] = None,
-    ) -> dict:
-        """
-        For Zero Padding, Copied from llama
-
-        Args:
-            encoded_inputs:
-                Dictionary of tokenized inputs (`List[int]`) or batch of tokenized inputs (`List[List[int]]`).
-            max_length: maximum length of the returned list and optionally padding length (see below).
-                Will truncate by taking into account the special tokens.
-            padding_strategy: PaddingStrategy to use for padding.
-
-                - PaddingStrategy.LONGEST Pad to the longest sequence in the batch
-                - PaddingStrategy.MAX_LENGTH: Pad to the max length (default)
-                - PaddingStrategy.DO_NOT_PAD: Do not pad
-                The tokenizer padding sides are defined in self.padding_side:
-
-                    - 'left': pads on the left of the sequences
-                    - 'right': pads on the right of the sequences
-            pad_to_multiple_of: (optional) Integer if set will pad the sequence to a multiple of the provided value.
-                This is especially useful to enable the use of Tensor Core on NVIDIA hardware with compute capability
-                >= 7.5 (Volta).
-            return_attention_mask:
-                (optional) Set to False to avoid returning attention mask (default: set to model specifics)
-        """
-        # Load from model defaults
-
-        # attention_mask shape [1,seq_len,seq_len]
-        if "attention_mask" in encoded_inputs and len(np.shape(encoded_inputs["attention_mask"])) > 2:
-            attention_mask = encoded_inputs["attention_mask"]
-            encoded_inputs.pop("attention_mask")
-        else:
-            attention_mask = None
-
-        required_input = encoded_inputs[self.model_input_names[0]]
-        encoded_inputs = super()._pad(
-            encoded_inputs, max_length, padding_strategy, pad_to_multiple_of, return_attention_mask
+    def _extract_non_learnable_parts(self, origin_msg: List[Dict[str, str]], split_s: List[str]):
+        regex_pattern = "|".join(map(re.escape, split_s))
+        rendered_messages = self.chat_template.render(
+            messages=origin_msg, add_generation_prompt=False, **self.special_tokens_map
         )
-        if attention_mask is not None and len(np.shape(attention_mask)) > 2:
-            encoded_inputs["attention_mask"] = attention_mask
-            needs_to_be_padded = padding_strategy != PaddingStrategy.DO_NOT_PAD and len(required_input) != max_length
-            if needs_to_be_padded:
-                difference = max_length - len(required_input)
-                if "attention_mask" in encoded_inputs:
-                    encoded_inputs["attention_mask"] = np.pad(
-                        encoded_inputs["attention_mask"],
-                        pad_width=[(0, 0), (difference, 0), (difference, 0)],
-                        mode="constant",
-                        constant_values=0,
-                    )
-        return encoded_inputs
+        pattern = re.compile(r"(?:%s)" % regex_pattern)
+        split_positions = [match.span() for match in pattern.finditer(rendered_messages)]
+
+        filtered_positions = []
+        for start, end in split_positions:
+            # Find the last occurrence of '<start_of_turn>' before the split index
+            last_start = rendered_messages.rfind("<start_of_turn>", 0, start)
+            if last_start == -1:
+                continue  # Skip if '<start_of_turn>' is not found
+            model_start = last_start + len("<start_of_turn>")
+
+            # Get the text following 'model_start' and check if it starts with 'model'
+            following_text = rendered_messages[model_start:].lstrip()
+            if following_text.startswith("model"):
+                filtered_positions.append((start, end))
+        non_learnable_parts = []
+        last_end = 0
+        for start, end in filtered_positions:
+            non_learnable_parts.append(rendered_messages[last_end:start])
+            last_end = end
+        remaining_part = rendered_messages[last_end:]
+        if remaining_part:
+            non_learnable_parts.append(remaining_part)
+        return non_learnable_parts

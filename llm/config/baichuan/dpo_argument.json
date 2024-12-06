@@ -24,7 +24,6 @@
     "disable_tqdm": true,
     "load_best_model_at_end": true,
     "tensor_parallel_degree": 8,
-    "sharding_parallel_degree": 1,
     "sharding": "stage1",
     "use_flash_attention": true,
     "recompute": false,

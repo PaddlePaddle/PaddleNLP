@@ -31,7 +31,7 @@ class YuanConfig(PretrainedConfig):
         hidden_act="silu",
         model_max_length=8192,
         initializer_range=0.02,
-        tensor_parallel_output=True,
+        tensor_parallel_output=False,
         rms_norm_eps=1e-6,
         use_cache=True,
         pad_token_id=77185,

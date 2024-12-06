@@ -21,6 +21,7 @@ import warnings
 from functools import partial
 from typing import Optional, Tuple
 
+import numpy as np
 import paddle
 import paddle.distributed.fleet.meta_parallel as mpu
 import paddle.nn.functional as F
@@ -28,7 +29,15 @@ from paddle import Tensor, nn
 from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-from paddle.distributed.fleet.utils import recompute
+
+from paddlenlp.transformers.refined_recompute import (
+    RRColumnParallelLinear,
+    RRColumnSequenceParallelLinear,
+    RRRowParallelLinear,
+    RRRowSequenceParallelLinear,
+    create_skip_config_for_refined_recompute,
+    recompute,
+)
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -70,6 +79,7 @@ from paddlenlp.utils.tools import get_env_device
 from .. import linear_utils
 from ..linear_utils import Linear
 from ..segment_parallel_utils import ReshardLayer
+from ..utils import caculate_llm_flops
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
     LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
@@ -99,14 +109,14 @@ __all__ = [
 
 def _get_interleave(n):
     def _get_interleave_power_of_2(n):
-        start = 2 ** (-(2 ** -(math.log2(n) - 3)))
+        start = 2 ** (-(2 ** -(np.log2(n) - 3)))
         ratio = start
         return [start * ratio**i for i in range(n)]
 
-    if math.log2(n).is_integer():
+    if np.log2(n).is_integer():
         return _get_interleave_power_of_2(n)
     else:
-        closest_power_of_2 = 2 ** math.floor(math.log2(n))
+        closest_power_of_2 = int(2 ** np.floor(np.log2(n)))
         return (
             _get_interleave_power_of_2(closest_power_of_2)
             + _get_interleave(2 * closest_power_of_2)[0::2][: n - closest_power_of_2]
@@ -172,7 +182,7 @@ def assign_kv_heads(num_kv_heads: int, num_gpus: int):
     return assignment_list
 
 
-def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
+def parallel_matmul(x: Tensor, y: Tensor, transpose_y=False, tensor_parallel_output=True):
     is_fleet_init = True
     tensor_parallel_degree = 1
     try:
@@ -190,7 +200,7 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
     if is_fleet_init and tensor_parallel_degree > 1 and y_is_distributed:
         # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
         input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
-        logits = paddle.matmul(input_parallel, y, transpose_y=False)
+        logits = paddle.matmul(input_parallel, y, transpose_y=transpose_y)
 
         if tensor_parallel_output:
             return logits
@@ -198,7 +208,7 @@ def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output=True):
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
 
     else:
-        logits = paddle.matmul(x, y, transpose_y=False)
+        logits = paddle.matmul(x, y, transpose_y=transpose_y)
         return logits
 
 
@@ -214,6 +224,7 @@ def scaled_dot_product_attention(
     sequence_parallel=False,
     reshard_layer=None,
     npu_is_casual=False,
+    skip_recompute=False,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -231,6 +242,7 @@ def scaled_dot_product_attention(
             sequence_parallel,
             reshard_layer,
             npu_is_casual,
+            skip_recompute=skip_recompute,
         )
 
         # Paddle Flash Attention input [ bz, seqlen, nhead, head_dim]
@@ -247,7 +259,12 @@ def scaled_dot_product_attention(
         value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
         # matmul and devide by sqrt(head_dim)
-        attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+        if get_env_device() == "intel_hpu":
+            # optimize div(const) to mul(const) for better performance
+            attn_weights = paddle.matmul(query_states * (1 / math.sqrt(head_dim)), key_states.transpose([0, 1, 3, 2]))
+        else:
+            attn_weights = paddle.matmul(query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2]))
+
         # then add alibi bias
         if alibi is not None:
             alibi = alibi.reshape([bsz, num_heads, 1, -1])
@@ -318,7 +335,7 @@ def _make_causal_mask(input_ids_shape, past_key_values_length):
     """
     batch_size, target_length = input_ids_shape  # target_length: seq_len
 
-    if get_env_device() == "npu" or get_env_device() == "mlu":
+    if get_env_device() in ["npu", "mlu", "intel_hpu"]:
         mask = paddle.tril(paddle.ones((target_length, target_length))).astype("int32")
     else:
         mask = paddle.tril(paddle.ones((target_length, target_length), dtype="bool"))
@@ -413,7 +430,11 @@ class LlamaRotaryEmbedding(nn.Layer):
         # [seq_len]
         t = paddle.arange(seq_len, dtype="float32")
         # [seq_len, dim/2]
-        freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+        if get_env_device() == "intel_hpu":
+            # fallback einsum to intel Gaudi TPC since MME doesn't support FP32
+            freqs = t.unsqueeze(1) * self.inv_freq.unsqueeze(0)
+        else:
+            freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         # [seq_len, dim]
         emb = paddle.concat([freqs, freqs], axis=-1)
@@ -424,6 +445,9 @@ class LlamaRotaryEmbedding(nn.Layer):
 
     def forward(self, x, seq_len=None):
         # x: [bs, num_attention_heads, seq_len, head_size]
+        if self.cos_cached.dtype != x.dtype and get_env_device() == "intel_hpu":
+            self.cos_cached = self.cos_cached.cast(x.dtype)
+            self.sin_cached = self.sin_cached.cast(x.dtype)
         cos = self.cos_cached[:, :seq_len, :, :]
         sin = self.sin_cached[:, :seq_len, :, :]
         return (
@@ -449,7 +473,11 @@ class LlamaLinearScalingRotaryEmbedding(LlamaRotaryEmbedding):
         t = paddle.arange(seq_len, dtype="float32")
         t = t / self.scaling_factor
         # [seq_len, dim/2]
-        freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
+        if get_env_device() == "intel_hpu":
+            # fallback einsum to intel Gaudi TPC since MME doesn't support FP32
+            freqs = t.unsqueeze(1) * self.inv_freq.unsqueeze(0)
+        else:
+            freqs = paddle.einsum("i,j->ij", t, self.inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
         # [seq_len, dim]
         emb = paddle.concat([freqs, freqs], axis=-1)
@@ -587,9 +615,23 @@ class LlamaMLP(nn.Layer):
         if config.sequence_parallel:
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
             RowParallelLinear = linear_utils.RowSequenceParallelLinear
+
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                    ColumnParallelLinear = RRColumnSequenceParallelLinear
+                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                    RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
+
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                    ColumnParallelLinear = RRColumnParallelLinear
+                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                    RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             if config.fuse_attention_ffn:
@@ -630,20 +672,6 @@ class LlamaMLP(nn.Layer):
 
     def forward(self, x):
         if self.fuse_attention_ffn:
-            # FIXME(yangjianbang): use paddle's native swiglu
-            if get_env_device() == "xpu":
-                try:
-                    import paddle_xpu_nn  # noqa: F821
-
-                    out = self.gate_up_fused_proj(x)
-                    out = paddle_xpu_nn.xpu_swiglu(out, axis=-1, turn=True)
-                    out = self.down_proj(out)
-                    return out
-                except ImportError:
-                    gate_out, up_out = paddle.chunk(self.gate_up_fused_proj(x), chunks=2, axis=-1)
-                    out = self.down_proj(F.silu(gate_out) * up_out)
-                    return out
-
             x = swiglu(self.gate_up_fused_proj(x))
         else:
             x = swiglu(self.gate_proj(x), self.up_proj(x))
@@ -704,7 +732,7 @@ class LlamaAttention(nn.Layer):
                 )
 
         self.use_fused_rope = config.use_fused_rope
-        if self.use_fused_rope and get_env_device() not in ["npu", "mlu", "xpu", "gcu"]:
+        if self.use_fused_rope and get_env_device() not in ["npu", "mlu", "xpu", "gcu", "intel_hpu"]:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
@@ -715,9 +743,22 @@ class LlamaAttention(nn.Layer):
         if config.sequence_parallel:
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
             RowParallelLinear = linear_utils.RowSequenceParallelLinear
+
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("attention_column_ln", False):
+                    ColumnParallelLinear = RRColumnSequenceParallelLinear
+                if config.skip_recompute_ops.get("attention_row_ln", False):
+                    RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
+            # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+            if config.recompute and not config.recompute_use_reentrant:
+                if config.skip_recompute_ops.get("attention_column_ln", False):
+                    ColumnParallelLinear = RRColumnParallelLinear
+                if config.skip_recompute_ops.get("attention_row_ln", False):
+                    RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
             if self.fuse_attention_qkv:
@@ -816,6 +857,14 @@ class LlamaAttention(nn.Layer):
         self.config = config
 
         self.attn_func = scaled_dot_product_attention
+
+        # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
+        if (
+            config.recompute
+            and not config.recompute_use_reentrant
+            and config.skip_recompute_ops.get("flash_attn", False)
+        ):
+            self.attn_func = partial(scaled_dot_product_attention, skip_recompute=True)
 
     def _init_rope(self):
         if (
@@ -1266,7 +1315,8 @@ class LlamaPretrainedModel(PretrainedModel):
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
                 mapping[1] = "llama." + mapping[1]
-            model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
+            if not config.tie_word_embeddings:
+                model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
 
         mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
@@ -1287,12 +1337,16 @@ class LlamaPretrainedModel(PretrainedModel):
             final_actions = {}
 
             base_actions = {
-                "lm_head.weight": partial(fn, is_column=True),
                 # Row Linear
                 "embed_tokens.weight": partial(fn, is_column=False),
                 "layers.0.self_attn.o_proj.weight": partial(fn, is_column=False),
                 "layers.0.mlp.down_proj.weight": partial(fn, is_column=False),
             }
+
+            if config.tie_word_embeddings:
+                base_actions["lm_head.weight"] = partial(fn, is_column=False)
+            else:
+                base_actions["lm_head.weight"] = partial(fn, is_column=True)
 
             if not config.vocab_size % config.tensor_parallel_degree == 0:
                 base_actions.pop("lm_head.weight")
@@ -1462,11 +1516,49 @@ class LlamaModel(LlamaPretrainedModel):
             )
 
         self.layers = nn.LayerList(
-            [LlamaDecoderLayer(config, i not in self.no_recompute_layers) for i in range(config.num_hidden_layers)]
+            [
+                LlamaDecoderLayer(
+                    create_skip_config_for_refined_recompute(i, config), i not in self.no_recompute_layers
+                )
+                for i in range(config.num_hidden_layers)
+            ]
         )
         self.norm = LlamaRMSNorm(config)
 
         self.gradient_checkpointing = False
+
+    def get_model_flops(self, batch_size=1, seq_length=None, **kwargs):
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return caculate_llm_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=False,
+        )
+
+    def get_hardware_flops(self, batch_size=1, seq_length=None, recompute=False, **kwargs):
+        if seq_length is None:
+            if hasattr(self.config, "seq_length"):
+                seq_length = self.config.seq_length
+            else:
+                seq_length = 2048
+
+        return caculate_llm_flops(
+            hidden_size=self.config.hidden_size,
+            intermediate_size=self.config.intermediate_size,
+            layer_num=self.config.num_hidden_layers,
+            vocab_size=self.config.vocab_size,
+            seq_length=seq_length,
+            recompute=recompute,
+            recompute_granularity=self.config.recompute_granularity,
+        )
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1485,7 +1577,7 @@ class LlamaModel(LlamaPretrainedModel):
                     combined_attention_mask = _make_causal_mask(
                         input_shape, past_key_values_length=past_key_values_length
                     )
-                    if get_env_device() == "npu" or get_env_device() == "mlu":
+                    if get_env_device() in ["npu", "mlu", "intel_hpu"]:
                         expanded_attn_mask = expanded_attn_mask.astype("bool") & combined_attention_mask.astype("bool")
                     else:
                         expanded_attn_mask = expanded_attn_mask & combined_attention_mask
@@ -1498,14 +1590,15 @@ class LlamaModel(LlamaPretrainedModel):
         else:
             expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
-        if get_env_device() == "npu" or get_env_device() == "mlu":
+        if get_env_device() in ["npu", "mlu", "intel_hpu"]:
             x = paddle.to_tensor(0.0, dtype="float32")
             y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float32")
             expanded_attn_mask = expanded_attn_mask.astype("float32")
             expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
         elif get_env_device() in ["xpu", "gcu"]:
+            min_val = paddle.finfo(dtype).min if get_env_device() == "gcu" else -1e37  # mask value for xpu
             x = paddle.to_tensor(0.0, dtype=dtype)
-            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype=dtype)
+            y = paddle.to_tensor(min_val, dtype=dtype)
             expanded_attn_mask = expanded_attn_mask.astype(dtype)
             expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
         else:
@@ -1648,7 +1741,11 @@ class LlamaModel(LlamaPretrainedModel):
 
         is_casual = False
 
-        if attn_mask_startend_row_indices is None and self.config.use_flash_attention and get_env_device() != "gcu":
+        if (
+            attn_mask_startend_row_indices is None
+            and self.config.use_flash_attention
+            and get_env_device() not in ["gcu", "intel_hpu"]
+        ):
             if self.config.use_flash_attention_for_generation or use_casual_mask:
                 is_casual = True
             else:
@@ -1808,7 +1905,7 @@ class ConcatMaskedLoss(PyLayer):
 
 
 class LlamaLMHead(nn.Layer):
-    def __init__(self, config: LlamaConfig):
+    def __init__(self, config: LlamaConfig, embedding_weights=None, transpose_y=False):
         super(LlamaLMHead, self).__init__()
         self.config = config
         if config.tensor_parallel_degree > 1 and config.vocab_size % config.tensor_parallel_degree == 0:
@@ -1816,21 +1913,32 @@ class LlamaLMHead(nn.Layer):
         else:
             vocab_size = config.vocab_size
 
-        if vocab_size != config.vocab_size:
-            with get_rng_state_tracker().rng_state():
+        self.transpose_y = transpose_y
+        if transpose_y:
+            if embedding_weights is not None:
+                self.weight = embedding_weights
+            else:
+                self.weight = self.create_parameter(
+                    shape=[vocab_size, config.hidden_size],
+                    dtype=paddle.get_default_dtype(),
+                )
+        else:
+            if vocab_size != config.vocab_size:
+                with get_rng_state_tracker().rng_state():
+                    self.weight = self.create_parameter(
+                        shape=[config.hidden_size, vocab_size],
+                        dtype=paddle.get_default_dtype(),
+                    )
+            else:
                 self.weight = self.create_parameter(
                     shape=[config.hidden_size, vocab_size],
                     dtype=paddle.get_default_dtype(),
                 )
-        else:
-            self.weight = self.create_parameter(
-                shape=[config.hidden_size, vocab_size],
-                dtype=paddle.get_default_dtype(),
-            )
         # Must set distributed attr for Tensor Parallel !
         self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
         if self.weight.is_distributed:
-            self.weight.split_axis = 1
+            # for tie_word_embeddings
+            self.weight.split_axis = 0 if self.transpose_y else 1
         if get_env_device() == "xpu":
             try:
                 from paddle_xpu.layers.nn import (  # noqa: F401
@@ -1858,22 +1966,33 @@ class LlamaLMHead(nn.Layer):
 
         if get_env_device() == "xpu" and self.xpu_parallel_matmul is not None:
             logits = self.xpu_parallel_matmul(
-                hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output, training=self.training
+                hidden_states,
+                self.weight,
+                transpose_y=self.transpose_y,
+                tensor_parallel_output=tensor_parallel_output,
+                training=self.training,
             )
         else:
-            logits = parallel_matmul(hidden_states, self.weight, tensor_parallel_output=tensor_parallel_output)
+            logits = parallel_matmul(
+                hidden_states, self.weight, transpose_y=self.transpose_y, tensor_parallel_output=tensor_parallel_output
+            )
         return logits
 
 
 class LlamaForCausalLM(LlamaPretrainedModel):
     enable_to_static_method = True
+    _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config):
         super().__init__(config)
         self.config = config
 
         self.llama = LlamaModel(config)
-        self.lm_head = LlamaLMHead(config)
+        if config.tie_word_embeddings:
+            self.lm_head = LlamaLMHead(config, embedding_weights=self.llama.embed_tokens.weight, transpose_y=True)
+            self.tie_weights()
+        else:
+            self.lm_head = LlamaLMHead(config)
         self.criterion = LlamaPretrainingCriterion(config)
 
     def get_input_embeddings(self):

@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cd ../legacy/model_zoo/gpt/data_tools/
+cd ../slm/model_zoo/gpt/data_tools/
 sed -i "s/python3/python/g" Makefile
 sed -i "s/python-config/python3.7m-config/g" Makefile
 cd -
 
-cd ../legacy/model_zoo/gpt-3/data_tools/
+cd ../slm/model_zoo/gpt-3/data_tools/
 sed -i "s/python3/python/g" Makefile
 sed -i "s/python-config/python3.7m-config/g" Makefile
 cd -
@@ -30,7 +30,7 @@ cd -
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
 
 python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
-python -m pip install tool_helpers -i https://mirror.baidu.com/pypi/simple
+python -m pip install fast_dataindex -i https://mirror.baidu.com/pypi/simple
 python -m pip install setuptools_scm 
 python -m pip install Cython 
 python -m pip install -r ../requirements.txt  #-i https://pypi.tuna.tsinghua.edu.cn/simple

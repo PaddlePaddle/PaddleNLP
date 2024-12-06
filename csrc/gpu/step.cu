@@ -102,7 +102,6 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
         }
         __syncthreads();
     }
-
     // 为需要block的位置分配block，每个位置分配一个block
     if (tid < need_block_len[0]) {
         const int need_block_id = need_block_list[tid];
@@ -116,33 +115,33 @@ __global__ void free_and_dispatch_block(bool *stop_flags,
         need_block_list[tid] = -1;
     }
     __syncthreads();
-
     // 计算可以复原的query id
     if (tid == 0) {
         int ori_free_list_len = free_list_len[0];
         int ori_step_len = step_len[0];
-        printf("ori_step_len %d\n", ori_step_len);
-        int ori_step_block_id = step_block_list[ori_step_len - 1];
-        int tmp_used_len = used_list_len[ori_step_block_id];
-        // 比之前调度时多分配一个block，防止马上恢复刚调度的query(比如回收的seq_id在need_block_list中）
-        int used_len = tmp_used_len < max_decoder_block_num ? tmp_used_len + 1 : tmp_used_len;
-        while (ori_step_len > 0 && ori_free_list_len >= used_len) {
+        if (ori_step_len > 0) {
+            int ori_step_block_id = step_block_list[ori_step_len - 1];
+            int tmp_used_len = used_list_len[ori_step_block_id];
+            // 比之前调度时多分配一个block，防止马上恢复刚调度的query(比如回收的seq_id在need_block_list中）
+            int used_len = tmp_used_len < max_decoder_block_num ? tmp_used_len + 1 : tmp_used_len;
+            while (ori_step_len > 0 && ori_free_list_len >= used_len) {
 #ifdef DEBUG_STEP
-            printf("recover seq_id: %d, free_list_len: %d, used_list_len: %d\n", 
-                    ori_step_block_id, ori_free_list_len, used_len);
+                printf("recover seq_id: %d, free_list_len: %d, used_list_len: %d\n", 
+                        ori_step_block_id, ori_free_list_len, used_len);
 #endif
-            recover_block_list[recover_len[0]] = ori_step_block_id;
-            is_block_step[ori_step_block_id] = false;
-            used_list_len[ori_step_block_id] = used_len;
-            ori_free_list_len -= used_len;
-            step_block_list[ori_step_len - 1] = -1;
-            step_len[0] -= 1;
-            recover_len[0] += 1;
-            ori_step_len = step_len[0];
-            if (ori_step_len > 0) {
-                ori_step_block_id = step_block_list[ori_step_len - 1];
-                tmp_used_len = used_list_len[ori_step_block_id];
-                used_len = tmp_used_len < max_decoder_block_num ? tmp_used_len + 1 : tmp_used_len;
+                recover_block_list[recover_len[0]] = ori_step_block_id;
+                is_block_step[ori_step_block_id] = false;
+                used_list_len[ori_step_block_id] = used_len;
+                ori_free_list_len -= used_len;
+                step_block_list[ori_step_len - 1] = -1;
+                step_len[0] -= 1;
+                recover_len[0] += 1;
+                ori_step_len = step_len[0];
+                if (ori_step_len > 0) {
+                    ori_step_block_id = step_block_list[ori_step_len - 1];
+                    tmp_used_len = used_list_len[ori_step_block_id];
+                    used_len = tmp_used_len < max_decoder_block_num ? tmp_used_len + 1 : tmp_used_len;
+                }
             }
         }
         need_block_len[0] = 0;

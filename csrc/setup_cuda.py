@@ -19,17 +19,21 @@ import paddle
 from paddle.utils.cpp_extension import CUDAExtension, setup
 
 
-def clone_git_repo(version, repo_url, destination_path):
+def update_git_submodule():
     try:
-        subprocess.run(["git", "clone", "-b", version, "--single-branch", repo_url, destination_path], check=True)
-        return True
+        subprocess.run(["git", "submodule", "update", "--init"], check=True)
     except subprocess.CalledProcessError as e:
-        print(f"Git clone {repo_url} operation failed with the following error: {e}")
-        print("Please check your network connection or access rights to the repository.")
-        print(
-            "If the problem persists, please refer to the README file for instructions on how to manually download and install the necessary components."
-        )
-        return False
+        print(f"Error occurred while updating git submodule: {str(e)}")
+        raise
+
+
+def find_end_files(directory, end_str):
+    gen_files = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(end_str):
+                gen_files.append(os.path.join(root, file))
+    return gen_files
 
 
 def get_sm_version():
@@ -50,10 +54,10 @@ def strtobool(v):
             f"Truthy value expected: got {v} but expected one of yes/no, true/false, t/f, y/n, 1/0 (case insensitive)."
         )
 
+
 def get_gencode_flags():
     if not strtobool(os.getenv("FLAG_LLM_PDC", "False")):
-        prop = paddle.device.cuda.get_device_properties()
-        cc = prop.major * 10 + prop.minor
+        cc = get_sm_version()
         return ["-gencode", "arch=compute_{0},code=sm_{0}".format(cc)]
     else:
         # support more cuda archs
@@ -70,6 +74,7 @@ def get_gencode_flags():
 gencode_flags = get_gencode_flags()
 library_path = os.environ.get("LD_LIBRARY_PATH", "/usr/local/cuda/lib64")
 
+sm_version = get_sm_version()
 
 sources = [
     "./gpu/save_with_output.cc",
@@ -97,16 +102,15 @@ sources = [
     "./gpu/dequant_int8.cu",
     "./gpu/flash_attn_bwd.cc",
     "./gpu/tune_cublaslt_gemm.cu",
+    "./gpu/sample_kernels/top_p_sampling_reject.cu",
+    "./gpu/update_inputs_v2.cu",
+    "./gpu/set_preids_token_penalty_multi_scores.cu",
+    "./gpu/speculate_decoding_kernels/ngram_match.cc",
 ]
+sources += find_end_files("./gpu/speculate_decoding_kernels", ".cu")
 
-cutlass_dir = "gpu/cutlass_kernels/cutlass"
 nvcc_compile_args = gencode_flags
-
-if not os.path.exists(cutlass_dir) or not os.listdir(cutlass_dir):
-    if not os.path.exists(cutlass_dir):
-        os.makedirs(cutlass_dir)
-    clone_git_repo("v3.5.0", "https://github.com/NVIDIA/cutlass.git", cutlass_dir)
-
+update_git_submodule()
 nvcc_compile_args += [
     "-O3",
     "-U__CUDA_NO_HALF_OPERATORS__",
@@ -115,21 +119,36 @@ nvcc_compile_args += [
     "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
     "-U__CUDA_NO_BFLOAT162_OPERATORS__",
     "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-    "-Igpu/cutlass_kernels",
-    "-Igpu/cutlass_kernels/cutlass/include",
-    "-Igpu/fp8_gemm_with_cutlass",
     "-Igpu",
+    "-Igpu/cutlass_kernels",
+    "-Igpu/fp8_gemm_with_cutlass",
+    "-Igpu/cutlass_kernels/fp8_gemm_fused/autogen",
+    "-Ithird_party/cutlass/include",
+    "-Ithird_party/nlohmann_json/single_include",
+    "-Igpu/sample_kernels",
 ]
+
 cc = get_sm_version()
+cuda_version = float(paddle.version.cuda())
 if cc >= 80:
     sources += ["gpu/int8_gemm_with_cutlass/gemm_dequant.cu"]
 
-if cc >= 89:
+    sources += [
+        "./gpu/append_attention.cu",
+        "./gpu/append_attn/get_block_shape_and_split_kv_block.cu",
+        "./gpu/append_attn/decoder_write_cache_with_rope_kernel.cu",
+        "./gpu/append_attn/speculate_write_cache_with_rope_kernel.cu",
+    ]
+    sources += find_end_files("./gpu/append_attn/template_instantiation", ".cu")
+
+if cc >= 89 and cuda_version >= 12.4:
+    os.system("python utils/auto_gen_fp8_fp8_gemm_fused_kernels.py")
+    os.system("python utils/auto_gen_fp8_fp8_dual_gemm_fused_kernels.py")
+    sources += find_end_files("gpu/cutlass_kernels/fp8_gemm_fused/autogen", ".cu")
     sources += [
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_gemm.cu",
-        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.cu",
+        "gpu/fp8_gemm_with_cutlass/fp8_fp8_half_cuda_core_gemm.cu",
         "gpu/fp8_gemm_with_cutlass/fp8_fp8_fp8_dual_gemm.cu",
-        "gpu/cutlass_kernels/fp8_gemm_fused/fp8_fp8_dual_gemm_scale_bias_act.cu",
     ]
 
 setup(

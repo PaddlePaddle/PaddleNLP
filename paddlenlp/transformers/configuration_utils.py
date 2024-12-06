@@ -268,6 +268,14 @@ class LlmMetaConfig:
             "Recompute granularity, Choose among ['full', 'core_attn', 'full_attn']",
         ),
         ("recompute_use_reentrant", bool, False, "recompute_use_reentrant"),
+        # refined_recompute attributes
+        (
+            "refined_recompute",
+            str,
+            "",
+            "refined_recompute, Choose from 'mlp_row_ln', 'mlp_column_ln', 'attention_row_ln', 'attention_column_ln', 'flash_attn']",
+        ),
+        ("skip_recompute_ops", Optional[Dict[str, int]], None, "skip_recompute_ops"),
     ]
 
     @classmethod
@@ -826,7 +834,8 @@ class PretrainedConfig:
 
         # Get config dict associated with the base config file
         config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
-
+        if config_dict is None:
+            return {}, kwargs
         # That config file may point us toward another config file to use.
         if "configuration_files" in config_dict:
             original_kwargs["cache_dir"] = os.path.join(cache_dir, pretrained_model_name_or_path, subfolder)
@@ -875,9 +884,8 @@ class PretrainedConfig:
             from_aistudio=from_aistudio,
             from_hf_hub=from_hf_hub,
         )
-        assert (
-            resolved_config_file is not None
-        ), f"please make sure one of the {filenames} under {pretrained_model_name_or_path}"
+        if resolved_config_file is None:
+            return None, kwargs
         try:
             logger.info(f"Loading configuration file {resolved_config_file}")
             # Load config dict
