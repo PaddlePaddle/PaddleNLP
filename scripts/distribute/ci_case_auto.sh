@@ -2022,6 +2022,7 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2(){
         --sequence_parallel 0 \
         --fuse_attention_qkv 1 \
         --use_flash_attention 1 \
+        --fused_linear_param_grad_add 1\
         --scale_loss 1024 \
         --learning_rate 0.00001 \
         --min_learning_rate 0.000005 \
