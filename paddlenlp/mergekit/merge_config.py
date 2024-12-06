@@ -36,8 +36,8 @@ class MergeConfig:
     )
     n_process: int = field(default=1, metadata={"help": "Number of processes to use for the merge."})
     merge_preifx: str = field(default="model", metadata={"help": "Prefix name: model or master_weights"})
-    merge_method: str = field(default=None, metadata={"help": "The merge strategy."})
-    merge_type: str = field(default=None, metadata={"help": "The type of merge process."})
+    merge_method: str = field(default="linear", metadata={"help": "The merge strategy."})
+    merge_type: str = field(default="linear", metadata={"help": "The type of merge process."})
     sparsify_type: str = field(default=None, metadata={"help": "The type of sparsify process."})
 
     # Model parameters
@@ -70,32 +70,34 @@ class MergeConfig:
         self.config_check()
 
     def config_check(self):
-        if self.tensor_type not in ["pd", "np"]:
-            raise ValueError(f"Unsupported tensor type: {self.tensor_type}. Please choose one from ['pd', 'np'].")
+        if self.tensor_type not in ["np"]:
+            raise ValueError(f"Unsupported tensor type: {self.tensor_type}. Support 'np' only.")
         if self.device != "cpu":
             logger.warning(f"Currently only support cpu device, but got {self.device}. Setting `device` to `cpu`.")
             self.device = "cpu"
             self.tensor_type = "np"
 
-        if self.merge_method is None and self.merge_type is None:
-            raise ValueError("Please specify the merge_method or merge_type")
         elif self.merge_method not in ["linear", "ties", "slerp", "della_linear", "della_ties", "dare", "dare_ties"]:
             raise ValueError(
                 f"Unsupported merge strategy: {self.merge_method}. Please choose one from ['linear', 'slerp']."
             )
-        if self.weight_list is None:
-            self.weight_list = [1.0] * len(self.model_name_or_path_list)
-            self.normalize = True
-        if len(self.model_name_or_path_list) != len(self.weight_list):
-            raise ValueError("The length of model_name_or_path_list and weight_list must be the same.")
-        if self.output_path is None:
-            raise ValueError("Please specify the output_path.")
+        if self.model_name_or_path_list is not None:
+            if not isinstance(self.model_name_or_path_list, list) or len(self.model_name_or_path_list) < 2:
+                raise ValueError(
+                    f"Please specify the model_name_or_path_list at least two. But got {self.model_name_or_path_list}"
+                )
+            if self.weight_list is None:
+                self.weight_list = [1.0] * len(self.model_name_or_path_list)
+                self.normalize = True
+            if len(self.model_name_or_path_list) != len(self.weight_list):
+                raise ValueError("The length of model_name_or_path_list and weight_list must be the same.")
         if self.reserve_p < 0 or self.reserve_p > 1:
             raise ValueError("reserve_p must be between 0 and 1.")
-        if self.reserve_p <= self.epsilon / 2 or self.reserve_p >= (1 - self.epsilon):
-            raise ValueError(
-                f"Error: reserve_p +- epsilon/2 must be in the range (0, 1). reserve_p + epsilon/2 = {self.reserve_p + self.epsilon / 2 }, reserve_p - epsilon/2 = {self.reserve_p - self.epsilon / 2 }"
-            )
+        if "della" in self.merge_method or self.sparsify_type == "magprune":
+            if self.reserve_p <= self.epsilon / 2 or self.reserve_p >= (1 - self.epsilon):
+                raise ValueError(
+                    f"Error: reserve_p +- epsilon/2 must be in the range (0, 1). reserve_p + epsilon/2 = {self.reserve_p + self.epsilon / 2 }, reserve_p - epsilon/2 = {self.reserve_p - self.epsilon / 2 }"
+                )
         paddle.set_device(self.device)
 
     @property

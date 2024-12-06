@@ -35,6 +35,7 @@ target_lists_for_llm=(
     "paddlenlp/datasets"
     "paddlenlp/generation"
     "paddlenlp/peft"
+    "paddlenlp/mergekit"
     "paddlenlp/quantization"
     "paddlenlp/trainer"
     "paddlenlp/trl"

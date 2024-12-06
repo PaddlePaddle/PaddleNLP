@@ -23,14 +23,14 @@ class MergeMethod:
     def merge(self, tensor_list):
         if self.sparsify_method is not None:
             tensor_list = [self.sparsify_method.sparsify(tensor) for tensor in tensor_list]
-        if self.merge_config.merge_method == "linear":
+        if self.merge_config.merge_type == "linear":
             return self.linear(tensor_list)
-        elif self.merge_config.merge_method == "slerp":
+        elif self.merge_config.merge_type == "slerp":
             return self.slerp(tensor_list)
-        elif self.merge_config.merge_method == "ties":
+        elif self.merge_config.merge_type == "ties":
             return self.ties(tensor_list)
         else:
-            raise NotImplementedError(f"{self.merge_config.merge_method} is not supported yet.")
+            raise NotImplementedError(f"{self.merge_config.merge_type} is not supported yet.")
 
     def linear(self, tensor_list):
         """
@@ -60,7 +60,6 @@ class MergeMethod:
         weight_list = self.merge_config.weight_list
         weight_sum = sum(weight_list)
         weight_list = [weight / weight_sum for weight in weight_list]
-
         if self.merge_config.tensor_type == "np":
             t0, t1 = tensor_list
             # Copy the vectors to reuse them later
@@ -73,7 +72,6 @@ class MergeMethod:
 
             # Dot product with the normalized vectors (can't use np.dot in W)
             dot = np.sum(t0 * t1)
-
             # If absolute value of dot product is almost 1, vectors are ~colinear, so use lerp
             if np.abs(dot) > self.merge_config.slerp_dot_threshold:
                 return weight_list[0] * t0_copy + weight_list[1] * t1_copy
@@ -119,9 +117,8 @@ class MergeMethod:
             if self.merge_config.normalize:
                 weight_mask = [mask * weight for mask, weight in zip(mask_list, weight_list)]
                 divisor = np.sum(weight_mask, axis=0)
-                divisor[divisor.abs() < 1e-8] = 1
+                divisor[np.abs(divisor) < 1e-8] = 1
                 merge_tensor /= divisor
-
             return merge_tensor
         else:
             raise NotImplementedError("Paddle Tensor is not supported yet.")
