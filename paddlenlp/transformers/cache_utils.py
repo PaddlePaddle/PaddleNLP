@@ -83,10 +83,10 @@ class Cache(paddle.nn.Layer):
         for layer_idx in range(len(self.key_cache)):
             if self.key_cache[layer_idx].numel() != 0:
                 device = self.key_cache[layer_idx].place
-                self.key_cache[layer_idx] = self.key_cache[layer_idx].index_select(0, beam_idx.to(device))
+                self.key_cache[layer_idx] = self.key_cache[layer_idx].index_select(beam_idx.to(device), 0)
             if self.value_cache[layer_idx].numel() != 0:
                 device = self.value_cache[layer_idx].place
-                self.value_cache[layer_idx] = self.value_cache[layer_idx].index_select(0, beam_idx.to(device))
+                self.value_cache[layer_idx] = self.value_cache[layer_idx].index_select(beam_idx.to(device), 0)
 
     @property
     def seen_tokens(self):
@@ -474,8 +474,8 @@ class OffloadedCache(DynamicCache):
             # Now deal with beam search ops which were delayed
             if self.beam_idx is not None:
                 self.beam_idx = self.beam_idx.to(original_device)
-                key_tensor = key_tensor.index_select(0, self.beam_idx)
-                value_tensor = value_tensor.index_select(0, self.beam_idx)
+                key_tensor = key_tensor.index_select(self.beam_idx, 0)
+                value_tensor = value_tensor.index_select(self.beam_idx, 0)
             # Prefetch the next layer
             self.prefetch_layer((layer_idx + 1) % len(self))
             return (key_tensor, value_tensor)
