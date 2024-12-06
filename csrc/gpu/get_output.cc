@@ -20,8 +20,7 @@
 
 #include "paddle/extension.h"
 
-#define MAX_BSZ 512
-#define SPECULATE_MAX_BSZ 256
+#define MAX_BSZ 256
 #define MAX_DRAFT_TOKENS 6
 
 template <int SIZE>
@@ -70,8 +69,8 @@ void GetOutput(const paddle::Tensor& x,
     static struct MsgData<SIZE> msg_rcv;
     GetOutputFunc<SIZE>(msg_rcv, x, rank_id, wait_flag);
   } else {
-    constexpr int SIZE = SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS +
-                         SPECULATE_MAX_BSZ +
+    constexpr int SIZE = MAX_BSZ * MAX_DRAFT_TOKENS +
+                         MAX_BSZ +
                          2;  // stop_flag, bsz, accept_num*bsz, tokens...
     static struct MsgData<SIZE> specu_msg_rcv;
     GetOutputFunc<SIZE>(specu_msg_rcv, x, rank_id, wait_flag);

@@ -267,29 +267,6 @@ def get_infer_model_path(input_dir, model_prefix):
         return os.path.join(input_dir, model_prefix)
 
 
-def generate_rank_mapping(output_filename):
-    ring_id = -1
-    try:
-        hcg = fleet.get_hybrid_communicate_group()
-        model_parallel_group = hcg.get_model_parallel_group()
-        ring_id = model_parallel_group.id
-    except Exception:
-        pass
-
-    if ring_id == -1:
-        return
-
-    world_size = dist.get_world_size()
-    with open(output_filename, "w") as f:
-        f.write("[ring_id -> ranks]\n")
-        f.write(",".join(map(str, [0] + list(range(world_size)))) + "\n")
-        f.write(",".join(map(str, [ring_id] + list(range(world_size)))) + "\n")
-
-        f.write("[rank -> ring_ids]\n")
-        for i in range(world_size):
-            f.write("{},0,{}\n".format(i, ring_id))
-
-
 def deserialize_from_file(fp):
     x_type = fp.read(1)
     x_type_out = struct.unpack("c", x_type)[0]
@@ -655,9 +632,9 @@ def speculate_read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_q
     paddle.device.set_device("cpu")
     paddle.disable_static()
     outputs = []
-    from paddlenlp.utils.env import MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
+    from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS
 
-    for _ in range(SPECULATE_MAX_BSZ):
+    for _ in range(MAX_BSZ):
         outputs.append([])
     output_tensor = tensor_queue.get(timeout=1)
     done_event.set()
@@ -674,12 +651,7 @@ def speculate_read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_q
         accept_num = output_tensor[2 : bsz + 2].numpy()
         for bi in range(bsz):
             output_numpy = output_tensor[
-                2
-                + SPECULATE_MAX_BSZ
-                + bi * MAX_DRAFT_TOKENS : 2
-                + SPECULATE_MAX_BSZ
-                + bi * MAX_DRAFT_TOKENS
-                + int(accept_num[bi]),
+                2 + MAX_BSZ + bi * MAX_DRAFT_TOKENS : 2 + MAX_BSZ + bi * MAX_DRAFT_TOKENS + int(accept_num[bi]),
                 0,
             ].numpy()
             output_numpy[output_numpy == -1] = tokenizer.eos_token_id

@@ -375,6 +375,44 @@ class BertConverter(Converter):
         return tokenizer
 
 
+class GPTConverter(Converter):
+    def converted(self, vocab: Dict[str, int] = None, merges: List[Tuple[str, str]] = None) -> Tokenizer:
+        if not vocab:
+            vocab = self.original_tokenizer.encoder
+        if not merges:
+            merges = list(self.original_tokenizer.bpe_ranks)
+
+        tokenizer = Tokenizer(
+            BPE(
+                vocab=vocab,
+                merges=merges,
+                dropout=None,
+                continuing_subword_prefix="",
+                end_of_word_suffix="",
+                fuse_unk=False,
+            )
+        )
+
+        add_prefix_space = getattr(self.original_tokenizer, "add_prefix_space", False)
+        tokenizer.pre_tokenizer = pre_tokenizers.ByteLevel(add_prefix_space=add_prefix_space)
+        tokenizer.decoder = decoders.ByteLevel()
+        if getattr(self.original_tokenizer, "add_bos_token", False):
+            bos = self.original_tokenizer.bos_token
+            bos_token_id = self.original_tokenizer.bos_token_id
+            tokenizer.post_processor = processors.TemplateProcessing(
+                single=f"{bos}:0 $A:0",
+                pair=f"{bos}:0 $A:0 $B:1",
+                special_tokens=[
+                    (bos, bos_token_id),
+                ],
+            )
+        else:
+            # XXX trim_offsets=False actually means this post_processor doesn't
+            # really do anything.
+            tokenizer.post_processor = processors.ByteLevel(trim_offsets=False)
+        return tokenizer
+
+
 class LlamaConverter(SpmConverter):
     handle_byte_fallback = True
 
@@ -487,8 +525,9 @@ class Qwen2Converter(Converter):
 
 
 SLOW_TO_FAST_CONVERTERS = {
-    "LlamaTokenizer": LlamaConverter,
     "BertTokenizer": BertConverter,
+    "GPTTokenizer": GPTConverter,
+    "LlamaTokenizer": LlamaConverter,
     "Qwen2Tokenizer": Qwen2Converter,
 }
 

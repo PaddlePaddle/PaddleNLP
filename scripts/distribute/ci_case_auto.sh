@@ -148,6 +148,8 @@ function llm_qwen_case_list_auto() {
         llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2
         llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2-PP2
         llm_qwen_dygraph_auto_bs1_bf16_DP2-MP2-PP2
+        llm_qwen_pir_auto_bs1_bf16_TP2
+        llm_qwen_pir_auto_bs1_bf16_TP2_PP2
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
@@ -155,7 +157,7 @@ function llm_qwen_case_list_auto() {
         for fun in "${fun_list[@]}"; do
             eval "$fun"
         done
-        track_case_status $FUNCNAME "llm_qwen_dygraph_auto_"
+        track_case_status $FUNCNAME "llm_qwen"
     else 
         echo -e "\033[31m ---- Invalid status $1 \033[0m"
         return 1
@@ -2289,6 +2291,163 @@ EOF
     rm -f $config_json
     echo "=========== $FUNCNAME run  end ==========="
 }
+
+function llm_qwen_pir_auto_bs1_bf16_TP2(){
+    echo "=========== $FUNCNAME run  begin ==========="
+
+    set -x
+    unset CUDA_VISIBLE_DEVICES
+
+    export FLAGS_call_stack_level=3
+
+    task_name="llama_auto_tp2"
+    case_log_dir="qwen_auto_pir_bf16_tp2"
+    rm -rf output/$task_name/
+    rm -rf "output/$task_name""_log"
+
+    export SOT_LOG_LEVEL=4
+    export PYTHONPATH=../../../:$PYTHONPATH
+
+
+    rm -rf $case_log_dir
+
+    export FLAGS_embedding_deterministic=1
+    export FLAGS_cudnn_deterministic=1
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_enable_pir_in_executor=1
+    export FLAGS_enable_pir_api=1
+
+    python -u  -m paddle.distributed.launch \
+        --gpus "0,1" \
+        --log_dir "$case_log_dir" \
+        run_pretrain_3D_auto.py \
+        --model_name_or_path "qwen/qwen-14b" \
+        --tokenizer_name_or_path "qwen/qwen-14b" \
+        --input_dir "./data" \
+        --output_dir "output/$task_name/" \
+        --per_device_train_batch_size 1\
+        --gradient_accumulation_steps 2\
+        --per_device_eval_batch_size 16\
+        --sharding "stage1" \
+        --sharding_parallel_degree 1\
+        --tensor_parallel_degree 2\
+        --pipeline_parallel_degree 1\
+        --pipeline_schedule_mode "VPP" \
+        --virtual_pipeline_seg_method 'QWenBlockAuto' \
+        --virtual_pp_degree 2\
+        --use_flash_attention true\
+        --use_fused_rms_norm false\
+        --use_fused_rope true\
+        --max_seq_length 4096\
+        --learning_rate 3e-05\
+        --min_learning_rate 3e-06\
+        --scale_loss 1024\
+        --warmup_steps 30\
+        --logging_steps 1\
+        --max_steps 10\
+        --save_steps 1000\
+        --eval_steps 10000\
+        --weight_decay 0.01\
+        --bf16 true\
+        --fp16_opt_level "O2"\
+        --amp_master_grad true \
+        --warmup_ratio 0.01\
+        --max_grad_norm 0.0\
+        --dataloader_num_workers 4\
+        --continue_training 0\
+        --do_train true\
+        --do_eval false\
+        --do_predict false \
+        --disable_tqdm true\
+        --recompute false\
+        --recompute_granularity "core_attn"\
+        --recompute_use_reentrant true\
+        --distributed_dataloader 0\
+        --save_total_limit 2\
+        --enable_auto_parallel 1\
+        --to_static 1 \
+        --num_hidden_layers 4 \
+        >>${log_path}/$FUNCNAME 2>&1
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llm_qwen_pir_auto_bs1_bf16_TP2_PP2(){
+    echo "=========== $FUNCNAME run  begin ==========="
+
+    set -x
+    unset CUDA_VISIBLE_DEVICES
+
+    export FLAGS_call_stack_level=3
+
+    task_name="llama_auto_tp2_pp2"
+    case_log_dir="qwen_auto_pir_bf16_tp2_pp2"
+    rm -rf output/$task_name/
+    rm -rf "output/$task_name""_log"
+
+    export SOT_LOG_LEVEL=4
+    export PYTHONPATH=../../../:$PYTHONPATH
+
+
+    rm -rf $case_log_dir
+
+    export FLAGS_embedding_deterministic=1
+    export FLAGS_cudnn_deterministic=1
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_enable_pir_in_executor=1
+    export FLAGS_enable_pir_api=1
+
+    python -u  -m paddle.distributed.launch \
+        --gpus "0,1,2,3" \
+        --log_dir "$case_log_dir" \
+        run_pretrain_3D_auto.py \
+        --model_name_or_path "qwen/qwen-14b" \
+        --tokenizer_name_or_path "qwen/qwen-14b" \
+        --input_dir "./data" \
+        --output_dir "output/$task_name/" \
+        --per_device_train_batch_size 1\
+        --gradient_accumulation_steps 4\
+        --per_device_eval_batch_size 16\
+        --sharding "stage1" \
+        --sharding_parallel_degree 1\
+        --tensor_parallel_degree 2\
+        --pipeline_parallel_degree 2\
+        --pipeline_schedule_mode "1F1B" \
+        --use_flash_attention true\
+        --use_fused_rms_norm false\
+        --use_fused_rope true\
+        --max_seq_length 4096\
+        --learning_rate 3e-05\
+        --min_learning_rate 3e-06\
+        --scale_loss 1024\
+        --warmup_steps 30\
+        --logging_steps 1\
+        --max_steps 10\
+        --save_steps 1000\
+        --eval_steps 10000\
+        --weight_decay 0.01\
+        --bf16 true\
+        --fp16_opt_level "O2"\
+        --amp_master_grad true \
+        --warmup_ratio 0.01\
+        --max_grad_norm 0.0\
+        --dataloader_num_workers 4\
+        --continue_training 0\
+        --do_train true\
+        --do_eval false\
+        --do_predict false \
+        --disable_tqdm true\
+        --recompute false\
+        --recompute_granularity "core_attn"\
+        --recompute_use_reentrant true\
+        --distributed_dataloader 0\
+        --save_total_limit 2\
+        --enable_auto_parallel 1\
+        --to_static 1 \
+        --num_hidden_layers 4 \
+        >>${log_path}/$FUNCNAME 2>&1
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
 
 ############ case end ############
 
