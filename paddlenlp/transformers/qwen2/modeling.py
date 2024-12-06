@@ -42,6 +42,7 @@ from paddlenlp.transformers.refined_recompute import (
     create_skip_config_for_refined_recompute,
     recompute,
 )
+from paddlenlp.trl.embedding_trainer import dist_gather_tensor_with_gradient
 
 from .. import linear_utils
 from ..activations import ACT2FN
@@ -1700,8 +1701,8 @@ class Qwen2SentenceEmbedding(Qwen2PretrainedModel):
             return q_reps, p_reps
 
         if self.embedding_negatives_cross_device:
-            q_reps = self._dist_gather_tensor(q_reps)
-            p_reps = self._dist_gather_tensor(p_reps)
+            q_reps = dist_gather_tensor_with_gradient(q_reps)
+            p_reps = dist_gather_tensor_with_gradient(p_reps)
 
         loss = self.in_batch_negative_loss(q_reps, p_reps)
         return loss
@@ -1734,14 +1735,3 @@ class Qwen2SentenceEmbedding(Qwen2PretrainedModel):
             hidden_states = outputs[0]
         last_hidden_states = hidden_states.gather_nd(embedding_indices)
         return last_hidden_states
-
-    def _dist_gather_tensor(self, tensor: Optional[paddle.Tensor]):
-        # This usage only within data parallelism only.
-        if tensor is None:
-            return None
-
-        all_tensors = [paddle.empty_like(tensor) for _ in range(self.world_size)]
-        dist.all_gather(all_tensors, tensor.contiguous())
-        all_tensors[self.process_rank] = tensor
-        all_tensors = paddle.concat(all_tensors, axis=0)
-        return all_tensors

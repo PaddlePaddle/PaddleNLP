@@ -78,8 +78,8 @@ class EmbeddingTrainer(Trainer):
             query_reps, passage_reps = model(**inputs, return_encode=True)
 
             if self.embedding_negatives_cross_device:
-                query_reps = self.dist_gather_tensor_with_gradient(query_reps)
-                passage_reps = self.dist_gather_tensor_with_gradient(passage_reps)
+                query_reps = dist_gather_tensor_with_gradient(query_reps)
+                passage_reps = dist_gather_tensor_with_gradient(passage_reps)
 
             self.accum_q_features.append(query_reps)
             self.accum_p_features.append(passage_reps)
@@ -146,8 +146,8 @@ class EmbeddingTrainer(Trainer):
                     query_reps, passage_reps = model(**inputs, return_encode=True)
 
                 if self.embedding_negatives_cross_device:
-                    query_reps = self.dist_gather_tensor_with_gradient(query_reps)
-                    passage_reps = self.dist_gather_tensor_with_gradient(passage_reps)
+                    query_reps = dist_gather_tensor_with_gradient(query_reps)
+                    passage_reps = dist_gather_tensor_with_gradient(passage_reps)
 
                 _loss = paddle.dot(query_reps.flatten(), accum_q_grads[i].flatten()) + paddle.dot(
                     passage_reps.flatten(), accum_p_grads[i].flatten()
@@ -179,33 +179,37 @@ class EmbeddingTrainer(Trainer):
             loss = self.accum_forward_backward(model)
         return loss
 
-    def dist_gather_tensor_with_gradient(self, tensor):
-        if tensor is None:
-            return None
 
-        if self.args.dataset_world_size == 1:
-            return tensor
+def dist_gather_tensor_with_gradient(tensor):
+    if tensor is None:
+        return None
 
-        hcg = fleet.get_hybrid_communicate_group()
-        sharding_group = hcg.get_sharding_parallel_group()
-        sharding_rank = sharding_group.rank
-        data_group = hcg.get_data_parallel_group()
-        data_rank = data_group.rank
+    if paddle.distributed.get_world_size() <= 1:
+        return tensor
 
-        if sharding_group.nranks > 1:
-            all_tensors = []
-            paddle.distributed.all_gather(all_tensors, tensor.contiguous(), group=sharding_group)
-            all_tensors[sharding_rank] = tensor
-            all_tensors = paddle.concat(all_tensors, axis=0)
-        else:
-            all_tensors = tensor
+    hcg = fleet.get_hybrid_communicate_group()
+    sharding_group = hcg.get_sharding_parallel_group()
+    sharding_rank = sharding_group.rank
+    data_group = hcg.get_data_parallel_group()
+    data_rank = data_group.rank
 
-        if data_group.nranks > 1:
-            final_tensors = []
-            paddle.distributed.all_gather(final_tensors, all_tensors.contiguous(), group=data_group)
-            final_tensors[data_rank] = all_tensors
-            final_tensors = paddle.concat(final_tensors, axis=0)
-        else:
-            final_tensors = all_tensors
+    if sharding_group.nranks == 1 and data_group.nranks == 1:
+        return tensor
 
-        return final_tensors
+    if sharding_group.nranks > 1:
+        all_tensors = []
+        paddle.distributed.all_gather(all_tensors, tensor.contiguous(), group=sharding_group)
+        all_tensors[sharding_rank] = tensor
+        all_tensors = paddle.concat(all_tensors, axis=0)
+    else:
+        all_tensors = tensor
+
+    if data_group.nranks > 1:
+        final_tensors = []
+        paddle.distributed.all_gather(final_tensors, all_tensors.contiguous(), group=data_group)
+        final_tensors[data_rank] = all_tensors
+        final_tensors = paddle.concat(final_tensors, axis=0)
+    else:
+        final_tensors = all_tensors
+
+    return final_tensors
