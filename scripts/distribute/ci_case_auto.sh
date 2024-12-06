@@ -2015,7 +2015,7 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2(){
         --max_seq_length 1024 \
         --per_device_train_batch_size 1 \
         --per_device_eval_batch_size 1 \
-        --sharding "" \
+        --sharding "stage1" \
         --tensor_parallel_degree 2 \
         --pipeline_parallel_degree 2 \
         --pipeline_schedule_mode "1F1B" \
