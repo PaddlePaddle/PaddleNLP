@@ -1538,7 +1538,7 @@ function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2(){
         --max_grad_norm 0.0 \
         --learning_rate 3e-05 \
         --min_learning_rate 3e-06 \
-        --max_steps 10000 \
+        --max_steps 10 \
         --logging_steps 1 \
         --eval_steps 10000 \
         --save_steps 1000 \
