@@ -1991,7 +1991,7 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
 }
 
 function llm_gpt_pir_auto_bs8_DP2_TP2_PP2(){
-        echo "=========== $FUNCNAME run begin ==========="
+    echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
     export FLAGS_call_stack_level=3
     export NVIDIA_TF32_OVERRIDE=0
