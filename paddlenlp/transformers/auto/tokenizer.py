@@ -117,7 +117,10 @@ else:
             ("tinybert", "TinyBertTokenizer"),
             ("unified_transformer", "UnifiedTransformerTokenizer"),
             ("unimo", "UNIMOTokenizer"),
-            ("gpt", (("GPTTokenizer", "GPTChineseTokenizer"), None)),
+            (
+                "gpt",
+                (("GPTTokenizer", "GPTChineseTokenizer"), "GPTTokenizerFast" if is_tokenizers_available() else None),
+            ),
             ("gau_alpha", "GAUAlphaTokenizer"),
             ("artist", "ArtistTokenizer"),
             ("chineseclip", "ChineseCLIPTokenizer"),
