@@ -86,14 +86,16 @@ function executable_fun_list() {
     if [ ! -f "$root_path/blacklist.csv" ];then
         wget -P $root_path/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
     fi
-    mapfile -t blacklist < $root_path/blacklist.csv
-    for fun in "${fun_list_origin[@]}"; do
-        # 检查函数是否在黑名单中
-        if [[ ! " ${blacklist[@]} " == *" $fun "* ]]; then
-            # 如果不在黑名单中，添加到可执行函数列表
-            fun_list+=("$fun")
-        else
-            echo "$fun is in the blacklist. Not added to executable list."
+    blacklist_file=$root_path/blacklist.csv
+    declare -A blacklist_map
+    while IFS= read -r blacklist_item; do
+        blacklist_item=$(echo "$blacklist_item" | xargs)
+        blacklist_map["$blacklist_item"]=true
+    done < "$blacklist_file"
+    echo $blacklist_map
+    for item in "${fun_list_origin[@]}"; do
+        if [[ -z "${blacklist_map[$item]}" ]]; then
+            fun_list+=("$item")
         fi
     done
 }
