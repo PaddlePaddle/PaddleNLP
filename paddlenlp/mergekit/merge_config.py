@@ -67,8 +67,8 @@ class MergeConfig:
         self.config_check()
 
     def config_check(self):
-        if not os.path.exists(self.output_path):
-            os.makedirs(self.output_path)
+        if self.output_path is not None:
+            os.makedirs(self.output_path, exist_ok=True)
         if self.tensor_type not in ["np"]:
             raise ValueError(f"Unsupported tensor type: {self.tensor_type}. Support 'np' only.")
         if self.device != "cpu":
