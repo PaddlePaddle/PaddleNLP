@@ -79,8 +79,9 @@ from ..data import (
     DataCollatorWithPadding,
     DistDataLoader,
     default_data_collator,
+    init_dataloader_comm_group,
 )
-from ..peft import LoRAModel, PrefixModelForCausalLM, VeRAModel
+from ..peft import LoKrModel, LoRAModel, PrefixModelForCausalLM, ReFTModel, VeRAModel
 
 try:
     from ..quantization.quantization_linear import QuantizationLinear
@@ -97,6 +98,7 @@ from ..transformers.segment_parallel_utils import split_inputs_sequence_dim
 from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
+    LOKR_WEIGHTS_NAME,
     LORA_WEIGHTS_NAME,
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_PEFT_WEIGHTS_INDEX_NAME,
@@ -110,6 +112,7 @@ from ..utils.env import (
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import logger
+from ..utils.tools import get_env_device
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
 from .plugins.timer import RuntimeTimer, get_timers, set_timers
@@ -141,6 +144,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     set_seed,
     should_skip_data,
     speed_metrics,
+    split_parallel_config,
 )
 from .training_args import TrainingArguments
 from .unified_checkpoint import UnifiedCheckpointHandler
@@ -416,6 +420,8 @@ class Trainer:
             isinstance(self.model, LoRAModel)
             or isinstance(self.model, PrefixModelForCausalLM)
             or isinstance(self.model, VeRAModel)
+            or isinstance(self.model, LoKrModel)
+            or isinstance(self.model, ReFTModel)
         ):
             if self.args.unified_checkpoint and "skip_save_model_weight" in self.args.unified_checkpoint_config:
                 self.args.unified_checkpoint_config.remove("skip_save_model_weight")
@@ -438,6 +444,10 @@ class Trainer:
                     layer.enable_recompute = True
 
             model.apply(fn)
+
+        self._pp_data_group = None
+        if self.args.pipeline_parallel_degree > 1 and self.args.distributed_dataloader:
+            self._pp_data_group = init_dataloader_comm_group()
 
         default_label_names = (
             ["start_positions", "end_positions"]
@@ -557,6 +567,12 @@ class Trainer:
                     convert_tp = True
             elif isinstance(self.model, VeRAModel):
                 weights_file = os.path.join(resume_from_checkpoint, VERA_WEIGHTS_NAME)
+            elif isinstance(self.model, LoKrModel):
+                weights_file = os.path.join(resume_from_checkpoint, LOKR_WEIGHTS_NAME)
+            elif isinstance(self.model, ReFTModel):
+                self.model.from_pretrained(resume_from_checkpoint, self.model.model)
+                return
+
             if self.args.dataset_rank == 0:
                 logger.info(f"Loading model from {resume_from_checkpoint} .")
 
@@ -615,6 +631,8 @@ class Trainer:
             isinstance(self.model, LoRAModel)
             or isinstance(self.model, PrefixModelForCausalLM)
             or isinstance(self.model, VeRAModel)
+            or isinstance(self.model, LoKrModel)
+            or isinstance(self.model, ReFTModel)
         ):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
             self.runtime_timer.stop()
@@ -1536,6 +1554,7 @@ class Trainer:
             train_dataset = self._remove_unused_columns(train_dataset, description="training")
         _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
+        additional_configs = {}
         if is_iterable_dataset:  # For iterable dataset
             if self.args.dataset_world_size > 1 and train_dataset is not None:
                 train_dataset = IterableDatasetShard(
@@ -1548,9 +1567,7 @@ class Trainer:
 
             if self.args.distributed_dataloader:
                 logger.info("Training using DistDataLoader.")
-                additional_configs = {"is_iterable_dataset": True}
-            else:
-                additional_configs = {}
+                additional_configs = {"is_iterable_dataset": True, "pp_data_group": self._pp_data_group}
             return _DataLoader(
                 train_dataset,
                 batch_size=self.args.per_device_train_batch_size,
@@ -1562,11 +1579,13 @@ class Trainer:
             train_sampler = self._get_train_sampler()
             if self.args.distributed_dataloader:
                 logger.info("Training using DistDataLoader.")
+                additional_configs = {"pp_data_group": self._pp_data_group}
             return _DataLoader(
                 train_dataset,
                 batch_sampler=train_sampler,
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
+                **additional_configs,
             )
 
     def _get_eval_sampler(self, eval_dataset: Dataset):
@@ -1581,20 +1600,13 @@ class Trainer:
                 drop_last=False,
             )
         else:
-            drop_last = False
-            if self.args.pipeline_parallel_degree > 1:
-                drop_last = True
-                logger.warning(
-                    "In parallel mode, the batch_size is strictly checked. set DistributedBatchSampler drop_last=True."
-                )
-
             return DistributedBatchSampler(
                 eval_dataset,
                 num_replicas=self.args.dataset_world_size,
                 rank=self.args.dataset_rank,
                 batch_size=self.args.per_device_eval_batch_size,
                 shuffle=False,
-                drop_last=drop_last,
+                drop_last=False,
             )
 
     def get_eval_dataloader(self, eval_dataset: Optional[Dataset] = None) -> DataLoader:
@@ -1622,6 +1634,7 @@ class Trainer:
             eval_dataset = self._remove_unused_columns(eval_dataset, description="evaluation")
         _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
+        additional_configs = {}
         if is_iterable_dataset:
             if self.args.dataset_world_size > 1 and eval_dataset is not None:
                 eval_dataset = IterableDatasetShard(
@@ -1631,11 +1644,10 @@ class Trainer:
                     num_processes=self.args.dataset_world_size,
                     process_index=self.args.dataset_rank,
                 )
+
             if self.args.distributed_dataloader:
                 logger.info("Eval using DistDataLoader.")
-                additional_configs = {"eval": True, "is_iterable_dataset": True}
-            else:
-                additional_configs = {}
+                additional_configs = {"eval": True, "is_iterable_dataset": True, "pp_data_group": self._pp_data_group}
             return _DataLoader(
                 eval_dataset,
                 batch_size=self.args.per_device_eval_batch_size,
@@ -1647,9 +1659,7 @@ class Trainer:
             eval_sampler = self._get_eval_sampler(eval_dataset)
             if self.args.distributed_dataloader:
                 logger.info("Eval using DistDataLoader.")
-                additional_configs = {"eval": True}
-            else:
-                additional_configs = {}
+                additional_configs = {"eval": True, "pp_data_group": self._pp_data_group}
             return _DataLoader(
                 eval_dataset,
                 batch_sampler=eval_sampler,
@@ -1682,6 +1692,7 @@ class Trainer:
             test_dataset = self._remove_unused_columns(test_dataset, description="test")
         _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
+        additional_config = {}
         if is_iterable_dataset:
             if self.args.dataset_world_size > 1 and test_dataset is not None:
                 test_dataset = IterableDatasetShard(
@@ -1694,9 +1705,7 @@ class Trainer:
 
             if self.args.distributed_dataloader:
                 logger.info("Test using DistDataLoader.")
-                additional_config = {"eval": True, "is_iterable_dataset": True}
-            else:
-                additional_config = {}
+                additional_config = {"eval": True, "is_iterable_dataset": True, "pp_data_group": self._pp_data_group}
             return _DataLoader(
                 test_dataset,
                 batch_size=self.args.per_device_eval_batch_size * self.world_size,
@@ -1708,9 +1717,7 @@ class Trainer:
             test_sampler = self._get_eval_sampler(test_dataset)
             if self.args.distributed_dataloader:
                 logger.info("Test using DistDataLoader.")
-                additional_config = {"eval": True}
-            else:
-                additional_config = {}
+                additional_config = {"eval": True, "pp_data_group": self._pp_data_group}
             # We use the same batch_size as for eval.
             return _DataLoader(
                 test_dataset,
@@ -1767,10 +1774,6 @@ class Trainer:
         return self.optimizer
 
     def _apply_to_optimizer(self, action):
-        if "gpu" not in paddle.device.get_device():
-            logger.warning("offload/reload optimizer's states is only supported on GPU devices.")
-            return
-
         attributes = [
             ("_accumulators", "_moment1_acc_str"),
             ("_accumulators", "_moment2_acc_str"),
@@ -1785,13 +1788,22 @@ class Trainer:
                     target_attr = target_attr[getattr(self.optimizer, attr[1])]
 
                 for key, value in target_attr.items():
-                    target_attr[key] = getattr(value, action)()
+                    if get_env_device() == "gpu":
+                        target_attr[key] = getattr(value, action)()
+                    else:
+                        target_attr[key] = getattr(value, "to")(action)
 
     def _offload_optimizer(self):
-        self._apply_to_optimizer("pin_memory")
+        if get_env_device() == "gpu":
+            self._apply_to_optimizer("pin_memory")
+        else:
+            self._apply_to_optimizer("cpu")
 
     def _reload_optimizer(self):
-        self._apply_to_optimizer("cuda")
+        if get_env_device() == "gpu":
+            self._apply_to_optimizer("cuda")
+        else:
+            self._apply_to_optimizer(get_env_device())
 
     def _load_rng_state(self, checkpoint):
         # Load RNG states from `checkpoint`
@@ -2053,6 +2065,14 @@ class Trainer:
                 self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
             self.optimizer = fleet.distributed_optimizer(self.optimizer)
 
+            if (
+                hasattr(self.args, "enable_sharding_comm_overlap")
+                and self.args.enable_sharding_comm_overlap
+                and self.args.unified_checkpoint
+                and "split_param" in split_parallel_config(self.args.sharding_parallel_config)
+            ):
+                model.register_sharding_comm_overlap_hook(self.optimizer)
+
         # No pipeline mode, sharding only
         if not in_pipeline_parallel_mode and in_sharding_parallel_mode:
             # Sharded DDP!
@@ -2067,6 +2087,7 @@ class Trainer:
                 if self.args.amp_master_grad:
                     mix_precision_utils.MixPrecisionLayer(model, dtype=self.amp_dtype)  # return value has no use
                 model = fleet.distributed_model(model)
+
                 if self.args.amp_master_grad:
                     self.optimizer = mix_precision_utils.MixPrecisionOptimizer(self.optimizer)
                 self.optimizer = fleet.distributed_optimizer(self.optimizer)
@@ -2692,6 +2713,7 @@ class Trainer:
                 "world_size": world_size,
                 "ignore_save_lr_and_optim": self.args.ignore_save_lr_and_optim,
                 "skip_save_model_weight": "skip_save_model_weight" in self.args.unified_checkpoint_config,
+                "remove_master_weight": "remove_master_weight" in self.args.unified_checkpoint_config,
             }
             if os.path.exists(
                 os.path.join(self.args.output_signal_dir, "async_save_info.json")
@@ -2726,6 +2748,8 @@ class Trainer:
             isinstance(self.model, LoRAModel)
             or isinstance(self.model, PrefixModelForCausalLM)
             or isinstance(self.model, VeRAModel)
+            or isinstance(self.model, LoKrModel)
+            or isinstance(self.model, ReFTModel)
         ):
             self.model.save_pretrained(
                 output_dir,
@@ -2840,8 +2864,15 @@ class Trainer:
                 else:
                     opt_state_dict = None
             else:
+                model = self.model
+                if (
+                    hasattr(self.args, "enable_sharding_comm_overlap")
+                    and self.args.enable_sharding_comm_overlap
+                    and "split_param" in split_parallel_config(self.args.sharding_parallel_config)
+                ):
+                    model = self.model_wrapped
                 opt_state_dict = self.unified_checkpoint_handler.load_unified_optimizer(
-                    model=self.model,
+                    model=model,
                     optimizer=self.optimizer,
                     resume_from_checkpoint=checkpoint,
                 )
@@ -3172,7 +3203,9 @@ class Trainer:
 
         # Metrics!
         if self.compute_metrics is not None and all_preds is not None and all_labels is not None:
-            metrics = self.compute_metrics(EvalPrediction(predictions=all_preds, label_ids=all_labels))
+            # all_labels maybe is a tuple when prediction_steps output label_mask
+            batch_labels = all_labels[0] if isinstance(all_labels, (list, tuple)) else all_labels
+            metrics = self.compute_metrics(EvalPrediction(predictions=all_preds, label_ids=batch_labels))
         else:
             metrics = {}
 
@@ -3267,6 +3300,16 @@ class Trainer:
             else:
                 labels = None
             inputs = inputs.pop("input_ids")
+        # consider no drop_last case
+        model_config_backup = model.micro_batch_size, model.accumulate_steps
+        if isinstance(inputs, tuple):
+            actual_batch_size = inputs[0].shape[0]
+        else:
+            actual_batch_size = inputs.shape[0]
+        model.micro_batch_size = 1
+        model.accumulate_steps = actual_batch_size
+        # train & eval share the same p2p_helper, so clear it before and after each step
+        model._p2p_helper.clear_meta_cache()
 
         with paddle.no_grad():
             if has_labels:
@@ -3276,6 +3319,9 @@ class Trainer:
                 loss = loss.mean().detach()
             else:
                 raise ValueError("pipeline mode eval need label!")
+        model.micro_batch_size, model.accumulate_steps = model_config_backup
+        # train & eval share the same p2p_helper, so clear it before and after each step
+        model._p2p_helper.clear_meta_cache()
 
         return (loss, None, labels)
 

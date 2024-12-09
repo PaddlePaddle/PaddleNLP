@@ -15,6 +15,7 @@
 
 import gc
 import os
+from itertools import chain
 
 import paddle
 import paddle.distributed as dist
@@ -22,7 +23,7 @@ from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
-from paddlenlp.transformers.model_utils import load_state_dict
+from paddlenlp.transformers.model_utils import load_state_dict, unwrap_model
 from paddlenlp.utils.env import (
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_OPTIMIZER_INDEX_NAME,
@@ -97,6 +98,7 @@ def gather_splited_param_for_optimizer(optimizer):
     global_rank = dist.get_rank()
     param_slice_info = {}
     param_shape_info = {}
+
     for buffer in optimizer._inner_opt._comm_buffer_list:
         for key in buffer._sharding_param_grad_view.keys():
             param_slice_info[key] = (
@@ -153,7 +155,7 @@ def gather_splited_param_for_optimizer(optimizer):
     return optim_state_dict, master_weights
 
 
-def load_unified_optimizer_split_param(model, optimizer, resume_from_checkpoint):
+def load_unified_optimizer_split_param(args, model, optimizer, resume_from_checkpoint):
     returned_optim_state_dict = nested_copy(optimizer.state_dict())
 
     index_filename, index_filename_master_weights = SAFE_OPTIMIZER_INDEX_NAME, SAFE_MASTER_WEIGHTS_INDEX_NAME
@@ -177,7 +179,13 @@ def load_unified_optimizer_split_param(model, optimizer, resume_from_checkpoint)
     expected_keys = []
     param_slice_info = {}
     param_shape_info = {}
-    for buffer in optimizer._inner_opt._comm_buffer_list:
+
+    comm_buffer_list = optimizer._inner_opt._comm_buffer_list
+    if hasattr(args, "enable_sharding_comm_overlap") and args.enable_sharding_comm_overlap:
+        comm_buffer_list = list(chain(*model._chunk_2_comm_buffers.values()))
+        model = unwrap_model(model)
+
+    for buffer in comm_buffer_list:
         for key in buffer._sharding_param_grad_view.keys():
             begin = buffer._sharding_param_grad_view[key]._param_begin
             end = buffer._sharding_param_grad_view[key]._param_end

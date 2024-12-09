@@ -571,7 +571,7 @@ class DataCollatorForLanguageModeling(DataCollatorMixin):
 
         def masked_fill(x, mask, value):
             y = paddle.full(x.shape, value, x.dtype)
-            return paddle.where(mask, y, x)
+            return paddle.where(mask.to("bool"), y, x)
 
         # probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
         probability_matrix = masked_fill(probability_matrix, special_tokens_mask, value=0.0)
@@ -789,6 +789,7 @@ class DataCollatorForWholeWordMask(DataCollatorForLanguageModeling):
         ]
 
         def masked_fill(x, mask, value):
+            mask = mask.astype("bool")
             y = paddle.full(x.shape, value, x.dtype)
             return paddle.where(mask, y, x)
 

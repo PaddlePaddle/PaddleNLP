@@ -137,6 +137,12 @@ class AvxConfig:
     cache_dtype: str = "fp16"
 
 
+@dataclass
+class SpeculateConfig:
+    speculate_max_draft_token_num: int = 5
+    speculate_method: str = None
+
+
 class FusedMultiTransformerConfig:
     def __init__(
         self,
@@ -201,6 +207,7 @@ class FusedMultiTransformerConfig:
         append_attn=False,
         moe_config=MoeConfig(),
         avx_config=AvxConfig(),
+        speculate_config=SpeculateConfig(),
     ):
         self.embed_dim = embed_dim
         self.num_heads = num_heads
@@ -278,6 +285,7 @@ class FusedMultiTransformerConfig:
 
         self.moe_config = moe_config
         self.avx_config = avx_config
+        self.speculate_config = speculate_config
 
 
 class FusedMultiTransformerBase(Layer):
@@ -1029,7 +1037,6 @@ class FusedMultiTransformerBase(Layer):
             kwargs["decoder_block_shape_q"] = 16
             kwargs["max_partition_size"] = 32768
             kwargs["encoder_max_partition_size"] = 32768
-            kwargs["speculate_max_draft_token_num"] = 5
 
             from paddlenlp_ops import get_block_shape_and_split_kv_block
 
@@ -1054,7 +1061,7 @@ class FusedMultiTransformerBase(Layer):
                 kwargs.get("decoder_block_shape_q", 16),
                 self.num_heads // self.kv_num_heads,
                 kwargs.get("block_size", 64),
-                kwargs["speculate_max_draft_token_num"],
+                self.config.speculate_config.speculate_max_draft_token_num,
             )
 
         residual_input = src
@@ -1683,7 +1690,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         self.quant_round_type = config.quant_round_type
         self.quant_max_bound = config.quant_max_bound
         self.quant_min_bound = config.quant_min_bound
-        # self.use_gemm_dequant = False
+        self.use_gemm_dequant = False
 
         self.qkv_out_scales = []
         self.linear_out_scales = []
@@ -1921,7 +1928,6 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
         if paddle.is_compiled_with_rocm():
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i])
         else:
-            # TODO: add gemm_dequant after qkv_out
             qkv_out = paddle.matmul(ln_out, self.qkv_weights[i], False, True)
         return qkv_out
 
@@ -2026,13 +2032,13 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
                 out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i])
                 out_linear_out = dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
             else:
-                try:
+                if self.use_gemm_dequant:
                     from paddlenlp_ops import gemm_dequant
 
                     out_linear_out = gemm_dequant(
                         fmha_out, self.linear_weights[i], self.linear_out_scales[i], self._dtype
                     )
-                except:
+                else:
                     out_linear_out = paddle.matmul(fmha_out, self.linear_weights[i], False, True)
                     out_linear_out = dequant_int8(out_linear_out, self.linear_out_scales[i], self._dtype)
         return out_linear_out
@@ -2087,11 +2093,11 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
                 ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i])
                 ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
             else:
-                try:
+                if self.use_gemm_dequant:
                     from paddlenlp_ops import gemm_dequant
 
                     ffn2_out = gemm_dequant(ffn1_out, self.ffn2_weights[i], self.ffn2_out_scales[i], self._dtype)
-                except:
+                else:
                     ffn2_out = paddle.matmul(ffn1_out, self.ffn2_weights[i], False, True)
                     ffn2_out = dequant_int8(ffn2_out, self.ffn2_out_scales[i], self._dtype)
         return ffn2_out
@@ -2195,9 +2201,9 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
                 kwargs.get("decoder_block_shape_q", 16),
                 kwargs.get("max_partition_size", 32768),
                 kwargs.get("encoder_max_partition_size", 32768),
-                kwargs["speculate_max_draft_token_num"],  # speculate_max_draft_token_num
+                self.config.speculate_config.speculate_max_draft_token_num,
                 True,  # causal
-                False,  # speculate_decoder
+                self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )[0]
         else:
             if paddle.is_compiled_with_xpu():
@@ -2292,8 +2298,15 @@ class FusedBlockMultiTransformer(FusedMultiTransformerBase):
         seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
         seq_lens_decoder = kwargs.get("seq_lens_decoder", None)
         max_input_length = kwargs.get("max_input_length", -1)
-
-        out = rebuild_padding_v2(multi_block_output, cum_offsets, seq_lens_decoder, seq_lens_encoder, max_input_length)
+        output_padding_offset = kwargs.get("output_padding_offset", None)  # only used in speculative decoding
+        out = rebuild_padding_v2(
+            multi_block_output,
+            cum_offsets,
+            seq_lens_decoder,
+            seq_lens_encoder,
+            output_padding_offset,
+            max_input_length,
+        )
 
         return out
 
@@ -2386,9 +2399,9 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
                 kwargs.get("decoder_block_shape_q", 16),
                 kwargs.get("max_partition_size", 32768),
                 kwargs.get("encoder_max_partition_size", 32768),
-                kwargs["speculate_max_draft_token_num"],  # speculate_max_draft_token_num
+                self.config.speculate_config.speculate_max_draft_token_num,
                 True,  # causal
-                False,  # speculate_decoder
+                self.config.speculate_config.speculate_method is not None,  # speculate_decoder
             )[0]
         else:
             fmha_out = paddle.incubate.nn.functional.block_multihead_attention(
@@ -2437,7 +2450,6 @@ class FusedBlockMultiTransformerA8W8(FusedBlockMultiTransformer, FusedMultiTrans
 
 class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
     def __init__(self, config: FusedMultiTransformerConfig):
-        """"""
         super().__init__(config)
         self.act_scales = None
         self.weight_scales = None
@@ -2752,7 +2764,7 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
                 kwargs.get("decoder_block_shape_q", 16),
                 kwargs.get("max_partition_size", 32768),
                 kwargs.get("encoder_max_partition_size", 32768),
-                kwargs["speculate_max_draft_token_num"],  # speculate_max_draft_token_num
+                self.config.speculate_config.speculate_max_draft_token_num,
                 True,  # causal
                 False,  # speculate_decoder
             )[0]

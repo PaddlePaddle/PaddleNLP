@@ -18,7 +18,7 @@ import json
 import os
 import unittest
 
-from paddlenlp.transformers import Qwen2Tokenizer
+from paddlenlp.transformers import Qwen2Tokenizer, Qwen2TokenizerFast
 from paddlenlp.transformers.qwen2.tokenizer import VOCAB_FILES_NAMES, bytes_to_unicode
 from tests.transformers.test_tokenizer_common import TokenizerTesterMixin
 
@@ -26,6 +26,7 @@ from tests.transformers.test_tokenizer_common import TokenizerTesterMixin
 class Qwen2TokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     from_pretrained_id = "__internal_testing__/tiny-random-qwen2"
     tokenizer_class = Qwen2Tokenizer
+    rust_tokenizer_class = Qwen2TokenizerFast
     test_slow_tokenizer = True
     space_between_special_tokens = False
     from_pretrained_kwargs = None

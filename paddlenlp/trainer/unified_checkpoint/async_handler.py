@@ -27,6 +27,10 @@ from paddlenlp.utils.log import logger
 if is_safetensors_available():
     from safetensors.numpy import save_file as safe_save_file
 
+from paddlenlp.quantization.unified_checkpoint_quantization import (
+    quant_unified_optimizer,
+)
+
 from .shared_memory_utils import (
     _read_state_dict_from_shm,
     _traverse_copy_to_shm,
@@ -69,12 +73,14 @@ class AsyncCheckpointHandler:
             self._shared_save_optimizer_flag = multiprocessing.Array("i", 1)
 
     def _file_save_async_or_sync(
-        self, state_dict, path, signal_path=None, is_sync=True, state_dict_type="model_weight"
+        self, state_dict, path, signal_path=None, is_sync=True, state_dict_type="model_weight", ckpt_quant_stage="O0"
     ):
         if is_sync:
             for k in list(state_dict.keys()):
                 if isinstance(state_dict[k], paddle.Tensor):
                     state_dict[k] = state_dict.pop(k).cpu().numpy()
+
+            state_dict = quant_unified_optimizer(state_dict, state_dict_type, ckpt_quant_stage)
             safe_save_file(state_dict, path, metadata={"format": "np"})
         else:
             if len(state_dict.keys()) == 0:
@@ -155,6 +161,7 @@ class AsyncCheckpointHandler:
                             self._lock,
                             state_dict_type,
                             self.global_rank,
+                            ckpt_quant_stage,
                         ),
                     )
                     self._process_optimizer_weight.start()
@@ -185,6 +192,7 @@ class AsyncCheckpointHandler:
         lock,
         state_dict_type,
         global_rank,
+        ckpt_quant_stage="O0",
     ):
         shm = shared_memory.SharedMemory(name=shm_name)
         while True:
@@ -198,6 +206,9 @@ class AsyncCheckpointHandler:
                 signal_path = shared_save_signal_path[:].decode("utf-8").rstrip("\x00")
                 logger.info(f"Start to async save {path}")
                 state_dict = _read_state_dict_from_shm(meta_dict, shm)  # numpy array
+                state_dict = quant_unified_optimizer(
+                    state_dict, state_dict_type, ckpt_quant_stage, async_save=True
+                )  # ckpt quantization
                 safe_save_file(state_dict, path, {"format": "np"})
                 del state_dict
                 saved_signal_path = os.path.join(signal_path, f".{state_dict_type}.done.{global_rank}")

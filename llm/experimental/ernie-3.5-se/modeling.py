@@ -135,7 +135,7 @@ def finfo(dtype: paddle.dtype = None):
 
 def masked_fill(x, mask, value):
     y = paddle.full(x.shape, value, x.dtype)
-    return paddle.where(mask, y, x)
+    return paddle.where(mask.to("bool"), y, x)
 
 
 def scaled_dot_product_attention(
