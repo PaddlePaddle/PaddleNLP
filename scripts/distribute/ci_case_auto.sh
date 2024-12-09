@@ -1982,7 +1982,7 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
         --model_type "gpt" \
         --enable_auto_parallel 1 \
         --to_static 1 \
-        --bf16 1 \
+        --fp16 1 \
         --fp16_opt_level "O2" \
         --num_hidden_layers 2 \
         --intermediate_size 1024 \
@@ -2045,7 +2045,7 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2(){
         --model_type "gpt" \
         --enable_auto_parallel 1 \
         --to_static 1 \
-        --bf16 1 \
+        --fp16 1 \
         --fp16_opt_level "O2" \
         --num_hidden_layers 2 \
         --intermediate_size 1024 \
