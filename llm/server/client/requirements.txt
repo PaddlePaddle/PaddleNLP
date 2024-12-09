@@ -1,0 +1,5 @@
+grpcio
+streamlit<=1.33.0
+streamlit_chat<=0.1.1
+protobuf==3.20.0
+tritonclient[grpc]==2.41.1
