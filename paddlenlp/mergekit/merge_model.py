@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import gc
 import json
 import os
 from multiprocessing import Process
@@ -129,7 +130,6 @@ class MergeModel:
                 )
             total_size += np.prod(merge_state_dict[key].shape) * self.numpy_dtype_map[str(merge_state_dict[key].dtype)]
             weight_map[key] = f"{self.merge_config.merge_preifx}-00001-of-00001.safetensors"
-
         # save safetensor file
         save_file(
             merge_state_dict,
@@ -146,6 +146,11 @@ class MergeModel:
             f.write(content)
         # save merge config file
         self.merge_config.save_pretrained(self.merge_config.output_path)
+        del state_dict_list
+        del merge_state_dict
+        if self.merge_config.base_model_path is not None:
+            del base_state_dict
+        gc.collect()
 
     def get_model_state_dict(self, model_path, file_type):
         if file_type == "safetensors":
@@ -272,11 +277,15 @@ class MergeModel:
             # dtype==bfloat16: numpy(float32) -> paddle(float32) -> paddle(bfloat16) -> numpy(uint16)
             if dtype == np.uint16:
                 merge_state_dict[k] = paddle.to_tensor(merge_state_dict[k], dtype="float32").astype("bfloat16").numpy()
+            del tensor_list
+            del base_tensor
         save_file(
             merge_state_dict,
             os.path.join(self.merge_config.output_path, shard_file),
             metadata={"format": "np"},
         )
+        del merge_state_dict
+        gc.collect()
 
     def shard_merge_pd(
         self,
