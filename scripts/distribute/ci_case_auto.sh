@@ -1959,7 +1959,7 @@ function llm_gpt_pir_auto_bs4_TP2_PP2(){
         --pipeline_parallel_degree 2 \
         --sequence_parallel 0 \
         --fuse_attention_qkv 1 \
-        --use_flash_attention 1 \
+        --use_flash_attention 0 \
         --scale_loss 1024 \
         --learning_rate 0.00001 \
         --min_learning_rate 0.000005 \
@@ -2021,7 +2021,7 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2(){
         --pipeline_schedule_mode "1F1B" \
         --sequence_parallel 0 \
         --fuse_attention_qkv 1 \
-        --use_flash_attention 1 \
+        --use_flash_attention 0 \
         --fused_linear_param_grad_add 1\
         --scale_loss 1024 \
         --learning_rate 0.00001 \
