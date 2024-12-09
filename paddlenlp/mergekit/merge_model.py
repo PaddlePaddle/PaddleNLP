@@ -17,9 +17,9 @@ from multiprocessing import Process
 
 import numpy as np
 import paddle
+from safetensors import safe_open
 from safetensors.numpy import save_file
 
-from paddlenlp.transformers import AutoModelForCausalLM
 from paddlenlp.utils.env import (
     PADDLE_MASTER_WEIGHTS_NAME,
     PADDLE_WEIGHTS_NAME,
@@ -28,7 +28,6 @@ from paddlenlp.utils.env import (
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
 )
-from paddlenlp.utils.log import logger
 from paddlenlp.utils.safetensors import fast_safe_open
 
 from .merge_method import MergeMethod
@@ -49,6 +48,7 @@ SPARSIFY_MERGE_MAPPING = {
 class MergeModel:
     def __init__(self, merge_config):
         self.reset_merge_model(merge_config=merge_config)
+        self.numpy_dtype_map = {"float32": 4, "float16": 2, "uint16": 2}
 
     def reset_merge_model(self, merge_config=None, merge_param_dict=None):
         if merge_config is not None:
@@ -71,71 +71,124 @@ class MergeModel:
 
     def merge_model(self):
         file_type_list = []
-        for model_path in self.merge_config.model_name_or_path_list:
+        for model_path in self.merge_config.model_path_list:
             file_type_list.append(self.check_model_path(model_path))
-        if self.merge_config.base_model_name_or_path is not None:
-            file_type_list.append(self.check_model_path(self.merge_config.base_model_name_or_path))
-
+        if self.merge_config.base_model_path is not None:
+            file_type_list.append(self.check_model_path(self.merge_config.base_model_path))
         if all(file_type == "safetensors" or file_type == "safetensors_without_index" for file_type in file_type_list):
             self.merge_safetensor_model(file_type_list)
         else:
-            logger.warning(
-                "Find '.pdparams' weight file exists. Set n_process = 1. Support AutoModelForCausalLM Only!!!\n"
-                "Slow! High memory usage! Not recommended!\n"
-                "It is recommended to convert the model into the Safetensor format!"
-            )
-            self.merge_causallm_model()
+            self.merge_mix_model(file_type_list)
 
-    def merge_causallm_model(self):
-        if self.merge_config.dtype is None:
-            raise ValueError("Please specify the dtype of the merged model.")
-        model_list = []
-        for model_path in self.merge_config.model_name_or_path_list:
-            model_list.append(AutoModelForCausalLM.from_pretrained(model_path, dtype=self.merge_config.dtype))
-        if self.merge_config.base_model_name_or_path is not None:
-            model_list.append(
-                AutoModelForCausalLM.from_pretrained(
-                    self.merge_config.base_model_name_or_path, dtype=self.merge_config.dtype
-                )
-            )
-        if not all(model_list[0].state_dict().keys() == model.state_dict().keys() for model in model_list):
-            raise ValueError("Weights key mismatch. Please make sure you load the correct weight file")
+    def merge_mix_model(self, file_type_list):
+        state_dict_list = []
+        for i, model_path in enumerate(self.merge_config.model_path_list):
+            state_dict_list.append(self.get_model_state_dict(model_path, file_type_list[i]))
+        if self.merge_config.base_model_path is not None:
+            state_dict_list.append(self.get_model_state_dict(self.merge_config.base_model_path, file_type_list[-1]))
+        if not all(state_dict_list[0].keys() == state_dict.keys() for state_dict in state_dict_list):
+            raise ValueError("State dict keys mismatch. Please make sure you load the correct weight file")
+        if self.merge_config.base_model_path is not None:
+            base_state_dict = state_dict_list.pop()
+            base_file_type = file_type_list.pop()
         merge_state_dict = {}
-        for key in model_list[0].state_dict().keys():
-            tensor_list = [model.state_dict()[key] for model in model_list]
-            if self.merge_config.tensor_type == "np":
-                dtype = tensor_list[0].dtype
-                if dtype == "bfloat16":
-                    tensor_list = [tensor.astype("float32").numpy() for tensor in tensor_list]
-                else:
-                    tensor_list = [tensor.numpy() for tensor in tensor_list]
-                if self.merge_config.base_model_name_or_path is not None:
-                    base_tensor = tensor_list.pop()
-                    tensor_list = [tensor - base_tensor for tensor in tensor_list]
-                merge_state_dict[key] = self.merge_method.merge(tensor_list)
-                if self.merge_config.base_model_name_or_path is not None:
-                    merge_state_dict[key] += base_tensor
-                merge_state_dict[key] = paddle.to_tensor(merge_state_dict[key])
-                if dtype == "bfloat16":
-                    merge_state_dict[key] = merge_state_dict[key].astype("bfloat16")
-            else:
-                raise NotImplementedError(f"Not support tensor_type '{self.merge_config.tensor_type}' yet!")
-        model_list[0].set_state_dict(merge_state_dict)
-        model_list[0].save_pretrained(self.merge_config.output_path)
+        total_size = 0
+        weight_map = {}
+        for key in state_dict_list[0].keys():
+            is_bf16 = False
+            tensor_list = []
+            for state_dict, file_type in zip(state_dict_list, file_type_list):
+                if file_type == "pdparams":
+                    if str(state_dict[key].dtype) == "paddle.bfloat16":
+                        is_bf16 = True
+                        state_dict[key] = state_dict[key].astype("float32").numpy()
+                    else:
+                        state_dict[key] = state_dict[key].numpy()
+                elif str(state_dict[key].dtype) == "uint16":
+                    is_bf16 = True
+                    state_dict[key] = paddle.to_tensor(state_dict[key], dtype="bfloat16").astype("float32").numpy()
+                tensor_list.append(state_dict[key])
+            if self.merge_config.base_model_path is not None:
+                if base_file_type == "pdparams":
+                    if str(base_state_dict[key].dtype) == "paddle.bfloat16":
+                        base_state_dict[key] = base_state_dict[key].astype("float32").numpy()
+                    else:
+                        base_state_dict[key] = base_state_dict[key].numpy()
+                elif str(base_state_dict[key].dtype) == "uint16":
+                    base_state_dict[key] = (
+                        paddle.to_tensor(base_state_dict[key], dtype="bfloat16").astype("float32").numpy()
+                    )
+                tensor_list = [tensor - base_state_dict[key] for tensor in tensor_list]
+            merge_state_dict[key] = self.merge_method.merge(tensor_list)
+            if self.merge_config.base_model_path is not None:
+                merge_state_dict[key] += base_state_dict[key]
+            # dtype==bfloat16: numpy(float32) -> paddle(float32) -> paddle(bfloat16) -> numpy(uint16)
+            if is_bf16:
+                merge_state_dict[key] = (
+                    paddle.to_tensor(merge_state_dict[key], dtype="float32").astype("bfloat16").numpy()
+                )
+            total_size += np.prod(merge_state_dict[key].shape) * self.numpy_dtype_map[str(merge_state_dict[key].dtype)]
+            weight_map[key] = f"{self.merge_config.merge_preifx}-00001-of-00001.safetensors"
+
+        # save safetensor file
+        save_file(
+            merge_state_dict,
+            os.path.join(
+                self.merge_config.output_path, f"{self.merge_config.merge_preifx}-00001-of-00001.safetensors"
+            ),
+            metadata={"format": "np"},
+        )
+        # save safe index file
+        index = {"metadata": {"total_size": int(total_size)}, "weight_map": weight_map}
+        save_index_file = os.path.join(self.merge_config.output_path, self.safe_index_name())
+        with open(save_index_file, "w", encoding="utf-8") as f:
+            content = json.dumps(index, indent=2) + "\n"
+            f.write(content)
+        # save merge config file
         self.merge_config.save_pretrained(self.merge_config.output_path)
 
+    def get_model_state_dict(self, model_path, file_type):
+        if file_type == "safetensors":
+            state_dict = {}
+            with open(os.path.join(model_path, self.safe_index_name()), "r", encoding="utf-8") as f:
+                index = json.load(f)
+            for key in index["weight_map"].keys():
+                with fast_safe_open(
+                    os.path.join(model_path, index["weight_map"][key]),
+                    framework="np",
+                ) as f:
+                    state_dict[key] = f.get_tensor(key)
+        elif file_type == "safetensors_without_index":
+            state_dict = {}
+            with fast_safe_open(os.path.join(model_path, self.safe_weight_name()), framework="numpy") as f:
+                for k in f.keys():
+                    state_dict[k] = f.get_tensor(k)
+        elif file_type == "pdparams":
+            state_dict = paddle.load(os.path.join(model_path, self.weight_name()))
+        else:
+            raise ValueError(f"Unsupported file_type: {file_type}")
+        return state_dict
+
     def create_safetensor_index(self, model_path):
-        index = {}
+        weight_map = {}
+        total_size = 0
+
+        with safe_open(os.path.join(model_path, self.safe_weight_name()), framework="numpy") as f:
+            for key in f.keys():
+                tensor = f.get_tensor(key)
+                total_size += np.prod(tensor.shape) * self.numpy_dtype_map[str(tensor.dtype)]
+                weight_map[key] = self.safe_weight_name()
+        index = {"metadata": {"total_size": total_size}, "weight_map": weight_map}
         return index
 
     def merge_safetensor_model(self, file_type_list):
         # load index
         index_list = []
-        model_name_or_path_list = self.merge_config.model_name_or_path_list
-        if self.merge_config.base_model_name_or_path is not None:
-            model_name_or_path_list += [self.merge_config.base_model_name_or_path]
+        model_path_list = self.merge_config.model_path_list
+        if self.merge_config.base_model_path is not None:
+            model_path_list += [self.merge_config.base_model_path]
 
-        for model_path, file_type in zip(model_name_or_path_list, file_type_list):
+        for model_path, file_type in zip(model_path_list, file_type_list):
             if file_type == "safetensors":
                 with open(os.path.join(model_path, self.safe_index_name()), "r", encoding="utf-8") as f:
                     index_list.append(json.load(f))
@@ -147,10 +200,10 @@ class MergeModel:
             raise ValueError("Weights total_size mismatch. Please make sure you load the correct weight file")
         if not all(index_list[0]["weight_map"].keys() == index["weight_map"].keys() for index in index_list):
             raise ValueError("Weights weight_map mismatch. Please make sure you load the correct weight file")
-
         # init new index
         index = {}
         index["metadata"] = index_list[0]["metadata"]
+        index["metadata"]["total_size"] = int(index["metadata"]["total_size"])
         index["weight_map"] = {}
 
         # Multi-process update
@@ -181,8 +234,6 @@ class MergeModel:
 
         # save safe index file
         save_index_file = os.path.join(self.merge_config.output_path, self.safe_index_name())
-        if save_index_file and not os.path.exists(self.merge_config.output_path):
-            os.makedirs(self.merge_config.output_path)
         with open(save_index_file, "w", encoding="utf-8") as f:
             content = json.dumps(index, indent=2) + "\n"
             f.write(content)
@@ -198,7 +249,7 @@ class MergeModel:
         for k in key_list:
             tensor_list = []
 
-            for i, model_path in enumerate(self.merge_config.model_name_or_path_list):
+            for i, model_path in enumerate(self.merge_config.model_path_list):
                 with fast_safe_open(os.path.join(model_path, index_list[i]["weight_map"][k]), framework="np") as w:
                     tensor = w.get_tensor(k)
                     dtype = tensor.dtype
@@ -206,9 +257,9 @@ class MergeModel:
                     if tensor.dtype == np.uint16:
                         tensor = paddle.to_tensor(tensor, dtype="bfloat16").astype("float32").numpy()
                     tensor_list.append(tensor)
-            if self.merge_config.base_model_name_or_path is not None:
+            if self.merge_config.base_model_path is not None:
                 with fast_safe_open(
-                    os.path.join(self.merge_config.base_model_name_or_path, index_list[-1]["weight_map"][k]),
+                    os.path.join(self.merge_config.base_model_path, index_list[-1]["weight_map"][k]),
                     framework="np",
                 ) as w:
                     base_tensor = w.get_tensor(k)
@@ -216,7 +267,7 @@ class MergeModel:
                         base_tensor = paddle.to_tensor(base_tensor, dtype="bfloat16").astype("float32").numpy()
                 tensor_list = [tensor - base_tensor for tensor in tensor_list]
             merge_state_dict[k] = self.merge_method.merge(tensor_list)
-            if self.merge_config.base_model_name_or_path is not None:
+            if self.merge_config.base_model_path is not None:
                 merge_state_dict[k] += base_tensor
             # dtype==bfloat16: numpy(float32) -> paddle(float32) -> paddle(bfloat16) -> numpy(uint16)
             if dtype == np.uint16:
@@ -236,7 +287,6 @@ class MergeModel:
         raise NotImplementedError("Not support paddle tensors.")
 
     def check_model_path(self, model_path):
-
         if os.path.exists(os.path.join(model_path, self.safe_index_name())):
             with open(os.path.join(model_path, self.safe_index_name()), "r", encoding="utf-8") as f:
                 index = json.load(f)
@@ -247,9 +297,9 @@ class MergeModel:
                     else:
                         ValueError(f"Not found {os.path.join(model_path, safe_file_list[i])}.")
             file_type = "safetensors"
-        elif os.path.exists(os.path.join(model_path, self.weight_name)):
+        elif os.path.exists(os.path.join(model_path, self.safe_weight_name())):
             file_type = "safetensors_without_index"
-        elif os.path.exists(os.path.join(model_path, self.weight_name)):
+        elif os.path.exists(os.path.join(model_path, self.weight_name())):
             file_type = "pdparams"
         else:
             raise ValueError(f"Please check path {model_path} is correct.")

@@ -41,12 +41,9 @@ class MergeConfig:
     sparsify_type: str = field(default=None, metadata={"help": "The type of sparsify process."})
 
     # Model parameters
-    model_name_or_path_list: Optional[List[str]] = field(
-        default=None, metadata={"help": "Merge model name or path list"}
-    )
-    base_model_name_or_path: str = field(default=None, metadata={"help": "Base model name or path."})
+    model_path_list: Optional[List[str]] = field(default=None, metadata={"help": "Merge model name or path list"})
+    base_model_path: str = field(default=None, metadata={"help": "Base model name or path."})
     output_path: str = field(default=None, metadata={"help": "Base model name or path."})
-    dtype: str = field(default=None, metadata={"help": "Data type of the model."})
     # merge parameters
     weight_list: Optional[List[float]] = field(
         default=None, metadata={"help": "Relative (or absolute if normalize=False) weighting of a given tensor"}
@@ -70,6 +67,8 @@ class MergeConfig:
         self.config_check()
 
     def config_check(self):
+        if not os.path.exists(self.output_path):
+            os.makedirs(self.output_path)
         if self.tensor_type not in ["np"]:
             raise ValueError(f"Unsupported tensor type: {self.tensor_type}. Support 'np' only.")
         if self.device != "cpu":
@@ -77,20 +76,18 @@ class MergeConfig:
             self.device = "cpu"
             self.tensor_type = "np"
 
-        elif self.merge_method not in ["linear", "ties", "slerp", "della_linear", "della_ties", "dare", "dare_ties"]:
+        elif self.merge_method not in ["linear", "ties", "slerp", "della_linear", "della", "dare_linear", "dare_ties"]:
             raise ValueError(
                 f"Unsupported merge strategy: {self.merge_method}. Please choose one from ['linear', 'slerp']."
             )
-        if self.model_name_or_path_list is not None:
-            if not isinstance(self.model_name_or_path_list, list) or len(self.model_name_or_path_list) < 2:
-                raise ValueError(
-                    f"Please specify the model_name_or_path_list at least two. But got {self.model_name_or_path_list}"
-                )
+        if self.model_path_list is not None:
+            if not isinstance(self.model_path_list, list) or len(self.model_path_list) < 2:
+                raise ValueError(f"Please specify the model_path_list at least two. But got {self.model_path_list}")
             if self.weight_list is None:
-                self.weight_list = [1.0] * len(self.model_name_or_path_list)
+                self.weight_list = [1.0] * len(self.model_path_list)
                 self.normalize = True
-            if len(self.model_name_or_path_list) != len(self.weight_list):
-                raise ValueError("The length of model_name_or_path_list and weight_list must be the same.")
+            if len(self.model_path_list) != len(self.weight_list):
+                raise ValueError("The length of model_path_list and weight_list must be the same.")
         if self.reserve_p < 0 or self.reserve_p > 1:
             raise ValueError("reserve_p must be between 0 and 1.")
         if "della" in self.merge_method or self.sparsify_type == "magprune":
@@ -127,19 +124,19 @@ class MergeConfig:
             writer.write(json.dumps(output_dict, indent=2, sort_keys=True))
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, **kwargs):
+    def from_pretrained(cls, pretrained_model_path, **kwargs):
         r"""
         This method loads the configuration of your adapter model from a directory.
         Args:
-            pretrained_model_name_or_path (`str`):
+            pretrained_model_path (`str`):
                 The directory or the hub-id where the configuration is saved.
             **kwargs:
                 Additional keyword arguments passed along to the child class initialization.
         """
-        if os.path.isfile(os.path.join(pretrained_model_name_or_path, MERGE_CONFIG_NAME)):
-            config_file = os.path.join(pretrained_model_name_or_path, MERGE_CONFIG_NAME)
+        if os.path.isfile(os.path.join(pretrained_model_path, MERGE_CONFIG_NAME)):
+            config_file = os.path.join(pretrained_model_path, MERGE_CONFIG_NAME)
         else:
-            raise ValueError(f"Can't find lora_config.json at '{pretrained_model_name_or_path}'")
+            raise ValueError(f"Can't find lora_config.json at '{pretrained_model_path}'")
 
         loaded_attributes = cls.from_json_file(config_file)
 

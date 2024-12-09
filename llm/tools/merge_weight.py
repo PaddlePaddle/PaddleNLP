@@ -15,17 +15,20 @@ import sys
 
 from paddlenlp.mergekit import MergeConfig, MergeModel
 from paddlenlp.trainer import PdArgumentParser
+from paddlenlp.utils.log import logger
 
 
 def merge_model():
     parser = PdArgumentParser((MergeConfig))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
-        merge_config = parser.parse_json_file_and_cmd_lines()
+        merge_config = parser.parse_json_file_and_cmd_lines()[0]
     else:
-        merge_config = parser.parse_args_into_dataclasses()
+        merge_config = parser.parse_args_into_dataclasses()[0]
 
     mergekit = MergeModel(merge_config)
+    logger.info("Start to merge model.")
     mergekit.merge_model()
+    logger.info("Finish merging model.")
 
 
 if __name__ == "__main__":

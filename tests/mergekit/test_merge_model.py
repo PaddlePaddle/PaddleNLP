@@ -12,31 +12,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# import copy
-# import os
-# import re
-# import unittest
-# from tempfile import TemporaryDirectory
+import os
+import unittest
+from tempfile import TemporaryDirectory
 
-# import numpy as np
-# import paddle
-# from parameterized import parameterized
+from parameterized import parameterized
 
-# from paddlenlp.mergekit import MergeConfig, SparsifyMethod
+from paddlenlp.mergekit import MergeConfig, MergeModel
+from paddlenlp.transformers import AutoModel
 
-# class TestSparsifyMethod(unittest.TestCase):
-#     def setUpClass(cls):
-#         cls.pd_param_model_name = "bert-base-uncased"
-#         cls.safetensors_model_name_or_path_list = []
-#         cls.base_model_name_or_path = "bert-base-uncased"
 
-#     @parameterized.expand([("slerp",), ("dare_linear",), ("lora",)])
-#     def test_safetensor_model(self, merge_method):
-#         with TemporaryDirectory() as tempdir:
-#             merge_config = MergeConfig(
-#                 merge_method=merge_method,
-#                 model_name_or_path_list= self.safetensors_model_name_or_path_list,
-#                 base_model_name_or_path=self.base_model_name_or_path,
-#                 output_path=tempdir)
-#             mergekit = MergeModel(merge_config)
-#             mergekit.merge()
+class TestMergeModel(unittest.TestCase):
+    @parameterized.expand([("slerp",), ("della",), ("dare_linear",), ("ties",)])
+    def test_merge_model(self, merge_method):
+        with TemporaryDirectory() as tempdir:
+            model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert", dtype="bfloat16")
+            pd_path = os.path.join(tempdir, "pd_model")
+            model.save_pretrained(pd_path)
+            safe_path = os.path.join(tempdir, "safe_model")
+            model.save_pretrained(safe_path, safe_serialization="safetensors")
+
+            # test mix
+            merge_config = MergeConfig(
+                merge_method=merge_method, model_path_list=[safe_path, pd_path], output_path=tempdir
+            )
+            mergekit = MergeModel(merge_config)
+            mergekit.merge_model()
+            # test safetensor only
+            merge_config = MergeConfig(
+                merge_method=merge_method, model_path_list=[safe_path, safe_path], output_path=tempdir, n_process=2
+            )
+            mergekit = MergeModel(merge_config)
+            mergekit.merge_model()
