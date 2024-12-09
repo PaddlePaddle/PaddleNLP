@@ -17,7 +17,7 @@ import json
 import os
 import unittest
 
-from paddlenlp.transformers import BloomTokenizer
+from paddlenlp.transformers import BloomTokenizer, BloomTokenizerFast
 
 from ..test_tokenizer_common import TokenizerTesterMixin
 
@@ -30,6 +30,7 @@ VOCAB_FILES_NAMES = {
 class BloomTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = BloomTokenizer
+    rust_tokenizer_class = BloomTokenizerFast
     from_pretrained_kwargs = {"add_prefix_space": True}
     test_decode_token = True
     test_seq2seq = False
@@ -90,7 +91,24 @@ class BloomTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
         input_tokens = tokens + [tokenizer.unk_token]
         input_bpe_tokens = [14, 15, 10, 9, 3, 2, 15, 19]
+
         self.assertListEqual(tokenizer.convert_tokens_to_ids(input_tokens), input_bpe_tokens)
+
+    # test encode_plus
+    def test_encodings_from_sample_data(self):
+        """
+        Assert that the created tokens are the same than the hard-coded ones
+        """
+        tokenizer = self.rust_tokenizer_class.from_pretrained("bigscience/bloom-560m")
+
+        INPUT_SENTENCES = ["The quick brown fox</s>", "jumps over the lazy dog</s>"]
+        TARGET_TOKENS = [[2175, 23714, 73173, 144252, 2], [77, 132619, 3478, 368, 109586, 35433, 2]]
+
+        computed_tokens = tokenizer.batch_encode(INPUT_SENTENCES)["input_ids"]
+        self.assertListEqual(TARGET_TOKENS, computed_tokens)
+
+        decoded_tokens = tokenizer.batch_decode(computed_tokens)
+        self.assertListEqual(decoded_tokens, INPUT_SENTENCES)
 
     def test_pretokenized_inputs(self, *args, **kwargs):
         pass

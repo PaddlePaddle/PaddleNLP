@@ -130,6 +130,8 @@ python merge_lora_params.py \
 - `neftune_noise_alpha`: NEFT alpha 参数，默认为5.0。
 - `vera`: 是否开启 VeRA 微调策略，默认为 False。
 - `vera_rank`: VeRA 算法中 rank（秩）的值，默认为8。
+- `lokr`: 是否开启 LoKr 微调策略，默认为 False。
+- `lokr_rank`: LoKr 算法中 rank（秩）的值，默认为8。
 - `use_long_sequence_strategies`: 是否使用长序列扩展策略，默认为 False。
 - `strategy_type`: 长序列扩展策略的类型，默认为 None。
 - `strategy_name`: 长序列扩展策略的具体名称，默认为 None。

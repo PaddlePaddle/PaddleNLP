@@ -16,6 +16,7 @@
 
 #include "fp8_gemm_fused/fp8_fp8_gemm_scale_bias_act.h"
 #include "fp8_common.h"  // NOLINT
+#include "fp8_fp8_half_cuda_core_gemm.h"
 
 std::vector<paddle::Tensor> cutlass_fp8_fp8_half_gemm(
     const paddle::Tensor& x,
@@ -116,26 +117,55 @@ std::vector<paddle::Tensor> cutlass_fp8_fp8_half_gemm(
     }
   }
 
-  GemmEpilogueAllParams params = {
-      x_ptr,
-      y_ptr,
-      out_ptr,
-      scale,
-      M,
-      N,
-      K,
-      lda,
-      ldb,
-      ldd,
-      batch_count,
-      place,
-      stream,
-      sm_version,
-      0.01,  // for leaky_relu
-      bias_data,
-      bias_dims,
-      fuse_gemm_config};
-  fp8_fp8_gemm_scale_bias_act(params);
+  if (M <=4 && trans_y && !trans_x && act == "noact" && enable_cuda_core_fp8_gemm()) {
+        GemmParams params = {
+            x_ptr,
+            y_ptr,
+            bias_data,
+            out_ptr,
+            M,
+            N,
+            K,
+            scale,
+            stream,
+        };
+
+        if (x.dtype() == phi::DataType::FLOAT8_E4M3FN)
+        {
+            if(output_dtype == "bfloat16") {
+                cuda_core_gemm_launcher<__nv_fp8_e4m3, __nv_bfloat16>(params);
+                
+            } else {
+                cuda_core_gemm_launcher<__nv_fp8_e4m3, half>(params);
+            }
+        } else {
+            if(output_dtype == "bfloat16") {
+                cuda_core_gemm_launcher<__nv_fp8_e5m2, __nv_bfloat16>(params);
+            } else {
+                cuda_core_gemm_launcher<__nv_fp8_e5m2, half>(params);
+            }
+        }
+    } else {
+        GemmEpilogueAllParams params = {x_ptr,
+                                        y_ptr,
+                                        out_ptr,
+                                        scale,
+                                        M,
+                                        N,
+                                        K,
+                                        lda,
+                                        ldb,
+                                        ldd,
+                                        batch_count,
+                                        place,
+                                        stream,
+                                        sm_version,
+                                        0.01,  // for leaky_relu
+                                        bias_data,
+                                        bias_dims,
+                                        fuse_gemm_config};
+        fp8_fp8_gemm_scale_bias_act(params);
+    }
   return {out};
 }
 

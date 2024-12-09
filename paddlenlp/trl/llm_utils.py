@@ -267,29 +267,6 @@ def get_infer_model_path(input_dir, model_prefix):
         return os.path.join(input_dir, model_prefix)
 
 
-def generate_rank_mapping(output_filename):
-    ring_id = -1
-    try:
-        hcg = fleet.get_hybrid_communicate_group()
-        model_parallel_group = hcg.get_model_parallel_group()
-        ring_id = model_parallel_group.id
-    except Exception:
-        pass
-
-    if ring_id == -1:
-        return
-
-    world_size = dist.get_world_size()
-    with open(output_filename, "w") as f:
-        f.write("[ring_id -> ranks]\n")
-        f.write(",".join(map(str, [0] + list(range(world_size)))) + "\n")
-        f.write(",".join(map(str, [ring_id] + list(range(world_size)))) + "\n")
-
-        f.write("[rank -> ring_ids]\n")
-        for i in range(world_size):
-            f.write("{},0,{}\n".format(i, ring_id))
-
-
 def deserialize_from_file(fp):
     x_type = fp.read(1)
     x_type_out = struct.unpack("c", x_type)[0]
@@ -633,7 +610,7 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
     from paddlenlp_ops import get_output
 
     while True:
-        get_output(output_tensor, 0, True)
+        get_output(output_tensor, 0, True, False)  # wait_flag  # speculative_decoding
         if int(output_tensor[0, 0]) == -2:  # read none
             continue
         bsz = int(output_tensor[1, 0])
@@ -645,6 +622,45 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
     output = np.concatenate(outputs, axis=1).tolist()
     seqs = tokenizer.batch_decode(output, skip_special_tokens=True, clean_up_tokenization_spaces=False)
     for i, (out, seq) in enumerate(zip(output, seqs)):
+        result_queue.put([i, out, seq])
+
+    logger.info("Finish read result message")
+
+
+def speculate_read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue, done_event: mp.Event):
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+    paddle.device.set_device("cpu")
+    paddle.disable_static()
+    outputs = []
+    from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS
+
+    for _ in range(MAX_BSZ):
+        outputs.append([])
+    output_tensor = tensor_queue.get(timeout=1)
+    done_event.set()
+    logger.info("Start speculate read result message")
+    logger.info(f"Current path is {os.getcwd()}")
+
+    from paddlenlp_ops import get_output
+
+    while True:
+        get_output(output_tensor, 0, True, True)  # wait_flag  # speculative_decoding
+        if int(output_tensor[0, 0]) == -2:  # read none
+            continue
+        bsz = int(output_tensor[1])
+        accept_num = output_tensor[2 : bsz + 2].numpy()
+        for bi in range(bsz):
+            output_numpy = output_tensor[
+                2 + MAX_BSZ + bi * MAX_DRAFT_TOKENS : 2 + MAX_BSZ + bi * MAX_DRAFT_TOKENS + int(accept_num[bi]),
+                0,
+            ].numpy()
+            output_numpy[output_numpy == -1] = tokenizer.eos_token_id
+            outputs[bi].extend(output_numpy.tolist())
+        if int(output_tensor[0, 0]) == -1:
+            break
+
+    seqs = tokenizer.batch_decode(outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+    for i, (out, seq) in enumerate(zip(outputs, seqs)):
         result_queue.put([i, out, seq])
 
     logger.info("Finish read result message")
