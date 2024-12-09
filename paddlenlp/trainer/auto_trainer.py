@@ -128,18 +128,25 @@ class AutoTrainer(Trainer):
     def _wrap_for_auto(self, model, train_dataloader):
         logger.info("Wrapping model for auto paralle")
         dist_loader = self._wrap_for_dist_loader(train_dataloader)
+        sharding_parallel_mesh_dimension = self.args.sharding_parallel_mesh_dimension
 
         if ShardingOption.SHARD_OP in self.args.sharding:
             self.optimizer = dist.shard_optimizer(
-                self.optimizer, dist.ShardingStage1(), self.args.gradient_accumulation_steps
+                self.optimizer,
+                dist.ShardingStage1(sharding_mesh_dim=sharding_parallel_mesh_dimension),
+                self.args.gradient_accumulation_steps,
             )
         elif ShardingOption.SHARD_GRAD_OP in self.args.sharding:
             self.optimizer = dist.shard_optimizer(
-                self.optimizer, dist.ShardingStage2(), self.args.gradient_accumulation_steps
+                self.optimizer,
+                dist.ShardingStage2(sharding_mesh_dim=sharding_parallel_mesh_dimension),
+                self.args.gradient_accumulation_steps,
             )
         elif ShardingOption.FULL_SHARD in self.args.sharding:
             self.optimizer = dist.shard_optimizer(
-                self.optimizer, dist.ShardingStage3(), self.args.gradient_accumulation_steps
+                self.optimizer,
+                dist.ShardingStage3(sharding_mesh_dim=sharding_parallel_mesh_dimension),
+                self.args.gradient_accumulation_steps,
             )
         else:
             self.optimizer = dist.shard_optimizer(self.optimizer, None, self.args.gradient_accumulation_steps)
@@ -152,9 +159,7 @@ class AutoTrainer(Trainer):
             if self.enable_autocast_context_manager:
                 unified_strategy.amp.custom_black_list.extend(["reduce_sum", "c_softmax_with_cross_entropy"])
                 if self.args.fp16_opt_level == "O2":
-                    print("custom_white_list", unified_strategy.amp.custom_white_list, flush=1)
                     unified_strategy.amp.custom_white_list.extend(["lookup_table", "lookup_table_v2"])
-                    print("custom_white_list", unified_strategy.amp.custom_white_list, flush=1)
 
             # dist.to_static() obtains the input spec information through next(dataloader), but this has side effects
             # on the passed-in dataloader, altering the state of the sampler of the dataloader. In some cases, once

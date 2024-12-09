@@ -240,13 +240,15 @@ PREFIX_CHECKPOINT_DIR = "checkpoint"
 _re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\-(\d+)$")
 
 
-def _check_checkpoint_files(folder_path, world_size, ignore_save_lr_and_optim, skip_save_model_weight):
+def _check_checkpoint_files(
+    folder_path, world_size, ignore_save_lr_and_optim, skip_save_model_weight, remove_master_weight
+):
     files = os.listdir(folder_path)
     model_weight_files = [f for f in files if f.startswith(".model_weight")]
     a = len(model_weight_files) == world_size
     if not ignore_save_lr_and_optim:
         b = True
-        if not skip_save_model_weight:
+        if not skip_save_model_weight or not remove_master_weight:
             master_weight_file = [f for f in files if f.startswith(".master_weight")]
             b = len(master_weight_file) == world_size
         optimizer_file = [f for f in files if f.startswith(".optimizer_weight")]
@@ -282,8 +284,13 @@ def get_last_checkpoint(folder, signal_folder=None, uc_async_save=False):
                 pre_world_size = saving_info.get("world_size", 1)
                 ignore_save_lr_and_optim = saving_info.get("ignore_save_lr_and_optim", False)
                 skip_save_model_weight = saving_info.get("skip_save_model_weight", False)
+                remove_master_weight = saving_info.get("remove_master_weight", False)
                 if _check_checkpoint_files(
-                    current_signal_path, pre_world_size, ignore_save_lr_and_optim, skip_save_model_weight
+                    current_signal_path,
+                    pre_world_size,
+                    ignore_save_lr_and_optim,
+                    skip_save_model_weight,
+                    remove_master_weight,
                 ):
                     return current_path
         return
@@ -1126,3 +1133,11 @@ def should_skip_data(global_step, skip_data_intervals):
             skip_flag = True
             break
     return skip_flag
+
+
+def split_parallel_config(parallel_config):
+    if "," in parallel_config:
+        parallel_config = set(parallel_config.split(","))
+    else:
+        parallel_config = set(parallel_config.split(" "))
+    return parallel_config

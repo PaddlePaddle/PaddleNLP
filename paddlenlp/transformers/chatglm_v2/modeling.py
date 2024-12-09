@@ -98,7 +98,7 @@ class RotaryEmbedding(nn.Layer):
     def __init__(self, dim, original_impl=False):
         super().__init__()
         self.default_dtype = paddle.get_default_dtype()
-        inv_freq = 1.0 / (10000 ** (paddle.arange(0, dim, 2, dtype="float32") / dim))
+        inv_freq = 1.0 / (10000 ** (paddle.arange(0, dim, 2, dtype=self.default_dtype) / dim))
         self.register_buffer("inv_freq", inv_freq)
         self.dim = dim
         self.original_impl = original_impl
@@ -113,16 +113,16 @@ class RotaryEmbedding(nn.Layer):
         theta = 1.0 / (base ** (paddle.arange(0, n_elem, 2, dtype="float32") / n_elem))
 
         # Create position indexes `[0, 1, ..., seq_len - 1]`
-        seq_idx = paddle.arange(0, seq_len, dtype=theta.dtype)
+        seq_idx = paddle.arange(0, seq_len, dtype="float32")
 
         # Calculate the product of position index and $\theta_i$
-        idx_theta = paddle.outer(seq_idx, theta).astype(self.default_dtype)
+        idx_theta = paddle.outer(seq_idx, theta).astype("float32")
 
         cache = paddle.stack([paddle.cos(idx_theta), paddle.sin(idx_theta)], axis=-1)
 
         # this is to mimic the behaviour of complex32, else we will get different results
-        if self.default_dtype in (paddle.float16, paddle.bfloat16, paddle.int8):
-            cache = cache.astype(self.default_dtype)
+        if self.default_dtype in ("float16", "bfloat16", "int8"):
+            cache = cache.astype("bfloat16") if self.default_dtype == "bfloat16" else cache.astype("float16")
             # cache = cache.bfloat16() if dtype == paddle.bfloat16 else cache.astype("float16")
         return cache
 
@@ -956,6 +956,11 @@ class ChatGLMv2PretrainedModel(PretrainedModel):
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
 
         return mappings
+
+    @classmethod
+    def set_inference_config(cls, config, predictor_args, **kwargs):
+        super().set_inference_config(config, predictor_args, **kwargs)
+        predictor_args.total_max_length = config.seq_length
 
 
 class Embedding(nn.Layer):

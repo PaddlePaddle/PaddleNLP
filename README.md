@@ -32,6 +32,8 @@
 
 ## News 📢
 
+* **2024.11.28 📚《FlashRAG-Paddle | 基于 PaddleNLP 的高效开发与评测 RAG 框架》**，为文本更快更好构建准确嵌入表示、加速推理生成速度。PaddleNLP 支持超大 Batch 嵌入表示学习与多硬件高性能推理，涵盖 INT8/INT4量化技术及多种高效注意力机制优化与 TensorCore 深度优化。内置全环节算子融合技术，使得 FlashRAG 推理性能相比 transformers 动态图提升70%以上，结合检索增强知识输出结果更加准确，带来敏捷高效的使用体验。直播时间：12月3日（周二）19：00。报名链接：https://www.wjx.top/vm/eaBa1vA.aspx?udsid=682361
+
 * **2024.08.08 📚《飞桨产业级大语言模型开发利器 PaddleNLP 3.0 重磅发布》**，训压推全流程贯通，主流模型全覆盖。大模型自动并行，千亿模型训推全流程开箱即用。提供产业级高性能精调与对齐解决方案，压缩推理领先，多硬件适配。覆盖产业级智能助手、内容创作、知识问答、关键信息抽取等应用场景。直播时间：8月22日（周四）19：00。报名链接：https://www.wjx.top/vm/Y2f7FFY.aspx?udsid=143844
 
 * **2024.06.27 [PaddleNLP v3.0 Beta](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta0)**：拥抱大模型，体验全升级。统一大模型套件，实现国产计算芯片全流程接入；全面支持飞桨4D 并行配置、高效精调策略、高效对齐算法、高性能推理等大模型产业级应用流程；自研极致收敛的 RsLoRA+算法、自动扩缩容存储机制 Unified Checkpoint 和通用化支持的 FastFFN、FusedQKV 助力大模型训推；主流模型持续支持更新，提供高效解决方案。
@@ -205,6 +207,22 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py 
 ```
 
 更多大模型全流程步骤，请参考[飞桨大模型套件](./llm)介绍。
+另外我们还提供了快速微调方式, 无需 clone 源代码：
+
+```python
+from paddlenlp.trl import SFTConfig, SFTTrainer
+from datasets import load_dataset
+
+dataset = load_dataset("ZHUI/alpaca_demo", split="train")
+
+training_args = SFTConfig(output_dir="Qwen/Qwen2.5-0.5B-SFT", device="gpu")
+trainer = SFTTrainer(
+    args=training_args,
+    model="Qwen/Qwen2.5-0.5B",
+    train_dataset=dataset,
+)
+trainer.train()
+```
 
 更多 PaddleNLP 内容可参考：
 

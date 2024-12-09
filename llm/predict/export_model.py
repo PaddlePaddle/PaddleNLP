@@ -18,11 +18,10 @@ from dataclasses import dataclass, field
 
 import paddle
 from paddle.distributed import fleet
+from predict.predictor import ModelArgument, PredictorArgument, create_predictor
 
 from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.trl import llm_utils
-
-from .predictor import ModelArgument, PredictorArgument, create_predictor
 
 
 @dataclass
@@ -59,7 +58,7 @@ def main():
         tensor_parallel_rank = hcg.get_model_parallel_rank()
 
     # set predictor type
-    predictor = create_predictor(predictor_args, model_args, tensor_parallel_degree, tensor_parallel_rank)
+    predictor = create_predictor(predictor_args, model_args)
     predictor.model.eval()
 
     predictor.model.to_static(
@@ -68,6 +67,7 @@ def main():
             "dtype": predictor_args.dtype,
             "export_precache": predictor_args.export_precache,
             "cachekv_int8_type": predictor_args.cachekv_int8_type,
+            "speculate_method": predictor_args.speculate_method,
         },
     )
     add_inference_args_to_config(predictor.model.config, predictor_args)
@@ -78,7 +78,6 @@ def main():
         predictor.model.generation_config.save_pretrained(export_args.output_path)
 
     predictor.tokenizer.save_pretrained(export_args.output_path)
-    llm_utils.generate_rank_mapping(os.path.join(export_args.output_path, "rank_mapping.csv"))
 
     if tensor_parallel_degree > 1:
         export_args.output_path = os.path.join(export_args.output_path, f"rank_{tensor_parallel_rank}")

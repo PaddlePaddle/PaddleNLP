@@ -1534,6 +1534,12 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             "chat_template_file": CHAT_TEMPLATE_CONFIG_NAME,
         }
 
+        if hasattr(cls, "vocab_files_names") and len(cls.resource_files_names) == 0:
+            cls.resource_files_names = copy.deepcopy(cls.vocab_files_names)
+            logger.error(
+                "The attribute 'vocab_files_names' is deprecated. Please use 'resource_files_names' instead.",
+                DeprecationWarning,
+            )
         vocab_files_target = {**cls.resource_files_names, **additional_files_names}
         # From HF Hub or AI Studio
         if from_hf_hub or from_aistudio:
@@ -1851,6 +1857,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         # Add tokenizer class to the tokenizer config to be able to reload it with from_pretrained
         tokenizer_class = self.__class__.__name__
+        # Remove the Fast at the end unless we have a special `PreTrainedTokenizerFast`
+        if tokenizer_class.endswith("Fast") and tokenizer_class != "PreTrainedTokenizerFast":
+            tokenizer_class = tokenizer_class[:-4]
         tokenizer_config["tokenizer_class"] = tokenizer_class
 
         with io.open(tokenizer_config_file, "w", encoding="utf-8") as f:

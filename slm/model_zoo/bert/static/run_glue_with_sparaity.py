@@ -159,7 +159,7 @@ def reset_program_state_dict(args, model, state_dict, pretrained_state_dict):
             reset_parameter_names.append(n)
         else:
             dtype_str = "float32"
-            if str(p.dtype) == "VarType.FP64":
+            if p.dtype == paddle.float64:
                 dtype_str = "float64"
             reset_state_dict[p.name] = np.random.normal(loc=0.0, scale=scale, size=p.shape).astype(dtype_str)
     logger.info("the following parameter had reset, please check. {}".format(reset_parameter_names))

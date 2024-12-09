@@ -47,7 +47,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         finetune_config["output_dir"] = self.output_dir
 
         with argv_context_guard(finetune_config):
-            from run_finetune import main
+            from run_quantization import main
 
             main()
 
@@ -60,7 +60,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         finetune_config["output_dir"] = self.output_dir
 
         with argv_context_guard(finetune_config):
-            from run_finetune import main
+            from run_quantization import main
 
             main()
 
@@ -75,7 +75,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         finetune_config["smooth"] = True
 
         with argv_context_guard(finetune_config):
-            from run_finetune import main
+            from run_quantization import main
 
             main()
 
@@ -91,7 +91,7 @@ class FinetuneTest(LLMTest, unittest.TestCase):
         finetune_config["shift"] = True
 
         with argv_context_guard(finetune_config):
-            from run_finetune import main
+            from run_quantization import main
 
             main()
 

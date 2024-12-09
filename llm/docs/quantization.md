@@ -67,31 +67,31 @@ python prepare_data_for_ptq.py
 ### 2.3 PTQ 量化
 
 ```shell
-python  run_finetune.py ./config/llama/ptq_argument.json
+python  run_quantization.py ./config/llama/ptq_argument.json
 ```
 
 ### 2.4 GPTQ 量化
 
 ```shell
-python  run_finetune.py ./config/llama/gptq_argument.json
+python  run_quantization.py ./config/llama/gptq_argument.json
 ```
 
 ### 2.5 AWQ 量化
 
 ```shell
-python  run_finetune.py ./config/llama/awq_argument.json
+python  run_quantization.py ./config/llama/awq_argument.json
 ```
 
 ### 2.6 W8A8C8(INT8)量化
 
 ```shell
-python  run_finetune.py ./config/llama/ptq_c8_argument.json
+python  run_quantization.py ./config/llama/ptq_c8_argument.json
 ```
 
 ### 2.7 W8A8(FP8)量化
 
 ```shell
-python  run_finetune.py ./config/llama/fp8_ptq_argument.json
+python  run_quantization.py ./config/llama/fp8_ptq_argument.json
 ```
 
 ### 2.8 量化参数介绍

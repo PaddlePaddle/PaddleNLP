@@ -108,8 +108,19 @@ PaddleNLP 提供了多种量化策略，支持Weight Only INT8及INT4推理，�
 
 - `cachekv_int8_type`: 是否使用cachekv int8量化，默认值为None。可选`dynamic`（已不再维护，不建议使用）和`static`两种，`static`需要额外的cache kv的scale校准表，传入的 `model_name_or_path` 为PTQ校准产出的量化模型。量化模型导出参考[大模型量化教程](../quantization.md)。
 
+### 3.4 投机解码参数
 
-### 3.4 解码策略参数
+- `speculate_method`: 推理解码算法，默认值为`None`，可选的数值有`None`、`inference_with_reference`。为`None`时为正常自回归解码，为`inference_with_reference`时为基于上下文的投机解码[论文地址](https://arxiv.org/pdf/2304.04487)。
+
+- `speculate_max_draft_token_num`: 投机解码算法中每轮产生的最大 draft tokens 数目，默认值为 1。
+
+- `speculate_max_ngram_size`: n-gram 匹配 draft tokens 时的最大窗口大小，默认值为`1`。inference_with_reference 算法中会先从 prompt 中使用 ngram 窗口滑动匹配 draft tokens，窗口大小和输入输出重叠程度共同决定了产生 draft tokens 的开销从而影响 inference_with_reference 算法的加速效果。
+
+- `speculate_verify_window`: 投机解码 verify 策略默认采用 TopP + window verify 中的 window 大小，默认值为`2`。更多有关 TopP + window verify 的详细介绍参考[投机解码教程](./speculative_decoding.md)。
+
+- `speculate_max_candidate_len`: 产生的最大候选 tokens 数目，根据候选 tokens 与 draft tokens 比较来进行 verify(仅在 TopP + window verify时生效)，默认值为`5`。
+
+### 3.5 解码策略参数
 
 - `decode_strategy`: 推理解码策略，默认值为`sampling`，可选的数值有`greedy_search`、`beam_search`和`sampling`。
 
@@ -119,7 +130,7 @@ PaddleNLP 提供了多种量化策略，支持Weight Only INT8及INT4推理，�
 
 - `temperature`:“采样”策略中会对输出logit除以temperature。默认值为1.0，表示不起作用。
 
-### 3.4 性能分析参数
+### 3.6 性能分析参数
 
 - `benchmark`: 是否开启性能分析，默认值为False。如果设为true，会将模型输入填充为src_length并强制解码到max_length，并计算模型推理吞吐量、记录推理时间。
 
@@ -165,6 +176,7 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 -  [llama](./llama.md)
 -  [qwen](./qwen.md)
 -  [mixtral](./mixtral.md)
+-  [投机解码](./speculative_decoding.md)
 
 环境准备，参考：
 
@@ -190,4 +202,3 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 ## 致谢
 
 我们参考[FlashInfer框架](https://github.com/flashinfer-ai/flashinfer)，在FlashInfer的基础上，实现了append attention。参考[PageAttention](https://github.com/vllm-project/vllm)的page分块的思想实现了generation阶段的block attention。基于[Flash Decoding](https://github.com/Dao-AILab/flash-attention)的KV分块思想实现了长sequence场景下的推理加速。基于[Flash Attention2](https://github.com/Dao-AILab/flash-attention)实现了prefill阶段的attention加速。FP8 GEMM基于[CUTLASS](https://github.com/NVIDIA/cutlass)的高性能模板库实现。有部分算子如gemm_dequant参考了[TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM)和[FasterTransformer](https://github.com/NVIDIA/FasterTransformer.git)的实现和优化思路。
-

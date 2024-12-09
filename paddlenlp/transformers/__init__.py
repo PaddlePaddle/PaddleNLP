@@ -32,6 +32,8 @@ from .image_processing_utils import ImageProcessingMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
 from .sequence_parallel_utils import AllGatherVarlenOp, sequence_parallel_sparse_mask_labels
 from .tensor_parallel_utils import parallel_matmul, parallel_linear, fused_head_and_loss_fn
+from .moe_gate import *
+from .moe_layer import *
 
 try:
     from paddle.distributed.fleet.utils.sequence_parallel_utils import (
@@ -258,6 +260,7 @@ from .nystromformer.tokenizer import *
 from .bloom.configuration import *
 from .bloom.modeling import *
 from .bloom.tokenizer import *
+from .bloom.tokenizer_fast import *
 from .clipseg.configuration import *
 from .clipseg.modeling import *
 from .clipseg.processing import *

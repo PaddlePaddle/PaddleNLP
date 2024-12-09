@@ -51,6 +51,7 @@ try:
 except:
     flash_attention = None
 
+from paddlenlp.transformers.refined_recompute import no_recompute
 from paddlenlp.transformers.ring_flash_attention import RingFlashAttention
 
 
@@ -174,6 +175,7 @@ def fusion_flash_attention(
     sequence_parallel=False,
     reshard_layer=None,
     npu_is_casual=False,
+    skip_recompute=False,
 ):
     bsz, q_len, num_heads, head_dim = query_states.shape
     _, kv_seq_len, _, _ = value_states.shape
@@ -233,14 +235,11 @@ def fusion_flash_attention(
                 key_states,
                 value_states,
                 attention_mask,
-                scaling_factor,
                 0.0,
-                False,
                 attention_mask is None,
-                None,
+                scaling_factor,
                 False,
             )
-            attn_output = paddle.transpose(attn_output, [0, 2, 1, 3])
         else:
             if config.context_parallel_degree > 1:
                 attn_output = RingFlashAttention.apply(
@@ -257,28 +256,34 @@ def fusion_flash_attention(
                         attn_mask_startend_row_indices = paddle.unsqueeze(attn_mask_startend_row_indices, axis=1)
 
                     if hasattr(F, "flashmask_attention"):
-                        attn_output = F.flashmask_attention(
+                        attn_output = no_recompute(
+                            F.flashmask_attention,
                             query_states,
                             key_states,
                             value_states,
                             startend_row_indices=attn_mask_startend_row_indices.unsqueeze(-1),
                             causal=True,
+                            enable=skip_recompute,
                         )
                     else:
-                        attn_output = F.flash_attention_with_sparse_mask(
+                        attn_output = no_recompute(
+                            F.flash_attention_with_sparse_mask,
                             query_states,
                             key_states,
                             value_states,
                             attn_mask_start_row_indices=attn_mask_startend_row_indices,
                             is_causal=True,
+                            enable=skip_recompute,
                         )
                 else:
-                    attn_output = F.scaled_dot_product_attention(
+                    attn_output = no_recompute(
+                        F.scaled_dot_product_attention,
                         query_states,
                         key_states,
                         value_states,
                         attn_mask=attention_mask,
                         is_causal=query_states.shape[1] != 1,
+                        enable=skip_recompute,
                     )
         attn_weights = None
 
