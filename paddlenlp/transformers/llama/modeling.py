@@ -1840,6 +1840,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
     def __init__(self, config):
 
         super(LlamaPretrainingCriterion, self).__init__()
+        self.num_items_in_batch = None
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
         self.enable_parallel_cross_entropy = (
@@ -1853,7 +1854,7 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
         else:
             self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=self.ignore_index)
 
-    def forward(self, prediction_scores, masked_lm_labels):
+    def forward(self, prediction_scores, masked_lm_labels, **loss_kwargs):
         if self.enable_parallel_cross_entropy:
             if prediction_scores.shape[-1] == self.config.vocab_size:
                 warnings.warn(
@@ -1873,11 +1874,18 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
             binary_sequence = paddle.where(
                 masked_lm_loss > 0, paddle.ones_like(masked_lm_loss), paddle.zeros_like(masked_lm_loss)
             )
-            count = paddle.sum(binary_sequence)
-            if count == 0:
-                loss = paddle.sum(masked_lm_loss * binary_sequence)
+            loss = paddle.sum(masked_lm_loss * binary_sequence)
+
+            num_items_in_batch = loss_kwargs.get("num_items_in_batch", None)
+            if num_items_in_batch is None and self.num_items_in_batch is not None:
+                num_items_in_batch = self.num_items_in_batch
+
+            if num_items_in_batch is None:
+                count = paddle.sum(binary_sequence)
+                if count > 0:
+                    loss = loss / count
             else:
-                loss = paddle.sum(masked_lm_loss * binary_sequence) / count
+                loss = loss / num_items_in_batch
 
         return loss
 
@@ -2080,6 +2088,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
         output_hidden_states=None,
         return_dict=None,
         attn_mask_startend_row_indices=None,
+        **loss_kwargs,
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -2113,7 +2122,7 @@ class LlamaForCausalLM(LlamaPretrainedModel):
 
         loss = None
         if labels is not None:
-            loss = self.criterion(logits, labels)
+            loss = self.criterion(logits, labels, **loss_kwargs)
 
         if not return_dict:
             output = (logits,) + outputs[1:]
