@@ -279,6 +279,7 @@ class MergeModel:
                 merge_state_dict[k] = paddle.to_tensor(merge_state_dict[k], dtype="float32").astype("bfloat16").numpy()
             del tensor_list
             if self.merge_config.base_model_path is not None:
+
                 del base_tensor
         save_file(
             merge_state_dict,
