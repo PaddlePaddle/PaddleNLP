@@ -357,6 +357,8 @@ class Trainer:
             "loss_kwargs" in model_forward_params
             and model_forward_params["loss_kwargs"].kind == inspect.Parameter.VAR_KEYWORD
         )
+        if hasattr(unwrapped_model, "get_loss_fn"):
+            criterion = unwrapped_model.get_loss_fn(unwrapped_model.config)
 
         if criterion is not None:
             if isinstance(criterion, nn.Layer):
@@ -2435,9 +2437,12 @@ class Trainer:
 
         if model.is_pipeline_last_stage(ignore_virtual=True):
             for loss_fn in model._layers._loss_fn:
-                setattr(
-                    loss_fn, "num_items_in_batch", num_items_in_batch / (self.args.world_size * model.accumulate_steps)
-                )
+                if self.args.average_tokens_across_devices:
+                    num_items_in_batch = num_items_in_batch / (self.args.world_size * model.accumulate_steps)
+                else:
+                    num_items_in_batch = num_items_in_batch / model.accumulate_steps
+
+                setattr(loss_fn, "num_items_in_batch", num_items_in_batch)
 
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
