@@ -27,7 +27,10 @@ import paddle.incubate.multiprocessing as mp
 from paddle.base.framework import in_cinn_mode, in_pir_executor_mode, use_pir_api
 from paddle.distributed import fleet
 
-from paddlenlp.experimental.transformers import InferenceWithReferenceProposer
+try:
+    from paddlenlp.experimental.transformers import InferenceWithReferenceProposer
+except:
+    pass
 from paddlenlp.generation import GenerationConfig, TextIteratorStreamer
 from paddlenlp.peft import LoRAConfig, LoRAModel, PrefixConfig, PrefixModelForCausalLM
 from paddlenlp.taskflow.utils import static_mode_guard
