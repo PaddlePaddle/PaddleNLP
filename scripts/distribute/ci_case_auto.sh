@@ -26,6 +26,9 @@ export llama_case_path=$root_path/llm/auto_parallel/llama
 export llama_data_path=/llama_data
 export llm_gpt_case_path=$root_path/llm/auto_parallel/gpt-3
 
+export qwen_case_path=$root_path/llm/auto_parallel/qwen
+export qwen_data_path=/qwen_data
+
 unset CUDA_VISIBLE_DEVICES
 
 function is_a100() {
@@ -2743,7 +2746,36 @@ function before_hook_for_llama() {
     fi
 }
 
-
+function before_hook_for_qwen() {
+    echo -e "\033[31m ---- Set FLAGS for Qwen auto cases  \033[0m"
+    cd ${qwen_case_path}
+    export FLAGS_new_executor_micro_batching=True  # True：打开新执行器
+    export FLAGS_embedding_deterministic=1         # 1：关闭随机性
+    export FLAGS_cudnn_deterministic=1             # 1：关闭随机性
+    export FLAGS_program_topo_reorder=1            # 1: 反向对齐动手拓扑排序
+    unset CUDA_MODULE_LOADING
+    env | grep FLAGS
+    export http_proxy=${proxy}
+    export https_proxy=${proxy}
+    export no_proxy=bcebos.com
+    python -m pip install -r $root_path/requirements.txt
+    python -m pip install -r $root_path/requirements-dev.txt
+    if [[ ! $FLAGS_download_data =~ "qwen" ]];then
+        echo -e "\033[31m ---- Download Qwen data  \033[0m"
+        rm -rf data
+        if [[ -e ${qwen_data_path}/data ]]; then
+            echo "Qwen data downloaded"
+        else
+            # download data for llama
+            mkdir ${qwen_data_path}/data;
+            wget -O ${qwen_data_path}/data/llama_openwebtext_100k_ids.npy https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy;
+            wget -O ${qwen_data_path}/data/llama_openwebtext_100k_idx.npz https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz;
+        fi
+        cp -r ${qwen_data_path}/data ${qwen_case_path}/
+    else
+        echo -e "\033[31m ---- Skip download qwen data \033[0m"
+    fi
+}
 
 
 export status=$1
@@ -2756,6 +2788,9 @@ if [[ $status = "prepare_case" ]];then
     elif [[ $2 = "llm_gpt_case_list_auto" ]];then
         before_hook_for_gpt
         llm_gpt_case_list_auto prepare_case
+    if [[ $2 = "qwen_case_list_auto" ]];then
+        before_hook_for_qwen 
+        qwen_case_list_auto prepare_case
     else
         echo -e "\033[31m ---- Invalid exec_case $2 \033[0m"
     fi
@@ -2767,6 +2802,8 @@ elif [[ $status = "exec_case" ]];then
         cd ${gpt_case_path}
     elif [[ $2 =~ "llama" ]];then
         cd ${llama_case_path}
+    elif [[ $2 =~ "qwen" ]];then
+        cd ${qwen_case_path}
     fi
     $2
 else
@@ -2780,6 +2817,9 @@ else
     elif [[ $status =~ "llama" ]];then
         cd ${llama_case_path}
         before_hook_for_llama
+    elif [[ $status =~ "qwen" ]];then
+        cd ${qwen_case_path}
+        before_hook_for_qwen
     else
         echo -e "\033[31m ---- Invalid exec_case $exec_case \033[0m"
     fi
