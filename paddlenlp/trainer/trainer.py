@@ -1415,7 +1415,7 @@ class Trainer:
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 dataset=self.train_dataset,
-                shuffle=False,
+                shuffle=True,
                 batch_size=self.args.per_device_train_batch_size,
                 drop_last=self.args.dataloader_drop_last,
             )
@@ -1423,7 +1423,7 @@ class Trainer:
         return DistributedBatchSampler(
             self.train_dataset,
             batch_size=self.args.per_device_train_batch_size,
-            shuffle=False,
+            shuffle=True,
             num_replicas=self.args.dataset_world_size,
             rank=self.args.dataset_rank,
             drop_last=self.args.dataloader_drop_last,
