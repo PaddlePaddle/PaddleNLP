@@ -42,6 +42,9 @@ class MergeConfig:
 
     # Model parameters
     model_path_list: Optional[List[str]] = field(default=None, metadata={"help": "Merge model name or path list"})
+    model_path_str: Optional[str] = field(
+        default=None, metadata={"help": "Merge model name or path string.(split by ',')"}
+    )
     base_model_path: str = field(default=None, metadata={"help": "Base model name or path."})
     output_path: str = field(default=None, metadata={"help": "Base model name or path."})
     # merge parameters
@@ -80,6 +83,8 @@ class MergeConfig:
             raise ValueError(
                 f"Unsupported merge strategy: {self.merge_method}. Please choose one from ['linear', 'slerp']."
             )
+        if self.model_path_str is not None:
+            self.model_path_list = self.model_path_str.split(",")
         if self.model_path_list is not None:
             if not isinstance(self.model_path_list, list) or len(self.model_path_list) < 2:
                 raise ValueError(f"Please specify the model_path_list at least two. But got {self.model_path_list}")

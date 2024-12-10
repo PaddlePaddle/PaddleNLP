@@ -18,7 +18,7 @@ from paddlenlp.trainer import PdArgumentParser
 from paddlenlp.utils.log import logger
 
 
-def merge_model():
+def merge():
     parser = PdArgumentParser((MergeConfig))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         merge_config = parser.parse_json_file_and_cmd_lines()[0]
@@ -32,4 +32,4 @@ def merge_model():
 
 
 if __name__ == "__main__":
-    merge_model()
+    merge()
