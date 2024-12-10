@@ -278,7 +278,8 @@ class MergeModel:
             if dtype == np.uint16:
                 merge_state_dict[k] = paddle.to_tensor(merge_state_dict[k], dtype="float32").astype("bfloat16").numpy()
             del tensor_list
-            del base_tensor
+            if self.merge_config.base_model_path is not None:
+                del base_tensor
         save_file(
             merge_state_dict,
             os.path.join(self.merge_config.output_path, shard_file),
