@@ -1593,7 +1593,6 @@ class LlamaModel(LlamaPretrainedModel):
         if get_env_device() in ["npu", "mlu", "intel_hpu"]:
             x = paddle.to_tensor(0.0, dtype="float32")
             y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float32")
-            expanded_attn_mask = expanded_attn_mask.astype("float32")
             expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
         elif get_env_device() in ["xpu", "gcu"]:
             min_val = paddle.finfo(dtype).min if get_env_device() == "gcu" else -1e37  # mask value for xpu

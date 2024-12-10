@@ -68,7 +68,7 @@ else:
             ("ernie_m", "ErnieMTokenizer"),
             ("fnet", "FNetTokenizer"),
             ("funnel", "FunnelTokenizer"),
-            ("gemma", "GemmaTokenizer"),
+            ("gemma", ("GemmaTokenizer", "GemmaTokenizerFast" if is_tokenizers_available() else None)),
             ("jamba", "JambaTokenizer"),
             ("layoutlm", "LayoutLMTokenizer"),
             ("layoutlmv2", "LayoutLMv2Tokenizer"),
@@ -117,14 +117,17 @@ else:
             ("tinybert", "TinyBertTokenizer"),
             ("unified_transformer", "UnifiedTransformerTokenizer"),
             ("unimo", "UNIMOTokenizer"),
-            ("gpt", (("GPTTokenizer", "GPTChineseTokenizer"), None)),
+            (
+                "gpt",
+                (("GPTTokenizer", "GPTChineseTokenizer"), "GPTTokenizerFast" if is_tokenizers_available() else None),
+            ),
             ("gau_alpha", "GAUAlphaTokenizer"),
             ("artist", "ArtistTokenizer"),
             ("chineseclip", "ChineseCLIPTokenizer"),
             ("ernie_vil", "ErnieViLTokenizer"),
             ("glm", "GLMGPT2Tokenizer"),
             ("qwen", "QWenTokenizer"),
-            ("qwen2", "Qwen2Tokenizer"),
+            ("qwen2", ("Qwen2Tokenizer", "Qwen2TokenizerFast" if is_tokenizers_available() else None)),
             ("yuan", "YuanTokenizer"),
         ]
     )

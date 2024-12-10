@@ -235,14 +235,11 @@ def fusion_flash_attention(
                 key_states,
                 value_states,
                 attention_mask,
-                scaling_factor,
                 0.0,
-                False,
                 attention_mask is None,
-                None,
+                scaling_factor,
                 False,
             )
-            attn_output = paddle.transpose(attn_output, [0, 2, 1, 3])
         else:
             if config.context_parallel_degree > 1:
                 attn_output = RingFlashAttention.apply(

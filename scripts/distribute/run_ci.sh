@@ -205,6 +205,33 @@ function execute_func_list(){
     echo -e "\033[31m $(printf '\t')  exit 250 tests(intermittent issue) :  $exit_250_count \033"
 }
 
+function clean_file(){
+    target_path=$1
+    matching_data_dirs=$(find "$target_path" -maxdepth 1 -type d -name "*data*")
+    if [ -n "$matching_data_dirs" ]; then
+        echo "cleaning data dirs:"
+        echo $matching_data_dirs        
+        for dir in $matching_data_dirs; do
+            rm -rf "$dir"
+            echo "deleted $dir"
+        done
+    else
+        echo "$target_path no data dirs found"
+    fi
+
+    matching_output_dirs=$(find "$target_path" -maxdepth 1 -type d -name "*output*")
+    if [ -n "$matching_output_dirs" ]; then
+        echo "cleaning output dirs:"
+        echo $matching_output_dirs
+        for dir in $matching_output_dirs; do
+            rm -rf "$dir"
+            echo "deleted $dir"
+        done
+    else
+        echo "$target_path no output dirs found"
+    fi
+}
+
 ####################################
 get_diff_TO_case # 获取待执行case列表
 case_list=($(awk -v RS=' ' '!a[$1]++' <<< ${case_list[*]}))  # 去重并将结果存储回原列表
@@ -231,6 +258,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         execute_func_list $cmd llama_auto
         export FLAGS_download_data="llama ""$FLAGS_download_data"
         let case_num++
+        clean_file $nlp_dir/llm/auto_parallel/llama
     fi
     if [[ $(contain_case gpt-3_auto ${case_list[@]}; echo $?) -eq 1 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_auto \033"
@@ -240,6 +268,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         export FLAGS_install_deps=1
         export FLAGS_download_data="gpt ""$FLAGS_download_data"
         let case_num++        
+        clean_file $nlp_dir/llm/auto_parallel/gpt-3
     fi
     if [[ $(contain_case gpt-3_dygraph ${case_list[@]}; echo $?) -eq 1 ]];then
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: gpt-3_dygraph \033"
@@ -249,6 +278,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
         export FLAGS_install_deps=1
         export FLAGS_download_data="gpt ""$FLAGS_download_data"
         let case_num++
+        clean_file $nlp_dir/slm/model_zoo/gpt-3
     fi
     echo -e "\033[31m ---- end run case  \033"
 
