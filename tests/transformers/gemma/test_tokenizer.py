@@ -16,7 +16,8 @@
 import unittest
 
 from paddlenlp.transformers.gemma.tokenizer import GemmaTokenizer
-from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
+from paddlenlp.transformers.gemma.tokenizer_fast import GemmaTokenizerFast
+from paddlenlp.transformers.tokenizer_utils import AddedToken, PretrainedTokenizer
 
 from ..test_tokenizer_common import TokenizerTesterMixin
 
@@ -26,10 +27,17 @@ VOCAB_FILES_NAMES = {"vocab_file": "tokenizer.model"}
 class GemmaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = GemmaTokenizer
+    rust_tokenizer_class = GemmaTokenizerFast
+    # skip test_create_token_type_ids cause transformers skip it
+    test_rust_tokenizer = False
     test_decode_token = True
 
     def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
         tokenizer = GemmaTokenizer.from_pretrained("google/gemma-2b", **kwargs)
+        return tokenizer
+
+    def get_rust_tokenizer(self, **kwargs) -> PretrainedTokenizer:
+        tokenizer = GemmaTokenizerFast.from_pretrained("google/gemma-2b", **kwargs)
         return tokenizer
 
     def get_input_output_texts(self, tokenizer):
@@ -61,6 +69,41 @@ class GemmaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_offsets_mapping_with_unk(self):
         pass
+
+    def test_special_tokens_initialization(self):
+        for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
+            with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+                added_tokens = [AddedToken("<special>", lstrip=True)]
+
+                tokenizer_r = self.rust_tokenizer_class.from_pretrained(
+                    pretrained_name, additional_special_tokens=added_tokens, **kwargs
+                )
+                r_output = tokenizer_r.encode("Hey this is a <special> token")["input_ids"]
+
+                special_token_id = tokenizer_r.encode("<special>", add_special_tokens=False)["input_ids"]
+
+                self.assertTrue(special_token_id[0] in r_output)
+
+    def test_fast_special_tokens(self):
+        slow_tokenizer = self.get_tokenizer()
+        fast_tokenizer = self.get_rust_tokenizer()
+        slow = slow_tokenizer.encode("A sample test", add_special_tokens=True)["input_ids"]
+        assert slow == [2, 235280, 6453, 2121]
+
+        fast_tokenizer.add_eos_token = False
+        fast = fast_tokenizer.encode("A sample test", add_special_tokens=True)["input_ids"]
+        assert fast == [2, 235280, 6453, 2121]
+
+        fast_tokenizer.add_eos_token = True
+        fast = fast_tokenizer.encode("A sample test", add_special_tokens=True)["input_ids"]
+        assert fast == [2, 235280, 6453, 2121, 1]
+
+        slow_tokenizer.add_eos_token = True
+        slow = slow_tokenizer.encode("A sample test", add_special_tokens=True)["input_ids"]
+        assert slow == [2, 235280, 6453, 2121, 1]
+
+        self.tokenizer_class.add_eos_token = False
+        self.rust_tokenizer_class.add_eos_token = False
 
     def test_special_tokens_mask(self):
         pass
@@ -247,5 +290,5 @@ class GemmaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 context_data=context_data,
             )
             for idx, round in enumerate(conversation_result["conversations"]):
-                self.assertEquals(tokenizer.decode(round[0]), decode_outputs[idx][0])
-                self.assertEquals(tokenizer.decode(round[1]), decode_outputs[idx][1])
+                self.assertEqual(tokenizer.decode(round[0]), decode_outputs[idx][0])
+                self.assertEqual(tokenizer.decode(round[1]), decode_outputs[idx][1])

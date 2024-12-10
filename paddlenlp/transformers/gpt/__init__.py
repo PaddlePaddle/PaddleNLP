@@ -17,3 +17,4 @@ from .modeling import *
 from .modeling_auto import *
 from .modeling_pp import *
 from .tokenizer import *
+from .tokenizer_fast import *

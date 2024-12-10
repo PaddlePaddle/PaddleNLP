@@ -20,8 +20,7 @@
 
 #include "paddle/extension.h"
 
-#define MAX_BSZ 512
-#define SPECULATE_MAX_BSZ 256
+#define MAX_BSZ 256
 #define MAX_DRAFT_TOKENS 6
 
 template <int SIZE>
@@ -63,15 +62,15 @@ void SaveOutMsgFunc(MsgData<SIZE>& msg_sed,  // NOLINT
     msg_sed.mtype = 1;
     msg_sed.mtext[0] = not_need_stop_data[0] ? 1 : -1;
     msg_sed.mtext[1] = bsz;
-    for (int i = 2; i < SPECULATE_MAX_BSZ + 2; i++) {
+    for (int i = 2; i < MAX_BSZ + 2; i++) {
       if (i - 2 >= bsz) {
         msg_sed.mtext[i] = 0;
       } else {
         msg_sed.mtext[i] = (int)accept_num_data[i - 2];
       }
     }
-    for (int i = SPECULATE_MAX_BSZ + 2; i < SIZE; i++) {
-      int token_id = i - SPECULATE_MAX_BSZ - 2;
+    for (int i = MAX_BSZ + 2; i < SIZE; i++) {
+      int token_id = i - MAX_BSZ - 2;
       int bid = token_id / MAX_DRAFT_TOKENS;
       int local_token_id = token_id % MAX_DRAFT_TOKENS;
       if (token_id / MAX_DRAFT_TOKENS >= bsz) {
@@ -97,8 +96,8 @@ void SaveOutMsg(const paddle::Tensor& x,
     static struct MsgData<SIZE> msg_sed;
     SaveOutMsgFunc<SIZE>(msg_sed, x, not_need_stop, accept_num, rank_id);
   } else {
-    constexpr int SIZE = SPECULATE_MAX_BSZ * MAX_DRAFT_TOKENS +
-                         SPECULATE_MAX_BSZ +
+    constexpr int SIZE = MAX_BSZ * MAX_DRAFT_TOKENS +
+                         MAX_BSZ +
                          2;  // stop_flag, bsz, accept_num*bsz, tokens...
     static struct MsgData<SIZE> specu_msg_sed;
     SaveOutMsgFunc<SIZE>(specu_msg_sed, x, not_need_stop, accept_num, rank_id);
