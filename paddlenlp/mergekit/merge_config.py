@@ -52,6 +52,7 @@ class MergeConfig:
         default=None, metadata={"help": "Relative (or absolute if normalize=False) weighting of a given tensor"}
     )
     normalize: bool = field(default=False, metadata={"help": "Whether to normalize the weighting."})
+    slerp_alpha: float = field(default=0.5, metadata={"help": "Slerp alpha."})
     slerp_normalize_eps: float = field(default=1e-8, metadata={"help": "Slerp normalization epsilon value"})
     slerp_dot_threshold: float = field(
         default=0.9995,

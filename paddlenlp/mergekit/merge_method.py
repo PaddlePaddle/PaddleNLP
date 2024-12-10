@@ -56,10 +56,7 @@ class MergeMethod:
         # check tensor_list length
         if len(tensor_list) != 2:
             raise ValueError("Slerp only support two tensors merge.")
-        # init weight (normalized)
-        weight_list = self.merge_config.weight_list
-        weight_sum = sum(weight_list)
-        weight_list = [weight / weight_sum for weight in weight_list]
+
         if self.merge_config.tensor_type == "np":
             t0, t1 = tensor_list
             # Copy the vectors to reuse them later
@@ -74,14 +71,14 @@ class MergeMethod:
             dot = np.sum(t0 * t1)
             # If absolute value of dot product is almost 1, vectors are ~colinear, so use lerp
             if np.abs(dot) > self.merge_config.slerp_dot_threshold:
-                return weight_list[0] * t0_copy + weight_list[1] * t1_copy
+                return (1 - self.merge_config.slerp_alpha) * t0_copy + self.merge_config.slerp_alpha * t1_copy
 
             # Calculate initial angle between t0 and t1
             theta_0 = np.arccos(dot)
             sin_theta_0 = np.sin(theta_0)
 
             # Angle at timestep t
-            theta_t = theta_0 * weight_list[0]
+            theta_t = theta_0 * self.merge_config.slerp_alpha
             sin_theta_t = np.sin(theta_t)
 
             # Finish the slerp algorithm
