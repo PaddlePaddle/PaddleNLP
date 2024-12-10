@@ -1591,7 +1591,9 @@ class Trainer:
         _DataLoader = DistDataLoader if self.args.distributed_dataloader else DataLoader
 
         if is_iterable_dataset:
-            if self.args.dataset_world_size > 1 and eval_dataset is not None:
+            if (
+                self.args.dataset_world_size > 1 or self.args.pipeline_parallel_degree > 1
+            ) and eval_dataset is not None:
                 eval_dataset = IterableDatasetShard(
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
