@@ -85,7 +85,7 @@ class LoRAGATrainer(Trainer):
         return gradient_dict
 
     def _wrap_model(self, model):
-        """Wrap Model without optimizer, support dp, pp and sharding"""
+        """Wrap Model without optimizer, support dp, tp and sharding"""
 
         in_pipeline_parallel_mode = self.args.pipeline_parallel_degree > 1
         in_sharding_parallel_mode = self.sharding is not None
