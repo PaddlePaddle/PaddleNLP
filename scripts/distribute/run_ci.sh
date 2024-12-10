@@ -123,6 +123,7 @@ get_diff_TO_case(){
                     if [[ ${file_item} == *${target_lists_for_llama[i]}* ]];then
                         case_list[${#case_list[*]}]=llama_auto
                     fi
+                done
                 for ((i=0; i<${#target_lists_for_qwen[@]}; i++)); do
                     if [[ ${file_item} == *${target_lists_for_qwen[i]}* ]];then
                         case_list[${#case_list[*]}]=qwen_auto
