@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import paddle
 from paddle import pir
 from paddle.base import core, framework
 from paddle.base.framework import Variable, in_dynamic_or_pir_mode, in_pir_mode
@@ -24,7 +25,7 @@ class AdamWMini(AdamW):
     def _add_moments_pows(self, p):
         acc_dtype = p.dtype
         if self._is_dtype_fp16_or_bf16(acc_dtype):
-            acc_dtype = DataType.FLOAT32 if in_pir_mode() else core.VarDesc.VarType.FP32
+            acc_dtype = DataType.FLOAT32 if in_pir_mode() else paddle.float32
 
         self._add_accumulator(self._moment1_acc_str, p, dtype=acc_dtype)
         # change moment2
