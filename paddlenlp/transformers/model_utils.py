@@ -864,6 +864,7 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
         warnings.resetwarnings()
         # paddlenlp hold  missing_keys , just ignore not found warnings.
         warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
+        warnings.filterwarnings("ignore", message=r".*paddle.to_tensor.*")
         model_to_load.set_state_dict(state_dict)
         error_msgs.extend([str(x.message) for x in w])
 
