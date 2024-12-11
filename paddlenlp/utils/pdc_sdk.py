@@ -500,7 +500,7 @@ class PDCTools:
         if not os.path.exists(path):
             logger.error(f"pdc_fc_generate_checksum gi{path} not exist")
             return PDCErrorCode.CommandFail
-        generate_checksum_args = [self._pdc_agent_bin, "-mode", "command", "-type", "generate_sum", "-path", f"{path}"]
+        generate_checksum_args = [self._pdc_agent_bin, "-mode", "command", "-type", "generateSum", "-path", f"{path}"]
         error_code = PDCErrorCode.Success
         try:
             logger.info(f"begin to generate_sum path: {path}")
@@ -521,7 +521,7 @@ class PDCTools:
         if not os.path.exists(path):
             logger.error(f"pdc_fc_do_check {path} not exist")
             return PDCErrorCode.CommandFail
-        generate_checksum_args = [self._pdc_agent_bin, "-mode", "command", "-type", "check_sum", "-path", f"{path}"]
+        generate_checksum_args = [self._pdc_agent_bin, "-mode", "command", "-type", "checkSum", "-path", f"{path}"]
         error_code = PDCErrorCode.Success
         try:
             logger.info(f"begin to check_sum path: {path}")
