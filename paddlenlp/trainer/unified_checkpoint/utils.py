@@ -24,10 +24,18 @@ from paddle.distributed import fleet
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.trainer.trainer_utils import ExplicitEnum, ShardingOption
 from paddlenlp.trainer.utils.helper import distributed_isfile
-from paddlenlp.transformers.model_utils import PretrainedModel, get_parameter_dtype
+from paddlenlp.transformers.model_utils import (
+    PretrainedModel,
+    get_parameter_dtype,
+    unwrap_model,
+)
 from paddlenlp.transformers.utils import dtype_byte_size
 from paddlenlp.utils.distributed import distributed_allgather, distributed_gather
 from paddlenlp.utils.env import (
+    BETA1_KEYNAME,
+    BETA2_KEYNAME,
+    MOMENT1_KEYNAME,
+    MOMENT2_KEYNAME,
     PADDLE_MASTER_WEIGHTS_INDEX_NAME,
     PADDLE_PEFT_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
@@ -68,6 +76,7 @@ class UnifiedCheckpointOption(ExplicitEnum):
 
     SKIP_SAVE_MODEL_WEIGHT = "skip_save_model_weight"
     MASTER_WEIGHT_COMPATIBLE = "master_weight_compatible"
+    REMOVE_MASTER_WEIGHT = "remove_master_weight"
     ASYNC_SAVE = "async_save"
     IGNORE_MERGE_OPTIMIZER = "ignore_merge_optimizer"
 
@@ -92,7 +101,10 @@ def is_need_master_weight(optimizer, is_fp16_or_bp16):
 def update_master_weight_status(args, optimizer, has_master_weight, safe_serialization):
     if is_need_master_weight(optimizer, is_fp16_or_bp16=(args.fp16 or args.bf16)):
         if not has_master_weight:
-            if UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value in args.unified_checkpoint_config:
+            if (
+                UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value in args.unified_checkpoint_config
+                or UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value in args.unified_checkpoint_config
+            ):
                 index_filename_master_weights = (
                     PADDLE_WEIGHTS_INDEX_NAME if not safe_serialization else SAFE_WEIGHTS_INDEX_NAME
                 )
@@ -104,7 +116,8 @@ def update_master_weight_status(args, optimizer, has_master_weight, safe_seriali
             else:
                 raise ValueError(
                     "Can't find a valid unified master weight checkpoint,"
-                    f"add '{UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value}' into 'unified_checkpoint_config' to "
+                    f"add '{UnifiedCheckpointOption.MASTER_WEIGHT_COMPATIBLE.value}'"
+                    f" or '{UnifiedCheckpointOption.REMOVE_MASTER_WEIGHT.value}' into 'unified_checkpoint_config' to "
                     "load model checkpoint as master weight"
                 )
         else:
@@ -193,6 +206,8 @@ def get_expected_state_dict(model_to_save):
     """
     Get trainable state_dict of model_to_save.
     """
+    model_to_save = unwrap_model(model_to_save)
+
     if isinstance(model_to_save, PretrainedModel):
         state_dict = model_to_save.state_dict()
         if (
@@ -221,7 +236,7 @@ def get_expected_keys(args, sharded_metadata, model, optimizer, is_master_weight
         params2rank = optimizer._param2rank
 
     model_state_dict = get_expected_state_dict(model)
-    struct2static_name_mappings = {k: v.name for k, v in get_expected_state_dict(model).items()}
+    struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}
 
     expected_keys = []
     for key in list(sharded_metadata["all_optimizer_keys"]):
@@ -457,7 +472,7 @@ def merge_tensor_parallel_for_optimizer(state_dict, tp_actions, all_filter_keys,
     return state_dict_to_save
 
 
-def filter_params(model_to_save, state_dict, is_optimizer=False):
+def filter_params(model_to_save, state_dict, args, is_optimizer=False):
     """
     Group according to the size of the tensor, aiming to make the weight size
     stored on each device as equal as possible.
@@ -473,16 +488,34 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
         return [list(state_dict.keys())]
 
     filter_tensor_list = [[] for _ in range(tp_size)]
+    is_master_weights = False
 
     if tp_rank == 0:
+        quant = False
+        if args.ckpt_quant_stage != "O0":
+            quant = True
         tensor_bytes_dict = {}
         model_state_dict = get_expected_state_dict(model_to_save)
         for (k, v) in state_dict.items():
-            model_v = model_state_dict[k.split("/")[0]] if is_optimizer else v
-            if hasattr(model_v, "is_distributed") and model_v.is_distributed:
-                tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
+            # master weight has same key as model weight
+            if not is_master_weights and k in model_state_dict:
+                is_master_weights = True
+
+            weight_key = k.split("/")[0]
+            model_v = model_state_dict[weight_key] if is_optimizer else v
+            if not quant or not is_optimizer:
+                if hasattr(model_v, "is_distributed") and model_v.is_distributed:
+                    tensor_bytes_dict[k] = v.numel().item() * tp_size * dtype_byte_size(v.dtype)
+                else:
+                    tensor_bytes_dict[k] = v.numel().item() * dtype_byte_size(v.dtype)
             else:
-                tensor_bytes_dict[k] = v.numel().item() * dtype_byte_size(v.dtype)
+                if weight_key not in tensor_bytes_dict:
+                    tensor_bytes_dict[weight_key] = 0
+
+                if hasattr(model_v, "is_distributed") and model_v.is_distributed:
+                    tensor_bytes_dict[weight_key] += v.numel().item() * tp_size * dtype_byte_size(v.dtype)
+                else:
+                    tensor_bytes_dict[weight_key] += v.numel().item() * dtype_byte_size(v.dtype)
 
         filter_tensor_list = []
         current_block = []
@@ -503,7 +536,14 @@ def filter_params(model_to_save, state_dict, is_optimizer=False):
                 current_block = []
                 current_block_size = 0
 
-            current_block.append(key)
+            if not quant or not is_optimizer or is_master_weights:
+                current_block.append(key)
+            else:
+                current_block.append(key + "/" + MOMENT1_KEYNAME)
+                current_block.append(key + "/" + MOMENT2_KEYNAME)
+                current_block.append(key + "/" + BETA1_KEYNAME)
+                current_block.append(key + "/" + BETA2_KEYNAME)
+
             current_block_size += weight_size
             total_size += weight_size
 

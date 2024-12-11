@@ -150,7 +150,8 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
     sharding_group = hcg.get_sharding_parallel_group()
     sharding_rank = sharding_group.rank
     dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
-    struct2static_name_mappings = {k: v.name for k, v in model.state_dict().items()}
+    model_state_dict = get_expected_state_dict(model)
+    struct2static_name_mappings = {k: v.name for k, v in model_state_dict.items()}
 
     if is_sharding_split_param_mode(args):
         # We do not check optimizer files completion for split_param, since it is very complicated. Directly support local resume.
@@ -185,6 +186,8 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
             state_dict = get_expected_state_dict(model)
 
             for key in state_dict.keys():
+                if model._keys_to_ignore_on_load_missing is not None and key in model._keys_to_ignore_on_load_missing:
+                    continue
                 if sharding_group.nranks > 1:
                     static_name = struct2static_name_mappings.get(key, None)
                     param_rank = param2rank.get(static_name, None)

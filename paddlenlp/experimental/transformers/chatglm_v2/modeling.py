@@ -35,6 +35,7 @@ from paddlenlp.experimental.transformers.utils import infererence_model_from_pre
 from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2PretrainedModel
 from paddlenlp.transformers.chatglm_v2.modeling import (
     Embedding,
+    LayerNorm,
     RMSNorm,
     RotaryEmbedding,
 )
@@ -182,9 +183,9 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
         self.post_layer_norm = config.post_layer_norm
         if self.post_layer_norm:
-            LayerNormFunc = RMSNorm if config.rmsnorm else nn.LayerNorm
+            LayerNormFunc = RMSNorm if config.rmsnorm else LayerNorm
             # Final layer norm before output.
-            self.final_layernorm = LayerNormFunc(config.hidden_size, epsilon=config.layernorm_epsilon, config=config)
+            self.final_layernorm = LayerNormFunc(config)
 
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
@@ -387,13 +388,13 @@ class ChatGLMv2BlockInferenceModel(ChatGLMv2InferenceModel):
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
-    def remove_padding(self, input_ids, seq_lens_this_time):
+    def remove_padding(self, input_ids, seq_lens_this_time, draft_tokens=None, seq_lens_encoder=None):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
         from paddlenlp_ops import get_padding_offset_v2
 
         ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
-            input_ids, cum_offsets_now, token_num, seq_lens_this_time
+            input_ids, cum_offsets_now, token_num, seq_lens_this_time, draft_tokens, seq_lens_encoder
         )
         return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
 

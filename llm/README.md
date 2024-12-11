@@ -50,7 +50,7 @@ PaddleNLP 将飞桨4D 并行策略加入到 Trainer API 中， 用户只需修�
      </font>
 </div>
 
-我们在此处提供了更详细的[预训练数据制作](./tools/preprocess)，[Pretrain 和自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/dataset.html)，[分布式策略支持情况](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-performance)，参见: [大模型预训练介绍](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html), [大模型权重列表](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-weight)。
+我们在此处提供了更详细的[预训练数据制作](./tools/preprocess)，[Pretrain 和自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/llm/dataset.html)，[分布式策略支持情况](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-performance)，参见: [大模型预训练介绍](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html), [大模型权重列表](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-weight)。
 
 此项目支持了 LLaMA、GPT-3、BaiChuan、Qwen 和 Mixtral 等大模型的预训练。用户切换配置 config 文件，即可一键运行。
 
@@ -228,16 +228,16 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo
 
 ```shell
 # PTQ 量化启动命令参考
-python run_finetune.py ./config/llama/ptq_argument.json
+python run_quantization.py ./config/llama/ptq_argument.json
 
 # GPTQ 量化启动命令参考
-python run_finetune.py ./config/llama/ptq_argument.json
+python run_quantization.py ./config/llama/gptq_argument.json
 
 # W8A8C8(INT)量化启动命令参考
-python run_finetune.py ./config/llama/ptq_c8_argument.json
+python run_quantization.py ./config/llama/ptq_c8_argument.json
 
 # W8A8(FP8)量化启动命令参考
-python run_finetune.py ./config/llama/fp8_ptq_argument.json
+python run_quantization.py ./config/llama/fp8_ptq_argument.json
 ```
 
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。

@@ -22,9 +22,12 @@ from paddle.distributed.fleet.meta_parallel import (
     PipelineLayer,
     SharedLayerDesc,
 )
-from paddle.distributed.fleet.utils import recompute
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
+from paddlenlp.transformers.refined_recompute import (
+    create_skip_config_for_refined_recompute,
+    recompute,
+)
 from paddlenlp.utils.tools import get_env_device
 
 from .modeling import (
@@ -242,7 +245,12 @@ class LlamaDecoderLayerPipe(LlamaDecoderLayer):
                 attn_mask_startend_row_indices = None
 
         has_gradient = not hidden_states.stop_gradient
-        if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
+        if (
+            self.enable_recompute
+            and self.layerwise_recompute
+            and self.config.recompute_granularity == "full"
+            and has_gradient
+        ):
             if attention_mask is not None or alibi is not None or attn_mask_startend_row_indices is not None:
                 hidden_states = recompute(
                     super().forward,
@@ -340,8 +348,6 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.recompute_granularity = self.config.recompute_granularity
         self.pp_recompute_interval = self.config.pp_recompute_interval
         self.no_recompute_layers = config.no_recompute_layers if config.no_recompute_layers is not None else []
-        if self.recompute_granularity == "full":
-            assert len(self.no_recompute_layers) == 0, "for pp with full recompute, no_recompute_layers is not support"
 
         virtual_pp_degree = getattr(self.config, "virtual_pp_degree", 1)
 
@@ -368,7 +374,11 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
 
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
-                LayerDesc(LlamaDecoderLayerPipe, config=config, layerwise_recompute=i not in self.no_recompute_layers),
+                LayerDesc(
+                    LlamaDecoderLayerPipe,
+                    config=create_skip_config_for_refined_recompute(i, config),
+                    layerwise_recompute=i not in self.no_recompute_layers,
+                ),
                 f"llama.layers.{i}",
             )
         self.add_sequential_layer(LayerDesc(LlamaRMSNormPipe, config=config), "llama")
