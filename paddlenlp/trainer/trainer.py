@@ -1157,11 +1157,8 @@ class Trainer:
                         steps_in_epoch <= args.gradient_accumulation_steps
                         and (step + 1) == steps_in_epoch
                     ):
-                        # NOTE: Only when num_items_in_batch is None, we need to divide the loss by gradient_accumulation_steps
-                        if (
-                            num_items_in_batch is None
-                            and self.args.pipeline_parallel_degree <= 1
-                            and self._enable_delay_scale_loss()
+                        if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss(
+                            num_items_in_batch
                         ):
                             tr_loss /= self.args.gradient_accumulation_steps
 
@@ -1207,11 +1204,8 @@ class Trainer:
                         self.timers and self.timers("all-reduce").stop()
                         self.timers and self.timers("optimizer-step").start()
 
-                        # NOTE: Only when num_items_in_batch is None, we need to divide the loss by gradient_accumulation_steps
-                        if (
-                            num_items_in_batch is None
-                            and self.args.gradient_accumulation_steps > 1
-                            and self._enable_delay_scale_loss()
+                        if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss(
+                            num_items_in_batch
                         ):
                             paddle.device.synchronize()
                             for p in model._layers.parameters():
@@ -1417,7 +1411,7 @@ class Trainer:
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 dataset=self.train_dataset,
-                shuffle=True,
+                shuffle=False,
                 batch_size=self.args.per_device_train_batch_size,
                 drop_last=self.args.dataloader_drop_last,
             )
@@ -1425,7 +1419,7 @@ class Trainer:
         return DistributedBatchSampler(
             self.train_dataset,
             batch_size=self.args.per_device_train_batch_size,
-            shuffle=True,
+            shuffle=False,
             num_replicas=self.args.dataset_world_size,
             rank=self.args.dataset_rank,
             drop_last=self.args.dataloader_drop_last,
@@ -2325,16 +2319,15 @@ class Trainer:
         else:
             loss = outputs
 
-        if (
-            self.args.average_tokens_across_devices
-            and (self.model_accepts_loss_kwargs or self.criterion_accepts_loss_kwargs)
-            and num_items_in_batch is not None
-        ):
+        if self.args.average_tokens_across_devices and self.args.world_size > 1 and num_items_in_batch is not None:
             loss *= self.args.world_size
-
         return (loss, outputs) if return_outputs else loss
 
-    def _enable_delay_scale_loss(self):
+    def _enable_delay_scale_loss(self, num_items_in_batch: Optional[int] = None):
+        if num_items_in_batch is not None and (self.model_accepts_loss_kwargs or self.criterion_accepts_loss_kwargs):
+            logger.warning_once("Detect loss_kwargs in `model` or `criterion`, disable delay scale loss.")
+            return False
+
         if in_auto_parallel_align_mode():
             return True
 
@@ -2376,11 +2369,10 @@ class Trainer:
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs, num_items_in_batch=num_items_in_batch)
 
-        # NOTE: Only when num_items_in_batch is None, we need to divide the loss by gradient_accumulation_steps
         if (
             num_items_in_batch is None
             and self.args.gradient_accumulation_steps > 1
-            and not self._enable_delay_scale_loss()
+            and not self._enable_delay_scale_loss(num_items_in_batch)
         ):
             loss = loss / self.args.gradient_accumulation_steps
 
@@ -2435,21 +2427,29 @@ class Trainer:
         model.optimizer = None  # we do not use `PipelineParallel` to handler optimizer step
         model.lr_scheduler = None
 
-        if model.is_pipeline_last_stage(ignore_virtual=True):
-            for loss_fn in model._layers._loss_fn:
-                if self.args.average_tokens_across_devices:
-                    num_items_in_batch = num_items_in_batch / (self.args.world_size * model.accumulate_steps)
-                else:
-                    num_items_in_batch = num_items_in_batch / model.accumulate_steps
+        enable_num_items_in_batch = num_items_in_batch is not None and (
+            self.model_accepts_loss_kwargs or self.criterion_accepts_loss_kwargs
+        )
+        if enable_num_items_in_batch:
+            backup_delay_scale_loss = model._delay_scale_loss
+            model._delay_scale_loss = False
+            if model.is_pipeline_last_stage(ignore_virtual=True):
+                for loss_fn in model._layers._loss_fn:
+                    if self.args.average_tokens_across_devices and self.args.world_size > 1:
+                        num_items_in_batch = num_items_in_batch / (self.args.world_size * model.accumulate_steps)
+                    else:
+                        num_items_in_batch = num_items_in_batch / model.accumulate_steps
 
-                setattr(loss_fn, "num_items_in_batch", num_items_in_batch)
+                    setattr(loss_fn, "num_items_in_batch", num_items_in_batch)
 
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
 
-        if model.is_pipeline_last_stage(ignore_virtual=True):
-            for loss_fn in model._layers._loss_fn:
-                setattr(loss_fn, "num_items_in_batch", None)
+        if enable_num_items_in_batch:
+            model._delay_scale_loss = backup_delay_scale_loss
+            if model.is_pipeline_last_stage(ignore_virtual=True):
+                for loss_fn in model._layers._loss_fn:
+                    setattr(loss_fn, "num_items_in_batch", None)
 
         return loss.detach()
 
@@ -3691,20 +3691,18 @@ class Trainer:
             except StopIteration:
                 break
 
-        if len(batch_samples) > 0 and "labels" in batch_samples[0]:
-            try:
-                num_items_in_batch = sum([((batch["labels"] != -100)).sum() for batch in batch_samples])
-            except (TypeError, AttributeError):
-                pass
+        if self.model_accepts_loss_kwargs or self.criterion_accepts_loss_kwargs:
+            if len(batch_samples) > 0 and "labels" in batch_samples[0]:
+                try:
+                    num_items_in_batch = sum([((batch["labels"] != -100)).sum() for batch in batch_samples])
+                except (TypeError, AttributeError):
+                    pass
 
-        if (
-            self.args.average_tokens_across_devices
-            and (self.model_accepts_loss_kwargs or self.criterion_accepts_loss_kwargs)
-            and num_items_in_batch is not None
-        ):
-            num_items_in_batch = self._nested_gather(num_items_in_batch).sum()
+            if paddle.is_tensor(num_items_in_batch):
+                if self.args.average_tokens_across_devices and self.args.world_size > 1:
+                    num_items_in_batch = self._nested_gather(num_items_in_batch).sum()
 
-        if num_items_in_batch is not None and num_items_in_batch.ndim == 0:
-            num_items_in_batch = num_items_in_batch.unsqueeze(0)
+                if num_items_in_batch.ndim == 0:
+                    num_items_in_batch = num_items_in_batch.unsqueeze(0)
 
         return batch_samples, num_items_in_batch
