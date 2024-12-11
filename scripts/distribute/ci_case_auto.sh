@@ -2063,6 +2063,7 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2(){
 }
 
 function llm_qwen_dygraph_auto_bs1_fp32_DP2() {
+    echo "=========== $FUNCNAME run  begin ==========="
     set -x
 
     config_json="pretrain_argument_for_ci_auto_dp2.json"
@@ -2156,6 +2157,7 @@ EOF
 }
 
 function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2() {
+    echo "=========== $FUNCNAME run  begin ==========="
     set -x
 
     config_json="pretrain_argument_for_ci_auto_dp2_mp2.json"
@@ -2249,6 +2251,7 @@ EOF
 }
 
 function llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2-PP2() {
+    echo "=========== $FUNCNAME run  begin ==========="
     set -x
 
     config_json="pretrain_argument_for_ci_auto_dp2_mp2_pp2.json"
@@ -2342,6 +2345,7 @@ EOF
 }
 
 function llm_qwen_dygraph_auto_bs1_bf16_DP2-MP2-PP2() {
+    echo "=========== $FUNCNAME run  begin ==========="
     set -x
 
     config_json="pretrain_argument_for_ci_auto_dp2_mp2_pp2.json"
