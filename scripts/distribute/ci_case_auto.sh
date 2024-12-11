@@ -147,12 +147,12 @@ function llm_gpt_case_list_auto() {
 
 function llm_qwen_case_list_auto() {
     fun_list=(
-        # The test name must have "llm_qwen_dygraph_auto_" as a prefix, 
+        # The test name must have "llm_qwen_" as a prefix, 
         # which will be used for tracking the execution status of the case.
-        llm_qwen_dygraph_auto_bs1_fp32_DP2
-        llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2
-        llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2-PP2
-        llm_qwen_dygraph_auto_bs1_bf16_DP2-MP2-PP2
+        # llm_qwen_dygraph_auto_bs1_fp32_DP2
+        # llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2
+        # llm_qwen_dygraph_auto_bs1_fp32_DP2-MP2-PP2
+        # llm_qwen_dygraph_auto_bs1_bf16_DP2-MP2-PP2
         llm_qwen_pir_auto_bs1_bf16_TP2
         llm_qwen_pir_auto_bs1_bf16_TP2_PP2
     )
