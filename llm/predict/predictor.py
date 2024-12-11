@@ -185,7 +185,7 @@ class BasePredictor:
         self.model_config = AutoConfig.from_pretrained(config.model_name_or_path)
         self.config: PredictorArgument = config
         if tokenizer is None:
-            tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path, padding_side="left")
+            tokenizer = AutoTokenizer.from_pretrained(config.model_name_or_path, use_fast=True, padding_side="left")
 
         self.tokenizer = tokenizer
 
@@ -1295,6 +1295,7 @@ def create_predictor(
 ):
     tokenizer = AutoTokenizer.from_pretrained(
         predictor_args.model_name_or_path,
+        use_fast=True,
     )
     # init chat_template for tokenizer
     llm_utils.init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
