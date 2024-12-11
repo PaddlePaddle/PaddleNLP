@@ -1061,12 +1061,12 @@ class Trainer:
                 if dp_master_grad:
                     is_no_sync = True
 
-                if is_no_sync:
-                    # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
-                    with model.no_sync():
+                sync_context = model.no_sync() if is_no_sync else contextlib.nullcontext()
+                with sync_context:
+                    if "step_control" in inspect.signature(self.training_step).parameters:
+                        tr_loss_step = self.training_step(model, inputs, step_control=step_control)
+                    else:
                         tr_loss_step = self.training_step(model, inputs)
-                else:
-                    tr_loss_step = self.training_step(model, inputs)
 
                 tr_loss += tr_loss_step
 
@@ -2195,7 +2195,9 @@ class Trainer:
         else:
             return False
 
-    def training_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
+    def training_step(
+        self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]], step_control=0
+    ) -> paddle.Tensor:
         """
         Perform a training step on a batch of inputs.
 
