@@ -2324,20 +2324,24 @@ class Trainer:
         return (loss, outputs) if return_outputs else loss
 
     def _enable_delay_scale_loss(self, num_items_in_batch: Optional[int] = None):
-        if num_items_in_batch is not None and (self.model_accepts_loss_kwargs or self.criterion_accepts_loss_kwargs):
-            logger.warning_once("Detect loss_kwargs in `model` or `criterion`, disable delay scale loss.")
-            return False
-
-        if in_auto_parallel_align_mode():
-            return True
-
         key = "enable_delay_scale_loss"
-        if self.args.pipeline_parallel_degree > 1:
-            return key in self.args.pipeline_parallel_config
+        if in_auto_parallel_align_mode():
+            value = True
+        elif self.args.pipeline_parallel_degree > 1:
+            value = key in self.args.pipeline_parallel_config
         elif self.args.tensor_parallel_degree > 1:
-            return key in self.args.tensor_parallel_config
+            value = key in self.args.tensor_parallel_config
         else:
-            return False
+            value = False
+
+        if (
+            value
+            and num_items_in_batch is not None
+            and (self.model_accepts_loss_kwargs or self.criterion_accepts_loss_kwargs)
+        ):
+            logger.warning_once("Detect loss_kwargs in `model` or `criterion`, disable delay scale loss.")
+            value = False
+        return value
 
     def training_step(
         self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]], num_items_in_batch: Optional[int] = None
