@@ -1040,7 +1040,7 @@ class IterableDatasetShard(IterableDataset):
             return math.ceil(len(self.dataset) / (self.batch_size * self.num_processes)) * self.batch_size
 
 
-class FirstBatchPaddingSampler(paddle.io.DistributedBatchSampler):
+class LastBatchPaddingSampler(paddle.io.DistributedBatchSampler):
     """The sampler which pads the first batch to the last batch"""
 
     def __iter__(self):
