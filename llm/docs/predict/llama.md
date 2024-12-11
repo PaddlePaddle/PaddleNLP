@@ -24,6 +24,7 @@
 |meta-llama/Meta-Llama-3.1-8B-Instruct|
 |meta-llama/Meta-Llama-3.1-70B-Instruct|
 |meta-llama/Meta-Llama-3.1-405B-Instruct|
+|meta-llama/Llama-3.2-3B-Instruct|
 
 ## 已验证的预量化模型
 
