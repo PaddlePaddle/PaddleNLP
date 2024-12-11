@@ -605,7 +605,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
 
 
 class LlamaMLP(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config, layer_idx: int = 0):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
@@ -618,9 +618,9 @@ class LlamaMLP(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                if config.skip_recompute_ops[layer_idx].get("mlp_column_ln", False):
                     ColumnParallelLinear = RRColumnSequenceParallelLinear
-                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                if config.skip_recompute_ops[layer_idx].get("mlp_row_ln", False):
                     RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
@@ -628,9 +628,9 @@ class LlamaMLP(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                if config.skip_recompute_ops[layer_idx].get("mlp_column_ln", False):
                     ColumnParallelLinear = RRColumnParallelLinear
-                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                if config.skip_recompute_ops[layer_idx].get("mlp_row_ln", False):
                     RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
@@ -682,7 +682,7 @@ class LlamaMLP(nn.Layer):
 class LlamaAttention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config: LlamaConfig, layerwise_recompute: bool = False):
+    def __init__(self, config: LlamaConfig, layerwise_recompute: bool = False, layer_idx: int = 0):
         super().__init__()
 
         self.config = config
@@ -746,18 +746,18 @@ class LlamaAttention(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops.get("attention_column_ln", False):
+                if config.skip_recompute_ops[layer_idx].get("attention_column_ln", False):
                     ColumnParallelLinear = RRColumnSequenceParallelLinear
-                if config.skip_recompute_ops.get("attention_row_ln", False):
+                if config.skip_recompute_ops[layer_idx].get("attention_row_ln", False):
                     RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops.get("attention_column_ln", False):
+                if config.skip_recompute_ops[layer_idx].get("attention_column_ln", False):
                     ColumnParallelLinear = RRColumnParallelLinear
-                if config.skip_recompute_ops.get("attention_row_ln", False):
+                if config.skip_recompute_ops[layer_idx].get("attention_row_ln", False):
                     RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
@@ -862,7 +862,7 @@ class LlamaAttention(nn.Layer):
         if (
             config.recompute
             and not config.recompute_use_reentrant
-            and config.skip_recompute_ops.get("flash_attn", False)
+            and config.skip_recompute_ops[layer_idx].get("flash_attn", False)
         ):
             self.attn_func = partial(scaled_dot_product_attention, skip_recompute=True)
 
@@ -1168,12 +1168,12 @@ class LlamaAttention(nn.Layer):
 
 
 class LlamaDecoderLayer(nn.Layer):
-    def __init__(self, config, layerwise_recompute: bool = False):
+    def __init__(self, config, layerwise_recompute: bool = False, layer_idx: int = 0):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size
-        self.self_attn = LlamaAttention(config, layerwise_recompute)
-        self.mlp = LlamaMLP(config)
+        self.self_attn = LlamaAttention(config, layerwise_recompute, layer_idx=layer_idx)
+        self.mlp = LlamaMLP(config, layer_idx=layer_idx)
         self.input_layernorm = LlamaRMSNorm(config)
         self.post_attention_layernorm = LlamaRMSNorm(config)
         self.sequence_parallel = config.sequence_parallel
@@ -1518,9 +1518,11 @@ class LlamaModel(LlamaPretrainedModel):
         self.layers = nn.LayerList(
             [
                 LlamaDecoderLayer(
-                    create_skip_config_for_refined_recompute(i, config), i not in self.no_recompute_layers
+                    create_skip_config_for_refined_recompute(layer_idx, config),
+                    layerwise_recompute=layer_idx not in self.no_recompute_layers,
+                    layer_idx=layer_idx,
                 )
-                for i in range(config.num_hidden_layers)
+                for layer_idx in range(config.num_hidden_layers)
             ]
         )
         self.norm = LlamaRMSNorm(config)

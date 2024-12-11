@@ -20,7 +20,6 @@ import inspect
 import queue
 import uuid
 import weakref
-from copy import deepcopy
 
 import paddle
 import paddle.autograd
@@ -520,16 +519,15 @@ def create_skip_config_for_refined_recompute(layer_idx, config):
 
     Returns:
         dict: Returns an updated configuration file containing the following key-value pairs:
-            - skip_recompute_ops (dict): A dictionary with each operation's name and a boolean
-                                         indicating whether to skip recomputation, defaults to None.
+            - skip_recompute_ops (dict): A dictionary with each model layer's each operation's name
+                                         and a boolean indicating whether to skip recomputation, defaults to None.
             - If the refined_recompute key does not exist or recompute is set to False,
               the original configuration file is returned.
 
     """
-    if not config.recompute:
+    if not config.recompute or config.refined_recompute is None:
         return config
     skip_config = dict()
-    config = deepcopy(config)
 
     try:
         hcg = fleet.get_hybrid_communicate_group()
@@ -557,7 +555,9 @@ def create_skip_config_for_refined_recompute(layer_idx, config):
                     skip_config[op_name] = True
                 else:
                     skip_config[op_name] = False
-    config.skip_recompute_ops = skip_config
+
+    config.skip_recompute_ops[layer_idx] = skip_config
+
     return config
 
 
