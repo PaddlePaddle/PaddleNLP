@@ -47,6 +47,7 @@ class PDCErrorCode(Enum):
     CalculateHashFail = 1502
     InvalidArgument = 1503
     CommandTimeout = 1504
+    CheckSumCommandFail = 1505
 
     UnknownError = 1999
 
@@ -490,7 +491,7 @@ class PDCTools:
             raise Exception(f"exec cmd {download_cmd_args} with error: {e}")
         return error_code
 
-    def _pdc_fc_generate_checksum(self, path: str) -> PDCErrorCode:
+    def pdc_fc_generate_checksum(self, path: str) -> PDCErrorCode:
         """
         Args
         :param localPath:
@@ -508,10 +509,10 @@ class PDCTools:
                 logger.info(f"generate_sum {path} successfully")
         except Exception as e:
             logger.error(f"exec cmd {generate_checksum_args} with error: {e}")
-            raise Exception(f"exec cmd {generate_checksum_args} with error: {e}")
+            return PDCErrorCode.CheckSumCommandFail
         return error_code
 
-    def _pdc_fc_do_check(self, path: str) -> PDCErrorCode:
+    def pdc_fc_do_check(self, path: str) -> PDCErrorCode:
         """
         Args
         :param localPath:
@@ -529,7 +530,7 @@ class PDCTools:
                 logger.info(f"check_sum {path} successfully")
         except Exception as e:
             logger.error(f"exec cmd {generate_checksum_args} with error: {e}")
-            raise Exception(f"exec cmd {generate_checksum_args} with error: {e}")
+            return PDCErrorCode.CheckSumCommandFail
         return error_code
 
     def _clean_tmp_files(self, tmp_files: List[str]):
