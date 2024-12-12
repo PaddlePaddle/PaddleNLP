@@ -2421,8 +2421,6 @@ class Trainer:
 
         model.train()
         if model._dp_comm_overlap or model._sharding_comm_overlap:
-            if scale_value is not None:
-                raise ValueError("scale_value is not supported when dp_comm_overlap or sharding_comm_overlap enabled.")
             for _, buffers in model._chunk_2_comm_buffers.items():
                 for buffer in buffers:
                     buffer._acc_steps = self.args.gradient_accumulation_steps
