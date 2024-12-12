@@ -1034,7 +1034,7 @@ class Trainer:
                 num_batches = (
                     self.args.gradient_accumulation_steps if update_step != (total_updates - 1) else remainder
                 )
-                batch_samples, num_items_in_batch = self.get_batch_samples(epoch_iterator, num_batches)
+                batch_samples, num_items_in_batch, scale_value = self.get_batch_samples(epoch_iterator, num_batches)
 
                 for step, inputs in enumerate(batch_samples):
                     if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
@@ -1138,9 +1138,9 @@ class Trainer:
                     if is_no_sync:
                         # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
                         with model.no_sync():
-                            tr_loss_step = self.training_step(model, inputs, num_items_in_batch)
+                            tr_loss_step = self.training_step(model, inputs, num_items_in_batch, scale_value)
                     else:
-                        tr_loss_step = self.training_step(model, inputs, num_items_in_batch)
+                        tr_loss_step = self.training_step(model, inputs, num_items_in_batch, scale_value)
 
                     tr_loss += tr_loss_step
 
@@ -1157,10 +1157,12 @@ class Trainer:
                         steps_in_epoch <= args.gradient_accumulation_steps
                         and (step + 1) == steps_in_epoch
                     ):
-                        if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss(
-                            num_items_in_batch
+                        if (
+                            self.args.pipeline_parallel_degree <= 1
+                            and self._enable_delay_scale_loss()
+                            and scale_value is not None
                         ):
-                            tr_loss /= self.args.gradient_accumulation_steps
+                            tr_loss /= scale_value
 
                         self.timers and self.timers("forward-backward").stop()
                         # Maunally collect gradients
@@ -1204,17 +1206,19 @@ class Trainer:
                         self.timers and self.timers("all-reduce").stop()
                         self.timers and self.timers("optimizer-step").start()
 
-                        if self.args.gradient_accumulation_steps > 1 and self._enable_delay_scale_loss(
-                            num_items_in_batch
+                        if (
+                            self.args.gradient_accumulation_steps > 1
+                            and self._enable_delay_scale_loss()
+                            and scale_value is not None
                         ):
                             paddle.device.synchronize()
                             for p in model._layers.parameters():
                                 with paddle.no_grad():
                                     if hasattr(p, "main_grad") and p.main_grad is not None:
                                         assert p.grad is None
-                                        p.main_grad.scale_(1.0 / self.args.gradient_accumulation_steps)
+                                        p.main_grad.scale_(1.0 / scale_value)
                                     elif p.grad is not None:
-                                        p.grad.scale_(1.0 / self.args.gradient_accumulation_steps)
+                                        p.grad.scale_(1.0 / scale_value)
 
                         # Optimizer step
                         self.callback_handler.on_optimizer_begin(
@@ -2319,32 +2323,26 @@ class Trainer:
         else:
             loss = outputs
 
-        if self.args.average_tokens_across_devices and self.args.world_size > 1 and num_items_in_batch is not None:
-            loss *= self.args.world_size
         return (loss, outputs) if return_outputs else loss
 
-    def _enable_delay_scale_loss(self, num_items_in_batch: Optional[int] = None):
-        key = "enable_delay_scale_loss"
+    def _enable_delay_scale_loss(self):
         if in_auto_parallel_align_mode():
-            value = True
-        elif self.args.pipeline_parallel_degree > 1:
-            value = key in self.args.pipeline_parallel_config
-        elif self.args.tensor_parallel_degree > 1:
-            value = key in self.args.tensor_parallel_config
-        else:
-            value = False
+            return True
 
-        if (
-            value
-            and num_items_in_batch is not None
-            and (self.model_accepts_loss_kwargs or self.criterion_accepts_loss_kwargs)
-        ):
-            logger.warning_once("Detect loss_kwargs in `model` or `criterion`, disable delay scale loss.")
-            value = False
-        return value
+        key = "enable_delay_scale_loss"
+        if self.args.pipeline_parallel_degree > 1:
+            return key in self.args.pipeline_parallel_config
+        elif self.args.tensor_parallel_degree > 1:
+            return key in self.args.tensor_parallel_config
+        else:
+            return False
 
     def training_step(
-        self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]], num_items_in_batch: Optional[int] = None
+        self,
+        model: nn.Layer,
+        inputs: Dict[str, Union[paddle.Tensor, Any]],
+        num_items_in_batch: Optional[int] = None,
+        scale_value: Optional[float] = None,
     ) -> paddle.Tensor:
         """
         Perform a training step on a batch of inputs.
@@ -2366,19 +2364,17 @@ class Trainer:
             `paddle.Tensor`: The tensor with training loss on this batch.
         """
         if self.args.pipeline_parallel_degree > 1:
-            return self.training_pipeline_step(model, inputs, num_items_in_batch=num_items_in_batch)
+            return self.training_pipeline_step(
+                model, inputs, num_items_in_batch=num_items_in_batch, scale_value=scale_value
+            )
 
         model.train()
         inputs = self._prepare_inputs(inputs)
         with self.autocast_smart_context_manager():
             loss = self.compute_loss(model, inputs, num_items_in_batch=num_items_in_batch)
 
-        if (
-            num_items_in_batch is None
-            and self.args.gradient_accumulation_steps > 1
-            and not self._enable_delay_scale_loss(num_items_in_batch)
-        ):
-            loss = loss / self.args.gradient_accumulation_steps
+        if not self._enable_delay_scale_loss() and scale_value is not None:
+            loss = loss / scale_value
 
         if self.do_grad_scaling:
             self.scaler.scale(loss).backward()
@@ -2387,7 +2383,11 @@ class Trainer:
         return loss.detach()
 
     def training_pipeline_step(
-        self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]], num_items_in_batch: Optional[int] = None
+        self,
+        model: nn.Layer,
+        inputs: Dict[str, Union[paddle.Tensor, Any]],
+        num_items_in_batch: Optional[int] = None,
+        scale_value: Optional[float] = None,
     ) -> paddle.Tensor:
         """
         Perform a training step on a batch of inputs.
@@ -2421,6 +2421,8 @@ class Trainer:
 
         model.train()
         if model._dp_comm_overlap or model._sharding_comm_overlap:
+            if scale_value is not None:
+                raise ValueError("scale_value is not supported when dp_comm_overlap or sharding_comm_overlap enabled.")
             for _, buffers in model._chunk_2_comm_buffers.items():
                 for buffer in buffers:
                     buffer._acc_steps = self.args.gradient_accumulation_steps
@@ -2435,25 +2437,23 @@ class Trainer:
             self.model_accepts_loss_kwargs or self.criterion_accepts_loss_kwargs
         )
         if enable_num_items_in_batch:
-            backup_delay_scale_loss = model._delay_scale_loss
+            delay_scale_loss_backup = model._delay_scale_loss
             model._delay_scale_loss = False
             if model.is_pipeline_last_stage(ignore_virtual=True):
                 for loss_fn in model._layers._loss_fn:
-                    if self.args.average_tokens_across_devices and self.args.world_size > 1:
-                        num_items_in_batch = num_items_in_batch / (self.args.world_size * model.accumulate_steps)
-                    else:
-                        num_items_in_batch = num_items_in_batch / model.accumulate_steps
-
-                    setattr(loss_fn, "num_items_in_batch", num_items_in_batch)
+                    setattr(loss_fn, "num_items_in_batch", num_items_in_batch / model.accumulate_steps)
 
         with self.autocast_smart_context_manager():
             loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
 
         if enable_num_items_in_batch:
-            model._delay_scale_loss = backup_delay_scale_loss
+            model._delay_scale_loss = delay_scale_loss_backup
             if model.is_pipeline_last_stage(ignore_virtual=True):
                 for loss_fn in model._layers._loss_fn:
                     setattr(loss_fn, "num_items_in_batch", None)
+
+            if delay_scale_loss_backup:
+                return loss.detach() / scale_value
 
         return loss.detach()
 
@@ -3686,9 +3686,11 @@ class Trainer:
         Returns:
             batch_samples: batch samples
             num_items_in_batch: number of items in batch
+            scale_value: scale value
         """
         batch_samples = []
         num_items_in_batch = None
+        scale_value = None
         for _ in range(num_batches):
             try:
                 batch_samples += [next(epoch_iterator)]
@@ -3703,10 +3705,23 @@ class Trainer:
                     pass
 
             if paddle.is_tensor(num_items_in_batch):
+                # NOTE: compute average tokens across devices
+                # divide by world_size and then we don't need to multiply world_size again in loss computation
+                # this implementation is different from Huggingface's transformers
                 if self.args.average_tokens_across_devices and self.args.world_size > 1:
-                    num_items_in_batch = self._nested_gather(num_items_in_batch).sum()
+                    num_items_in_batch = self._nested_gather(num_items_in_batch).sum() / self.args.world_size
 
+                # 0D tensor error
                 if num_items_in_batch.ndim == 0:
                     num_items_in_batch = num_items_in_batch.unsqueeze(0)
 
-        return batch_samples, num_items_in_batch
+        if num_items_in_batch is None:
+            if self.args.gradient_accumulation_steps > 1:
+                scale_value = self.args.gradient_accumulation_steps
+            num_items_in_batch = None
+        else:
+            if self._enable_delay_scale_loss():
+                scale_value = num_items_in_batch.item()
+                num_items_in_batch = paddle.to_tensor([1], dtype="int64")
+
+        return batch_samples, num_items_in_batch, scale_value
