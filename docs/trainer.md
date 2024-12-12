@@ -749,7 +749,11 @@ Trainer 是一个简单，但功能完整的 Paddle 训练和评估模块，并�
                       Whether to reduce peak memory usage by releasing gradients after each iteration. (default: False)
 
   --ckpt_quant_stage
-                      是否开启 unified Checkpoint 压缩, O0:不压缩, O1: Int8 压缩, O2: Int4 压缩, 默认为O0）
-                      Whether use unified Checkpoint compression, O0: deactivate, O1: Int8 compression, O2: Int4 compression. (default: O0)
+                      是否开启 unified Checkpoint 压缩, 可选项["O0", "O1", "O2"], 默认为O0）
+                        O1: 对 Adam 优化器一/二阶动量进行 Int8 压缩.
+                        O2: 对 Adam 优化器一/二阶动量进行 Int4 压缩.
+                      Whether use unified Checkpoint compression, choices=["O0", "O1", "O2"]. (default: O0)
+                        O1: Compress Adam moment1/moment2 to Int8 dtype.
+                        O2: Compress Adam moment1/moment2 to Int4 dtype.
 
 ```
