@@ -1592,7 +1592,9 @@ class Trainer:
 
         additional_configs = {}
         if is_iterable_dataset:
-            if self.args.dataset_world_size > 1 and eval_dataset is not None:
+            if (
+                self.args.dataset_world_size > 1 or self.args.pipeline_parallel_degree > 1
+            ) and eval_dataset is not None:
                 eval_dataset = IterableDatasetShard(
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
@@ -3099,7 +3101,9 @@ class Trainer:
 
         # Metrics!
         if self.compute_metrics is not None and all_preds is not None and all_labels is not None:
-            metrics = self.compute_metrics(EvalPrediction(predictions=all_preds, label_ids=all_labels))
+            # all_labels maybe is a tuple when prediction_steps output label_mask
+            batch_labels = all_labels[0] if isinstance(all_labels, (list, tuple)) else all_labels
+            metrics = self.compute_metrics(EvalPrediction(predictions=all_preds, label_ids=batch_labels))
         else:
             metrics = {}
 
