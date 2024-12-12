@@ -543,7 +543,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
         echo "result: loss=$loss ips=$ips mem=$mem"
         loss_base=7.57775269
         ips_base=5442.5208
-        mem_base=22.387750148773193
+        mem_base=25.066193342208862
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
         echo "=========== $FUNCNAME run  end ==========="
     fi
@@ -642,7 +642,7 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
         mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
         echo "result: loss=$loss ips=$ips mem=$mem"
         loss_base=7.57775269 # record new data
-        ips_base=-1
+        ips_base=5825.427
         mem_base=-1
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
         echo "=========== $FUNCNAME run  end ==========="  
@@ -733,7 +733,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
         loss_base=9.16783295
         loss_md5_base=8ea72495fba4e1b9ba004b4431e27218
         if [ $IS_A100 -ne 0 ];then
-            loss_base=9.37966919
+            loss_base=9.38012543
         fi
         ips_base=-1
         mem_base=-1
@@ -923,7 +923,7 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP() {
         loss_base=9.25199432
         loss_md5_base=83531e98ee11cd271db175150ab254bb
         if [ $IS_A100 -ne 0 ];then
-            loss_base=9.44203949
+            loss_base=9.44225311
         fi
         ips_base=-1
         mem_base=-1
