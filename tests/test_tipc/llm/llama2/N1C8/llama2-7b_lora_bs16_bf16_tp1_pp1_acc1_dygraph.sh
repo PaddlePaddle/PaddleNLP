@@ -12,24 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-python -m pip install -r ../requirements.txt
-python -m pip install -r ../requirements-dev.txt
-export PYTHONPATH=../:${PYTHONPATH}
-echo ${PYTHONPATH}
 
+param="model_name_or_path=meta-llama/Llama-2-7b "
+param+="per_device_train_batch_size=1 "
+param+="tensor_parallel_degree=1 "
+param+="pipeline_parallel_degree=1 "
+param+="recompute=true "
+param+="recompute_granularity=full "
+param+="gradient_accumulation_steps=1 "
+param+="run_stage=lora "
+param+="run_mode=tp1_pp1_acc1_dygraph "
+param+="device_num=N1C8 "
+param+="global_batch_size=16 "
+param+="model_item=llama2-7b_lora "
+param+="max_steps=150 "
 
-# install fused_ln custom ops
-cd ../slm/model_zoo/gpt-3/external_ops/
-python setup.py install
-cd -
+cd ./tests
+bash ./test_tipc/llm/llama2/benchmark_common/prepare.sh
 
-# install paddlenlp_ops
-cd ../csrc/
-python setup_cuda.py install
-cd -
-
-cd ../llm
-cp -r ../tests/test_tipc/llm/qwen2_5/benchmark_common/benchmark_json ./
-
-wget https://paddlenlp.bj.bcebos.com/llm_benchmark_data/paddle_data.tar.gz
-tar zxvf paddle_data.tar.gz && rm -rf paddle_data.tar.gz
+bash -c "${param} bash ./test_tipc/llm/llama2/benchmark_common/run_benchmark.sh"

@@ -29,7 +29,7 @@ python setup_cuda.py install
 cd -
 
 cd ../llm
-cp -r ../tests/test_tipc/llm/qwen2_5/benchmark_common/benchmark_json ./
+cp -r ../tests/test_tipc/llm/llama2/benchmark_common/benchmark_json ./
 
 wget https://paddlenlp.bj.bcebos.com/llm_benchmark_data/paddle_data.tar.gz
 tar zxvf paddle_data.tar.gz && rm -rf paddle_data.tar.gz
