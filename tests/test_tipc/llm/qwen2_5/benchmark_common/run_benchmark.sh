@@ -117,7 +117,8 @@ function _train(){
     else
         timeout 30m ${train_cmd} > ${log_file} 2>&1
         # echo ${train_cmd}
-        Effective_Tokens_per_second=`cat ${log_file} |grep 'Effective_Tokens_per_second' |awk -F': ' '{print $2}'`
+        Effective_Tokens_per_second=`cat ${log_file} | grep -E 'Effective_Tokens_per_second|Effective tokens per second:' \
+                                            |awk -F': ' '{print $2}' |awk -F' ' '{print $1}'`
         num_gpu=$(echo "$device_num" | sed 's/^.*C//')
         ips=$(awk -v a="$Effective_Tokens_per_second" -v b="$num_gpu" 'BEGIN {printf "%.2f\n", a / b}')
         echo "Effective_Tokens_per_second_per_gpu: ${ips}" >> ${log_file}
