@@ -157,7 +157,7 @@ class DPOCriterion(nn.Layer):
 
                 hidden_states = hidden_states.reshape([-1, hidden_states.shape[-1]])
                 hidden_states = paddle.gather(hidden_states, sparse_tgt_idx, axis=0)
-        elif self.config.use_fused_head_and_loss_fn:
+        elif use_fused_head_and_loss_fn:
             if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
                 hidden_states = GatherOp.apply(hidden_states)
                 hidden_states = hidden_states.reshape(
