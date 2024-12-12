@@ -25,10 +25,6 @@ import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
-<<<<<<< HEAD
-=======
-from paddle.distributed import fleet
->>>>>>> update api
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import try_import
@@ -607,9 +603,6 @@ class GPTEmbeddingsNet(nn.Layer):
         self.position_embeddings = nn.Embedding(
             config.max_position_embeddings,
             config.hidden_size,
-        )
-        self.word_embeddings.weight = dist.shard_tensor(
-            self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Replicate()]
         )
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
