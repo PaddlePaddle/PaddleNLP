@@ -68,7 +68,7 @@ install_paddle(){
     python -m pip uninstall paddlepaddle -y
     python -m pip install pillow -y
     python -m pip install --user ${paddle} --no-cache-dir;
-    python -c "import paddle;print('paddle')print(paddle.__version__);print(paddle.version.show())" >> ${log_path}/commit_info.txt
+    python -c "import paddle;print('paddle');print(paddle.__version__);print(paddle.version.show())" >> ${log_path}/commit_info.txt
     python -c 'from visualdl import LogWriter'
 }
 ####################################
@@ -111,7 +111,7 @@ for line in `cat scripts/regression/model_list.txt`;do
 done
 cd ${nlp_dir}
 get_diff_TO_P0case(){
-for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
     arr_file_name=(${file_name//// })
     dir1=${arr_file_name[0]}
     dir2=${arr_file_name[1]}
