@@ -350,25 +350,30 @@ class Trainer:
         self.model = model
         self.criterion = criterion
 
-        # Just in case the model was wrapped outside of the `Trainer`
-        unwrapped_model = unwrap_model(model)
-        model_forward_params = inspect.signature(unwrapped_model.forward).parameters
-        self.model_accepts_loss_kwargs = (
-            "loss_kwargs" in model_forward_params
-            and model_forward_params["loss_kwargs"].kind == inspect.Parameter.VAR_KEYWORD
-        )
-        if hasattr(unwrapped_model, "get_loss_fn"):
-            criterion = unwrapped_model.get_loss_fn(unwrapped_model.config)
-
-        if criterion is not None:
-            if isinstance(criterion, nn.Layer):
-                criterion_forward_params = inspect.signature(criterion.forward).parameters
-            self.criterion_accepts_loss_kwargs = (
-                "loss_kwargs" in criterion_forward_params
-                and criterion_forward_params["loss_kwargs"].kind == inspect.Parameter.VAR_KEYWORD
-            )
-        else:
+        # NOTE: currenly fix accumulation loss bug, donot support auto parallel
+        if self.args.enable_auto_parallel:
+            self.model_accepts_loss_kwargs = False
             self.criterion_accepts_loss_kwargs = False
+        else:
+            # Just in case the model was wrapped outside of the `Trainer`
+            unwrapped_model = unwrap_model(model)
+            model_forward_params = inspect.signature(unwrapped_model.forward).parameters
+            self.model_accepts_loss_kwargs = (
+                "loss_kwargs" in model_forward_params
+                and model_forward_params["loss_kwargs"].kind == inspect.Parameter.VAR_KEYWORD
+            )
+            if hasattr(unwrapped_model, "get_loss_fn"):
+                criterion = unwrapped_model.get_loss_fn(unwrapped_model.config)
+
+            if criterion is not None:
+                if isinstance(criterion, nn.Layer):
+                    criterion_forward_params = inspect.signature(criterion.forward).parameters
+                self.criterion_accepts_loss_kwargs = (
+                    "loss_kwargs" in criterion_forward_params
+                    and criterion_forward_params["loss_kwargs"].kind == inspect.Parameter.VAR_KEYWORD
+                )
+            else:
+                self.criterion_accepts_loss_kwargs = False
 
         self.compute_metrics = compute_metrics
         self.preprocess_logits_for_metrics = preprocess_logits_for_metrics
@@ -900,7 +905,6 @@ class Trainer:
             num_train_samples,
             resume_from_checkpoint,
             ignore_keys_for_eval,
-            num_examples,
         )
 
     def _inner_training_loop(
@@ -915,7 +919,6 @@ class Trainer:
         num_train_samples,
         resume_from_checkpoint,
         ignore_keys_for_eval,
-        num_examples,
     ):
         start_time = time.time()
         self._globalstep_last_start_time = time.time()
