@@ -1015,293 +1015,276 @@ class Trainer:
                 train_dataloader.batch_sampler, DistributedBatchSampler
             ):
                 train_dataloader.batch_sampler.set_epoch(epoch)
-            epoch_dataloader = train_dataloader
 
             step_control = 0  # used in loop control, reset to 0 after every step
             self.control = self.callback_handler.on_epoch_begin(args, self.state, self.control)
 
             step = -1
+            new_epoch_iterator = self.get_batch_samples(epoch_iterator, self.args.gradient_accumulation_steps)
+            for step, (inputs, num_items_in_batch, scale_value) in enumerate(new_epoch_iterator):
+                if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
+                    inputs = split_inputs_sequence_dim(inputs)
+                if self.args.use_hybrid_parallel and self.args.context_parallel_degree > 1:
+                    inputs = split_inputs_sequence_dim_load_balance(inputs)
+                if self.args.ignore_data_skip:
+                    self.timers and self.timers("read-data").stop()
 
-            epoch_iterator = iter(epoch_dataloader)
-            # We chunkify the epoch iterator into gradient accumulation steps `n` batches
-            remainder = num_examples % self.args.gradient_accumulation_steps
-            if remainder == 0:
-                remainder = self.args.gradient_accumulation_steps
-            update_step = -1
-            total_updates = steps_in_epoch // self.args.gradient_accumulation_steps + 1
-            for _ in range(total_updates):
-                update_step += 1
-                num_batches = (
-                    self.args.gradient_accumulation_steps if update_step != (total_updates - 1) else remainder
-                )
-                batch_samples, num_items_in_batch, scale_value = self.get_batch_samples(epoch_iterator, num_batches)
+                os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
+                self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
 
-                for step, inputs in enumerate(batch_samples):
-                    if self.args.use_hybrid_parallel and self.args.sep_parallel_degree > 1:
-                        inputs = split_inputs_sequence_dim(inputs)
-                    if self.args.use_hybrid_parallel and self.args.context_parallel_degree > 1:
-                        inputs = split_inputs_sequence_dim_load_balance(inputs)
-                    if self.args.ignore_data_skip:
-                        self.timers and self.timers("read-data").stop()
-
-                    os.environ["TRAINER_GLOBAL_STEP"] = str(self.state.global_step)
-                    self.callback_handler.on_load_data_end(args, self.state, self.control, inputs=inputs)
-
-                    # Skip past any already trained steps if resuming training
-                    # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
-                    # We use consumed_samples to reset the status
-                    if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
-                        train_dataloader.batch_sampler, NlpDistributedBatchSampler
-                    ):
-                        if step == 0:
-                            if steps_trained_progress_bar is not None:
-                                steps_trained_progress_bar.update(steps_trained_in_current_epoch)
-                                steps_trained_progress_bar.close()
-                                steps_trained_progress_bar = None
-                            self._load_rng_state(resume_from_checkpoint)
-                        step += steps_trained_in_current_epoch
-                    elif steps_trained_in_current_epoch > 0:
-                        steps_trained_in_current_epoch -= 1
+                # Skip past any already trained steps if resuming training
+                # for paddlenlp.utils.batch_sampler.DistributedBatchSampler
+                # We use consumed_samples to reset the status
+                if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
+                    train_dataloader.batch_sampler, NlpDistributedBatchSampler
+                ):
+                    if step == 0:
                         if steps_trained_progress_bar is not None:
-                            steps_trained_progress_bar.update(1)
-                        if steps_trained_in_current_epoch == 0:
-                            self._load_rng_state(resume_from_checkpoint)
-                        self.timers and self.timers("read-data").start()
-                        continue
-                    elif steps_trained_progress_bar is not None:
-                        steps_trained_progress_bar.close()
-                        steps_trained_progress_bar = None
+                            steps_trained_progress_bar.update(steps_trained_in_current_epoch)
+                            steps_trained_progress_bar.close()
+                            steps_trained_progress_bar = None
+                        self._load_rng_state(resume_from_checkpoint)
+                    step += steps_trained_in_current_epoch
+                elif steps_trained_in_current_epoch > 0:
+                    steps_trained_in_current_epoch -= 1
+                    if steps_trained_progress_bar is not None:
+                        steps_trained_progress_bar.update(1)
+                    if steps_trained_in_current_epoch == 0:
+                        self._load_rng_state(resume_from_checkpoint)
+                    self.timers and self.timers("read-data").start()
+                    continue
+                elif steps_trained_progress_bar is not None:
+                    steps_trained_progress_bar.close()
+                    steps_trained_progress_bar = None
 
-                    if should_skip_data(self.state.global_step, self.args.skip_data_intervals):
-                        # skip this step
+                if should_skip_data(self.state.global_step, self.args.skip_data_intervals):
+                    # skip this step
 
-                        if (step_control + 1) % self.args.gradient_accumulation_steps == 0 or (
-                            # last step in epoch but step is always smaller than gradient_accumulation_steps
-                            steps_in_epoch <= args.gradient_accumulation_steps
-                            and (step + 1) == steps_in_epoch
-                        ):
-                            # update current global step and skip step
-                            self.state.global_step += 1
-                            self._skip_global_steps += 1
-                            self._skip_steps_since_last_logged += 1
-
-                            self.state.epoch = epoch + (step + 1) / steps_in_epoch
-
-                            if self.state.global_step == 1 and self.args.logging_first_step:
-                                self.control.should_log = True
-                            if (
-                                self.args.logging_strategy == IntervalStrategy.STEPS
-                                and self.state.global_step % self.args.logging_steps == 0
-                            ):
-                                self.control.should_log = True
-
-                            self.control.should_evaluate = False
-                            self.control.should_save = False
-
-                            # log loss and memeory usage
-                            self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
-                            self._print_timer()
-                            step_control = 0
-                        else:
-                            step_control += 1
-                        if self.state.global_step >= self.state.max_steps:
-                            break
-
-                        self.timers and self.timers("read-data").start()
-                        continue
-
-                    if step_control % args.gradient_accumulation_steps == 0:
-                        self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
-                        self.timers and self.timers("forward-backward").start()
-
-                    # stage2 and stage3 should not no_sync, because the is no DDP wrapper and no_sync API
-                    # hybrid_parallel (tp or pp or sharding stage 1) should not no_sync
-                    availiable_no_sync = hasattr(model, "no_sync")
-                    is_no_sync = (
-                        (
-                            ((step_control + 1) % args.gradient_accumulation_steps != 0)
-                            and args._no_sync_in_gradient_accumulation
-                        )
-                        or args.recompute
-                        or args.use_expert_parallel
-                    ) and availiable_no_sync
-                    # sharding
-                    # stage1. the same as ddp
-                    # stage2. manualy collect gradient on dp group
-
-                    dp_master_grad = (
-                        self.args.world_size > 1 and self.args.amp_master_grad and not self.args.use_hybrid_parallel
-                    )
-                    if dp_master_grad:
-                        is_no_sync = True
-
-                    if is_no_sync:
-                        # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
-                        with model.no_sync():
-                            tr_loss_step = self.training_step(model, inputs, num_items_in_batch, scale_value)
-                    else:
-                        tr_loss_step = self.training_step(model, inputs, num_items_in_batch, scale_value)
-
-                    tr_loss += tr_loss_step
-
-                    def fused_allreduce_gradients_no_sync(paramlist, hcg):
-                        paramlist = list(paramlist)
-                        nonmoe_list = [p for p in paramlist if not getattr(p, "no_sync", False)]
-                        moelist = [p for p in paramlist if getattr(p, "no_sync", False)]
-                        if moelist and not self.args.use_expert_parallel:
-                            logger.warning("found `no sync` param when `use_expert_parallel=False`")
-                        fused_allreduce_gradients(nonmoe_list, hcg)
-
-                    if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
+                    if (step_control + 1) % self.args.gradient_accumulation_steps == 0 or (
                         # last step in epoch but step is always smaller than gradient_accumulation_steps
                         steps_in_epoch <= args.gradient_accumulation_steps
                         and (step + 1) == steps_in_epoch
                     ):
-                        if (
-                            self.args.pipeline_parallel_degree <= 1
-                            and self._enable_delay_scale_loss()
-                            and scale_value is not None
-                        ):
-                            tr_loss /= scale_value
-
-                        self.timers and self.timers("forward-backward").stop()
-                        # Maunally collect gradients
-                        # Case 1: Use recompute and dp
-                        # Case 2: Hack dp with master_grad
-                        # Case 3: Pipeline or sharding overlap
-                        # local_rank != -1 don't means dp in networks.
-                        self.timers and self.timers("all-reduce").start()
-
-                        # Case 1: Use recompute and dp / sharding stage1,
-                        # manualy collect gradient for dp.
-                        if (args.recompute or args.use_expert_parallel) and availiable_no_sync:
-                            fused_allreduce_gradients_no_sync(list(model.parameters()), None)
-
-                        # Case 2: hack dp with master_grad
-                        elif dp_master_grad:
-                            fused_allreduce_gradients_no_sync(list(model.parameters()), None)
-
-                        # Pipeline parallel mode,  handle gradient reduce here to overlap
-                        enable_dp_comm_overlap = "enable_dp_comm_overlap" in args.pipeline_parallel_config
-
-                        enable_release_grads = False
-                        if args.sharding_parallel_degree > 1:
-                            enable_release_grads = "enable_release_grads" in args.sharding_parallel_config
-                        if not enable_release_grads and args.pipeline_parallel_degree > 1:
-                            enable_release_grads = "enable_release_grads" in args.pipeline_parallel_config
-
-                        # Case 3: Pipeline parallel mode, overlap with dp
-                        if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
-                            parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
-
-                            if not enable_dp_comm_overlap:
-                                if self.optimizer._sharding_enable:
-                                    assert reshard_util.is_sharding_opt(self.optimizer)
-                                    self.optimizer._inner_opt.reduce_gradients(
-                                        list(parameters_list), self.optimizer._hcg
-                                    )
-
-                                if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
-                                    fused_allreduce_gradients_no_sync(list(parameters_list), self.optimizer._hcg)
-                        self.timers and self.timers("all-reduce").stop()
-                        self.timers and self.timers("optimizer-step").start()
-
-                        if (
-                            self.args.gradient_accumulation_steps > 1
-                            and self._enable_delay_scale_loss()
-                            and scale_value is not None
-                        ):
-                            paddle.device.synchronize()
-                            for p in model._layers.parameters():
-                                with paddle.no_grad():
-                                    if hasattr(p, "main_grad") and p.main_grad is not None:
-                                        assert p.grad is None
-                                        p.main_grad.scale_(1.0 / scale_value)
-                                    elif p.grad is not None:
-                                        p.grad.scale_(1.0 / scale_value)
-
-                        # Optimizer step
-                        self.callback_handler.on_optimizer_begin(
-                            args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
-                        )
-                        optimizer_was_run = True
-
-                        if self.args.offload_optim:
-                            self._reload_optimizer()
-
-                        if self.do_grad_scaling:
-                            if args.pipeline_parallel_degree > 1:
-                                assert not self.args.use_expert_parallel, "pipeline moe not work under fp16"
-                            scale_before = paddle.assign(self.scaler._scale)
-                            self.scaler.step(self.optimizer)
-                            self.scaler.update()
-                            scale_after = self.scaler._scale
-                            # Compatible with paddlepaddle 2.6.0 using typo word.
-                            if hasattr(self.scaler, "_cache_founf_inf"):
-                                optimizer_was_run = not self.scaler._cache_founf_inf
-                            else:
-                                optimizer_was_run = not self.scaler._cache_found_inf
-                            if not optimizer_was_run:
-                                scale_before_value = scale_before.cpu().numpy()
-                                scale_after_value = scale_after.cpu().numpy()
-                                logger.warning(
-                                    f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
-                                )
-                        elif isinstance(self.optimizer, HybridParallelOptimizer):
-                            self.optimizer._step(parameters_list)
-                        else:
-                            self.optimizer.step()
-
-                        if self.args.offload_optim:
-                            self._offload_optimizer()
-
-                        self.timers and self.timers("optimizer-step").stop()
-
-                        if optimizer_was_run:
-                            self.lr_scheduler.step()
-
-                        if args.release_grads or enable_release_grads:
-                            self.optimizer.clear_grad(set_to_zero=False)
-                            if args.pipeline_parallel_degree > 1:
-                                for _, buffers in model._chunk_2_comm_buffers.items():
-                                    for buffer in buffers:
-                                        buffer._clear_grad_storage()
-                        else:
-                            self.optimizer.clear_grad()
-
-                        self.callback_handler.on_optimizer_end(
-                            args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
-                        )
-
+                        # update current global step and skip step
                         self.state.global_step += 1
+                        self._skip_global_steps += 1
+                        self._skip_steps_since_last_logged += 1
+
                         self.state.epoch = epoch + (step + 1) / steps_in_epoch
-                        self.control = self.callback_handler.on_step_end(args, self.state, self.control)
+
+                        if self.state.global_step == 1 and self.args.logging_first_step:
+                            self.control.should_log = True
+                        if (
+                            self.args.logging_strategy == IntervalStrategy.STEPS
+                            and self.state.global_step % self.args.logging_steps == 0
+                        ):
+                            self.control.should_log = True
+
+                        self.control.should_evaluate = False
+                        self.control.should_save = False
+
+                        # log loss and memeory usage
                         self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
                         self._print_timer()
                         step_control = 0
                     else:
-                        self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
                         step_control += 1
-
-                    if self.control.should_epoch_stop or self.control.should_training_stop:
+                    if self.state.global_step >= self.state.max_steps:
                         break
 
-                    if self.args.ignore_data_skip:
-                        self.timers and self.timers("read-data").start()
+                    self.timers and self.timers("read-data").start()
+                    continue
 
-                if step < 0:
-                    logger.warning(
-                        f"There seems to be not a single sample in your epoch_iterator, stopping training at step"
-                        f" {self.state.global_step}! This is expected if you're using an IterableDataset and set"
-                        f" num_steps ({self.state.max_steps}) higher than the number of available samples."
+                if step_control % args.gradient_accumulation_steps == 0:
+                    self.control = self.callback_handler.on_step_begin(args, self.state, self.control)
+                    self.timers and self.timers("forward-backward").start()
+
+                # stage2 and stage3 should not no_sync, because the is no DDP wrapper and no_sync API
+                # hybrid_parallel (tp or pp or sharding stage 1) should not no_sync
+                availiable_no_sync = hasattr(model, "no_sync")
+                is_no_sync = (
+                    (
+                        ((step_control + 1) % args.gradient_accumulation_steps != 0)
+                        and args._no_sync_in_gradient_accumulation
                     )
-                    self.control.should_training_stop = True
+                    or args.recompute
+                    or args.use_expert_parallel
+                ) and availiable_no_sync
+                # sharding
+                # stage1. the same as ddp
+                # stage2. manualy collect gradient on dp group
 
-                self.control = self.callback_handler.on_epoch_end(args, self.state, self.control)
-                self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                dp_master_grad = (
+                    self.args.world_size > 1 and self.args.amp_master_grad and not self.args.use_hybrid_parallel
+                )
+                if dp_master_grad:
+                    is_no_sync = True
 
-                if self.control.should_training_stop:
+                if is_no_sync:
+                    # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
+                    with model.no_sync():
+                        tr_loss_step = self.training_step(model, inputs, num_items_in_batch, scale_value)
+                else:
+                    tr_loss_step = self.training_step(model, inputs, num_items_in_batch, scale_value)
+
+                tr_loss += tr_loss_step
+
+                def fused_allreduce_gradients_no_sync(paramlist, hcg):
+                    paramlist = list(paramlist)
+                    nonmoe_list = [p for p in paramlist if not getattr(p, "no_sync", False)]
+                    moelist = [p for p in paramlist if getattr(p, "no_sync", False)]
+                    if moelist and not self.args.use_expert_parallel:
+                        logger.warning("found `no sync` param when `use_expert_parallel=False`")
+                    fused_allreduce_gradients(nonmoe_list, hcg)
+
+                if (step_control + 1) % args.gradient_accumulation_steps == 0 or (
+                    # last step in epoch but step is always smaller than gradient_accumulation_steps
+                    steps_in_epoch <= args.gradient_accumulation_steps
+                    and (step + 1) == steps_in_epoch
+                ):
+                    if (
+                        self.args.pipeline_parallel_degree <= 1
+                        and self._enable_delay_scale_loss()
+                        and scale_value is not None
+                    ):
+                        tr_loss /= scale_value
+
+                    self.timers and self.timers("forward-backward").stop()
+                    # Maunally collect gradients
+                    # Case 1: Use recompute and dp
+                    # Case 2: Hack dp with master_grad
+                    # Case 3: Pipeline or sharding overlap
+                    # local_rank != -1 don't means dp in networks.
+                    self.timers and self.timers("all-reduce").start()
+
+                    # Case 1: Use recompute and dp / sharding stage1,
+                    # manualy collect gradient for dp.
+                    if (args.recompute or args.use_expert_parallel) and availiable_no_sync:
+                        fused_allreduce_gradients_no_sync(list(model.parameters()), None)
+
+                    # Case 2: hack dp with master_grad
+                    elif dp_master_grad:
+                        fused_allreduce_gradients_no_sync(list(model.parameters()), None)
+
+                    # Pipeline parallel mode,  handle gradient reduce here to overlap
+                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in args.pipeline_parallel_config
+
+                    enable_release_grads = False
+                    if args.sharding_parallel_degree > 1:
+                        enable_release_grads = "enable_release_grads" in args.sharding_parallel_config
+                    if not enable_release_grads and args.pipeline_parallel_degree > 1:
+                        enable_release_grads = "enable_release_grads" in args.pipeline_parallel_config
+
+                    # Case 3: Pipeline parallel mode, overlap with dp
+                    if isinstance(self.optimizer, HybridParallelOptimizer) and not self.do_grad_scaling:
+                        parameters_list = _obtain_optimizer_parameters_list(self.optimizer._inner_opt)
+
+                        if not enable_dp_comm_overlap:
+                            if self.optimizer._sharding_enable:
+                                assert reshard_util.is_sharding_opt(self.optimizer)
+                                self.optimizer._inner_opt.reduce_gradients(list(parameters_list), self.optimizer._hcg)
+
+                            if self.optimizer._dp_enable or getattr(self.optimizer, "_sep_enable", False):
+                                fused_allreduce_gradients_no_sync(list(parameters_list), self.optimizer._hcg)
+                    self.timers and self.timers("all-reduce").stop()
+                    self.timers and self.timers("optimizer-step").start()
+
+                    if (
+                        self.args.gradient_accumulation_steps > 1
+                        and self._enable_delay_scale_loss()
+                        and scale_value is not None
+                    ):
+                        paddle.device.synchronize()
+                        for p in model._layers.parameters():
+                            with paddle.no_grad():
+                                if hasattr(p, "main_grad") and p.main_grad is not None:
+                                    assert p.grad is None
+                                    p.main_grad.scale_(1.0 / scale_value)
+                                elif p.grad is not None:
+                                    p.grad.scale_(1.0 / scale_value)
+
+                    # Optimizer step
+                    self.callback_handler.on_optimizer_begin(
+                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                    )
+                    optimizer_was_run = True
+
+                    if self.args.offload_optim:
+                        self._reload_optimizer()
+
+                    if self.do_grad_scaling:
+                        if args.pipeline_parallel_degree > 1:
+                            assert not self.args.use_expert_parallel, "pipeline moe not work under fp16"
+                        scale_before = paddle.assign(self.scaler._scale)
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
+                        scale_after = self.scaler._scale
+                        # Compatible with paddlepaddle 2.6.0 using typo word.
+                        if hasattr(self.scaler, "_cache_founf_inf"):
+                            optimizer_was_run = not self.scaler._cache_founf_inf
+                        else:
+                            optimizer_was_run = not self.scaler._cache_found_inf
+                        if not optimizer_was_run:
+                            scale_before_value = scale_before.cpu().numpy()
+                            scale_after_value = scale_after.cpu().numpy()
+                            logger.warning(
+                                f"optimizer not run, scale_before: {scale_before_value[0]}, scale_after: {scale_after_value[0]}"
+                            )
+                    elif isinstance(self.optimizer, HybridParallelOptimizer):
+                        self.optimizer._step(parameters_list)
+                    else:
+                        self.optimizer.step()
+
+                    if self.args.offload_optim:
+                        self._offload_optimizer()
+
+                    self.timers and self.timers("optimizer-step").stop()
+
+                    if optimizer_was_run:
+                        self.lr_scheduler.step()
+
+                    if args.release_grads or enable_release_grads:
+                        self.optimizer.clear_grad(set_to_zero=False)
+                        if args.pipeline_parallel_degree > 1:
+                            for _, buffers in model._chunk_2_comm_buffers.items():
+                                for buffer in buffers:
+                                    buffer._clear_grad_storage()
+                    else:
+                        self.optimizer.clear_grad()
+
+                    self.callback_handler.on_optimizer_end(
+                        args, self.state, self.control, scaler=self.scaler if self.do_grad_scaling else None
+                    )
+
+                    self.state.global_step += 1
+                    self.state.epoch = epoch + (step + 1) / steps_in_epoch
+                    self.control = self.callback_handler.on_step_end(args, self.state, self.control)
+                    self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+                    self._print_timer()
+                    step_control = 0
+                else:
+                    self.control = self.callback_handler.on_substep_end(args, self.state, self.control)
+                    step_control += 1
+
+                if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
+
+                if self.args.ignore_data_skip:
+                    self.timers and self.timers("read-data").start()
+
+            if step < 0:
+                logger.warning(
+                    f"There seems to be not a single sample in your epoch_iterator, stopping training at step"
+                    f" {self.state.global_step}! This is expected if you're using an IterableDataset and set"
+                    f" num_steps ({self.state.max_steps}) higher than the number of available samples."
+                )
+                self.control.should_training_stop = True
+
+            self.control = self.callback_handler.on_epoch_end(args, self.state, self.control)
+            self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
+
+            if self.control.should_training_stop:
+                break
 
         if args.past_index and hasattr(self, "_past"):
             # Clean the state at the end of training
@@ -1415,7 +1398,7 @@ class Trainer:
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 dataset=self.train_dataset,
-                shuffle=False,
+                shuffle=True,
                 batch_size=self.args.per_device_train_batch_size,
                 drop_last=self.args.dataloader_drop_last,
             )
@@ -1423,7 +1406,7 @@ class Trainer:
         return DistributedBatchSampler(
             self.train_dataset,
             batch_size=self.args.per_device_train_batch_size,
-            shuffle=False,
+            shuffle=True,
             num_replicas=self.args.dataset_world_size,
             rank=self.args.dataset_rank,
             drop_last=self.args.dataloader_drop_last,
@@ -2273,7 +2256,7 @@ class Trainer:
 
         return ctx_manager
 
-    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch: Optional[int] = None):
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch: Optional[paddle.Tensor] = None):
         """
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
         Subclass and override for custom behavior.
@@ -2341,7 +2324,7 @@ class Trainer:
         self,
         model: nn.Layer,
         inputs: Dict[str, Union[paddle.Tensor, Any]],
-        num_items_in_batch: Optional[int] = None,
+        num_items_in_batch: Optional[paddle.Tensor] = None,
         scale_value: Optional[float] = None,
     ) -> paddle.Tensor:
         """
@@ -2386,7 +2369,7 @@ class Trainer:
         self,
         model: nn.Layer,
         inputs: Dict[str, Union[paddle.Tensor, Any]],
-        num_items_in_batch: Optional[int] = None,
+        num_items_in_batch: Optional[paddle.Tensor] = None,
         scale_value: Optional[float] = None,
     ) -> paddle.Tensor:
         """
@@ -3686,40 +3669,51 @@ class Trainer:
             num_items_in_batch: number of items in batch
             scale_value: scale value
         """
+        epoch_iterator = iter(epoch_iterator)
+
         batch_samples = []
-        num_items_in_batch = None
-        scale_value = None
-        for _ in range(num_batches):
-            try:
-                batch_samples += [next(epoch_iterator)]
-            except StopIteration:
-                break
 
-        if self.model_accepts_loss_kwargs or self.criterion_accepts_loss_kwargs:
-            if len(batch_samples) > 0 and "labels" in batch_samples[0]:
-                try:
-                    num_items_in_batch = sum([((batch["labels"] != -100)).sum() for batch in batch_samples])
-                except (TypeError, AttributeError):
-                    pass
-
-            if paddle.is_tensor(num_items_in_batch):
-                # NOTE: compute average tokens across devices
-                # divide by world_size and then we don't need to multiply world_size again in loss computation
-                # this implementation is different from Huggingface's transformers
-                if self.args.average_tokens_across_devices and self.args.world_size > 1:
-                    num_items_in_batch = self._nested_gather(num_items_in_batch).sum() / self.args.world_size
-
-                # 0D tensor error
-                if num_items_in_batch.ndim == 0:
-                    num_items_in_batch = num_items_in_batch.unsqueeze(0)
-
-        if num_items_in_batch is None:
-            if self.args.gradient_accumulation_steps > 1:
-                scale_value = self.args.gradient_accumulation_steps
+        while True:
+            batch_samples = []
             num_items_in_batch = None
-        else:
-            if self._enable_delay_scale_loss():
-                scale_value = num_items_in_batch.item()
-                num_items_in_batch = paddle.to_tensor([1], dtype="int64")
+            scale_value = None
+            is_last_batch = False
+            try:
+                for _ in range(num_batches):
+                    sample = next(epoch_iterator)
+                    batch_samples.append(sample)
 
-        return batch_samples, num_items_in_batch, scale_value
+                    if self.model_accepts_loss_kwargs or self.criterion_accepts_loss_kwargs:
+                        if len(batch_samples) > 0 and "labels" in batch_samples[0]:
+                            try:
+                                if num_items_in_batch is None:
+                                    num_items_in_batch = 0
+                                num_items_in_batch += (sample["labels"] != -100).sum()
+                            except (TypeError, AttributeError):
+                                pass
+            except StopIteration:
+                is_last_batch = True
+
+            if batch_samples:
+                if num_items_in_batch is None:
+                    if self.args.gradient_accumulation_steps > 1:
+                        scale_value = float(self.args.gradient_accumulation_steps)
+                else:
+                    # NOTE: compute average tokens across devices
+                    # divide by world_size and then we don't need to multiply world_size again in loss computation
+                    # this implementation is different from Huggingface's transformers
+                    if self.args.average_tokens_across_devices and self.args.world_size > 1:
+                        num_items_in_batch = self._nested_gather(num_items_in_batch).sum() / self.args.world_size
+
+                    # 0D tensor error
+                    if num_items_in_batch.ndim == 0:
+                        num_items_in_batch = num_items_in_batch.unsqueeze(0)
+
+                    if self._enable_delay_scale_loss():
+                        scale_value = num_items_in_batch.item()
+                        num_items_in_batch = paddle.to_tensor([1], dtype="int64")
+
+                yield from [[sample, num_items_in_batch, scale_value] for sample in batch_samples]
+
+            if is_last_batch:
+                break
