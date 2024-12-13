@@ -19,8 +19,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import paddle
-import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
@@ -73,24 +73,34 @@ def seed_guard_context(name=None):
         return contextlib.nullcontext()
 
 
-def parallel_matmul(lm_output, logit_weights, parallel_output):
-    hcg = fleet.get_hybrid_communicate_group()
-    model_parallel_group = hcg.get_model_parallel_group()
-    world_size = hcg.get_model_parallel_world_size()
+def parallel_matmul(x: Tensor, y: Tensor, tensor_parallel_output):
 
-    if world_size > 1:
-        # _c_identity is backwards is reduce
-        input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
+    is_fleet_init = True
+    tensor_parallel_degree = 1
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        model_parallel_group = hcg.get_model_parallel_group()
+        tensor_parallel_degree = hcg.get_model_parallel_world_size()
+    except:
+        is_fleet_init = False
 
-        logits = paddle.matmul(input_parallel, logit_weights, transpose_y=False)
+    if paddle.in_dynamic_mode():
+        y_is_distributed = y.is_distributed
+    else:
+        y_is_distributed = tensor_parallel_degree > 1
 
-        if parallel_output:
+    if is_fleet_init and tensor_parallel_degree > 1 and y_is_distributed:
+        # if not running under distributed.launch, it will raise AttributeError: 'Fleet' object has no attribute '_hcg'
+        input_parallel = paddle.distributed.collective._c_identity(x, group=model_parallel_group)
+        logits = paddle.matmul(input_parallel, y, transpose_y=False)
+
+        if tensor_parallel_output:
             return logits
 
-        # _c_concat has not grad backwards
         return paddle.distributed.collective._c_concat(logits, group=model_parallel_group)
+
     else:
-        logits = paddle.matmul(lm_output, logit_weights, transpose_y=False)
+        logits = paddle.matmul(x, y, transpose_y=False)
         return logits
 
 
@@ -151,16 +161,25 @@ def apply_rotary_pos_emb(x: paddle.Tensor, rope_cache: paddle.Tensor) -> paddle.
     return paddle.concat((x_out2, x_pass.cast(x_out2.dtype)), axis=-1)
 
 
+class LayerNorm(nn.LayerNorm):
+    def __init__(self, config):
+        self.config = config
+        super().__init__(config.hidde_size, epsilon=config.layernorm_epsilon)
+
+
 class RMSNorm(nn.Layer):
-    def __init__(self, hidden_size, config: ChatGLMv2Config, epsilon=None):
+    def __init__(self, config: ChatGLMv2Config):
         super().__init__()
-        self.hidden_size = hidden_size
+        self.hidden_size = config.hidden_size
         self.weight = paddle.create_parameter(
             shape=[self.hidden_size],
             dtype=paddle.get_default_dtype(),
             default_initializer=nn.initializer.Constant(1.0),
         )
-        self.epsilon = 1e-5 if epsilon is None else epsilon
+        self.epsilon = 1e-5 if config.layernorm_epsilon is None else config.layernorm_epsilon
+
+        if config.sequence_parallel:
+            mark_as_sequence_parallel_parameter(self.weight)
 
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.weight)
@@ -519,18 +538,16 @@ class GLMBlock(nn.Layer):
         self.config = config
         self.fp32_residual_connection = config.fp32_residual_connection
 
-        LayerNormFunc = RMSNorm if config.rmsnorm else nn.LayerNorm
+        LayerNormFunc = RMSNorm if config.rmsnorm else LayerNorm
         # Layernorm on the input data.
-        self.input_layernorm = LayerNormFunc(config.hidden_size, epsilon=config.layernorm_epsilon, config=config)
+        self.input_layernorm = LayerNormFunc(config)
 
         # Self attention.
         self.self_attention = SelfAttention(config, layer_number)
         self.hidden_dropout = config.hidden_dropout
 
         # Layernorm on the attention output
-        self.post_attention_layernorm = LayerNormFunc(
-            config.hidden_size, epsilon=config.layernorm_epsilon, config=config
-        )
+        self.post_attention_layernorm = LayerNormFunc(config)
 
         # MLP
         self.mlp = MLP(config)
@@ -617,9 +634,9 @@ class GLMTransformer(nn.Layer):
         self.layers = nn.LayerList([build_layer(i + 1) for i in range(self.num_hidden_layers)])
 
         if self.post_layer_norm:
-            LayerNormFunc = RMSNorm if config.rmsnorm else nn.LayerNorm
+            LayerNormFunc = RMSNorm if config.rmsnorm else LayerNorm
             # Final layer norm before output.
-            self.final_layernorm = LayerNormFunc(config.hidden_size, epsilon=config.layernorm_epsilon, config=config)
+            self.final_layernorm = LayerNormFunc(config)
 
     def _get_layer(self, layer_number):
         return self.layers[layer_number]
@@ -1012,12 +1029,7 @@ class ChatGLMv2Model(ChatGLMv2PretrainedModel):
         else:
             self.rotary_pos_emb = RotaryEmbedding(rotary_dim // 2)
         self.encoder = GLMTransformer(config)
-        if config.tensor_parallel_degree > 1:
-            self.output_layer = nn.Linear(
-                config.hidden_size, config.padded_vocab_size // config.tensor_parallel_degree, bias_attr=False
-            )
-        else:
-            self.output_layer = nn.Linear(config.hidden_size, config.padded_vocab_size, bias_attr=False)
+        self.output_layer = Chatglmv2LMHead(config)
         self.apply(self.init_weights)
 
     def get_input_embeddings(self):
@@ -1138,7 +1150,7 @@ class Chatglmv2LMHead(nn.Layer):
     def __init__(self, config: ChatGLMv2Config, embedding_weights=None):
         super(Chatglmv2LMHead, self).__init__()
         if embedding_weights is not None:
-            self.decoder_weight = embedding_weights
+            self.weight = embedding_weights
         else:
             if config.tensor_parallel_degree > 1:
                 vocab_size = config.vocab_size // config.tensor_parallel_degree
@@ -1147,23 +1159,27 @@ class Chatglmv2LMHead(nn.Layer):
 
             if vocab_size != config.vocab_size:
                 with get_rng_state_tracker().rng_state():
-                    self.decoder_weight = self.create_parameter(
+                    self.weight = self.create_parameter(
                         shape=[config.hidden_size, vocab_size],
                         dtype=paddle.get_default_dtype(),
                     )
             else:
-                self.decoder_weight = self.create_parameter(
+                self.weight = self.create_parameter(
                     shape=[config.hidden_size, vocab_size], dtype=paddle.get_default_dtype()
                 )
+            # Must set distributed attr for Tensor Parallel !
+            self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
+            if self.weight.is_distributed:
+                self.weight.split_axis = 1
         self.config = config
 
-    def forward(self, hidden_states, return_last_logit=False):
-        if return_last_logit:
-            hidden_states = hidden_states[-1:]
+    def forward(self, hidden_states):
         if self.config.sequence_parallel:
             hidden_states = GatherOp.apply(hidden_states)
             hidden_states = paddle.reshape_(hidden_states, [self.config.seq_length, -1, self.config.hidden_size])
-        logits = parallel_matmul(hidden_states, self.decoder_weight, self.config.tensor_parallel_output)
+
+        logits = parallel_matmul(hidden_states, self.weight, self.config.tensor_parallel_output)
+        # shape = [batch_size, seq_length, vocab_size]
         return logits.transpose([1, 0, 2])
 
 
@@ -1265,20 +1281,8 @@ class ChatGLMv2ForCausalLM(ChatGLMv2PretrainedModel):
 
         hidden_states = transformer_outputs[0]
 
-        if self.config.sequence_parallel:
-            hidden_states = GatherOp.apply(hidden_states)
-            seq_length = self.config.seq_length
-            hidden_states = hidden_states.reshape([seq_length, -1, self.config.hidden_size])
-        if return_last_logit:
-            hidden_states = hidden_states[-1:]
-        if self.config.tensor_parallel_degree > 1:
-            lm_logits = parallel_matmul(
-                hidden_states, self.chatglm_v2.output_layer.weight, self.config.tensor_parallel_output
-            )
-        else:
-            lm_logits = self.chatglm_v2.output_layer(hidden_states)
-        lm_logits = lm_logits.transpose([1, 0, 2])
         # shape = [batch_size, seq_length, vocab_size]
+        lm_logits = self.chatglm_v2.output_layer(hidden_states)
         loss = None
         if labels is not None:
             loss = self.criterion(lm_logits, labels)
