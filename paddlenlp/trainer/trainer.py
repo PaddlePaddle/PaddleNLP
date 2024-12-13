@@ -973,7 +973,7 @@ class Trainer:
         self.state.num_train_epochs = num_train_epochs
         self.state.is_local_process_zero = self.is_local_process_zero()
         self.state.is_world_process_zero = self.is_world_process_zero()
-        self.state.trained_samples = 0
+        self.state.consumed_samples = 0
 
         self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
 
@@ -1049,9 +1049,10 @@ class Trainer:
                         self._skip_steps_since_last_logged += 1
 
                         self.state.epoch = epoch + (step + 1) / steps_in_epoch
-                        self.state.trained_samples = (
-                            (epoch * steps_in_epoch + step + 1)
+                        self.state.consumed_samples = (
+                            self.state.global_step
                             * args.per_device_train_batch_size
+                            * args.gradient_accumulation_steps
                             * args.dataset_world_size
                         )
 
@@ -1236,9 +1237,10 @@ class Trainer:
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
-                    self.state.trained_samples = (
-                        (epoch * steps_in_epoch + step + 1)
+                    self.state.consumed_samples = (
+                        self.state.global_step
                         * args.per_device_train_batch_size
+                        * args.gradient_accumulation_steps
                         * args.dataset_world_size
                     )
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
