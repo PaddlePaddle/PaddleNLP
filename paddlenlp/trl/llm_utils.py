@@ -610,7 +610,7 @@ def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Q
     from paddlenlp_ops import get_output
 
     while True:
-        get_output(output_tensor, 0, True, False)  # wait_flag  # speculative_decoding
+        get_output(output_tensor, 0, True)
         if int(output_tensor[0, 0]) == -2:  # read none
             continue
         bsz = int(output_tensor[1, 0])
@@ -632,26 +632,31 @@ def speculate_read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_q
     paddle.device.set_device("cpu")
     paddle.disable_static()
     outputs = []
-    from paddlenlp.utils.env import MAX_BSZ, MAX_DRAFT_TOKENS
+    from paddlenlp.utils.env import MAX_DRAFT_TOKENS, SPECULATE_MAX_BSZ
 
-    for _ in range(MAX_BSZ):
+    for _ in range(SPECULATE_MAX_BSZ):
         outputs.append([])
     output_tensor = tensor_queue.get(timeout=1)
     done_event.set()
     logger.info("Start speculate read result message")
     logger.info(f"Current path is {os.getcwd()}")
 
-    from paddlenlp_ops import get_output
+    from paddlenlp_ops import speculate_get_output
 
     while True:
-        get_output(output_tensor, 0, True, True)  # wait_flag  # speculative_decoding
+        speculate_get_output(output_tensor, 0, True)
         if int(output_tensor[0, 0]) == -2:  # read none
             continue
         bsz = int(output_tensor[1])
         accept_num = output_tensor[2 : bsz + 2].numpy()
         for bi in range(bsz):
             output_numpy = output_tensor[
-                2 + MAX_BSZ + bi * MAX_DRAFT_TOKENS : 2 + MAX_BSZ + bi * MAX_DRAFT_TOKENS + int(accept_num[bi]),
+                2
+                + SPECULATE_MAX_BSZ
+                + bi * MAX_DRAFT_TOKENS : 2
+                + SPECULATE_MAX_BSZ
+                + bi * MAX_DRAFT_TOKENS
+                + int(accept_num[bi]),
                 0,
             ].numpy()
             output_numpy[output_numpy == -1] = tokenizer.eos_token_id

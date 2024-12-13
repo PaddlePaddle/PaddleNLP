@@ -1120,12 +1120,17 @@ class Trainer:
                 if dp_master_grad:
                     is_no_sync = True
 
-                if is_no_sync:
-                    # Avoid unnecessary DDP synchronization since there will be no backward pass on this example.
-                    with model.no_sync():
-                        tr_loss_step = self.training_step(model, inputs, num_items_in_batch, scale_value)
-                else:
-                    tr_loss_step = self.training_step(model, inputs, num_items_in_batch, scale_value)
+                sync_context = model.no_sync() if is_no_sync else contextlib.nullcontext()
+                training_kwargs = {}
+                training_step_parameters = inspect.signature(self.training_step).parameters
+                if "step_control" in training_step_parameters:
+                    training_kwargs["step_control"] = step_control
+                if "num_items_in_batch" in training_step_parameters:
+                    training_kwargs["num_items_in_batch"] = num_items_in_batch
+                if "scale_value" in training_step_parameters:
+                    training_kwargs["scale_value"] = scale_value
+                with sync_context:
+                    tr_loss_step = self.training_step(model, inputs, **training_kwargs)
 
                 tr_loss += tr_loss_step
 
@@ -1167,7 +1172,10 @@ class Trainer:
                         fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     # Pipeline parallel mode,  handle gradient reduce here to overlap
-                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in args.pipeline_parallel_config
+                    enable_dp_comm_overlap = (
+                        self.args.pipeline_parallel_degree > 1
+                        and "enable_dp_comm_overlap" in args.pipeline_parallel_config
+                    )
 
                     enable_release_grads = False
                     if args.sharding_parallel_degree > 1:
@@ -1622,7 +1630,6 @@ class Trainer:
     def _get_eval_sampler(self, eval_dataset: Dataset):
         if eval_dataset is None or not has_length(eval_dataset):
             return None
-
         if self.args.world_size <= 1:
             return paddle.io.BatchSampler(
                 eval_dataset,
@@ -1631,14 +1638,28 @@ class Trainer:
                 drop_last=False,
             )
         else:
-            return DistributedBatchSampler(
-                eval_dataset,
-                num_replicas=self.args.dataset_world_size,
-                rank=self.args.dataset_rank,
-                batch_size=self.args.per_device_eval_batch_size,
-                shuffle=False,
-                drop_last=False,
-            )
+            if self.args.pipeline_parallel_degree > 1:
+                # In pipeline parallelism, batch size will be strictly checked
+                # Use LastBatchPaddingSampler to pad the last batch with the first batch
+                from .trainer_utils import LastBatchPaddingSampler
+
+                return LastBatchPaddingSampler(
+                    eval_dataset,
+                    num_replicas=self.args.dataset_world_size,
+                    rank=self.args.dataset_rank,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    shuffle=False,
+                    drop_last=False,
+                )
+            else:
+                return DistributedBatchSampler(
+                    eval_dataset,
+                    num_replicas=self.args.dataset_world_size,
+                    rank=self.args.dataset_rank,
+                    batch_size=self.args.per_device_eval_batch_size,
+                    shuffle=False,
+                    drop_last=False,
+                )
 
     def get_eval_dataloader(self, eval_dataset: Optional[Dataset] = None) -> DataLoader:
         """
@@ -1667,7 +1688,9 @@ class Trainer:
 
         additional_configs = {}
         if is_iterable_dataset:
-            if self.args.dataset_world_size > 1 and eval_dataset is not None:
+            if (
+                self.args.dataset_world_size > 1 or self.args.pipeline_parallel_degree > 1
+            ) and eval_dataset is not None:
                 eval_dataset = IterableDatasetShard(
                     eval_dataset,
                     batch_size=self.args.per_device_eval_batch_size,
@@ -2324,6 +2347,7 @@ class Trainer:
         self,
         model: nn.Layer,
         inputs: Dict[str, Union[paddle.Tensor, Any]],
+        step_control=0,
         num_items_in_batch: Optional[paddle.Tensor] = None,
         scale_value: Optional[float] = None,
     ) -> paddle.Tensor:
@@ -3376,14 +3400,6 @@ class Trainer:
             else:
                 labels = None
             inputs = inputs.pop("input_ids")
-        # consider no drop_last case
-        model_config_backup = model.micro_batch_size, model.accumulate_steps
-        if isinstance(inputs, tuple):
-            actual_batch_size = inputs[0].shape[0]
-        else:
-            actual_batch_size = inputs.shape[0]
-        model.micro_batch_size = 1
-        model.accumulate_steps = actual_batch_size
         # train & eval share the same p2p_helper, so clear it before and after each step
         model._p2p_helper.clear_meta_cache()
 
@@ -3395,7 +3411,6 @@ class Trainer:
                 loss = loss.mean().detach()
             else:
                 raise ValueError("pipeline mode eval need label!")
-        model.micro_batch_size, model.accumulate_steps = model_config_backup
         # train & eval share the same p2p_helper, so clear it before and after each step
         model._p2p_helper.clear_meta_cache()
 
