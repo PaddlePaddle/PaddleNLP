@@ -18,7 +18,7 @@ python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     run_pretrain.py \
     --unified_checkpoint 1 \
-    --unified_checkpoint_config "enable_all_options"
+    --unified_checkpoint_config "async_save"
 ```
 
 - **总开关**
@@ -167,7 +167,7 @@ python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     run_pretrain.py \
     --unified_checkpoint 1 \
-    --unified_checkpoint_config "enable_all_options remove_master_weight"
+    --unified_checkpoint_config "async_save remove_master_weight"
     --ckpt_quant_stage O2
 ```
 
