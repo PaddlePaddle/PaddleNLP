@@ -64,27 +64,24 @@ function restore_func() {
         rm "functions.txt"
         echo "Deleted existing functions.txt"
     fi
-    for function in ${fun_list[@]};do
-        echo "$function" >> functions.txt
-    done
-}
-
-function executable_fun_list() {
-    fun_list_origin=$1
-    fun_list=()
-    if [ ! -f "$root_path/blacklist.csv" ];then
-        wget -P $root_path/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
+    if [ -e "blacklist.csv" ]; then
+        rm "blacklist.csv"
+        # wget blacklist
+        wget -P ${log_path}/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
+        echo "Deleted existing blacklist.csv and wget new blacklist.csv"
     fi
-    blacklist_file=$root_path/blacklist.csv
+    blacklist_file=./blacklist.csv
     declare -A blacklist_map
     while IFS= read -r blacklist_item; do
         blacklist_item=$(echo "$blacklist_item" | xargs)
         blacklist_map["$blacklist_item"]=true
     done < "$blacklist_file"
-    echo $blacklist_map
-    for item in "${fun_list_origin[@]}"; do
+    echo "blacklist: $blacklist_map"
+    for function in ${fun_list[@]};do
         if [[ -z "${blacklist_map[$item]}" ]]; then
-            fun_list+=("$item")
+            echo "$function" >> functions.txt
+        else
+            echo "skip blacklist case: $function"
         fi
     done
 }
@@ -116,7 +113,6 @@ function gpt_case_list_dygraph() {
         gpt_eval_WikiText
         gpt_eval_LAMBADA
     )
-    executable_fun_list $fun_list_origin
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
@@ -136,7 +132,6 @@ function llm_gpt_case_list_dygraph() {
         # be used for tracking the execution status of the case.
         llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1
     )
-    executable_fun_list $fun_list_origin
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
     elif [ $1 = "exec_case" ]; then
