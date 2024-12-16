@@ -38,9 +38,31 @@ class TestMergeModel(unittest.TestCase):
             )
             mergekit = MergeModel(merge_config)
             mergekit.merge_model()
+
+            # test mix with base model
+            merge_config = MergeConfig(
+                merge_method=merge_method,
+                model_path_list=[safe_path, pd_path],
+                output_path=tempdir,
+                base_model_path=safe_path,
+            )
+            mergekit = MergeModel(merge_config)
+            mergekit.merge_model()
+
             # test safetensor only
             merge_config = MergeConfig(
                 merge_method=merge_method, model_path_list=[safe_path, safe_path], output_path=tempdir, n_process=2
+            )
+            mergekit = MergeModel(merge_config)
+            mergekit.merge_model()
+
+            # test safetensor only with base model
+            merge_config = MergeConfig(
+                merge_method=merge_method,
+                model_path_list=[safe_path, safe_path],
+                output_path=tempdir,
+                n_process=2,
+                base_model_path=safe_path,
             )
             mergekit = MergeModel(merge_config)
             mergekit.merge_model()

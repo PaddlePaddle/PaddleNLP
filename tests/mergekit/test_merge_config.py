@@ -22,9 +22,12 @@ class TestMergeConfig(unittest.TestCase):
     def test_save_load(self):
         with TemporaryDirectory() as tempdir:
             merge_config = MergeConfig()
+            merge_config.to_dict()
             merge_config.save_pretrained(tempdir)
             loaded_merge_config = MergeConfig.from_pretrained(tempdir)
             self.assertEqual(merge_config, loaded_merge_config)
+            with self.assertRaises(ValueError):
+                MergeConfig.from_pretrained("./rand")
 
     def test_raise_exception(self):
         with self.assertRaises(ValueError):

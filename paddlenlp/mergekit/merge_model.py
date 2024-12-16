@@ -313,7 +313,9 @@ class MergeModel:
         elif os.path.exists(os.path.join(model_path, self.weight_name())):
             file_type = "pdparams"
         else:
-            raise ValueError(f"Please check path {model_path} is correct.")
+            raise ValueError(
+                f"Please check path {model_path} is correct. Support safetensors and pdparams in complete parameter format (not TP or PP format) only."
+            )
         return file_type
 
     def weight_name(self):
