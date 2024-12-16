@@ -165,6 +165,7 @@ class LoRAModel(nn.Layer):
         self.forward = self.model.forward
         if lora_config.loraga:
             self.loraga_init_dict = {}
+            self.reinit_base_model = False
 
         logger.info("Mark only lora and trainable_module as trainable.")
         self.mark_only_lora_as_trainable()
@@ -349,11 +350,11 @@ class LoRAModel(nn.Layer):
                     )
 
                     base_name = name.replace("lora_A", "weight")
-
-                    # Reinit base model
-                    offset = init_loraA.cuda() @ init_loraB.cuda()
-                    ori_weight = model_state_dict[base_name]
-                    model_state_dict[base_name].set_value(ori_weight - self.lora_config.scaling * offset)
+                    if not self.reinit_base_model:
+                        # Reinit base model
+                        offset = init_loraA.cuda() @ init_loraB.cuda()
+                        ori_weight = model_state_dict[base_name]
+                        model_state_dict[base_name].set_value(ori_weight - self.lora_config.scaling * offset)
         del model_state_dict
         gc.collect()
         self.model.set_state_dict(state_dict)

@@ -74,10 +74,9 @@ class LoRAGATrainer(Trainer):
         ):
             for batch in dataloader:
                 iters += 1
-                batch = {k: paddle.to_tensor(v) for k, v in batch.items()}
-
                 # Pipeline parallel not supported currently
-                loss, logits = model(**batch)
+                with paddle.amp.auto_cast(enable=True, custom_black_list=self.args.amp_custom_black_list):
+                    loss, logits = model(**batch)
                 loss.backward()
 
                 if iters == self.loraga_init_iters:
@@ -160,13 +159,21 @@ def get_module_gradient(
     rank_suffix = "_" + str(local_rank)
     local_grad_name = ".".join(grad_name.split(".")[1:]) + ".weight" + rank_suffix
     gradient = gradient_dict.pop(local_grad_name).cuda()
+
+    is_fleet_init = True
+    try:
+        hcg = fleet.get_hybrid_communicate_group()
+        model_parallel_group = hcg.get_model_parallel_group()
+        sharding_parallel_group = hcg.get_sharding_parallel_group()
+        data_parallel_group = hcg.get_data_parallel_group()
+    except:
+        is_fleet_init = False
+
     if tp_degree > 1:
         # remove prefix and suffix in name
         model_split_key = local_grad_name.split(base_model_prefix)[-1].rsplit(rank_suffix, 1)[0]
         if model_split_key in base_model_split_mappings:
             merge_func = base_model_split_mappings[model_split_key]
-            hcg = fleet.get_hybrid_communicate_group()
-            model_parallel_group = hcg.get_model_parallel_group()
             output_tensors = []
             dist.all_gather(output_tensors, gradient, group=model_parallel_group)
 
@@ -175,18 +182,17 @@ def get_module_gradient(
 
     # sharding
     if sharding_degree > 1:
-        hcg = fleet.get_hybrid_communicate_group()
-        sharding_parallel_group = hcg.get_sharding_parallel_group()
         if sharding_parallel_group.nranks > 1:
-
             dist.all_reduce(gradient, op=dist.ReduceOp.SUM, group=sharding_parallel_group)
             gradient /= sharding_parallel_group.nranks
+
     # dp
     if dp_degree > 1:
-        hcg = fleet.get_hybrid_communicate_group()
-        data_parallel_group = hcg.get_data_parallel_group()
         if data_parallel_group.nranks > 1:
-            dist.all_reduce(gradient, op=dist.ReduceOp.SUM, group=data_parallel_group)
+            if is_fleet_init:
+                dist.all_reduce(gradient, op=dist.ReduceOp.SUM, group=data_parallel_group)
+            else:
+                dist.all_reduce(gradient, op=dist.ReduceOp.SUM)
             gradient /= data_parallel_group.nranks
     return gradient
 
@@ -250,6 +256,7 @@ def loraga_svd_reinit(
                 lora_split_mapping,
                 **kwargs,
             )
+    model.reinit_base_model = True
     model.loraga_init_dict = loraga_init_dict
 
 
