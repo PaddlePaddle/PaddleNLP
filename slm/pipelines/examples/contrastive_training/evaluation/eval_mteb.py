@@ -14,71 +14,63 @@
 
 import argparse
 import logging
+import sys
 
 import mteb
 import paddle
-from evaluation.mteb.mteb_models_nv import NVEncodeModel
+from models.modeling import BiEncoderModel
+from models.modeling_nv import NVEncodeModel
 from mteb import MTEB
-from mteb_models import EncodeModel
 
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.transformers import AutoModel, AutoModelForCausalLM, AutoTokenizer
 
 
-def get_model(peft_model_name, base_model_name):
-    if peft_model_name is not None:
-        base_model = AutoModelForCausalLM.from_pretrained(base_model_name, dtype="bfloat16")
-        lora_config = LoRAConfig.from_pretrained(peft_model_name)
-        lora_config.merge_weights = True
-        lora_weights = paddle.load(peft_model_name + "/lora_model_state.pdparams")
-        k = list(lora_weights.keys())[0]
-        assert k.startswith(
-            "llama."
-        ), "You Must Manually Replace 'model' to 'llama'. Please Refer to do_replace_model_llama.py"
-        model = LoRAModel.from_pretrained(base_model, peft_model_name, lora_config=lora_config, dtype="bfloat16")
-        return model
-    else:
-        base_model = AutoModel.from_pretrained(base_model_name)
-        return base_model
+class MTEB_EvalModel:
+    def __init__(self, model, tokenizer):
+        self.model = model
+        self.tokenizer = tokenizer
+
+    def encode_queries(self, queries, **kwargs):
+        return self.model.encode_queries(queries)
+
+    def encode_corpus(self, corpus, **kwargs):
+        return self.model.encode_corpus(corpus)
 
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base_model_name_or_path", default="bge-large-en-v1.5", type=str)
+    parser.add_argument("--base_model_name_or_path", type=str)
     parser.add_argument("--peft_model_name_or_path", default=None, type=str)
     parser.add_argument("--output_folder", default="tmp", type=str)
 
     parser.add_argument("--task_name", default="SciFact", type=str)
     parser.add_argument(
-        "--task_split",
-        default="test",
-        help='Note that some datasets do not have "test", they only have "dev"',
-        type=str,
-    )
+        "--task_split", default="test", type=str
+    )  # some datasets do not have "test", they only have "dev"
 
-    parser.add_argument("--query_instruction", default=None, help="add prefix instruction before query", type=str)
-    parser.add_argument(
-        "--document_instruction", default=None, help="add prefix instruction before document", type=str
-    )
+    parser.add_argument("--query_instruction", default="query: ", type=str)
+    parser.add_argument("--document_instruction", default="document: ", type=str)
 
-    parser.add_argument("--pooling_method", default="last", help="choose in [mean, last, cls]", type=str)
-    parser.add_argument("--max_seq_length", default=512, type=int)
+    parser.add_argument("--pooling_method", default="last", type=str)  # mean, last, cls
+    parser.add_argument("--max_seq_length", default=4096, type=int)
     parser.add_argument("--eval_batch_size", default=1, type=int)
 
-    parser.add_argument("--pad_token", default="unk_token", help="unk_token, eos_token or pad_token", type=str)
-    parser.add_argument("--padding_side", default="left", help="right or left", type=str)
-    parser.add_argument("--add_bos_token", default=0, help="1 means add token", type=int)
-    parser.add_argument("--add_eos_token", default=1, help="1 means add token", type=int)
+    parser.add_argument("--pad_token", default="unk_token", type=str)  # unk_token, eos_token
+    parser.add_argument("--padding_side", default="left", type=str)  # right, left
+    parser.add_argument("--add_bos_token", default=0, type=int)
+    parser.add_argument("--add_eos_token", default=1, type=int)
 
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = get_args()
+    for k, v in vars(args).items():
+        print(f"{k}: {v}")
 
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO)
-    logger.info("Args: {}".format(args))
 
     if "NV-Embed" in args.base_model_name_or_path:
         logger.info("Using NV-Embed")
@@ -94,14 +86,22 @@ if __name__ == "__main__":
             args.base_model_name_or_path,
             tokenizer_path=args.base_model_name_or_path,
             eval_batch_size=args.eval_batch_size,
+            max_seq_length=args.max_seq_length,
             query_instruction=query_prefix,
             document_instruction=passage_prefix,
-            dtype="float16",
+            dtype="bfloat16" if args.peft_model_name_or_path else "float16",
         )
-        encode_model.eval()
+
+        if args.peft_model_name_or_path is not None:
+            lora_config = LoRAConfig.from_pretrained(args.peft_model_name_or_path)
+            lora_config.merge_weights = True
+            encode_model = LoRAModel.from_pretrained(
+                encode_model, args.peft_model_name_or_path, lora_config=lora_config, dtype="bfloat16"
+            )
+        tokenizer = encode_model.tokenizer
 
     else:
-        model = get_model(args.peft_model_name_or_path, args.base_model_name_or_path)
+        logger.info("Using Normal AutoModel")
 
         assert args.add_bos_token in [0, 1], f"add_bos_token should be either 0 or 1, but got {args.add_bos_token}"
         assert args.add_eos_token in [0, 1], f"add_eos_token should be either 0 or 1, but got {args.add_eos_token}"
@@ -120,15 +120,28 @@ if __name__ == "__main__":
         tokenizer.add_bos_token = bool(args.add_bos_token)
         tokenizer.add_eos_token = bool(args.add_eos_token)
 
-        encode_model = EncodeModel(
-            model=model,
+        encode_model = BiEncoderModel(
+            model_name_or_path=args.base_model_name_or_path,
+            normalized=True,
+            sentence_pooling_method=args.pooling_method,
             tokenizer=tokenizer,
-            pooling_method=args.pooling_method,
-            query_instruction=args.query_instruction,
-            document_instruction=args.document_instruction,
             eval_batch_size=args.eval_batch_size,
             max_seq_length=args.max_seq_length,
         )
+
+        if args.peft_model_name_or_path:
+            lora_config = LoRAConfig.from_pretrained(args.peft_model_name_or_path)
+            lora_config.merge_weights = True
+            encode_model.config = (
+                encode_model.model_config
+            )  # for NV-Embed, this is no needed, but for repllama, this is needed
+            encode_model.config.tensor_parallel_degree = 1
+            encode_model = LoRAModel.from_pretrained(
+                encode_model, args.peft_model_name_or_path, lora_config=lora_config, dtype=lora_config.dtype
+            )
+
+    encode_model.eval()
+    mtb_eval_model = MTEB_EvalModel(encode_model, tokenizer)
 
     logger.info("Ready to eval")
     evaluation = MTEB(tasks=mteb.get_tasks(tasks=[args.task_name]))

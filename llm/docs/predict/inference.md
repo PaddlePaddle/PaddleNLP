@@ -27,9 +27,8 @@ PaddleNLP大模型推理提供压缩、推理、服务全流程体验 ：
 PaddleNLP 中已经添加高性能推理模型相关实现，已验证过的模型如下：
 | Models | Example Models |
 |--------|----------------|
-|Llama 3.1, Llama 3, Llama 2|`meta-llama/Meta-Llama-3.1-8B`, `meta-llama/Meta-Llama-3.1-8B-Instruct`, `meta-llama/Meta-Llama-3.1-405B`, `meta-llama/Meta-Llama-3.1-405B-Instruct`,`meta-llama/Meta-Llama-3-8B`, `meta-llama/Meta-Llama-3-8B-Instruct`, `meta-llama/Meta-Llama-3-70B`, `meta-llama/Meta-Llama-3-70B-Instruct`, `meta-llama/Llama-Guard-3-8B`, `Llama-2-7b, meta-llama/Llama-2-7b-chat`, `meta-llama/Llama-2-13b`, `meta-llama/Llama-2-13b-chat`, `meta-llama/Llama-2-70b`, `meta-llama/Llama-2-70b-chat`|
-|Qwen 2| `Qwen/Qwen2-0.5B`, `Qwen/Qwen2-0.5B-Instruct`, `Qwen/Qwen2-1.5B`, `Qwen/Qwen2-1.5B-Instruct`, `Qwen/Qwen2-7B`, `Qwen/Qwen2-7B-Instruct`, `Qwen/Qwen2-72B`, `Qwen/Qwen2-72B-Instruct`, `Qwen/Qwen2-57B-A14B`, `Qwen/Qwen2-57B-A14B-Instruct`, `Qwen/Qwen2-Math-1.5B-Instruct`|
-|Qwen 2.5| `Qwen/Qwen2.5-7B-Instruct`, `Qwen/Qwen2.5-14B-Instruct`, `Qwen/Qwen2.5-Math-1.5B-Instruct`, `Qwen/Qwen2.5-Coder-1.5B-Instruct`|
+|Llama 3.x, Llama 2|`meta-llama/Llama-3.2-3B-Instruct`, `meta-llama/Meta-Llama-3.1-8B`, `meta-llama/Meta-Llama-3.1-8B-Instruct`, `meta-llama/Meta-Llama-3.1-405B`, `meta-llama/Meta-Llama-3.1-405B-Instruct`,`meta-llama/Meta-Llama-3-8B`, `meta-llama/Meta-Llama-3-8B-Instruct`, `meta-llama/Meta-Llama-3-70B`, `meta-llama/Meta-Llama-3-70B-Instruct`, `meta-llama/Llama-Guard-3-8B`, `Llama-2-7b, meta-llama/Llama-2-7b-chat`, `meta-llama/Llama-2-13b`, `meta-llama/Llama-2-13b-chat`, `meta-llama/Llama-2-70b`, `meta-llama/Llama-2-70b-chat`|
+|Qwen 2.x|`Qwen/Qwen2-1.5B`, `Qwen/Qwen2-1.5B-Instruct`, `Qwen/Qwen2-7B`, `Qwen/Qwen2-7B-Instruct`, `Qwen/Qwen2-72B`, `Qwen/Qwen2-72B-Instruct`, `Qwen/Qwen2-57B-A14B`, `Qwen/Qwen2-57B-A14B-Instruct`, `Qwen/Qwen2-Math-1.5B-Instruct`, `Qwen/Qwen2.5-7B-Instruct`, `Qwen/Qwen2.5-14B-Instruct`, `Qwen/Qwen2.5-Math-1.5B-Instruct`, `Qwen/Qwen2.5-Coder-1.5B-Instruct`, `Qwen/Qwen2.5-32B-Instruct`, `Qwen/Qwen2.5-72B-Instruct`|
 |Qwen-MoE| `Qwen/Qwen1.5-MoE-A2.7B`, `Qwen/Qwen1.5-MoE-A2.7B-Chat`, `Qwen/Qwen2-57B-A14B`, `Qwen/Qwen2-57B-A14B-Instruct`|
 |Mixtral| `mistralai/Mixtral-8x7B-Instruct-v0.1`, `mistralai/Mixtral-8x22B-Instruct-v0.1`|
 |ChatGLM 3, ChatGLM 2| `THUDM/chatglm3-6b`, `THUDM/chatglm2-6b`|

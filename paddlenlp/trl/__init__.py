@@ -14,6 +14,7 @@
 
 from .dpo_criterion import DPOCriterion
 from .dpo_trainer import DPOTrainer
+from .embedding_trainer import EmbeddingTrainer
 from .kto_criterion import KTOCriterion
 from .kto_trainer import KTOTrainer
 from .model_config import *

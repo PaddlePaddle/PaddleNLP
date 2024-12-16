@@ -279,6 +279,7 @@ class DPOTrainer(Trainer):
         """
         prediction_step function for pipeline parallel mode.
         """
+        model._p2p_helper.clear_meta_cache()
         concatenated_inputs = {}
         # consider no drop last
         per_device_train_batch_size = self.args.per_device_train_batch_size
@@ -349,6 +350,7 @@ class DPOTrainer(Trainer):
         )
         self.log_metric(**metric_inputs)
         self.reset_dpo_infohub()
+        model._p2p_helper.clear_meta_cache()
         return (loss, None, None)
 
     def log_metric(

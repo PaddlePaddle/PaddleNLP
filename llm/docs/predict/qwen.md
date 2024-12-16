@@ -21,6 +21,11 @@
 |Qwen/Qwen2-7B-Instruct|
 |Qwen/Qwen1.5-MoE-A2.7B-Chat|
 |Qwen/Qwen2-57B-A14B-Instruct|
+|Qwen/Qwen2.5-1.5B-Instruct|
+|Qwen/Qwen2.5-7B-Instruct|
+|Qwen/Qwen2.5-14B-Instruct|
+|Qwen/Qwen2.5-32B-Instruct|
+|Qwen/Qwen2.5-72B-Instruct|
 
 ## 已验证的预量化模型
 

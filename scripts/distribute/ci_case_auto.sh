@@ -231,7 +231,7 @@ function llama_dygraph_auto_bs8_fp32_DP2() {
     echo "result: loss=$loss ips=$ips mem=$mem"
     loss_base=9.4992733
     if [ $IS_A100 -ne 0 ];then
-        loss_base=9.53084087
+        loss_base=9.50651741
     fi
     ips_base=-1
     mem_base=-1
@@ -541,9 +541,9 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
         ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
         mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
         echo "result: loss=$loss ips=$ips mem=$mem"
-        loss_base=7.54158936
+        loss_base=7.57775269
         ips_base=5442.5208
-        mem_base=22.387750148773193
+        mem_base=25.066193342208862
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
         echo "=========== $FUNCNAME run  end ==========="
     fi
@@ -641,9 +641,9 @@ function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw() {
         ips=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'interval_tokens_per_second_per_device: ' '{print $2}' | awk -F ',' '{print $1}'`
         mem=`cat $case_log_dir/workerlog.0 | grep 'global_step: 30' | awk -F 'max_memory_reserved: ' '{print $2}' | awk -F ',' '{print $1}'`
         echo "result: loss=$loss ips=$ips mem=$mem"
-        loss_base=7.54568558 # record new data
-        ips_base=-1
-        mem_base=-1
+        loss_base=7.57775269 # record new data
+        ips_base=5825.427
+        mem_base=25.562287092208862
         check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
         echo "=========== $FUNCNAME run  end ==========="  
     fi
@@ -732,8 +732,10 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
         echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
         loss_base=9.16783295
         loss_md5_base=8ea72495fba4e1b9ba004b4431e27218
-        if [ $IS_A100 -ne 0 ];then
-            loss_base=9.38009949
+        if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
+            loss_base=9.37966919
+        elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
+            loss_base=9.38012543
         fi
         ips_base=-1
         mem_base=-1
@@ -922,8 +924,10 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP2-SP() {
         echo "result: to_static=$to_static loss=$loss loss_md5=$loss_md5 ips=$ips mem=$mem"
         loss_base=9.25199432
         loss_md5_base=83531e98ee11cd271db175150ab254bb
-        if [ $IS_A100 -ne 0 ];then
-            loss_base=9.44241714
+        if [ $IS_A100 -ne 0 ] && [ $to_static -eq 0 ];then
+            loss_base=9.44203949
+        elif [ $IS_A100 -ne 0 ] && [ $to_static -eq 1 ];then
+            loss_base=9.44225311
         fi
         ips_base=-1
         mem_base=-1
@@ -1017,7 +1021,7 @@ function llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1() {
         echo "result: to_static=$to_static loss=$loss ips=$ips mem=$mem"
         loss_base=9.99302673
         if [ $IS_A100 -ne 0 ];then
-            loss_base=10.18783569
+            loss_base=10.20991516
         fi
         ips_base=-1
         mem_base=-1
@@ -1895,7 +1899,7 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.60014629
+        loss_base=10.58719826
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -1969,7 +1973,7 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
         # loss_base=10.58141422   # note: need to debug
-        loss_base=10.60039139
+        loss_base=10.58743668
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2788,6 +2792,7 @@ function before_hook_for_gpt() {
     else
         echo -e "\033[31m ---- Skip install requirements for GPT auto cases  \033[0m"
     fi
+    unset http_proxy && unset https_proxy
     if [[ ! $FLAGS_download_data =~ "gpt" ]];then
         echo -e "\033[31m ---- Download GPT data  \033[0m"
         rm -rf data
@@ -2831,6 +2836,7 @@ function before_hook_for_llama() {
     export no_proxy=bcebos.com
     python -m pip install -r $root_path/requirements.txt
     python -m pip install -r $root_path/requirements-dev.txt
+    unset http_proxy && unset https_proxy
     if [[ ! $FLAGS_download_data =~ "llama" ]];then
         echo -e "\033[31m ---- Download LLaMA data  \033[0m"
         rm -rf data

@@ -35,6 +35,7 @@ from paddlenlp.experimental.transformers.utils import infererence_model_from_pre
 from paddlenlp.transformers import ChatGLMv2Config, ChatGLMv2PretrainedModel
 from paddlenlp.transformers.chatglm_v2.modeling import (
     Embedding,
+    LayerNorm,
     RMSNorm,
     RotaryEmbedding,
 )
@@ -182,9 +183,9 @@ class ChatGLMv2InferenceModel(ChatGLMv2PretrainedModel):
 
         self.post_layer_norm = config.post_layer_norm
         if self.post_layer_norm:
-            LayerNormFunc = RMSNorm if config.rmsnorm else nn.LayerNorm
+            LayerNormFunc = RMSNorm if config.rmsnorm else LayerNorm
             # Final layer norm before output.
-            self.final_layernorm = LayerNormFunc(config.hidden_size, epsilon=config.layernorm_epsilon, config=config)
+            self.final_layernorm = LayerNormFunc(config)
 
     def set_transformer_block(self, transformer_config):
         if self.use_weight_only:
