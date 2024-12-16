@@ -87,7 +87,7 @@ function restore_func() {
 }
 
 function gpt_case_list_dygraph() {
-    fun_list_origin=(
+    fun_list=(
         # The test name must have "gpt_" as a prefix, which will 
         # be used for tracking the execution status of the case.
         gpt_preprocess_data
@@ -127,7 +127,7 @@ function gpt_case_list_dygraph() {
 }
 
 function llm_gpt_case_list_dygraph() {
-    fun_list_origin=(
+    fun_list=(
         # The test name must have "llm_gpt_" as a prefix, which will 
         # be used for tracking the execution status of the case.
         llm_gpt_recompute_bs32_bf16_MP2-SD4-stage1
