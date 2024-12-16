@@ -75,24 +75,22 @@ function restore_func() {
         rm "functions.txt"
         echo "Deleted existing functions.txt"
     fi
-    if [ -e "blacklist.csv" ]; then
-        rm "blacklist.csv"
-        # wget blacklist
+    if [ ! -f "${log_path}/blacklist.csv" ]; then
         wget -P ${log_path}/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
-        echo "Deleted existing blacklist.csv and wget new blacklist.csv"
+        echo "\033 ---- wget blacklist.csv \033"
     fi
-    blacklist_file=./blacklist.csv
+    blacklist_file=${log_path}/blacklist.csv
     declare -A blacklist_map
     while IFS= read -r blacklist_item; do
         blacklist_item=$(echo "$blacklist_item" | xargs)
         blacklist_map["$blacklist_item"]=true
     done < "$blacklist_file"
-    echo "blacklist: $blacklist_map"
+    echo "\033 ---- blacklist: $blacklist_map \033"
     for function in ${fun_list[@]};do
         if [[ -z "${blacklist_map[$item]}" ]]; then
             echo "$function" >> functions.txt
         else
-            echo "skip blacklist case: $function"
+            echo "\033 ---- skip blacklist case: $function \033"
         fi
     done
 }
