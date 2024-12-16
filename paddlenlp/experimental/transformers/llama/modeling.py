@@ -89,12 +89,9 @@ class FusedLlamaRMSNorm(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        result = paddle.incubate.nn.functional.fused_rms_norm(
+        return paddle.incubate.nn.functional.fused_rms_norm(
             hidden_states, self.weight, None, self.variance_epsilon, begin_norm_axis=1
-        )
-        if isinstance(result, tuple):
-            return result[0]
-        return result
+        )[0]
 
 
 class LLamaAvxLMHead(nn.Layer):

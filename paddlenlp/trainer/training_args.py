@@ -378,6 +378,8 @@ class TrainingArguments:
             Whether to use distributed dataloader. Default is `False`.
         release_grads (`bool`, *optional*):
             Whether to release gradients during training. Default is `False`.
+        ckpt_quant_stage (`str`, *optional*):
+            Whether activate checkpoint quantization. O0: deactivate, O1: Int8 compression, O2: Int4 compression. (default: O0).
     """
 
     output_dir: str = field(
@@ -878,7 +880,9 @@ class TrainingArguments:
     )
     ckpt_quant_stage: str = field(
         default="O0",
-        metadata={"help": "checkpoint quantization stage."},
+        metadata={
+            "help": "checkpoint quantization stage. O0: deactivate, O1: Int8 compression, O2: Int4 compression. (default: O0)"
+        },
     )
     ignore_load_lr_and_optim: Optional[bool] = field(
         default=False,
