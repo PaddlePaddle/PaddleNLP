@@ -340,9 +340,11 @@ class Llama3Tokenizer(PretrainedTokenizer):
         self.eos_token = ENDOFTEXT
         self.bos_token_id = self.bod_id
         self.eos_token_id = self.eod_id
-        self.pad_token = self.convert_ids_to_tokens(self.eos_token_id)
+        if "pad_token" not in kwargs:
+            self.pad_token = self.convert_ids_to_tokens(self.eos_token_id)
+            kwargs["pad_token"] = self.pad_token
 
-        super().__init__(pad_token=self.pad_token, **kwargs)
+        super().__init__(**kwargs)
 
     def __len__(self) -> int:
         return self.tokenizer.n_vocab
