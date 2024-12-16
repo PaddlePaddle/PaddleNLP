@@ -51,7 +51,7 @@ class MergeConfig:
     weight_list: Optional[List[float]] = field(
         default=None, metadata={"help": "Relative (or absolute if normalize=False) weighting of a given tensor"}
     )
-    normalize: bool = field(default=False, metadata={"help": "Whether to normalize the weighting."})
+    normalize: bool = field(default=True, metadata={"help": "Whether to normalize the weighting."})
     slerp_alpha: float = field(default=0.5, metadata={"help": "Slerp alpha."})
     slerp_normalize_eps: float = field(default=1e-8, metadata={"help": "Slerp normalization epsilon value"})
     slerp_dot_threshold: float = field(
@@ -142,7 +142,7 @@ class MergeConfig:
         if os.path.isfile(os.path.join(pretrained_model_path, MERGE_CONFIG_NAME)):
             config_file = os.path.join(pretrained_model_path, MERGE_CONFIG_NAME)
         else:
-            raise ValueError(f"Can't find lora_config.json at '{pretrained_model_path}'")
+            raise ValueError(f"Can't find merge_config.json at '{pretrained_model_path}'")
 
         loaded_attributes = cls.from_json_file(config_file)
 
