@@ -80,17 +80,12 @@ function restore_func() {
         echo "\033 ---- wget blacklist.csv \033"
     fi
     blacklist_file=${log_path}/blacklist.csv
-    declare -A blacklist_map
-    while IFS= read -r blacklist_item; do
-        blacklist_item=$(echo "$blacklist_item" | xargs)
-        blacklist_map["$blacklist_item"]=true
-    done < "$blacklist_file"
-    echo "\033 ---- blacklist: $blacklist_map \033"
+    mapfile -t blacklist < "$blacklist_file"
     for function in ${fun_list[@]};do
-        if [[ -z "${blacklist_map[$item]}" ]]; then
-            echo "$function" >> functions.txt
+        if [[ " ${blacklist[@]} " == *" ${function} "* ]]; then
+            echo "Function '$function' is blacklisted and will be skipped."
         else
-            echo "\033 ---- skip blacklist case: $function \033"
+            echo "$function" >> functions.txt
         fi
     done
 }
