@@ -316,6 +316,41 @@ class LoRAModel(nn.Layer):
         warnings.filterwarnings(
             action="ignore", message=".*Skip loading for.*", category=Warning, lineno=0, append=False
         )
+
+        model_state_dict = self.model.state_dict()
+        if self.lora_config.loraga:
+
+            def process_split_and_assign(name, concat_tensor, axis, init_dict, state_dict):
+                if isinstance(concat_tensor, np.ndarray):
+                    final_lora, init_lora = np.split(concat_tensor, 2, axis=axis)
+                    init_lora = paddle.to_tensor(init_lora)
+                else:
+                    final_lora, init_lora = paddle.split(concat_tensor, 2, axis=axis)
+                init_dict[name] = init_lora
+                state_dict[name] = final_lora
+                return init_lora
+
+            for name in state_dict.keys():
+                if "lora_A" in name:
+                    concat_lora_A = state_dict[name]
+                    init_loraA = process_split_and_assign(
+                        name, concat_lora_A, axis=1, init_dict=self.loraga_init_dict, state_dict=state_dict
+                    )
+
+                    loraB_name = name.replace("lora_A", "lora_B")
+                    concat_lora_B = state_dict[loraB_name]
+                    init_loraB = process_split_and_assign(
+                        loraB_name, concat_lora_B, axis=0, init_dict=self.loraga_init_dict, state_dict=state_dict
+                    )
+
+                    base_name = name.replace("lora_A", "weight")
+                    if not self.reinit_base_model:
+                        # Reinit base model
+                        offset = init_loraA.cuda() @ init_loraB.cuda()
+                        ori_weight = model_state_dict[base_name]
+                        model_state_dict[base_name].set_value(ori_weight - self.lora_config.scaling * offset)
+        del model_state_dict
+        gc.collect()
         self.model.set_state_dict(state_dict)
         logger.info("Load lora weight successfully")
 
