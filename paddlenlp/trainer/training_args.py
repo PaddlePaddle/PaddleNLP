@@ -1018,6 +1018,8 @@ class TrainingArguments:
             raise ValueError("At most one of fp16 and bf16 can be True for full eval, but not both")
 
         self.optim = OptimizerNames(self.optim)
+        if self.optim == OptimizerNames.ADAMW_MINI and self.tensor_parallel_degree > 1:
+            raise ValueError("AdamW Mini currently doesn't support tensor parallelism.")
 
         self.use_hybrid_parallel = False
 
