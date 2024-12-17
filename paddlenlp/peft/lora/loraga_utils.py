@@ -76,7 +76,7 @@ class LoRAGATrainer(Trainer):
                 iters += 1
                 # Pipeline parallel not supported currently
                 with paddle.amp.auto_cast(enable=True, custom_black_list=self.args.amp_custom_black_list):
-                    loss, logits = model(**batch)
+                    loss, _ = model(**batch)
                 loss.backward()
 
                 if iters == self.loraga_init_iters:

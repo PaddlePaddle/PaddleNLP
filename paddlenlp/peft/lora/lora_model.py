@@ -334,18 +334,18 @@ class LoRAModel(nn.Layer):
                     final_lora, init_lora = paddle.split(concat_tensor, 2, axis=axis)
                 init_dict[name] = init_lora
                 state_dict[name] = final_lora
-                return final_lora, init_lora
+                return init_lora
 
             for name in state_dict.keys():
                 if "lora_A" in name:
                     concat_lora_A = state_dict[name]
-                    final_loraA, init_loraA = process_split_and_assign(
+                    init_loraA = process_split_and_assign(
                         name, concat_lora_A, axis=1, init_dict=self.loraga_init_dict, state_dict=state_dict
                     )
 
                     loraB_name = name.replace("lora_A", "lora_B")
                     concat_lora_B = state_dict[loraB_name]
-                    final_loraB, init_loraB = process_split_and_assign(
+                    init_loraB = process_split_and_assign(
                         loraB_name, concat_lora_B, axis=0, init_dict=self.loraga_init_dict, state_dict=state_dict
                     )
 
