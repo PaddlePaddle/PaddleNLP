@@ -266,6 +266,7 @@ class TrainingArguments:
               sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
               sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
               sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.
+              replace_with_parallel_cross_entropy, it replaces 'cross_entropy_with_softmax' OP with 'c_softmax_with_cross_entropy' OP in PIR static graph, which can improve model parallel performance.
         pipeline_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
             following config is support:
@@ -681,6 +682,7 @@ class TrainingArguments:
                 "sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.\n"
                 "sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.\n"
                 "sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.\n"
+                "replace_with_parallel_cross_entropy, it replaces 'cross_entropy_with_softmax' OP with 'c_softmax_with_cross_entropy' OP in PIR static graph, which can improve model parallel performance.\n"
             )
         },
     )
@@ -1018,6 +1020,8 @@ class TrainingArguments:
             raise ValueError("At most one of fp16 and bf16 can be True for full eval, but not both")
 
         self.optim = OptimizerNames(self.optim)
+        if self.optim == OptimizerNames.ADAMW_MINI and self.tensor_parallel_degree > 1:
+            raise ValueError("AdamW Mini currently doesn't support tensor parallelism.")
 
         self.use_hybrid_parallel = False
 
@@ -1565,6 +1569,7 @@ class TrainingArguments:
                             "enable_delay_scale_loss",
                             # "enable_mp_skip_c_identity",
                             # "enable_mp_fused_linear_param_grad_add",
+                            "replace_with_parallel_cross_entropy",
                         ]:
                             raise ValueError(
                                 f"Found unknown tensor parallell config {x}, "

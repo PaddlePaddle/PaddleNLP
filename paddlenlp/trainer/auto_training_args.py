@@ -14,6 +14,7 @@
 
 from dataclasses import dataclass, field
 
+from .trainer_utils import split_parallel_config
 from .training_args import TrainingArguments
 from .utils import add_start_docstrings
 
@@ -68,3 +69,7 @@ class AutoTrainingArguments(TrainingArguments):
         if self.fused_linear:
             fused_passes.enable = True
             fused_passes.fused_passes_list.append("fused_gemm_epilogue_pass")
+
+        mp_configs = split_parallel_config(self.tensor_parallel_config)
+        if "replace_with_parallel_cross_entropy" in mp_configs:
+            self.strategy.mp_optimization.replace_with_parallel_cross_entropy = True
