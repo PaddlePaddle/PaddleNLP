@@ -563,7 +563,7 @@ def create_skip_config_for_refined_recompute(layer_idx, config):
 
 def update_refined_recompute(rr, lora=False):
     """update refined recompute dict."""
-    if rr == "":
+    if rr is None or rr == "":
         return {}
     else:
 
