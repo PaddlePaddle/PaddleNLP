@@ -160,6 +160,9 @@ class LoRAModel(nn.Layer):
                 f"Reset tensor_parallel_degree of lora_config to {self.model.config.tensor_parallel_degree}."
             )
         self.forward = self.model.forward
+        if lora_config.loraga:
+            self.loraga_init_dict = {}
+            self.reinit_base_model = False
 
         logger.info("Mark only lora and trainable_module as trainable.")
         self.mark_only_lora_as_trainable()
@@ -266,7 +269,7 @@ class LoRAModel(nn.Layer):
                     tp_actions if pre_tensor_parallel_split else None,
                     expected_keys,
                 )
-                error_msgs += _load_state_dict_into_model(lora_model.model, state_dict, "")
+                error_msgs += _load_state_dict_into_model(lora_model, state_dict, "")
                 del state_dict
                 gc.collect()
 
@@ -432,8 +435,9 @@ class LoRAModel(nn.Layer):
 
         lora_config_to_save = LoRAConfig(**self.lora_config.to_dict())
 
+        trainable_state_dict = self.get_trainable_state_dict(concat_init_lora=lora_config_to_save.loraga)
+
         if merge_tensor_parallel and lora_config_to_save.tensor_parallel_degree > 1:
-            trainable_state_dict = self.get_trainable_state_dict()
             trainable_state_dict = self._merge_trainable_tensor_parallel(trainable_state_dict)
             if not is_main_process:
                 logger.info("Saving with merge_tensor_parallel, tensor_parallel_rank > 0 don't need save")
@@ -442,7 +446,6 @@ class LoRAModel(nn.Layer):
                 variant = "_".join([x for x in variant.split("_") if "tp" not in x])
             lora_config_to_save.tensor_parallel_degree = -1
         else:
-            trainable_state_dict = self.get_trainable_state_dict()
             if lora_config_to_save.tensor_parallel_degree > 1:
                 if variant is None:
                     variant = weight_name_suffix()
@@ -672,12 +675,18 @@ class LoRAModel(nn.Layer):
             original_module.bias = module.bias
         setattr(parent_module, attribute_chain[-1], original_module)
 
-    def get_trainable_state_dict(self):
+    def get_trainable_state_dict(self, concat_init_lora=False):
         trainable_state_dict = OrderedDict()
         for name, weight in self.model.state_dict().items():
             # get lora parameter & QAT scale parameter
             if not weight.stop_gradient or "activation_quanter" in name or "weight_quanter" in name:
-                trainable_state_dict[name] = weight
+                if concat_init_lora:
+                    if "lora_A" in name:
+                        trainable_state_dict[name] = paddle.concat([weight, self.loraga_init_dict[name]], axis=1)
+                    else:
+                        trainable_state_dict[name] = paddle.concat([weight, self.loraga_init_dict[name]], axis=0)
+                else:
+                    trainable_state_dict[name] = weight
         return trainable_state_dict
 
     def print_trainable_parameters(self) -> None:

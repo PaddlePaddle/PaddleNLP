@@ -596,6 +596,8 @@ class Trainer:
                         self.model,
                         resume_from_checkpoint,
                     )
+                    if isinstance(self.model, LoRAModel) and self.model.lora_config.loraga:
+                        self.model.reinit_base_model = True
                     logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
                     self.runtime_timer.stop()
                     return
@@ -606,6 +608,8 @@ class Trainer:
             or isinstance(self.model, VeRAModel)
         ):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
+            if isinstance(self.model, LoRAModel) and self.model.lora_config.loraga:
+                self.model.reinit_base_model = True
             self.runtime_timer.stop()
             return
 
