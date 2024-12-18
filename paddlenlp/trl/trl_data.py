@@ -15,7 +15,7 @@
 import numpy as np
 
 
-def check_preference_pairwise_data(data):
+def check_preference_data(data):
     if isinstance(data["src"], str):
         data["src"] = [data["src"]]
     if isinstance(data["tgt"], str):
@@ -40,42 +40,10 @@ def check_preference_pairwise_data(data):
     return data
 
 
-def check_preference_pointwise_data(data):
-    if isinstance(data["src"], str):
-        data["src"] = [data["src"]]
-    if isinstance(data["tgt"], str):
-        data["tgt"] = [data["tgt"]]
-    if len(data["src"]) != len(data["tgt"]) + 1:
-        raise ValueError(
-            "The number of src and tgt should differ by 1, but got {} and {}".format(
-                len(data["src"]), len(data["tgt"])
-            )
-        )
-    if len(data["response"]) != 1 or len(data["response_kl"]) != 1 or len(data["sort"]) != 1:
-        raise ValueError(
-            f"response, response_kl and sort length must be 1. "
-            f"But got response_length:{len(data['response'])} sort_length:{len(data['sort'])}."
-        )
-    if len(data["response"][0]) < 1:
-        raise ValueError(f"Response field must be longer than 1." f" But got 'response':{data['response']}.")
-
-    if len(data["response_kl"][0]) < 1:
-        raise ValueError(f"Response_kl field must be longer than 1." f" But got 'response_kl':{data['response_kl']}.")
-
-    return data
-
-
-def check_preference_data(data, data_type="pairwise"):
-    if data_type == "pairwise":
-        return check_preference_pairwise_data(data)
-    elif data_type == "pointwise":
-        return check_preference_pointwise_data(data)
-
-
-def preprocess_preference_pairwise_data(data, tokenizer, data_args, model_args):
+def preprocess_preference_data(data, tokenizer, data_args, model_args):
     """Convert raw format example to Example."""
     # 1. Check data format
-    data = check_preference_data(data, "pairwise")
+    data = check_preference_data(data)
 
     if data["sort"][0] > data["sort"][1]:
         chosen = data["response"][0]
@@ -202,142 +170,7 @@ def preprocess_preference_pairwise_data(data, tokenizer, data_args, model_args):
     return output_dict
 
 
-def preprocess_preference_pointwise_data(data, tokenizer, data_args, model_args):
-    """Convert raw format example to Example."""
-    # 1. Check data format
-    data = check_preference_data(data, "pointwise")
-    response = data["response"][0]
-    response_kl = data["response_kl"][0]
-    response_encode_tokens = []
-    for idx in range(len(data["src"])):
-        if idx < len(data["tgt"]):
-            if tokenizer.chat_template is not None:
-                response_encode_tokens.append(
-                    [
-                        data["src"][idx].strip(),
-                        data["tgt"][idx].strip(),
-                    ]
-                )
-            else:
-                response_encode_tokens.append(
-                    [
-                        tokenizer.encode(data["src"][idx].strip(), add_special_tokens=True)["input_ids"],
-                        tokenizer.encode(data["tgt"][idx].strip(), add_special_tokens=False)["input_ids"]
-                        + [tokenizer.eos_token_id],
-                    ]
-                )
-        else:
-            if tokenizer.chat_template is not None:
-                response_encode_tokens.append(
-                    [
-                        data["src"][idx].strip(),
-                        response.strip(),
-                    ]
-                )
-            else:
-                response_encode_tokens.append(
-                    [
-                        tokenizer.encode(data["src"][idx].strip(), add_special_tokens=True)["input_ids"],
-                        tokenizer.encode(response.strip(), add_special_tokens=False)["input_ids"]
-                        + [tokenizer.eos_token_id],
-                    ]
-                )
-    if tokenizer.chat_template is not None:
-        chat_input_list = response_encode_tokens
-        response_encode_tokens = tokenizer.encode_chat_inputs(chat_input_list)["conversations"]
-        # convert to response_kl response_encode_tokens
-        chat_input_list[-1][-1] = response_kl.strip()
-        response_kl_encode_tokens = tokenizer.encode_chat_inputs(chat_input_list)["conversations"]
-
-        """Post process sequence: tokenization & truncation."""
-        tokens_prompt = response_encode_tokens[-1][0][:-1]
-        eos_token_id = response_encode_tokens[-1][-1][-1]
-        tokens_response = response_encode_tokens[-1][0][-1:] + response_encode_tokens[-1][-1][:-1]
-        tokens_response_kl = response_encode_tokens[-1][0][-1:] + response_kl_encode_tokens[-1][-1][:-1]
-    else:
-        eos_token_id = tokenizer.eos_token_id
-        tokens_prompt = response_encode_tokens[-1][0][:-1]
-        tokens_response = (
-            response_encode_tokens[-1][0][-1:]
-            + tokenizer.encode(response.strip(), add_special_tokens=False)["input_ids"]
-        )
-        tokens_response_kl = (
-            response_encode_tokens[-1][0][-1:]
-            + tokenizer.encode(response_kl.strip(), add_special_tokens=False)["input_ids"]
-        )
-
-    if len(tokens_prompt) + len(tokens_response) + len(tokens_response_kl) > data_args.max_seq_len:
-        # truncate prompt
-        tokens_prompt = tokens_prompt[-data_args.max_prompt_len :]
-        if (len(tokens_prompt) + len(tokens_response) + len(tokens_response_kl)) > data_args.max_seq_len:
-            max_response_len = data_args.max_seq_len - len(tokens_prompt)
-            # 按比例截断
-            max_response_len = int(
-                len(tokens_response) / (len(tokens_response) + len(tokens_response_kl)) * max_response_len
-            )
-            max_response_kl_len = max_response_len - max_response_len
-            tokens_response = tokens_response[:max_response_len]
-            tokens_response_kl = tokens_response_kl[:max_response_kl_len]
-
-    cur_len = len(tokens_prompt) + len(tokens_response) + len(tokens_response_kl)
-    turn_index = len(response_encode_tokens) - 2
-
-    # append former dialog contents
-    while turn_index >= 0:
-        tokens_src = response_encode_tokens[turn_index][0]
-        tokens_target = response_encode_tokens[turn_index][1]
-        turn_index -= 1
-
-        if len(tokens_src) + len(tokens_target) > data_args.max_seq_len - cur_len:
-            break
-        tokens_prompt = tokens_src + tokens_target + tokens_prompt
-        cur_len += len(tokens_src) + len(tokens_target)
-
-    input_ids = tokens_prompt + tokens_response + tokens_response_kl
-    prompt_len = len(tokens_prompt)
-    response_len = len(tokens_response)
-    response_kl_len = len(tokens_response_kl)
-    seq_len = len(input_ids)
-    # make position ids & labels
-
-    position_ids = (
-        list(range(prompt_len))  # prompt
-        + list(range(prompt_len, prompt_len + response_len))  # response
-        + list(range(prompt_len, prompt_len + response_kl_len))  # response_kl
-    )
-    response_labels = [0] * prompt_len + tokens_response[1:] + [eos_token_id] + [0] * response_kl_len
-    response_kl_labels = [0] * prompt_len + [0] * response_len + tokens_response_kl[1:] + [eos_token_id]
-
-    # response index
-    response_indexs = [prompt_len, prompt_len + response_len, seq_len, data["sort"][0]]
-    output_dict = {
-        "input_ids": input_ids,
-        "position_ids": position_ids,
-        "response_labels": response_labels,
-        "response_kl_labels": response_kl_labels,
-        "response_indexs": response_indexs,
-    }
-
-    # attention mask
-    if model_args.flash_mask:
-        output_dict["attn_mask_startend_row_indices"] = (
-            [seq_len] * prompt_len + [prompt_len + response_len] * response_len + [seq_len] * response_kl_len
-        )
-    else:
-        attention_mask = np.tri(seq_len, seq_len, dtype=bool)
-        attention_mask[(prompt_len + response_len) :, prompt_len : (prompt_len + response_len)] = False
-        output_dict["attention_mask"] = attention_mask
-    return output_dict
-
-
-def preprocess_preference_data(data, tokenizer, data_args, model_args, data_type):
-    if data_type == "pairwise":
-        return preprocess_preference_pairwise_data(data, tokenizer, data_args, model_args)
-    elif data_type == "pointwise":
-        return preprocess_preference_pointwise_data(data, tokenizer, data_args, model_args)
-
-
-def preference_pairwise_collate_fn(batch, max_seq_len=None):
+def preference_collate_fn(batch, max_seq_len=None):
     """Convert batch data into tensor."""
     if max_seq_len is None:
         raise ValueError("max_seq_len is None.")
@@ -400,75 +233,3 @@ def preference_pairwise_collate_fn(batch, max_seq_len=None):
         else:
             input_dict[key] = np.array(input_dict[key])
     return input_dict
-
-
-def preference_pointwise_collate_fn(batch, max_seq_len=None):
-    """Convert batch data into tensor."""
-    if max_seq_len is None:
-        raise ValueError("max_seq_len is None.")
-
-    input_dict = {
-        "input_ids": [],
-        "position_ids": [],
-        "response_labels": [],
-        "response_kl_labels": [],
-        "response_indexs": [],
-    }
-    sequence = batch[0]
-    if "attn_mask_startend_row_indices" in sequence:
-        input_dict["attn_mask_startend_row_indices"] = []
-        use_attn_mask_startend_row_indices = True
-    elif "attention_mask" in sequence:
-        input_dict["attention_mask"] = []
-        use_attn_mask_startend_row_indices = False
-    else:
-        raise ValueError("attention_mask and attn_mask_startend_row_indices are both None.")
-
-    for i, sequence in enumerate(batch):
-        difference = max_seq_len - len(sequence["input_ids"])
-
-        input_dict["input_ids"].append(sequence["input_ids"] + [0] * difference)
-        input_dict["position_ids"].append(sequence["position_ids"] + [0] * difference)
-        input_dict["response_labels"].append(sequence["response_labels"] + [0] * difference)
-        input_dict["response_kl_labels"].append(sequence["response_kl_labels"] + [0] * difference)
-        if use_attn_mask_startend_row_indices:
-            input_dict["attn_mask_startend_row_indices"].append(
-                [
-                    sequence["attn_mask_startend_row_indices"]
-                    + [sequence["attn_mask_startend_row_indices"][-1]] * difference
-                ]
-            )
-        else:
-            input_dict["attention_mask"].append(
-                np.pad(
-                    sequence["attention_mask"],
-                    pad_width=((0, 0), (0, difference), (0, difference)),
-                    mode="constant",
-                    constant_values=False,
-                )
-            )
-
-        for ri in sequence["response_indexs"]:
-            input_dict["response_indexs"].append(
-                [
-                    i,  # bs
-                    ri[0],  # response_response_start_index
-                    ri[1],  # rejeted_response_start_index
-                    ri[2],  # rejeted_response_end_index + 1
-                ]
-            )
-    for key in input_dict:
-        if key == "attention_mask":
-            input_dict[key] = np.array(input_dict[key], dtype=bool)
-        elif key == "attn_mask_startend_row_indices":
-            input_dict[key] = np.array(input_dict[key], dtype=np.int32)
-        else:
-            input_dict[key] = np.array(input_dict[key])
-    return input_dict
-
-
-def preference_collate_fn(batch, max_seq_len=None, data_type="pairwise"):
-    if data_type == "pairwise":
-        return preference_pairwise_collate_fn(batch, max_seq_len)
-    elif data_type == "pointwise":
-        return preference_pointwise_collate_fn(batch, max_seq_len)
