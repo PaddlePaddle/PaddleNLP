@@ -93,7 +93,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 
 ### 2. 精调
 
-PaddleNLP 支持多个主流大模型的 SFT、LoRA、Prefix Tuning 等精调策略，提供统一、高效精调方案：
+PaddleNLP 支持多个主流大模型的 SFT、PEFT 等精调策略，提供统一、高效精调方案：
 
 - **统一训练入口**。飞桨大模型套件精调方案可适配业界主流大模型，用户只需修改配置文件，即能在单卡或多卡（支持4D 并行分布式策略）进行多种大模型精调。
 - **高效数据和分布式策略**。Zero Padding 零填充优化策略结合 FlashMask 策略有效提升模型训练效率。独创 PEFT 结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛，支持单卡（A100 80G）百亿模型微调、单机（A100 80G * 8）千亿模型微调。
@@ -150,7 +150,7 @@ python  run_finetune.py ./config/llama/lora_argument.json
 python  run_finetune.py ./config/llama/pt_argument.json
 ```
 
-更多大模型精调分布式使用文档、训练细节和效果请参见[大模型精调教程](./docs/finetune.md)。
+除了 LoRA、Prefix Tuning 外，还支持 LoKr、VeRA、MoRA、ReFT、rsLoRA、LoRA+、PiSSA、MoSLoRA 等多种精调算法，更多大模型精调使用文档、训练细节和效果请参见[大模型精调教程](./docs/finetune.md)。
 
 ### 3. 对齐
 
