@@ -18,6 +18,7 @@ from arguments import DataArguments, ModelArguments
 from arguments import RetrieverTrainingArguments as TrainingArguments
 from data import EmbedCollator, TrainDatasetForEmbedding
 from models.modeling import BiEncoderModel
+from models.modeling_nv import NVEncodeModel
 
 from paddlenlp.peft import LoRAConfig, LoRAModel
 from paddlenlp.trainer import PdArgumentParser, Trainer, get_last_checkpoint, set_seed
@@ -77,22 +78,40 @@ def main():
     # Set seed
     set_seed(training_args.seed)
     tokenizer = AutoTokenizer.from_pretrained(
-        model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
-        use_fast=False,
+        model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path
     )
+    tokenizer.pad_token = tokenizer.unk_token
+    tokenizer.add_bos_token = False
+    tokenizer.add_eos_token = True
     tokenizer.padding_side = "right"
 
-    model = BiEncoderModel.from_pretrained(
-        model_name_or_path=model_args.model_name_or_path,
-        normalized=model_args.normalized,
-        sentence_pooling_method=training_args.sentence_pooling_method,
-        negatives_cross_device=training_args.negatives_cross_device,
-        temperature=training_args.temperature,
-        margin=training_args.margin,
-        use_inbatch_neg=training_args.use_inbatch_neg,
-        matryoshka_dims=training_args.matryoshka_dims if training_args.use_matryoshka else None,
-        matryoshka_loss_weights=training_args.matryoshka_loss_weights if training_args.use_matryoshka else None,
-    )
+    if "NV-Embed" in model_args.model_name_or_path:
+        model = NVEncodeModel.from_pretrained(
+            model_args.model_name_or_path,
+            tokenizer_path=model_args.model_name_or_path,  # used for calculate the token len of instruction
+            query_instruction=data_args.query_instruction_for_retrieval,
+            document_instruction=data_args.passage_instruction_for_retrieval,  # needed to as input, because will use it to calculate the mask
+            normalized=model_args.normalized,
+            negatives_cross_device=training_args.negatives_cross_device,
+            temperature_=training_args.temperature,  # temperature is a reserved keyword of NV-Embed, so we use temperature_
+            margin=training_args.margin,
+            use_inbatch_neg=training_args.use_inbatch_neg,
+            matryoshka_dims=training_args.matryoshka_dims if training_args.use_matryoshka else None,
+            matryoshka_loss_weights=training_args.matryoshka_loss_weights if training_args.use_matryoshka else None,
+            dtype=dtype,
+        )
+    else:
+        model = BiEncoderModel(
+            model_name_or_path=model_args.model_name_or_path,
+            normalized=model_args.normalized,
+            sentence_pooling_method=training_args.sentence_pooling_method,
+            negatives_cross_device=training_args.negatives_cross_device,
+            temperature=training_args.temperature,
+            margin=training_args.margin,
+            use_inbatch_neg=training_args.use_inbatch_neg,
+            matryoshka_dims=training_args.matryoshka_dims if training_args.use_matryoshka else None,
+            matryoshka_loss_weights=training_args.matryoshka_loss_weights if training_args.use_matryoshka else None,
+        )
 
     if training_args.fix_position_embedding:
         for k, v in model.named_parameters():
@@ -110,17 +129,29 @@ def main():
                 v.stop_gradient = True
 
     if training_args.fine_tune_type == "lora":
-        if "llama" in model_args.model_name_or_path or "baichuan" in model_args.model_name_or_path:
-            target_modules = [".*q_proj.*", ".*k_proj.*", ".*v_proj.*"]
+        if any([x in model_args.model_name_or_path for x in ["llama", "baichuan", "NV-Embed"]]):
+            target_modules = [
+                ".*q_proj.*",
+                ".*k_proj.*",
+                ".*v_proj.*",
+                ".*o_proj.*",
+                ".*down_proj.*",
+                ".*up_proj.*",
+                ".*gate_proj.*",
+            ]
         else:
-            target_modules = [".*query_key_value.*"]
+            raise ValueError("need to specify the target modules for LoRA fine-tuning.")
 
         lora_config = LoRAConfig(
             target_modules=target_modules,
-            r=8,
-            lora_alpha=32,
+            r=32,
+            lora_alpha=64,
+            lora_dropout=0.1,
             dtype=dtype,
         )
+        if "llama" in model_args.model_name_or_path.lower():
+            model.config = model.model_config  # for NV-Embed, this is no needed, but for repllama, this is needed
+        model.config.tensor_parallel_degree = training_args.tensor_parallel_degree
         model = LoRAModel(model, lora_config)
         model.mark_only_lora_as_trainable()
         model.print_trainable_parameters()

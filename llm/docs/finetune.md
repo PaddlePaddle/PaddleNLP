@@ -36,7 +36,7 @@
 ### 3.1 环境准备
 
 - PaddlePaddle 3.0-beta
-- PaddleNLP   3.0.0b2
+- PaddleNLP   3.0.0b3
 - PaddleSlim develop
 
 git clone 代码到本地，即可开始。
@@ -184,6 +184,7 @@ python merge_lora_params.py \
 - `pipeline_parallel_degree`: 表示划分流水线的大小.(假设该参数为4, 模型12层, 则每一个 pp stage 包含3层模型) 默认值-1, 表示不启用流水线并行。
 - `sharding_parallel_degree`: 表示分组参数切片的数据并行大小. 默认值1, 表示不启用分组参数切片的数据并行。
 - `sharding`:是否使用 Paddle 的 Sharding 数据并行功能，用户的参数。支持 sharding `stage1`, `stage2` or `stage3`。其中`stage2``stage3`可以和`offload`组合使用。
+- `optim`:默认为`adamw`，支持`adamw`, `adamw_mini`。
 </div>
 
 

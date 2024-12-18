@@ -864,6 +864,7 @@ def _load_state_dict_into_model(model_to_load, state_dict, start_prefix):
         warnings.resetwarnings()
         # paddlenlp hold  missing_keys , just ignore not found warnings.
         warnings.filterwarnings("ignore", message=r".*is not found in the provided dict.*")
+        warnings.filterwarnings("ignore", message=r".*paddle.to_tensor.*")
         model_to_load.set_state_dict(state_dict)
         error_msgs.extend([str(x.message) for x in w])
 
@@ -1169,6 +1170,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             config.use_fake_parameter = predictor_args.use_fake_parameter
             config.single_card_ptq = not predictor_args.use_fake_parameter
         config.append_attn = predictor_args.append_attn
+        config.decode_strategy = predictor_args.decode_strategy
 
         if config.quantization_config.quant_type is not None:
             if predictor_args.mode == "dynamic":
@@ -1201,6 +1203,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             config.speculate_max_ngram_size = predictor_args.speculate_max_ngram_size
             config.speculate_verify_window = predictor_args.speculate_verify_window
             config.speculate_max_candidate_len = predictor_args.speculate_max_candidate_len
+            config.decode_strategy = "speculate_decoding"
 
     @classmethod
     def confirm_inference_model(cls, predictor_args, **kwargs):

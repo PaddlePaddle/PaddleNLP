@@ -39,6 +39,7 @@ __all__ = [
     "DataCollatorForSeq2Seq",
     "DataCollatorForLanguageModeling",
     "DataCollatorForWholeWordMask",
+    "DataCollatorForEmbedding",
 ]
 
 InputDataClass = NewType("InputDataClass", Any)
@@ -415,6 +416,129 @@ class DataCollatorForSeq2Seq:
             decoder_input_ids = self.model.prepare_decoder_input_ids_from_labels(labels=batch["labels"])
             batch["decoder_input_ids"] = decoder_input_ids
         return batch
+
+
+@dataclass
+class DataCollatorForEmbedding:
+    tokenizer: PretrainedTokenizerBase
+    model: Optional[Any] = None
+    padding: Union[bool, str, PaddingStrategy] = True
+    pad_to_multiple_of: Optional[int] = None
+    label_pad_token_id: int = -100
+    return_tensors: str = "pd"
+    return_attention_mask: Optional[bool] = None
+    max_label_length: Optional[int] = None
+
+    max_query_len: int = 512
+    max_passage_len: int = 512
+
+    def __call__(self, batch, return_tensors=None) -> Any:
+        """Convert batch data into tensor."""
+        input_keys = ["input_ids", "position_ids"]
+
+        attn_key = "attention_mask"
+        input_keys.append(attn_key)
+
+        # Initialize query and passage lists
+        queries = {key: [] for key in input_keys}
+        passages = {key: [] for key in input_keys}
+
+        batch_query_embedding_indices = []
+        batch_passage_embedding_indices = []
+
+        global_passage_idx = 0
+
+        # Process each batch sequence
+        for idx, batch_sequence in enumerate(batch):
+            query_data = [pair.query for pair in batch_sequence]
+            padded_query_token_ids, padded_query_position_ids, query_token_ids = self.process_data(
+                query_data, self.tokenizer.pad_token_id, self.max_query_len
+            )
+
+            queries["input_ids"].append(padded_query_token_ids)
+            queries["position_ids"].append(padded_query_position_ids)
+            batch_query_embedding_indices.append([idx, len(query_token_ids[0]) - 1])
+
+            queries[attn_key].append(self.gen_self_attn_mask(query_token_ids, self.max_query_len))
+
+            for pair in batch_sequence:
+                for passage in pair.passages:
+                    passage_data = [passage]
+                    padded_passage_token_ids, padded_passage_position_ids, passage_token_ids = self.process_data(
+                        passage_data, self.tokenizer.pad_token_id, self.max_passage_len
+                    )
+
+                    passages["input_ids"].append(padded_passage_token_ids)
+                    passages["position_ids"].append(padded_passage_position_ids)
+                    batch_passage_embedding_indices.append([global_passage_idx, len(passage_token_ids[0]) - 1])
+
+                    passages[attn_key].append(self.gen_self_attn_mask(passage_token_ids, self.max_passage_len))
+                    global_passage_idx += 1
+
+        for data in (queries, passages):
+            for k, v in data.items():
+                data[k] = paddle.to_tensor(np.concatenate(v))
+
+        queries["embedding_indices"] = paddle.to_tensor(np.array(batch_query_embedding_indices, dtype="int32"))
+        passages["embedding_indices"] = paddle.to_tensor(np.array(batch_passage_embedding_indices, dtype="int32"))
+
+        return {
+            "query": queries,
+            "passages": passages,
+        }
+
+    def process_data(self, data, pad_idx, max_len):
+        """padding token_ids & position_ids."""
+        token_ids = [sum((item.token_ids for item in data), [])]
+        position_ids = [sum((item.position_ids for item in data), [])]
+        padded_token_ids = self.pad_batch_data(token_ids, pad_id=pad_idx, max_seq_len=max_len)
+        padded_position_ids = self.pad_batch_data(position_ids, pad_id=0, max_seq_len=max_len)
+        return padded_token_ids, padded_position_ids, token_ids
+
+    @staticmethod
+    def pad_batch_data(insts, pad_id=0, max_seq_len=None, return_seq_len=False, pad_style="right"):
+        """Pad sequences to the max sequence length in batch."""
+        max_len = max_seq_len if max_seq_len is not None else max(map(len, insts))
+        if pad_style == "left":
+            inst_data = np.array([[pad_id] * (max_len - len(inst)) + list(inst) for inst in insts])
+        else:
+            inst_data = np.array([list(inst) + [pad_id] * (max_len - len(inst)) for inst in insts])
+
+        if return_seq_len:
+            seq_len = np.array([len(inst) for inst in insts])
+            return inst_data.astype("int64").reshape([-1, max_len]), seq_len
+        else:
+            return inst_data.astype("int64").reshape([-1, max_len])
+
+    @staticmethod
+    def gen_self_attn_mask(batch_token_ids: List[List[int]], max_seq_len: int):
+        """Generate self attention mask for multiple sub-sequence."""
+        input_mask_data = np.zeros((1, 1, max_seq_len, max_seq_len), dtype="float32")
+        offset = 0
+        for index, token_ids in enumerate(batch_token_ids):
+            cur_len = len(token_ids)
+            b = np.tril(np.ones([cur_len, cur_len]), 0)
+            input_mask_data[0, 0, offset : offset + cur_len, offset : offset + cur_len] = b
+            offset += cur_len
+        return input_mask_data
+
+    @staticmethod
+    def gen_attn_mask_start_row_indices(batch_token_ids: List[List[int]], max_seq_len: int, sliding_window: int):
+        """Generate attn_mask_start_row_indices for flash attention."""
+        offset = 0
+        attn_mask_start_row_indices = []
+        for token_ids in batch_token_ids:
+            cur_len = len(token_ids)
+            if sliding_window > 0:
+                for i in range(cur_len):
+                    attn_mask_start_row_indices.append(offset + min(cur_len, i + sliding_window))
+            else:
+                attn_mask_start_row_indices.extend([offset + cur_len] * cur_len)
+            offset += cur_len
+        if offset < max_seq_len:
+            attn_mask_start_row_indices.extend(list(range(offset + 1, max_seq_len + 1)))
+
+        return np.array(attn_mask_start_row_indices, dtype=np.int32)[None, None]
 
 
 def _paddle_collate_batch(examples, tokenizer, pad_to_multiple_of: Optional[int] = None):

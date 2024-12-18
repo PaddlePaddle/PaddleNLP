@@ -507,7 +507,7 @@ def unified_checkpoint_into_shards(
     paddle.device.cuda.empty_cache()
     assert hasattr(model_to_save, "config")
 
-    state_dict = get_expected_state_dict(model_to_save)
+    state_dict = get_expected_state_dict(model_to_save, concat_additional_adapter=True)
     all_filter_keys = filter_params(model_to_save, state_dict, args)
 
     config_to_save = copy.deepcopy(model_to_save.config)

@@ -146,135 +146,6 @@ class FusedHeadAndCrossEntropy(PyLayer):
     """Fuse LM Head and CrossEntropyLoss into one module."""
 
     @staticmethod
-    def _fused_head_and_loss_fn_npu(
-        hidden_states,
-        labels,
-        loss_mask,
-        lm_head_bias,
-        lm_head_weight_cast,
-        lm_head_bias_cast,
-        grad_lm_head_weight,
-        grad_lm_head_bias,
-        indices,
-        divisor,
-        n_tokens,
-        loop_chunk_size,
-        tensor_parallel_degree,
-        tensor_parallel_output,
-        model_parallel_group,
-        return_token_loss,
-        transpose_y,
-        dtype,
-    ):
-        token_loss_list = []
-        grad_hidden_states_list = []
-
-        token_idx_section = [loop_chunk_size for _ in range(0, n_tokens, loop_chunk_size)]
-        token_idx_section[-1] = -1
-        hidden_states_chunk = hidden_states.split(token_idx_section, axis=0)
-        labels_chunk = labels.split(token_idx_section, axis=0)
-        loss_mask_chunk = loss_mask.split(token_idx_section, axis=0)
-
-        for i in range(len(token_idx_section)):
-            # logits calculations
-            logits_chunk_cast = paddle.matmul(
-                hidden_states_chunk[i],
-                lm_head_weight_cast,
-                transpose_y=transpose_y,
-            )
-            if lm_head_bias is not None:
-                logits_chunk_cast += lm_head_bias_cast
-            if tensor_parallel_degree > 1 and not tensor_parallel_output:
-                logits_chunk_cast_lst = []
-                dist.all_gather(
-                    logits_chunk_cast_lst,
-                    logits_chunk_cast,
-                    group=model_parallel_group,
-                )
-                logits_chunk_cast = paddle.concat(logits_chunk_cast_lst, axis=-1)
-            logits_chunk = logits_chunk_cast.astype("float32")
-
-            # log softmax
-            max_logits = paddle.max(logits_chunk, axis=-1, keepdim=True)
-            if tensor_parallel_degree > 1 and tensor_parallel_output:
-                dist.all_reduce(max_logits, op=dist.ReduceOp.MAX, group=model_parallel_group)
-            normalized_logits = logits_chunk - max_logits
-            exp_logits = paddle.exp(normalized_logits)
-            sum_exp_logits = paddle.sum(exp_logits, axis=-1, keepdim=True)
-            if tensor_parallel_degree > 1 and tensor_parallel_output:
-                dist.all_reduce(
-                    sum_exp_logits,
-                    op=dist.ReduceOp.SUM,
-                    group=model_parallel_group,
-                )
-            log_sum_exp_logits = paddle.log(sum_exp_logits)
-
-            # cross entropy
-            labels_one_hot = labels_chunk[i].unsqueeze(1) == indices
-            label_logits = paddle.sum(
-                paddle.where(
-                    labels_one_hot,
-                    normalized_logits,
-                    paddle.zeros_like(normalized_logits),
-                ),
-                axis=-1,
-                keepdim=True,
-            )
-            if tensor_parallel_degree > 1 and tensor_parallel_output:
-                dist.all_reduce(
-                    label_logits,
-                    op=dist.ReduceOp.SUM,
-                    group=model_parallel_group,
-                )
-            token_loss_chunk = (log_sum_exp_logits - label_logits).squeeze(1) / divisor
-            cond = loss_mask_chunk[i].astype("bool")
-            token_loss_chunk = paddle.where(cond, token_loss_chunk, paddle.zeros_like(token_loss_chunk))
-            token_loss_list.append((token_loss_chunk * loss_mask_chunk[i]))
-
-            # gradients calculations
-            if not return_token_loss:
-                if tensor_parallel_degree > 1 and not tensor_parallel_output:
-                    exp_logits = exp_logits.split(model_parallel_group.nranks, axis=-1)[model_parallel_group.rank]
-                    labels_one_hot = labels_one_hot.split(model_parallel_group.nranks, axis=-1)[
-                        model_parallel_group.rank
-                    ]
-                grad_logits_chunk = (exp_logits / sum_exp_logits - labels_one_hot.astype("float32")) / divisor
-                grad_logits_chunk = grad_logits_chunk.astype(dtype)
-                grad_logits_chunk = paddle.where(
-                    cond.unsqueeze(1),
-                    grad_logits_chunk,
-                    paddle.zeros_like(grad_logits_chunk),
-                )
-                if hidden_states.stop_gradient:
-                    grad_hidden_states_list.append(
-                        paddle.matmul(
-                            grad_logits_chunk,
-                            lm_head_weight_cast,
-                            transpose_y=not transpose_y,
-                        )
-                    )
-                if grad_lm_head_weight is not None:
-                    if transpose_y:
-                        grad_lm_head_weight += paddle.matmul(
-                            grad_logits_chunk,
-                            hidden_states_chunk[i],
-                            transpose_x=True,
-                        )
-                    else:
-                        grad_lm_head_weight += paddle.matmul(
-                            hidden_states_chunk[i],
-                            grad_logits_chunk,
-                            transpose_x=True,
-                        )
-                if grad_lm_head_bias is not None:
-                    grad_lm_head_bias += grad_logits_chunk.astype("float32").sum(axis=0).astype(dtype)
-
-        token_loss = paddle.concat(token_loss_list, axis=0)
-        if hidden_states.stop_gradient:
-            grad_hidden_states = paddle.concat(grad_hidden_states_list, axis=0)
-        return token_loss, grad_lm_head_weight, grad_lm_head_bias, grad_hidden_states
-
-    @staticmethod
     def forward(
         ctx,
         hidden_states: paddle.Tensor,
@@ -368,141 +239,114 @@ class FusedHeadAndCrossEntropy(PyLayer):
             else:
                 grad_lm_head_bias = None
             if hidden_states.stop_gradient:
-                if get_env_device() != "npu":
-                    grad_hidden_states = paddle.zeros_like(hidden_states)
-                else:
-                    grad_hidden_states = None
+                grad_hidden_states = paddle.zeros_like(hidden_states)
             else:
                 grad_hidden_states = None
 
-        if get_env_device() == "npu":
-            (
-                token_loss,
-                grad_lm_head_weight,
-                grad_lm_head_bias,
-                grad_hidden_states,
-            ) = FusedHeadAndCrossEntropy._fused_head_and_loss_fn_npu(
-                hidden_states,
-                labels,
-                loss_mask,
-                lm_head_bias,
+        # initialize outputs
+        token_loss = paddle.empty((n_tokens,), dtype=paddle.float32)
+
+        # blockwise calculations
+        for i in range(0, n_tokens, loop_chunk_size):
+            token_start_idx = i
+            token_end_idx = min(i + loop_chunk_size, n_tokens)
+            cur_chunk_range = paddle.arange(token_start_idx, token_end_idx)
+            hidden_states_chunk = paddle.gather(hidden_states, cur_chunk_range, axis=0)
+            labels_chunk = paddle.gather(labels, cur_chunk_range, axis=0)
+            loss_mask_chunk = paddle.gather(loss_mask, cur_chunk_range, axis=0)
+
+            # logits calculations
+            logits_chunk_cast = paddle.matmul(
+                hidden_states_chunk,
                 lm_head_weight_cast,
-                lm_head_bias_cast,
-                grad_lm_head_weight,
-                grad_lm_head_bias,
-                indices,
-                divisor,
-                n_tokens,
-                loop_chunk_size,
-                tensor_parallel_degree,
-                tensor_parallel_output,
-                model_parallel_group,
-                return_token_loss,
-                transpose_y,
-                dtype,
+                transpose_y=transpose_y,
             )
-        else:
-            # initialize outputs
-            token_loss = paddle.empty((n_tokens,), dtype=hidden_states.dtype)
-
-            # blockwise calculations
-            for i in range(0, n_tokens, loop_chunk_size):
-                token_start_idx = i
-                token_end_idx = min(i + loop_chunk_size, n_tokens)
-                hidden_states_chunk = hidden_states[token_start_idx:token_end_idx]
-                labels_chunk = labels[token_start_idx:token_end_idx]
-
-                # logits calculations
-                logits_chunk_cast = paddle.matmul(
-                    hidden_states_chunk,
-                    lm_head_weight_cast,
-                    transpose_y=transpose_y,
+            if lm_head_bias is not None:
+                logits_chunk_cast += lm_head_bias_cast
+            if tensor_parallel_degree > 1 and not tensor_parallel_output:
+                logits_chunk_cast_lst = []
+                dist.all_gather(
+                    logits_chunk_cast_lst,
+                    logits_chunk_cast,
+                    group=model_parallel_group,
                 )
-                if lm_head_bias is not None:
-                    logits_chunk_cast += lm_head_bias_cast
+                logits_chunk_cast = paddle.concat(logits_chunk_cast_lst, axis=-1)
+            logits_chunk = logits_chunk_cast.astype("float32")
+
+            # log softmax
+            max_logits = paddle.max(logits_chunk, axis=-1, keepdim=True)
+            if tensor_parallel_degree > 1 and tensor_parallel_output:
+                dist.all_reduce(max_logits, op=dist.ReduceOp.MAX, group=model_parallel_group)
+            normalized_logits = logits_chunk - max_logits
+            exp_logits = paddle.exp(normalized_logits)
+            sum_exp_logits = paddle.sum(exp_logits, axis=-1, keepdim=True)
+            if tensor_parallel_degree > 1 and tensor_parallel_output:
+                dist.all_reduce(
+                    sum_exp_logits,
+                    op=dist.ReduceOp.SUM,
+                    group=model_parallel_group,
+                )
+            log_sum_exp_logits = paddle.log(sum_exp_logits)
+
+            # cross entropy
+            labels_one_hot = labels_chunk.unsqueeze(1) == indices
+            label_logits = paddle.sum(
+                paddle.where(
+                    labels_one_hot,
+                    normalized_logits,
+                    paddle.zeros_like(normalized_logits),
+                ),
+                axis=-1,
+                keepdim=True,
+            )
+            if tensor_parallel_degree > 1 and tensor_parallel_output:
+                dist.all_reduce(
+                    label_logits,
+                    op=dist.ReduceOp.SUM,
+                    group=model_parallel_group,
+                )
+            token_loss_chunk = (log_sum_exp_logits - label_logits).squeeze(1) / divisor
+            cond = loss_mask_chunk.astype("bool")
+            token_loss_chunk = paddle.where(cond, token_loss_chunk, paddle.zeros_like(token_loss_chunk))
+            paddle.scatter_(token_loss, cur_chunk_range, token_loss_chunk, overwrite=True)
+
+            # gradients calculations
+            if not return_token_loss:
                 if tensor_parallel_degree > 1 and not tensor_parallel_output:
-                    logits_chunk_cast_lst = []
-                    dist.all_gather(
-                        logits_chunk_cast_lst,
-                        logits_chunk_cast,
-                        group=model_parallel_group,
-                    )
-                    logits_chunk_cast = paddle.concat(logits_chunk_cast_lst, axis=-1)
-                logits_chunk = logits_chunk_cast.astype("float32")
-
-                # log softmax
-                max_logits = paddle.max(logits_chunk, axis=-1, keepdim=True)
-                if tensor_parallel_degree > 1 and tensor_parallel_output:
-                    dist.all_reduce(max_logits, op=dist.ReduceOp.MAX, group=model_parallel_group)
-                normalized_logits = logits_chunk - max_logits
-                exp_logits = paddle.exp(normalized_logits)
-                sum_exp_logits = paddle.sum(exp_logits, axis=-1, keepdim=True)
-                if tensor_parallel_degree > 1 and tensor_parallel_output:
-                    dist.all_reduce(
-                        sum_exp_logits,
-                        op=dist.ReduceOp.SUM,
-                        group=model_parallel_group,
-                    )
-                log_sum_exp_logits = paddle.log(sum_exp_logits)
-
-                # cross entropy
-                labels_one_hot = labels_chunk.unsqueeze(1) == indices
-                label_logits = paddle.sum(
-                    paddle.where(
-                        labels_one_hot,
-                        normalized_logits,
-                        paddle.zeros_like(normalized_logits),
-                    ),
-                    axis=-1,
-                    keepdim=True,
+                    exp_logits = exp_logits.split(model_parallel_group.nranks, axis=-1)[model_parallel_group.rank]
+                    labels_one_hot = labels_one_hot.split(model_parallel_group.nranks, axis=-1)[
+                        model_parallel_group.rank
+                    ]
+                grad_logits_chunk = (exp_logits / sum_exp_logits - labels_one_hot.astype("float32")) / divisor
+                grad_logits_chunk = grad_logits_chunk.astype(dtype)
+                grad_logits_chunk = paddle.where(
+                    cond.unsqueeze(1),
+                    grad_logits_chunk,
+                    paddle.zeros_like(grad_logits_chunk),
                 )
-                if tensor_parallel_degree > 1 and tensor_parallel_output:
-                    dist.all_reduce(
-                        label_logits,
-                        op=dist.ReduceOp.SUM,
-                        group=model_parallel_group,
-                    )
-                token_loss_chunk = (log_sum_exp_logits - label_logits).squeeze(1) / divisor
-                cond = loss_mask[token_start_idx:token_end_idx].astype("bool")
-                token_loss_chunk = paddle.where(cond, token_loss_chunk, paddle.zeros_like(token_loss_chunk))
-                token_loss[token_start_idx:token_end_idx] = token_loss_chunk * loss_mask[token_start_idx:token_end_idx]
 
-                # gradients calculations
-                if not return_token_loss:
-                    if tensor_parallel_degree > 1 and not tensor_parallel_output:
-                        exp_logits = exp_logits.split(model_parallel_group.nranks, axis=-1)[model_parallel_group.rank]
-                        labels_one_hot = labels_one_hot.split(model_parallel_group.nranks, axis=-1)[
-                            model_parallel_group.rank
-                        ]
-                    grad_logits_chunk = (exp_logits / sum_exp_logits - labels_one_hot.astype("float32")) / divisor
-                    grad_logits_chunk = grad_logits_chunk.astype(dtype)
-                    grad_logits_chunk = paddle.where(
-                        cond.unsqueeze(1),
-                        grad_logits_chunk,
-                        paddle.zeros_like(grad_logits_chunk),
+                if grad_hidden_states is not None:
+                    paddle.scatter_(
+                        grad_hidden_states,
+                        cur_chunk_range,
+                        paddle.matmul(grad_logits_chunk, lm_head_weight_cast, transpose_y=not transpose_y),
+                        overwrite=True,
                     )
-
-                    if hidden_states.stop_gradient:
-                        grad_hidden_states[token_start_idx:token_end_idx] = paddle.matmul(
+                if grad_lm_head_weight is not None:
+                    if transpose_y:
+                        grad_lm_head_weight += paddle.matmul(
                             grad_logits_chunk,
-                            lm_head_weight_cast,
-                            transpose_y=not transpose_y,
+                            hidden_states_chunk,
+                            transpose_x=True,
                         )
-                    if grad_lm_head_weight is not None:
-                        if transpose_y:
-                            grad_lm_head_weight += paddle.matmul(
-                                grad_logits_chunk,
-                                hidden_states_chunk,
-                                transpose_x=True,
-                            )
-                        else:
-                            grad_lm_head_weight += paddle.matmul(
-                                hidden_states_chunk,
-                                grad_logits_chunk,
-                                transpose_x=True,
-                            )
-                    if grad_lm_head_bias is not None:
-                        grad_lm_head_bias += grad_logits_chunk.astype("float32").sum(axis=0).astype(dtype)
+                    else:
+                        grad_lm_head_weight += paddle.matmul(
+                            hidden_states_chunk,
+                            grad_logits_chunk,
+                            transpose_x=True,
+                        )
+                if grad_lm_head_bias is not None:
+                    grad_lm_head_bias += grad_logits_chunk.astype("float32").sum(axis=0).astype(dtype)
 
         if return_token_loss:
             loss = token_loss.reshape(original_shape[:-1])
@@ -646,8 +490,10 @@ class FusedHeadAndCrossEntropy(PyLayer):
         for i in range(0, n_tokens, loop_chunk_size):
             token_start_idx = i
             token_end_idx = min(i + loop_chunk_size, n_tokens)
-            hidden_states_chunk = hidden_states[token_start_idx:token_end_idx]
-            labels_chunk = labels[token_start_idx:token_end_idx]
+            cur_chunk_range = paddle.arange(token_start_idx, token_end_idx)
+            hidden_states_chunk = paddle.gather(hidden_states, cur_chunk_range, axis=0)
+            labels_chunk = paddle.gather(labels, cur_chunk_range, axis=0)
+            loss_mask_chunk = paddle.gather(loss_mask, cur_chunk_range, axis=0)
 
             # logits calculations
             logits_chunk_cast = paddle.matmul(
@@ -687,9 +533,9 @@ class FusedHeadAndCrossEntropy(PyLayer):
                 labels_one_hot = labels_one_hot.split(model_parallel_group.nranks, axis=-1)[model_parallel_group.rank]
             grad_logits_chunk = exp_logits / sum_exp_logits - labels_one_hot.astype("float32")
             # NOTE(hehuang): scaling grad_logits_chunk by grad_token_loss
-            grad_logits_chunk *= grad_token_loss[token_start_idx:token_end_idx].unsqueeze(1)
+            grad_logits_chunk *= paddle.gather(grad_token_loss, cur_chunk_range, axis=0).unsqueeze(1)
             grad_logits_chunk = grad_logits_chunk.astype(dtype)
-            cond = loss_mask[token_start_idx:token_end_idx].astype("bool")
+            cond = loss_mask_chunk.astype("bool")
             grad_logits_chunk = paddle.where(
                 cond.unsqueeze(1),
                 grad_logits_chunk,
@@ -697,10 +543,11 @@ class FusedHeadAndCrossEntropy(PyLayer):
             )
 
             if grad_hidden_states is not None:
-                grad_hidden_states[token_start_idx:token_end_idx] = paddle.matmul(
-                    grad_logits_chunk,
-                    lm_head_weight_cast,
-                    transpose_y=not transpose_y,
+                paddle.scatter_(
+                    grad_hidden_states,
+                    cur_chunk_range,
+                    paddle.matmul(grad_logits_chunk, lm_head_weight_cast, transpose_y=not transpose_y),
+                    overwrite=True,
                 )
             if grad_lm_head_weight is not None:
                 if transpose_y:

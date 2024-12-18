@@ -85,6 +85,7 @@ class TrainerState:
 
     epoch: Optional[float] = None
     global_step: int = 0
+    consumed_samples: int = 0
     max_steps: int = 0
     num_train_epochs: int = 0
     total_flos: float = 0

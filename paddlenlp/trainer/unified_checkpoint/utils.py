@@ -202,7 +202,7 @@ def mapping_optimizer_tp_actions(tp_actions, optimizer_loaded_keys):
     return new_actions
 
 
-def get_expected_state_dict(model_to_save):
+def get_expected_state_dict(model_to_save, **kwargs):
     """
     Get trainable state_dict of model_to_save.
     """
@@ -220,7 +220,9 @@ def get_expected_state_dict(model_to_save):
                 if key in state_dict:
                     state_dict.pop(key)
     elif isinstance(model_to_save, LoRAModel):
-        state_dict = model_to_save.get_trainable_state_dict()
+        concat_additional_adapter = kwargs.get("concat_additional_adapter", False)
+        concat_init_lora = model_to_save.lora_config.loraga and concat_additional_adapter
+        state_dict = model_to_save.get_trainable_state_dict(concat_init_lora=concat_init_lora)
     elif isinstance(model_to_save, PrefixModelForCausalLM):
         state_dict = model_to_save.prefix_encoder.state_dict()
 

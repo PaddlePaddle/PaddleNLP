@@ -17,6 +17,8 @@ import shutil
 import tempfile
 import unittest
 
+from parameterized import parameterized_class
+
 from paddlenlp.transformers.auto.tokenizer import AutoTokenizer
 from paddlenlp.transformers.llama.tokenizer import LlamaTokenizer
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
@@ -211,6 +213,30 @@ class LlamaTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         # No max_model_input_sizes
         self.assertGreaterEqual(len(self.tokenizer_class.pretrained_resource_files_map), 1)
         self.assertGreaterEqual(len(list(self.tokenizer_class.pretrained_resource_files_map.values())[0]), 1)
+
+
+@parameterized_class(
+    ["model_name_or_path"],
+    [
+        ["facebook/llama-7b"],
+        ["meta-llama/Meta-Llama-3.1-8B"],
+        ["meta-llama/Llama-3.2-1B"],
+        ["meta-llama/Llama-3.3-70B-Instruct"],
+    ],
+)
+class LlamaTokenizationLoadTest(unittest.TestCase):
+    model_name_or_path: str = None
+
+    def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
+        tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path, **kwargs)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.unk_token
+        return tokenizer
+
+    def test_load_tokenizer(self):
+        tokenizer = self.get_tokenizer()
+        text = "lower newer"
+        tokenizer.tokenize(text, add_prefix_space=True)
 
 
 class TikTokenIntegrationTests(unittest.TestCase):
