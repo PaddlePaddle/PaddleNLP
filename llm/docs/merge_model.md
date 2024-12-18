@@ -109,6 +109,8 @@ python merge_weight.py \
 - `slerp_dot_threshold`: Slerp 点积阈值。如果点积值超过该阈值，则使用线性插值，默认为 `0.9995`。
 - `ties_elect_type`: ties mask 的处理类型，支持 `"sum"` 或 `"count"`，默认为 `"sum"`。
 
+
+
 </div>
 
 <summary>&emsp; 稀疏化参数（Sparsify Parameters）</summary><div>
