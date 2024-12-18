@@ -300,7 +300,7 @@ class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             self.add_sequential_layer(
                 LayerDesc(
                     Qwen2DecoderLayerPipe,
-                    config=create_skip_config_for_refined_recompute(config.skip_recompute_ops[i], config),
+                    config=create_skip_config_for_refined_recompute(i, config),
                     layerwise_recompute=i not in self.no_recompute_layers,
                 ),
                 f"qwen2.layers.{i}",

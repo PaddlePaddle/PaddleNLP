@@ -953,8 +953,8 @@ class Qwen2Model(Qwen2PretrainedModel):
         self.layers = nn.LayerList(
             [
                 Qwen2DecoderLayer(
-                    config=create_skip_config_for_refined_recompute(config.skip_recompute_ops[layer_idx], config),
-                    layerwise_recompute=config.skip_recompute_ops[layer_idx] not in self.no_recompute_layers,
+                    config=create_skip_config_for_refined_recompute(layer_idx, config),
+                    layerwise_recompute=layer_idx not in self.no_recompute_layers,
                     layer_idx=layer_idx,
                 )
                 for layer_idx in range(config.num_hidden_layers)

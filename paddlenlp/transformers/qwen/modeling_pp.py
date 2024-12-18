@@ -175,7 +175,7 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             self.add_sequential_layer(
                 LayerDesc(
                     QWenBlockPipe,
-                    config=create_skip_config_for_refined_recompute(config.skip_recompute_ops[i], config),
+                    config=create_skip_config_for_refined_recompute(i, config),
                 ),
                 f"qwen.h.{i}",
             )
