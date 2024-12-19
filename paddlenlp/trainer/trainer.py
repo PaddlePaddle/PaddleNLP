@@ -114,6 +114,7 @@ from ..utils.env import (
     PADDLE_PEFT_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_INDEX_NAME,
     PADDLE_WEIGHTS_NAME,
+    PREFIX_CHECKPOINT_DIR,
     PREFIX_WEIGHTS_NAME,
     SAFE_MASTER_WEIGHTS_INDEX_NAME,
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
@@ -127,6 +128,7 @@ from ..utils.env import (
 from ..utils.fault_tolerance import LOSS_INF_ERROR, LOSS_NAN_ERROR
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import MetricsDumper, logger
+from ..utils.pdc_sdk import FLASH_DEVICE
 from ..utils.tools import get_env_device
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
@@ -141,7 +143,6 @@ from .trainer_callback import (
     TrainerState,
 )
 from .trainer_utils import (  # set_hyrbid_parallel_seed,
-    PREFIX_CHECKPOINT_DIR,
     EvalLoopOutput,
     EvalPrediction,
     IntervalStrategy,
@@ -863,7 +864,11 @@ class Trainer:
                     os.makedirs(resume_from_checkpoint, exist_ok=True)
                     logger.info(f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}")
 
-        if resume_from_checkpoint is not None and self.args.pdc_download_ckpt:
+        if (
+            resume_from_checkpoint is not None
+            and self.args.pdc_download_ckpt
+            and FLASH_DEVICE not in resume_from_checkpoint
+        ):
             if self.is_local_process_zero():
                 download_recovery_ckpt_from_pdc(resume_from_checkpoint, self.args.pdc_download_timeout)
             if self.args.world_size > 1:
@@ -2687,13 +2692,20 @@ class Trainer:
                 paddle.save(state_dict, save_path)
             dist.barrier(mp_group)
 
+    def _get_save_infos_based_on_steps(self, checkpoint_folder):
+        flash_checkpoint_dir = None
+        persistent_checkpoint_dir = None
+        if self.args.flash_save_steps > 0 and self.state.global_step % self.args.flash_save_steps == 0:
+            flash_checkpoint_dir = os.path.join(FLASH_DEVICE, checkpoint_folder)
+        if self.args.save_steps > 0 and self.state.global_step % self.args.save_steps == 0:
+            persistent_checkpoint_dir = os.path.join(self.args.output_dir, checkpoint_folder)
+        return (flash_checkpoint_dir, persistent_checkpoint_dir)
+
     def _save_checkpoint_flash(self):
         self.runtime_timer.start("checkpoint saving time")
         self.maybe_update_flash_checkpoint_worker()
         checkpoint_folder = f"{PREFIX_CHECKPOINT_DIR}-{self.state.global_step}"
-        flash_checkpoint_dir = None
-        persistent_checkpoint_dir = os.path.join(self.args.output_dir, checkpoint_folder)
-        save_infos = (flash_checkpoint_dir, persistent_checkpoint_dir)
+        save_infos = self._get_save_infos_based_on_steps(checkpoint_folder)
         non_cached_objects = (self.lr_scheduler.state_dict(), self.state)
         self.flash_checkpoint_manager.get_idle_worker_for_saving(save_infos, non_cached_objects)
         self.runtime_timer.stop()

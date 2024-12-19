@@ -32,6 +32,7 @@ from paddlenlp.trainer import Trainer
 from ..transformers.model_utils import unwrap_model
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.env import (
+    PREFIX_CHECKPOINT_DIR,
     SCALER_NAME,
     SCHEDULER_NAME,
     TRAINER_STATE_NAME,
@@ -42,7 +43,6 @@ from .argparser import strtobool
 from .auto_training_args import AutoTrainingArguments
 from .trainer_callback import TrainerState
 from .trainer_utils import (  # set_hyrbid_parallel_seed,
-    PREFIX_CHECKPOINT_DIR,
     ShardingOption,
     TrainOutput,
     _exec_mode_guard,
