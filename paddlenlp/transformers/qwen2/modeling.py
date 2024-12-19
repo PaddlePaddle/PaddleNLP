@@ -441,7 +441,7 @@ class Qwen2MLP(nn.Layer):
         if self.fuse_attention_ffn:
             return self.down_proj(self.act_fn(self.gate_up_fused_proj(x)))
         else:
-            return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+            return self.down_proj(self.act_fn(self.gate_proj(x), self.up_proj(x)))
 
 
 def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
