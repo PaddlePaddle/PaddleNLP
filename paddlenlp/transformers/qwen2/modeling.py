@@ -295,9 +295,7 @@ class Qwen2RMSNorm(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
-            return fusion_ops.fusion_rms_norm(
-                hidden_states, self.weight, self.variance_epsilon, False
-            )
+            return fusion_ops.fusion_rms_norm(hidden_states, self.weight, self.variance_epsilon, False)
 
         if paddle.in_dynamic_mode():
             with paddle.amp.auto_cast(False):
@@ -543,13 +541,17 @@ class Qwen2Attention(nn.Layer):
                     gather_output=False,
                 )
             else:
-                self.q_proj = ColumnParallelLinear(self.hidden_size, self.hidden_size, has_bias=True, gather_output=False)
+                self.q_proj = ColumnParallelLinear(
+                    self.hidden_size, self.hidden_size, has_bias=True, gather_output=False
+                )
                 self.k_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False)  # fmt:skip
                 self.v_proj = ColumnParallelLinear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, has_bias=True, gather_output=False)  # fmt:skip
             self.o_proj = RowParallelLinear(self.hidden_size, self.hidden_size, has_bias=False, input_is_parallel=True)
         else:
             if self.fuse_attention_qkv:
-                self.qkv_proj = Linear(self.hidden_size, self.hidden_size + 2 * self.config.num_key_value_heads * self.head_dim)
+                self.qkv_proj = Linear(
+                    self.hidden_size, self.hidden_size + 2 * self.config.num_key_value_heads * self.head_dim
+                )
             else:
                 self.q_proj = Linear(self.hidden_size, self.hidden_size, bias_attr=True)
                 self.k_proj = Linear(self.hidden_size, self.config.num_key_value_heads * self.head_dim, bias_attr=True)
