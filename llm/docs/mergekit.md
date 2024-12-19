@@ -59,7 +59,7 @@ git clone 代码到本地，即可开始。
 ### 3.2 模型融合
 
 ```
-python merge_weight.py \
+python mergekit.py \
     --device cpu \
     --tensor_type np \
     --n_process 2 \

@@ -206,7 +206,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo
 PadlleNLP 支持多种模型融合方法，包括**Linear、Slerp、Ties、DARE、DELLA**，并支持模型参数稀疏化方法与模型融合算法的灵活组合使用。
 ```shell
 # 模型融合启动命令参考
-python merge_weight.py \
+python mergekit.py \
     --device cpu \
     --tensor_type np \
     --n_process 2 \
@@ -216,7 +216,7 @@ python merge_weight.py \
 
 ```
 
-更多模型融合算法与细节详见[模型融合文档](./docs/merge_model.md)。
+更多模型融合算法与细节详见[模型融合文档](./docs/mergekit.md)。
 
 ### 5. 量化
 
