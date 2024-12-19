@@ -37,21 +37,12 @@ from paddlenlp.transformers.model_utils import (
     unwrap_optimizer,
 )
 from paddlenlp.transformers.utils import paddlenlp_load
+from paddlenlp.utils.env import MODEL_META_NAME, SHARDING_META_NAME
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
 
 from . import reshard as reshard_util
 from .reshard import SHARDING_STRATEGY_V1, SHARDING_STRATEGY_V2, pp_reshard
-
-# Name of the files used for checkpointing
-TRAINING_ARGS_NAME = "training_args.bin"
-TRAINER_STATE_NAME = "trainer_state.json"
-
-OPTIMIZER_NAME = "optimizer.pdopt"
-SCHEDULER_NAME = "scheduler.pdparams"
-SCALER_NAME = "scaler.pdparams"
-MODEL_META_NAME = "model_meta.json"
-SHARDING_META_NAME = "shard_meta.json"
 
 
 def to_device(tensor, place=None):
@@ -418,16 +409,16 @@ class ShardingIO:
             )
         return state_dict, config_to_save, weight_name_suffix
 
-    def save_distributed_model_meta(self, dir):
+    def gather_distributed_model_meta(self):
         if not self.args.use_hybrid_parallel:
-            return
+            return None
 
         if not self.args.should_save_sharding_stage1_model:
-            return
+            return None
 
         nranks = dist.get_world_size()
         if nranks <= 1:
-            return
+            return None
 
         model_meta = {}
         parallel_config = self._get_distributed_strategy()
@@ -437,12 +428,7 @@ class ShardingIO:
         if sharding_metas:
             model_meta["sharding_metas"] = sharding_metas
 
-        if dist.get_rank():
-            return
-
-        path = os.path.join(dir, MODEL_META_NAME)
-        with open(path, "w") as f:
-            json.dump(model_meta, f)
+        return model_meta
 
     def _get_distributed_strategy(self):
         pp_degree = 1

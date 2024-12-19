@@ -25,6 +25,7 @@ except ImportError:
     LOSS_INF_ERROR = "PaddleRecall error(104): LossInf"
 
 PDC_DOWNLOAD_ERROR = "PaddleRecall error(105): PDCDownloadError"
+FC_DUMP_ERROR = "PaddleRecall error(106): FCDumpError"
 
 
 def is_ft_env():

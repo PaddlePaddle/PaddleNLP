@@ -132,3 +132,10 @@ MAX_QUANTIZATION_TIMES = 1
 MAX_BSZ = 512
 SPECULATE_MAX_BSZ = 256
 MAX_DRAFT_TOKENS = 6
+# Name of the files used for checkpointing
+TRAINING_ARGS_NAME = "training_args.bin"
+TRAINER_STATE_NAME = "trainer_state.json"
+MODEL_META_NAME = "model_meta.json"
+SCHEDULER_NAME = "scheduler.pdparams"
+SCALER_NAME = "scaler.pdparams"
+SHARDING_META_NAME = "shard_meta.json"
