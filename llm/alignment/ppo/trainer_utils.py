@@ -32,7 +32,6 @@ from paddle.io import DataLoader
 from paddlenlp.generation.utils import GenerationMixin
 from paddlenlp.trainer import IntervalStrategy
 from paddlenlp.trainer.trainer import (
-    TRAINER_STATE_NAME,
     HybridParallelOptimizer,
     NlpDistributedBatchSampler,
     ShardingOption,
@@ -53,6 +52,7 @@ from paddlenlp.transformers import BatchEncoding, PretrainedModel, PretrainedTok
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_outputs import ModelOutput
 from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy
+from paddlenlp.utils.env import TRAINER_STATE_NAME
 
 
 @dataclass

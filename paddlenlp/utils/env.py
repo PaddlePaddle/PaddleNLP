@@ -79,6 +79,15 @@ CONFIG_NAME = "config.json"
 TOKENIZER_CONFIG_NAME = "tokenizer_config.json"
 CHAT_TEMPLATE_CONFIG_NAME = "chat_template.json"
 GENERATION_CONFIG_NAME = "generation_config.json"
+
+# Name of the files used for checkpointing
+TRAINING_ARGS_NAME = "training_args.bin"
+TRAINER_STATE_NAME = "trainer_state.json"
+MODEL_META_NAME = "model_meta.json"
+SCHEDULER_NAME = "scheduler.pdparams"
+SCALER_NAME = "scaler.pdparams"
+SHARDING_META_NAME = "shard_meta.json"
+
 # Fast tokenizers (provided by HuggingFace tokenizer's library) can be saved in a single file
 FULL_TOKENIZER_NAME = "tokenizer.json"
 TIKTOKEN_VOCAB_FILE = "tokenizer.model"

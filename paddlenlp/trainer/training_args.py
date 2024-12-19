@@ -994,6 +994,30 @@ class TrainingArguments:
     save_sharding_stage1_model_include_freeze_params: Optional[bool] = field(
         default=False, metadata={"help": "Save Sharding Stage1 Model Exclude Freeze Params"}
     )
+    enable_flash_save_mode: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable Flash Save Mode"},
+    )
+    fc_workers_num: Optional[int] = field(
+        default=3,
+        metadata={
+            "help": "The worker num for flash save mode. Increase to gain performance but cost more memory and cpu usage."
+        },
+    )
+    fc_pipeline_hooks_capacity_usage: Optional[float] = field(
+        default=0.6,
+        metadata={
+            "help": "Set pipeline hook capacity usage ratio. Lower value brings faster save speed but may effect calculation speed."
+        },
+    )
+    save_tokenizer: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Save tokenizer to output_dir."},
+    )
+    save_rng_states: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Save rng states to output_dir."},
+    )
     pdc_download_ckpt: Optional[bool] = field(
         default=False,
         metadata={"help": "Download checkpoint in paddlecloud longjob environment"},
