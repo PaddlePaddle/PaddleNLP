@@ -77,6 +77,9 @@ class LoRAConfig:
     rslora: bool = field(default=False, metadata={"help": "Whether to use RsLoRA"})
     pissa: bool = field(default=False, metadata={"help": "Whether to use Pissa: https://arxiv.org/pdf/2404.02948.pdf"})
     loraga: bool = field(default=False, metadata={"help": "Whether to LoRA-GA"})
+    use_mora: bool = field(
+        default=False, metadata={"help": "Whether to use MoRA: https://arxiv.org/pdf/2405.12130.pdf"}
+    )
     lora_plus_scale: float = field(default=1.0, metadata={"help": "Lora B scale in LoRA+"})
     base_model_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "The name of the base model to use."}

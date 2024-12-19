@@ -154,8 +154,10 @@ class LoRAModel(nn.Layer):
         if issubclass(type(self.model), PipelineLayer):
             self.is_pipelinemodel = True
             self.model._single_to_pp_mapping = None
-        if (self.lora_config.tensor_parallel_degree > 1 or self.is_pipelinemodel) and self.lora_config.lora_use_mixer:
-            raise NotImplementedError("lora_use_mixer is not supported in tensor parallel mode.")
+        if (self.lora_config.tensor_parallel_degree > 1 or self.is_pipelinemodel) and (
+            self.lora_config.lora_use_mixer or self.use_mora
+        ):
+            raise NotImplementedError("lora_use_mixer or mora is not supported in tensor parallel mode.")
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:
             self.lora_config.tensor_parallel_degree = self.model.config.tensor_parallel_degree
             logger.warning(
@@ -256,7 +258,6 @@ class LoRAModel(nn.Layer):
             )
             loaded_keys = sharded_metadata["all_checkpoint_keys"]
             expected_keys = set(lora_model.get_trainable_state_dict().keys())
-
             missing_keys = expected_keys - set(loaded_keys)
             if len(missing_keys) > 0:
                 raise ValueError(f"missing_keys: {missing_keys}")
@@ -487,6 +488,7 @@ class LoRAModel(nn.Layer):
                 bias_attr=False if module.bias is None else None,
                 use_quick_lora=lora_config.use_quick_lora,
                 lora_use_mixer=lora_config.lora_use_mixer,
+                use_mora=lora_config.use_mora,
             )
         if isinstance(module, nn.Conv2D):
             lora_module = LoRAConv2D(
@@ -703,7 +705,7 @@ class LoRAModel(nn.Layer):
             else:
                 trainable_numel += np.prod(weight.shape)
         logger.debug(
-            f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel+trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel+trainable_numel):.2%}"
+            f"Frozen parameters: {freeze_numel:.2e} || Trainable parameters:{trainable_numel:.2e} || Total parameters:{freeze_numel + trainable_numel:.2e}|| Trainable:{trainable_numel / (freeze_numel + trainable_numel):.2%}"
         )
 
     def mark_only_lora_as_trainable(self) -> None:

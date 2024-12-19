@@ -43,7 +43,7 @@ def reft_predict(predictor_args):
     tokenizer.pad_token_id = tokenizer.eos_token_id
     dev_ds = load_dataset(
         "json",
-        data_files=os.path.join(predictor_args.dataset_name_or_path, "dev.json"),
+        data_files=predictor_args.data_file,
     )[0]
     trans_func = partial(
         convert_example_for_reft,
@@ -80,7 +80,7 @@ def get_pred_parser():
     parser.add_argument("--reft_path", type=str, help="The reft model path")
     parser.add_argument("--output_file", type=str, help="The output file path")
     parser.add_argument("--batch_size", type=int, help="The batch size in prediction")
-    parser.add_argument("--dataset_name_or_path", type=str, help="The dataset name or path")
+    parser.add_argument("--data_file", type=str, help="The dataset name or path")
     parser.add_argument("--max_length", type=int, default=1024, help="The maximum length of input sequences")
     parser.add_argument("--src_length", type=int, default=512, help="The source sequence length")
     parser.add_argument("--num_beams", type=int, default=4, help="The maximum length of input sequences")

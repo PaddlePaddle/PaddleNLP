@@ -1904,9 +1904,14 @@ class Trainer:
             if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:
                 if self.args.tensor_parallel_degree <= 1:
                     checkpoint_rng_state["hybrid_parallel_rng_state_tracker"].pop("model_parallel_rng", None)
-                fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
-                    checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
-                )
+                try:
+                    fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
+                        checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
+                    )
+                except:
+                    logger.warning(
+                        "Hybrid paralell rng states change when training environment differs, so we dot not set state tracker here."
+                    )
             else:
                 logger.warning("Not found hybrid parallel RNG state.")
 

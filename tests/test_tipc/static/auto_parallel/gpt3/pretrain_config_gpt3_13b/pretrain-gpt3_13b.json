@@ -3,7 +3,7 @@
     "tokenizer_name_or_path": "gpt3-13B-en",
     "to_static": true,
     "enable_auto_parallel": 1,
-    "input_dir": "../llama_data",
+    "input_dir": "./data",
     "output_dir": "./checkpoints/gpt_pretrain_ckpts",
     "split": "949,50,1",
     "max_seq_length": 4096,

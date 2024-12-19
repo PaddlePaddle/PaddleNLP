@@ -15,7 +15,7 @@
 param="model_item=baichuan-inc-baichaun-2-13b_pretrain "
 param+="run_mode=DP1_MP2_PP4_1F1B_Sharding8_Stage2 "
 param+="device_num=N4C32 "
-param+="global_batch_size=32 "
+param+="global_batch_size=128 "
 param+="nnodes=4 "
 param+="model_type=baichuan2_13b "
 
