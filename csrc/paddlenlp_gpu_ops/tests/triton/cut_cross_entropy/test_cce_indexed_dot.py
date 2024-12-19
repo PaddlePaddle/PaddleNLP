@@ -1,7 +1,6 @@
 # Copyright (C) 2024 Apple Inc. All Rights Reserved.
 import paddle
 import pytest
-
 from paddlenlp_gpu_ops.triton.cut_cross_entropy.indexed_dot import (
     indexed_neg_dot_forward_kernel,
 )

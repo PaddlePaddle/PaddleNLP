@@ -4,7 +4,6 @@ import paddle
 import paddle.nn.functional as F
 import pytest
 from einops import rearrange
-
 from paddlenlp_gpu_ops.cuda.causal_conv1d import (
     causal_conv1d_fn,
     causal_conv1d_ref,

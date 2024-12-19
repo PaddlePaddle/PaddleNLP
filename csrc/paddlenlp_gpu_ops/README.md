@@ -1,4 +1,4 @@
-# paddlenlp_gpu_ops
+# PaddleNLP GPU 算子库
 paddlenlp_gpu_ops 是一个专为 PaddleNLP 设计的 GPU 算子库，它囊括了一系列常用的自然语言处理（NLP）算子，并提供了 CUDA 和 Triton 两种实现方式，以充分利用 GPU 的强大计算能力。
 
 目前支持：

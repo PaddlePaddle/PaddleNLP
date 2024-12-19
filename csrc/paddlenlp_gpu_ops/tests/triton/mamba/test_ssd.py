@@ -16,7 +16,6 @@ import paddle
 import paddle.nn.functional as F
 import pytest
 from einops import rearrange
-
 from paddlenlp_gpu_ops.triton.ssd_chunk_state import (
     _chunk_cumsum_fwd,
     _chunk_state_fwd,

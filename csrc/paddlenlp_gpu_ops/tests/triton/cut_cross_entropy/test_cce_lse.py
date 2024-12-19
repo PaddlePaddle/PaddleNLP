@@ -4,7 +4,6 @@ from typing import Union
 import paddle
 import paddle.nn.functional as F
 import pytest
-
 from paddlenlp_gpu_ops.triton.cut_cross_entropy.cce_lse_forward import (
     cce_lse_forward_kernel,
 )

@@ -70,7 +70,16 @@ class RingProb(paddle.autograd.PyLayer):
         group=None,
     ):
         if group is None:
-            group = dist.fleet.get_hybrid_communicate_group().get_data_parallel_group()
+            hcg = dist.fleet.get_hybrid_communicate_group()
+            dp_world_size = hcg.get_data_parallel_world_size()
+            sd_world_size = hcg.get_sharding_parallel_world_size()
+            if dp_world_size > 1 and sd_world_size > 1:
+                raise RuntimeError("data parallel with sharding parallel is not supported in `RingProb` now")
+            if dp_world_size > 1:
+                group = hcg.get_data_parallel_group()
+            if sd_world_size > 1:
+                group = hcg.get_sharding_parallel_group()
+
         k = k.contiguous()
         comm = RingComm(group)
 

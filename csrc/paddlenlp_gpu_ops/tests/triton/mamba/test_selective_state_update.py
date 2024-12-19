@@ -4,7 +4,6 @@
 import paddle
 import pytest
 from einops import repeat
-
 from paddlenlp_gpu_ops.triton.selective_state_update import (
     selective_state_update,
     selective_state_update_ref,

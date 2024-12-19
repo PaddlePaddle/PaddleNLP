@@ -3,7 +3,6 @@
 
 import paddle
 import pytest
-
 from paddlenlp_gpu_ops.cuda.selective_scan import (
     mamba_inner_fn,
     mamba_inner_ref,
