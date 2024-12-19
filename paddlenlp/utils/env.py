@@ -19,6 +19,7 @@ PPNLP_HOME              -->  the root directory for storing PaddleNLP related da
 └─ DATA_HOME         -->  Store automatically downloaded datasets.
 """
 import os
+import re
 
 
 def _get_user_home():
@@ -132,6 +133,10 @@ MAX_QUANTIZATION_TIMES = 1
 MAX_BSZ = 512
 SPECULATE_MAX_BSZ = 256
 MAX_DRAFT_TOKENS = 6
+# checkpoint dir name and regex
+PREFIX_CHECKPOINT_DIR = "checkpoint"
+_re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\-(\d+)$")
+
 # Name of the files used for checkpointing
 TRAINING_ARGS_NAME = "training_args.bin"
 TRAINER_STATE_NAME = "trainer_state.json"
