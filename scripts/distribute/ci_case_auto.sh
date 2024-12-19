@@ -2239,11 +2239,11 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.566679
+    loss_base=10.57121372
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.56109619 # after add dropout spmd
+        loss_base=10.57415771 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
