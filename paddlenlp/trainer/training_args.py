@@ -266,6 +266,8 @@ class TrainingArguments:
               sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
               sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
               sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.
+              replace_with_c_embedding, it supports replacing col-sliced embedding with row-sliced c_embedding when it set True, which is used in PIR auto_parallel.
+              replace_with_parallel_cross_entropy, it replaces 'cross_entropy_with_softmax' OP with 'c_softmax_with_cross_entropy' OP in PIR static graph, which can improve model parallel performance.
         pipeline_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
             following config is support:
@@ -378,6 +380,8 @@ class TrainingArguments:
             Whether to use distributed dataloader. Default is `False`.
         release_grads (`bool`, *optional*):
             Whether to release gradients during training. Default is `False`.
+        ckpt_quant_stage (`str`, *optional*):
+            Whether activate checkpoint quantization. O0: deactivate, O1: Int8 compression, O2: Int4 compression. (default: O0).
     """
 
     output_dir: str = field(
@@ -679,6 +683,8 @@ class TrainingArguments:
                 "sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.\n"
                 "sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.\n"
                 "sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.\n"
+                "replace_with_c_embedding, it supports replacing col-sliced embedding with row-sliced c_embedding when it set True, which is used in PIR auto_parallel.\n"
+                "replace_with_parallel_cross_entropy, it replaces 'cross_entropy_with_softmax' OP with 'c_softmax_with_cross_entropy' OP in PIR static graph, which can improve model parallel performance.\n"
             )
         },
     )
@@ -870,9 +876,16 @@ class TrainingArguments:
                 "- skip_save_model_weight: do not save model weights when the masters weight exist\n"
                 "- master_weight_compatible: 1. if the master weights exist, only load when needed\n"
                 "                            2. if master weights does not exist, convert model weights to master weights when needed\n"
+                "- remove_master_weight: same with `master_weight_compatible`, use in checkpoint quantization.\n"
                 "- async_save: enable asynchronous saving checkpoints to disk\n"
                 "- enable_all_options: enable all optimization configurations\n"
             )
+        },
+    )
+    ckpt_quant_stage: str = field(
+        default="O0",
+        metadata={
+            "help": "checkpoint quantization stage. O0: deactivate, O1: Int8 compression, O2: Int4 compression. (default: O0)"
         },
     )
     ignore_load_lr_and_optim: Optional[bool] = field(
@@ -1009,6 +1022,8 @@ class TrainingArguments:
             raise ValueError("At most one of fp16 and bf16 can be True for full eval, but not both")
 
         self.optim = OptimizerNames(self.optim)
+        if self.optim == OptimizerNames.ADAMW_MINI and self.tensor_parallel_degree > 1:
+            raise ValueError("AdamW Mini currently doesn't support tensor parallelism.")
 
         self.use_hybrid_parallel = False
 
@@ -1361,10 +1376,6 @@ class TrainingArguments:
                             strategy.hybrid_configs["sharding_configs"].comm_buffer_size_MB = int(
                                 self.sharding_comm_buffer_size_MB
                             )
-                            # The `comm_buffer_size_MB` is added directly to sharding properties
-                            # for semi-auto mode, avoiding potential confusion with strategy config,
-                            # as parameters in semi-auto mode are managed via strategy.
-                            strategy.sharding.comm_buffer_size_MB = int(self.sharding_comm_buffer_size_MB)
 
                         if "split_param" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].split_param = True
@@ -1372,10 +1383,6 @@ class TrainingArguments:
 
                         if "enable_release_grads" in sharding_parallel_config:
                             strategy.hybrid_configs["sharding_configs"].release_gradients = True
-                            # `release_gradients` is set directly in sharding properties for the same
-                            # reason as `comm_buffer_size_MB`, to avoid confusion with centralized
-                            # strategy management in semi-auto mode.
-                            strategy.sharding.release_gradients = True
 
                         if self.pipeline_parallel_degree == 1:
                             strategy.hybrid_configs["sharding_configs"].tensor_fusion = (
@@ -1562,19 +1569,23 @@ class TrainingArguments:
                         if x not in [
                             "enable_mp_async_allreduce",  # allreduce_matmul_grad_overlapping in auto_parallel
                             "enable_delay_scale_loss",
+                            "replace_with_c_embedding",
                             # "enable_mp_skip_c_identity",
                             # "enable_mp_fused_linear_param_grad_add",
+                            "replace_with_parallel_cross_entropy",
                         ]:
                             raise ValueError(
                                 f"Found unknown tensor parallell config {x}, "
-                                f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add"
+                                f"accept config is enable_mp_async_allreduce, replace_with_c_embedding, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add"
                             )
                 try:
                     if "enable_mp_async_allreduce" in mp_config:
                         mp_optimization.allreduce_matmul_grad_overlapping = True
+                    if "replace_with_c_embedding" in mp_config:
+                        mp_optimization.replace_with_c_embedding = True
                 except:
                     warnings.warn(
-                        "The enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
+                        "The enable_mp_async_allreduce, replace_with_c_embedding, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
                         "by current version of Paddle. Please try latest develop Paddle."
                     )
 
@@ -1588,6 +1599,8 @@ class TrainingArguments:
                     sharding.stage = 2
                 elif ShardingOption.FULL_SHARD in self.sharding:
                     sharding.stage = 3
+                if self.sharding_comm_buffer_size_MB > 0:
+                    sharding.comm_buffer_size_MB = int(self.sharding_comm_buffer_size_MB)
 
                 sharding_parallel_config = split_parallel_config(self.sharding_parallel_config)
                 for x in sharding_parallel_config:
@@ -1596,6 +1609,7 @@ class TrainingArguments:
                             "enable_stage1_tensor_fusion",
                             "enable_stage1_overlap",
                             "enable_stage2_overlap",
+                            "enable_release_grads",
                         ]:
                             raise ValueError(
                                 f"Found unknown pipeline mode config {x}, " f"accpet config is reduce_overlap."
@@ -1609,6 +1623,9 @@ class TrainingArguments:
 
                     if "enable_stage1_tensor_fusion" in sharding_parallel_config:
                         sharding.grad_bucket_size_numel = 210355872
+
+                    if "enable_release_grads" in sharding_parallel_config:
+                        sharding.release_gradients = True
 
             if self.bf16 or self.fp16:
                 amp = strategy.amp
@@ -1688,6 +1705,7 @@ class TrainingArguments:
                     if x not in [
                         "skip_save_model_weight",
                         "master_weight_compatible",
+                        "remove_master_weight",
                         "async_save",
                         "enable_all_options",
                         "ignore_merge_optimizer",

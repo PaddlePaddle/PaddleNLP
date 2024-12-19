@@ -40,6 +40,7 @@ from paddlenlp.experimental.transformers.fused_transformer_layers import (
     FusedMultiTransformerBase,
     FusedMultiTransformerConfig,
     FusedMultiTransformerWeightOnly,
+    SpeculateConfig,
 )
 from paddlenlp.experimental.transformers.generation_utils import (
     GenerationAvxInferenceModel,
@@ -88,12 +89,9 @@ class FusedLlamaRMSNorm(nn.Layer):
         self.config = config
 
     def forward(self, hidden_states):
-        result = paddle.incubate.nn.functional.fused_rms_norm(
+        return paddle.incubate.nn.functional.fused_rms_norm(
             hidden_states, self.weight, None, self.variance_epsilon, begin_norm_axis=1
-        )
-        if isinstance(result, tuple):
-            return result[0]
-        return result
+        )[0]
 
 
 class LLamaAvxLMHead(nn.Layer):
@@ -608,6 +606,10 @@ class LlamaInferenceModel(LlamaPretrainedModel):
                 paddle.ParamAttr(name="fusellama.{}.cache_v_out_scale".format(i)) for i in range(self.num_layers)
             ]
 
+        speculate_config = SpeculateConfig(
+            speculate_method=config.get("speculate_method", None),
+            speculate_max_draft_token_num=config.get("speculate_max_draft_token_num", 5),
+        )
         transformer_config = FusedMultiTransformerConfig(
             embed_dim=self.hidden_size,
             num_heads=self.num_attention_heads,
@@ -657,6 +659,7 @@ class LlamaInferenceModel(LlamaPretrainedModel):
             rank_id=config.tensor_parallel_rank,
             trans_qkvw=(False if paddle.is_compiled_with_rocm() and "a8w8" in self.quant_type else True),
             append_attn=config.append_attn,
+            speculate_config=speculate_config,
         )
 
         self.set_transformer_block(transformer_config)
@@ -1382,13 +1385,13 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
         else:
             self.transformer_block = FusedBlockMultiTransformer(transformer_config)
 
-    def remove_padding(self, input_ids, seq_lens_this_time):
+    def remove_padding(self, input_ids, seq_lens_this_time, draft_tokens=None, seq_lens_encoder=None):
         cum_offsets_now = paddle.cumsum(self.max_seq_len - seq_lens_this_time)
         token_num = paddle.sum(seq_lens_this_time)
         from paddlenlp_ops import get_padding_offset_v2
 
         ids_remove_padding, cum_offsets, padding_offset, cu_seqlens_q, cu_seqlens_k = get_padding_offset_v2(
-            input_ids, cum_offsets_now, token_num, seq_lens_this_time
+            input_ids, cum_offsets_now, token_num, seq_lens_this_time, draft_tokens, seq_lens_encoder
         )
         return ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k
 
@@ -1407,9 +1410,19 @@ class LlamaBlockInferenceModel(LlamaInferenceModel):
 
         seq_lens_this_time = kwargs.get("seq_lens_this_time", None)
         rope_emb = kwargs.get("rope_emb", None)
-        ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
-            input_ids, seq_lens_this_time
-        )
+        draft_tokens = kwargs.get("draft_tokens", None)
+        seq_lens_encoder = kwargs.get("seq_lens_encoder", None)
+
+        # whether speculative decoding or not
+        if draft_tokens is None:
+            ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+                input_ids, seq_lens_this_time
+            )
+        else:
+            ids_remove_padding, padding_offset, cum_offsets, cu_seqlens_q, cu_seqlens_k = self.remove_padding(
+                input_ids, seq_lens_this_time, draft_tokens, seq_lens_encoder
+            )
+
         kwargs["cu_seqlens_q"] = cu_seqlens_q
         kwargs["cu_seqlens_k"] = cu_seqlens_k
         kwargs["padding_offsets"] = padding_offset
@@ -1537,7 +1550,11 @@ class LlamaForCausalLMInferenceModel(GenerationInferenceModel, LlamaPretrainedMo
     def __init__(self, config):
         super().__init__(config)
         self.llama = LlamaInferenceModel(config)
-        self.lm_head = LlamaLMHead(config)
+        if config.tie_word_embeddings:
+            self.lm_head = LlamaLMHead(config, embedding_weights=self.llama.embed_tokens.weight, transpose_y=True)
+            self.tie_weights()
+        else:
+            self.lm_head = LlamaLMHead(config)
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
@@ -1710,8 +1727,16 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
 
     def __init__(self, config):
         super().__init__(config)
+        self.max_candidate_len = config.get("speculate_max_candidate_len", 5)
+        self.verify_window = config.get("speculate_verify_window", 2)
+        self.max_seq_len = config.max_seq_len
+
         self.llama = LlamaBlockInferenceModel(config)
-        self.lm_head = LlamaLMHead(config)
+        if config.tie_word_embeddings:
+            self.lm_head = LlamaLMHead(config, embedding_weights=self.llama.embed_tokens.weight, transpose_y=True)
+            self.tie_weights()
+        else:
+            self.lm_head = LlamaLMHead(config)
 
     @classmethod
     def _get_tensor_parallel_mappings(cls, config: LlamaConfig, is_split=True):
@@ -1845,6 +1870,11 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         v_quant_scales = kwargs.get("v_quant_scales", None)
         k_dequant_scales = kwargs.get("k_dequant_scales", None)
         v_dequant_scales = kwargs.get("v_dequant_scales", None)
+
+        # speculative decoding related parameters
+        draft_tokens = kwargs.get("draft_tokens", None)
+        output_padding_offset = kwargs.get("output_padding_offset", None)
+
         model_inputs = {
             "input_ids": input_ids,
             "src_mask": src_mask,
@@ -1859,6 +1889,8 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             "v_quant_scales": v_quant_scales,
             "k_dequant_scales": k_dequant_scales,
             "v_dequant_scales": v_dequant_scales,
+            "draft_tokens": draft_tokens,
+            "output_padding_offset": output_padding_offset,
         }
         return model_inputs
 
@@ -1877,6 +1909,8 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
         v_quant_scales=None,
         k_dequant_scales=None,
         v_dequant_scales=None,
+        draft_tokens=None,
+        output_padding_offset=None,
     ):
         outputs = self.llama(
             input_ids,
@@ -1892,6 +1926,8 @@ class LlamaForCausalLMBlockInferenceModel(GenerationBlockInferenceModel, LlamaPr
             v_quant_scales=v_quant_scales,
             k_dequant_scales=k_dequant_scales,
             v_dequant_scales=v_dequant_scales,
+            draft_tokens=draft_tokens,
+            output_padding_offset=output_padding_offset,
         )
 
         hidden_states = outputs[0]

@@ -75,6 +75,7 @@ GENERATION_CONFIG_NAME = "generation_config.json"
 # Fast tokenizers (provided by HuggingFace tokenizer's library) can be saved in a single file
 FULL_TOKENIZER_NAME = "tokenizer.json"
 TIKTOKEN_VOCAB_FILE = "tokenizer.model"
+MERGE_CONFIG_NAME = "merge_config.json"
 
 LORA_CONFIG_NAME = "lora_config.json"
 LORA_WEIGHTS_NAME = "lora_model_state.pdparams"
@@ -85,6 +86,9 @@ VERA_WEIGHTS_NAME = "vera_model_state.pdparams"
 PREFIX_CONFIG_NAME = "prefix_config.json"
 PREFIX_WEIGHTS_NAME = "prefix_model_state.pdparams"
 PADDLE_PEFT_WEIGHTS_INDEX_NAME = "peft_model.pdparams.index.json"
+
+LOKR_WEIGHTS_NAME = "lokr_model_state.pdparams"
+LOKR_CONFIG_NAME = "lokr_config.json"
 
 PAST_KEY_VALUES_FILE_NAME = "pre_caches.npy"
 
@@ -111,3 +115,20 @@ SAFE_MASTER_WEIGHTS_INDEX_NAME = "master_weights.safetensors.index.json"
 
 SAFE_PEFT_WEIGHTS_NAME = "peft_model.safetensors"
 SAFE_PEFT_WEIGHTS_INDEX_NAME = "peft_model.safetensors.index.json"
+
+# Checkpoint quantization
+MOMENT1_KEYNAME = "moment1_0"
+MOMENT2_KEYNAME = "moment2_0"
+BETA1_KEYNAME = "beta1_pow_acc_0"
+BETA2_KEYNAME = "beta2_pow_acc_0"
+SYMMETRY_QUANT_SCALE = "@scales"
+ASYMMETRY_QUANT_SCALE_MIN = "@min_scales"
+ASYMMETRY_QUANT_SCALE_MAX = "@max_scales"
+MAX_QUANTIZATION_TIMES = 1
+
+# LLM Inference related environment variables
+# Note(@Wanglongzhi2001): MAX_BSZ must be the same as definition in get_output / save_output
+# SPECULATE_MAX_BSZ, MAX_DRAFT_TOKENS must be the same as definition in speculate_get_output / speculate_save_output
+MAX_BSZ = 512
+SPECULATE_MAX_BSZ = 256
+MAX_DRAFT_TOKENS = 6

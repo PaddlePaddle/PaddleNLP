@@ -119,6 +119,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo
 - `unified_checkpoint`: 是否使用统一的 checkpoint，默认为 `True`。
 - `autotuner_benchmark`: 是否启用 autotuner 基准测试，默认为 `False`。
 - `benchmark`: 是否开启基准测试，默认为 `False`。
+- `optim`:默认为`adamw`，支持`adamw`, `adamw_mini`。
 ### DPO 参数（DPOArguments）
 - `beta`: DPO 损失函数的 beta 参数，默认为 0.1。
 - `simpo_gamma`: SimPO 损失函数的 gamma 参数，默认为 0.5。

@@ -135,7 +135,7 @@ class CodeGenAttention(Layer):
         attn_weights = attn_weights / self.scale_attn
         mask_value = paddle.to_tensor(-1e4, dtype=attn_weights.dtype)
         # Need to be a tensor, otherwise we get error: `RuntimeError: expected scalar type float but found double`.
-        attn_weights = paddle.where(causal_mask, attn_weights, mask_value)
+        attn_weights = paddle.where(causal_mask.to("bool"), attn_weights, mask_value)
 
         if attention_mask is not None:
             # Apply the attention mask

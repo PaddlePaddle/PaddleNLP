@@ -54,18 +54,24 @@ else:
                 ),
             ),
             ("blenderbot", "BlenderbotTokenizer"),
-            ("bloom", "BloomTokenizer"),
+            (
+                "bloom",
+                ("BloomTokenizer", "BloomTokenizerFast" if is_tokenizers_available() else None),
+            ),
             ("clip", "CLIPTokenizer"),
             ("codegen", "CodeGenTokenizer"),
             ("convbert", "ConvBertTokenizer"),
             ("ctrl", "CTRLTokenizer"),
             ("distilbert", "DistilBertTokenizer"),
             ("electra", "ElectraTokenizer"),
-            ("ernie", "ErnieTokenizer"),
+            (
+                "ernie",
+                ("ErnieTokenizer", "ErnieTokenizerFast" if is_tokenizers_available() else None),
+            ),
             ("ernie_m", "ErnieMTokenizer"),
             ("fnet", "FNetTokenizer"),
             ("funnel", "FunnelTokenizer"),
-            ("gemma", "GemmaTokenizer"),
+            ("gemma", ("GemmaTokenizer", "GemmaTokenizerFast" if is_tokenizers_available() else None)),
             ("jamba", "JambaTokenizer"),
             ("layoutlm", "LayoutLMTokenizer"),
             ("layoutlmv2", "LayoutLMv2Tokenizer"),
@@ -114,14 +120,17 @@ else:
             ("tinybert", "TinyBertTokenizer"),
             ("unified_transformer", "UnifiedTransformerTokenizer"),
             ("unimo", "UNIMOTokenizer"),
-            ("gpt", (("GPTTokenizer", "GPTChineseTokenizer"), None)),
+            (
+                "gpt",
+                (("GPTTokenizer", "GPTChineseTokenizer"), "GPTTokenizerFast" if is_tokenizers_available() else None),
+            ),
             ("gau_alpha", "GAUAlphaTokenizer"),
             ("artist", "ArtistTokenizer"),
             ("chineseclip", "ChineseCLIPTokenizer"),
             ("ernie_vil", "ErnieViLTokenizer"),
             ("glm", "GLMGPT2Tokenizer"),
             ("qwen", "QWenTokenizer"),
-            ("qwen2", "Qwen2Tokenizer"),
+            ("qwen2", ("Qwen2Tokenizer", "Qwen2TokenizerFast" if is_tokenizers_available() else None)),
             ("yuan", "YuanTokenizer"),
         ]
     )
@@ -178,7 +187,12 @@ def tokenizer_class_from_name(class_name: str):
 
                     return getattr(module, class_name)
                 except AttributeError:
-                    raise ValueError(f"Tokenizer class {class_name} is not currently imported.")
+                    try:
+                        module = importlib.import_module(f".{module_name}.tokenizer_fast", "paddlenlp.transformers")
+
+                        return getattr(module, class_name)
+                    except AttributeError:
+                        raise ValueError(f"Tokenizer class {class_name} is not currently imported.")
 
     for config, tokenizers in TOKENIZER_MAPPING._extra_content.items():
         for tokenizer in tokenizers:

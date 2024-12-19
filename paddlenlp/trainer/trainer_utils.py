@@ -240,13 +240,15 @@ PREFIX_CHECKPOINT_DIR = "checkpoint"
 _re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\-(\d+)$")
 
 
-def _check_checkpoint_files(folder_path, world_size, ignore_save_lr_and_optim, skip_save_model_weight):
+def _check_checkpoint_files(
+    folder_path, world_size, ignore_save_lr_and_optim, skip_save_model_weight, remove_master_weight
+):
     files = os.listdir(folder_path)
     model_weight_files = [f for f in files if f.startswith(".model_weight")]
     a = len(model_weight_files) == world_size
     if not ignore_save_lr_and_optim:
         b = True
-        if not skip_save_model_weight:
+        if not skip_save_model_weight or not remove_master_weight:
             master_weight_file = [f for f in files if f.startswith(".master_weight")]
             b = len(master_weight_file) == world_size
         optimizer_file = [f for f in files if f.startswith(".optimizer_weight")]
@@ -282,8 +284,13 @@ def get_last_checkpoint(folder, signal_folder=None, uc_async_save=False):
                 pre_world_size = saving_info.get("world_size", 1)
                 ignore_save_lr_and_optim = saving_info.get("ignore_save_lr_and_optim", False)
                 skip_save_model_weight = saving_info.get("skip_save_model_weight", False)
+                remove_master_weight = saving_info.get("remove_master_weight", False)
                 if _check_checkpoint_files(
-                    current_signal_path, pre_world_size, ignore_save_lr_and_optim, skip_save_model_weight
+                    current_signal_path,
+                    pre_world_size,
+                    ignore_save_lr_and_optim,
+                    skip_save_model_weight,
+                    remove_master_weight,
                 ):
                     return current_path
         return
@@ -310,6 +317,7 @@ class OptimizerNames(ExplicitEnum):
 
     ADAMW = "adamw"
     ADAFACTOR = "adafactor"
+    ADAMW_MINI = "adamw_mini"
 
 
 class ShardingOption(ExplicitEnum):
@@ -1031,6 +1039,66 @@ class IterableDatasetShard(IterableDataset):
             return (len(self.dataset) // (self.batch_size * self.num_processes)) * self.batch_size
         else:
             return math.ceil(len(self.dataset) / (self.batch_size * self.num_processes)) * self.batch_size
+
+
+class LastBatchPaddingSampler(paddle.io.DistributedBatchSampler):
+    """The sampler which pads the first batch to the last batch"""
+
+    def __iter__(self):
+        local_batch_size = self.batch_size * self._acc_steps
+        num_samples = len(self.dataset)
+        indices = np.arange(num_samples).tolist()
+        global_eval_batch_size = self.batch_size * self.nranks
+        last_batch_size = num_samples % global_eval_batch_size
+
+        # Padding the first batch if the last batch is not full
+        if last_batch_size > 0:
+            padding_size = global_eval_batch_size - last_batch_size
+            # Select the first batch of indices for padding
+            if global_eval_batch_size <= len(indices):
+                first_batch_idx = indices[:global_eval_batch_size]
+            else:
+                first_batch_idx = indices.copy()
+            while padding_size > 0:
+                # Repeatedly pad the indices until the padding size is fulfilled
+                if padding_size > len(first_batch_idx):
+                    indices += first_batch_idx
+                    padding_size -= len(first_batch_idx)
+                else:
+                    indices += first_batch_idx[:padding_size]
+                    padding_size = 0
+
+        # Update the total number of indices
+        self.total_size = len(indices)
+        if self.shuffle:
+            np.random.RandomState(self.epoch).shuffle(indices)
+            self.epoch += 1
+
+        # subsample
+        def _get_indices_by_batch_size(indices):
+            subsampled_indices = []
+            # Iterate over the indices and extract batches that belong to the current device
+            for i in range(
+                self.local_rank * self.batch_size,
+                len(indices),
+                self.batch_size * self.nranks,
+            ):
+                subsampled_indices.extend(indices[i : i + self.batch_size])
+
+            return subsampled_indices
+
+        if self.nranks > 1:
+            indices = _get_indices_by_batch_size(indices)
+
+        _sample_iter = iter(indices)
+        batch_indices = []
+        for idx in _sample_iter:
+            batch_indices.append(idx)
+            if len(batch_indices) == local_batch_size:
+                yield batch_indices
+                batch_indices = []
+        # Ensure that there are no leftover indices after batching
+        assert len(batch_indices) == 0
 
 
 def find_batch_size(tensors):

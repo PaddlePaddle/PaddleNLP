@@ -278,7 +278,7 @@ __forceinline__ __host__ __device__ void vec_cast<nv_bfloat16, float>(
       break;                                       \
     }                                              \
     default: {                                     \
-      PD_THROW("not support the head_dim");        \
+      PD_THROW("not support the head_dim: ", head_dim);        \
     }                                              \
   }
 

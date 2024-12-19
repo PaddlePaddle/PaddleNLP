@@ -23,7 +23,7 @@ k1 = [4096, 4096, 4096, 14336]
 n1 = [6144, 4096, 28672, 4096]
 
 # llama3.1-405b mp=8
-k2 = [16384, 16384, 16384, 6656]
+k2 = [16384, 2048, 16384, 6656]
 n2 = [2560, 16384, 13312, 16384]
 
 # qwen2-1.5b
@@ -43,5 +43,5 @@ tune_cublaslt_gemm(K_tensor, N_tensor, M_start, M_end, "int8", True, False, Path
 
 # shape 计算公式
 # [qkv, out_linear, ffn1, ffn2]
-# k = [hidden_size, hidden_size, hidden_size, intermediate_size//mp_size]
+# k = [hidden_size, hidden_size//mp_size, hidden_size, intermediate_size//mp_size]
 # n = [((num_attention_heads//mp_size)+2*(num_key_value_heads//mp_size))*(hidden_size//num_attention_heads), hidden_size, 2*(intermediate_size//mp_size), hidden_size]

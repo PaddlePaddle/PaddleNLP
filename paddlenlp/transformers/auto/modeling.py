@@ -799,8 +799,6 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
     AutoInferenceModelForCausalLM.
     """
 
-    _name_mapping = get_name_mapping("ForCausalLM")
-
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
         """
@@ -832,13 +830,14 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
                 )
         else:
             # Check whether the model use block attention
-            attn_type = "Block" if predictor_args.block_attn else ""
+            if predictor_args.block_attn or predictor_args.speculate_method is not None:
+                attn_type = "Block"
+            else:
+                attn_type = ""
             model_name = f"{config.architectures[0]}{attn_type}"
 
         # Import the InferenceModel
-        import_class = importlib.import_module(
-            f"paddlenlp.experimental.transformers.{cls._name_mapping[config.architectures[0]]}.modeling"
-        )
+        import_class = importlib.import_module(f"paddlenlp.experimental.transformers.{config.model_type}.modeling")
 
         model_class_name = f"{model_name}InferenceModel"
         model_class = getattr(import_class, model_class_name)
@@ -857,7 +856,9 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         )
 
         if predictor_args.mode == "dynamic":
-            return model_class.from_pretrained(predictor_args.model_name_or_path, config=config, dtype=dtype)
+            model = model_class.from_pretrained(predictor_args.model_name_or_path, config=config, dtype=dtype)
+            model.eval()
+            return model
 
         return model_class
 
