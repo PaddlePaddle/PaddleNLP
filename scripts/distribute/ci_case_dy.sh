@@ -72,7 +72,7 @@ function restore_func() {
     mapfile -t blacklist < "$blacklist_file"
     for function in ${fun_list[@]};do
         if [[ " ${blacklist[@]} " == *" ${function} "* ]]; then
-            echo ""\033 ---- Function '$function' is blacklisted and will be skipped. \033"
+            echo "\033 ---- Function '$function' is blacklisted and will be skipped. \033"
         else
             echo "$function" >> functions.txt
         fi
