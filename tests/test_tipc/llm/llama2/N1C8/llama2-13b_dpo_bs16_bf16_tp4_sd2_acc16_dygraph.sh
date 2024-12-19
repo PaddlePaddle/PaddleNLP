@@ -17,16 +17,12 @@ param="model_name_or_path=meta-llama/Llama-2-13b "
 param+="per_device_train_batch_size=1 "
 param+="tensor_parallel_degree=4 "
 param+="sharding_parallel_degree=2 "
-param+="sharding=stage2 "
-param+="recompute=true "
-param+="recompute_granularity=full "
-param+="gradient_accumulation_steps=4 "
+param+="gradient_accumulation_steps=16 "
 param+="run_stage=dpo "
-param+="run_mode=tp4_sd2_acc4_dygraph "
+param+="run_mode=tp4_sd2_acc16_dygraph "
 param+="device_num=N1C8 "
 param+="global_batch_size=16 "
 param+="model_item=llama2-13b_dpo "
-param+="max_steps=150 "
 
 cd ./tests
 bash ./test_tipc/llm/llama2/benchmark_common/prepare.sh

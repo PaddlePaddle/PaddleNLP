@@ -13,18 +13,17 @@
 # limitations under the License.
 
 
-param="model_name_or_path=Qwen/Qwen2.5-1.5B "
+param="model_name_or_path=Qwen/Qwen2.5-7B "
 param+="per_device_train_batch_size=1 "
 param+="tensor_parallel_degree=1 "
 param+="pipeline_parallel_degree=1 "
-param+="recompute=false "
-param+="recompute_granularity=full "
-param+="gradient_accumulation_steps=1 "
+param+="sharding_parallel_degree=1 "
+param+="gradient_accumulation_steps=4 "
 param+="run_stage=lora "
-param+="run_mode=tp1_pp1_acc1_dygraph "
+param+="run_mode=tp1_pp1_sd1_acc4_dygraph "
 param+="device_num=N1C8 "
 param+="global_batch_size=16 "
-param+="model_item=qwen-qwen2_5-1_5b_lora "
+param+="model_item=qwen-qwen2_5-7b_lora "
 param+="max_steps=150 "
 
 cd ./tests

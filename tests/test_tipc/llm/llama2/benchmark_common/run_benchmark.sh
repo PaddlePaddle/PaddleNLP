@@ -22,17 +22,12 @@ function _set_params(){
     tensor_parallel_degree=${tensor_parallel_degree:-1}
     pipeline_parallel_degree=${pipeline_parallel_degree:-1}
     sharding_parallel_degree=${sharding_parallel_degree:-1}
-    sharding=${sharding:-"stage1"}
-    recompute=${recompute:-1}
-    recompute_granularity=${recompute_granularity:-"full"}
     gradient_accumulation_steps=${gradient_accumulation_steps:-1}
     run_stage=${run_stage:-"sft"}
     run_mode=${run_mode:-"DP1-MP1-PP4-mbs1-acc8-recompute"}
     device_num=${device_num:-"N1C8"}
     global_batch_size=${global_batch_size:-16}
     model_item=${model_item:-"qwen-qwen-7b_seqlen2048_pretrain"}
-    max_steps=${max_steps:-150}
-    logging_steps=${logging_steps:-1}
     base_batch_size=${global_batch_size}
 
     profiling=${PROFILING:-"false"}      # (必选) Profiling  开关，默认关闭，通过全局变量传递

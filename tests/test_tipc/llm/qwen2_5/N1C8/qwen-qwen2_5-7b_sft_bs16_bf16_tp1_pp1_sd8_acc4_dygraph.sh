@@ -13,20 +13,17 @@
 # limitations under the License.
 
 
-param="model_name_or_path=Qwen/Qwen2.5-14B "
+param="model_name_or_path=Qwen/Qwen2.5-7B "
 param+="per_device_train_batch_size=1 "
-param+="tensor_parallel_degree=2 "
-param+="sharding_parallel_degree=4 "
-param+="sharding=stage2 "
-param+="recompute=true "
-param+="recompute_granularity=full "
-param+="gradient_accumulation_steps=2 "
+param+="tensor_parallel_degree=1 "
+param+="pipeline_parallel_degree=1 "
+param+="sharding_parallel_degree=8 "
+param+="gradient_accumulation_steps=4 "
 param+="run_stage=sft "
-param+="run_mode=tp2_sd4_acc2_dygraph "
+param+="run_mode=tp1_pp1_sd8_acc4_dygraph "
 param+="device_num=N1C8 "
 param+="global_batch_size=16 "
-param+="model_item=qwen-qwen2_5-14b_sft "
-param+="max_steps=150 "
+param+="model_item=qwen-qwen2_5-7b_sft "
 
 cd ./tests
 bash ./test_tipc/llm/qwen2_5/benchmark_common/prepare.sh
