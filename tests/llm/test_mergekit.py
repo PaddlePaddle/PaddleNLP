@@ -41,6 +41,6 @@ class MergeTest(LLMTest, unittest.TestCase):
 
             merge_config = {"model_path_str": ",".join([pd_path, safe_path]), "output_path": tempdir}
             with argv_context_guard(merge_config):
-                from tools.merge_weight import merge
+                from tools.mergekit import merge
 
                 merge()
