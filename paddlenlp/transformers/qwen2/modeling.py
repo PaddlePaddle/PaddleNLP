@@ -434,14 +434,28 @@ class Qwen2MLP(nn.Layer):
 
         if config.hidden_act == "silu":
             self.act_fn = fusion_ops.swiglu
+            self.fuse_swiglu = True
         else:
             self.act_fn = ACT2FN[config.hidden_act]
+            self.fuse_swiglu = False
 
     def forward(self, x):
         if self.fuse_attention_ffn:
-            return self.down_proj(self.act_fn(self.gate_up_fused_proj(x)))
+            x = self.gate_up_fused_proj(x)
+            if self.fuse_swiglu:
+                y = None
+            else:
+                x, y = x.chunk(2, axis=-1)
         else:
-            return self.down_proj(self.act_fn(self.gate_proj(x), self.up_proj(x)))
+            x = self.gate_proj(x)
+            y = self.up_proj(x)
+
+        if self.fuse_swiglu:
+            x = self.act_fn(x, y)
+        else:
+            x = self.act_fn(x) * y
+
+        return self.down_proj(x)
 
 
 def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
