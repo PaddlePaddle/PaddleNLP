@@ -16,13 +16,13 @@ import paddle
 import paddle.nn.functional as F
 import pytest
 from einops import rearrange
-from paddlenlp_gpu_ops.triton.ssd_chunk_state import (
+from ppnlp_kernel.triton.ssd_chunk_state import (
     _chunk_cumsum_fwd,
     _chunk_state_fwd,
     chunk_state,
     chunk_state_varlen,
 )
-from paddlenlp_gpu_ops.triton.ssd_state_passing import _state_passing_fwd
+from ppnlp_kernel.triton.ssd_state_passing import _state_passing_fwd
 
 #######################################################################################################################################
 # patch paddle.allclose

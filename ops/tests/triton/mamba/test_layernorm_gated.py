@@ -16,7 +16,7 @@ import paddle
 import paddle.nn.functional as F
 import pytest
 from einops import rearrange
-from paddlenlp_gpu_ops.triton.layernorm_gated import layernorm_fn, rms_norm_ref
+from ppnlp_kernel.triton.layernorm_gated import layernorm_fn, rms_norm_ref
 
 #######################################################################################################################################
 # patch paddle.allclose

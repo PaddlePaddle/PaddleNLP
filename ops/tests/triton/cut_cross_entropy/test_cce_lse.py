@@ -4,10 +4,8 @@ from typing import Union
 import paddle
 import paddle.nn.functional as F
 import pytest
-from paddlenlp_gpu_ops.triton.cut_cross_entropy.cce_lse_forward import (
-    cce_lse_forward_kernel,
-)
-from paddlenlp_gpu_ops.triton.cut_cross_entropy.utils import softcapping
+from ppnlp_kernel.triton.cut_cross_entropy.cce_lse_forward import cce_lse_forward_kernel
+from ppnlp_kernel.triton.cut_cross_entropy.utils import softcapping
 
 skip_no_cuda = pytest.mark.skipif(not paddle.device.is_compiled_with_cuda(), reason="Test requires CUDA")
 
