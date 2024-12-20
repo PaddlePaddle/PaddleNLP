@@ -31,7 +31,7 @@
 <a href="https://trendshift.io/repositories/2246" target="_blank"><img src="https://trendshift.io/api/badge/repositories/2246" alt="PaddlePaddle%2FPaddleNLP | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 ## News 📢
-* **2024.12.16 [PaddleNLP v3.0 Beta3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta3)**：大模型功能全新升级，新增了Llama-3.2、DeepSeekV2模型，升级了TokenizerFast，快速分词，重构了SFTTrainer，一键开启SFT训练。此外，PaddleNLP还支持了优化器状态的卸载和重载功能，实现了精细化的重新计算，训练性能提升7%。在Unified Checkpoint方面，进一步优化了异步保存逻辑，新增Checkpoint压缩功能，可节省78.5%存储空间。
+* **2024.12.16 [PaddleNLP v3.0 Beta3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v3.0.0-beta3)**：大模型功能全新升级，新增了Llama-3.2、DeepSeekV2模型，升级了TokenizerFast，快速分词，重构了SFTTrainer，一键开启SFT训练。此外，PaddleNLP还支持了优化器状态的卸载和重载功能，实现了精细化的重新计算，训练性能提升7%。在Unified Checkpoint方面，进一步优化了异步保存逻辑，模型存储加速95%，新增Checkpoint压缩功能，可节省78.5%存储空间。
 最后，在大模型推理方面，升级Append Attention，支持了FP8量化，支持投机解码。
 
 * **2024.12.13 📚《飞桨大模型套件 Unified Checkpoint 技术》**，加速模型存储95%，节省空间78%。支持全分布式策略调整自适应转换，提升模型训练的灵活性与可扩展性。训练-压缩-推理统一存储协议，无需手动转换提升全流程体验。Checkpoint 无损压缩结合异步保存，实现秒级存储并降低模型存储成本。适用于智能制造、指挥交通、医疗健康、金融服务等产业实际场景。12月24日（周二）19：00直播为您详细解读该技术如何优化大模型训练流程。报名链接：https://www.wjx.top/vm/huZkHn9.aspx?udsid=787976
@@ -59,7 +59,7 @@
 ### <a href=#高效易用的预训练> 🚀 高效易用的预训练 </a>
 
 支持纯数据并行策略、分组参数切片的数据并行策略、张量模型并行策略和流水线模型并行策略的4D 高性能训练，Trainer 支持分布式策略配置化，降低复杂分布式组合带来的使用成本；
-[Unified Checkpoint 大模型存储格式](./llm/docs/unified_checkpoint.md)在模型参数分布上支持动态扩缩容训练，降低硬件切换带来的迁移成本。
+[Unified Checkpoint 大模型存储工具](./llm/docs/unified_checkpoint.md)可以使得训练断点支持机器资源动态扩缩容恢复。此外，异步保存，模型存储可加速95%，Checkpoint压缩，可节省78.5%存储空间。
 
 ### <a href=#高效精调> 🤗 高效精调 </a>
 
