@@ -4,13 +4,13 @@ import paddle
 import paddle.nn.functional as F
 import pytest
 from einops import rearrange
-from ppnlp_kernel.cuda.causal_conv1d import (
+from paddlenlp_kernel.cuda.causal_conv1d import (
     causal_conv1d_fn,
     causal_conv1d_ref,
     causal_conv1d_update,
     causal_conv1d_update_ref,
 )
-from ppnlp_kernel.triton.causal_conv1d_varlen import (
+from paddlenlp_kernel.triton.causal_conv1d_varlen import (
     causal_conv1d_varlen_states,
     causal_conv1d_varlen_states_ref,
 )

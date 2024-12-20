@@ -1,10 +1,10 @@
 # Copyright (C) 2024 Apple Inc. All Rights Reserved.
 import paddle
 import pytest
-from ppnlp_kernel.triton.cut_cross_entropy.indexed_dot import (
+from paddlenlp_kernel.triton.cut_cross_entropy.indexed_dot import (
     indexed_neg_dot_forward_kernel,
 )
-from ppnlp_kernel.triton.cut_cross_entropy.utils import softcapping
+from paddlenlp_kernel.triton.cut_cross_entropy.utils import softcapping
 
 skip_no_cuda = pytest.mark.skipif(not paddle.device.is_compiled_with_cuda(), reason="Test requires CUDA")
 

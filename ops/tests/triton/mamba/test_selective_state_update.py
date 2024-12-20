@@ -4,7 +4,7 @@
 import paddle
 import pytest
 from einops import repeat
-from ppnlp_kernel.triton.selective_state_update import (
+from paddlenlp_kernel.triton.selective_state_update import (
     selective_state_update,
     selective_state_update_ref,
 )

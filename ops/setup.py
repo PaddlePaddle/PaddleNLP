@@ -89,7 +89,7 @@ def write_custom_op_api_py(libname, filename):
 
 if len(sys.argv) > 0:
     # generate lib files
-    lib_path = Path("src/ppnlp_kernel/cuda/lib")
+    lib_path = Path("src/paddlenlp_kernel/cuda/lib")
     if lib_path.exists():
         shutil.rmtree(lib_path)
     lib_path.mkdir(exist_ok=True)
@@ -112,7 +112,7 @@ if len(sys.argv) > 0:
 
 # NEW ADDED END
 setup(
-    name="ppnlp_kernel",
+    name="paddlenlp_kernel",
     version="0.1.0",  # expected format is one of x.y.z.dev0, or x.y.z.rc1 or x.y.z (no to dashes, yes to dots)
     description="PaddleNLP GPU OPS cuda & triton.",
     long_description=open("README.md", "r", encoding="utf-8").read(),
@@ -124,7 +124,7 @@ setup(
     url="https://github.com/PaddlePaddle/paddlenlp/ops",
     package_dir={"": "src"},
     packages=find_packages("src"),
-    package_data={"ppnlp_kernel.cuda.lib": ["*.so", "*.dll", "*.dylib"]},
+    package_data={"paddlenlp_kernel.cuda.lib": ["*.so", "*.dll", "*.dylib"]},
     include_package_data=True,
     python_requires=">=3.8.0",
     install_requires=read_requirements_file("requirements.txt"),

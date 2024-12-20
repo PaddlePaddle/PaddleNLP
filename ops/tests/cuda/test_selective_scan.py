@@ -3,7 +3,7 @@
 
 import paddle
 import pytest
-from ppnlp_kernel.cuda.selective_scan import (
+from paddlenlp_kernel.cuda.selective_scan import (
     mamba_inner_fn,
     mamba_inner_ref,
     selective_scan_fn,

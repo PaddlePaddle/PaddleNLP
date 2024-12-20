@@ -4,9 +4,9 @@ from typing import Union
 import paddle
 import paddle.nn.functional as F
 import pytest
-from ppnlp_kernel.triton.cut_cross_entropy import linear_cross_entropy
-from ppnlp_kernel.triton.cut_cross_entropy.constants import IGNORE_INDEX
-from ppnlp_kernel.triton.cut_cross_entropy.utils import softcapping
+from paddlenlp_kernel.triton.cut_cross_entropy import linear_cross_entropy
+from paddlenlp_kernel.triton.cut_cross_entropy.constants import IGNORE_INDEX
+from paddlenlp_kernel.triton.cut_cross_entropy.utils import softcapping
 
 skip_no_cuda = pytest.mark.skipif(not paddle.device.is_compiled_with_cuda(), reason="Test requires CUDA")
 

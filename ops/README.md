@@ -1,5 +1,5 @@
 # PaddleNLP Kernel 库
-> ppnlp-kernel 是一个专为 PaddleNLP 量身打造的 GPU 算子库，它集成了一系列常用的自然语言处理（NLP）算子，并提供了 CUDA 和 Triton 两种高效的实现方式，旨在充分利用 GPU 的卓越计算能力，为 NLP 任务加速。
+> paddlenlp-kernel 是一个专为 PaddleNLP 量身打造的 GPU 算子库，它集成了一系列常用的自然语言处理（NLP）算子，并提供了 CUDA 和 Triton 两种高效的实现方式，旨在充分利用 GPU 的卓越计算能力，为 NLP 任务加速。
 
 当前支持的算子包括：
 - mamba1 和 mamba2 算子
@@ -29,15 +29,15 @@ python setup.py bdist_wheel
 pip install dist/*.whl
 ```
 
-## 使用 ppnlp_kernel 库
+## 使用 paddlenlp_kernel 库
 以下是如何在代码中使用 `CUDA` 和 `Triton` 算子的示例：
 ```python
 # 导入并使用 CUDA 算子
-from ppnlp_kernel.cuda.selective_scan import selective_scan_fn
+from paddlenlp_kernel.cuda.selective_scan import selective_scan_fn
 xxx = selective_scan_fn(xxx)
 
 # 导入并使用 Triton 算子
-from ppnlp_kernel.triton.inf_cl import cal_flash_loss
+from paddlenlp_kernel.triton.inf_cl import cal_flash_loss
 xxx = cal_flash_loss(xxx)
 ```
 
@@ -49,7 +49,7 @@ pytest -v tests/cuda  # 测试 CUDA 算子
 pytest -v tests/triton  # 测试 Triton 算子
 ```
 
-通过上述步骤，您将能够顺利安装并测试 `ppnlp_kernel` 库，享受 GPU 加速带来的高效 NLP 算子体验。
+通过上述步骤，您将能够顺利安装并测试 `paddlenlp_kernel` 库，享受 GPU 加速带来的高效 NLP 算子体验。
 
 # 注意
 
