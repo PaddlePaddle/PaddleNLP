@@ -21,7 +21,7 @@ from paddle.distributed import fleet
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.trainer.argparser import strtobool
-from paddlenlp.trainer.utils.helper import distributed_isfile
+from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
     _add_variant,
