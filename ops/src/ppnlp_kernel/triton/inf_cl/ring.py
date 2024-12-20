@@ -36,6 +36,8 @@ def init_dp_sd_comm_group():
     elif sd_world_size > 1:
         dp_sd_group, dp_sd_comm_group = hcg._sharding_group, hcg.get_sharding_parallel_group()
 
+    hcg._dp_sd_group = dp_sd_group
+    hcg._dp_sd_comm_group = dp_sd_comm_group
     return dp_sd_group, dp_sd_comm_group
 
 
@@ -87,7 +89,7 @@ class RingProb(paddle.autograd.PyLayer):
         if group is None:
             hcg = dist.fleet.get_hybrid_communicate_group()
             if not hasattr(hcg, "_dp_sd_group") and not hasattr(hcg, "_dp_sd_comm_group"):
-                hcg._dp_sd_group, hcg._dp_sd_comm_group = init_dp_sd_comm_group()
+                init_dp_sd_comm_group()
             group = hcg._dp_sd_comm_group
 
         assert group is not None, "Communication group must be specified!"
@@ -174,7 +176,7 @@ class InfProb(paddle.autograd.PyLayer):
         if group is None:
             hcg = dist.fleet.get_hybrid_communicate_group()
             if not hasattr(hcg, "_dp_sd_group") and not hasattr(hcg, "_dp_sd_comm_group"):
-                hcg._dp_sd_group, hcg._dp_sd_comm_group = init_dp_sd_comm_group()
+                init_dp_sd_comm_group()
             group = hcg._dp_sd_comm_group
 
         assert group is not None, "Communication group must be specified!"
