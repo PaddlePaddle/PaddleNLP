@@ -167,7 +167,11 @@ from .training_args import TrainingArguments
 from .unified_checkpoint import UnifiedCheckpointHandler
 from .utils import reshard as reshard_util
 from .utils.async_save import AsyncSaver
-from .utils.flash_checkpoint import FlashCheckpointManager, get_fused_param_mappings
+
+try:
+    from .utils.flash_checkpoint import FlashCheckpointManager, get_fused_param_mappings
+except:
+    FlashCheckpointManager, get_fused_param_mappings = None, None
 from .utils.helper import (  # nested_truncate,
     broadcast_dataset_rank0_model,
     broadcast_dp_optimizer,
@@ -406,6 +410,12 @@ class Trainer:
 
         self._save_ckpt_func = _save_ckpt_func
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
+
+        if FlashCheckpointManager is None and self.args.enable_flash_save_mode:
+            logger.warning(
+                "enable_flash_save_mode has been set as True, but paddle version is too old to support this function, please upgrade it."
+            )
+            self.args.enable_flash_save_mode = False
 
         if self.args.enable_flash_save_mode:
             # Currently, flash save mode only support pretraining mode with hybrid parallel enabled
@@ -762,9 +772,9 @@ class Trainer:
             + unwrapped_model.backward_pipeline_parallel_hook_capacity
         )
         self.flash_checkpoint_manager = FlashCheckpointManager(
-            worker_num=self.args.fc_workers_num,
+            worker_num=self.args.flash_workers_num,
             pipeline_hooks_capacity=pipeline_hooks_capacity,
-            capacity_usage=self.args.fc_pipeline_hooks_capacity_usage,
+            capacity_usage=self.args.flash_pipeline_hooks_capacity_usage,
         )
         for i in range(unwrapped_model.forward_pipeline_parallel_hook_capacity):
             unwrapped_model.register_forward_pipeline_parallel_hook(
