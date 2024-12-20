@@ -64,22 +64,22 @@ def _block_is_filtered(check_val: tl.tensor, filter_eps: tl.tensor) -> tl.tensor
     return tl.reduce(check_val < filter_eps, None, tl_and_reduce_fn)
 
 
-@cce_backward_autotune()
-@triton.heuristics(
-    {
-        "EVEN_D": lambda args: (args["D"] % args["BLOCK_D"]) == 0,
-        "MM_BACK_BLOCK_D": lambda args: args["BLOCK_D"] * 2,
-        "MM_BACK_EVEN_D": lambda args: (args["D"] % (args["BLOCK_D"] * 2)) == 0,
-        "HAS_VALIDS": lambda args: args["Valids"] is not None,
-        "HAS_VOCAB_ORDERING": lambda args: args["VocabOrdering"] is not None,
-        "FILTER_GRAD": lambda args: args["filter_eps"] is not None,
-        "HAS_TARGETS": lambda args: args["Targets"] is not None,
-        "HAS_SOFTCAP": lambda args: args["softcap"] is not None,
-        "ITEM_DO": lambda args: (args["dOut"].numel() == 1).item(),
-        "GROUP_B": lambda args: 8,
-    }
-)
-@triton.jit
+# @cce_backward_autotune()
+# @triton.heuristics(
+#     {
+#         "EVEN_D": lambda args: (args["D"] % args["BLOCK_D"]) == 0,
+#         "MM_BACK_BLOCK_D": lambda args: args["BLOCK_D"] * 2,
+#         "MM_BACK_EVEN_D": lambda args: (args["D"] % (args["BLOCK_D"] * 2)) == 0,
+#         "HAS_VALIDS": lambda args: args["Valids"] is not None,
+#         "HAS_VOCAB_ORDERING": lambda args: args["VocabOrdering"] is not None,
+#         "FILTER_GRAD": lambda args: args["filter_eps"] is not None,
+#         "HAS_TARGETS": lambda args: args["Targets"] is not None,
+#         "HAS_SOFTCAP": lambda args: args["softcap"] is not None,
+#         "ITEM_DO": lambda args: (args["dOut"].numel() == 1).item(),
+#         "GROUP_B": lambda args: 8,
+#     }
+# )
+# @triton.jit
 def _cce_backward_kernel(
     E,
     C,
@@ -235,6 +235,25 @@ def _cce_backward_kernel(
         MM_BACK_BLOCK_D,
         MM_BACK_EVEN_D,
     )
+
+
+# Fix issues https://github.com/apple/ml-cross-entropy/issues/6
+_cce_backward_kernel = triton.jit(_cce_backward_kernel)
+_cce_backward_kernel = triton.heuristics(
+    {
+        "EVEN_D": lambda args: (args["D"] % args["BLOCK_D"]) == 0,
+        "MM_BACK_BLOCK_D": lambda args: args["BLOCK_D"] * 2,
+        "MM_BACK_EVEN_D": lambda args: (args["D"] % (args["BLOCK_D"] * 2)) == 0,
+        "HAS_VALIDS": lambda args: args["Valids"] is not None,
+        "HAS_VOCAB_ORDERING": lambda args: args["VocabOrdering"] is not None,
+        "FILTER_GRAD": lambda args: args["filter_eps"] is not None,
+        "HAS_TARGETS": lambda args: args["Targets"] is not None,
+        "HAS_SOFTCAP": lambda args: args["softcap"] is not None,
+        "ITEM_DO": lambda args: (args["dOut"].numel() == 1).item(),
+        "GROUP_B": lambda args: 8,
+    }
+)(_cce_backward_kernel)
+_cce_backward_kernel = cce_backward_autotune()(_cce_backward_kernel)
 
 
 def cce_backward_kernel(

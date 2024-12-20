@@ -120,7 +120,7 @@ setup(
     license="Apache 2.0 License",
     author="PaddlePaddle",
     author_email="paddlenlp@baidu.com",
-    url="https://github.com/PaddlePaddle/paddlenlp/paddlenlp_gpu_ops",
+    url="https://github.com/PaddlePaddle/paddlenlp/csrc/ops",
     package_dir={"": "src"},
     packages=find_packages("src"),
     package_data={"paddlenlp_gpu_ops.cuda.lib": ["*.so", "*.dll", "*.dylib"]},

@@ -79,6 +79,7 @@ class RingProb(paddle.autograd.PyLayer):
                 group = hcg.get_data_parallel_group()
             if sd_world_size > 1:
                 group = hcg.get_sharding_parallel_group()
+        assert group is not None, "Communication group must be specified!"
 
         k = k.contiguous()
         comm = RingComm(group)
@@ -164,12 +165,13 @@ class InfProb(paddle.autograd.PyLayer):
             dp_world_size = hcg.get_data_parallel_world_size()
             sd_world_size = hcg.get_sharding_parallel_world_size()
             if dp_world_size > 1 and sd_world_size > 1:
-                raise RuntimeError("data parallel with sharding parallel is not supported in `RingProb` now")
+                raise RuntimeError("data parallel with sharding parallel is not supported in `InfProb` now")
             if dp_world_size > 1:
                 group = hcg.get_data_parallel_group()
             if sd_world_size > 1:
                 group = hcg.get_sharding_parallel_group()
-        
+        assert group is not None, "Communication group must be specified!"
+
         k = k.contiguous()
         comm = RingComm(group)
 
