@@ -435,7 +435,10 @@ class UnifiedCheckpointHandler:
             os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME)
         )
         if has_merge_optimizer_safetensors:
-            with open(os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME), "r") as f:
+            optimizer_index_file = os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME)
+            if distributed_isfile(optimizer_index_file):
+                distributed_file(optimizer_index_file)
+            with open(optimizer_index_file, "r") as f:
                 index = json.loads(f.read())
 
         # get quant ckpt info `ckpt_quant_stage` and `quant_ckpt_resume_times`
