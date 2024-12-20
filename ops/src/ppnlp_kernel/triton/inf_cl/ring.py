@@ -24,6 +24,21 @@ import paddle.nn.functional as F
 from .flash import _cal_flash_loss, _flash_prob_backward, _flash_prob_forward
 
 
+def init_dp_sd_comm_group():
+    hcg = dist.fleet.get_hybrid_communicate_group()
+    dp_world_size = hcg.get_data_parallel_world_size()
+    sd_world_size = hcg.get_sharding_parallel_world_size()
+
+    if dp_world_size > 1 and sd_world_size > 1:
+        dp_sd_group, dp_sd_comm_group = hcg.create_fuse_group(["data", "sharding"])
+    elif dp_world_size > 1:
+        dp_sd_group, dp_sd_comm_group = hcg._dp_group, hcg.get_data_parallel_group()
+    elif sd_world_size > 1:
+        dp_sd_group, dp_sd_comm_group = hcg._sharding_group, hcg.get_sharding_parallel_group()
+
+    return dp_sd_group, dp_sd_comm_group
+
+
 class RingComm:
     def __init__(self, group):
         self.group = group
@@ -71,14 +86,10 @@ class RingProb(paddle.autograd.PyLayer):
     ):
         if group is None:
             hcg = dist.fleet.get_hybrid_communicate_group()
-            dp_world_size = hcg.get_data_parallel_world_size()
-            sd_world_size = hcg.get_sharding_parallel_world_size()
-            if dp_world_size > 1 and sd_world_size > 1:
-                raise RuntimeError("data parallel with sharding parallel is not supported in `RingProb` now")
-            if dp_world_size > 1:
-                group = hcg.get_data_parallel_group()
-            if sd_world_size > 1:
-                group = hcg.get_sharding_parallel_group()
+            if not hasattr(hcg, "_dp_sd_group") and not hasattr(hcg, "_dp_sd_comm_group"):
+                hcg._dp_sd_group, hcg._dp_sd_comm_group = init_dp_sd_comm_group()
+            group = hcg._dp_sd_comm_group
+
         assert group is not None, "Communication group must be specified!"
 
         k = k.contiguous()
@@ -162,14 +173,10 @@ class InfProb(paddle.autograd.PyLayer):
     def forward(ctx, q, k, group):
         if group is None:
             hcg = dist.fleet.get_hybrid_communicate_group()
-            dp_world_size = hcg.get_data_parallel_world_size()
-            sd_world_size = hcg.get_sharding_parallel_world_size()
-            if dp_world_size > 1 and sd_world_size > 1:
-                raise RuntimeError("data parallel with sharding parallel is not supported in `InfProb` now")
-            if dp_world_size > 1:
-                group = hcg.get_data_parallel_group()
-            if sd_world_size > 1:
-                group = hcg.get_sharding_parallel_group()
+            if not hasattr(hcg, "_dp_sd_group") and not hasattr(hcg, "_dp_sd_comm_group"):
+                hcg._dp_sd_group, hcg._dp_sd_comm_group = init_dp_sd_comm_group()
+            group = hcg._dp_sd_comm_group
+
         assert group is not None, "Communication group must be specified!"
 
         k = k.contiguous()
