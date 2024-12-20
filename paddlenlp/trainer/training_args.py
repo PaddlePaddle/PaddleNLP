@@ -293,6 +293,15 @@ class TrainingArguments:
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
+        refined_recompute (`str`, *optional*, defaults to `""`):
+            The refined recompute parameter is designed to optimize the balance between GPU memory usage and computational speed.
+            An example configuration could be: `attention_column_ln:-1,attention_row_ln:-1,flash_attn:-1,mlp_column_ln:5,mlp_row_ln:-1`.
+            The supported parameters for refining recompute are `attention_column_ln`, `attention_row_ln`, `flash_attn`, `mlp_column_ln`, and `mlp_row_ln`.
+            The associated number, `skip_num`, determines how many times to bypass recomputation for the specified operation.
+            A `skip_num` of `-1` indicates no recomputation across all stages, maximizing memory usage;
+            A `skip_num` of `0` enforces recomputation at every stage, minimizing memory usage.
+            You can also set `skip_num` to a value within the range [1, ..., num_layers]. If `skip_num` exceeds `num_layers`, it will behave as if set to `-1`.
+            If a parameter is omitted, it defaults to `xxx:0`."
         scale_loss (`float`,  *optional*, defaults to 32768):
             The value of initial scale_loss for fp16. (default: 32768)
         local_rank (`int`, *optional*, defaults to -1):
