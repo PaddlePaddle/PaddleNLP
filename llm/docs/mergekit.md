@@ -88,7 +88,6 @@ python mergekit.py \
 - `ties_elect_type`: ties mask 的处理类型，支持 `"sum"` 或 `"count"`，默认为 `"sum"`。
 
 
-
 </div>
 
 <summary>&emsp; 稀疏化参数（Sparsify Parameters）</summary><div>
