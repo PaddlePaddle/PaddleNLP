@@ -356,6 +356,7 @@ def get_train_data_file(args):
 class PretrainingTrainer(AutoTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.is_pretraining = True
 
     def _wrap_for_dist_loader(self, train_dataloader):
         dist_loader = super()._wrap_for_dist_loader(train_dataloader)

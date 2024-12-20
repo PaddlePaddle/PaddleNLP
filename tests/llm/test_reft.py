@@ -62,7 +62,7 @@ class ReftTest(LLMTest, unittest.TestCase):
         perdict_params = {
             "model_name_or_path": reft_config["model_name_or_path"],
             "reft_path": self.output_dir,
-            "dataset_name_or_path": self.data_dir,
+            "data_file": os.path.join(self.data_dir, "dev.json"),
             "batch_size": 8,
         }
         self.run_reft_predictor(perdict_params)

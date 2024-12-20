@@ -59,7 +59,7 @@
 ### <a href=#高效易用的预训练> 🚀 高效易用的预训练 </a>
 
 支持纯数据并行策略、分组参数切片的数据并行策略、张量模型并行策略和流水线模型并行策略的4D 高性能训练，Trainer 支持分布式策略配置化，降低复杂分布式组合带来的使用成本；
-[Unified Checkpoint 大模型存储格式](./llm/docs/unified_checkpoint.md)在模型参数分布上支持动态扩缩容训练，降低硬件切换带来的迁移成本。
+[Unified Checkpoint 大模型存储工具](./llm/docs/unified_checkpoint.md)可以使得训练断点支持机器资源动态扩缩容恢复。此外，异步保存，模型存储可加速95%，Checkpoint 压缩，可节省78.5%存储空间。
 
 ### <a href=#高效精调> 🤗 高效精调 </a>
 

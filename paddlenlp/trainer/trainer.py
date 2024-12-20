@@ -1904,9 +1904,14 @@ class Trainer:
             if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:
                 if self.args.tensor_parallel_degree <= 1:
                     checkpoint_rng_state["hybrid_parallel_rng_state_tracker"].pop("model_parallel_rng", None)
-                fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
-                    checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
-                )
+                try:
+                    fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
+                        checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
+                    )
+                except:
+                    logger.warning(
+                        "Hybrid paralell rng states change when training environment differs, so we dot not set state tracker here."
+                    )
             else:
                 logger.warning("Not found hybrid parallel RNG state.")
 
@@ -2552,7 +2557,10 @@ class Trainer:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
                         os.makedirs(signal_dir, exist_ok=True)
                         paddle.save(global_rank, os.path.join(signal_dir, f".optimizer_weight.done.{global_rank}"))
-                        if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
+                        if (
+                            "skip_save_model_weight" not in self.args.unified_checkpoint_config
+                            or "remove_master_weight" not in self.args.unified_checkpoint_config
+                        ):
                             paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
             if self.args.should_save or self.args.use_expert_parallel:
                 if not self.args.use_hybrid_parallel:
@@ -2589,7 +2597,10 @@ class Trainer:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
                         os.makedirs(signal_dir, exist_ok=True)
                         paddle.save(global_rank, os.path.join(signal_dir, f".optimizer_weight.done.{global_rank}"))
-                        if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
+                        if (
+                            "skip_save_model_weight" not in self.args.unified_checkpoint_config
+                            or "remove_master_weight" not in self.args.unified_checkpoint_config
+                        ):
                             paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
 
         self.runtime_timer.stop()

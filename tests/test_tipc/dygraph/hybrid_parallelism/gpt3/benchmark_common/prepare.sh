@@ -20,18 +20,18 @@ cd ../slm/model_zoo/gpt-3/external_ops/
 python setup.py install
 cd -
 
-# install fast_dataindex
-cd ../llm/auto_parallel/llama
-python -m pip install fast_dataindex
+python -m pip install tiktoken
 
-# download data
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
-wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
+# install fast_dataindex
+cd ../llm/
 rm -rf data
 mkdir data
-mv llama_openwebtext_100k_ids.npy ./data
-mv llama_openwebtext_100k_idx.npz ./data
+cd data
+# download data
+wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
+wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
+cd -
 
-# mv pretrain_config
-rm -rf pretrain_config_*
-cp -r ../../../tests/test_tipc/static/auto_parallel/baichuan2/pretrain_config_* ./
+# mv autoconfig
+rm -rf auto_config_*
+cp -r ../tests/test_tipc/dygraph/hybrid_parallelism/gpt3/auto_config_* ./

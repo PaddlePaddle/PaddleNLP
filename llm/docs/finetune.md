@@ -7,7 +7,7 @@
 - 易用并行策略：支持纯数据并行（Data Parallelism）、分组参数切片的数据并行（Sharding Parallelism）、张量模型并行（Tensor Parallelism）、流水线模型并行（Pipeline Parallelism）、序列并行(Sequence parallelism)。
 - 多种精度训练：16/32bit 全量精调、4/8/16bit LoRA 精调、混合量化 LoRA 精调。
 - 性能极致优化：FlashAttention-2、FlashMask、Greedy Zero Padding。
-- 先进精调策略：LoRA+、PiSSA、rsLoRA、NEFTune、VeRA。
+- 先进精调策略：LoRA+、PiSSA、rsLoRA、NEFTune、VeRA、MoRA、ReFT、MoSLoRA。
 
 更多算法原理细节详见[飞桨大模型常见算法文档](algorithm_overview.md)
 
@@ -71,7 +71,8 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py
 2. 设置`use_flash_attention`为 True 使用 FlashAttention。在 FlashAttention 打开的基础上设置`flash_mask`为 True 使用 FlashMask。
 3. SFT API 支持4D 并行策略，可以通过控制`tensor_parallel_degree`、`pipeline_parallel_degree`、 `sharding`、`sharding_parallel_degree`调整
 
-### 3.4 LoRA/QLoRA
+### 3.4 PEFT
+#### 3.4.1 LoRA/QLoRA
 
 ```
 # 单卡LoRA
@@ -93,13 +94,12 @@ python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.
 3. 可以通过设置`weight_quantize_algo`将主干模型量化低比特，例如'weight_only_int4','weight_only_int8'，'nf4'或'fp4'。具体参考精调参数介绍
 4. 设置`use_flash_attention`为 True 使用 FlashAttention。在 FlashAttention 打开的基础上设置`flash_mask`为 True 使用 FlashMask。
 5. LoRA API 支持4D 并行策略，可以通过控制`tensor_parallel_degree`、`pipeline_parallel_degree`、 `sharding`、`sharding_parallel_degree`调整并行训练策略，可拓展至**单机 LoRA 微调千亿模型**。
-
-### 3.5 LoRA 参数合并
+6. 可配置`rslora`、`lora_plus_scale`、`pissa`、`lora_use_mixer`、`use_mora`等参数，使用 rsLoRA、LoRa+、PiSSA、MosLoRA（暂不支持张量模型并行）、MoRA（暂不支持张量模型并行） 等算法。
 
 为了后续的**压缩**和**静态图推理**方便，我们提供 LoRA 参数合并脚本，可以将 LoRA 参数合并到主干模型并保存相应的权重。
 ```
 python merge_lora_params.py \
-    --model_name_or_path ./checkpoints/sft_ckpts \
+    --model_name_or_path ./base_model \
     --lora_path ./checkpoints/lora_ckpts \
     --output_path ./checkpoints/lora_merge \
     --device "gpu" \
@@ -115,6 +115,102 @@ python merge_lora_params.py \
 - `safe_serialization`: 是否保存为 safetensor 格式，默认为 True。
 </div>
 
+#### 3.4.2 Prefix Tuning
+```
+# 单卡Prefix Tuning
+python  run_finetune.py ./config/llama/pt_argument.json
+
+# 多卡Prefix Tuning
+python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.py ./config/llama/pt_argument.json
+```
+
+#### 3.4.3 VeRA
+```
+# 单卡VeRA
+python  run_finetune.py ./config/llama/vera_argument.json
+
+# 多卡VeRA（暂不支持张量模型并行）
+python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.py ./config/llama/vera_argument.json
+```
+
+为了后续的**压缩**和**静态图推理**方便，我们提供 VeRA 参数合并脚本，可以将 VeRA 参数合并到主干模型并保存相应的权重。
+```
+python merge_vera_params.py \
+    --model_name_or_path ./base_model \
+    --vera_path ./checkpoints/vera_ckpts \
+    --merge_vera_model_path ./checkpoints/vera_merge \
+    --device "gpu" \
+    --safe_serialization True
+```
+
+<summary>&emsp; 脚本参数介绍</summary><div>
+
+- `vera_path`: VeRA 参数和配置路径，对 VeRA 参数进行初始化，默认为 None。
+- `model_name_or_path`: 必须，主干模型参数路径，默认为 None。
+- `merge_vera_model_path`: 必须，合并参数后保存路径，默认为 None。
+- `device`: 运行环境，默认为 gpu。
+</div>
+
+#### 3.4.4 LoKr
+```
+# 单卡LoKr
+python  run_finetune.py ./config/llama/lokr_argument.json
+
+# 多卡LoKr（暂不支持张量模型并行）
+python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.py ./config/llama/lokr_argument.json
+```
+为了后续的**压缩**和**静态图推理**方便，我们提供 LoKr 参数合并脚本，可以将 LoKr 参数合并到主干模型并保存相应的权重。
+```
+python merge_lokr_params.py \
+    --model_name_or_path ./base_model \
+    --lokr_path ./checkpoints/lokr_ckpts \
+    --merge_lokr_model_path ./checkpoints/lokr_merge \
+    --device "gpu" \
+    --safe_serialization True
+```
+
+<summary>&emsp; 脚本参数介绍</summary><div>
+
+- `lokr_path`: LoKr 参数和配置路径，对 LoKr 参数进行初始化，默认为 None。
+- `model_name_or_path`: 必须，主干模型参数路径，默认为 None。
+- `merge_lokr_model_path`: 必须，合并参数后保存路径，默认为 None。
+- `device`: 运行环境，默认为 gpu。
+</div>
+
+#### 3.4.4 ReFT
+```
+# 单卡ReFT
+python  run_finetune.py ./config/llama/reft_argument.json
+
+# 多卡ReFT（暂不支持张量模型并行）
+python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.py ./config/llama/reft_argument.json
+```
+ReFT 目前仅支持动态图预测，预测脚本如下
+```
+python ./predict/reft_predictor.py \
+    --model_name_or_path ./base_model \
+    --reft_path ./checkpoints/lokr_ckpts \
+    --output_file output.json \
+    --batch_size 1 \
+    --data_file "./data/dev.json"
+    --max_length 4096
+```
+
+<summary>&emsp; 脚本参数介绍</summary><div>
+
+- `reft_path`: ReFT 参数和配置路径，对 ReFT 参数进行初始化。
+- `model_name_or_path`: 主干模型参数路径。
+- `batch_size`: 批大小。该参数越大，占用显存越高；该参数越小，占用显存越低。
+- `data_file`: 待推理 json 文件，默认为 None。样例数据：
+    ```json
+    {"tgt":"", "src": "写一个300字的小说大纲，内容是李白穿越到现代，最后成为公司文职人员的故事"}
+    {"tgt":"", "src": "我要采访一位科幻作家，创建一个包含5个问题的列表"}
+    ```
+- `output_file`: 保存推理结果文件。
+- `src_length`: 模型输入上下文最大 token 长度。
+- `max_length`:模型输入（上下文+生成内容）的最大 token 长度。
+</div>
+
 ## 4.精调参数介绍
 <summary>&emsp; 模型参数（ModelArgument） </summary><div>
 
@@ -128,15 +224,18 @@ python merge_lora_params.py \
 - `lora_plus_scale`:  是否使用 LoRA+，设置 B 与 A 的学习率比例。
 - `neftune`: 是否使用[NEFT](https://arxiv.org/abs/2310.05914)，进行微调。默认为 False。
 - `neftune_noise_alpha`: NEFT alpha 参数，默认为5.0。
-- `vera`: 是否开启 VeRA 微调策略，默认为 False。
+- `vera`: 是否开启 [VeRA](https://arxiv.org/abs/2310.11454) 微调策略，默认为 False。
 - `vera_rank`: VeRA 算法中 rank（秩）的值，默认为8。
-- `lokr`: 是否开启 LoKr 微调策略，默认为 False。
+- `lokr`: 是否开启 [LoKr](https://arxiv.org/abs/2309.14859) 微调策略，默认为 False。
 - `lokr_rank`: LoKr 算法中 rank（秩）的值，默认为8。
 - `use_long_sequence_strategies`: 是否使用长序列扩展策略，默认为 False。
+- `reft`: 是否开启 [ReFT](https://arxiv.org/abs/2404.03592) 微调策略，默认为 False。
+- `use_mora`: 是否开启 [MoRA](https://arxiv.org/abs/2405.12130) 微调策略，默认为 False。
+- `lora_use_mixer`: 是否开启 [MosLoRA](https://arxiv.org/abs/2406.11909) 策略，默认为 False。
+- `pissa`: 是否开启 [PiSSA](https://arxiv.org/abs/2404.02948) 策略，默认为 False。
 - `strategy_type`: 长序列扩展策略的类型，默认为 None。
 - `strategy_name`: 长序列扩展策略的具体名称，默认为 None。
 - `rope_scaling_factor`: 应用 RoPE 扩展策略时的缩放因子。
-- `lora_use_mixer`: 是否开启 MosLoRA 策略。
 </div>
 
 <summary>&emsp; 数据参数（DataArgument）</summary><div>
