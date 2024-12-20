@@ -436,8 +436,7 @@ class UnifiedCheckpointHandler:
         )
         if has_merge_optimizer_safetensors:
             optimizer_index_file = os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME)
-            if distributed_isfile(optimizer_index_file):
-                distributed_file(optimizer_index_file)
+            distributed_file(optimizer_index_file)
             with open(optimizer_index_file, "r") as f:
                 index = json.loads(f.read())
 
