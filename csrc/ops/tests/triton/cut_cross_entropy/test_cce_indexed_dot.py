@@ -13,7 +13,7 @@ skip_no_cuda = pytest.mark.skipif(not paddle.device.is_compiled_with_cuda(), rea
 @pytest.mark.parametrize("dtype,error_tol", [(paddle.float32, 5e-7), (paddle.float16, 1e-3), (paddle.bfloat16, 1e-2)])
 @pytest.mark.parametrize("softcap", [None, 20.0])
 @pytest.mark.parametrize("shape", [(256, 512, 128), (255, 507, 128), (255, 507, 123)])
-def test_indexed_dot(dtype: paddle.dtype, error_tol: float, softcap: float | None, shape: tuple[int, int, int]):
+def test_indexed_dot(dtype: paddle.dtype, error_tol: float, softcap: float, shape: tuple[int, int, int]):
     paddle.seed(0)
 
     if dtype == paddle.bfloat16 and not paddle.device.is_compiled_with_cuda():
