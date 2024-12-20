@@ -9,7 +9,35 @@
 - **缓解对齐代价**：在对预训练模型进行微调 sft 后得到微调模型，之后我们通常进行 RLHF。RLHF 被证明有效提升了 LLMs 的用户友好性，但它会引入一个对齐税（alignment tax），即在对齐人类偏好后模型的性能可能有所下降。模型融合可以缓解对齐税。
 
 ## 2.大模型融合算法介绍
-### 2.1 权重融合方法
+### 2.1 快速开始
+接下来我们将介绍如何使用统一脚本进行模型融合。
+#### 2.1.1 环境准备
+
+- PaddlePaddle 3.0-beta
+- PaddleNLP   develop
+
+git clone 代码到本地，即可开始。
+
+```bash
+    git clone https://github.com/PaddlePaddle/PaddleNLP.git
+    # pip install ./PaddleNLP 使用develop版本
+    cd PaddleNLP/llm/tools
+    # 到达运行目录
+```
+#### 2.1.2 模型融合
+
+```
+python mergekit.py \
+    --device cpu \
+    --tensor_type np \
+    --n_process 2 \
+    --merge_method linear \
+    --model_path_list ../checkpoints/model1 ../checkpoints/model \
+    --output_path ../checkpoints/model_merge
+
+```
+
+### 2.2 权重融合方法
 | merge_method   | 权重稀疏      | 权重融合   | 支持融合模型数 |
 |----------------|---------------|------------|----------------|
 | linear         | /             | linear     | >=2            |
@@ -29,35 +57,6 @@
 - **trim**: [TIES](https://arxiv.org/abs/2306.01708)论文中提出稀疏方式，根据绝对值由大到小顺序，保留设定比例权重数值，将其余小数值权重设为0。可选超参 `reserve_p`、`rescale`。
 - **dare**: [DARE](https://arxiv.org/abs/2311.03099)论文中提出稀疏方式，根据设定概率，随机选择保留原始权重或设为0。可选超参 `reserve_p`、`rescale`。
 - **magprune**:[DELLA](https://arxiv.org/abs/2406.11617)论文中提出稀疏方式，根据权重绝对值大小给定不同保留概率，随机选择保留原始权重或设为0。可选超参 `reserve_p`、`rescale`、`epsilon`。
-
-### 2.2 快速开始
-接下来我们将介绍如何使用统一脚本进行模型融合。
-#### 2.2.1 环境准备
-
-- PaddlePaddle 3.0-beta
-- PaddleNLP   3.0.0b2
-
-git clone 代码到本地，即可开始。
-
-```bash
-    git clone https://github.com/PaddlePaddle/PaddleNLP.git
-    # pip install ./PaddleNLP 使用develop版本
-    cd PaddleNLP/llm/tools
-    # 到达运行目录
-```
-#### 2.2.2 模型融合
-
-```
-python mergekit.py \
-    --device cpu \
-    --tensor_type np \
-    --n_process 2 \
-    --merge_method linear \
-    --model_path_list ../checkpoints/model1 ../checkpoints/model \
-    --output_path ../checkpoints/model_merge
-
-```
-
 ## 3.Mergekit 参数介绍
 <summary>&emsp; 通用参数（Common Parameters）</summary><div>
 
@@ -74,7 +73,6 @@ python mergekit.py \
 <summary>&emsp; 模型参数（Model Parameters）</summary><div>
 
 - `model_path_list`: 融合模型的路径或名称列表，需至少包含两个路径。默认为 `None`。
-- `model_path_str`: 融合模型名称或路径字符串,以逗号分隔，默认为 `None`。
 - `base_model_path`: 基础模型的路径或名称，默认为 `None`。
 - `output_path`: 融合模型保存的目录路径，默认为 `None`。
 
