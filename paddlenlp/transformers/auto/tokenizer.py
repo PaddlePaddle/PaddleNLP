@@ -64,7 +64,10 @@ else:
             ("ctrl", "CTRLTokenizer"),
             ("distilbert", "DistilBertTokenizer"),
             ("electra", "ElectraTokenizer"),
-            ("ernie", "ErnieTokenizer"),
+            (
+                "ernie",
+                ("ErnieTokenizer", "ErnieTokenizerFast" if is_tokenizers_available() else None),
+            ),
             ("ernie_m", "ErnieMTokenizer"),
             ("fnet", "FNetTokenizer"),
             ("funnel", "FunnelTokenizer"),

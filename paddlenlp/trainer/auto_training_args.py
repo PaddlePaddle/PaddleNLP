@@ -14,6 +14,7 @@
 
 from dataclasses import dataclass, field
 
+from .trainer_utils import split_parallel_config
 from .training_args import TrainingArguments
 from .utils import add_start_docstrings
 
@@ -24,6 +25,11 @@ class AutoTrainingArguments(TrainingArguments):
     """
     Training Arguments for auto_parallel.
     """
+
+    fused_linear: bool = field(
+        default=False,
+        metadata={"help": "Enable fused linear op, which will fuse matmul and bias add together."},
+    )
 
     fused_linear_param_grad_add: bool = field(
         default=False,
@@ -46,17 +52,24 @@ class AutoTrainingArguments(TrainingArguments):
         super().__post_init__()
         assert self.enable_auto_parallel
 
+        fused_passes = self.strategy.fused_passes
+
         if self.fused_linear_param_grad_add:
-            fused_passes = self.strategy.fused_passes
             fused_passes.enable = True
             fused_passes.fused_passes_list.append("fused_linear_param_grad_add_pass")
 
         if self.fuse_allreduce_split_to_reducescatter:
-            fused_passes = self.strategy.fused_passes
             fused_passes.enable = True
             fused_passes.fused_passes_list.append("fuse_allreduce_split_to_reducescatter_pass")
 
         if self.eliminate_transpose:
-            fused_passes = self.strategy.fused_passes
             fused_passes.enable = True
             fused_passes.fused_passes_list.append("eliminate_transpose")
+
+        if self.fused_linear:
+            fused_passes.enable = True
+            fused_passes.fused_passes_list.append("fused_gemm_epilogue_pass")
+
+        mp_configs = split_parallel_config(self.tensor_parallel_config)
+        if "replace_with_parallel_cross_entropy" in mp_configs:
+            self.strategy.mp_optimization.replace_with_parallel_cross_entropy = True

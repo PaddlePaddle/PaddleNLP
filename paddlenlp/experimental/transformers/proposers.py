@@ -16,7 +16,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 import paddle
-from paddlenlp_ops import ngram_match
 
 
 class Proposer(ABC):
@@ -72,6 +71,9 @@ class InferenceWithReferenceProposer(Proposer):
         seq_lens_this_time = kargs["seq_lens_this_time"].cpu()
         seq_lens_encoder = model_inputs["seq_lens_encoder"].cpu()
         seq_lens_decoder = model_inputs["seq_lens_decoder"].cpu()
+
+        from paddlenlp_ops import ngram_match
+
         ngram_match(
             self.input_ids_cpu,
             self.input_ids_len.cpu(),

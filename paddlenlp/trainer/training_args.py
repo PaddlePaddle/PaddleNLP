@@ -266,6 +266,8 @@ class TrainingArguments:
               sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.
               sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.
               sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.
+              replace_with_c_embedding, it supports replacing col-sliced embedding with row-sliced c_embedding when it set True, which is used in PIR auto_parallel.
+              replace_with_parallel_cross_entropy, it replaces 'cross_entropy_with_softmax' OP with 'c_softmax_with_cross_entropy' OP in PIR static graph, which can improve model parallel performance.
         pipeline_parallel_config (`str`, *optional*)(
             Some additional config it highly affect the useage of pipeline parallel, we provide some option to config it.
             following config is support:
@@ -378,6 +380,8 @@ class TrainingArguments:
             Whether to use distributed dataloader. Default is `False`.
         release_grads (`bool`, *optional*):
             Whether to release gradients during training. Default is `False`.
+        ckpt_quant_stage (`str`, *optional*):
+            Whether activate checkpoint quantization. O0: deactivate, O1: Int8 compression, O2: Int4 compression. (default: O0).
     """
 
     output_dir: str = field(
@@ -679,6 +683,8 @@ class TrainingArguments:
                 "sync_param, in optimizer step, use broadcast to sync parameters those attr 'is_distributed' is False.\n"
                 "sync_grad, in optimizer step, use broadcast to sync gradients those attr 'is_distributed' is False.\n"
                 "sync_moment, in optimizer step, use broadcast to sync momentums those attr 'is_distributed' is False.\n"
+                "replace_with_c_embedding, it supports replacing col-sliced embedding with row-sliced c_embedding when it set True, which is used in PIR auto_parallel.\n"
+                "replace_with_parallel_cross_entropy, it replaces 'cross_entropy_with_softmax' OP with 'c_softmax_with_cross_entropy' OP in PIR static graph, which can improve model parallel performance.\n"
             )
         },
     )
@@ -878,7 +884,9 @@ class TrainingArguments:
     )
     ckpt_quant_stage: str = field(
         default="O0",
-        metadata={"help": "checkpoint quantization stage."},
+        metadata={
+            "help": "checkpoint quantization stage. O0: deactivate, O1: Int8 compression, O2: Int4 compression. (default: O0)"
+        },
     )
     ignore_load_lr_and_optim: Optional[bool] = field(
         default=False,
@@ -1014,6 +1022,8 @@ class TrainingArguments:
             raise ValueError("At most one of fp16 and bf16 can be True for full eval, but not both")
 
         self.optim = OptimizerNames(self.optim)
+        if self.optim == OptimizerNames.ADAMW_MINI and self.tensor_parallel_degree > 1:
+            raise ValueError("AdamW Mini currently doesn't support tensor parallelism.")
 
         self.use_hybrid_parallel = False
 
@@ -1559,19 +1569,23 @@ class TrainingArguments:
                         if x not in [
                             "enable_mp_async_allreduce",  # allreduce_matmul_grad_overlapping in auto_parallel
                             "enable_delay_scale_loss",
+                            "replace_with_c_embedding",
                             # "enable_mp_skip_c_identity",
                             # "enable_mp_fused_linear_param_grad_add",
+                            "replace_with_parallel_cross_entropy",
                         ]:
                             raise ValueError(
                                 f"Found unknown tensor parallell config {x}, "
-                                f"accept config is enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add"
+                                f"accept config is enable_mp_async_allreduce, replace_with_c_embedding, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add"
                             )
                 try:
                     if "enable_mp_async_allreduce" in mp_config:
                         mp_optimization.allreduce_matmul_grad_overlapping = True
+                    if "replace_with_c_embedding" in mp_config:
+                        mp_optimization.replace_with_c_embedding = True
                 except:
                     warnings.warn(
-                        "The enable_mp_async_allreduce, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
+                        "The enable_mp_async_allreduce, replace_with_c_embedding, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add are not supported "
                         "by current version of Paddle. Please try latest develop Paddle."
                     )
 

@@ -67,7 +67,7 @@ def save_file_sync(state_dict, path):
 def save_single_card_checkpoint(model_to_save, output_dir):
     """Save checkpoint for non-distributed environment."""
 
-    state_dict = get_expected_state_dict(model_to_save)
+    state_dict = get_expected_state_dict(model_to_save, concat_additional_adapter=True)
     if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
         weight_filename = "peft_model-00001-of-00001.safetensors"
         index_filename = SAFE_PEFT_WEIGHTS_INDEX_NAME

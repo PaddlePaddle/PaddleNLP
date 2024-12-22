@@ -53,10 +53,7 @@ class FusedQWenRMSNorm(nn.Layer):
         )
 
     def forward(self, x):
-        result = paddle.incubate.nn.functional.fused_rms_norm(x, self.weight, None, self.eps, begin_norm_axis=1)
-        if isinstance(result, tuple):
-            return result[0]
-        return result
+        return paddle.incubate.nn.functional.fused_rms_norm(x, self.weight, None, self.eps, begin_norm_axis=1)[0]
 
 
 @register_base_model

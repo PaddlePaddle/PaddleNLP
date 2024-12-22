@@ -646,13 +646,22 @@ class GenerationBlockInferenceModel(GenerationMixin):
         model_kwargs["accept_num"] = accept_num
         model_kwargs["actual_draft_token_num"] = actual_draft_token_num
 
-        ret = self.sample(
-            eos_token_id,
-            top_k=0,
-            top_p=top_p,
-            temperature=temperature,
-            **model_kwargs,
-        )
+        if self.config.decode_strategy == "speculate_decoding":
+            ret = self.speculate_decoding(
+                eos_token_id,
+                top_k=0,
+                top_p=top_p,
+                temperature=temperature,
+                **model_kwargs,
+            )
+        else:
+            ret = self.sample(
+                eos_token_id,
+                top_k=0,
+                top_p=top_p,
+                temperature=temperature,
+                **model_kwargs,
+            )
         return ret
 
     def sample(
@@ -684,140 +693,200 @@ class GenerationBlockInferenceModel(GenerationMixin):
             step_idx = model_kwargs["step_idx"]
             logits = paddle.cast(outputs, paddle.float32)
 
-            # TODO(Wanglongzhi2001): token_penalty of speculative decoding
-            if not is_speculative_decoding:
-                from paddlenlp_ops import set_preids_token_penalty_multi_scores
+            from paddlenlp_ops import set_preids_token_penalty_multi_scores
 
-                set_preids_token_penalty_multi_scores(
-                    model_kwargs["pre_ids"],
-                    model_kwargs["input_ids"],
-                    model_kwargs["seq_lens_encoder"],
-                    model_kwargs["seq_lens_decoder"],
-                    step_idx,
-                    model_kwargs["stop_flags"],
-                    logits,
-                    penalty_score,
-                    frequency_score,
-                    presence_score,
-                    temperature,
-                    model_kwargs["bad_tokens"],
-                    step_idx,
-                    model_kwargs["min_dec_len"],
-                    eos_token_id,
-                )
+            set_preids_token_penalty_multi_scores(
+                model_kwargs["pre_ids"],
+                model_kwargs["input_ids"],
+                model_kwargs["seq_lens_encoder"],
+                model_kwargs["seq_lens_decoder"],
+                step_idx,
+                model_kwargs["stop_flags"],
+                logits,
+                penalty_score,
+                frequency_score,
+                presence_score,
+                temperature,
+                model_kwargs["bad_tokens"],
+                step_idx,
+                model_kwargs["min_dec_len"],
+                eos_token_id,
+            )
 
             # sample
             probs = F.softmax(logits)
 
+            # compute next_tokens
+            if use_faster_top_p_sampling():
+                from paddlenlp_ops import top_p_sampling_reject
+
+                next_tokens = top_p_sampling_reject(probs, top_p, 0)
+            else:
+                _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
+
+            if self.config.tensor_parallel_degree > 1:
+                paddle.distributed.broadcast(next_tokens, 0)
+
+            from paddlenlp_ops import update_inputs_v2
+
+            update_inputs_v2(
+                model_kwargs["stop_flags"],
+                model_kwargs["step_idx"],
+                model_kwargs["not_need_stop"],
+                model_kwargs["seq_lens_this_time"],
+                model_kwargs["seq_lens_encoder"],
+                model_kwargs["seq_lens_decoder"],
+                model_kwargs["max_dec_len"],
+                model_kwargs["input_ids"],
+                model_kwargs["stop_nums"],
+                next_tokens,
+                model_kwargs["is_block_step"],
+                eos_token_id,
+                model_kwargs["next_tokens"],
+            )
+
             from paddlenlp_ops import save_output
 
-            # whether speculative decoding
-            if not is_speculative_decoding:
-
-                # compute next_tokens
-                if use_faster_top_p_sampling():
-                    from paddlenlp_ops import top_p_sampling_reject
-
-                    next_tokens = top_p_sampling_reject(probs, top_p, 0)
-                else:
-                    _, next_tokens = paddle.tensor.top_p_sampling(probs, top_p)
-
-                if self.config.tensor_parallel_degree > 1:
-                    paddle.distributed.broadcast(next_tokens, 0)
-
-                from paddlenlp_ops import update_inputs_v2
-
-                update_inputs_v2(
-                    model_kwargs["stop_flags"],
-                    model_kwargs["step_idx"],
-                    model_kwargs["not_need_stop"],
-                    model_kwargs["seq_lens_this_time"],
-                    model_kwargs["seq_lens_encoder"],
-                    model_kwargs["seq_lens_decoder"],
-                    model_kwargs["max_dec_len"],
-                    model_kwargs["input_ids"],
-                    model_kwargs["stop_nums"],
-                    next_tokens,
-                    model_kwargs["is_block_step"],
-                    eos_token_id,
-                    model_kwargs["next_tokens"],
-                )
-
-                save_output(
-                    next_tokens,
-                    model_kwargs["not_need_stop"],
-                    model_kwargs.get("accept_num", None),  # only initialized in speculative decoding
-                    self.config.tensor_parallel_rank,
-                )
-                return next_tokens
-            else:
-                from paddlenlp_ops import (
-                    speculate_set_value_by_flags_and_idx,
-                    speculate_verify_and_update,
-                    top_p_candidates,
-                )
-
-                verify_scores, verify_tokens, actual_candidate_len = top_p_candidates(
-                    probs, top_p, model_kwargs["output_padding_offset"], self.max_candidate_len, self.max_seq_len
-                )  # [token_num, max_candidate_len]
-
-                # Speculate Verify And Update
-                speculate_verify_and_update(
-                    model_kwargs["accept_tokens"],
-                    model_kwargs["accept_num"],
-                    model_kwargs["step_idx"],
-                    model_kwargs["seq_lens_encoder"],
-                    model_kwargs["seq_lens_decoder"],
-                    model_kwargs["stop_flags"],
-                    model_kwargs["not_need_stop"],
-                    model_kwargs[
-                        "draft_tokens"
-                    ],  # Both input and output, need to write the last 1 token accepted to position 0.
-                    model_kwargs["seq_lens_this_time"],
-                    verify_tokens,
-                    verify_scores,
-                    model_kwargs["max_dec_len"],
-                    eos_token_id,
-                    model_kwargs["is_block_step"],
-                    model_kwargs["output_cum_offsets"],
-                    actual_candidate_len,
-                    model_kwargs["actual_draft_token_num"],
-                    top_p,
-                    self.max_seq_len,
-                    self.verify_window,
-                    True,  # enable_topp
-                )
-
-                save_output(
-                    model_kwargs["accept_tokens"],
-                    model_kwargs["not_need_stop"],
-                    model_kwargs["accept_num"],
-                    self.config.tensor_parallel_rank,
-                )
-
-                # If seq_lens_decoder is 0 (means stop), accept_num should be set to 0
-                model_kwargs["accept_num"][model_kwargs["seq_lens_decoder"] == 0] = 0
-
-                # Update pre_ids through accept tokens
-                speculate_set_value_by_flags_and_idx(
-                    model_kwargs["pre_ids"],
-                    model_kwargs["accept_tokens"],
-                    model_kwargs["accept_num"],
-                    model_kwargs["stop_flags"],
-                    model_kwargs["seq_lens_this_time"],
-                    model_kwargs["seq_lens_encoder"],
-                    model_kwargs["seq_lens_decoder"],
-                    model_kwargs["step_idx"],
-                )
-
-        is_speculative_decoding = model_kwargs.get("draft_tokens", None) is not None
-        if is_speculative_decoding:
-            # Prepare output padding offset
-            output_padding_offset, output_cum_offsets = self.get_output_padding_offset(
-                model_kwargs["seq_lens_this_time"], model_kwargs["seq_lens_encoder"], model_kwargs["seq_lens_decoder"]
+            save_output(
+                next_tokens,
+                model_kwargs["not_need_stop"],
+                self.config.tensor_parallel_rank,
             )
-            model_kwargs["output_padding_offset"] = output_padding_offset
-            model_kwargs["output_cum_offsets"] = output_cum_offsets
+            return next_tokens
+
+        # encoder
+        outputs = _forward_(**model_kwargs)  # [bs, 1, dim_embed]
+        # first decoder
+        next_tokens = _post_process_(
+            outputs,
+            top_k,
+            top_p,
+            penalty_score,
+            frequency_score,
+            presence_score,
+            temperature,
+            model_kwargs,
+        )
+
+        return next_tokens
+
+    def speculate_decoding(
+        self,
+        eos_token_id,
+        top_k,
+        top_p,
+        penalty_score,
+        frequency_score,
+        presence_score,
+        temperature=None,
+        min_tokens_to_keep=1,
+        **model_kwargs
+    ):
+        def _forward_(**args):
+            model_inputs = self.prepare_inputs_for_generation(**args)
+            return self(**model_inputs)
+
+        def _post_process_(
+            outputs,
+            top_k,
+            top_p,
+            penalty_score,
+            frequency_score,
+            presence_score,
+            temperature,
+            model_kwargs,
+        ):
+            step_idx = model_kwargs["step_idx"]
+            logits = paddle.cast(outputs, paddle.float32)
+
+            from paddlenlp_ops import speculate_get_token_penalty_multi_scores
+
+            speculate_get_token_penalty_multi_scores(
+                model_kwargs["pre_ids"],
+                logits,
+                penalty_score,
+                frequency_score,
+                presence_score,
+                temperature,
+                model_kwargs["bad_tokens"],
+                step_idx,
+                model_kwargs["min_dec_len"],
+                eos_token_id,
+                model_kwargs["seq_lens_this_time"],
+                model_kwargs["output_padding_offset"],
+                model_kwargs["output_cum_offsets"],
+                self.max_seq_len,
+            )
+
+            # sample
+            probs = F.softmax(logits)
+
+            from paddlenlp_ops import (
+                speculate_save_output,
+                speculate_set_value_by_flags_and_idx,
+                speculate_verify_and_update,
+                top_p_candidates,
+            )
+
+            verify_scores, verify_tokens, actual_candidate_len = top_p_candidates(
+                probs, top_p, model_kwargs["output_padding_offset"], self.max_candidate_len, self.max_seq_len
+            )  # [token_num, max_candidate_len]
+
+            # Speculate Verify And Update
+            speculate_verify_and_update(
+                model_kwargs["accept_tokens"],
+                model_kwargs["accept_num"],
+                model_kwargs["step_idx"],
+                model_kwargs["seq_lens_encoder"],
+                model_kwargs["seq_lens_decoder"],
+                model_kwargs["stop_flags"],
+                model_kwargs["not_need_stop"],
+                model_kwargs[
+                    "draft_tokens"
+                ],  # Both input and output, need to write the last 1 token accepted to position 0.
+                model_kwargs["seq_lens_this_time"],
+                verify_tokens,
+                verify_scores,
+                model_kwargs["max_dec_len"],
+                eos_token_id,
+                model_kwargs["is_block_step"],
+                model_kwargs["output_cum_offsets"],
+                actual_candidate_len,
+                model_kwargs["actual_draft_token_num"],
+                top_p,
+                self.max_seq_len,
+                self.verify_window,
+                True,  # enable_topp
+            )
+
+            speculate_save_output(
+                model_kwargs["accept_tokens"],
+                model_kwargs["accept_num"],
+                model_kwargs["not_need_stop"],
+                self.config.tensor_parallel_rank,
+            )
+
+            # If seq_lens_decoder is 0 (means stop), accept_num should be set to 0
+            model_kwargs["accept_num"][model_kwargs["seq_lens_decoder"] == 0] = 0
+
+            # Update pre_ids through accept tokens
+            speculate_set_value_by_flags_and_idx(
+                model_kwargs["pre_ids"],
+                model_kwargs["accept_tokens"],
+                model_kwargs["accept_num"],
+                model_kwargs["stop_flags"],
+                model_kwargs["seq_lens_this_time"],
+                model_kwargs["seq_lens_encoder"],
+                model_kwargs["seq_lens_decoder"],
+                model_kwargs["step_idx"],
+            )
+
+        # Prepare output padding offset
+        output_padding_offset, output_cum_offsets = self.get_output_padding_offset(
+            model_kwargs["seq_lens_this_time"], model_kwargs["seq_lens_encoder"], model_kwargs["seq_lens_decoder"]
+        )
+        model_kwargs["output_padding_offset"] = output_padding_offset
+        model_kwargs["output_cum_offsets"] = output_cum_offsets
 
         # encoder
         outputs = _forward_(**model_kwargs)  # [bs, 1, dim_embed]

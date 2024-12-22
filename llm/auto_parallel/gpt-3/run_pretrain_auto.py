@@ -68,12 +68,6 @@ class PreTrainingArguments(AutoTrainingArguments):
             "help": "The steps use to control the learing rate. If the step > decay_steps, will use the min_learning_rate."
         },
     )
-    enable_linear_fused_grad_add: bool = field(
-        default=False,
-        metadata={
-            "help": "Enable fused linear grad add strategy, which will reduce elementwise add for grad accumulation in the backward of nn.Linear ."
-        },
-    )
     job_schedule_profiler_start: int = field(
         default=-1,
         metadata={"help": "The step to start job_schedule_profiler."},
@@ -203,6 +197,15 @@ class ModelArguments:
     fuse_attention_ffn: bool = field(
         default=False,
         metadata={"help": "whether to fuse first up and gate proj in mlp block"},
+    )
+    # this optional can be use in run_pretrain.py
+    use_fast_layer_norm: bool = field(
+        default=False,
+        metadata={"help": "GPT3 model, use fast layernorm"},
+    )
+    use_fused_dropout_add: bool = field(
+        default=False,
+        metadata={"help": "Gpt3 model, use_fused_dropout_add"},
     )
     recompute_granularity: str = field(
         default="full",
@@ -353,6 +356,7 @@ def get_train_data_file(args):
 class PretrainingTrainer(AutoTrainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.is_pretraining = True
 
     def _wrap_for_dist_loader(self, train_dataloader):
         dist_loader = super()._wrap_for_dist_loader(train_dataloader)
@@ -391,13 +395,18 @@ def init_seed(seed: int = 1234, args=None):
     else:
         assert not args.use_hybrid_parallel and args.enable_auto_parallel
         if dist.get_world_size() > 1:
+            if args.hybrid_parallel_topo_order is None or args.hybrid_parallel_topo_order == "pp_first":
+                order = ["pp", "dp", "sharding", "mp", "sep"]
+            elif args.hybrid_parallel_topo_order == "sharding_first":
+                order = ["dp", "sharding", "pp", "mp", "sep"]
             topo = Topology(
                 dist.get_rank(),
                 dist.get_world_size(),
-                dp_degree=args.data_parallel_degree,
+                dp_degree=max(args.data_parallel_degree, args.sharding_parallel_degree),
                 pp_degree=args.pipeline_parallel_degree,
                 mp_degree=args.tensor_parallel_degree,
-                sharding_degree=1,  # auto_parallel's sharding is not orthogonal with dp, mp and pp
+                sharding_degree=1,
+                order=order,
             )
 
             global_seed, local_seed, random_seed = _get_distributed_seeds(args.seed, topo)
@@ -422,11 +431,6 @@ def main():
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
-    if training_args.enable_linear_fused_grad_add:
-        from fused_layers import mock_layers
-
-        mock_layers()
 
     if model_args.tokenizer_name_or_path is None:
         model_args.tokenizer_name_or_path = model_args.model_name_or_path
@@ -467,7 +471,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
-
+    config.use_fast_layer_norm = model_args.use_fast_layer_norm
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings
     if not model_args.continue_training:
@@ -491,7 +495,7 @@ def main():
     config.num_attention_heads = (
         model_args.num_attention_heads if model_args.num_attention_heads is not None else config.num_attention_heads
     )
-
+    config.use_fused_dropout_add = model_args.use_fused_dropout_add
     config.use_flash_attention = model_args.use_flash_attention
     config.use_fused_rms_norm = model_args.use_fused_rms_norm
     config.fuse_attention_qkv = model_args.fuse_attention_qkv
@@ -533,6 +537,8 @@ def main():
         def fn(layer):
             if hasattr(layer, "enable_recompute") and (layer.enable_recompute is False or layer.enable_recompute == 0):
                 layer.enable_recompute = True
+                if hasattr(layer, "layerwise_recompute"):
+                    layer.layerwise_recompute = True
 
         model.apply(fn)
 

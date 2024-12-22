@@ -741,7 +741,7 @@ class FusedMultiTransformerBase(Layer):
 
     def compute_layernorm_before_qkv(self, src, i):
         if i == 0:
-            ln_out = self.norm_func(src, self.ln_scales[i], self.ln_biases[i], self._epsilon, begin_norm_axis=1)
+            ln_out = self.norm_func(src, self.ln_scales[i], self.ln_biases[i], self._epsilon, begin_norm_axis=1)[0]
         else:
             ln_out = src
 
@@ -1918,7 +1918,7 @@ class FusedMultiTransformerA8W8(FusedMultiTransformerBase):
                 quant_round_type=self.quant_round_type,
                 quant_max_bound=self.quant_max_bound,
                 quant_min_bound=self.quant_min_bound,
-            )
+            )[0]
         else:
             ln_out = src
 
@@ -2617,9 +2617,7 @@ class FusedBlockMultiTransformerFP8(FusedBlockMultiTransformer):
                 quant_round_type=1,
                 quant_max_bound=self.config.quant_max_bound,
                 quant_min_bound=self.config.quant_min_bound,
-            )
-            if in_dynamic_mode():
-                ln_out = ln_out[0]
+            )[0]
         else:
             ln_out = src
 

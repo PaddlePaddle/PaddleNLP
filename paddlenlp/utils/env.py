@@ -75,6 +75,7 @@ GENERATION_CONFIG_NAME = "generation_config.json"
 # Fast tokenizers (provided by HuggingFace tokenizer's library) can be saved in a single file
 FULL_TOKENIZER_NAME = "tokenizer.json"
 TIKTOKEN_VOCAB_FILE = "tokenizer.model"
+MERGE_CONFIG_NAME = "merge_config.json"
 
 LORA_CONFIG_NAME = "lora_config.json"
 LORA_WEIGHTS_NAME = "lora_model_state.pdparams"
@@ -126,6 +127,8 @@ ASYMMETRY_QUANT_SCALE_MAX = "@max_scales"
 MAX_QUANTIZATION_TIMES = 1
 
 # LLM Inference related environment variables
-# Note(@Wanglongzhi2001): MAX_BSZ, MAX_DRAFT_TOKENS must be the same as definition in get_output / save_output
-MAX_BSZ = 256
+# Note(@Wanglongzhi2001): MAX_BSZ must be the same as definition in get_output / save_output
+# SPECULATE_MAX_BSZ, MAX_DRAFT_TOKENS must be the same as definition in speculate_get_output / speculate_save_output
+MAX_BSZ = 512
+SPECULATE_MAX_BSZ = 256
 MAX_DRAFT_TOKENS = 6
