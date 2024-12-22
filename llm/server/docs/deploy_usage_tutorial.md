@@ -149,27 +149,6 @@ health接口：（模型是否准备好推理）
 
 ## 服务测试
 
-### Python 客户端
-
-```
-from fastdeploy_client.chatbot import ChatBot
-
-hostname = "127.0.0.1"          # 服务部署的hostname
-port = 8811                     # 服务配置的GRPC_PORT
-
-chatbot = ChatBot(hostname=hostname, port=port)
-
-# 非流式接口
-result = chatbot.generate("hello", topp=0.8, max_dec_len=128, timeout=120)
-print(result)
-
-# 流式接口
-chatbot = ChatBot(hostname=hostname, port=port)
-stream_result = chatbot.stream_generate("hello", max_dec_len=128, timeout=120)
-for res in stream_result:
-    print(res)
-```
-
 ### HTTP调用
 
 提示：HTTP调用接口使用变量 PUSH_MODE_HTTP_PORT 配置！HTTP_PORT 仅用于探活接口使用！
@@ -348,10 +327,8 @@ docker build --network=host -f ./dockerfiles/Dockerfile_serving_cuda123_cudnn9 -
 | penalty_score | float | 惩罚分数 | 否 | 1 |  |
 | presence_score | float | 存在分数 | 否 | 0 |  |
 | stream | bool | 是否流式返回 | 否 | False |  |
-| return_all_tokens | bool | 是否一次性返回所有结果 | 否 | False | 与stream参数差异见表后备注 |
 | timeout | int | 请求等待的超时时间，单位是秒 | 否 | 300 |  |
 | return_usage | bool | 是否返回输入、输出 token 数量 | 否 | False |  |
 
 * 在正确配置PUSH_MODE_HTTP_PORT字段下，服务支持 GRPC 和 HTTP 两种请求服务
   * stream 参数仅对 HTTP 请求生效
-  * return_all_tokens 参数对 GRPC 和 HTTP 请求均有效

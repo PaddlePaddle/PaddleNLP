@@ -2,7 +2,6 @@ FROM registry.baidubce.com/paddlepaddle/fastdeploy:llm-base-gcc12.3-cuda11.8-cud
 
 WORKDIR /opt/output/
 COPY ./server/ /opt/output/Serving/
-COPY ./client/ /opt/output/client/
 
 ENV LD_LIBRARY_PATH="/usr/local/cuda-11.8/compat/:$LD_LIBRARY_PATH"
 
@@ -16,8 +15,6 @@ RUN git clone https://gitee.com/paddlepaddle/PaddleNLP.git && cd PaddleNLP/csrc 
     && cp -r /opt/output/PaddleNLP/paddlenlp /usr/local/lib/python3.10/dist-packages/ \
     && cp -r /root/.local/lib/python3.10/site-packages/* /usr/local/lib/python3.10/dist-packages/ \
     && rm -rf /opt/output/PaddleNLP
-
-RUN cd /opt/output/client && pip install -r requirements.txt && pip install .
 
 RUN python3 -m pip install -r /opt/output/Serving/requirements.txt && rm /opt/output/Serving/requirements.txt
 RUN mv Serving/server /usr/local/lib/python3.10/dist-packages/
