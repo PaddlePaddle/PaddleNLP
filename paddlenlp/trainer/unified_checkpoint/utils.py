@@ -210,15 +210,6 @@ def get_expected_state_dict(model_to_save, **kwargs):
 
     if isinstance(model_to_save, PretrainedModel):
         state_dict = model_to_save.state_dict()
-        if (
-            hasattr(model_to_save.config, "tie_word_embeddings")
-            and model_to_save.config.tie_word_embeddings
-            and hasattr(model_to_save, "_tied_weights_keys")
-            and model_to_save._tied_weights_keys is not None
-        ):
-            for key in model_to_save._tied_weights_keys:
-                if key in state_dict:
-                    state_dict.pop(key)
     elif isinstance(model_to_save, LoRAModel):
         concat_additional_adapter = kwargs.get("concat_additional_adapter", False)
         concat_init_lora = model_to_save.lora_config.loraga and concat_additional_adapter
