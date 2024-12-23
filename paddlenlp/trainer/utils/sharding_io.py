@@ -421,12 +421,8 @@ class ShardingIO:
             return None
 
         model_meta = {}
-        parallel_config = self._get_distributed_strategy()
-        if parallel_config:
-            model_meta["parallel_config"] = parallel_config
-        sharding_metas = self._gather_sharding_metas()
-        if sharding_metas:
-            model_meta["sharding_metas"] = sharding_metas
+        model_meta["parallel_config"] = self._get_distributed_strategy()
+        model_meta["sharding_metas"] = self._gather_sharding_metas()
 
         return model_meta
 
@@ -437,8 +433,6 @@ class ShardingIO:
         vpp_degree = 1
         nranks = dist.get_world_size()
         if self.args.use_hybrid_parallel and nranks > 1:
-            if dist.get_rank():
-                return
             hcg = fleet.get_hybrid_communicate_group()
             mp_degree = hcg.get_model_parallel_world_size()
             pp_degree = hcg.get_pipe_parallel_world_size()
@@ -574,10 +568,6 @@ class ShardingIO:
         nranks = dist.get_world_size()
         if not self.args.use_hybrid_parallel or nranks <= 1:
             return None
-        if self.args.sharding_parallel_rank != 0:
-            return None
-        if self.args.data_parallel_rank != 0:
-            return None
         if not reshard_util.is_sharding_opt(self.optimizer):
             return None
 
@@ -610,8 +600,6 @@ class ShardingIO:
         sharding_metas[suffix] = sharding_meta
         sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_model_parallel_group())
         sharding_metas = {k: v for e in sharding_metas_list for (k, v) in e.items()}
-        if self.args.tensor_parallel_rank != 0:
-            return None
         sharding_metas_list = self._all_gather_simple_object(sharding_metas, self.hcg.get_pipe_parallel_group())
         sharding_metas = {k: v for e in sharding_metas_list for (k, v) in e.items()}
         return sharding_metas
