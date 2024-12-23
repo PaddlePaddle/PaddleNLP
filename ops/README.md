@@ -53,6 +53,10 @@ pytest -v tests/triton  # 测试 Triton 算子
 
 # 注意
 
+推荐用户使用以下版本的库：
+- paddlepaddle-gpu >= 3.0.0b2
+- triton >= 3.0.0
+
 由于 `Triton` 库原本依赖于 `PyTorch`，为了方便 `Paddle` 用户使用 `Triton`，您可以按照以下步骤替换 `Triton` 库的部分源码，使其与 `Paddle` 兼容：
 
 ```bash

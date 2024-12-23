@@ -64,7 +64,7 @@ def init_to_zero(names):
     return lambda nargs: [nargs[name].zero_() for name in names if nargs[name] is not None]
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         triton.Config(
             {"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 64},
@@ -697,7 +697,7 @@ def selective_scan_bwd(dout, x, dt, A, B, C, D=None, z=None):
     Return:
         out: (batch, seqlen, nheads, headdim)
     """
-    import selective_scan_cuda_pd as selective_scan
+    from ...cuda import selective_scan_cuda_pd as selective_scan
 
     batch, seqlen, nheads, headdim = x.shape
     chunk_size = dt.shape[-1]
@@ -1010,7 +1010,7 @@ def ssd_selective_scan(x, dt, A, B, C, D=None, z=None, dt_bias=None, dt_softplus
     Return:
         out: (batch, seqlen, nheads, headdim)
     """
-    from mamba_ssm_paddle.ops.selective_scan_interface import selective_scan_fn
+    from ...cuda.selective_scan import selective_scan_fn
 
     batch, seqlen, nheads, headdim = x.shape
     _, _, ngroups, dstate = B.shape

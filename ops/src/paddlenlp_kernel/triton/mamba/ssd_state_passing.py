@@ -13,7 +13,7 @@ from einops import rearrange
 from ...utils import custom_bwd, custom_fwd
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         triton.Config({"BLOCK_SIZE": 64}),
         triton.Config({"BLOCK_SIZE": 128}),
@@ -106,7 +106,7 @@ def _state_passing_fwd_kernel(
         out_ptrs += stride_out_chunk
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         triton.Config({"BLOCK_SIZE": 64}),
         triton.Config({"BLOCK_SIZE": 128}),

@@ -364,9 +364,9 @@ def _cce_forward_best_config() -> Config:
     return Config(dict(BLOCK_B=256, BLOCK_V=128, BLOCK_D=32), num_warps=8, num_stages=3)
 
 
-def cce_forward_autotune() -> Callable[..., autotuner.Autotuner]:
+def cce_forward_autotune() -> Callable[..., autotuner.PaddleAutotuner]:
     if _AUTOTUNE:
-        return triton.autotune(
+        return triton.paddle_autotune(
             configs=get_autotune_config(),
             key=["V", "D", "B_BIN"],
             prune_configs_by={
@@ -392,9 +392,9 @@ def _cce_backward_best_config() -> Config:
     return Config(dict(BLOCK_B=128, BLOCK_V=128, BLOCK_D=32), num_warps=4, num_stages=4)
 
 
-def cce_backward_autotune() -> Callable[..., autotuner.Autotuner]:
+def cce_backward_autotune() -> Callable[..., autotuner.PaddleAutotuner]:
     if _AUTOTUNE:
-        return triton.autotune(
+        return triton.paddle_autotune(
             configs=get_autotune_config(),
             key=["V", "D", "B_BIN"],
             prune_configs_by={
@@ -461,9 +461,9 @@ def _indexed_dot_all_configs() -> list[Config]:
     ]
 
 
-def indexed_dot_autotune() -> Callable[..., autotuner.Autotuner]:
+def indexed_dot_autotune() -> Callable[..., autotuner.PaddleAutotuner]:
     if _AUTOTUNE:
-        return triton.autotune(
+        return triton.paddle_autotune(
             configs=_indexed_dot_all_configs(),
             key=["D", "B_BIN"],
             reset_to_zero=["Out"],

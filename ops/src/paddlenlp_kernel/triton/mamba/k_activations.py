@@ -7,7 +7,7 @@ import triton
 import triton.language as tl
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         triton.Config({"BLOCK_N": 32}),
         triton.Config({"BLOCK_N": 64}),
@@ -60,7 +60,7 @@ def _swiglu_fwd(xy, out=None):
     return out.reshape([*batch_shape, out.shape[-1]])
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         triton.Config({"BLOCK_N": 32}),
         triton.Config({"BLOCK_N": 64}),

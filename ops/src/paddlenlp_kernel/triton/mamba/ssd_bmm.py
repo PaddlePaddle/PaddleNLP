@@ -15,7 +15,7 @@ def init_to_zero(names):
     return lambda nargs: [nargs[name].zero_() for name in names if nargs[name] is not None]
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         triton.Config({"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 64}, num_stages=3, num_warps=8),
         triton.Config({"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4),
@@ -112,7 +112,7 @@ def _bmm_chunk_fwd_kernel(
     tl.store(out_ptrs, out, mask=(offs_m[:, None] < chunk_size) & (offs_n[None, :] < chunk_size))
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         triton.Config({"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_CS": 64}, num_stages=3, num_warps=8),
         triton.Config({"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_CS": 32}, num_stages=4, num_warps=4),

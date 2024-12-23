@@ -21,7 +21,7 @@ def init_to_zero(names):
     return lambda nargs: [nargs[name].zero_() for name in names if nargs[name] is not None]
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         triton.Config({"BLOCK_SIZE_H": 1}),
         triton.Config({"BLOCK_SIZE_H": 2}),
@@ -102,7 +102,7 @@ def _chunk_cumsum_fwd_kernel(
     tl.store(dA_cs_ptrs, dA_cs, mask=(offs_h[:, None] < nheads) & (offs_c[None, :] < chunk_size))
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         triton.Config({"BLOCK_SIZE_H": 1}, pre_hook=init_to_zero(["dA_ptr", "ddt_bias_ptr"])),
         triton.Config({"BLOCK_SIZE_H": 2}, pre_hook=init_to_zero(["dA_ptr", "ddt_bias_ptr"])),
@@ -208,7 +208,7 @@ def _chunk_cumsum_bwd_kernel(
         tl.atomic_add(ddt_bias_ptr + offs_h * stride_ddt_bias_head, ddt_bias, mask=offs_h < nheads)
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         triton.Config({"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 64}, num_stages=3, num_warps=8),
         triton.Config({"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4),
@@ -332,7 +332,7 @@ def _chunk_state_fwd_kernel(
     tl.store(states_ptrs, states, mask=c_mask)
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         triton.Config(
             {"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 64},
@@ -516,7 +516,7 @@ def _chunk_state_bwd_dx_kernel(
     tl.store(dx_ptrs, dx, mask=(offs_m[:, None] < chunk_size_limit) & (offs_n[None, :] < hdim))
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         triton.Config(
             {"BLOCK_SIZE_M": 32, "BLOCK_SIZE_N": 128},
@@ -731,7 +731,7 @@ def _chunk_state_bwd_db_kernel(
     tl.store(db_ptrs, acc, mask=(offs_m[:, None] < chunk_size_limit) & (offs_n[None, :] < dstate))
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         # triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K': 64}, num_stages=3, num_warps=8, pre_hook=init_to_zero(["ddA_cumsum_ptr"])),
         # triton.Config({'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K': 32}, num_stages=4, num_warps=4, pre_hook=init_to_zero(["ddA_cumsum_ptr"])),
@@ -914,7 +914,7 @@ def _chunk_state_bwd_ddAcs_stable_kernel(
     tl.atomic_add(ddA_cumsum_ptrs + stride_ddA_cs_csize, ddA_cs, mask=offs_m < chunk_size - 1)
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=[
         triton.Config({"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 64}, num_stages=3, num_warps=8),
         triton.Config({"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4),

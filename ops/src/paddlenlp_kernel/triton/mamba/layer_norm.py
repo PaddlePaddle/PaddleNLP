@@ -170,7 +170,7 @@ configs_autotune = [
 pruned_configs_autotune = config_prune(configs_autotune)
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=pruned_configs_autotune,
     key=["N", "HAS_RESIDUAL", "STORE_RESIDUAL_OUT", "IS_RMS_NORM", "HAS_BIAS"],
 )
@@ -415,7 +415,7 @@ def _layer_norm_fwd(
     )
 
 
-@triton.autotune(
+@triton.paddle_autotune(
     configs=pruned_configs_autotune,
     key=["N", "HAS_DRESIDUAL", "STORE_DRESIDUAL", "IS_RMS_NORM", "HAS_BIAS", "HAS_DROPOUT"],
 )
