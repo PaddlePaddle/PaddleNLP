@@ -577,6 +577,7 @@ def update_refined_recompute(rr, lora=False):
         ops = rr.split(",")
         enable_rr = False
         for op in ops:
+            op = op.strip()
             if ":" not in op:
                 raise ValueError("Illegal refined_recompute input, please check.")
             op_name, skip_num = op.split(":")[0], int(op.split(":")[1])
