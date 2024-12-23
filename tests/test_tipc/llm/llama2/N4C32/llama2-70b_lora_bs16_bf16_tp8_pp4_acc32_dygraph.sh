@@ -13,18 +13,18 @@
 # limitations under the License.
 
 
-param="model_name_or_path=Qwen/Qwen2.5-72B "
+param="model_name_or_path=meta-llama/Llama-2-70b "
 param+="per_device_train_batch_size=1 "
 param+="tensor_parallel_degree=8 "
-param+="sharding_parallel_degree=4 "
-param+="gradient_accumulation_steps=4 "
-param+="run_stage=dpo "
-param+="run_mode=tp8_sd4_acc4_dygraph "
+param+="pipeline_parallel_degree=4 "
+param+="gradient_accumulation_steps=32 "
+param+="run_stage=lora "
+param+="run_mode=tp4_pp1_acc4_dygraph "
 param+="device_num=N4C32 "
 param+="global_batch_size=16 "
-param+="model_item=qwen-qwen2_5-72b_dpo "
+param+="model_item=llama2-70b_lora "
 
 cd ./tests
-bash ./test_tipc/llm/qwen2_5/benchmark_common/prepare.sh
+bash ./test_tipc/llm/llama2/benchmark_common/prepare.sh
 
-bash -c "${param} bash ./test_tipc/llm/qwen2_5/benchmark_common/run_benchmark.sh"
+bash -c "${param} bash ./test_tipc/llm/llama2/benchmark_common/run_benchmark.sh"

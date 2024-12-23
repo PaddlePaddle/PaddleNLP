@@ -30,7 +30,7 @@
     "load_best_model_at_end": true,
     "eval_with_do_generation": false,
     "metric_for_best_model": "accuracy",
-    "recompute": false,
+    "recompute": true,
 	"recompute_granularity": "full",
     "save_total_limit": 1,
 	"benchmark": true,
