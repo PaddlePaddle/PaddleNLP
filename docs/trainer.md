@@ -604,7 +604,7 @@ Trainer 是一个简单，但功能完整的 Paddle 训练和评估模块，并�
   --refined_recompute
                         精化重新计算参数，用于在GPU显存使用和计算速度之间寻求最佳平衡。
                         此参数允许用户对重新计算过程进行细致控制，以优化资源利用。具体配置示例如下：
-                        `"attention_column_ln:-1, attention_row_ln:-1, flash_attn:-1, mlp_column_ln:5, mlp_row_ln:-1"`
+                        `"attention_column_ln:-1,attention_row_ln:-1,flash_attn:-1,mlp_column_ln:5,mlp_row_ln:-1"`
 
                         在配置中，支持的参数包括：
                             `attention_column_ln`
@@ -624,7 +624,7 @@ Trainer 是一个简单，但功能完整的 Paddle 训练和评估模块，并�
 
                         Refined recompute parameter for optimizing the balance between GPU memory usage and computational speed.
                         This parameter allows fine-grained control over the recomputation process to optimize resource utilization. An example configuration is as follows:
-                        `"attention_column_ln:-1, attention_row_ln:-1, flash_attn:-1, mlp_column_ln:5, mlp_row_ln:-1"`
+                        `"attention_column_ln:-1,attention_row_ln:-1,flash_attn:-1,mlp_column_ln:5,mlp_row_ln:-1"`
 
                         The supported parameters in the configuration include:
                             `attention_column_ln`
