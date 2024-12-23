@@ -268,6 +268,13 @@ class LlmMetaConfig:
             "Recompute granularity, Choose among ['full', 'core_attn', 'full_attn']",
         ),
         ("recompute_use_reentrant", bool, False, "recompute_use_reentrant"),
+        # refined_recompute attributes
+        (
+            "refined_recompute",
+            str,
+            "",
+            "refined_recompute, Choose from 'mlp_row_ln', 'mlp_column_ln', 'attention_row_ln', 'attention_column_ln', 'flash_attn']",
+        ),
     ]
 
     @classmethod
@@ -560,11 +567,6 @@ class PretrainedConfig:
         # for transformers fuse
         self.fuse_attention_qkv = kwargs.pop("fuse_attention_qkv", False)
         self.fuse_attention_ffn = kwargs.pop("fuse_attention_ffn", False)
-
-        # for refined_recompute
-        self.refined_recompute = kwargs.pop("refined_recompute", {})
-        self.skip_recompute_ops = kwargs.pop("skip_recompute_ops", {})
-        self.register_unsavable_keys(["refined_recompute", "skip_recompute_ops"])
 
         if "quantization_config" in kwargs and isinstance(kwargs["quantization_config"], Dict):
             kwargs["quantization_config"] = QuantizationConfig.from_dict(kwargs["quantization_config"])

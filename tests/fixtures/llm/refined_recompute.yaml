@@ -30,12 +30,24 @@ finetune:
     ignore_save_lr_and_optim: 1
 
   default:
-    llama:
+    llama_sft_tp4_sp:
       model_name_or_path: __internal_testing__/tiny-random-llama
       sequence_parallel: 1
-    qwen2:
+    llama_sft_tp4_pp2_sp:
+      model_name_or_path: __internal_testing__/tiny-random-llama
+      sequence_parallel: 1
+      pipeline_parallel_degree: 2
+    qwen2_sft_tp4:
+      model_name_or_path: __internal_testing__/tiny-random-qwen2
+      sequence_parallel: 0
+    qwen2_sft_tp4_sp:
       model_name_or_path: __internal_testing__/tiny-random-qwen2
       sequence_parallel: 1
-    qwen:
+    qwen_sft_tp4:
       model_name_or_path: __internal_testing__/tiny-fused-qwen
       sequence_parallel: 0
+    qwen_lora_tp4_sp:
+      model_name_or_path: __internal_testing__/tiny-fused-qwen
+      sequence_parallel: 1
+      learning_rate: 3e-04
+      lora: true

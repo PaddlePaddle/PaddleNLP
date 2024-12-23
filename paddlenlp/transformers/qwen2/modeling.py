@@ -39,7 +39,7 @@ from paddlenlp.transformers.refined_recompute import (
     RRColumnSequenceParallelLinear,
     RRRowParallelLinear,
     RRRowSequenceParallelLinear,
-    create_skip_config_for_refined_recompute,
+    get_skip_recompte_ops,
     recompute,
 )
 from paddlenlp.utils.tools import get_env_device
@@ -368,8 +368,9 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
 
 
 class Qwen2MLP(nn.Layer):
-    def __init__(self, config: Qwen2Config, is_shared=False, layer_idx: int = 0):
+    def __init__(self, config: Qwen2Config, is_shared=False, skip_recompute_ops={}):
         super().__init__()
+        self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
 
@@ -381,9 +382,9 @@ class Qwen2MLP(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops[layer_idx].get("mlp_column_ln", False):
+                if skip_recompute_ops.get("mlp_column_ln", False):
                     ColumnParallelLinear = RRColumnSequenceParallelLinear
-                if config.skip_recompute_ops[layer_idx].get("mlp_row_ln", False):
+                if skip_recompute_ops.get("mlp_row_ln", False):
                     RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
@@ -391,9 +392,9 @@ class Qwen2MLP(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops[layer_idx].get("mlp_column_ln", False):
+                if skip_recompute_ops.get("mlp_column_ln", False):
                     ColumnParallelLinear = RRColumnParallelLinear
-                if config.skip_recompute_ops[layer_idx].get("mlp_row_ln", False):
+                if skip_recompute_ops.get("mlp_row_ln", False):
                     RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
@@ -445,10 +446,11 @@ class Qwen2Attention(nn.Layer):
     and "Generating Long Sequences with Sparse Transformers".
     """
 
-    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = True, layer_idx: int = 0):
+    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = True, skip_recompute_ops={}):
         super().__init__()
 
         self.config = config
+        self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
 
@@ -497,9 +499,9 @@ class Qwen2Attention(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops[layer_idx].get("attention_column_ln", False):
+                if skip_recompute_ops.get("attention_column_ln", False):
                     ColumnParallelLinear = RRColumnSequenceParallelLinear
-                if config.skip_recompute_ops[layer_idx].get("attention_row_ln", False):
+                if skip_recompute_ops.get("attention_row_ln", False):
                     RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
@@ -507,9 +509,9 @@ class Qwen2Attention(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops[layer_idx].get("attention_column_ln", False):
+                if skip_recompute_ops.get("attention_column_ln", False):
                     ColumnParallelLinear = RRColumnParallelLinear
-                if config.skip_recompute_ops[layer_idx].get("attention_row_ln", False):
+                if skip_recompute_ops.get("attention_row_ln", False):
                     RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
@@ -532,11 +534,7 @@ class Qwen2Attention(nn.Layer):
         self.attn_func = scaled_dot_product_attention
 
         # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
-        if (
-            config.recompute
-            and not config.recompute_use_reentrant
-            and config.skip_recompute_ops[layer_idx].get("flash_attn", False)
-        ):
+        if config.recompute and not config.recompute_use_reentrant and skip_recompute_ops.get("flash_attn", False):
             self.attn_func = partial(scaled_dot_product_attention, skip_recompute=True)
 
     def forward(
@@ -656,13 +654,14 @@ class Qwen2Attention(nn.Layer):
 
 
 class Qwen2DecoderLayer(nn.Layer):
-    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = False, layer_idx: int = 0):
+    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = False, skip_recompte_ops={}):
         super().__init__()
         self.config = config
+        self.skip_recompte_ops = skip_recompte_ops
         self.hidden_size = config.hidden_size
-        self.self_attn = Qwen2Attention(config, layerwise_recompute, layer_idx=layer_idx)
+        self.self_attn = Qwen2Attention(config, layerwise_recompute, skip_recompte_ops=skip_recompte_ops)
 
-        self.mlp = Qwen2MLP(config, layer_idx=layer_idx)
+        self.mlp = Qwen2MLP(config, skip_recompte_ops=skip_recompte_ops)
         self.input_layernorm = Qwen2RMSNorm(config)
         self.post_attention_layernorm = Qwen2RMSNorm(config)
 
@@ -953,9 +952,9 @@ class Qwen2Model(Qwen2PretrainedModel):
         self.layers = nn.LayerList(
             [
                 Qwen2DecoderLayer(
-                    config=create_skip_config_for_refined_recompute(layer_idx, config),
+                    config=config,
                     layerwise_recompute=layer_idx not in self.no_recompute_layers,
-                    layer_idx=layer_idx,
+                    skip_recompte_ops=get_skip_recompte_ops(config, layer_idx),
                 )
                 for layer_idx in range(config.num_hidden_layers)
             ]

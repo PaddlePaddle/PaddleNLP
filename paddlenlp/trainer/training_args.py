@@ -1777,6 +1777,43 @@ class TrainingArguments:
                 f"The local_ran: {self.local_rank} should be consistent with the world size: {paddle.distributed.get_world_size()}."
             )
 
+        # arse_refined_recompute string to dict
+        if self.refined_recompute in [None, ""]:
+            self.refined_recompute = dict()
+        else:
+            refined_recompute_dict = {
+                "mlp_row_ln": 0,
+                "attention_row_ln": 0,
+                "attention_column_ln": 0,
+                "mlp_column_ln": 0,
+                "flash_attn": 0,
+            }
+            ops = self.refined_recompute.split(",")
+            enable_rr = False
+            for op in ops:
+                op = op.strip()
+                if ":" not in op:
+                    raise ValueError("Illegal refined_recompute input, please check.")
+                op_name, skip_num = op.split(":")[0], int(op.split(":")[1])
+                if op_name not in refined_recompute_dict:
+                    raise ValueError(f"Refined recompute do not support {op_name}, please check.")
+                if (
+                    op_name in ["mlp_row_ln", "attention_row_ln", "attention_column_ln", "mlp_column_ln"]
+                    and self.tensor_parallel_degree <= 1
+                ):
+                    logger.warning(
+                        f"Refined recompute is only supported for the `{op_name}` operation when `tensor_parallel_degree` is greater than 1. \
+                            This refined recompute operation will be ignored."
+                    )
+                    continue
+
+                refined_recompute_dict[op_name] = skip_num
+                if skip_num != 0:
+                    enable_rr = True
+            if not enable_rr:
+                refined_recompute_dict = dict()
+            self.refined_recompute = refined_recompute_dict
+
     def __str__(self):
         self_as_dict = asdict(self)
         self_as_dict = {k: f"<{k.upper()}>" if k.endswith("_token") else v for k, v in self_as_dict.items()}
