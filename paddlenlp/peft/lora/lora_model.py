@@ -155,7 +155,7 @@ class LoRAModel(nn.Layer):
             self.is_pipelinemodel = True
             self.model._single_to_pp_mapping = None
         if (self.lora_config.tensor_parallel_degree > 1 or self.is_pipelinemodel) and (
-            self.lora_config.lora_use_mixer or self.use_mora
+            self.lora_config.lora_use_mixer or self.lora_config.use_mora
         ):
             raise NotImplementedError("lora_use_mixer or mora is not supported in tensor parallel mode.")
         if self.lora_config.tensor_parallel_degree != self.model.config.tensor_parallel_degree:

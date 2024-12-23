@@ -109,7 +109,7 @@ class Timers:
         self.timers = {}
 
     def __call__(self, name, use_event=False):
-        clazz = _GPUEventTimer if use_event else _Timer
+        clazz = _GPUEventTimer if use_event and paddle.is_compiled_with_cuda() else _Timer
         timer = self.timers.get(name)
         if timer is None:
             timer = clazz(name)

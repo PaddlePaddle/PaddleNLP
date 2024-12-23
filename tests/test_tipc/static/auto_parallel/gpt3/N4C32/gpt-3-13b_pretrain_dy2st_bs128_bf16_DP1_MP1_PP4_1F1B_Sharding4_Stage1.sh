@@ -15,7 +15,7 @@
 param="model_item=gpt3-13b_pretrain_dy2st "
 param+="run_mode=DP1_MP2_PP4_1F1B_Sharding4_Stage1 "
 param+="device_num=N4C32 "
-param+="global_batch_size=32 "
+param+="global_batch_size=128 "
 param+="nnodes=4 "
 param+="model_type=gpt3_13b "
 

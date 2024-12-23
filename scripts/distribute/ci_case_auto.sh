@@ -75,11 +75,20 @@ function restore_func() {
         rm "functions.txt"
         echo "Deleted existing functions.txt"
     fi
+    if [ ! -f "${log_path}/blacklist.csv" ]; then
+        wget -P ${log_path}/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
+        echo "\033 ---- wget blacklist.csv \033"
+    fi
+    blacklist_file=${log_path}/blacklist.csv
+    mapfile -t blacklist < "$blacklist_file"
     for function in ${fun_list[@]};do
-        echo "$function" >> functions.txt
+        if [[ " ${blacklist[@]} " == *" ${function} "* ]]; then
+            echo "\033 ---- Function '$function' is blacklisted and will be skipped. \033"
+        else
+            echo "$function" >> functions.txt
+        fi
     done
 }
-
 
 
 # NOTE: Please place the new tests as much as possible after the existing tests

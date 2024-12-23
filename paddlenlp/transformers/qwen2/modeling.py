@@ -484,7 +484,7 @@ class Qwen2Attention(nn.Layer):
 
         self.use_fused_rope = config.use_fused_rope
         if self.use_fused_rope:
-            if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
+            if get_env_device() not in ["gpu", "xpu"] or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
                     "Will disable fuse rope. Try using latest gpu version of Paddle."
