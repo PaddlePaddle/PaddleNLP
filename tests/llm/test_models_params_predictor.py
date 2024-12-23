@@ -1,0 +1,129 @@
+# Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+import os
+import unittest
+
+from parameterized import parameterized, parameterized_class
+
+from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+
+from .testing_utils import LLMTest
+
+
+@parameterized_class(
+    ["model_name_or_path", "model_class"],
+    [
+        ["__internal_testing__/Qwen/Qwen2.5-1.5B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Qwen/Qwen2.5-7B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Qwen/Qwen2.5-14B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Qwen/Qwen1.5-MoE-A2.7B-Chat-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Qwen/Qwen2.5-72B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/meta-llama/Llama-2-7b-chat-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/meta-llama/Llama-2-13b-chat-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/meta-llama/Llama-2-70b-chat-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/meta-llama/Meta-Llama-3-8B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/meta-llama/Meta-Llama-3.1-8B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/meta-llama/Meta-Llama-3.1-70B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+    ],
+)
+class CommonModelInferenceTest(LLMTest, unittest.TestCase):
+    config_path: str = "./tests/fixtures/llm/predictor.yaml"
+    model_name_or_path: str = None
+    model_class = None
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
+        AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
+
+    def test_common_model_inference(self):
+        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
+        result = self._read_result(os.path.join(self.output_dir, "predict.json"))
+        self.assertTrue(len(result) > 0, f"The inference result for {self.model_name_or_path} is empty!")
+
+
+@parameterized_class(
+    ["model_name_or_path", "model_class"],
+    [
+        ["__internal_testing__/Qwen/Qwen2.5-1.5B-Instruct", AutoModelForCausalLM],
+    ],
+)
+class CommonParamInferenceTest(LLMTest, unittest.TestCase):
+    config_path: str = "./tests/fixtures/llm/predictor.yaml"
+    model_name_or_path: str = None
+    model_class = None
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
+        AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
+        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
+        self.golden_result = self._read_result(os.path.join(self.output_dir, "predict.json"))
+
+    @parameterized.expand(
+        [
+            ["batch_size", "4"],
+            ["use_flash_attention", True],
+            ["avx_model", True],
+            ["use_fake_parameter", True],
+            ["inference_model", False],
+            ["block_attn", True],
+            ["append_attn", True],
+        ]
+    )
+    def test_common_param_inference(self, param_key, param_value):
+        def levenshtein_distance_optimized(a, b):
+            m, n = len(a), len(b)
+
+            previous = list(range(n + 1))
+            current = [0] * (n + 1)
+
+            for i in range(1, m + 1):
+                current[0] = i
+                for j in range(1, n + 1):
+                    if a[i - 1] == b[j - 1]:
+                        current[j] = previous[j - 1]
+                    else:
+                        current[j] = 1 + min(previous[j], current[j - 1], previous[j - 1])
+                previous, current = current, previous
+
+            return previous[n]
+
+        def levenshtein_similarity(a, b):
+            distance = levenshtein_distance_optimized(a, b)
+            max_length = max(len(a), len(b))
+            return 1 - (distance / max_length)
+
+        config_params = {"inference_model": True, "src_length": 512, "max_length": 48}
+        config_params[param_key] = param_value
+
+        self.run_predictor(config_params)
+
+        result = self._read_result(os.path.join(self.output_dir, "predict.json"))
+        assert len(self.golden_result) == len(result)
+
+        partial_match, full_match = 0, 0
+        for golden_item, result_item in zip(self.golden_result, result):
+            score = levenshtein_similarity(golden_item, result_item)
+            if score >= 0.95:
+                full_match += 1
+            if score >= 0.6:
+                partial_match += 1
+
+        if param_key == "inference_model":
+            self.assertGreaterEqual(full_match / len(self.golden_result), 0.3)
+            self.assertGreaterEqual(partial_match / len(self.golden_result), 0.4)
+        else:
+            self.assertGreaterEqual(full_match / len(self.golden_result), 0.7)
+            self.assertGreaterEqual(partial_match / len(self.golden_result), 0.9)
