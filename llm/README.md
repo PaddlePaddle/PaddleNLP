@@ -13,23 +13,23 @@
 - **大模型无损量化**。大模型套件预先集成了 PaddleSlim LLM.PTQ 量化算法，以及业界广泛采用的 GPTQ 和 AWQ 的 W4量化方法，成功实现了对主流大模型的无损量化处理，显著加速了模型的推理速度。
 - **高性能推理**。大模型套件的高性能推理模块内置了动态插入和全环节算子融合的高级策略，这极大地提升了并行推理的速度。同时，该模块隐藏了底层技术细节，为用户提供了开箱即用的高性能并行推理功能。
 
+
 ## 🛠️ 支持模型列表 🛠️
 
-| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO | RLHF | Quantization | Torch convert |
-|----------------------------------------|----------|-----|------|---------------|-----|------|--------------|---------------|
-| [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅   | ✅    | ✅            | ✅             |
-| [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧   | 🚧           | ✅             |
-| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | ✅   | 🚧   | 🚧           | 🚧            |
-| [Mistral](./config/mistral)            | ❌        | ✅   | ✅    | ✅             | ✅   | 🚧   | 🚧           | ✅             |
-| [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧   | ✅            | ✅             |
-| [ChatGLM-6B](./config/chatglm)         | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ❌             |
-| [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅    | ✅             | ✅   | 🚧   | ✅            | ✅             |
-| [Bloom](./config/bloom)                | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ✅             |
-| [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧  | 🚧   | 🚧           | ✅             |
-| [OPT](./config/opt)                    | 🚧       | ✅   | ✅    | 🚧            | 🚧  | 🚧   | 🚧           | ✅             |
-| [Gemma](./config/gemma)                | 🚧       | ✅   |🚧     | 🚧            | ✅  | 🚧   | 🚧           | 🚧             |
-| [Yuan](./config/yuan)                  | ✅       | ✅   |✅     | 🚧            | ✅  | 🚧   | 🚧           | 🚧             |
-
+| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO | RLHF | Mergekit | Quantization | Torch convert |
+|----------------------------------------|----------|-----|------|---------------|----------------|------|-------|--------------|---------------|
+| [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅             | ✅    | ✅    | ✅            | ✅             |
+| [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
+| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | ✅             | 🚧   | ✅    | 🚧           | 🚧            |
+| [Mistral](./config/mistral)            | ✅         | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
+| [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
+| [ChatGLM-6B](./config/chatglm)         | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ❌             |
+| [ChatGLM2/ChatGLM3](./config/chatglm2) | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
+| [Bloom](./config/bloom)                | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ✅             |
+| [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
+| [OPT](./config/opt)                    | ✅       | ✅   | ✅    | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
+| [Gemma](./config/gemma)                | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
+| [Yuan](./config/yuan)                  | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
 
 - ✅: Supported
 - 🚧: In Progress
@@ -202,7 +202,23 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo
 
 飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF 文档](./docs/rlhf.md)。
 
-### 4. 量化
+### 4. 模型融合
+PadlleNLP 支持多种模型融合方法，包括**Linear、Slerp、Ties、DARE、DELLA**，并支持模型参数稀疏化方法与模型融合算法的灵活组合使用。
+```shell
+# 模型融合启动命令参考
+python mergekit.py \
+    --device cpu \
+    --tensor_type np \
+    --n_process 2 \
+    --merge_method linear \
+    --model_path_list ../checkpoints/model1 ../checkpoints/model \
+    --output_path ../checkpoints/model_merge
+
+```
+
+更多模型融合算法与细节详见[模型融合文档](./docs/mergekit.md)。
+
+### 5. 量化
 
 大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。量化算法包含：
 
@@ -242,7 +258,7 @@ python run_quantization.py ./config/llama/fp8_ptq_argument.json
 
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。
 
-### 5. 推理
+### 6. 推理
 
 PaddleNLP 提供高性能推理，内置动态插入和全环节算子融合策略，极大加快并行推理的速度，同时支持 FP16/BF16、WINT8、WINT4、A8W8、A8W8C8多种推理方式。
 
@@ -268,15 +284,15 @@ python ./predict/predictor.py --model_name_or_path ./inference --inference_model
 
 更多模型推理使用方法详见[大模型推理文档](./docs/predict/inference.md)。
 
-### 6. 服务化部署
+### 7. 服务化部署
 
-#### 6.1 环境准备
+#### 7.1 环境准备
 
 - python >= 3.8
 - gradio
 - flask
 
-#### 6.2 Flask & Gradio UI 服务化部署
+#### 7.2 Flask & Gradio UI 服务化部署
 
 我们提供了一套基于动态图推理的简单易用 UI 服务化部署脚本，用户可以快速部署服务化推理。
 
@@ -294,7 +310,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_ser
 
 此外，如果想通过 API 脚本的方式跑推理，可参考：`./predict/request_flask_server.py` 文件。
 
-### 7. PyTorch 模型权重转换
+### 8. PyTorch 模型权重转换
 
 PaddleNLP 提供了可自动将 PyTorch 相关的权重转化为 Paddle 权重的接口，代码如下：
 
