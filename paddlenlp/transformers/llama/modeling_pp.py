@@ -314,6 +314,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     _get_fuse_or_split_param_mappings = LlamaPretrainedModel._get_fuse_or_split_param_mappings
     _init_weights = LlamaPretrainedModel._init_weights
     _keys_to_ignore_on_load_unexpected = LlamaPretrainedModel._keys_to_ignore_on_load_unexpected
+    _tied_weights_keys = ["lm_head.weight"]
 
     # DONOT Add base_model_prefix !!!!
 

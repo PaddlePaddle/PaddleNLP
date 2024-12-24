@@ -21,7 +21,7 @@ from paddle.distributed import fleet
 
 from paddlenlp.peft import LoRAModel, PrefixModelForCausalLM
 from paddlenlp.trainer.argparser import strtobool
-from paddlenlp.trainer.utils.helper import distributed_isfile
+from paddlenlp.trainer.utils.helper import distributed_file, distributed_isfile
 from paddlenlp.transformers.model_utils import (
     PretrainedModel,
     _add_variant,
@@ -435,7 +435,9 @@ class UnifiedCheckpointHandler:
             os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME)
         )
         if has_merge_optimizer_safetensors:
-            with open(os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME), "r") as f:
+            optimizer_index_file = os.path.join(resume_from_checkpoint, SAFE_OPTIMIZER_INDEX_NAME)
+            distributed_file(optimizer_index_file)
+            with open(optimizer_index_file, "r") as f:
                 index = json.loads(f.read())
 
         # get quant ckpt info `ckpt_quant_stage` and `quant_ckpt_resume_times`
@@ -585,8 +587,13 @@ def unified_optimizer_into_shards(
     static2struct_name_mappings = {}
     state_dict = get_expected_state_dict(model)
     fp32_weight = {}
+
+    extra_save_keys = {}
     for k, v in state_dict.items():
-        static2struct_name_mappings[v.name] = k
+        if v.name not in static2struct_name_mappings:
+            static2struct_name_mappings[v.name] = k
+        else:
+            extra_save_keys[v.name] = k
         if master_weights is not None and v.dtype == paddle.float32:
             if args.dataset_rank > 0:  # deal with different dataset rank.
                 continue
@@ -597,10 +604,15 @@ def unified_optimizer_into_shards(
         static_name, type_name = generate_base_static_name(key)
         new_name = static2struct_name_mappings[static_name] + "/" + type_name
         optim_state_dict[new_name] = optim_state_dict.pop(key)
+        if static_name in extra_save_keys:
+            extra_new_name = extra_save_keys[static_name] + "/" + type_name
+            optim_state_dict[extra_new_name] = optim_state_dict[new_name]
 
     if master_weights is not None:
         for key in list(master_weights.keys()):
             master_weights[static2struct_name_mappings[key]] = master_weights.pop(key)
+            if key in extra_save_keys:
+                master_weights[extra_save_keys[key]] = master_weights[static2struct_name_mappings[key]]
         master_weights.update(fp32_weight)
 
     # filter optimizer param
