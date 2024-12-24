@@ -12,11 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os
+import shutil
+import tempfile
 import unittest
 
 from parameterized import parameterized, parameterized_class
 
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
+from tests.parallel_launch import TestMultipleGpus
+from tests.testing_utils import require_gpu
 
 from .testing_utils import LLMTest
 
@@ -53,6 +57,29 @@ class CommonModelInferenceTest(LLMTest, unittest.TestCase):
         self.assertTrue(len(result) > 0, f"The inference result for {self.model_name_or_path} is empty!")
 
 
+def levenshtein_similarity(a, b):
+    def levenshtein_distance_optimized(a, b):
+        m, n = len(a), len(b)
+
+        previous = list(range(n + 1))
+        current = [0] * (n + 1)
+
+        for i in range(1, m + 1):
+            current[0] = i
+            for j in range(1, n + 1):
+                if a[i - 1] == b[j - 1]:
+                    current[j] = previous[j - 1]
+                else:
+                    current[j] = 1 + min(previous[j], current[j - 1], previous[j - 1])
+            previous, current = current, previous
+
+        return previous[n]
+
+    distance = levenshtein_distance_optimized(a, b)
+    max_length = max(len(a), len(b))
+    return 1 - (distance / max_length)
+
+
 @parameterized_class(
     ["model_name_or_path", "model_class"],
     [
@@ -68,7 +95,7 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
         super().setUp()
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
-        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
+        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48, "data_file": ""})
         self.golden_result = self._read_result(os.path.join(self.output_dir, "predict.json"))
 
     @parameterized.expand(
@@ -83,29 +110,8 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
         ]
     )
     def test_common_param_inference(self, param_key, param_value):
-        def levenshtein_distance_optimized(a, b):
-            m, n = len(a), len(b)
 
-            previous = list(range(n + 1))
-            current = [0] * (n + 1)
-
-            for i in range(1, m + 1):
-                current[0] = i
-                for j in range(1, n + 1):
-                    if a[i - 1] == b[j - 1]:
-                        current[j] = previous[j - 1]
-                    else:
-                        current[j] = 1 + min(previous[j], current[j - 1], previous[j - 1])
-                previous, current = current, previous
-
-            return previous[n]
-
-        def levenshtein_similarity(a, b):
-            distance = levenshtein_distance_optimized(a, b)
-            max_length = max(len(a), len(b))
-            return 1 - (distance / max_length)
-
-        config_params = {"inference_model": True, "src_length": 512, "max_length": 48}
+        config_params = {"inference_model": True, "src_length": 512, "max_length": 48, "data_file": ""}
         config_params[param_key] = param_value
 
         self.run_predictor(config_params)
@@ -127,3 +133,45 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
         else:
             self.assertGreaterEqual(full_match / len(self.golden_result), 0.7)
             self.assertGreaterEqual(partial_match / len(self.golden_result), 0.9)
+
+
+class CommonGpusInferenceTest(TestMultipleGpus, LLMTest):
+    config_path: str = "./tests/fixtures/llm/predictor.yaml"
+    model_name_or_path: str = "__internal_testing__/Qwen/Qwen2.5-1.5B-Instruct"
+    model_class = AutoModelForCausalLM
+
+    def setUp(self):
+        TestMultipleGpus.setUp(self)
+        LLMTest.setUp(self)
+        self.save_file_path = tempfile.mkdtemp()
+        self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
+        AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
+        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48, "data_file": ""})
+        self.golden_result = self._read_result(os.path.join(self.output_dir, "predict.json"))
+
+    @require_gpu(2)
+    def test_muti_gpus_inference(self):
+        scripts = "tests/llm/testing_run_gpus_inference.py"
+        config = {
+            "tensor_parallel_degree": 2,
+            "pipeline_parallel_degree": 1,
+            "save_path": os.path.join(self.save_file_path, "predict.json"),
+        }
+        self.run_2gpu(scripts, **config)
+
+        result = self._read_result(os.path.join(self.save_file_path, "predict.json"))
+        partial_match, full_match = 0, 0
+        for golden_item, result_item in zip(self.golden_result, result):
+            score = levenshtein_similarity(golden_item, result_item)
+            if score >= 0.95:
+                full_match += 1
+            if score >= 0.6:
+                partial_match += 1
+
+        self.assertGreaterEqual(full_match / len(self.golden_result), 0.7)
+        self.assertGreaterEqual(partial_match / len(self.golden_result), 0.9)
+
+    def tearDown(self):
+        LLMTest.tearDown(self)
+        if os.path.exists(self.save_file_path):
+            shutil.rmtree(self.save_file_path)
