@@ -464,7 +464,7 @@ class AquilaLinearScalingRotaryEmbedding(AquilaRotaryEmbedding):
 
 
 class AquilaNTKScalingRotaryEmbedding(AquilaRotaryEmbedding):
-    """LlamaRotaryEmbedding extended with NTK scaling. https://www.reddit.com/r/LocalLLaMA/comments/14lz7j5/ntkaware_scaled_rope_allows_llama_models_to_have/"""
+    """AquilaNTKScalingRotaryEmbedding extended with NTK scaling. https://www.reddit.com/r/LocalLLaMA/comments/14lz7j5/ntkaware_scaled_rope_allows_llama_models_to_have/"""
 
     def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
         base = base * scaling_factor ** (dim / (dim - 2))
@@ -473,7 +473,7 @@ class AquilaNTKScalingRotaryEmbedding(AquilaRotaryEmbedding):
 
 
 class AquilaDynamicNTKScalingRotaryEmbedding(AquilaRotaryEmbedding):
-    """LlamaRotaryEmbedding extended with Dynamic NTK scaling. https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/"""
+    """AquilaRotaryEmbedding extended with Dynamic NTK scaling. https://www.reddit.com/r/LocalLLaMA/comments/14mrgpr/dynamically_scaled_rope_further_increases/"""
 
     def __init__(self, dim, max_position_embeddings=2048, base=10000, scaling_factor=1.0):
         self.scaling_factor = scaling_factor

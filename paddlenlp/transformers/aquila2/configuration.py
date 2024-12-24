@@ -35,8 +35,7 @@ AQUILA_PRETRAINED_RESOURCE_FILES_MAP = {
 class AquilaConfig(PretrainedConfig):
     r"""
     This is the configuration class to store the configuration of a [`~AquilaModel`]. It is used to instantiate an Aquila
-    model according to the specified arguments, defining the model architecture. Instantiating a configuration with the
-    defaults will yield a similar configuration to that of the Llama-7B.
+    model according to the specified arguments, defining the model architecture.
     Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
     documentation from [`PretrainedConfig`] for more information.
     Args:
