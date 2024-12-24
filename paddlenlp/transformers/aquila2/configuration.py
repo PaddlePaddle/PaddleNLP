@@ -17,7 +17,7 @@
 
 # modified from https://github.com/PaddlePaddle/PaddleNLP/blob/7947bca07f0dfb37172a4c0040defd0cdbbc10a0/paddlenlp/transformers/llama/configuration.py
 
-from paddlenlp.transformers.configuration_utils import PretrainedConfig
+from ..configuration_utils import PretrainedConfig
 
 __all__ = [
     "AquilaConfig",

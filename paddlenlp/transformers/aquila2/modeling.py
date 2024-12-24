@@ -74,7 +74,7 @@ from paddlenlp.utils.tools import get_env_device
 from paddlenlp.transformers import linear_utils
 from paddlenlp.transformers.linear_utils import Linear
 from paddlenlp.transformers.segment_parallel_utils import ReshardLayer
-from .configuration_aquila_pd import (
+from .configuration import (
     AQUILA_PRETRAINED_INIT_CONFIGURATION,
     AQUILA_PRETRAINED_RESOURCE_FILES_MAP,
     AquilaConfig,
