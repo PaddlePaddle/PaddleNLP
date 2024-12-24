@@ -18,7 +18,7 @@ import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
-from paddlenlp.transformers.refined_recompute import get_skip_recompte_ops
+from paddlenlp.transformers.refined_recompute import get_skip_recompute_ops
 
 from .modeling import (
     QWenBlock,
@@ -174,7 +174,7 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 LayerDesc(
                     QWenBlockPipe,
                     config=config,
-                    skip_recompte_ops=get_skip_recompte_ops(config, i),
+                    skip_recompute_ops=get_skip_recompute_ops(config, i),
                 ),
                 f"qwen.h.{i}",
             )

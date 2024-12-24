@@ -54,7 +54,7 @@ __all__ = [
     "no_recompute",
     "recompute",
     "get_global_rr_queue_dict",
-    "get_skip_recompte_ops",
+    "get_skip_recompute_ops",
     "RRColumnSequenceParallelLinear",
     "RRRowSequenceParallelLinear",
     "RRColumnParallelLinear",
@@ -329,10 +329,7 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
     amp_white_list, amp_black_list = tracer._get_amp_op_list()
 
     class IntermediateHolder:
-        def __init__(self, name, shape, dtype) -> None:
-            self.name = name
-            self.shape = shape
-            self.dtype = dtype
+        pass
 
     storage = weakref.WeakKeyDictionary()
     holder_list = []
@@ -341,11 +338,11 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
 
     def pack(x):
         # [PACK] in no recompute context or input tensor no need recompute, return the input tensor directly
-        if x.persistable or (in_no_recompute_ctx() and not x.name.endswith(recompute_suffix)):
+        if x is not None and x.persistable or (in_no_recompute_ctx() and not x.name.endswith(recompute_suffix)):
             return share_buffer_to_tensor_or_param(x)
 
         # remove the recompute suffix
-        res = IntermediateHolder(x.name, x.shape, x.dtype)
+        res = IntermediateHolder()
         holder_list.append(weakref.ref(res))
         return res
 
@@ -358,7 +355,7 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
         if len(storage) == 0:
 
             def inner_pack(inner_x):
-                if inner_x.persistable:
+                if inner_x is not None and inner_x.persistable:
                     return
 
                 nonlocal unpack_counter
@@ -404,16 +401,7 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
             raise Exception(
                 "Not supported to retrieve a tensor saved by autograd multiple times that is no need to recompute."
             )
-        tensor = storage.pop(x)
-        assert x.shape == tensor.shape, (
-            f"The shape:{x.shape} of the tensor saved by autograd is not "
-            f"consistent with the original tensor shape:{tensor.shape}! "
-        )
-        assert x.dtype == tensor.dtype, (
-            f"The dtype:{x.dtype} of the tensor saved by autograd is not"
-            f"consistent with the original tensor dtype:{tensor.dtype}! "
-        )
-        return tensor
+        return storage[x]
 
     with switch_recompute_id_ctx(recompute_id + "@first"):
         with paddle.autograd.saved_tensors_hooks(pack, unpack):
@@ -507,7 +495,7 @@ def get_pp_vp_split_layers(layer_num, pp_size, vp_size, skip_recompute_num=-1):
     return set(sum(no_recompute_layer_num, []))
 
 
-def get_skip_recompte_ops(config, layer_idx):
+def get_skip_recompute_ops(config, layer_idx):
     """
     Creates a dictionary for skipping recomputation based on the configuration file,
     effective only at the specified layer index.

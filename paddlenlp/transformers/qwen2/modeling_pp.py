@@ -24,7 +24,7 @@ from paddle.distributed.fleet.meta_parallel import (
     SharedLayerDesc,
 )
 
-from paddlenlp.transformers.refined_recompute import get_skip_recompte_ops, recompute
+from paddlenlp.transformers.refined_recompute import get_skip_recompute_ops, recompute
 
 from ...utils.tools import get_env_device
 from ..model_utils import PipelinePretrainedModel
@@ -299,7 +299,7 @@ class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                     Qwen2DecoderLayerPipe,
                     config=config,
                     layerwise_recompute=i not in self.no_recompute_layers,
-                    skip_recompte_ops=get_skip_recompte_ops(config, i),
+                    skip_recompute_ops=get_skip_recompute_ops(config, i),
                 ),
                 f"qwen2.layers.{i}",
             )

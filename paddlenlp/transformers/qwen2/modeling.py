@@ -39,7 +39,7 @@ from paddlenlp.transformers.refined_recompute import (
     RRColumnSequenceParallelLinear,
     RRRowParallelLinear,
     RRRowSequenceParallelLinear,
-    get_skip_recompte_ops,
+    get_skip_recompute_ops,
     recompute,
 )
 from paddlenlp.utils.tools import get_env_device
@@ -654,14 +654,14 @@ class Qwen2Attention(nn.Layer):
 
 
 class Qwen2DecoderLayer(nn.Layer):
-    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = False, skip_recompte_ops={}):
+    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = False, skip_recompute_ops={}):
         super().__init__()
         self.config = config
-        self.skip_recompte_ops = skip_recompte_ops
+        self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
-        self.self_attn = Qwen2Attention(config, layerwise_recompute, skip_recompte_ops=skip_recompte_ops)
+        self.self_attn = Qwen2Attention(config, layerwise_recompute, skip_recompute_ops=skip_recompute_ops)
 
-        self.mlp = Qwen2MLP(config, skip_recompte_ops=skip_recompte_ops)
+        self.mlp = Qwen2MLP(config, skip_recompute_ops=skip_recompute_ops)
         self.input_layernorm = Qwen2RMSNorm(config)
         self.post_attention_layernorm = Qwen2RMSNorm(config)
 
@@ -954,7 +954,7 @@ class Qwen2Model(Qwen2PretrainedModel):
                 Qwen2DecoderLayer(
                     config=config,
                     layerwise_recompute=layer_idx not in self.no_recompute_layers,
-                    skip_recompte_ops=get_skip_recompte_ops(config, layer_idx),
+                    skip_recompute_ops=get_skip_recompute_ops(config, layer_idx),
                 )
                 for layer_idx in range(config.num_hidden_layers)
             ]

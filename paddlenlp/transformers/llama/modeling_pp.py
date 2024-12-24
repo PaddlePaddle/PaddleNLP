@@ -24,7 +24,7 @@ from paddle.distributed.fleet.meta_parallel import (
 )
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
-from paddlenlp.transformers.refined_recompute import get_skip_recompte_ops, recompute
+from paddlenlp.transformers.refined_recompute import get_skip_recompute_ops, recompute
 from paddlenlp.utils.tools import get_env_device
 
 from .modeling import (
@@ -375,7 +375,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                     LlamaDecoderLayerPipe,
                     config=config,
                     layerwise_recompute=i not in self.no_recompute_layers,
-                    skip_recompte_ops=get_skip_recompte_ops(config, i),
+                    skip_recompute_ops=get_skip_recompute_ops(config, i),
                 ),
                 f"llama.layers.{i}",
             )

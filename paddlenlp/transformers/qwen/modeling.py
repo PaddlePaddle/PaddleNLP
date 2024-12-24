@@ -31,7 +31,7 @@ from paddlenlp.transformers.refined_recompute import (
     RRColumnSequenceParallelLinear,
     RRRowParallelLinear,
     RRRowSequenceParallelLinear,
-    get_skip_recompte_ops,
+    get_skip_recompute_ops,
     no_recompute,
     recompute,
 )
@@ -138,9 +138,9 @@ def get_triangle_upper_mask(x, mask=None):
 
 
 class QWenAttention(nn.Layer):
-    def __init__(self, config, skip_recompte_ops={}):
+    def __init__(self, config, skip_recompute_ops={}):
         super().__init__()
-        self.skip_recompte_ops = skip_recompte_ops
+        self.skip_recompute_ops = skip_recompute_ops
         self.config = config
         self.seq_length = config.seq_length
         self.hidden_size = config.hidden_size
@@ -166,18 +166,18 @@ class QWenAttention(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if skip_recompte_ops.get("attention_column_ln", False):
+                if skip_recompute_ops.get("attention_column_ln", False):
                     ColumnParallelLinear = RRColumnSequenceParallelLinear
-                if skip_recompte_ops.get("attention_row_ln", False):
+                if skip_recompute_ops.get("attention_row_ln", False):
                     RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if skip_recompte_ops.get("attention_column_ln", False):
+                if skip_recompute_ops.get("attention_column_ln", False):
                     ColumnParallelLinear = RRColumnParallelLinear
-                if skip_recompte_ops.get("attention_row_ln", False):
+                if skip_recompute_ops.get("attention_row_ln", False):
                     RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
@@ -409,11 +409,11 @@ class QWenAttention(nn.Layer):
 
 
 class QWenMLP(nn.Layer):
-    def __init__(self, config, skip_recompte_ops={}):
+    def __init__(self, config, skip_recompute_ops={}):
         super().__init__()
         ff_dim_in = config.intermediate_size // 2
         self.fuse_attention_ffn = config.fuse_attention_ffn
-        self.skip_recompte_ops = skip_recompte_ops
+        self.skip_recompute_ops = skip_recompute_ops
 
         if config.sequence_parallel:
             ColumnParallelLinear = linear_utils.ColumnSequenceParallelLinear
@@ -421,18 +421,18 @@ class QWenMLP(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if skip_recompte_ops.get("mlp_column_ln", False):
+                if skip_recompute_ops.get("mlp_column_ln", False):
                     ColumnParallelLinear = RRColumnSequenceParallelLinear
-                if skip_recompte_ops.get("mlp_row_ln", False):
+                if skip_recompute_ops.get("mlp_row_ln", False):
                     RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if skip_recompte_ops.get("mlp_column_ln", False):
+                if skip_recompute_ops.get("mlp_column_ln", False):
                     ColumnParallelLinear = RRColumnParallelLinear
-                if skip_recompte_ops.get("mlp_row_ln", False):
+                if skip_recompute_ops.get("mlp_row_ln", False):
                     RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
@@ -485,13 +485,13 @@ class QWenMLP(nn.Layer):
 
 
 class QWenBlock(nn.Layer):
-    def __init__(self, config, skip_recompte_ops={}):
+    def __init__(self, config, skip_recompute_ops={}):
         super().__init__()
         self.sequence_parallel = config.sequence_parallel
         self.ln_1 = QWenRMSNorm(config)
-        self.attn = QWenAttention(config, skip_recompte_ops=skip_recompte_ops)
+        self.attn = QWenAttention(config, skip_recompute_ops=skip_recompute_ops)
         self.ln_2 = QWenRMSNorm(config)
-        self.mlp = QWenMLP(config, skip_recompte_ops=skip_recompte_ops)
+        self.mlp = QWenMLP(config, skip_recompute_ops=skip_recompute_ops)
 
     def forward(
         self,
@@ -728,8 +728,7 @@ class QWenModel(QWenPretrainedModel):
             [
                 QWenBlock(
                     config=config,
-                    layer_idx=layer_idx,
-                    skip_recompte_ops=get_skip_recompte_ops(config, layer_idx),
+                    skip_recompute_ops=get_skip_recompute_ops(config, layer_idx),
                 )
                 for layer_idx in range(config.num_hidden_layers)
             ]
