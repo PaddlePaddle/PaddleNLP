@@ -1,1520 +1,0 @@
-/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/base/framework.py:654: UserWarning: PaddlePaddle version 2.3.0 or higher is required, but 0.0.0 installed, Maybe you are using a develop version, please make sure the version is good with your code.
-No module named paddleslim_ops, please install if you need.
-[33m[2024-12-24 20:14:59,298] [ WARNING][0m - sharding_parallel_degree=1 means no sharding, please set sharding to empty![0m
-[2024-12-24 20:14:59,298] [    INFO] distributed_strategy.py:333 - distributed strategy initialized
-======================= Modified FLAGS detected =======================
-FLAGS(name='FLAGS_curand_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/curand/lib', default_value='')
-FLAGS(name='FLAGS_cusolver_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cusolver/lib', default_value='')
-FLAGS(name='FLAGS_nccl_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/nccl/lib', default_value='')
-FLAGS(name='FLAGS_nvidia_package_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia', default_value='')
-FLAGS(name='FLAGS_selected_gpus', current_value='2', default_value='')
-FLAGS(name='FLAGS_cusparse_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cusparse/lib', default_value='')
-FLAGS(name='FLAGS_cublas_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cublas/lib', default_value='')
-FLAGS(name='FLAGS_enable_pir_in_executor', current_value=True, default_value=False)
-FLAGS(name='FLAGS_cudnn_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cudnn/lib', default_value='')
-FLAGS(name='FLAGS_cupti_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cuda_cupti/lib', default_value='')
-=======================================================================
-I1224 20:14:59.300580 41802 tcp_utils.cc:107] Retry to connect to 10.174.138.88:50895 while the server is not yet listening.
-I1224 20:15:02.300840 41802 tcp_utils.cc:130] Successfully connected to 10.174.138.88:50895
-I1224 20:15:02.301311 41802 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 20:15:02.301342 41802 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-[2024-12-24 20:15:02,301] [    INFO] topology.py:375 - Total 8 pipe comm group(s) create successfully!
-W1224 20:15:02.304848 41802 gpu_resources.cc:119] Please NOTE: device: 2, GPU Compute Capability: 8.0, Driver API Version: 12.0, Runtime API Version: 11.8
-W1224 20:15:02.306059 41802 gpu_resources.cc:164] device: 2, cuDNN Version: 8.6.
-/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/base/framework.py:654: UserWarning: PaddlePaddle version 2.3.0 or higher is required, but 0.0.0 installed, Maybe you are using a develop version, please make sure the version is good with your code.
-No module named paddleslim_ops, please install if you need.
-[33m[2024-12-24 20:17:22,013] [ WARNING][0m - sharding_parallel_degree=1 means no sharding, please set sharding to empty![0m
-[2024-12-24 20:17:22,013] [    INFO] distributed_strategy.py:333 - distributed strategy initialized
-======================= Modified FLAGS detected =======================
-FLAGS(name='FLAGS_cusparse_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cusparse/lib', default_value='')
-FLAGS(name='FLAGS_cudnn_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cudnn/lib', default_value='')
-FLAGS(name='FLAGS_cusolver_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cusolver/lib', default_value='')
-FLAGS(name='FLAGS_cublas_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cublas/lib', default_value='')
-FLAGS(name='FLAGS_nccl_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/nccl/lib', default_value='')
-FLAGS(name='FLAGS_cupti_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cuda_cupti/lib', default_value='')
-FLAGS(name='FLAGS_curand_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/curand/lib', default_value='')
-FLAGS(name='FLAGS_nvidia_package_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia', default_value='')
-FLAGS(name='FLAGS_enable_pir_in_executor', current_value=True, default_value=False)
-FLAGS(name='FLAGS_selected_gpus', current_value='2', default_value='')
-=======================================================================
-I1224 20:17:22.015632 43276 tcp_utils.cc:130] Successfully connected to 10.174.138.88:46178
-I1224 20:17:22.015957 43276 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 20:17:22.015976 43276 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-[2024-12-24 20:17:22,016] [    INFO] topology.py:375 - Total 8 pipe comm group(s) create successfully!
-W1224 20:17:22.017712 43276 gpu_resources.cc:119] Please NOTE: device: 2, GPU Compute Capability: 8.0, Driver API Version: 12.0, Runtime API Version: 11.8
-W1224 20:17:22.018419 43276 gpu_resources.cc:164] device: 2, cuDNN Version: 8.6.
-/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/distributed/communication/group.py:128: UserWarning: Current global rank 2 is not in group _default_pg12
-[2024-12-24 20:17:27,194] [    INFO] topology.py:375 - Total 8 data comm group(s) create successfully!
-I1224 20:17:27.194618 43276 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 20:17:27.194634 43276 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-[2024-12-24 20:17:27,194] [    INFO] topology.py:375 - Total 1 model comm group(s) create successfully!
-[2024-12-24 20:17:27,194] [    INFO] topology.py:375 - Total 8 sharding comm group(s) create successfully!
-I1224 20:17:27.194785 43276 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 20:17:27.194789 43276 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-I1224 20:17:27.194808 43276 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 20:17:27.194810 43276 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-[2024-12-24 20:17:27,194] [    INFO] topology.py:295 - HybridParallelInfo: rank_id: 2, mp_degree: 8, sharding_degree: 1, pp_degree: 1, dp_degree: 1, sep_degree: 1, mp_group: [0, 1, 2, 3, 4, 5, 6, 7],  sharding_group: [2], pp_group: [2], dp_group: [2], sep:group: None, check/clip group: [0, 1, 2, 3, 4, 5, 6, 7]
-[32m[2024-12-24 20:17:27,195] [    INFO][0m -     +==============================================================================+
-    |                                                                              |
-    |                         DistributedStrategy Overview                         |
-    |                                                                              |
-    +==============================================================================+
-    |                        a_sync=True <-> a_sync_configs                        |
-    +------------------------------------------------------------------------------+
-    |                               k_steps                    -1                  |
-    |                     max_merge_var_num                    1                   |
-    |                       send_queue_size                    16                  |
-    |               independent_recv_thread                  False                 |
-    |         min_send_grad_num_before_recv                    1                   |
-    |                      thread_pool_size                    1                   |
-    |                       send_wait_times                    1                   |
-    |               runtime_split_send_recv                  False                 |
-    |                        launch_barrier                   True                 |
-    |             heter_worker_device_guard                   cpu                  |
-    |                        lr_decay_steps                    10                  |
-    |                            use_ps_gpu                    0                   |
-    |                         use_gpu_graph                    0                   |
-    +==============================================================================+
-    |                    Environment Flags, Communication Flags                    |
-    +------------------------------------------------------------------------------+
-    |                                  mode                    1                   |
-    |                               elastic                  False                 |
-    |                                  auto                  False                 |
-    |                   sync_nccl_allreduce                   True                 |
-    |                         nccl_comm_num                    1                   |
-    |            use_hierarchical_allreduce                  False                 |
-    |   hierarchical_allreduce_inter_nranks                    1                   |
-    |                       sync_batch_norm                  False                 |
-    |                   fuse_all_reduce_ops                   True                 |
-    |                  fuse_grad_size_in_MB                    32                  |
-    |              fuse_grad_size_in_TFLOPS                   50.0                 |
-    |               cudnn_exhaustive_search                  False                 |
-    |             conv_workspace_size_limit                   512                  |
-    |    cudnn_batchnorm_spatial_persistent                  False                 |
-    |                        fp16_allreduce                  False                 |
-    |               last_comm_group_size_MB                   1.0                  |
-    |                find_unused_parameters                  False                 |
-    |            without_graph_optimization                   True                 |
-    |                 fuse_grad_size_in_num                    8                   |
-    |                 calc_comm_same_stream                  False                 |
-    |                                   asp                  False                 |
-    |                       fuse_grad_merge                  False                 |
-    |                             semi_auto                  False                 |
-    |                            adam_d2sum                  False                 |
-    |                           auto_search                  False                 |
-    |                        heter_ccl_mode                  False                 |
-    |                         is_fl_ps_mode                  False                 |
-    |                      with_coordinator                  False                 |
-    |                            split_data                   True                 |
-    |                  downpour_table_param                    []                  |
-    |                       fs_client_param                                        |
-    +==============================================================================+
-    |                                Build Strategy                                |
-    +------------------------------------------------------------------------------+
-    |              fuse_elewise_add_act_ops                  False                 |
-    |                       fuse_bn_act_ops                  False                 |
-    |              fuse_relu_depthwise_conv                  False                 |
-    |                    fuse_broadcast_ops                  False                 |
-    |                fuse_all_optimizer_ops                  False                 |
-    |                        enable_inplace                  False                 |
-    |     enable_backward_optimizer_op_deps                   True                 |
-    |                 cache_runtime_context                  False                 |
-    |                   fuse_bn_add_act_ops                   True                 |
-    |                    enable_auto_fusion                  False                 |
-    |                          enable_addto                  False                 |
-    |              allow_cuda_graph_capture                  False                 |
-    |                       reduce_strategy                    0                   |
-    |                    fuse_gemm_epilogue                  False                 |
-    |                   debug_graphviz_path                                        |
-    |                       fused_attention                  False                 |
-    |                     fused_feedforward                  False                 |
-    |            fuse_dot_product_attention                  False                 |
-    |                          fuse_resunit                  False                 |
-    +==============================================================================+
-[0m
-[32m[2024-12-24 20:17:27,196] [    INFO][0m - The default value for the training argument `--report_to` will change in v5 (from all installed integrations to none). In v5, you will need to use `--report_to all` to get the same behavior as now. You should start updating your code and make this info disappear :-).[0m
-[32m[2024-12-24 20:17:27,197] [    INFO][0m - The global seed is set to 42, local seed is set to 52 and random seed is set to 42.[0m
-[35m[2024-12-24 20:17:27,197] [   DEBUG][0m - ============================================================[0m
-[35m[2024-12-24 20:17:27,197] [   DEBUG][0m -      Model Configuration Arguments      [0m
-[35m[2024-12-24 20:17:27,197] [   DEBUG][0m - paddle commit id              : 2a3c9b9dc2fb1fdecaaa6355ed3b72723214d872[0m
-[35m[2024-12-24 20:17:27,197] [   DEBUG][0m - paddlenlp commit id           : 801682de722abea56fe1c4ab21874bf6157c54a3.dirty[0m
-[35m[2024-12-24 20:17:27,197] [   DEBUG][0m - flash_mask                    : True[0m
-[35m[2024-12-24 20:17:27,197] [   DEBUG][0m - fuse_attention_ffn            : None[0m
-[35m[2024-12-24 20:17:27,197] [   DEBUG][0m - fuse_attention_qkv            : None[0m
-[35m[2024-12-24 20:17:27,197] [   DEBUG][0m - lora_alpha                    : -1[0m
-[35m[2024-12-24 20:17:27,197] [   DEBUG][0m - lora_path                     : None[0m
-[35m[2024-12-24 20:17:27,197] [   DEBUG][0m - lora_plus_scale               : 1.0[0m
-[35m[2024-12-24 20:17:27,197] [   DEBUG][0m - lora_rank                     : 8[0m
-[35m[2024-12-24 20:17:27,197] [   DEBUG][0m - model_name_or_path            : meta-llama/Meta-Llama-3-8B[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - rslora                        : False[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - rslora_plus                   : False[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - tokenizer_name_or_path        : None[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - use_quick_lora                : True[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - weight_quantize_algo          : None[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - [0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - ============================================================[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m -       Data Configuration Arguments      [0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - paddle commit id              : 2a3c9b9dc2fb1fdecaaa6355ed3b72723214d872[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - paddlenlp commit id           : 801682de722abea56fe1c4ab21874bf6157c54a3.dirty[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - dev_dataset_path              : ./data/dev.jsonl[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - greedy_zero_padding           : False[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - max_prompt_len                : 2048[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - max_seq_len                   : 4096[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - train_dataset_path            : ./data/train.jsonl[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - [0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - ============================================================[0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m -    KTOConfig Configuration Arguments    [0m
-[35m[2024-12-24 20:17:27,198] [   DEBUG][0m - paddle commit id              : 2a3c9b9dc2fb1fdecaaa6355ed3b72723214d872[0m
-[35m[2024-12-24 20:17:27,199] [   DEBUG][0m - paddlenlp commit id           : 801682de722abea56fe1c4ab21874bf6157c54a3.dirty[0m
-[35m[2024-12-24 20:17:27,199] [   DEBUG][0m - beta                          : 0.1[0m
-[35m[2024-12-24 20:17:27,199] [   DEBUG][0m - desirable_weight              : 1.0[0m
-[35m[2024-12-24 20:17:27,199] [   DEBUG][0m - lora                          : False[0m
-[35m[2024-12-24 20:17:27,199] [   DEBUG][0m - undesirable_weight            : 1.0[0m
-[35m[2024-12-24 20:17:27,199] [   DEBUG][0m - [0m
-[33m[2024-12-24 20:17:27,199] [ WARNING][0m - Process rank: 2, device: gpu, world_size: 8, distributed training: True, 16-bits training: True[0m
-[32m[2024-12-24 20:17:27,199] [    INFO][0m - Start to load model & tokenizer.[0m
-(…)y/meta-llama/Meta-Llama-3-8B/config.json:   0%|          | 0.00/654 [00:00<?, ?B/s](…)y/meta-llama/Meta-Llama-3-8B/config.json: 100%|██████████| 654/654 [00:00<00:00, 165kB/s]
-[32m[2024-12-24 20:17:27,342] [    INFO][0m - We are using <class 'paddlenlp.transformers.llama.modeling.LlamaForCausalLM'> to load 'meta-llama/Meta-Llama-3-8B'.[0m
-[32m[2024-12-24 20:17:27,342] [    INFO][0m - Loading configuration file /root/.paddlenlp/models/meta-llama/Meta-Llama-3-8B/config.json[0m
-(…)-Llama-3-8B/model.safetensors.index.json:   0%|          | 0.00/23.9k [00:00<?, ?B/s](…)-Llama-3-8B/model.safetensors.index.json: 100%|██████████| 23.9k/23.9k [00:00<00:00, 17.1MB/s]
-[32m[2024-12-24 20:17:27,440] [    INFO][0m - Loading weights file from cache at /root/.paddlenlp/models/meta-llama/Meta-Llama-3-8B/model.safetensors.index.json[0m
-Downloading shards:   0%|          | 0/4 [00:00<?, ?it/s]
-(…)ma-3-8B/model-00001-of-00004.safetensors:   0%|          | 0.00/4.98G [00:00<?, ?B/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   0%|          | 10.5M/4.98G [00:00<01:00, 82.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   1%|          | 31.5M/4.98G [00:00<00:57, 85.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   1%|          | 52.4M/4.98G [00:00<00:55, 89.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   1%|▏         | 62.9M/4.98G [00:00<00:53, 91.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   1%|▏         | 73.4M/4.98G [00:00<00:53, 92.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   2%|▏         | 94.4M/4.98G [00:01<00:58, 82.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   2%|▏         | 105M/4.98G [00:01<00:58, 83.0MB/s] [A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   3%|▎         | 126M/4.98G [00:01<00:53, 91.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   3%|▎         | 136M/4.98G [00:01<01:00, 80.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   3%|▎         | 157M/4.98G [00:01<00:59, 81.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   3%|▎         | 168M/4.98G [00:01<00:56, 84.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   4%|▎         | 178M/4.98G [00:02<00:55, 86.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   4%|▍         | 199M/4.98G [00:02<00:50, 94.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   4%|▍         | 220M/4.98G [00:02<00:50, 94.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   5%|▍         | 241M/4.98G [00:02<00:52, 89.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   5%|▌         | 252M/4.98G [00:02<00:55, 85.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   5%|▌         | 273M/4.98G [00:03<00:49, 95.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   6%|▌         | 283M/4.98G [00:03<00:58, 80.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   6%|▌         | 304M/4.98G [00:03<00:53, 86.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   6%|▋         | 315M/4.98G [00:03<00:53, 86.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   7%|▋         | 325M/4.98G [00:03<00:55, 83.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   7%|▋         | 336M/4.98G [00:03<00:56, 82.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   7%|▋         | 346M/4.98G [00:03<00:54, 84.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   7%|▋         | 367M/4.98G [00:04<00:52, 88.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   8%|▊         | 388M/4.98G [00:04<01:01, 75.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   8%|▊         | 398M/4.98G [00:04<01:02, 73.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   8%|▊         | 419M/4.98G [00:04<00:51, 88.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   9%|▊         | 430M/4.98G [00:05<00:55, 82.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   9%|▉         | 451M/4.98G [00:05<00:51, 87.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   9%|▉         | 461M/4.98G [00:05<00:50, 90.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:   9%|▉         | 472M/4.98G [00:05<00:50, 89.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  10%|▉         | 493M/4.98G [00:05<00:53, 83.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  10%|█         | 503M/4.98G [00:05<00:54, 81.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  10%|█         | 514M/4.98G [00:06<00:53, 83.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  11%|█         | 535M/4.98G [00:06<00:52, 85.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  11%|█         | 556M/4.98G [00:06<00:49, 89.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  12%|█▏        | 577M/4.98G [00:06<00:48, 91.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  12%|█▏        | 587M/4.98G [00:06<00:47, 92.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  12%|█▏        | 598M/4.98G [00:06<00:51, 85.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  12%|█▏        | 608M/4.98G [00:07<00:59, 73.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  13%|█▎        | 629M/4.98G [00:07<00:53, 81.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  13%|█▎        | 640M/4.98G [00:07<00:56, 77.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  13%|█▎        | 661M/4.98G [00:07<00:50, 85.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  13%|█▎        | 671M/4.98G [00:07<00:51, 83.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  14%|█▎        | 682M/4.98G [00:08<00:55, 76.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  14%|█▍        | 703M/4.98G [00:08<00:52, 82.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  15%|█▍        | 724M/4.98G [00:08<00:48, 88.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  15%|█▍        | 734M/4.98G [00:08<00:48, 86.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  15%|█▍        | 744M/4.98G [00:08<00:53, 79.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  15%|█▌        | 765M/4.98G [00:08<00:47, 88.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  16%|█▌        | 786M/4.98G [00:09<00:47, 87.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  16%|█▌        | 797M/4.98G [00:09<00:46, 90.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  16%|█▌        | 807M/4.98G [00:09<00:47, 87.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  17%|█▋        | 828M/4.98G [00:09<00:47, 87.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  17%|█▋        | 849M/4.98G [00:09<00:48, 85.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  17%|█▋        | 870M/4.98G [00:10<00:49, 83.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  18%|█▊        | 891M/4.98G [00:10<00:46, 87.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  18%|█▊        | 912M/4.98G [00:10<00:46, 86.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  19%|█▊        | 923M/4.98G [00:10<00:46, 87.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  19%|█▉        | 933M/4.98G [00:10<00:44, 90.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  19%|█▉        | 944M/4.98G [00:11<00:44, 89.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  19%|█▉        | 954M/4.98G [00:11<00:45, 88.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  19%|█▉        | 965M/4.98G [00:11<00:44, 90.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  20%|█▉        | 975M/4.98G [00:11<00:50, 79.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  20%|█▉        | 986M/4.98G [00:11<00:48, 83.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  20%|██        | 1.01G/4.98G [00:11<00:42, 93.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  20%|██        | 1.02G/4.98G [00:11<00:43, 91.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  21%|██        | 1.04G/4.98G [00:12<00:43, 89.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  21%|██▏       | 1.06G/4.98G [00:12<00:45, 86.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  22%|██▏       | 1.08G/4.98G [00:12<00:48, 80.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  22%|██▏       | 1.10G/4.98G [00:12<00:46, 83.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  22%|██▏       | 1.11G/4.98G [00:12<00:46, 82.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  23%|██▎       | 1.12G/4.98G [00:13<00:48, 78.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  23%|██▎       | 1.13G/4.98G [00:13<00:47, 80.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  23%|██▎       | 1.14G/4.98G [00:13<00:47, 81.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  23%|██▎       | 1.15G/4.98G [00:13<00:47, 79.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  23%|██▎       | 1.16G/4.98G [00:13<00:51, 74.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  24%|██▎       | 1.17G/4.98G [00:13<00:47, 80.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  24%|██▍       | 1.20G/4.98G [00:13<00:40, 92.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  24%|██▍       | 1.21G/4.98G [00:14<00:46, 81.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  24%|██▍       | 1.22G/4.98G [00:14<00:46, 81.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  25%|██▍       | 1.23G/4.98G [00:14<00:43, 85.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  25%|██▌       | 1.25G/4.98G [00:14<00:44, 84.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  25%|██▌       | 1.27G/4.98G [00:14<00:45, 81.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  26%|██▌       | 1.29G/4.98G [00:15<00:46, 79.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  26%|██▋       | 1.31G/4.98G [00:15<00:42, 86.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  27%|██▋       | 1.33G/4.98G [00:15<00:41, 88.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  27%|██▋       | 1.34G/4.98G [00:15<00:40, 88.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  27%|██▋       | 1.36G/4.98G [00:15<00:35, 102MB/s] [A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  28%|██▊       | 1.38G/4.98G [00:16<00:40, 88.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  28%|██▊       | 1.39G/4.98G [00:16<00:41, 87.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  28%|██▊       | 1.41G/4.98G [00:16<00:39, 89.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  28%|██▊       | 1.42G/4.98G [00:16<00:48, 72.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  29%|██▊       | 1.43G/4.98G [00:16<00:46, 76.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  29%|██▉       | 1.45G/4.98G [00:17<00:43, 81.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  29%|██▉       | 1.46G/4.98G [00:17<00:49, 71.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  30%|██▉       | 1.48G/4.98G [00:17<00:42, 82.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  30%|███       | 1.50G/4.98G [00:17<00:42, 81.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  30%|███       | 1.51G/4.98G [00:17<00:41, 83.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  31%|███       | 1.53G/4.98G [00:17<00:38, 90.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  31%|███       | 1.54G/4.98G [00:18<00:39, 86.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  31%|███▏      | 1.56G/4.98G [00:18<00:37, 90.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  32%|███▏      | 1.58G/4.98G [00:18<00:36, 92.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  32%|███▏      | 1.59G/4.98G [00:18<00:35, 94.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  32%|███▏      | 1.60G/4.98G [00:18<00:43, 77.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  33%|███▎      | 1.63G/4.98G [00:19<00:37, 88.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  33%|███▎      | 1.65G/4.98G [00:19<00:38, 87.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  34%|███▎      | 1.67G/4.98G [00:19<00:37, 88.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  34%|███▎      | 1.68G/4.98G [00:19<00:36, 90.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  34%|███▍      | 1.69G/4.98G [00:19<00:39, 82.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  34%|███▍      | 1.70G/4.98G [00:19<00:39, 83.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  34%|███▍      | 1.71G/4.98G [00:20<00:42, 76.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  35%|███▍      | 1.72G/4.98G [00:20<00:42, 76.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  35%|███▍      | 1.73G/4.98G [00:20<00:43, 75.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  35%|███▌      | 1.75G/4.98G [00:20<00:41, 77.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  36%|███▌      | 1.77G/4.98G [00:20<00:37, 84.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  36%|███▌      | 1.78G/4.98G [00:20<00:38, 83.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  36%|███▌      | 1.79G/4.98G [00:21<00:38, 83.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  36%|███▌      | 1.80G/4.98G [00:21<00:36, 86.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  36%|███▋      | 1.81G/4.98G [00:21<00:40, 78.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  37%|███▋      | 1.84G/4.98G [00:21<00:37, 84.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  37%|███▋      | 1.85G/4.98G [00:21<00:37, 84.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  37%|███▋      | 1.86G/4.98G [00:21<00:37, 82.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  38%|███▊      | 1.88G/4.98G [00:22<00:37, 83.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  38%|███▊      | 1.90G/4.98G [00:22<00:35, 87.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  39%|███▊      | 1.92G/4.98G [00:22<00:37, 82.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  39%|███▉      | 1.93G/4.98G [00:22<00:38, 78.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  39%|███▉      | 1.94G/4.98G [00:22<00:41, 72.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  39%|███▉      | 1.96G/4.98G [00:23<00:35, 84.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  40%|███▉      | 1.97G/4.98G [00:23<00:36, 82.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  40%|████      | 1.99G/4.98G [00:23<00:32, 91.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  40%|████      | 2.00G/4.98G [00:23<00:38, 77.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  40%|████      | 2.01G/4.98G [00:23<00:36, 80.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  41%|████      | 2.02G/4.98G [00:24<00:42, 69.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  41%|████      | 2.03G/4.98G [00:24<00:40, 72.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  41%|████      | 2.04G/4.98G [00:24<00:42, 68.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  41%|████▏     | 2.06G/4.98G [00:24<00:42, 69.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  42%|████▏     | 2.08G/4.98G [00:24<00:33, 86.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  42%|████▏     | 2.09G/4.98G [00:24<00:35, 82.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  42%|████▏     | 2.10G/4.98G [00:24<00:34, 82.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  42%|████▏     | 2.11G/4.98G [00:25<00:37, 77.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  43%|████▎     | 2.13G/4.98G [00:25<00:31, 90.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  43%|████▎     | 2.14G/4.98G [00:25<00:32, 86.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  43%|████▎     | 2.15G/4.98G [00:25<00:36, 78.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  43%|████▎     | 2.16G/4.98G [00:25<00:34, 81.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  44%|████▎     | 2.17G/4.98G [00:25<00:37, 73.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  44%|████▍     | 2.19G/4.98G [00:26<00:35, 79.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  44%|████▍     | 2.20G/4.98G [00:26<00:33, 83.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  44%|████▍     | 2.21G/4.98G [00:26<00:34, 80.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  45%|████▍     | 2.22G/4.98G [00:26<00:35, 77.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  45%|████▌     | 2.24G/4.98G [00:26<00:30, 88.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  45%|████▌     | 2.25G/4.98G [00:26<00:31, 87.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  46%|████▌     | 2.28G/4.98G [00:27<00:31, 86.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  46%|████▌     | 2.29G/4.98G [00:27<00:30, 87.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  46%|████▋     | 2.31G/4.98G [00:27<00:26, 99.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  47%|████▋     | 2.32G/4.98G [00:27<00:30, 87.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  47%|████▋     | 2.34G/4.98G [00:27<00:28, 93.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  47%|████▋     | 2.36G/4.98G [00:27<00:27, 93.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  48%|████▊     | 2.37G/4.98G [00:28<00:27, 93.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  48%|████▊     | 2.38G/4.98G [00:28<00:28, 92.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  48%|████▊     | 2.40G/4.98G [00:28<00:26, 96.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  49%|████▊     | 2.42G/4.98G [00:28<00:26, 97.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  49%|████▉     | 2.43G/4.98G [00:28<00:26, 97.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  49%|████▉     | 2.44G/4.98G [00:28<00:26, 94.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  50%|████▉     | 2.46G/4.98G [00:29<00:26, 93.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  50%|████▉     | 2.49G/4.98G [00:29<00:26, 92.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  50%|█████     | 2.51G/4.98G [00:29<00:28, 88.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  51%|█████     | 2.52G/4.98G [00:29<00:27, 90.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  51%|█████     | 2.53G/4.98G [00:29<00:27, 89.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  51%|█████     | 2.54G/4.98G [00:29<00:26, 92.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  51%|█████     | 2.55G/4.98G [00:29<00:26, 91.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  51%|█████▏    | 2.56G/4.98G [00:30<00:25, 94.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  52%|█████▏    | 2.57G/4.98G [00:30<00:31, 77.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  52%|█████▏    | 2.59G/4.98G [00:30<00:28, 84.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  52%|█████▏    | 2.61G/4.98G [00:30<00:29, 81.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  53%|█████▎    | 2.62G/4.98G [00:30<00:28, 83.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  53%|█████▎    | 2.63G/4.98G [00:30<00:27, 84.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  53%|█████▎    | 2.65G/4.98G [00:31<00:26, 86.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  54%|█████▎    | 2.67G/4.98G [00:31<00:27, 83.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  54%|█████▍    | 2.68G/4.98G [00:31<00:27, 83.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  54%|█████▍    | 2.71G/4.98G [00:31<00:24, 93.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  55%|█████▍    | 2.72G/4.98G [00:31<00:26, 86.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  55%|█████▍    | 2.73G/4.98G [00:32<00:25, 87.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  55%|█████▍    | 2.74G/4.98G [00:32<00:26, 83.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  55%|█████▌    | 2.75G/4.98G [00:32<00:25, 85.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  55%|█████▌    | 2.76G/4.98G [00:32<00:28, 78.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  56%|█████▌    | 2.77G/4.98G [00:32<00:27, 81.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  56%|█████▌    | 2.78G/4.98G [00:32<00:25, 86.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  56%|█████▌    | 2.79G/4.98G [00:32<00:27, 80.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  56%|█████▋    | 2.80G/4.98G [00:33<00:29, 74.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  57%|█████▋    | 2.82G/4.98G [00:33<00:26, 82.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  57%|█████▋    | 2.84G/4.98G [00:33<00:25, 84.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  58%|█████▊    | 2.86G/4.98G [00:33<00:22, 92.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  58%|█████▊    | 2.88G/4.98G [00:33<00:24, 87.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  58%|█████▊    | 2.90G/4.98G [00:34<00:22, 93.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  59%|█████▊    | 2.92G/4.98G [00:34<00:21, 94.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  59%|█████▉    | 2.93G/4.98G [00:34<00:22, 91.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  59%|█████▉    | 2.95G/4.98G [00:34<00:22, 92.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  60%|█████▉    | 2.97G/4.98G [00:34<00:22, 87.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  60%|██████    | 2.99G/4.98G [00:35<00:22, 89.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  60%|██████    | 3.01G/4.98G [00:35<00:23, 85.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  61%|██████    | 3.03G/4.98G [00:35<00:23, 83.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  61%|██████▏   | 3.05G/4.98G [00:35<00:21, 88.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  62%|██████▏   | 3.06G/4.98G [00:35<00:21, 90.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  62%|██████▏   | 3.07G/4.98G [00:36<00:21, 86.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  62%|██████▏   | 3.09G/4.98G [00:36<00:23, 81.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  63%|██████▎   | 3.11G/4.98G [00:36<00:21, 86.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  63%|██████▎   | 3.14G/4.98G [00:36<00:20, 89.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  63%|██████▎   | 3.16G/4.98G [00:36<00:19, 95.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  64%|██████▎   | 3.17G/4.98G [00:37<00:21, 83.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  64%|██████▍   | 3.18G/4.98G [00:37<00:23, 76.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  64%|██████▍   | 3.20G/4.98G [00:37<00:22, 80.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  64%|██████▍   | 3.21G/4.98G [00:37<00:21, 83.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  65%|██████▍   | 3.22G/4.98G [00:37<00:20, 85.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  65%|██████▌   | 3.24G/4.98G [00:38<00:20, 86.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  66%|██████▌   | 3.26G/4.98G [00:38<00:21, 78.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  66%|██████▌   | 3.28G/4.98G [00:38<00:19, 84.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  66%|██████▌   | 3.29G/4.98G [00:38<00:19, 84.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  66%|██████▋   | 3.30G/4.98G [00:38<00:22, 75.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  67%|██████▋   | 3.31G/4.98G [00:39<00:23, 70.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  67%|██████▋   | 3.33G/4.98G [00:39<00:19, 85.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  67%|██████▋   | 3.34G/4.98G [00:39<00:20, 78.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  68%|██████▊   | 3.37G/4.98G [00:39<00:19, 83.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  68%|██████▊   | 3.38G/4.98G [00:39<00:18, 85.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  68%|██████▊   | 3.39G/4.98G [00:39<00:20, 76.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  68%|██████▊   | 3.40G/4.98G [00:40<00:20, 75.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  68%|██████▊   | 3.41G/4.98G [00:40<00:19, 81.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  69%|██████▉   | 3.43G/4.98G [00:40<00:18, 84.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  69%|██████▉   | 3.44G/4.98G [00:40<00:18, 84.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  69%|██████▉   | 3.45G/4.98G [00:40<00:17, 84.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  70%|██████▉   | 3.46G/4.98G [00:40<00:17, 88.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  70%|██████▉   | 3.47G/4.98G [00:40<00:17, 85.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  70%|███████   | 3.49G/4.98G [00:41<00:15, 94.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  71%|███████   | 3.51G/4.98G [00:41<00:15, 96.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  71%|███████   | 3.52G/4.98G [00:41<00:14, 98.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  71%|███████   | 3.53G/4.98G [00:41<00:16, 85.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  71%|███████   | 3.54G/4.98G [00:41<00:16, 88.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  72%|███████▏  | 3.57G/4.98G [00:41<00:14, 94.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  72%|███████▏  | 3.58G/4.98G [00:42<00:17, 79.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  72%|███████▏  | 3.59G/4.98G [00:42<00:17, 78.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  72%|███████▏  | 3.60G/4.98G [00:42<00:16, 84.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  72%|███████▏  | 3.61G/4.98G [00:42<00:15, 88.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  73%|███████▎  | 3.62G/4.98G [00:42<00:18, 75.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  73%|███████▎  | 3.64G/4.98G [00:42<00:15, 84.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  73%|███████▎  | 3.65G/4.98G [00:43<00:18, 72.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  74%|███████▎  | 3.67G/4.98G [00:43<00:15, 86.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  74%|███████▍  | 3.68G/4.98G [00:43<00:15, 83.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  74%|███████▍  | 3.70G/4.98G [00:43<00:15, 84.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  75%|███████▍  | 3.71G/4.98G [00:43<00:14, 86.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  75%|███████▌  | 3.73G/4.98G [00:43<00:12, 96.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  75%|███████▌  | 3.74G/4.98G [00:44<00:14, 85.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  75%|███████▌  | 3.75G/4.98G [00:44<00:14, 87.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  76%|███████▌  | 3.76G/4.98G [00:44<00:13, 88.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  76%|███████▌  | 3.77G/4.98G [00:44<00:13, 91.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  76%|███████▌  | 3.79G/4.98G [00:44<00:14, 82.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  76%|███████▋  | 3.80G/4.98G [00:44<00:13, 86.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  76%|███████▋  | 3.81G/4.98G [00:44<00:13, 85.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  77%|███████▋  | 3.82G/4.98G [00:44<00:13, 86.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  77%|███████▋  | 3.83G/4.98G [00:45<00:13, 83.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  77%|███████▋  | 3.84G/4.98G [00:45<00:12, 88.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  77%|███████▋  | 3.85G/4.98G [00:45<00:17, 64.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  78%|███████▊  | 3.87G/4.98G [00:45<00:13, 80.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  78%|███████▊  | 3.88G/4.98G [00:45<00:12, 84.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  78%|███████▊  | 3.89G/4.98G [00:45<00:14, 77.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  79%|███████▊  | 3.91G/4.98G [00:46<00:13, 80.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  79%|███████▉  | 3.93G/4.98G [00:46<00:12, 83.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  79%|███████▉  | 3.95G/4.98G [00:46<00:12, 80.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  80%|███████▉  | 3.97G/4.98G [00:46<00:11, 88.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  80%|████████  | 3.98G/4.98G [00:46<00:10, 90.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  80%|████████  | 4.00G/4.98G [00:47<00:12, 78.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  81%|████████  | 4.02G/4.98G [00:47<00:12, 79.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  81%|████████  | 4.03G/4.98G [00:47<00:11, 82.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  81%|████████  | 4.04G/4.98G [00:47<00:10, 85.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  81%|████████▏ | 4.05G/4.98G [00:47<00:10, 88.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  82%|████████▏ | 4.06G/4.98G [00:47<00:10, 85.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  82%|████████▏ | 4.07G/4.98G [00:47<00:10, 85.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  82%|████████▏ | 4.08G/4.98G [00:48<00:11, 75.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  82%|████████▏ | 4.10G/4.98G [00:48<00:10, 81.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  83%|████████▎ | 4.11G/4.98G [00:48<00:10, 85.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  83%|████████▎ | 4.13G/4.98G [00:48<00:09, 93.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  83%|████████▎ | 4.14G/4.98G [00:48<00:10, 76.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  83%|████████▎ | 4.15G/4.98G [00:48<00:10, 78.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  84%|████████▍ | 4.17G/4.98G [00:49<00:09, 84.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  84%|████████▍ | 4.18G/4.98G [00:49<00:10, 73.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  84%|████████▍ | 4.19G/4.98G [00:49<00:10, 77.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  85%|████████▍ | 4.22G/4.98G [00:49<00:08, 86.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  85%|████████▍ | 4.23G/4.98G [00:49<00:10, 73.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  85%|████████▌ | 4.24G/4.98G [00:50<00:09, 77.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  86%|████████▌ | 4.26G/4.98G [00:50<00:08, 87.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  86%|████████▌ | 4.27G/4.98G [00:50<00:08, 82.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  86%|████████▌ | 4.29G/4.98G [00:50<00:07, 93.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  87%|████████▋ | 4.31G/4.98G [00:50<00:07, 86.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  87%|████████▋ | 4.32G/4.98G [00:50<00:07, 87.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  87%|████████▋ | 4.33G/4.98G [00:51<00:07, 80.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  87%|████████▋ | 4.34G/4.98G [00:51<00:07, 82.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  88%|████████▊ | 4.36G/4.98G [00:51<00:06, 96.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  88%|████████▊ | 4.37G/4.98G [00:51<00:07, 85.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  88%|████████▊ | 4.39G/4.98G [00:51<00:06, 94.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  89%|████████▊ | 4.41G/4.98G [00:52<00:06, 88.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  89%|████████▉ | 4.42G/4.98G [00:52<00:06, 90.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  89%|████████▉ | 4.44G/4.98G [00:52<00:06, 83.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  89%|████████▉ | 4.45G/4.98G [00:52<00:06, 86.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  90%|████████▉ | 4.46G/4.98G [00:52<00:06, 79.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  90%|████████▉ | 4.48G/4.98G [00:52<00:05, 87.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  90%|█████████ | 4.49G/4.98G [00:52<00:05, 88.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  90%|█████████ | 4.50G/4.98G [00:53<00:05, 91.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  91%|█████████ | 4.51G/4.98G [00:53<00:05, 88.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  91%|█████████ | 4.52G/4.98G [00:53<00:05, 84.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  91%|█████████ | 4.53G/4.98G [00:53<00:05, 86.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  91%|█████████ | 4.54G/4.98G [00:53<00:04, 87.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  91%|█████████▏| 4.55G/4.98G [00:53<00:04, 91.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  92%|█████████▏| 4.56G/4.98G [00:53<00:04, 85.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  92%|█████████▏| 4.57G/4.98G [00:53<00:04, 86.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  92%|█████████▏| 4.58G/4.98G [00:53<00:04, 87.1MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  92%|█████████▏| 4.59G/4.98G [00:54<00:04, 84.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  93%|█████████▎| 4.61G/4.98G [00:54<00:03, 92.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  93%|█████████▎| 4.62G/4.98G [00:54<00:04, 81.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  93%|█████████▎| 4.65G/4.98G [00:54<00:03, 89.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  94%|█████████▎| 4.66G/4.98G [00:54<00:03, 87.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  94%|█████████▍| 4.67G/4.98G [00:55<00:04, 77.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  94%|█████████▍| 4.69G/4.98G [00:55<00:03, 83.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  94%|█████████▍| 4.70G/4.98G [00:55<00:03, 85.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  95%|█████████▍| 4.71G/4.98G [00:55<00:03, 78.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  95%|█████████▍| 4.72G/4.98G [00:55<00:03, 77.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  95%|█████████▌| 4.73G/4.98G [00:55<00:03, 76.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  95%|█████████▌| 4.74G/4.98G [00:55<00:03, 72.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  95%|█████████▌| 4.75G/4.98G [00:56<00:02, 78.2MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  96%|█████████▌| 4.76G/4.98G [00:56<00:02, 83.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  96%|█████████▌| 4.77G/4.98G [00:56<00:02, 77.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  96%|█████████▋| 4.79G/4.98G [00:56<00:02, 82.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  97%|█████████▋| 4.81G/4.98G [00:56<00:01, 85.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  97%|█████████▋| 4.83G/4.98G [00:57<00:01, 77.4MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  97%|█████████▋| 4.84G/4.98G [00:57<00:01, 77.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  98%|█████████▊| 4.85G/4.98G [00:57<00:01, 80.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  98%|█████████▊| 4.87G/4.98G [00:57<00:01, 81.8MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  98%|█████████▊| 4.88G/4.98G [00:57<00:01, 69.9MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  98%|█████████▊| 4.89G/4.98G [00:57<00:01, 69.5MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  98%|█████████▊| 4.90G/4.98G [00:57<00:01, 75.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  99%|█████████▊| 4.91G/4.98G [00:58<00:00, 80.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  99%|█████████▉| 4.92G/4.98G [00:58<00:00, 66.7MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  99%|█████████▉| 4.94G/4.98G [00:58<00:00, 78.6MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors:  99%|█████████▉| 4.95G/4.98G [00:58<00:00, 79.3MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors: 100%|█████████▉| 4.96G/4.98G [00:58<00:00, 80.0MB/s][A
-(…)ma-3-8B/model-00001-of-00004.safetensors: 100%|██████████| 4.98G/4.98G [00:58<00:00, 85.1MB/s][A(…)ma-3-8B/model-00001-of-00004.safetensors: 100%|██████████| 4.98G/4.98G [00:58<00:00, 84.5MB/s]
-Downloading shards:  25%|██▌       | 1/4 [00:59<02:57, 59.11s/it]
-(…)ma-3-8B/model-00002-of-00004.safetensors:   0%|          | 0.00/5.00G [00:00<?, ?B/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   0%|          | 21.0M/5.00G [00:00<00:29, 168MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   1%|          | 41.9M/5.00G [00:00<00:26, 184MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   1%|▏         | 62.9M/5.00G [00:00<00:31, 155MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   2%|▏         | 83.9M/5.00G [00:00<00:33, 147MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   2%|▏         | 105M/5.00G [00:00<00:39, 125MB/s] [A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   3%|▎         | 126M/5.00G [00:00<00:34, 140MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   3%|▎         | 147M/5.00G [00:01<00:36, 132MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   3%|▎         | 168M/5.00G [00:01<00:37, 127MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   4%|▍         | 189M/5.00G [00:01<00:37, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   4%|▍         | 210M/5.00G [00:01<00:35, 133MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   5%|▍         | 231M/5.00G [00:01<00:39, 121MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   5%|▌         | 252M/5.00G [00:01<00:35, 134MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   5%|▌         | 273M/5.00G [00:02<00:40, 117MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   6%|▌         | 294M/5.00G [00:02<00:37, 125MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   6%|▋         | 315M/5.00G [00:02<00:38, 121MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   7%|▋         | 336M/5.00G [00:02<00:34, 133MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   7%|▋         | 357M/5.00G [00:02<00:38, 119MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   8%|▊         | 377M/5.00G [00:02<00:36, 126MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   8%|▊         | 398M/5.00G [00:03<00:35, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   8%|▊         | 419M/5.00G [00:03<00:36, 125MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   9%|▉         | 440M/5.00G [00:03<00:40, 111MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:   9%|▉         | 472M/5.00G [00:03<00:35, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  10%|▉         | 493M/5.00G [00:03<00:33, 134MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  10%|█         | 514M/5.00G [00:04<00:37, 121MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  11%|█         | 535M/5.00G [00:04<00:33, 134MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  11%|█         | 556M/5.00G [00:04<00:37, 120MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  12%|█▏        | 577M/5.00G [00:04<00:33, 132MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  12%|█▏        | 598M/5.00G [00:04<00:40, 110MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  12%|█▏        | 619M/5.00G [00:04<00:37, 118MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  13%|█▎        | 640M/5.00G [00:05<00:34, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  13%|█▎        | 661M/5.00G [00:05<00:31, 139MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  14%|█▎        | 682M/5.00G [00:05<00:34, 124MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  14%|█▍        | 703M/5.00G [00:05<00:32, 131MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  14%|█▍        | 724M/5.00G [00:05<00:34, 123MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  15%|█▍        | 744M/5.00G [00:05<00:33, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  15%|█▌        | 765M/5.00G [00:05<00:33, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  16%|█▌        | 786M/5.00G [00:06<00:30, 136MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  16%|█▌        | 807M/5.00G [00:06<00:37, 113MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  17%|█▋        | 828M/5.00G [00:06<00:32, 130MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  17%|█▋        | 849M/5.00G [00:06<00:34, 121MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  17%|█▋        | 870M/5.00G [00:06<00:30, 137MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  18%|█▊        | 891M/5.00G [00:07<00:33, 123MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  18%|█▊        | 912M/5.00G [00:07<00:31, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  19%|█▊        | 933M/5.00G [00:07<00:31, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  19%|█▉        | 954M/5.00G [00:07<00:32, 123MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  20%|█▉        | 975M/5.00G [00:07<00:36, 110MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  20%|██        | 1.01G/5.00G [00:07<00:30, 132MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  21%|██        | 1.03G/5.00G [00:08<00:31, 126MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  21%|██        | 1.05G/5.00G [00:08<00:28, 139MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  21%|██▏       | 1.07G/5.00G [00:08<00:30, 130MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  22%|██▏       | 1.09G/5.00G [00:08<00:33, 116MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  22%|██▏       | 1.11G/5.00G [00:08<00:29, 132MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  23%|██▎       | 1.13G/5.00G [00:08<00:30, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  23%|██▎       | 1.15G/5.00G [00:09<00:29, 130MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  23%|██▎       | 1.17G/5.00G [00:09<00:29, 130MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  24%|██▍       | 1.20G/5.00G [00:09<00:31, 121MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  24%|██▍       | 1.22G/5.00G [00:09<00:30, 125MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  25%|██▍       | 1.24G/5.00G [00:09<00:30, 125MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  25%|██▌       | 1.26G/5.00G [00:09<00:28, 133MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  26%|██▌       | 1.28G/5.00G [00:10<00:31, 120MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  26%|██▌       | 1.30G/5.00G [00:10<00:28, 132MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  26%|██▋       | 1.32G/5.00G [00:10<00:29, 123MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  27%|██▋       | 1.34G/5.00G [00:10<00:28, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  27%|██▋       | 1.36G/5.00G [00:10<00:28, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  28%|██▊       | 1.38G/5.00G [00:10<00:29, 124MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  28%|██▊       | 1.41G/5.00G [00:11<00:29, 123MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  29%|██▊       | 1.43G/5.00G [00:11<00:26, 135MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  29%|██▉       | 1.45G/5.00G [00:11<00:29, 120MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  29%|██▉       | 1.47G/5.00G [00:11<00:28, 123MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  30%|██▉       | 1.49G/5.00G [00:11<00:28, 125MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  30%|███       | 1.51G/5.00G [00:11<00:27, 126MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  31%|███       | 1.53G/5.00G [00:12<00:27, 125MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  31%|███       | 1.55G/5.00G [00:12<00:29, 116MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  31%|███▏      | 1.57G/5.00G [00:12<00:27, 122MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  32%|███▏      | 1.59G/5.00G [00:12<00:25, 135MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  32%|███▏      | 1.61G/5.00G [00:12<00:27, 121MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  33%|███▎      | 1.65G/5.00G [00:13<00:27, 122MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  33%|███▎      | 1.67G/5.00G [00:13<00:25, 131MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  34%|███▍      | 1.69G/5.00G [00:13<00:26, 125MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  34%|███▍      | 1.71G/5.00G [00:13<00:25, 131MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  35%|███▍      | 1.73G/5.00G [00:13<00:27, 118MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  35%|███▌      | 1.75G/5.00G [00:13<00:25, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  35%|███▌      | 1.77G/5.00G [00:13<00:24, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  36%|███▌      | 1.79G/5.00G [00:14<00:24, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  36%|███▋      | 1.81G/5.00G [00:14<00:28, 110MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  37%|███▋      | 1.85G/5.00G [00:14<00:23, 136MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  37%|███▋      | 1.87G/5.00G [00:14<00:27, 114MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  38%|███▊      | 1.90G/5.00G [00:14<00:23, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  38%|███▊      | 1.92G/5.00G [00:15<00:25, 119MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  39%|███▉      | 1.94G/5.00G [00:15<00:23, 131MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  39%|███▉      | 1.96G/5.00G [00:15<00:23, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  40%|███▉      | 1.98G/5.00G [00:15<00:23, 131MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  40%|████      | 2.00G/5.00G [00:15<00:23, 125MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  40%|████      | 2.02G/5.00G [00:15<00:22, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  41%|████      | 2.04G/5.00G [00:16<00:25, 118MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  41%|████▏     | 2.07G/5.00G [00:16<00:22, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  42%|████▏     | 2.09G/5.00G [00:16<00:21, 137MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  42%|████▏     | 2.11G/5.00G [00:16<00:24, 117MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  43%|████▎     | 2.14G/5.00G [00:16<00:21, 131MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  43%|████▎     | 2.16G/5.00G [00:17<00:21, 131MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  44%|████▎     | 2.18G/5.00G [00:17<00:24, 114MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  44%|████▍     | 2.21G/5.00G [00:17<00:21, 130MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  45%|████▍     | 2.23G/5.00G [00:17<00:22, 121MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  45%|████▌     | 2.25G/5.00G [00:17<00:22, 124MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  46%|████▌     | 2.28G/5.00G [00:18<00:21, 127MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  46%|████▌     | 2.30G/5.00G [00:18<00:20, 134MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  46%|████▋     | 2.32G/5.00G [00:18<00:23, 113MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  47%|████▋     | 2.35G/5.00G [00:18<00:19, 138MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  47%|████▋     | 2.37G/5.00G [00:18<00:19, 133MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  48%|████▊     | 2.39G/5.00G [00:18<00:21, 120MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  48%|████▊     | 2.41G/5.00G [00:19<00:21, 122MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  49%|████▊     | 2.43G/5.00G [00:19<00:19, 133MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  49%|████▉     | 2.45G/5.00G [00:19<00:21, 121MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  49%|████▉     | 2.47G/5.00G [00:19<00:21, 119MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  50%|████▉     | 2.50G/5.00G [00:19<00:21, 116MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  50%|█████     | 2.52G/5.00G [00:19<00:20, 123MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  51%|█████     | 2.54G/5.00G [00:20<00:18, 131MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  51%|█████     | 2.56G/5.00G [00:20<00:17, 142MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  52%|█████▏    | 2.58G/5.00G [00:20<00:20, 120MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  52%|█████▏    | 2.60G/5.00G [00:20<00:18, 132MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  52%|█████▏    | 2.62G/5.00G [00:20<00:18, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  53%|█████▎    | 2.64G/5.00G [00:20<00:16, 142MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  53%|█████▎    | 2.66G/5.00G [00:21<00:18, 124MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  54%|█████▎    | 2.68G/5.00G [00:21<00:17, 135MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  54%|█████▍    | 2.71G/5.00G [00:21<00:18, 123MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  55%|█████▍    | 2.73G/5.00G [00:21<00:17, 134MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  55%|█████▍    | 2.75G/5.00G [00:21<00:20, 110MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  56%|█████▌    | 2.78G/5.00G [00:21<00:17, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  56%|█████▌    | 2.80G/5.00G [00:22<00:16, 130MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  56%|█████▋    | 2.82G/5.00G [00:22<00:16, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  57%|█████▋    | 2.84G/5.00G [00:22<00:17, 121MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  57%|█████▋    | 2.86G/5.00G [00:22<00:16, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  58%|█████▊    | 2.88G/5.00G [00:22<00:18, 115MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  58%|█████▊    | 2.90G/5.00G [00:22<00:16, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  59%|█████▊    | 2.93G/5.00G [00:23<00:14, 138MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  59%|█████▉    | 2.95G/5.00G [00:23<00:16, 125MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  59%|█████▉    | 2.97G/5.00G [00:23<00:17, 114MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  60%|█████▉    | 2.99G/5.00G [00:23<00:16, 123MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  60%|██████    | 3.01G/5.00G [00:23<00:14, 137MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  61%|██████    | 3.03G/5.00G [00:24<00:16, 123MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  61%|██████    | 3.05G/5.00G [00:24<00:15, 127MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  61%|██████▏   | 3.07G/5.00G [00:24<00:15, 124MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  62%|██████▏   | 3.09G/5.00G [00:24<00:13, 138MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  62%|██████▏   | 3.11G/5.00G [00:24<00:15, 124MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  63%|██████▎   | 3.14G/5.00G [00:24<00:13, 133MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  63%|██████▎   | 3.16G/5.00G [00:25<00:16, 115MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  64%|██████▎   | 3.18G/5.00G [00:25<00:14, 126MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  64%|██████▍   | 3.20G/5.00G [00:25<00:14, 127MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  64%|██████▍   | 3.22G/5.00G [00:25<00:15, 116MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  65%|██████▍   | 3.24G/5.00G [00:25<00:14, 123MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  65%|██████▌   | 3.26G/5.00G [00:25<00:13, 134MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  66%|██████▌   | 3.28G/5.00G [00:25<00:12, 133MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  66%|██████▌   | 3.30G/5.00G [00:26<00:13, 127MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  66%|██████▋   | 3.32G/5.00G [00:26<00:13, 125MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  67%|██████▋   | 3.34G/5.00G [00:26<00:14, 115MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  67%|██████▋   | 3.37G/5.00G [00:26<00:13, 119MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  68%|██████▊   | 3.39G/5.00G [00:26<00:12, 132MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  68%|██████▊   | 3.41G/5.00G [00:26<00:11, 133MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  69%|██████▊   | 3.43G/5.00G [00:27<00:12, 127MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  69%|██████▉   | 3.45G/5.00G [00:27<00:12, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  69%|██████▉   | 3.47G/5.00G [00:27<00:11, 130MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  70%|██████▉   | 3.49G/5.00G [00:27<00:11, 127MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  70%|███████   | 3.51G/5.00G [00:27<00:11, 131MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  71%|███████   | 3.53G/5.00G [00:28<00:12, 119MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  71%|███████   | 3.55G/5.00G [00:28<00:10, 135MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  72%|███████▏  | 3.58G/5.00G [00:28<00:13, 106MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  72%|███████▏  | 3.61G/5.00G [00:28<00:10, 138MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  73%|███████▎  | 3.63G/5.00G [00:28<00:10, 125MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  73%|███████▎  | 3.65G/5.00G [00:28<00:10, 124MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  73%|███████▎  | 3.67G/5.00G [00:29<00:10, 132MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  74%|███████▍  | 3.69G/5.00G [00:29<00:09, 133MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  74%|███████▍  | 3.71G/5.00G [00:29<00:10, 121MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  75%|███████▍  | 3.73G/5.00G [00:29<00:09, 131MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  75%|███████▌  | 3.75G/5.00G [00:29<00:09, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  76%|███████▌  | 3.77G/5.00G [00:29<00:10, 117MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  76%|███████▌  | 3.80G/5.00G [00:30<00:09, 127MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  76%|███████▋  | 3.82G/5.00G [00:30<00:08, 132MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  77%|███████▋  | 3.84G/5.00G [00:30<00:12, 96.4MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  77%|███████▋  | 3.87G/5.00G [00:30<00:08, 132MB/s] [A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  78%|███████▊  | 3.89G/5.00G [00:30<00:08, 130MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  78%|███████▊  | 3.91G/5.00G [00:30<00:08, 135MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  79%|███████▊  | 3.93G/5.00G [00:31<00:08, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  79%|███████▉  | 3.95G/5.00G [00:31<00:08, 130MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  79%|███████▉  | 3.97G/5.00G [00:31<00:07, 137MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  80%|███████▉  | 4.00G/5.00G [00:31<00:08, 117MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  80%|████████  | 4.02G/5.00G [00:31<00:07, 126MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  81%|████████  | 4.04G/5.00G [00:32<00:07, 124MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  81%|████████  | 4.06G/5.00G [00:32<00:07, 132MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  82%|████████▏ | 4.08G/5.00G [00:32<00:08, 110MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  82%|████████▏ | 4.11G/5.00G [00:32<00:06, 144MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  83%|████████▎ | 4.13G/5.00G [00:32<00:07, 123MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  83%|████████▎ | 4.15G/5.00G [00:32<00:06, 134MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  83%|████████▎ | 4.17G/5.00G [00:33<00:06, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  84%|████████▍ | 4.19G/5.00G [00:33<00:06, 121MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  84%|████████▍ | 4.22G/5.00G [00:33<00:06, 128MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  85%|████████▍ | 4.24G/5.00G [00:33<00:05, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  85%|████████▌ | 4.26G/5.00G [00:33<00:06, 120MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  86%|████████▌ | 4.28G/5.00G [00:33<00:05, 134MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  86%|████████▌ | 4.30G/5.00G [00:34<00:05, 123MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  86%|████████▋ | 4.32G/5.00G [00:34<00:05, 130MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  87%|████████▋ | 4.34G/5.00G [00:34<00:06, 110MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  87%|████████▋ | 4.37G/5.00G [00:34<00:05, 113MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  88%|████████▊ | 4.40G/5.00G [00:34<00:04, 137MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  89%|████████▊ | 4.42G/5.00G [00:35<00:04, 118MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  89%|████████▉ | 4.46G/5.00G [00:35<00:04, 117MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  90%|████████▉ | 4.49G/5.00G [00:35<00:03, 134MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  90%|█████████ | 4.51G/5.00G [00:35<00:03, 135MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  91%|█████████ | 4.53G/5.00G [00:35<00:03, 118MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  91%|█████████ | 4.55G/5.00G [00:36<00:03, 117MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  91%|█████████▏| 4.57G/5.00G [00:36<00:03, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  92%|█████████▏| 4.59G/5.00G [00:36<00:03, 131MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  92%|█████████▏| 4.61G/5.00G [00:36<00:02, 139MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  93%|█████████▎| 4.63G/5.00G [00:36<00:02, 130MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  93%|█████████▎| 4.66G/5.00G [00:36<00:02, 134MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  94%|█████████▎| 4.68G/5.00G [00:37<00:02, 131MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  94%|█████████▍| 4.70G/5.00G [00:37<00:02, 125MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  94%|█████████▍| 4.72G/5.00G [00:37<00:02, 127MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  95%|█████████▍| 4.74G/5.00G [00:37<00:01, 131MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  95%|█████████▌| 4.76G/5.00G [00:37<00:01, 124MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  96%|█████████▌| 4.78G/5.00G [00:37<00:01, 114MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  96%|█████████▌| 4.80G/5.00G [00:38<00:01, 127MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  96%|█████████▋| 4.82G/5.00G [00:38<00:01, 127MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  97%|█████████▋| 4.84G/5.00G [00:38<00:01, 129MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  97%|█████████▋| 4.87G/5.00G [00:38<00:00, 135MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  98%|█████████▊| 4.89G/5.00G [00:38<00:00, 124MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  98%|█████████▊| 4.91G/5.00G [00:38<00:00, 135MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  99%|█████████▊| 4.93G/5.00G [00:39<00:00, 103MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors:  99%|█████████▉| 4.96G/5.00G [00:39<00:00, 93.1MB/s][A
-(…)ma-3-8B/model-00002-of-00004.safetensors: 100%|█████████▉| 4.98G/5.00G [00:39<00:00, 109MB/s] [A
-(…)ma-3-8B/model-00002-of-00004.safetensors: 100%|██████████| 5.00G/5.00G [00:39<00:00, 120MB/s][A(…)ma-3-8B/model-00002-of-00004.safetensors: 100%|██████████| 5.00G/5.00G [00:39<00:00, 126MB/s]
-Downloading shards:  50%|█████     | 2/4 [01:39<01:35, 47.85s/it]Downloading shards:  75%|███████▌  | 3/4 [02:45<00:56, 56.25s/it]Downloading shards: 100%|██████████| 4/4 [03:00<00:00, 40.01s/it]Downloading shards: 100%|██████████| 4/4 [03:00<00:00, 45.11s/it]
-Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:01<00:03,  1.20s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:02<00:02,  1.28s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:03<00:01,  1.26s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:04<00:00,  1.10it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:04<00:00,  1.03s/it]
-[32m[2024-12-24 20:20:33,841] [    INFO][0m - All model checkpoint weights were used when initializing LlamaForCausalLM.
-[0m
-[32m[2024-12-24 20:20:33,841] [    INFO][0m - All the weights of LlamaForCausalLM were initialized from the model checkpoint at meta-llama/Meta-Llama-3-8B.
-If your task is similar to the task the model of the checkpoint was trained on, you can already use LlamaForCausalLM for predictions without further training.[0m
-[32m[2024-12-24 20:20:33,843] [    INFO][0m - Loading configuration file /root/.paddlenlp/models/meta-llama/Meta-Llama-3-8B/generation_config.json[0m
-[32m[2024-12-24 20:20:33,844] [    INFO][0m - Loading configuration file /root/.paddlenlp/models/meta-llama/Meta-Llama-3-8B/config.json[0m
-[32m[2024-12-24 20:20:35,565] [    INFO][0m - Loading model & tokenizer successfully ![0m
-[32m[2024-12-24 20:20:35,565] [    INFO][0m - Start to create dataset[0m
-Map:   0%|          | 0/4000 [00:00<?, ? examples/s]Map:  21%|██▏       | 852/4000 [00:00<00:00, 8461.00 examples/s]Map:  50%|█████     | 2000/4000 [00:00<00:00, 7627.08 examples/s]Map:  73%|███████▎  | 2914/4000 [00:00<00:00, 8205.47 examples/s]Map: 100%|██████████| 4000/4000 [00:00<00:00, 7947.25 examples/s]Map: 100%|██████████| 4000/4000 [00:00<00:00, 7940.12 examples/s]
-[32m[2024-12-24 20:21:00,122] [    INFO][0m - Creating train Zero Padding Data Stream. This may take a few minutes.[0m
-Traceback (most recent call last):
-  File "/root/paddlejob/workspace/env_run/output/lugim/PaddleNLP1/llm/./alignment/kto/run_kto.py", line 285, in <module>
-    main()
-  File "/root/paddlejob/workspace/env_run/output/lugim/PaddleNLP1/llm/./alignment/kto/run_kto.py", line 203, in main
-    train_ds = ZeroPaddingMapDataset(
-  File "/root/paddlejob/workspace/env_run/output/lugim/PaddleNLP1/paddlenlp/datasets/zero_padding_dataset.py", line 111, in __init__
-    self.new_data = self._create_zero_padding_data(data)
-  File "/root/paddlejob/workspace/env_run/output/lugim/PaddleNLP1/paddlenlp/datasets/zero_padding_dataset.py", line 119, in _create_zero_padding_data
-    record = data[i]
-  File "/root/paddlejob/workspace/env_run/output/lugim/PaddleNLP1/paddlenlp/datasets/dataset.py", line 266, in __getitem__
-    return self._transform(self.new_data[idx]) if self._transform_pipline else self.new_data[idx]
-  File "/root/paddlejob/workspace/env_run/output/lugim/PaddleNLP1/paddlenlp/datasets/dataset.py", line 258, in _transform
-    data = fn(data)
-  File "/root/paddlejob/workspace/env_run/output/lugim/PaddleNLP1/paddlenlp/trl/trl_data.py", line 50, in preprocess_preference_data
-    data = check_preference_data(data)
-  File "/root/paddlejob/workspace/env_run/output/lugim/PaddleNLP1/paddlenlp/trl/trl_data.py", line 36, in check_preference_data
-    raise ValueError("The response should not be empty, buut got {data}.")
-ValueError: The response should not be empty, buut got {data}.
-/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/base/framework.py:654: UserWarning: PaddlePaddle version 2.3.0 or higher is required, but 0.0.0 installed, Maybe you are using a develop version, please make sure the version is good with your code.
-No module named paddleslim_ops, please install if you need.
-[33m[2024-12-24 21:19:15,022] [ WARNING][0m - sharding_parallel_degree=1 means no sharding, please set sharding to empty![0m
-[2024-12-24 21:19:15,023] [    INFO] distributed_strategy.py:333 - distributed strategy initialized
-======================= Modified FLAGS detected =======================
-FLAGS(name='FLAGS_enable_pir_in_executor', current_value=True, default_value=False)
-FLAGS(name='FLAGS_nvidia_package_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia', default_value='')
-FLAGS(name='FLAGS_nccl_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/nccl/lib', default_value='')
-FLAGS(name='FLAGS_cublas_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cublas/lib', default_value='')
-FLAGS(name='FLAGS_cusolver_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cusolver/lib', default_value='')
-FLAGS(name='FLAGS_selected_gpus', current_value='2', default_value='')
-FLAGS(name='FLAGS_cudnn_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cudnn/lib', default_value='')
-FLAGS(name='FLAGS_cupti_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cuda_cupti/lib', default_value='')
-FLAGS(name='FLAGS_cusparse_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cusparse/lib', default_value='')
-FLAGS(name='FLAGS_curand_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/curand/lib', default_value='')
-=======================================================================
-I1224 21:19:15.025254 104202 tcp_utils.cc:107] Retry to connect to 10.174.138.88:50851 while the server is not yet listening.
-I1224 21:19:18.025481 104202 tcp_utils.cc:130] Successfully connected to 10.174.138.88:50851
-I1224 21:19:18.025844 104202 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 21:19:18.025867 104202 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-[2024-12-24 21:19:18,026] [    INFO] topology.py:375 - Total 8 pipe comm group(s) create successfully!
-W1224 21:19:18.027755 104202 gpu_resources.cc:119] Please NOTE: device: 2, GPU Compute Capability: 8.0, Driver API Version: 12.0, Runtime API Version: 11.8
-W1224 21:19:18.028530 104202 gpu_resources.cc:164] device: 2, cuDNN Version: 8.6.
-/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/distributed/communication/group.py:128: UserWarning: Current global rank 2 is not in group _default_pg12
-[2024-12-24 21:19:20,115] [    INFO] topology.py:375 - Total 8 data comm group(s) create successfully!
-I1224 21:19:20.115656 104202 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 21:19:20.115674 104202 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-[2024-12-24 21:19:20,115] [    INFO] topology.py:375 - Total 1 model comm group(s) create successfully!
-[2024-12-24 21:19:20,115] [    INFO] topology.py:375 - Total 8 sharding comm group(s) create successfully!
-I1224 21:19:20.115828 104202 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 21:19:20.115842 104202 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-I1224 21:19:20.115867 104202 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 21:19:20.115870 104202 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-[2024-12-24 21:19:20,115] [    INFO] topology.py:295 - HybridParallelInfo: rank_id: 2, mp_degree: 8, sharding_degree: 1, pp_degree: 1, dp_degree: 1, sep_degree: 1, mp_group: [0, 1, 2, 3, 4, 5, 6, 7],  sharding_group: [2], pp_group: [2], dp_group: [2], sep:group: None, check/clip group: [0, 1, 2, 3, 4, 5, 6, 7]
-[32m[2024-12-24 21:19:20,116] [    INFO][0m -     +==============================================================================+
-    |                                                                              |
-    |                         DistributedStrategy Overview                         |
-    |                                                                              |
-    +==============================================================================+
-    |                        a_sync=True <-> a_sync_configs                        |
-    +------------------------------------------------------------------------------+
-    |                               k_steps                    -1                  |
-    |                     max_merge_var_num                    1                   |
-    |                       send_queue_size                    16                  |
-    |               independent_recv_thread                  False                 |
-    |         min_send_grad_num_before_recv                    1                   |
-    |                      thread_pool_size                    1                   |
-    |                       send_wait_times                    1                   |
-    |               runtime_split_send_recv                  False                 |
-    |                        launch_barrier                   True                 |
-    |             heter_worker_device_guard                   cpu                  |
-    |                        lr_decay_steps                    10                  |
-    |                            use_ps_gpu                    0                   |
-    |                         use_gpu_graph                    0                   |
-    +==============================================================================+
-    |                    Environment Flags, Communication Flags                    |
-    +------------------------------------------------------------------------------+
-    |                                  mode                    1                   |
-    |                               elastic                  False                 |
-    |                                  auto                  False                 |
-    |                   sync_nccl_allreduce                   True                 |
-    |                         nccl_comm_num                    1                   |
-    |            use_hierarchical_allreduce                  False                 |
-    |   hierarchical_allreduce_inter_nranks                    1                   |
-    |                       sync_batch_norm                  False                 |
-    |                   fuse_all_reduce_ops                   True                 |
-    |                  fuse_grad_size_in_MB                    32                  |
-    |              fuse_grad_size_in_TFLOPS                   50.0                 |
-    |               cudnn_exhaustive_search                  False                 |
-    |             conv_workspace_size_limit                   512                  |
-    |    cudnn_batchnorm_spatial_persistent                  False                 |
-    |                        fp16_allreduce                  False                 |
-    |               last_comm_group_size_MB                   1.0                  |
-    |                find_unused_parameters                  False                 |
-    |            without_graph_optimization                   True                 |
-    |                 fuse_grad_size_in_num                    8                   |
-    |                 calc_comm_same_stream                  False                 |
-    |                                   asp                  False                 |
-    |                       fuse_grad_merge                  False                 |
-    |                             semi_auto                  False                 |
-    |                            adam_d2sum                  False                 |
-    |                           auto_search                  False                 |
-    |                        heter_ccl_mode                  False                 |
-    |                         is_fl_ps_mode                  False                 |
-    |                      with_coordinator                  False                 |
-    |                            split_data                   True                 |
-    |                  downpour_table_param                    []                  |
-    |                       fs_client_param                                        |
-    +==============================================================================+
-    |                                Build Strategy                                |
-    +------------------------------------------------------------------------------+
-    |              fuse_elewise_add_act_ops                  False                 |
-    |                       fuse_bn_act_ops                  False                 |
-    |              fuse_relu_depthwise_conv                  False                 |
-    |                    fuse_broadcast_ops                  False                 |
-    |                fuse_all_optimizer_ops                  False                 |
-    |                        enable_inplace                  False                 |
-    |     enable_backward_optimizer_op_deps                   True                 |
-    |                 cache_runtime_context                  False                 |
-    |                   fuse_bn_add_act_ops                   True                 |
-    |                    enable_auto_fusion                  False                 |
-    |                          enable_addto                  False                 |
-    |              allow_cuda_graph_capture                  False                 |
-    |                       reduce_strategy                    0                   |
-    |                    fuse_gemm_epilogue                  False                 |
-    |                   debug_graphviz_path                                        |
-    |                       fused_attention                  False                 |
-    |                     fused_feedforward                  False                 |
-    |            fuse_dot_product_attention                  False                 |
-    |                          fuse_resunit                  False                 |
-    +==============================================================================+
-[0m
-[32m[2024-12-24 21:19:20,117] [    INFO][0m - The default value for the training argument `--report_to` will change in v5 (from all installed integrations to none). In v5, you will need to use `--report_to all` to get the same behavior as now. You should start updating your code and make this info disappear :-).[0m
-[32m[2024-12-24 21:19:20,118] [    INFO][0m - The global seed is set to 42, local seed is set to 52 and random seed is set to 42.[0m
-[35m[2024-12-24 21:19:20,118] [   DEBUG][0m - ============================================================[0m
-[35m[2024-12-24 21:19:20,118] [   DEBUG][0m -      Model Configuration Arguments      [0m
-[35m[2024-12-24 21:19:20,118] [   DEBUG][0m - paddle commit id              : 2a3c9b9dc2fb1fdecaaa6355ed3b72723214d872[0m
-[35m[2024-12-24 21:19:20,118] [   DEBUG][0m - paddlenlp commit id           : 801682de722abea56fe1c4ab21874bf6157c54a3.dirty[0m
-[35m[2024-12-24 21:19:20,118] [   DEBUG][0m - flash_mask                    : True[0m
-[35m[2024-12-24 21:19:20,118] [   DEBUG][0m - fuse_attention_ffn            : None[0m
-[35m[2024-12-24 21:19:20,118] [   DEBUG][0m - fuse_attention_qkv            : None[0m
-[35m[2024-12-24 21:19:20,118] [   DEBUG][0m - lora_alpha                    : -1[0m
-[35m[2024-12-24 21:19:20,118] [   DEBUG][0m - lora_path                     : None[0m
-[35m[2024-12-24 21:19:20,118] [   DEBUG][0m - lora_plus_scale               : 1.0[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - lora_rank                     : 8[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - model_name_or_path            : meta-llama/Meta-Llama-3-8B[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - rslora                        : False[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - rslora_plus                   : False[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - tokenizer_name_or_path        : None[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - use_quick_lora                : True[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - weight_quantize_algo          : None[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - [0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - ============================================================[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m -       Data Configuration Arguments      [0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - paddle commit id              : 2a3c9b9dc2fb1fdecaaa6355ed3b72723214d872[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - paddlenlp commit id           : 801682de722abea56fe1c4ab21874bf6157c54a3.dirty[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - dev_dataset_path              : ./data/dev.jsonl[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - greedy_zero_padding           : False[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - max_prompt_len                : 2048[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - max_seq_len                   : 4096[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - train_dataset_path            : ./data/train.jsonl[0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - [0m
-[35m[2024-12-24 21:19:20,119] [   DEBUG][0m - ============================================================[0m
-[35m[2024-12-24 21:19:20,120] [   DEBUG][0m -    KTOConfig Configuration Arguments    [0m
-[35m[2024-12-24 21:19:20,120] [   DEBUG][0m - paddle commit id              : 2a3c9b9dc2fb1fdecaaa6355ed3b72723214d872[0m
-[35m[2024-12-24 21:19:20,120] [   DEBUG][0m - paddlenlp commit id           : 801682de722abea56fe1c4ab21874bf6157c54a3.dirty[0m
-[35m[2024-12-24 21:19:20,120] [   DEBUG][0m - beta                          : 0.1[0m
-[35m[2024-12-24 21:19:20,120] [   DEBUG][0m - desirable_weight              : 1.0[0m
-[35m[2024-12-24 21:19:20,120] [   DEBUG][0m - lora                          : False[0m
-[35m[2024-12-24 21:19:20,120] [   DEBUG][0m - undesirable_weight            : 1.0[0m
-[35m[2024-12-24 21:19:20,120] [   DEBUG][0m - [0m
-[33m[2024-12-24 21:19:20,120] [ WARNING][0m - Process rank: 2, device: gpu, world_size: 8, distributed training: True, 16-bits training: True[0m
-[32m[2024-12-24 21:19:20,120] [    INFO][0m - Start to load model & tokenizer.[0m
-[32m[2024-12-24 21:19:20,121] [    INFO][0m - We are using <class 'paddlenlp.transformers.llama.modeling.LlamaForCausalLM'> to load 'meta-llama/Meta-Llama-3-8B'.[0m
-[32m[2024-12-24 21:19:20,121] [    INFO][0m - Loading configuration file /root/.paddlenlp/models/meta-llama/Meta-Llama-3-8B/config.json[0m
-[32m[2024-12-24 21:19:20,122] [    INFO][0m - Loading weights file from cache at /root/.paddlenlp/models/meta-llama/Meta-Llama-3-8B/model.safetensors.index.json[0m
-Downloading shards:   0%|          | 0/4 [00:00<?, ?it/s]Downloading shards: 100%|██████████| 4/4 [00:00<00:00, 45100.04it/s]
-Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:01<00:03,  1.20s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:02<00:02,  1.21s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:03<00:01,  1.24s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:04<00:00,  1.11it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:04<00:00,  1.02s/it]
-[32m[2024-12-24 21:19:25,880] [    INFO][0m - All model checkpoint weights were used when initializing LlamaForCausalLM.
-[0m
-[32m[2024-12-24 21:19:25,880] [    INFO][0m - All the weights of LlamaForCausalLM were initialized from the model checkpoint at meta-llama/Meta-Llama-3-8B.
-If your task is similar to the task the model of the checkpoint was trained on, you can already use LlamaForCausalLM for predictions without further training.[0m
-[32m[2024-12-24 21:19:25,881] [    INFO][0m - Loading configuration file /root/.paddlenlp/models/meta-llama/Meta-Llama-3-8B/generation_config.json[0m
-[32m[2024-12-24 21:19:25,882] [    INFO][0m - Loading configuration file /root/.paddlenlp/models/meta-llama/Meta-Llama-3-8B/config.json[0m
-[32m[2024-12-24 21:19:28,314] [    INFO][0m - Loading model & tokenizer successfully ![0m
-[32m[2024-12-24 21:19:28,314] [    INFO][0m - Start to create dataset[0m
-[32m[2024-12-24 21:19:52,370] [    INFO][0m - Creating train Zero Padding Data Stream. This may take a few minutes.[0m
-[32m[2024-12-24 21:20:23,092] [    INFO][0m - Creating dev Zero Padding Data Stream. This may take a few minutes.[0m
-[32m[2024-12-24 21:20:29,901] [    INFO][0m - Creating dataset successfully ...[0m
-[32m[2024-12-24 21:20:29,902] [    INFO][0m - The global seed is set to 42, local seed is set to 52 and random seed is set to 42.[0m
-[32m[2024-12-24 21:20:30,040] [    INFO][0m - max_steps is given, it will override any value given in num_train_epochs[0m
-[32m[2024-12-24 21:20:30,041] [    INFO][0m - Using half precision[0m
-[35m[2024-12-24 21:20:30,086] [   DEBUG][0m - ============================================================[0m
-[35m[2024-12-24 21:20:30,086] [   DEBUG][0m -     Training Configuration Arguments    [0m
-[35m[2024-12-24 21:20:30,086] [   DEBUG][0m - paddle commit id              : 2a3c9b9dc2fb1fdecaaa6355ed3b72723214d872[0m
-[35m[2024-12-24 21:20:30,086] [   DEBUG][0m - paddlenlp commit id           : 801682de722abea56fe1c4ab21874bf6157c54a3.dirty[0m
-[35m[2024-12-24 21:20:30,086] [   DEBUG][0m - _no_sync_in_gradient_accumulation: True[0m
-[35m[2024-12-24 21:20:30,086] [   DEBUG][0m - adam_beta1                    : 0.9[0m
-[35m[2024-12-24 21:20:30,086] [   DEBUG][0m - adam_beta2                    : 0.999[0m
-[35m[2024-12-24 21:20:30,086] [   DEBUG][0m - adam_epsilon                  : 1e-08[0m
-[35m[2024-12-24 21:20:30,086] [   DEBUG][0m - amp_custom_black_list         : None[0m
-[35m[2024-12-24 21:20:30,086] [   DEBUG][0m - amp_custom_white_list         : None[0m
-[35m[2024-12-24 21:20:30,086] [   DEBUG][0m - amp_master_grad               : False[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - auto_parallel_resume_form_hybrid_parallel: False[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - autotuner_benchmark           : False[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - benchmark                     : False[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - bf16                          : True[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - bf16_full_eval                : False[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - ckpt_quant_stage              : O0[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - context_parallel_degree       : 1[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - current_device                : gpu:2[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - data_parallel_config          : [0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - data_parallel_degree          : 1[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - data_parallel_rank            : 0[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - dataloader_drop_last          : False[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - dataloader_num_workers        : 0[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - dataset_rank                  : 0[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - dataset_world_size            : 1[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - ddp_find_unused_parameters    : None[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - device                        : gpu[0m
-[35m[2024-12-24 21:20:30,087] [   DEBUG][0m - disable_tqdm                  : True[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - distributed_dataloader        : False[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - do_eval                       : True[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - do_export                     : False[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - do_predict                    : False[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - do_train                      : True[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - enable_auto_parallel          : False[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - eval_accumulation_steps       : None[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - eval_batch_size               : 1[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - eval_steps                    : 100[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - evaluation_strategy           : IntervalStrategy.STEPS[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - expert_max_capacity           : 4294967296[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - expert_min_capacity           : 1[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - flatten_param_grads           : False[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - force_reshard_pp              : False[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - fp16                          : False[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - fp16_full_eval                : False[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - fp16_opt_level                : O2[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - fuse_sequence_parallel_allreduce: False[0m
-[35m[2024-12-24 21:20:30,088] [   DEBUG][0m - gradient_accumulation_steps   : 8[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - greater_is_better             : False[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - hybrid_parallel_topo_order    : pp_first[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - ignore_data_skip              : False[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - ignore_load_lr_and_optim      : False[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - ignore_save_lr_and_optim      : False[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - label_names                   : None[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - lazy_data_processing          : False[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - learning_rate                 : 2e-06[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - load_best_model_at_end        : True[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - load_sharded_model            : False[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - local_process_index           : 2[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - local_rank                    : 2[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - log_level                     : -1[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - log_level_replica             : -1[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - log_on_each_node              : True[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - logging_dir                   : ./checkpoints/dpo_ckpts/runs/Dec24_21-19-15_bddwd-inf-k8s-a100-a12ni6-0528.bddwd.baidu.com[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - logging_first_step            : False[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - logging_steps                 : 1[0m
-[35m[2024-12-24 21:20:30,089] [   DEBUG][0m - logging_strategy              : IntervalStrategy.STEPS[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - logical_process_index         : 2[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - lr_end                        : 1e-07[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - lr_scheduler_type             : SchedulerType.LINEAR[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - max_evaluate_steps            : -1[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - max_grad_norm                 : 1.0[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - max_steps                     : 100[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - metric_for_best_model         : loss[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - minimum_eval_times            : None[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - no_cuda                       : False[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - no_recompute_layers           : None[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - num_cycles                    : 0.5[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - num_train_epochs              : 1[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - offload_optim                 : False[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - optim                         : OptimizerNames.ADAMW[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - optimizer_name_suffix         : tp02[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - ordered_save_group_size       : 0[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - output_dir                    : ./checkpoints/dpo_ckpts[0m
-[35m[2024-12-24 21:20:30,090] [   DEBUG][0m - output_signal_dir             : ./checkpoints/dpo_ckpts[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - overwrite_output_dir          : False[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - past_index                    : -1[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - per_device_eval_batch_size    : 1[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - per_device_train_batch_size   : 1[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - pipeline_parallel_config      : [0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - pipeline_parallel_degree      : 1[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - pipeline_parallel_rank        : 0[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - power                         : 1.0[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - pp_recompute_interval         : 1[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - prediction_loss_only          : False[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - process_index                 : 2[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - recompute                     : False[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - recompute_granularity         : full[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - recompute_use_reentrant       : False[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - refined_recompute             : [0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - release_grads                 : False[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - remove_unused_columns         : True[0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - report_to                     : ['visualdl'][0m
-[35m[2024-12-24 21:20:30,091] [   DEBUG][0m - resume_from_checkpoint        : None[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - run_name                      : ./checkpoints/dpo_ckpts[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - save_on_each_node             : False[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - save_sharded_model            : False[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - save_steps                    : 500[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - save_strategy                 : IntervalStrategy.STEPS[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - save_total_limit              : None[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - scale_loss                    : 32768[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - seed                          : 42[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - sep_parallel_degree           : 1[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - sequence_parallel             : False[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - sequence_parallel_config      : [0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - sharding                      : [][0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - sharding_comm_buffer_size_MB  : -1[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - sharding_degree               : -1[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - sharding_parallel_config      : [0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - sharding_parallel_degree      : 1[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - sharding_parallel_mesh_dimension: dp[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - sharding_parallel_rank        : 0[0m
-[35m[2024-12-24 21:20:30,092] [   DEBUG][0m - should_load_dataset           : True[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - should_load_sharding_stage1_model: False[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - should_log                    : False[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - should_save                   : False[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - should_save_model_state       : True[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - should_save_sharding_stage1_model: False[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - skip_data_intervals           : None[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - skip_memory_metrics           : True[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - skip_profile_timer            : True[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - skip_recompute_ops            : None[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - tensor_parallel_config        : [0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - tensor_parallel_degree        : 8[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - tensor_parallel_output        : True[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - tensor_parallel_rank          : 2[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - to_static                     : False[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - train_batch_size              : 1[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - unified_checkpoint            : True[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - unified_checkpoint_config     : [''][0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - use_async_save                : False[0m
-[35m[2024-12-24 21:20:30,093] [   DEBUG][0m - use_expert_parallel           : False[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - use_flash_attention           : True[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - use_fused_dropout_add         : False[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - use_fused_linear              : False[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - use_fused_rms_norm            : False[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - use_fused_rope                : False[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - use_hybrid_parallel           : True[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - virtual_pp_degree             : 1[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - wandb_api_key                 : None[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - warmup_ratio                  : 0.0[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - warmup_steps                  : 10[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - weight_decay                  : 0.0[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - weight_name_suffix            : tp02[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - world_size                    : 8[0m
-[35m[2024-12-24 21:20:30,094] [   DEBUG][0m - [0m
-[2024-12-24 21:20:30,145] [    INFO] tensor_parallel.py:33 - start broadcast mp parameters
-[2024-12-24 21:20:33,330] [    INFO] tensor_parallel.py:50 - mp's parameters is ready
-I1224 21:20:33.333540 104202 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 21:20:33.333562 104202 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-[32m[2024-12-24 21:20:33,333] [    INFO][0m - Starting training from resume_from_checkpoint : None[0m
-[2024-12-24 21:20:35,687] [    INFO] tensor_parallel.py:33 - start broadcast mp parameters
-[2024-12-24 21:20:35,698] [    INFO] tensor_parallel.py:50 - mp's parameters is ready
-[2024-12-24 21:20:35,699] [ WARNING] hybrid_parallel_optimizer.py:313 - While using ClipGradByGlobalNorm in TensorParallel, PipelineParallel or Sharding, the grad clip of original optimizer will be changed.
-[32m[2024-12-24 21:20:35,709] [    INFO][0m - [timelog] checkpoint loading time: 0.00s (2024-12-24 21:20:35) [0m
-[32m[2024-12-24 21:20:35,709] [    INFO][0m - ***** Running training *****[0m
-[32m[2024-12-24 21:20:35,709] [    INFO][0m -   Num examples = 728[0m
-[32m[2024-12-24 21:20:35,709] [    INFO][0m -   Num Epochs = 2[0m
-[32m[2024-12-24 21:20:35,709] [    INFO][0m -   Instantaneous batch size per device = 1[0m
-[32m[2024-12-24 21:20:35,709] [    INFO][0m -   Total train batch size (w. parallel, distributed & accumulation) = 8[0m
-[32m[2024-12-24 21:20:35,709] [    INFO][0m -   Gradient Accumulation steps = 8[0m
-[32m[2024-12-24 21:20:35,709] [    INFO][0m -   Total optimization steps = 100[0m
-[32m[2024-12-24 21:20:35,709] [    INFO][0m -   Total num train samples = 800[0m
-[35m[2024-12-24 21:20:35,711] [   DEBUG][0m -   Number of trainable parameters = 1,004,015,616 (per device)[0m
-[35m[2024-12-24 21:20:35,716] [   DEBUG][0m -   Number of trainable parameters = 8,032,124,928 (all devices, roughly)[0m
-Exception in thread Thread-2:
-Traceback (most recent call last):
-  File "/root/miniconda3/envs/lugim/lib/python3.9/threading.py", line 980, in _bootstrap_inner
-    self.run()
-  File "/root/miniconda3/envs/lugim/lib/python3.9/threading.py", line 917, in run
-    self._target(*self._args, **self._kwargs)
-  File "/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/io/dataloader/dataloader_iter.py", line 245, in _thread_loop
-    batch = self._dataset_fetcher.fetch(
-  File "/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/io/dataloader/fetcher.py", line 85, in fetch
-    data = self.collate_fn(data)
-  File "/root/paddlejob/workspace/env_run/output/lugim/PaddleNLP1/paddlenlp/trl/trl_data.py", line 223, in preference_collate_fn
-    for key in input_dict:
-RuntimeError: dictionary keys changed during iteration
-/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/base/framework.py:654: UserWarning: PaddlePaddle version 2.3.0 or higher is required, but 0.0.0 installed, Maybe you are using a develop version, please make sure the version is good with your code.
-No module named paddleslim_ops, please install if you need.
-[33m[2024-12-24 21:23:40,959] [ WARNING][0m - sharding_parallel_degree=1 means no sharding, please set sharding to empty![0m
-[2024-12-24 21:23:40,960] [    INFO] distributed_strategy.py:333 - distributed strategy initialized
-======================= Modified FLAGS detected =======================
-FLAGS(name='FLAGS_cusolver_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cusolver/lib', default_value='')
-FLAGS(name='FLAGS_cusparse_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cusparse/lib', default_value='')
-FLAGS(name='FLAGS_curand_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/curand/lib', default_value='')
-FLAGS(name='FLAGS_nvidia_package_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia', default_value='')
-FLAGS(name='FLAGS_enable_pir_in_executor', current_value=True, default_value=False)
-FLAGS(name='FLAGS_selected_gpus', current_value='2', default_value='')
-FLAGS(name='FLAGS_cudnn_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cudnn/lib', default_value='')
-FLAGS(name='FLAGS_cublas_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cublas/lib', default_value='')
-FLAGS(name='FLAGS_cupti_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/cuda_cupti/lib', default_value='')
-FLAGS(name='FLAGS_nccl_dir', current_value='/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/../nvidia/nccl/lib', default_value='')
-=======================================================================
-I1224 21:23:40.962271 108013 tcp_utils.cc:130] Successfully connected to 10.174.138.88:54341
-I1224 21:23:40.962546 108013 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 21:23:40.962565 108013 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-[2024-12-24 21:23:40,962] [    INFO] topology.py:375 - Total 8 pipe comm group(s) create successfully!
-W1224 21:23:40.964319 108013 gpu_resources.cc:119] Please NOTE: device: 2, GPU Compute Capability: 8.0, Driver API Version: 12.0, Runtime API Version: 11.8
-W1224 21:23:40.965055 108013 gpu_resources.cc:164] device: 2, cuDNN Version: 8.6.
-/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/distributed/communication/group.py:128: UserWarning: Current global rank 2 is not in group _default_pg12
-[2024-12-24 21:23:43,212] [    INFO] topology.py:375 - Total 8 data comm group(s) create successfully!
-I1224 21:23:43.212862 108013 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 21:23:43.212885 108013 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-[2024-12-24 21:23:43,212] [    INFO] topology.py:375 - Total 1 model comm group(s) create successfully!
-[2024-12-24 21:23:43,212] [    INFO] topology.py:375 - Total 8 sharding comm group(s) create successfully!
-I1224 21:23:43.213047 108013 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 21:23:43.213050 108013 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-I1224 21:23:43.213073 108013 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 21:23:43.213076 108013 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-[2024-12-24 21:23:43,213] [    INFO] topology.py:295 - HybridParallelInfo: rank_id: 2, mp_degree: 8, sharding_degree: 1, pp_degree: 1, dp_degree: 1, sep_degree: 1, mp_group: [0, 1, 2, 3, 4, 5, 6, 7],  sharding_group: [2], pp_group: [2], dp_group: [2], sep:group: None, check/clip group: [0, 1, 2, 3, 4, 5, 6, 7]
-[32m[2024-12-24 21:23:43,213] [    INFO][0m -     +==============================================================================+
-    |                                                                              |
-    |                         DistributedStrategy Overview                         |
-    |                                                                              |
-    +==============================================================================+
-    |                        a_sync=True <-> a_sync_configs                        |
-    +------------------------------------------------------------------------------+
-    |                               k_steps                    -1                  |
-    |                     max_merge_var_num                    1                   |
-    |                       send_queue_size                    16                  |
-    |               independent_recv_thread                  False                 |
-    |         min_send_grad_num_before_recv                    1                   |
-    |                      thread_pool_size                    1                   |
-    |                       send_wait_times                    1                   |
-    |               runtime_split_send_recv                  False                 |
-    |                        launch_barrier                   True                 |
-    |             heter_worker_device_guard                   cpu                  |
-    |                        lr_decay_steps                    10                  |
-    |                            use_ps_gpu                    0                   |
-    |                         use_gpu_graph                    0                   |
-    +==============================================================================+
-    |                    Environment Flags, Communication Flags                    |
-    +------------------------------------------------------------------------------+
-    |                                  mode                    1                   |
-    |                               elastic                  False                 |
-    |                                  auto                  False                 |
-    |                   sync_nccl_allreduce                   True                 |
-    |                         nccl_comm_num                    1                   |
-    |            use_hierarchical_allreduce                  False                 |
-    |   hierarchical_allreduce_inter_nranks                    1                   |
-    |                       sync_batch_norm                  False                 |
-    |                   fuse_all_reduce_ops                   True                 |
-    |                  fuse_grad_size_in_MB                    32                  |
-    |              fuse_grad_size_in_TFLOPS                   50.0                 |
-    |               cudnn_exhaustive_search                  False                 |
-    |             conv_workspace_size_limit                   512                  |
-    |    cudnn_batchnorm_spatial_persistent                  False                 |
-    |                        fp16_allreduce                  False                 |
-    |               last_comm_group_size_MB                   1.0                  |
-    |                find_unused_parameters                  False                 |
-    |            without_graph_optimization                   True                 |
-    |                 fuse_grad_size_in_num                    8                   |
-    |                 calc_comm_same_stream                  False                 |
-    |                                   asp                  False                 |
-    |                       fuse_grad_merge                  False                 |
-    |                             semi_auto                  False                 |
-    |                            adam_d2sum                  False                 |
-    |                           auto_search                  False                 |
-    |                        heter_ccl_mode                  False                 |
-    |                         is_fl_ps_mode                  False                 |
-    |                      with_coordinator                  False                 |
-    |                            split_data                   True                 |
-    |                  downpour_table_param                    []                  |
-    |                       fs_client_param                                        |
-    +==============================================================================+
-    |                                Build Strategy                                |
-    +------------------------------------------------------------------------------+
-    |              fuse_elewise_add_act_ops                  False                 |
-    |                       fuse_bn_act_ops                  False                 |
-    |              fuse_relu_depthwise_conv                  False                 |
-    |                    fuse_broadcast_ops                  False                 |
-    |                fuse_all_optimizer_ops                  False                 |
-    |                        enable_inplace                  False                 |
-    |     enable_backward_optimizer_op_deps                   True                 |
-    |                 cache_runtime_context                  False                 |
-    |                   fuse_bn_add_act_ops                   True                 |
-    |                    enable_auto_fusion                  False                 |
-    |                          enable_addto                  False                 |
-    |              allow_cuda_graph_capture                  False                 |
-    |                       reduce_strategy                    0                   |
-    |                    fuse_gemm_epilogue                  False                 |
-    |                   debug_graphviz_path                                        |
-    |                       fused_attention                  False                 |
-    |                     fused_feedforward                  False                 |
-    |            fuse_dot_product_attention                  False                 |
-    |                          fuse_resunit                  False                 |
-    +==============================================================================+
-[0m
-[32m[2024-12-24 21:23:43,214] [    INFO][0m - The default value for the training argument `--report_to` will change in v5 (from all installed integrations to none). In v5, you will need to use `--report_to all` to get the same behavior as now. You should start updating your code and make this info disappear :-).[0m
-[32m[2024-12-24 21:23:43,215] [    INFO][0m - The global seed is set to 42, local seed is set to 52 and random seed is set to 42.[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - ============================================================[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m -      Model Configuration Arguments      [0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - paddle commit id              : 2a3c9b9dc2fb1fdecaaa6355ed3b72723214d872[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - paddlenlp commit id           : 801682de722abea56fe1c4ab21874bf6157c54a3.dirty[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - flash_mask                    : True[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - fuse_attention_ffn            : None[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - fuse_attention_qkv            : None[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - lora_alpha                    : -1[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - lora_path                     : None[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - lora_plus_scale               : 1.0[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - lora_rank                     : 8[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - model_name_or_path            : meta-llama/Meta-Llama-3-8B[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - rslora                        : False[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - rslora_plus                   : False[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - tokenizer_name_or_path        : None[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - use_quick_lora                : True[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - weight_quantize_algo          : None[0m
-[35m[2024-12-24 21:23:43,216] [   DEBUG][0m - [0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - ============================================================[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m -       Data Configuration Arguments      [0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - paddle commit id              : 2a3c9b9dc2fb1fdecaaa6355ed3b72723214d872[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - paddlenlp commit id           : 801682de722abea56fe1c4ab21874bf6157c54a3.dirty[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - dev_dataset_path              : ./data/dev.jsonl[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - greedy_zero_padding           : False[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - max_prompt_len                : 2048[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - max_seq_len                   : 4096[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - train_dataset_path            : ./data/train.jsonl[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - [0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - ============================================================[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m -    KTOConfig Configuration Arguments    [0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - paddle commit id              : 2a3c9b9dc2fb1fdecaaa6355ed3b72723214d872[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - paddlenlp commit id           : 801682de722abea56fe1c4ab21874bf6157c54a3.dirty[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - beta                          : 0.1[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - desirable_weight              : 1.0[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - lora                          : False[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - undesirable_weight            : 1.0[0m
-[35m[2024-12-24 21:23:43,217] [   DEBUG][0m - [0m
-[33m[2024-12-24 21:23:43,218] [ WARNING][0m - Process rank: 2, device: gpu, world_size: 8, distributed training: True, 16-bits training: True[0m
-[32m[2024-12-24 21:23:43,218] [    INFO][0m - Start to load model & tokenizer.[0m
-[32m[2024-12-24 21:23:43,218] [    INFO][0m - We are using <class 'paddlenlp.transformers.llama.modeling.LlamaForCausalLM'> to load 'meta-llama/Meta-Llama-3-8B'.[0m
-[32m[2024-12-24 21:23:43,219] [    INFO][0m - Loading configuration file /root/.paddlenlp/models/meta-llama/Meta-Llama-3-8B/config.json[0m
-[32m[2024-12-24 21:23:43,220] [    INFO][0m - Loading weights file from cache at /root/.paddlenlp/models/meta-llama/Meta-Llama-3-8B/model.safetensors.index.json[0m
-Downloading shards:   0%|          | 0/4 [00:00<?, ?it/s]Downloading shards: 100%|██████████| 4/4 [00:00<00:00, 43804.74it/s]
-Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:01<00:03,  1.11s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:02<00:02,  1.17s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [00:03<00:01,  1.17s/it]Loading checkpoint shards: 100%|██████████| 4/4 [00:03<00:00,  1.18it/s]Loading checkpoint shards: 100%|██████████| 4/4 [00:03<00:00,  1.04it/s]
-[32m[2024-12-24 21:23:48,901] [    INFO][0m - All model checkpoint weights were used when initializing LlamaForCausalLM.
-[0m
-[32m[2024-12-24 21:23:48,902] [    INFO][0m - All the weights of LlamaForCausalLM were initialized from the model checkpoint at meta-llama/Meta-Llama-3-8B.
-If your task is similar to the task the model of the checkpoint was trained on, you can already use LlamaForCausalLM for predictions without further training.[0m
-[32m[2024-12-24 21:23:48,903] [    INFO][0m - Loading configuration file /root/.paddlenlp/models/meta-llama/Meta-Llama-3-8B/generation_config.json[0m
-[32m[2024-12-24 21:23:48,903] [    INFO][0m - Loading configuration file /root/.paddlenlp/models/meta-llama/Meta-Llama-3-8B/config.json[0m
-[32m[2024-12-24 21:23:50,686] [    INFO][0m - Loading model & tokenizer successfully ![0m
-[32m[2024-12-24 21:23:50,686] [    INFO][0m - Start to create dataset[0m
-[32m[2024-12-24 21:24:14,741] [    INFO][0m - Creating train Zero Padding Data Stream. This may take a few minutes.[0m
-[32m[2024-12-24 21:24:45,402] [    INFO][0m - Creating dev Zero Padding Data Stream. This may take a few minutes.[0m
-[32m[2024-12-24 21:24:52,084] [    INFO][0m - Creating dataset successfully ...[0m
-[32m[2024-12-24 21:24:52,084] [    INFO][0m - The global seed is set to 42, local seed is set to 52 and random seed is set to 42.[0m
-[32m[2024-12-24 21:24:52,214] [    INFO][0m - max_steps is given, it will override any value given in num_train_epochs[0m
-[32m[2024-12-24 21:24:52,214] [    INFO][0m - Using half precision[0m
-[35m[2024-12-24 21:24:52,255] [   DEBUG][0m - ============================================================[0m
-[35m[2024-12-24 21:24:52,255] [   DEBUG][0m -     Training Configuration Arguments    [0m
-[35m[2024-12-24 21:24:52,255] [   DEBUG][0m - paddle commit id              : 2a3c9b9dc2fb1fdecaaa6355ed3b72723214d872[0m
-[35m[2024-12-24 21:24:52,255] [   DEBUG][0m - paddlenlp commit id           : 801682de722abea56fe1c4ab21874bf6157c54a3.dirty[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - _no_sync_in_gradient_accumulation: True[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - adam_beta1                    : 0.9[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - adam_beta2                    : 0.999[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - adam_epsilon                  : 1e-08[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - amp_custom_black_list         : None[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - amp_custom_white_list         : None[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - amp_master_grad               : False[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - auto_parallel_resume_form_hybrid_parallel: False[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - autotuner_benchmark           : False[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - benchmark                     : False[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - bf16                          : True[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - bf16_full_eval                : False[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - ckpt_quant_stage              : O0[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - context_parallel_degree       : 1[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - current_device                : gpu:2[0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - data_parallel_config          : [0m
-[35m[2024-12-24 21:24:52,256] [   DEBUG][0m - data_parallel_degree          : 1[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - data_parallel_rank            : 0[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - dataloader_drop_last          : False[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - dataloader_num_workers        : 0[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - dataset_rank                  : 0[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - dataset_world_size            : 1[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - ddp_find_unused_parameters    : None[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - device                        : gpu[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - disable_tqdm                  : True[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - distributed_dataloader        : False[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - do_eval                       : True[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - do_export                     : False[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - do_predict                    : False[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - do_train                      : True[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - enable_auto_parallel          : False[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - eval_accumulation_steps       : None[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - eval_batch_size               : 1[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - eval_steps                    : 100[0m
-[35m[2024-12-24 21:24:52,257] [   DEBUG][0m - evaluation_strategy           : IntervalStrategy.STEPS[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - expert_max_capacity           : 4294967296[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - expert_min_capacity           : 1[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - flatten_param_grads           : False[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - force_reshard_pp              : False[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - fp16                          : False[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - fp16_full_eval                : False[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - fp16_opt_level                : O2[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - fuse_sequence_parallel_allreduce: False[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - gradient_accumulation_steps   : 8[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - greater_is_better             : False[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - hybrid_parallel_topo_order    : pp_first[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - ignore_data_skip              : False[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - ignore_load_lr_and_optim      : False[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - ignore_save_lr_and_optim      : False[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - label_names                   : None[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - lazy_data_processing          : False[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - learning_rate                 : 2e-06[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - load_best_model_at_end        : True[0m
-[35m[2024-12-24 21:24:52,258] [   DEBUG][0m - load_sharded_model            : False[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - local_process_index           : 2[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - local_rank                    : 2[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - log_level                     : -1[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - log_level_replica             : -1[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - log_on_each_node              : True[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - logging_dir                   : ./checkpoints/dpo_ckpts/runs/Dec24_21-23-40_bddwd-inf-k8s-a100-a12ni6-0528.bddwd.baidu.com[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - logging_first_step            : False[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - logging_steps                 : 1[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - logging_strategy              : IntervalStrategy.STEPS[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - logical_process_index         : 2[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - lr_end                        : 1e-07[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - lr_scheduler_type             : SchedulerType.LINEAR[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - max_evaluate_steps            : -1[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - max_grad_norm                 : 1.0[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - max_steps                     : 100[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - metric_for_best_model         : loss[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - minimum_eval_times            : None[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - no_cuda                       : False[0m
-[35m[2024-12-24 21:24:52,259] [   DEBUG][0m - no_recompute_layers           : None[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - num_cycles                    : 0.5[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - num_train_epochs              : 1[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - offload_optim                 : False[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - optim                         : OptimizerNames.ADAMW[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - optimizer_name_suffix         : tp02[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - ordered_save_group_size       : 0[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - output_dir                    : ./checkpoints/dpo_ckpts[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - output_signal_dir             : ./checkpoints/dpo_ckpts[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - overwrite_output_dir          : False[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - past_index                    : -1[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - per_device_eval_batch_size    : 1[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - per_device_train_batch_size   : 1[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - pipeline_parallel_config      : [0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - pipeline_parallel_degree      : 1[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - pipeline_parallel_rank        : 0[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - power                         : 1.0[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - pp_recompute_interval         : 1[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - prediction_loss_only          : False[0m
-[35m[2024-12-24 21:24:52,260] [   DEBUG][0m - process_index                 : 2[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - recompute                     : False[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - recompute_granularity         : full[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - recompute_use_reentrant       : False[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - refined_recompute             : [0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - release_grads                 : False[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - remove_unused_columns         : True[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - report_to                     : ['visualdl'][0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - resume_from_checkpoint        : None[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - run_name                      : ./checkpoints/dpo_ckpts[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - save_on_each_node             : False[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - save_sharded_model            : False[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - save_steps                    : 500[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - save_strategy                 : IntervalStrategy.STEPS[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - save_total_limit              : None[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - scale_loss                    : 32768[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - seed                          : 42[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - sep_parallel_degree           : 1[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - sequence_parallel             : False[0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - sequence_parallel_config      : [0m
-[35m[2024-12-24 21:24:52,261] [   DEBUG][0m - sharding                      : [][0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - sharding_comm_buffer_size_MB  : -1[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - sharding_degree               : -1[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - sharding_parallel_config      : [0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - sharding_parallel_degree      : 1[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - sharding_parallel_mesh_dimension: dp[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - sharding_parallel_rank        : 0[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - should_load_dataset           : True[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - should_load_sharding_stage1_model: False[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - should_log                    : False[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - should_save                   : False[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - should_save_model_state       : True[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - should_save_sharding_stage1_model: False[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - skip_data_intervals           : None[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - skip_memory_metrics           : True[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - skip_profile_timer            : True[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - skip_recompute_ops            : None[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - tensor_parallel_config        : [0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - tensor_parallel_degree        : 8[0m
-[35m[2024-12-24 21:24:52,262] [   DEBUG][0m - tensor_parallel_output        : True[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - tensor_parallel_rank          : 2[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - to_static                     : False[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - train_batch_size              : 1[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - unified_checkpoint            : True[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - unified_checkpoint_config     : [''][0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - use_async_save                : False[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - use_expert_parallel           : False[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - use_flash_attention           : True[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - use_fused_dropout_add         : False[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - use_fused_linear              : False[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - use_fused_rms_norm            : False[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - use_fused_rope                : False[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - use_hybrid_parallel           : True[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - virtual_pp_degree             : 1[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - wandb_api_key                 : None[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - warmup_ratio                  : 0.0[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - warmup_steps                  : 10[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - weight_decay                  : 0.0[0m
-[35m[2024-12-24 21:24:52,263] [   DEBUG][0m - weight_name_suffix            : tp02[0m
-[35m[2024-12-24 21:24:52,264] [   DEBUG][0m - world_size                    : 8[0m
-[35m[2024-12-24 21:24:52,264] [   DEBUG][0m - [0m
-[2024-12-24 21:24:52,320] [    INFO] tensor_parallel.py:33 - start broadcast mp parameters
-[2024-12-24 21:24:59,372] [    INFO] tensor_parallel.py:50 - mp's parameters is ready
-I1224 21:24:59.374883 108013 process_group_nccl.cc:151] ProcessGroupNCCL pg_timeout_ 1800000
-I1224 21:24:59.374905 108013 process_group_nccl.cc:152] ProcessGroupNCCL nccl_comm_init_option_ 0
-[32m[2024-12-24 21:24:59,375] [    INFO][0m - Starting training from resume_from_checkpoint : None[0m
-[2024-12-24 21:25:03,229] [    INFO] tensor_parallel.py:33 - start broadcast mp parameters
-[2024-12-24 21:25:03,240] [    INFO] tensor_parallel.py:50 - mp's parameters is ready
-[2024-12-24 21:25:03,241] [ WARNING] hybrid_parallel_optimizer.py:313 - While using ClipGradByGlobalNorm in TensorParallel, PipelineParallel or Sharding, the grad clip of original optimizer will be changed.
-[32m[2024-12-24 21:25:03,241] [    INFO][0m - [timelog] checkpoint loading time: 0.00s (2024-12-24 21:25:03) [0m
-[32m[2024-12-24 21:25:03,241] [    INFO][0m - ***** Running training *****[0m
-[32m[2024-12-24 21:25:03,241] [    INFO][0m -   Num examples = 728[0m
-[32m[2024-12-24 21:25:03,241] [    INFO][0m -   Num Epochs = 2[0m
-[32m[2024-12-24 21:25:03,241] [    INFO][0m -   Instantaneous batch size per device = 1[0m
-[32m[2024-12-24 21:25:03,241] [    INFO][0m -   Total train batch size (w. parallel, distributed & accumulation) = 8[0m
-[32m[2024-12-24 21:25:03,241] [    INFO][0m -   Gradient Accumulation steps = 8[0m
-[32m[2024-12-24 21:25:03,242] [    INFO][0m -   Total optimization steps = 100[0m
-[32m[2024-12-24 21:25:03,242] [    INFO][0m -   Total num train samples = 800[0m
-[35m[2024-12-24 21:25:03,244] [   DEBUG][0m -   Number of trainable parameters = 1,004,015,616 (per device)[0m
-[35m[2024-12-24 21:25:03,244] [   DEBUG][0m -   Number of trainable parameters = 8,032,124,928 (all devices, roughly)[0m
-Exception in thread Thread-2:
-Traceback (most recent call last):
-  File "/root/miniconda3/envs/lugim/lib/python3.9/threading.py", line 980, in _bootstrap_inner
-    self.run()
-  File "/root/miniconda3/envs/lugim/lib/python3.9/threading.py", line 917, in run
-    self._target(*self._args, **self._kwargs)
-  File "/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/io/dataloader/dataloader_iter.py", line 285, in _thread_loop
-    raise e
-  File "/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/io/dataloader/dataloader_iter.py", line 270, in _thread_loop
-    Traceback (most recent call last):
-  File "/root/paddlejob/workspace/env_run/output/lugim/PaddleNLP1/llm/./alignment/kto/run_kto.py", line 285, in <module>
-    main()
-  File "/root/paddlejob/workspace/env_run/output/lugim/PaddleNLP1/llm/./alignment/kto/run_kto.py", line 248, in main
-    train_result = trainer.train(resume_from_checkpoint=last_checkpoint)
-  File "/root/paddlejob/workspace/env_run/output/lugim/PaddleNLP1/paddlenlp/trainer/trainer.py", line 876, in train
-    return self._inner_training_loop(
-  File "/root/paddlejob/workspace/env_run/output/lugim/PaddleNLP1/paddlenlp/trainer/trainer.py", line 1006, in _inner_training_loop
-    for step, inputs in enumerate(epoch_iterator):
-  File "/root/miniconda3/envs/lugim/lib/python3.9/site-packages/paddle/io/dataloader/dataloader_iter.py", line 301, in __next__
-    self._reader.read_next_list()[0]
-SystemError: (Fatal) Blocking queue is killed because the data reader raises an exception.
-  [Hint: Expected killed_ != true, but received killed_:1 == true:1.] (at ../paddle/phi/core/operators/reader/blocking_queue.h:179)
-
-tmp.set(slot, core.CPUPlace())
-ValueError: (InvalidArgument) Input object type error or incompatible array data type. tensor.set() supports array with bool, float16, float32, float64, int8, int16, int32, int64, uint8 or uint16, please check your input or input array data type. (at ../paddle/fluid/pybind/tensor_py.h:569)
-
