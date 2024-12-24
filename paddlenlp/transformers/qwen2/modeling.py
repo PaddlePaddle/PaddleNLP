@@ -447,8 +447,7 @@ class Qwen2MLP(nn.Layer):
             else:
                 x, y = x.chunk(2, axis=-1)
         else:
-            x = self.gate_proj(x)
-            y = self.up_proj(x)
+            x, y = self.gate_proj(x), self.up_proj(x)
 
         if self.fuse_swiglu:
             x = self.act_fn(x, y)
