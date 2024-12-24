@@ -25,8 +25,8 @@ from typing import Optional, Tuple
 
 import regex as re
 
-from paddlenlp.utils.log import logger
 from paddlenlp.transformers.tokenizer_utils import AddedToken, PretrainedTokenizer
+from paddlenlp.utils.log import logger
 
 VOCAB_FILES_NAMES = {
     "vocab_file": "vocab.json",
@@ -134,8 +134,7 @@ class AquilaTokenizer(PretrainedTokenizer):
     max_model_input_sizes = MAX_MODEL_INPUT_SIZES
 
     pretrained_resource_files_map = {
-        "vocab_file": {
-        },
+        "vocab_file": {},
     }
 
     def __init__(

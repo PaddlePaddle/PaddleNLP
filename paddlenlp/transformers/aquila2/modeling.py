@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# modified from PaddleNLP https://github.com/PaddlePaddle/PaddleNLP/blob/7947bca07f0dfb37172a4c0040defd0cdbbc10a0/paddlenlp/transformers/llama/modeling.py 
+# modified from PaddleNLP https://github.com/PaddlePaddle/PaddleNLP/blob/7947bca07f0dfb37172a4c0040defd0cdbbc10a0/paddlenlp/transformers/llama/modeling.py
 
 """Paddle Aquila model"""
 from __future__ import annotations
@@ -58,22 +58,22 @@ try:
 except:
     pass
 
+from paddlenlp.transformers import linear_utils
 from paddlenlp.transformers.conversion_utils import (
     StateDictNameMapping,
     init_name_mappings,
 )
+from paddlenlp.transformers.linear_utils import Linear
 from paddlenlp.transformers.long_sequence_strategies import LongSequenceStrategies
 from paddlenlp.transformers.model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
     CausalLMOutputWithCrossAttentions,
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+from paddlenlp.transformers.segment_parallel_utils import ReshardLayer
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
 
-from paddlenlp.transformers import linear_utils
-from paddlenlp.transformers.linear_utils import Linear
-from paddlenlp.transformers.segment_parallel_utils import ReshardLayer
 from .configuration import (
     AQUILA_PRETRAINED_INIT_CONFIGURATION,
     AQUILA_PRETRAINED_RESOURCE_FILES_MAP,
@@ -1813,7 +1813,7 @@ class AquilaForCausalLM(AquilaPretrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.config = config
-        self.config['model_type'] = 'aquila'
+        self.config["model_type"] = "aquila"
         self.aquila = AquilaModel(config)
         self.lm_head = AquilaLMHead(config)
         self.criterion = AquilaPretrainingCriterion(config)

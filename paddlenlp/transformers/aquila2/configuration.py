@@ -25,14 +25,10 @@ __all__ = [
     "AQUILA_PRETRAINED_RESOURCE_FILES_MAP",
 ]
 
-AQUILA_PRETRAINED_INIT_CONFIGURATION = {
-    
-}
+AQUILA_PRETRAINED_INIT_CONFIGURATION = {}
 
 AQUILA_PRETRAINED_RESOURCE_FILES_MAP = {
-    "model_state": {
-        
-    },
+    "model_state": {},
 }
 
 
