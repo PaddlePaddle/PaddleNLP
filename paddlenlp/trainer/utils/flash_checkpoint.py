@@ -39,7 +39,7 @@ from paddlenlp.utils.env import (
     TRAINER_STATE_NAME,
     TRAINING_ARGS_NAME,
 )
-from paddlenlp.utils.fault_tolerance import FC_DUMP_ERROR
+from paddlenlp.utils.fault_tolerance import FC_DUMP_ERROR, PC_DUMP_ERROR
 from paddlenlp.utils.log import logger
 
 
@@ -300,7 +300,7 @@ class FlashCheckpointManager:
         for worker in self.workers:
             if worker.status.value == FCWorkerStatus.ERROR.value:
                 logger.error(f"[FC manager] Worker{worker.worker_id} encountered error.")
-                raise RuntimeError(f"{FC_DUMP_ERROR}")
+                raise RuntimeError(f"{PC_DUMP_ERROR}")
 
     def flash_checkpoint_pipeline_hook(self, hook_id):
         if self.current_worker is None:
@@ -450,7 +450,7 @@ class FlashCheckpointWorker:
                 self.process_dump_task_impl(self.flash_save_dir)
                 logger.info(f"[FC worker{self.worker_id}] Dumping to flash device done: {self.flash_save_dir}")
             except Exception as e:
-                logger.error(f"[FC worker{self.worker_id}] Failed to dump to flash device: {e}")
+                logger.error(f"{FC_DUMP_ERROR} [FC worker{self.worker_id}] Failed to dump to flash device: {e}")
         if self.persistent_save_dir:
             try:
                 self.process_dump_task_impl(self.persistent_save_dir)

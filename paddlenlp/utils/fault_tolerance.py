@@ -25,7 +25,10 @@ except ImportError:
     LOSS_INF_ERROR = "PaddleRecall error(104): LossInf"
 
 PDC_DOWNLOAD_ERROR = "PaddleRecall error(105): PDCDownloadError"
-FC_DUMP_ERROR = "PaddleRecall error(106): FCDumpError"
+# only warn msg
+FC_DUMP_ERROR = "PaddleRecall error(106): FlashCheckpointDumpError"
+# fatal error, must be fixed by babysitters
+PC_DUMP_ERROR = "PaddleRecall error(107): PersistentCheckpointDumpError"
 
 
 def is_ft_env():
