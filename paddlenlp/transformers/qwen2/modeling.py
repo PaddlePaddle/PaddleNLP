@@ -368,8 +368,10 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
 
 
 class Qwen2MLP(nn.Layer):
-    def __init__(self, config: Qwen2Config, is_shared=False, skip_recompute_ops={}):
+    def __init__(self, config: Qwen2Config, is_shared=False, skip_recompute_ops=None):
         super().__init__()
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
         self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
@@ -446,9 +448,10 @@ class Qwen2Attention(nn.Layer):
     and "Generating Long Sequences with Sparse Transformers".
     """
 
-    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = True, skip_recompute_ops={}):
+    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = True, skip_recompute_ops=None):
         super().__init__()
-
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
         self.config = config
         self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
@@ -654,8 +657,10 @@ class Qwen2Attention(nn.Layer):
 
 
 class Qwen2DecoderLayer(nn.Layer):
-    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = False, skip_recompute_ops={}):
+    def __init__(self, config: Qwen2Config, layerwise_recompute: bool = False, skip_recompute_ops=None):
         super().__init__()
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
         self.config = config
         self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size

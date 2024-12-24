@@ -605,8 +605,10 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
 
 
 class LlamaMLP(nn.Layer):
-    def __init__(self, config, skip_recompute_ops={}):
+    def __init__(self, config, skip_recompute_ops=None):
         super().__init__()
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
         self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
@@ -683,8 +685,10 @@ class LlamaMLP(nn.Layer):
 class LlamaAttention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config: LlamaConfig, layerwise_recompute: bool = False, skip_recompute_ops={}):
+    def __init__(self, config: LlamaConfig, layerwise_recompute: bool = False, skip_recompute_ops=None):
         super().__init__()
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
         self.skip_recompute_ops = skip_recompute_ops
         self.config = config
         self.hidden_size = config.hidden_size
@@ -1165,9 +1169,11 @@ class LlamaAttention(nn.Layer):
 
 
 class LlamaDecoderLayer(nn.Layer):
-    def __init__(self, config, layerwise_recompute: bool = False, skip_recompute_ops={}):
+    def __init__(self, config, layerwise_recompute: bool = False, skip_recompute_ops=None):
         super().__init__()
         self.config = config
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
         self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
         self.self_attn = LlamaAttention(config, layerwise_recompute, skip_recompute_ops=skip_recompute_ops)

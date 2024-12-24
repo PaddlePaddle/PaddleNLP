@@ -138,8 +138,10 @@ def get_triangle_upper_mask(x, mask=None):
 
 
 class QWenAttention(nn.Layer):
-    def __init__(self, config, skip_recompute_ops={}):
+    def __init__(self, config, skip_recompute_ops=None):
         super().__init__()
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
         self.skip_recompute_ops = skip_recompute_ops
         self.config = config
         self.seq_length = config.seq_length
@@ -409,8 +411,10 @@ class QWenAttention(nn.Layer):
 
 
 class QWenMLP(nn.Layer):
-    def __init__(self, config, skip_recompute_ops={}):
+    def __init__(self, config, skip_recompute_ops=None):
         super().__init__()
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
         ff_dim_in = config.intermediate_size // 2
         self.fuse_attention_ffn = config.fuse_attention_ffn
         self.skip_recompute_ops = skip_recompute_ops
@@ -485,8 +489,10 @@ class QWenMLP(nn.Layer):
 
 
 class QWenBlock(nn.Layer):
-    def __init__(self, config, skip_recompute_ops={}):
+    def __init__(self, config, skip_recompute_ops=None):
         super().__init__()
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
         self.sequence_parallel = config.sequence_parallel
         self.ln_1 = QWenRMSNorm(config)
         self.attn = QWenAttention(config, skip_recompute_ops=skip_recompute_ops)
