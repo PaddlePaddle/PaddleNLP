@@ -25,6 +25,7 @@ import regex as re
 
 from ...utils.log import logger
 from .. import AddedToken, PretrainedTokenizer
+from ..tokenizer_utils_base import TextInput
 
 VOCAB_FILES_NAMES = {
     "vocab_file": "vocab.json",
@@ -264,6 +265,9 @@ class Qwen2Tokenizer(PretrainedTokenizer):
         word = " ".join(word)
         self.cache[token] = word
         return word
+
+    def tokenize(self, text: TextInput, **kwargs) -> List[str]:
+        super().tokenize_without_strip(text, **kwargs)
 
     def _tokenize(self, text):
         """Tokenize a string."""

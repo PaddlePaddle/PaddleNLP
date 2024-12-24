@@ -24,6 +24,7 @@ from paddlenlp.transformers.convert_slow_tokenizer import import_protobuf
 
 from ...utils.log import logger
 from .. import PretrainedTokenizer
+from ..tokenizer_utils_base import TextInput
 
 __all__ = ["LlamaTokenizer", "Llama3Tokenizer"]
 
@@ -122,6 +123,9 @@ class LlamaTokenizer(PretrainedTokenizer):
         vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
         vocab.update(self.added_tokens_encoder)
         return vocab
+
+    def tokenize(self, text: TextInput, **kwargs) -> List[str]:
+        super().tokenize_without_strip(text, **kwargs)
 
     def _tokenize(self, text):
         """Returns a tokenized string."""
