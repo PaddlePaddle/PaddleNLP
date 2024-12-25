@@ -1,5 +1,5 @@
 {
-    "model_name_or_path": "meta-llama/Meta-Llama-3-8B",
+    "model_name_or_path": "Qwen/Qwen2-7B",
     "train_dataset_path": "./data/train.jsonl",
     "dev_dataset_path": "./data/dev.jsonl",
     "output_dir": "./checkpoints/kto_ckpts",

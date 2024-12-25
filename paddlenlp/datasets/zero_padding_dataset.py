@@ -67,14 +67,14 @@ class ZeroPadding:
             elif "response_1_labels" in input_keys and "response_0_labels" in input_keys:
                 batched_features["response_1_labels"].extend(record["response_1_labels"])
                 batched_features["response_0_labels"].extend(record["response_0_labels"])
-                response_indexs = []
-                for ii in range(3):
-                    response_indexs.append(record["response_indexs"][ii] + sequence_sum)
+                response_indexs = [
+                    ri + sequence_sum if i < 3 else ri for i, ri in enumerate(record["response_indexs"])
+                ]
                 batched_features["response_indexs"].append(response_indexs)
             elif "response_indexs" in input_keys:
-                response_indexs = []
-                for ii in range(3):
-                    response_indexs.append(record["response_indexs"][ii] + sequence_sum)
+                response_indexs = [
+                    ri + sequence_sum if i < 3 else ri for i, ri in enumerate(record["response_indexs"])
+                ]
                 batched_features["response_indexs"].append(response_indexs)
             else:
                 raise ValueError("labels is required for ZeroPadding Dataset")

@@ -183,7 +183,7 @@ python  run_finetune.py ./config/llama/pt_argument.json
 ...
 ```
 
-为了方便测试，我们也提供了广告生成数据集可以直接使用：
+为了方便测试，我们也提供了偏好数据集可以直接使用：
 
 ```bash
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
@@ -196,9 +196,60 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 # DPO 启动命令参考
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
+
+##### LoRA DPO
+
+```bash
+# DPO 启动命令参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
+```
 更多 DPO 技术细节和使用说明详见[DPO 文档](./docs/dpo.md)。
 
-#### 3.2 RLHF
+#### 3.2 KTO
+
+##### 数据准备
+
+我们支持的精调数据格式是每行包含一个字典的 json 文件，每个字典包含以下字段：
+
+- `src` : `str, List(str)`, 用户对话内容。
+- `tgt` : `str, List(str)`, 系统回复内容。
+- `response` : `str, List(str)`, 包含 resoinse 回复。
+- `sort` : `List(int)`, sort 值用于区分 response 属于 chosen 和 rejected（0是 rejected，1是 chosen）。
+
+样例数据：
+
+```text
+{
+    "src": ["In this task, you are given a second sentence. Your task is to generate the first sentence on the same topic but incoherent and inconsistent with the second sentence.\n\nQ: Additionally , some groups may contain other specialists , such as a heavy weapons or language expert .\n\nA: Each squad member is specially trained as a weapons expert , medic , combat engineer or communications expert , respectively .\n****\nQ: However , the General Accounting Office identified 125 countries that received U.S. training and assistance for their police forces during fiscal year 1990 at a cost of at least $117 million .\n\nA: No government agency is in charge of calculating the cost .\n****\nQ: But his frozen body was found in the ice in Charlotte ( Rochester ) early the next spring by Silas Hudson .\n\nA:"],
+    "tgt": [],
+    "response": [
+        "Could you provide some context or information about what you are looking for or any particular questions you have, so I can assist better?"],
+    "sort": [1]
+}
+...
+```
+
+为了方便测试，我们也提供了偏好数据集可以直接使用：
+
+```bash
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized_pointwise.tar.gz
+tar -zxvf ultrafeedback_binarized.tar.gz
+```
+
+##### 全参 KTO
+
+```bash
+# KTO 启动命令参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_argument.json
+```
+##### LoRA KTO
+
+```bash
+# KTO 启动命令参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_lora_argument.json
+```
+
+#### 3.3 RLHF
 
 飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF 文档](./docs/rlhf.md)。
 

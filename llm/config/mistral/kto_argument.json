@@ -1,5 +1,5 @@
 {
-    "model_name_or_path": "meta-llama/Meta-Llama-3-8B",
+    "model_name_or_path": "mistralai/Mistral-7B-Instruct-v0.3",
     "train_dataset_path": "./data/train.jsonl",
     "dev_dataset_path": "./data/dev.jsonl",
     "output_dir": "./checkpoints/kto_ckpts",
@@ -26,7 +26,6 @@
     "tensor_parallel_degree": 8,
     "sharding": "stage1",
     "use_flash_attention": true,
-    "flash_mask":true,
     "recompute": false,
     "recompute_granularity": "full",
     "beta": 0.1,

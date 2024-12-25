@@ -177,7 +177,6 @@ def preference_collate_fn(batch, max_seq_len=None, data_type="pairwaise"):
     """Convert batch data into tensor."""
     if max_seq_len is None:
         raise ValueError("max_seq_len is None.")
-
     input_dict = {
         "input_ids": [],
         "position_ids": [],
@@ -218,11 +217,11 @@ def preference_collate_fn(batch, max_seq_len=None, data_type="pairwaise"):
                     constant_values=False,
                 )
             )
-
         for ri in sequence["response_indexs"]:
             if data_type == "pairwise":
                 ri.pop()
-            input_dict["response_indexs"].append(ri.insert(i, 0))
+            ri.insert(i, 0)
+            input_dict["response_indexs"].append(ri)
     if data_type == "pairwise":
         input_dict["chosen_labels"] = input_dict.pop("response_0_labels")
         input_dict["rejected_labels"] = input_dict.pop("response_1_labels")
