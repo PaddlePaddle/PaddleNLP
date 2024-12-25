@@ -16,7 +16,7 @@
 
 ## 🛠️ 支持模型列表 🛠️
 
-| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO | RLHF | Mergekit | Quantization | Torch convert |
+| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO/KTO | RLHF | Mergekit | Quantization | Torch convert |
 |----------------------------------------|----------|-----|------|---------------|----------------|------|-------|--------------|---------------|
 | [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅             | ✅    | ✅    | ✅            | ✅             |
 | [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
@@ -154,7 +154,7 @@ python  run_finetune.py ./config/llama/pt_argument.json
 
 ### 3. 对齐
 
-我们支持 DPO、RLHF 等偏好对齐策略。DPO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
+我们支持 DPO、KTO、RLHF 等偏好对齐策略。DPO、KTO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
 
 #### 3.1 DPO
 
