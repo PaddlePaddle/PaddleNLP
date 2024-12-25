@@ -395,13 +395,13 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
                     ):
                         with switch_recompute_id_ctx(recompute_id + "@second"):
                             with paddle.autograd.saved_tensors_hooks(inner_pack, inner_unpack):
-                                unused_outputs = function(*args, **kwargs)  # noqa: F841
+                                function(*args, **kwargs)
 
         if x not in storage:
             raise Exception(
                 "Not supported to retrieve a tensor saved by autograd multiple times that is no need to recompute."
             )
-        return storage[x]
+        return storage.pop(x)
 
     with switch_recompute_id_ctx(recompute_id + "@first"):
         with paddle.autograd.saved_tensors_hooks(pack, unpack):
@@ -521,12 +521,14 @@ def get_skip_recompute_ops(config, layer_idx):
         pp_size = max(hcg.get_pipe_parallel_world_size(), 1)
     except:
         pp_size = 1
+    layer_num = config.num_layers if hasattr(config, "num_layers") else config.num_hidden_layers
+    if hasattr(config, "add_tail_layer") and config.add_tail_layer:
+        layer_num += 1
 
     for op_name, skip_num in config.refined_recompute.items():
         # is pp model
         if pp_size > 1:
             vp_size = max(config.virtual_pp_degree, 1)
-            layer_num = config.num_layers if hasattr(config, "num_layers") else config.num_hidden_layers
             no_recompute_layers = get_pp_vp_split_layers(layer_num, pp_size, vp_size, skip_num)
             if layer_idx in no_recompute_layers:
                 skip_recompute_ops[op_name] = True
