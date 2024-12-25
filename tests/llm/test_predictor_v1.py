@@ -83,7 +83,7 @@ def levenshtein_similarity(a, b):
 @parameterized_class(
     ["model_name_or_path", "model_class"],
     [
-        ["__internal_testing__/Qwen2.5-1.5B-Instruct", AutoModelForCausalLM],
+        ["Qwen/Qwen2.5-1.5B-Instruct", AutoModelForCausalLM],
     ],
 )
 class CommonParamInferenceTest(LLMTest, unittest.TestCase):
@@ -137,7 +137,7 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
 
 class CommonGpusInferenceTest(TestMultipleGpus, LLMTest):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"
-    model_name_or_path: str = "__internal_testing__/Qwen2.5-1.5B-Instruct"
+    model_name_or_path: str = "Qwen/Qwen2.5-1.5B-Instruct"
     model_class = AutoModelForCausalLM
 
     def setUp(self):
