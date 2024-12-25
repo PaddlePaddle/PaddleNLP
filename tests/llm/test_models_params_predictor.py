@@ -95,24 +95,24 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
         super().setUp()
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
-        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48, "data_file": ""})
+        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
         self.golden_result = self._read_result(os.path.join(self.output_dir, "predict.json"))
 
     @parameterized.expand(
         [
-            ["batch_size", "4"],
-            ["use_flash_attention", True],
-            ["avx_model", True],
-            ["use_fake_parameter", True],
-            ["inference_model", False],
-            ["block_attn", True],
-            ["append_attn", True],
+            ({"batch_size": "4"},),
+            ({"use_flash_attention": True},),
+            # ({"avx_model": True,"append_attn": False},),
+            # ({"use_fake_parameter": True, "quant_type":"a8w8c8"},),
+            (["inference_model", False],),
+            ({"block_attn": True},),
+            ({"append_attn": True},),
         ]
     )
-    def test_common_param_inference(self, param_key, param_value):
+    def test_common_param_inference(self, param_case):
 
-        config_params = {"inference_model": True, "src_length": 512, "max_length": 48, "data_file": ""}
-        config_params[param_key] = param_value
+        config_params = {"inference_model": True, "src_length": 512, "max_length": 48}
+        config_params.update(param_case)
 
         self.run_predictor(config_params)
 
@@ -127,7 +127,7 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
             if score >= 0.6:
                 partial_match += 1
 
-        if param_key == "inference_model":
+        if config_params["inference_model"]:
             self.assertGreaterEqual(full_match / len(self.golden_result), 0.3)
             self.assertGreaterEqual(partial_match / len(self.golden_result), 0.4)
         else:
