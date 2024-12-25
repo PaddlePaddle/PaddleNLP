@@ -28,17 +28,17 @@ from .testing_utils import LLMTest
 @parameterized_class(
     ["model_name_or_path", "model_class"],
     [
-        ["__internal_testing__/Qwen/Qwen2.5-1.5B-Instruct-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Qwen/Qwen2.5-7B-Instruct-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Qwen/Qwen2.5-14B-Instruct-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Qwen/Qwen1.5-MoE-A2.7B-Chat-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Qwen/Qwen2.5-72B-Instruct-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/meta-llama/Llama-2-7b-chat-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/meta-llama/Llama-2-13b-chat-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/meta-llama/Llama-2-70b-chat-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/meta-llama/Meta-Llama-3-8B-Instruct-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/meta-llama/Meta-Llama-3.1-8B-Instruct-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/meta-llama/Meta-Llama-3.1-70B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Qwen2.5-1.5B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Qwen2.5-7B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Qwen2.5-14B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Qwen1.5-MoE-A2.7B-Chat-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Qwen2.5-72B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Llama-2-7b-chat-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Llama-2-13b-chat-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Llama-2-70b-chat-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Meta-Llama-3-8B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Meta-Llama-3.1-8B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Meta-Llama-3.1-70B-Instruct-tiny-nhl1", AutoModelForCausalLM],
     ],
 )
 class CommonModelInferenceTest(LLMTest, unittest.TestCase):
@@ -83,7 +83,7 @@ def levenshtein_similarity(a, b):
 @parameterized_class(
     ["model_name_or_path", "model_class"],
     [
-        ["__internal_testing__/Qwen/Qwen2.5-1.5B-Instruct", AutoModelForCausalLM],
+        ["__internal_testing__/Qwen2.5-1.5B-Instruct", AutoModelForCausalLM],
     ],
 )
 class CommonParamInferenceTest(LLMTest, unittest.TestCase):
@@ -104,7 +104,7 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
             ({"use_flash_attention": True},),
             # ({"avx_model": True,"append_attn": False},),
             # ({"use_fake_parameter": True, "quant_type":"a8w8c8"},),
-            (["inference_model", False],),
+            ({"inference_model": False},),
             ({"block_attn": True},),
             ({"append_attn": True},),
         ]
@@ -127,7 +127,7 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
             if score >= 0.6:
                 partial_match += 1
 
-        if config_params["inference_model"]:
+        if not config_params["inference_model"]:
             self.assertGreaterEqual(full_match / len(self.golden_result), 0.3)
             self.assertGreaterEqual(partial_match / len(self.golden_result), 0.4)
         else:
@@ -137,7 +137,7 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
 
 class CommonGpusInferenceTest(TestMultipleGpus, LLMTest):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"
-    model_name_or_path: str = "__internal_testing__/Qwen/Qwen2.5-1.5B-Instruct"
+    model_name_or_path: str = "__internal_testing__/Qwen2.5-1.5B-Instruct"
     model_class = AutoModelForCausalLM
 
     def setUp(self):

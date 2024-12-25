@@ -23,7 +23,7 @@ from tests.llm.testing_utils import LLMTest
 
 class GpusInference(LLMTest, unittest.TestCase):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"
-    model_name_or_path: str = "__internal_testing__/Qwen/Qwen2.5-1.5B-Instruct"
+    model_name_or_path: str = "__internal_testing__/Qwen2.5-1.5B-Instruct"
     model_class = AutoModelForCausalLM
 
     def __init__(self):
