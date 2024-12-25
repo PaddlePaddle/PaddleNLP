@@ -173,7 +173,7 @@ def preprocess_preference_data(data, tokenizer, data_args, model_args):
     return output_dict
 
 
-def preference_collate_fn(batch, max_seq_len=None, data_type="pairwaise"):
+def preference_collate_fn(batch, max_seq_len=None, data_type="pairwise"):
     """Convert batch data into tensor."""
     if max_seq_len is None:
         raise ValueError("max_seq_len is None.")
@@ -219,9 +219,9 @@ def preference_collate_fn(batch, max_seq_len=None, data_type="pairwaise"):
             )
         for ri in sequence["response_indexs"]:
             if data_type == "pairwise":
-                ri.pop()
-            ri.insert(i, 0)
-            input_dict["response_indexs"].append(ri)
+                input_dict["response_indexs"].append([i] + ri[:-1])
+            else:
+                input_dict["response_indexs"].append([i] + ri)
     if data_type == "pairwise":
         input_dict["chosen_labels"] = input_dict.pop("response_0_labels")
         input_dict["rejected_labels"] = input_dict.pop("response_1_labels")
