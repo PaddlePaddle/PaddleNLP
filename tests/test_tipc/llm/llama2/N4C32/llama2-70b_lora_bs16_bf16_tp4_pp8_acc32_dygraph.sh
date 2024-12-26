@@ -15,15 +15,14 @@
 
 param="model_name_or_path=meta-llama/Llama-2-70b "
 param+="per_device_train_batch_size=1 "
-param+="tensor_parallel_degree=8 "
-param+="pipeline_parallel_degree=4 "
-param+="sharding_parallel_degree=1 "
+param+="tensor_parallel_degree=4 "
+param+="pipeline_parallel_degree=8 "
 param+="gradient_accumulation_steps=32 "
-param+="run_stage=dpo "
-param+="run_mode=tp8_pp1_sd4_acc32_dygraph "
+param+="run_stage=lora "
+param+="run_mode=tp4_pp8_acc32_dygraph "
 param+="device_num=N4C32 "
 param+="global_batch_size=16 "
-param+="model_item=llama2-70b_dpo "
+param+="model_item=llama2-70b_lora "
 
 cd ./tests
 bash ./test_tipc/llm/llama2/benchmark_common/prepare.sh
