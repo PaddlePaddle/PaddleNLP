@@ -105,7 +105,7 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
             ({"batch_size": "4"},),
             # ({"use_flash_attention": True},),
             # ({"avx_model": True,"append_attn": False},),
-            # ({"use_fake_parameter": True, "quant_type":"a8w8c8"},),
+            ({"use_fake_parameter": True, "quant_type": "a8w8c8"},),
             ({"inference_model": False},),
             # ({"block_attn": True},),
             ({"append_attn": True},),
@@ -132,6 +132,8 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
         if not config_params["inference_model"]:
             self.assertGreaterEqual(full_match / len(self.golden_result), 0.3)
             self.assertGreaterEqual(partial_match / len(self.golden_result), 0.4)
+        elif config_params["use_fake_parameter"]:
+            pass
         else:
             self.assertGreaterEqual(full_match / len(self.golden_result), 0.7)
             self.assertGreaterEqual(partial_match / len(self.golden_result), 0.9)
