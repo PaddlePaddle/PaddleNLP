@@ -50,7 +50,7 @@ class GpusInference(LLMTest, unittest.TestCase):
         fleet.get_hybrid_communicate_group()
 
     def run_inference(self, out_path):
-        config_params = {"inference_model": True, "max_length": 48, "output_file": out_path}
+        config_params = {"inference_model": True, "append_attn": True, "max_length": 48, "output_file": out_path}
         self.run_predictor(config_params)
 
     def tearDown(self):
