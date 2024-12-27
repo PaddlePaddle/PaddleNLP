@@ -24,6 +24,7 @@
     "bf16": true,
     "fp16_opt_level": "O2",
     "do_train": true,
+    "greedy_zero_padding": true,
     "do_eval": false,
     "disable_tqdm": true,
     "load_best_model_at_end": true,
