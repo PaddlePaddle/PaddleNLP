@@ -113,7 +113,6 @@ def main():
     if not training_args.autotuner_benchmark or model_args.weight_quantize_algo is not None:
         model = model_class.from_pretrained(**model_kwargs)
         # for KTO save
-        model.config.kto_config = None
         if not kto_config.lora:
             config = AutoConfig.from_pretrained(**model_kwargs)
             ref_model = model_class.from_config(config, dtype=dtype)
@@ -127,6 +126,7 @@ def main():
             ref_model = model_class.from_config(config, dtype=dtype)
         else:
             ref_model = None
+    model.config.kto_config = None
 
     if model_args.flash_mask and not model.config.use_flash_attention:
         logger.warning("`flash_mask` must use with zero padding and flash attention.")
