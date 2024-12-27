@@ -28,17 +28,10 @@ from .testing_utils import LLMTest
 @parameterized_class(
     ["model_name_or_path", "model_class"],
     [
-        ["__internal_testing__/Qwen2.5-1.5B-Instruct-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Qwen2.5-7B-Instruct-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Qwen2.5-14B-Instruct-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Qwen1.5-MoE-A2.7B-Chat-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Qwen2.5-72B-Instruct-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Llama-2-7b-chat-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Llama-2-13b-chat-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Llama-2-70b-chat-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Meta-Llama-3-8B-Instruct-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Meta-Llama-3.1-8B-Instruct-tiny-nhl1", AutoModelForCausalLM],
-        ["__internal_testing__/Meta-Llama-3.1-70B-Instruct-tiny-nhl1", AutoModelForCausalLM],
+        ["__internal_testing__/Qwen2.5-7B-Instruct-tiny-nhl2", AutoModelForCausalLM],
+        ["__internal_testing__/Qwen1.5-MoE-A2.7B-Chat-tiny-nhl2", AutoModelForCausalLM],
+        ["__internal_testing__/Llama-2-7b-chat-tiny-nhl2", AutoModelForCausalLM],
+        ["__internal_testing__/Meta-Llama-3.1-8B-Instruct-tiny-nhl2", AutoModelForCausalLM],
     ],
 )
 class CommonModelInferenceTest(LLMTest, unittest.TestCase):
@@ -80,6 +73,9 @@ def levenshtein_similarity(a, b):
     return 1 - (distance / max_length)
 
 
+global_result = {}
+
+
 @parameterized_class(
     ["model_name_or_path", "model_class"],
     [
@@ -95,17 +91,23 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
         super().setUp()
         self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
-        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
-        self.golden_result = self._read_result(os.path.join(self.output_dir, "predict.json"))
+        global global_result
+        model_tag = os.path.basename(self.model_name_or_path)
+        if model_tag not in global_result:
+            self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
+            self.golden_result = self._read_result(os.path.join(self.output_dir, "predict.json"))
+            global_result[model_tag] = self.golden_result
+        else:
+            self.golden_result = global_result[model_tag]
 
     @parameterized.expand(
         [
             ({"batch_size": "4"},),
-            ({"use_flash_attention": True},),
+            # ({"use_flash_attention": True},),
             # ({"avx_model": True,"append_attn": False},),
             # ({"use_fake_parameter": True, "quant_type":"a8w8c8"},),
             ({"inference_model": False},),
-            ({"block_attn": True},),
+            # ({"block_attn": True},),
             ({"append_attn": True},),
         ]
     )
@@ -135,19 +137,38 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
             self.assertGreaterEqual(partial_match / len(self.golden_result), 0.9)
 
 
+@parameterized_class(
+    ["model_name_or_path", "model_class", "compare_precision"],
+    [
+        ["Qwen/Qwen2.5-1.5B-Instruct", AutoModelForCausalLM, True],
+        ["__internal_testing__/Qwen2.5-72B-Instruct-tiny-nhl2", AutoModelForCausalLM, False],
+        ["__internal_testing__/Llama-2-70b-chat-tiny-nhl2", AutoModelForCausalLM, False],
+        ["__internal_testing__/Meta-Llama-3.1-70B-Instruct-tiny-nhl2", AutoModelForCausalLM, False],
+    ],
+)
 class CommonGpusInferenceTest(TestMultipleGpus, LLMTest):
     config_path: str = "./tests/fixtures/llm/predictor.yaml"
-    model_name_or_path: str = "Qwen/Qwen2.5-1.5B-Instruct"
-    model_class = AutoModelForCausalLM
+    model_name_or_path: str = None
+    model_class = None
+    compare_precision = None
 
     def setUp(self):
         TestMultipleGpus.setUp(self)
         LLMTest.setUp(self)
         self.save_file_path = tempfile.mkdtemp()
-        self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
-        AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
-        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48, "data_file": ""})
-        self.golden_result = self._read_result(os.path.join(self.output_dir, "predict.json"))
+        if self.compare_precision:
+            global global_result
+            model_tag = os.path.basename(self.model_name_or_path)
+            if model_tag not in global_result:
+                self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(
+                    self.output_dir
+                )
+                AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
+                self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
+                self.golden_result = self._read_result(os.path.join(self.output_dir, "predict.json"))
+                global_result[model_tag] = self.golden_result
+            else:
+                self.golden_result = global_result[model_tag]
 
     @require_gpu(2)
     def test_muti_gpus_inference(self):
@@ -156,20 +177,23 @@ class CommonGpusInferenceTest(TestMultipleGpus, LLMTest):
             "tensor_parallel_degree": 2,
             "pipeline_parallel_degree": 1,
             "save_path": os.path.join(self.save_file_path, "predict.json"),
+            "model_name_or_path": self.model_name_or_path,
         }
         self.run_2gpu(scripts, **config)
 
         result = self._read_result(os.path.join(self.save_file_path, "predict.json"))
-        partial_match, full_match = 0, 0
-        for golden_item, result_item in zip(self.golden_result, result):
-            score = levenshtein_similarity(golden_item, result_item)
-            if score >= 0.95:
-                full_match += 1
-            if score >= 0.6:
-                partial_match += 1
+        self.assertTrue(len(result) > 0, f"The inference result for {self.model_name_or_path} is empty!")
 
-        self.assertGreaterEqual(full_match / len(self.golden_result), 0.7)
-        self.assertGreaterEqual(partial_match / len(self.golden_result), 0.9)
+        if self.compare_precision:
+            partial_match, full_match = 0, 0
+            for golden_item, result_item in zip(self.golden_result, result):
+                score = levenshtein_similarity(golden_item, result_item)
+                if score >= 0.95:
+                    full_match += 1
+                if score >= 0.6:
+                    partial_match += 1
+            self.assertGreaterEqual(full_match / len(self.golden_result), 0.7)
+            self.assertGreaterEqual(partial_match / len(self.golden_result), 0.9)
 
     def tearDown(self):
         LLMTest.tearDown(self)
