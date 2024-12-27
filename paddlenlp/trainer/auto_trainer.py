@@ -400,7 +400,6 @@ class AutoTrainer(Trainer):
 
         model, dist_loader = self._wrap_for_auto(model, train_dataloader)
         train_dataloader = dist_loader()
-
         if resume_from_checkpoint is not None:
             self._load_from_checkpoint(resume_from_checkpoint)
 
@@ -620,9 +619,11 @@ class AutoTrainer(Trainer):
         return loss
 
     def static_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
-        input_ids, labels = tuple(inputs.values())
+        # NOTE(zhangwl):need support input attention_mask in static mode
+        input_ids, labels, _ = list(inputs.values())
         loss = model(input_ids, labels)
-
+        # inputs = list(inputs.values())
+        # loss = model(*inputs)
         if loss is not None and self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
 
@@ -679,6 +680,7 @@ class AutoTrainer(Trainer):
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         with _exec_mode_guard("dynamic"):
+            self.control.should_evaluate = False
             super()._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, **kwargs)
 
     def _save_model(self):

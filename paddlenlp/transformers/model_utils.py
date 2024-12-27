@@ -2789,6 +2789,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             },....
         ]
         """
+        # import pdb;pdb.set_trace()
         assert isinstance(configs, (dict, list))
         if isinstance(configs, dict):
             return configs
@@ -2848,17 +2849,15 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                     prefix = ""
                 layer_config = layer.auto_dist_config(prefix)
                 merged_config = self.merge_auto_dist_configs([merged_config, layer_config])
-                for _, deeper_layer in layer.named_sublayers():
-                    if hasattr(deeper_layer, "auto_dist_config"):
-                        # mask all `auto_dist_config` methods in deeper layer
-                        deeper_layer.auto_dist_config = lambda x: {}
-
+                # for _, deeper_layer in layer.named_sublayers():
+                #     if hasattr(deeper_layer, "auto_dist_config"):
+                #         # mask all `auto_dist_config` methods in deeper layer
+                #         deeper_layer.auto_dist_config = lambda x: {}
         final_config = {
             "dp_config": None,
             "mp_config": None,
             "pp_config": None,
         }
-
         if "tensor_parallel" in auto_dist_degree and auto_dist_degree["tensor_parallel"]:
             merged_config["mp_config"] is not None
             final_config["mp_config"] = merged_config["mp_config"]

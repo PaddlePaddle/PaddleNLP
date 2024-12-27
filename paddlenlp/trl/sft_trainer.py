@@ -160,10 +160,15 @@ class SFTTrainer(Trainer):
                     )
                 if not _multiple:
                     eval_dataset = _eval_datasets["singleton"]
-
+        # print("data_collator ",data_collator)
+        # if data_collator is None:
+        #     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer,max_label_length=args.max_seq_length)
+        # elif hasattr(data_collator, "tokenizer"):
+        #     data_collator.tokenizer = tokenizer if data_collator.tokenizer is None else data_collator.tokenizer
+        #     data_collator.max_label_length = args.max_seq_length
+        #     data_collator.max_length = args.max_seq_length
         if data_collator is None:
             data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer)
-
         super().__init__(
             model=model,
             criterion=criterion,
