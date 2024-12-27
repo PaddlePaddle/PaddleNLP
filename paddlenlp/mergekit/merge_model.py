@@ -18,6 +18,7 @@ from multiprocessing import Process
 
 import numpy as np
 import paddle
+import paddle.distributed as dist
 from safetensors import safe_open
 from safetensors.numpy import save_file
 
@@ -186,8 +187,75 @@ class MergeModel:
         index = {"metadata": {"total_size": total_size}, "weight_map": weight_map}
         return index
 
+    # def merge_safetensor_model(self, file_type_list):
+    #     # load index
+    #     index_list = []
+    #     model_path_list = self.merge_config.model_path_list
+    #     if self.merge_config.base_model_path is not None:
+    #         model_path_list += [self.merge_config.base_model_path]
+
+    #     for model_path, file_type in zip(model_path_list, file_type_list):
+    #         if file_type == "safetensors":
+    #             with open(os.path.join(model_path, self.safe_index_name()), "r", encoding="utf-8") as f:
+    #                 index_list.append(json.load(f))
+    #         else:
+    #             index = self.create_safetensor_index(model_path)
+    #             index_list.append(index)
+    #     # check index
+    #     if not all(index_list[0]["metadata"]["total_size"] == index["metadata"]["total_size"] for index in index_list):
+    #         raise ValueError("Weights total_size mismatch. Please make sure you load the correct weight file")
+    #     if not all(index_list[0]["weight_map"].keys() == index["weight_map"].keys() for index in index_list):
+    #         raise ValueError("Weights weight_map mismatch. Please make sure you load the correct weight file")
+    #     # init new index
+    #     index = {}
+    #     index["metadata"] = index_list[0]["metadata"]
+    #     index["metadata"]["total_size"] = int(index["metadata"]["total_size"])
+    #     index["weight_map"] = {}
+
+    #     # Multi-process update
+    #     key_list = list(index_list[0]["weight_map"].keys())
+    #     positions = divide_positions(len(key_list), self.merge_config.n_process)
+    #     threads = []
+    #     if self.merge_config.tensor_type == "np":
+    #         target = self.shard_merge_np
+    #     else:
+    #         target = self.shard_merge_pd
+
+    #     for i in range(len(positions) - 1):
+    #         shard_file = f"{self.merge_config.merge_preifx}-{i+1:05d}-of-{self.merge_config.n_process:05d}.safetensors"
+    #         t = Process(
+    #             target=target,
+    #             args=(
+    #                 key_list[positions[i] : positions[i + 1]],  # key_list
+    #                 index_list,  # index_list
+    #                 shard_file,  # shard_file name
+    #             ),
+    #         )
+    #         threads.append(t)
+    #         for k in key_list[positions[i] : positions[i + 1]]:
+    #             index["weight_map"][k] = shard_file
+    #     for t in threads:
+    #         t.start()
+    #     for t in threads:
+    #         t.join()
+
+    #     # save safe index file
+    #     save_index_file = os.path.join(self.merge_config.output_path, self.safe_index_name())
+    #     with open(save_index_file, "w", encoding="utf-8") as f:
+    #         content = json.dumps(index, indent=2) + "\n"
+    #         f.write(content)
+    #     self.merge_config.save_pretrained(self.merge_config.output_path)
+
     def merge_safetensor_model(self, file_type_list):
-        # load index
+        use_gpu = self.merge_config.device == "gpu"
+
+        if use_gpu:
+            rank = dist.get_rank()
+        if dist.get_world_size() > 1:
+            dist.init_parallel_env()
+            dist.barrier()
+
+        # Load index
         index_list = []
         model_path_list = self.merge_config.model_path_list
         if self.merge_config.base_model_path is not None:
@@ -200,49 +268,70 @@ class MergeModel:
             else:
                 index = self.create_safetensor_index(model_path)
                 index_list.append(index)
-        # check index
+
+        # Check index
         if not all(index_list[0]["metadata"]["total_size"] == index["metadata"]["total_size"] for index in index_list):
             raise ValueError("Weights total_size mismatch. Please make sure you load the correct weight file")
         if not all(index_list[0]["weight_map"].keys() == index["weight_map"].keys() for index in index_list):
             raise ValueError("Weights weight_map mismatch. Please make sure you load the correct weight file")
-        # init new index
+
+        # Initialize new index
         index = {}
         index["metadata"] = index_list[0]["metadata"]
         index["metadata"]["total_size"] = int(index["metadata"]["total_size"])
         index["weight_map"] = {}
 
-        # Multi-process update
         key_list = list(index_list[0]["weight_map"].keys())
-        positions = divide_positions(len(key_list), self.merge_config.n_process)
-        threads = []
-        if self.merge_config.tensor_type == "np":
-            target = self.shard_merge_np
+        if use_gpu:
+            positions = divide_positions(len(key_list), dist.get_world_size())
         else:
-            target = self.shard_merge_pd
-        for i in range(len(positions) - 1):
-            shard_file = f"{self.merge_config.merge_preifx}-{i+1:05d}-of-{self.merge_config.n_process:05d}.safetensors"
-            t = Process(
-                target=target,
-                args=(
-                    key_list[positions[i] : positions[i + 1]],  # key_list
-                    index_list,  # index_list
-                    shard_file,  # shard_file name
-                ),
-            )
-            threads.append(t)
-            for k in key_list[positions[i] : positions[i + 1]]:
-                index["weight_map"][k] = shard_file
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+            positions = divide_positions(len(key_list), self.merge_config.n_process)
 
-        # save safe index file
-        save_index_file = os.path.join(self.merge_config.output_path, self.safe_index_name())
-        with open(save_index_file, "w", encoding="utf-8") as f:
-            content = json.dumps(index, indent=2) + "\n"
-            f.write(content)
-        self.merge_config.save_pretrained(self.merge_config.output_path)
+        if use_gpu:
+            start_idx = positions[rank]
+            end_idx = positions[rank + 1] if rank + 1 < len(positions) else len(key_list)
+            local_keys = key_list[start_idx:end_idx]
+
+            shard_file = f"{self.merge_config.merge_preifx}-{rank+1:05d}-of-{dist.get_world_size():05d}.safetensors"
+            for k in local_keys:
+                index["weight_map"][k] = shard_file
+
+            if self.merge_config.tensor_type == "np":
+                ValueError(f"Tensor type '{self.merge_config.tensor_type}' should be 'pd' when using GPU.")
+            else:
+                self.shard_merge_pd(local_keys, index_list, shard_file)
+            if dist.get_world_size() > 1:
+                dist.barrier()
+        else:
+            threads = []
+            for i in range(len(positions) - 1):
+                shard_file = (
+                    f"{self.merge_config.merge_preifx}-{i+1:05d}-of-{self.merge_config.n_process:05d}.safetensors"
+                )
+                t = Process(
+                    target=self.shard_merge_np if self.merge_config.tensor_type == "np" else self.shard_merge_pd,
+                    args=(
+                        key_list[positions[i] : positions[i + 1]],  # key_list
+                        index_list,  # index_list
+                        shard_file,  # shard_file name
+                    ),
+                )
+                threads.append(t)
+                for k in key_list[positions[i] : positions[i + 1]]:
+                    index["weight_map"][k] = shard_file
+
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+        # Save safe index file
+        if not use_gpu or (use_gpu and rank == 0):
+            save_index_file = os.path.join(self.merge_config.output_path, self.safe_index_name())
+            with open(save_index_file, "w", encoding="utf-8") as f:
+                content = json.dumps(index, indent=2) + "\n"
+                f.write(content)
+            self.merge_config.save_pretrained(self.merge_config.output_path)
 
     def shard_merge_np(
         self,
@@ -295,7 +384,44 @@ class MergeModel:
         index_list,
         shard_file,
     ):
-        raise NotImplementedError("Not support paddle tensors.")
+        merge_state_dict = {}
+        for k in key_list:
+            tensor_list = []
+
+            for i, model_path in enumerate(self.merge_config.model_path_list):
+                with fast_safe_open(os.path.join(model_path, index_list[i]["weight_map"][k]), framework="np") as w:
+                    tensor = w.get_tensor(k)
+                    # 将 numpy 转为 Paddle Tensor
+                    tensor = paddle.to_tensor(tensor, dtype="float32")
+                    tensor_list.append(tensor)
+            if self.merge_config.base_model_path is not None:
+                with fast_safe_open(
+                    os.path.join(self.merge_config.base_model_path, index_list[-1]["weight_map"][k]),
+                    framework="np",
+                ) as w:
+                    base_tensor = w.get_tensor(k)
+                    base_tensor = paddle.to_tensor(base_tensor, dtype="float32")
+                tensor_list = [tensor - base_tensor for tensor in tensor_list]
+
+            merge_tensor = self.merge_method.merge(tensor_list)
+
+            if self.merge_config.base_model_path is not None:
+                merge_tensor += base_tensor
+
+            # 转换为 numpy 并存储
+            merge_state_dict[k] = merge_tensor.numpy()
+
+            del tensor_list
+            if self.merge_config.base_model_path is not None:
+                del base_tensor
+
+        save_file(
+            merge_state_dict,
+            os.path.join(self.merge_config.output_path, shard_file),
+            metadata={"format": "np"},
+        )
+        del merge_state_dict
+        gc.collect()
 
     def check_model_path(self, model_path):
         if os.path.exists(os.path.join(model_path, self.safe_index_name())):

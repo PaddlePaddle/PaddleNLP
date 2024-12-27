@@ -73,12 +73,11 @@ class MergeConfig:
     def config_check(self):
         if self.output_path is not None:
             os.makedirs(self.output_path, exist_ok=True)
-        if self.tensor_type not in ["np"]:
-            raise ValueError(f"Unsupported tensor type: {self.tensor_type}. Support 'np' only.")
-        if self.device != "cpu":
-            logger.warning(f"Currently only support cpu device, but got {self.device}. Setting `device` to `cpu`.")
+        if self.tensor_type not in ["np", "pd"]:
+            raise ValueError(f"Unsupported tensor type: {self.tensor_type}. Support 'np' and 'pd' only.")
+        if self.device == "gpu" and self.tensor_type == "np":
+            logger.warning("np only support cpu device, but got gpu. Setting `device` to `cpu`.")
             self.device = "cpu"
-            self.tensor_type = "np"
 
         elif self.merge_method not in ["linear", "ties", "slerp", "della_linear", "della", "dare_linear", "dare_ties"]:
             raise ValueError(

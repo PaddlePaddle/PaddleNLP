@@ -66,3 +66,25 @@ class TestMergeModel(unittest.TestCase):
             )
             mergekit = MergeModel(merge_config)
             mergekit.merge_model()
+
+            # test safetensor only with pd
+            merge_config = MergeConfig(
+                merge_method=merge_method,
+                model_path_list=[safe_path, safe_path],
+                output_path=tempdir,
+                n_process=2,
+                tensor_type="pd",
+            )
+            mergekit = MergeModel(merge_config)
+            mergekit.merge_model()
+
+            # test safetensor only with pd and gpu
+            merge_config = MergeConfig(
+                merge_method=merge_method,
+                model_path_list=[safe_path, safe_path],
+                output_path=tempdir,
+                device="gpu",
+                tensor_type="pd",
+            )
+            mergekit = MergeModel(merge_config)
+            mergekit.merge_model()
