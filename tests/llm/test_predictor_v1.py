@@ -45,7 +45,7 @@ class CommonModelInferenceTest(LLMTest, unittest.TestCase):
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
 
     def test_common_model_inference(self):
-        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
+        self.run_predictor({"inference_model": True, "max_length": 48})
         result = self._read_result(os.path.join(self.output_dir, "predict.json"))
         self.assertTrue(len(result) > 0, f"The inference result for {self.model_name_or_path} is empty!")
 
@@ -94,7 +94,7 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
         global global_result
         model_tag = os.path.basename(self.model_name_or_path)
         if model_tag not in global_result:
-            self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
+            self.run_predictor({"inference_model": True, "max_length": 48})
             self.golden_result = self._read_result(os.path.join(self.output_dir, "predict.json"))
             global_result[model_tag] = self.golden_result
         else:
@@ -110,7 +110,7 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
     )
     def test_common_param_inference(self, param_case):
 
-        config_params = {"inference_model": True, "src_length": 512, "max_length": 48}
+        config_params = {"inference_model": True, "max_length": 48}
         config_params.update(param_case)
 
         self.run_predictor(config_params)
@@ -129,7 +129,7 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
         if not config_params["inference_model"]:
             self.assertGreaterEqual(full_match / len(self.golden_result), 0.3)
             self.assertGreaterEqual(partial_match / len(self.golden_result), 0.4)
-        elif config_params["use_fake_parameter"]:
+        elif config_params.get("use_fake_parameter", False):
             pass
         else:
             self.assertGreaterEqual(full_match / len(self.golden_result), 0.7)
@@ -163,7 +163,7 @@ class CommonGpusInferenceTest(TestMultipleGpus, LLMTest):
                     self.output_dir
                 )
                 AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
-                self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
+                self.run_predictor({"inference_model": True, "max_length": 48})
                 self.golden_result = self._read_result(os.path.join(self.output_dir, "predict.json"))
                 global_result[model_tag] = self.golden_result
             else:
