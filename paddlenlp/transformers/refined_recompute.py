@@ -429,9 +429,21 @@ def recompute(function, *args, **kwargs):
     Returns:
         Output of function on args.
     """
+    # Hack to mix *args with **kwargs in a python 2.7-compliant way
     preserve = kwargs.pop("preserve_rng_state", True)
+
+    # whether to use reentrant method to implement recompute
     use_reentrant = kwargs.pop("use_reentrant", True)
+
+    if not paddle.in_dynamic_mode():
+        from paddle.distributed.auto_parallel.interface import (
+            recompute as static_auto_recompute,
+        )
+
+        return static_auto_recompute(function)(*args, **kwargs)
+
     if not use_reentrant:
+        _ = kwargs.pop("offload_indices", [])  # currently not support offload_indices
         if framework._dygraph_tracer()._has_grad:
             check_args = list(args)
             check_args.extend(list(kwargs.values()))

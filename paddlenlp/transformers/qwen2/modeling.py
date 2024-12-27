@@ -32,6 +32,7 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+from paddle.distributed.fleet.recompute.recompute import recompute
 
 from paddlenlp.transformers.contrastive_loss import SimpleContrastiveLoss
 from paddlenlp.transformers.refined_recompute import (
@@ -40,8 +41,8 @@ from paddlenlp.transformers.refined_recompute import (
     RRRowParallelLinear,
     RRRowSequenceParallelLinear,
     get_skip_recompute_ops,
-    recompute,
 )
+from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
 from paddlenlp.utils.tools import get_env_device
 
 from .. import linear_utils
@@ -605,7 +606,8 @@ class Qwen2Attention(nn.Layer):
             and has_gradient
             and self.recompute_granularity == "core_attn"
         ):
-            outputs = recompute(
+            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
+            outputs = recompute_fn(
                 self.attn_func,
                 query_states,
                 self.config,
@@ -714,7 +716,8 @@ class Qwen2DecoderLayer(nn.Layer):
             and has_gradient
             and self.recompute_granularity == "full_attn"
         ):
-            outputs = recompute(
+            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
+            outputs = recompute_fn(
                 self.self_attn,
                 hidden_states,
                 position_ids,
@@ -1058,7 +1061,8 @@ class Qwen2Model(Qwen2PretrainedModel):
 
             return custom_forward
 
-        hidden_states = recompute(
+        recompute_fn = rr_recompute if any(layer_module.skip_recompute_ops.values()) else recompute
+        hidden_states = recompute_fn(
             create_custom_forward(layer_module),
             hidden_states,
             position_ids,

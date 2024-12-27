@@ -24,6 +24,7 @@ import paddle.nn.functional as F
 from paddle import Tensor, nn
 from paddle.distributed import fleet
 from paddle.distributed.fleet.layers.mpu.random import get_rng_state_tracker
+from paddle.distributed.fleet.recompute.recompute import recompute
 from paddle.utils import try_import
 
 from paddlenlp.transformers.refined_recompute import (
@@ -33,8 +34,8 @@ from paddlenlp.transformers.refined_recompute import (
     RRRowSequenceParallelLinear,
     get_skip_recompute_ops,
     no_recompute,
-    recompute,
 )
+from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
 
 try:
     from paddle.incubate.nn.functional import swiglu
@@ -390,7 +391,8 @@ class QWenAttention(nn.Layer):
 
         has_gradient = not (query.stop_gradient and key.stop_gradient and value.stop_gradient)
         if self.enable_recompute and self.training and has_gradient and self.recompute_granularity == "core_attn":
-            attn_output, attn_weight = recompute(
+            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
+            attn_output, attn_weight = recompute_fn(
                 self._attn,
                 query,
                 key,
@@ -799,7 +801,8 @@ class QWenModel(QWenPretrainedModel):
 
             return custom_forward
 
-        hidden_states = recompute(
+        recompute_fn = rr_recompute if any(block.skip_recompute_ops.values()) else recompute
+        hidden_states = recompute_fn(
             create_custom_forward(block),
             hidden_states,
             layer_past,

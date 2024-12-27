@@ -29,6 +29,7 @@ from paddle import Tensor, nn
 from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+from paddle.distributed.fleet.recompute.recompute import recompute
 
 from paddlenlp.transformers.refined_recompute import (
     RRColumnParallelLinear,
@@ -36,8 +37,8 @@ from paddlenlp.transformers.refined_recompute import (
     RRRowParallelLinear,
     RRRowSequenceParallelLinear,
     get_skip_recompute_ops,
-    recompute,
 )
+from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -1114,7 +1115,8 @@ class LlamaAttention(nn.Layer):
             and has_gradient
             and self.recompute_granularity == "core_attn"
         ):
-            outputs = recompute(
+            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
+            outputs = recompute_fn(
                 self.attn_func,
                 query_states,
                 self.config,
@@ -1225,7 +1227,8 @@ class LlamaDecoderLayer(nn.Layer):
             and has_gradient
             and self.recompute_granularity == "full_attn"
         ):
-            outputs = recompute(
+            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
+            outputs = recompute_fn(
                 self.self_attn,
                 hidden_states,
                 position_ids,
@@ -1633,7 +1636,8 @@ class LlamaModel(LlamaPretrainedModel):
 
             return custom_forward
 
-        hidden_states = recompute(
+        recompute_fn = rr_recompute if self.config.refined_recompute else recompute
+        hidden_states = recompute_fn(
             create_custom_forward(layer_module),
             hidden_states,
             position_ids,
