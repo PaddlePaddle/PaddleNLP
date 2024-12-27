@@ -26,7 +26,7 @@ from paddle.distributed import fleet
 from tqdm.auto import tqdm
 
 from paddlenlp.trainer import Trainer
-from paddlenlp.transformers.model_utils import PretrainedModel
+from ..data import DataCollatorForSeq2Seq
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
 from .argparser import strtobool
@@ -85,6 +85,20 @@ class AutoTrainer(Trainer):
             if not param._is_initialized() and param._init_func is not None:
                 param.initialize()
         kwargs["model"] = model
+
+        trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
+        self.set_optimizer_grouped_parameters(trainable_parameters)
+
+        assert kwargs["args"].max_seq_length is not None, "max_seq_length must be specified in auto_parallel"
+
+        if kwargs.get("data_collator", None) is None:
+            data_collator = DataCollatorForSeq2Seq(
+                max_length=kwargs["args"].max_seq_length,
+                max_label_length=kwargs["args"].max_seq_length,
+                padding="max_length",
+            )
+            kwargs["data_collator"] = data_collator
+
         super().__init__(*args, **kwargs)
         assert self.args.enable_auto_parallel
 
@@ -619,9 +633,11 @@ class AutoTrainer(Trainer):
         return loss
 
     def static_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
-        input_ids, labels = tuple(inputs.values())
+        # NOTE(zhangwl):need support input attention_mask in static mode
+        input_ids, labels, _ = list(inputs.values())
         loss = model(input_ids, labels)
-
+        # inputs = list(inputs.values())
+        # loss = model(*inputs)
         if loss is not None and self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
 
@@ -678,6 +694,7 @@ class AutoTrainer(Trainer):
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         with _exec_mode_guard("dynamic"):
+            self.control.should_evaluate = False
             super()._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, **kwargs)
 
     def _save_model(self):

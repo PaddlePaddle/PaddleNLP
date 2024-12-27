@@ -32,8 +32,8 @@ from paddlenlp.metrics import BLEU, Rouge1, Rouge2, RougeL
 from paddlenlp.peft import (
     LoKrConfig,
     LoKrModel,
-    LoRAConfig,
-    LoRAModel,
+    LoRAAutoConfig,
+    LoRAAutoModel,
     PrefixConfig,
     PrefixModelForCausalLM,
     VeRAConfig,
@@ -436,9 +436,25 @@ def main():
         gen_args=gen_args,
         data_args=data_args,
     )
+<<<<<<< HEAD:llm/run_finetune.py
     trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
     trainer.set_optimizer_grouped_parameters(trainable_parameters)
 
+=======
+    # #NOTE(zhangwl):this may move to wrap
+    # trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
+    # trainer.set_optimizer_grouped_parameters(trainable_parameters)
+
+    # def forward_pre_hook(layer, input):
+    #     print(f"{layer} forward start")
+
+    # def forward_post_hook(layer, input, output):
+    #     print(f"{layer} forward done")
+
+    # for layer in trainer.model.sublayers():
+    #     layer.register_forward_pre_hook(forward_pre_hook)
+    #     layer.register_forward_post_hook(forward_post_hook)
+>>>>>>> [AutoParallel]:auto parallel support lora model:llm/auto_parallel/run_finetune_auto.py
     # Train
     print(trainer.model)
     if training_args.do_train:
@@ -539,7 +555,7 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
             ), "Currently not support enabling sharding_stage1_overlap in lora mode."
         if model_args.lora_path is None:
             target_modules = get_lora_target_modules(model)
-            lora_config = LoRAConfig(
+            lora_config = LoRAAutoConfig(
                 target_modules=target_modules,
                 r=model_args.lora_rank,
                 lora_alpha=2 * model_args.lora_rank if not model_args.rslora else 4,
@@ -553,10 +569,12 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
                 use_quick_lora=model_args.use_quick_lora,
                 lora_use_mixer=model_args.lora_use_mixer,
                 use_mora=model_args.use_mora,
+                use_intermediate_api=training_args.use_intermediate_api,
+                pipeline_parallel_degree=training_args.pipeline_parallel_degree,
             )
-            model = LoRAModel(model, lora_config)
+            model = LoRAAutoModel(model, lora_config)
         else:
-            model = LoRAModel.from_pretrained(model=model, lora_path=model_args.lora_path)
+            model = LoRAAutoModel.from_pretrained(model=model, lora_path=model_args.lora_path)
 
         model.print_trainable_parameters()
 
