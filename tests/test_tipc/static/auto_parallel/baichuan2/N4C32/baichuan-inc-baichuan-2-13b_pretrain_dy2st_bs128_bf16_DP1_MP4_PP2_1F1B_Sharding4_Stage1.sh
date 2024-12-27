@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-param="model_item=gpt3-13b_pretrain_dy2st "
-param+="run_mode=DP1_MP2_PP4_1F1B_Sharding4_Stage1 "
+param="model_item=baichuan-inc-baichuan-2-13b_pretrain "
+param+="run_mode=DP1_MP4_PP2_1F1B_Sharding4_Stage1 "
 param+="device_num=N4C32 "
 param+="global_batch_size=128 "
 param+="nnodes=4 "
-param+="model_type=gpt3_13b "
+param+="model_type=baichuan2_13b "
 
 cd ./tests
-bash ./test_tipc/static/auto_parallel/gpt3/benchmark_common/prepare.sh
+bash ./test_tipc/static/auto_parallel/baichuan2/benchmark_common/prepare.sh
 
-bash -c "${param} bash ./test_tipc/static/auto_parallel/gpt3/benchmark_common/run_benchmark.sh"
+bash -c "${param} bash ./test_tipc/static/auto_parallel/baichuan2/benchmark_common/run_benchmark.sh"

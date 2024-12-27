@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-param="model_item=qwen-2-14b_pretrain_dy2st "
+param="model_item=qwen-14b_pretrain_dy2st "
 param+="run_mode=DP1_MP2_PP4_1F1B_Sharding4_Stage1 "
 param+="device_num=N4C32 "
 param+="global_batch_size=128 "
