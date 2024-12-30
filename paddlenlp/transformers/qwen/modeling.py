@@ -495,6 +495,7 @@ class QWenBlock(nn.Layer):
         super().__init__()
         if skip_recompute_ops is None:
             skip_recompute_ops = {}
+        self.skip_recompute_ops = skip_recompute_ops
         self.sequence_parallel = config.sequence_parallel
         self.ln_1 = QWenRMSNorm(config)
         self.attn = QWenAttention(config, skip_recompute_ops=skip_recompute_ops)
