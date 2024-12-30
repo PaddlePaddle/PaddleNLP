@@ -1636,7 +1636,7 @@ class LlamaModel(LlamaPretrainedModel):
 
             return custom_forward
 
-        recompute_fn = rr_recompute if self.config.refined_recompute else recompute
+        recompute_fn = rr_recompute if any(layer_module.skip_recompute_ops.values()) else recompute
         hidden_states = recompute_fn(
             create_custom_forward(layer_module),
             hidden_states,
