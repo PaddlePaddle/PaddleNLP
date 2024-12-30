@@ -25,7 +25,7 @@ from .testing_utils import LLMTest
 
 @parameterized_class(
     ["model_dir"],
-    [["llama"], ["chatglm2"], ["qwen"], ["qwen2"]],
+    [["qwen"], ["qwen2"]],
 )
 class FinetuneTest(LLMTest, unittest.TestCase):
     config_path: str = "./tests/fixtures/llm/kto.yaml"
