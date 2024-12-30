@@ -185,12 +185,12 @@ def get_module_gradient(
 
     # dp
     if dp_degree > 1:
-        if data_parallel_group.nranks > 1:
-            if is_fleet_init:
-                dist.all_reduce(gradient, op=dist.ReduceOp.SUM, group=data_parallel_group)
-            else:
-                dist.all_reduce(gradient, op=dist.ReduceOp.SUM)
+        if is_fleet_init:
+            dist.all_reduce(gradient, op=dist.ReduceOp.SUM, group=data_parallel_group)
             gradient /= data_parallel_group.nranks
+        else:
+            dist.all_reduce(gradient, op=dist.ReduceOp.SUM)
+            gradient /= dist.get_world_size()
     return gradient
 
 
