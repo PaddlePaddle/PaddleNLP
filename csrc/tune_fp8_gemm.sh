@@ -12,22 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# llama2-7B
-# nohup python ./utils/tune_cutlass_fp8_gemm.py \
-#         --m_min 32 \
-#         --m_max 2049 \
-#         --n 4096 12288 \
-#         --k 4096 11008 \
-#         >  tune_fp8_gemm.log 2>&1 &
+# 指定GPU
+export CUDA_VISIBLE_DEVICES=0
+# 开启FP8 cutlass调优(必要性配置)
+export FLAGS_use_cutlass_device_best_config_path=tune
 
-# llama3-8B
+# 根据不同模型，调整gemm参数，其中n和k的的值需要成对出现，具体逻辑可参考相关.py文件。
+# llama3-8B 单GEMM调优参数设置
 nohup python ./utils/tune_cutlass_fp8_gemm.py \
         --m_min 32 \
         --m_max 32768 \
-        --n 4096 6144 \
-        --k 4096 14336 \
+        --n 6144 4096 4096 \
+        --k 4096 4096 14336 \
         >  tune_fp8_gemm.log 2>&1 &
 
+# llama3-8B 双GEMM调优参数设置
 # nohup python ./utils/tune_cutlass_fp8_dual_gemm.py \
 #         --m_min 32 \
 #         --m_max 32768 \

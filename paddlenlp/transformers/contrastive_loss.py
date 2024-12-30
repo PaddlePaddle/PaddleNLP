@@ -63,3 +63,90 @@ class MatryoshkaContrastiveLoss(nn.Layer):
         else:
             loss = self.loss_fn(q_reps, p_reps)
         return loss
+
+
+class SimpleInfclLoss(nn.Layer):
+    def __init__(self, inf_cl_head_dim=64):
+        """
+        Initializes the Simple Inf_cl Loss class.
+
+        Args:
+            inf_cl_head_dim (int, optional): Dimension of the projection head. Default is 64.
+        """
+        super().__init__()
+        self.head_dim = inf_cl_head_dim
+
+    def forward(self, q_reps, p_reps):
+        """
+        Computes the instance discrimination loss.
+
+        Args:
+            q_reps (Tensor): Query representations.
+            p_reps (Tensor): key representations.
+
+        Returns:
+            Tensor: The computed loss.
+        """
+        try:
+            from paddlenlp_kernel.triton.inf_cl import cal_inf_loss
+        except ImportError:
+            raise ImportError(
+                "Paddlenlp_kernels are not available, which means the inf_cl loss cannot be used. If you wish to use the inf_cl loss, please follow the instructions in the README.md on the `ops`."
+            )
+        group_size = p_reps.shape[0] // q_reps.shape[0]  # Number of keys per query
+        labels = paddle.arange(q_reps.shape[0], dtype="int64")  # Generate labels for queries
+        labels = labels * group_size  # Adjust labels based on group size
+        loss = cal_inf_loss(q_reps, p_reps, labels=labels, scale=None, head_dim=self.head_dim)
+        return loss
+
+
+class MatryoshkaInfclLoss(nn.Layer):
+    def __init__(self, embedding_matryoshka_dims: Optional[List[int]] = None, inf_cl_head_dim=64):
+        """
+        Initializes the Matryoshka Inf_cl Loss class.
+
+        Args:
+            embedding_matryoshka_dims (List[int], optional): List of dimensions for Matryoshka embeddings.
+                If None, no Matryoshka embedding is used. Default is None.
+            inf_cl_head_dim (int, optional): Dimension of the projection head. Default is 64.
+        """
+        super().__init__()
+        if embedding_matryoshka_dims is None:
+            self.embedding_matryoshka_dims = []
+        else:
+            self.embedding_matryoshka_dims = embedding_matryoshka_dims
+        self.loss_fn = SimpleInfclLoss(inf_cl_head_dim)
+
+    def forward(self, q_reps, p_reps):
+        """
+        Computes the Matryoshka instance discrimination loss.
+
+        Args:
+            q_reps (Tensor): Query representations.
+            p_reps (Tensor): key representations.
+
+        Returns:
+            Tensor: The computed loss.
+        """
+        if len(self.embedding_matryoshka_dims) > 0:
+            loss = 0.0
+            for dim in self.embedding_matryoshka_dims:
+                reduced_q_reps = q_reps[:, :dim]  # Reduce query representations to the current Matryoshka dimension
+                reduced_q_reps = nn.functional.normalize(
+                    reduced_q_reps, axis=-1
+                )  # Normalize the reduced query representations along the last axis
+
+                reduced_p_reps = p_reps[:, :dim]  # Reduce key representations to the current Matryoshka dimension
+                reduced_p_reps = nn.functional.normalize(
+                    reduced_p_reps, axis=-1
+                )  # Normalize the reduced key representations along the last axis
+
+                dim_loss = self.loss_fn(
+                    reduced_q_reps, reduced_p_reps
+                )  # Compute the loss for the current Matryoshka dimension using the internal loss function
+                loss += dim_loss
+        else:
+            loss = self.loss_fn(
+                q_reps, p_reps
+            )  # If no Matryoshka dimensions are specified, compute the loss using the full representations
+        return loss

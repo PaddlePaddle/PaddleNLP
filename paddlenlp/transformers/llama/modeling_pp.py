@@ -30,6 +30,7 @@ from paddlenlp.transformers.refined_recompute import (
 )
 from paddlenlp.utils.tools import get_env_device
 
+from ..dpo_criterion import DPOCriterion
 from .modeling import (
     LlamaConfig,
     LlamaDecoderLayer,
@@ -423,4 +424,7 @@ class LlamaForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         # PipelinePretrainedModel.__init__(self.super(), config=config)
 
     def get_loss_fn(self, config):
-        return LlamaPretrainingCriterion(config)
+        if config.dpo_config is not None:
+            return DPOCriterion(config, use_infohub=True)
+        else:
+            return LlamaPretrainingCriterion(config)

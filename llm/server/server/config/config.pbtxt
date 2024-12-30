@@ -1,0 +1,20 @@
+backend: "python"
+max_batch_size: 0
+model_transaction_policy {
+  decoupled: True
+}
+input [
+  {
+    name: "IN"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUT"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+instance_group [{ kind: KIND_CPU }]

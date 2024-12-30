@@ -88,3 +88,11 @@ class EmbeddingArgument:
         default=None,
         metadata={"help": "The dims for matryoshka training."},
     )
+    loss_type: str = field(
+        default="contrastive",
+        metadata={"help": "The type of loss computation."},
+    )
+    inf_cl_head_dim: int = field(
+        default=64,
+        metadata={"help": "The size of the head dimension when gpu ops are set as 'inf_cl'."},
+    )
