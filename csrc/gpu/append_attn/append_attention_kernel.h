@@ -300,10 +300,3 @@ inline uint32_t get_max_partition_size(int bsz) {
             max_partition_size_env == nullptr ? 0 : std::stoul(std::string(max_partition_size_env));
     return (max_partition_size != 0 ? max_partition_size : (bsz == 1 ? 128 : 512));
 }
-
-inline uint32_t get_encoder_max_partition_size() {
-    static const char* encoder_max_partition_size_env = std::getenv("FLAGS_cascade_encoder_attention_max_partition_size");
-    static const uint32_t encoder_max_partition_size =
-            encoder_max_partition_size_env == nullptr ? 32768 : std::stoul(std::string(encoder_max_partition_size_env));
-    return encoder_max_partition_size;
-}

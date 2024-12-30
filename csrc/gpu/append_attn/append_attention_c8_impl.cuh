@@ -914,7 +914,7 @@ void MultiQueryAppendC8Attention(
     cudaDeviceGetAttribute(&sm_count, cudaDevAttrMultiProcessorCount, dev_id);
     uint32_t chunk_size = get_max_partition_size(bsz);
     if (!is_decoder) {
-      chunk_size = get_encoder_max_partition_size();
+      chunk_size = max_seq_len;
     }
     const int num_chunks = div_up(max_dec_len, chunk_size);
     dim3 grids(num_blocks_x_cpu, num_chunks, kv_num_heads);
@@ -1136,7 +1136,7 @@ void MultiQueryAppendC8Attention(
     cudaDeviceGetAttribute(&sm_count, cudaDevAttrMultiProcessorCount, dev_id);
     uint32_t chunk_size = get_max_partition_size(bsz);
     if (!is_decoder) {
-      chunk_size = get_encoder_max_partition_size();
+      chunk_size = max_seq_len;
     }
 
     const int num_chunks = div_up(max_dec_len, chunk_size);
