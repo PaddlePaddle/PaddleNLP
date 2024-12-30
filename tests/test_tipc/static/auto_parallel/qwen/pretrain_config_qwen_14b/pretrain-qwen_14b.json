@@ -50,6 +50,6 @@
     "auto_parallel_resume_form_hybrid_parallel": true,
     "data_parallel_config": "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate",
     "sharding_parallel_config": "enable_stage1_overlap",
-    "tensor_parallel_config": "enable_mp_async_allreduce",
+    "tensor_parallel_config": "enable_mp_async_allreduce replace_with_parallel_cross_entropy",
     "pipeline_parallel_config": "enable_send_recv_overlap enable_split_backward"
 }

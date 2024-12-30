@@ -32,5 +32,6 @@
   "unified_checkpoint": true,
   "use_flash_attention": true,
   "amp_custom_black_list": "elementwise_div",
-  "release_grads": true
+  "release_grads": true,
+  "loss_type": "contrastive"
 }

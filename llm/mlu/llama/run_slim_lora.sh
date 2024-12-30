@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-param="model_item=gpt3-13b_pretrain "
-param+="run_mode=DP1_MP2_PP4_VPP5_Sharding4_Stage1 "
-param+="device_num=N4C32 "
-param+="global_batch_size=128 "
-param+="nnodes=4 "
-param+="model_type=gpt3_13b "
-
-cd ./tests
-bash ./test_tipc/dygraph/hybrid_parallelism/gpt3/benchmark_common/prepare.sh
-
-bash -c "${param} bash ./test_tipc/dygraph/hybrid_parallelism/gpt3/benchmark_common/run_benchmark.sh"
+python -m paddle.distributed.launch --devices '0,1,2,3,4,5,6,7' \
+                                     --log_dir ./log_finetune/code_slim \
+                                     ../../run_finetune.py \
+                                    config/llama_lora_argument.json \
+                                    --output_dir ./output/slim/lora  \
+                                    --logging_dir ./log_slim_lora/slim/lora \
+                                    --dataset_name_or_path ./eng_data/data_code \
+                                    2>&1 | tee log_lora_slim
