@@ -80,14 +80,14 @@ def main():
             hasattr(training_args, "pipeline_parallel_config")
             and "enable_clear_every_step_cache" in training_args.pipeline_parallel_config
         ), "Should set '--pipeline_parallel_config enable_clear_every_step_cache' in bash script for pp."
-    if model_args.sequence_parallel:
+    if training_args.sequence_parallel:
         if training_args.pipeline_parallel_degree > 1:
             assert (
                 hasattr(training_args, "pipeline_parallel_config")
                 and "disable_partial_send_recv" in training_args.pipeline_parallel_config
             ), "Should set '--pipeline_parallel_config disable_partial_send_recv' in bash script for pp with sp."
         if training_args.tensor_parallel_degree <= 1:
-            model_args.sequence_parallel = False
+            training_args.sequence_parallel = False
             logger.info("Tensor_parallel_degree = 1. Set sequence_parallel to False.")
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
