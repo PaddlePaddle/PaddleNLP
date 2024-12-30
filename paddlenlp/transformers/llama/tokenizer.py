@@ -125,7 +125,7 @@ class LlamaTokenizer(PretrainedTokenizer):
         return vocab
 
     def tokenize(self, text: TextInput, **kwargs) -> List[str]:
-        super().tokenize_without_strip(text, **kwargs)
+        return super().tokenize_without_strip(text, **kwargs)
 
     def _tokenize(self, text):
         """Returns a tokenized string."""

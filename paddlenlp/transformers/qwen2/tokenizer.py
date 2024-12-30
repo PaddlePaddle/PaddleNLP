@@ -267,7 +267,7 @@ class Qwen2Tokenizer(PretrainedTokenizer):
         return word
 
     def tokenize(self, text: TextInput, **kwargs) -> List[str]:
-        super().tokenize_without_strip(text, **kwargs)
+        return super().tokenize_without_strip(text, **kwargs)
 
     def _tokenize(self, text):
         """Tokenize a string."""
