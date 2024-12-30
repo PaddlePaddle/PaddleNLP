@@ -19,9 +19,11 @@ from typing import Optional
 from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import IntervalStrategy
 from paddlenlp.trainer.utils.doc import add_start_docstrings
+from paddlenlp.transformers.configuration_utils import llmmetaclass
 
 
 @dataclass
+@llmmetaclass
 @add_start_docstrings(TrainingArguments.__doc__)
 class DPOTrainingArguments(TrainingArguments):
     """DPOTrainingArguments"""
@@ -122,29 +124,18 @@ class DPOModelArgument:
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
-    use_flash_attention: bool = field(default=False, metadata={"help": "Whether to use flash attention"})
-    recompute_granularity: str = field(
-        default="full",
-        metadata={
-            "help": "The granularity of recompute training can be selected as `full` or `full_attn` or `core_attn`."
-        },
-    )
     flash_mask: bool = field(default=False, metadata={"help": "Whether to use flash mask in flash attention."})
-    virtual_pp_degree: int = field(
-        default=1,
-        metadata={"help": "virtual_pp_degree"},
-    )
-    sequence_parallel: bool = field(
-        default=False,
-        metadata={"help": "whether to use sequence parallel"},
-    )
-    tensor_parallel_output: bool = field(
-        default=True,
-        metadata={"help": "whether to use tensor_parallel_output"},
-    )
     weight_quantize_algo: str = field(
         default=None,
         metadata={"help": "Model weight quantization algorithm including 'nf4'(qlora), 'weight_only_int8'."},
+    )
+    fuse_attention_qkv: bool = field(
+        default=None,
+        metadata={"help": "whether to fuse attention qkv"},
+    )
+    fuse_attention_ffn: bool = field(
+        default=None,
+        metadata={"help": "whether to fuse first up and gate proj in mlp block"},
     )
     # LoRA
     lora_rank: int = field(default=8, metadata={"help": "Lora rank."})

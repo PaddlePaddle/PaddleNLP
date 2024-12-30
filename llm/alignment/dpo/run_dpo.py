@@ -122,9 +122,13 @@ def main():
         dtype=dtype,
         tensor_parallel_degree=training_args.tensor_parallel_degree,
         tensor_parallel_rank=training_args.tensor_parallel_rank,
-        recompute_granularity=model_args.recompute_granularity,
-        use_flash_attention=model_args.use_flash_attention,
-        tensor_parallel_output=model_args.tensor_parallel_output,
+        recompute_granularity=training_args.recompute_granularity,
+        use_flash_attention=training_args.use_flash_attention,
+        tensor_parallel_output=training_args.tensor_parallel_output,
+        use_fused_rms_norm=training_args.use_fused_rms_norm,
+        use_fused_rope=training_args.use_fused_rope,
+        use_fused_linear=training_args.use_fused_linear,
+        use_fused_dropout_add=training_args.use_fused_dropout_add,
     )
 
     if training_args.pipeline_parallel_degree > 1:
@@ -157,7 +161,7 @@ def main():
     if model_args.flash_mask and not any(isinstance(model, cls) for cls in flash_mask_support_list):
         raise NotImplementedError(f"{model.__class__} not support flash mask.")
 
-    if model_args.sequence_parallel:
+    if training_args.sequence_parallel:
         register_sequence_parallel_allreduce_hooks(
             model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
         )
