@@ -13,9 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import atexit
 import contextlib
 import functools
+import json
 import logging
+import multiprocessing
+import signal
 import threading
 import time
 
@@ -128,6 +132,68 @@ class Logger(object):
         another type of cache that includes the caller frame information in the hashing function.
         """
         self.warning(*args, **kwargs)
+
+
+class MetricsDumper(object):
+    """
+    Deafult JSONDumper in PaddleNLP
+
+    Args:
+        name(str) : Logger name, default is 'PaddleNLP'
+    """
+
+    def __init__(self, filename: str = None):
+        self.filename = "./training_metrics" if not filename else filename
+        self.queue = multiprocessing.Queue()
+        self.process = multiprocessing.Process(target=self._write_json, args=(self.queue,))
+        self.process.start()
+
+        # Ensure subprocess exits when main process is interrupted
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+
+        atexit.register(self.close)
+
+    def append(self, data):
+        """
+        Append a JSON object to the queue for background writing.
+
+        :param data: The JSON object to append.
+        """
+        self.queue.put(data)
+
+    def _write_json(self, queue):
+        """
+        Write JSON objects from the queue to the file in the background.
+
+        :param queue: The multiprocessing queue from which to read data.
+        """
+        while True:
+            try:
+                metrics = queue.get(timeout=10)  # Timeout to allow graceful shutdown
+                if metrics is None:
+                    break
+                with open(self.filename, "a") as writer:
+                    writer.write(json.dumps(metrics) + "\n")
+            except:
+                continue
+
+    def _signal_handler(self, sig, frame):
+        """
+        Handle signals to ensure graceful shutdown.
+
+        :param sig: Signal number.
+        :param frame: Current stack frame.
+        """
+        self.shutdown_event.set()  # Signal the background process to stop
+        self.close()
+
+    def close(self):
+        """
+        Close the background process and ensure all data is written.
+        """
+        self.queue.put(None)  # Signal the process to exit
+        self.process.join()
 
 
 logger = Logger()

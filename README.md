@@ -129,7 +129,7 @@
 * 大模型预训练、精调（包含 SFT、PEFT 技术）、对齐、量化已支持 LLaMA 系列、Baichuan 系列、Bloom 系列、ChatGLM 系列、Mistral 系列、OPT 系列和 Qwen 系列，【LLM】模型预训练、精调、对齐、量化支持列表如下：
 
 
-| Model                                      | Pretrain | SFT | LoRA | FlashMask | Prefix Tuning | DPO/SimPO/ORPO | RLHF | Mergekit | Quantization |
+| Model                                      | Pretrain | SFT | LoRA | FlashMask | Prefix Tuning | DPO/SimPO/ORPO/KTO | RLHF | Mergekit | Quantization |
 |--------------------------------------------|:--------:|:---:|:----:|:---------:|:-------------:|:--------------:|:----:|:-----:|:------------:|
 | [Llama](./llm/config/llama)                |    ✅     |  ✅  |  ✅   |     ✅     |       ✅       |       ✅        |  ✅   |   ✅   |      ✅       |
 | [Qwen](./llm/config/qwen)                  |    ✅     |  ✅  |  ✅   |     ✅     |       ✅       |       ✅        |  🚧  |   ✅   |      🚧      |
