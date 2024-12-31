@@ -1155,7 +1155,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             ]
             model_mappings.extend(layer_mappings)
 
-            # MoE paramerters
+            # MoE parameters
             model_mappings.append([f"layers.{layer_index}.mlp.gate.weight", None, "transpose"])
             for expert_idx in range(config.n_routed_experts):
                 expert_mappings = [
@@ -1170,10 +1170,10 @@ class DeepseekV2PretrainedModel(PretrainedModel):
 
         init_name_mappings(mappings=model_mappings)
         # base-model prefix "Qwen2MoEModel"
-        if "Qwen2Model" not in config.architectures:
+        if "DeepSeekV2Model" not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
-                mapping[1] = "deepseek_v2." + mapping[1]
+                mapping[1] = f"{cls.base_model_prefix}." + mapping[1]
             if not config.tie_word_embeddings:
                 model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
 
