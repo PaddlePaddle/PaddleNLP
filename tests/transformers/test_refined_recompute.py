@@ -530,6 +530,7 @@ class BertRefinedRecomputeTest(unittest.TestCase):
 
     @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute-pp only support on gpu")
     def test_refined_recompute_pp(self):
+        paddle.set_device("gpu")
         raw_dtype = paddle.get_default_dtype()
         grad1, layer1 = self.pp_fwd_bwd(recompute=True, use_rr_recompute=False)
         grad2, layer2 = self.pp_fwd_bwd(recompute=True, use_rr_recompute=True)
@@ -573,6 +574,7 @@ class TestRefinedRecomputeModel(unittest.TestCase):
 
     @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute-pp only support on gpu")
     def test_llama_refined_recompute(self):
+        paddle.set_device("gpu")
         from paddlenlp.transformers.llama import LlamaConfig, LlamaModel
 
         llama_model = "__internal_testing__/tiny-random-llama"
@@ -590,6 +592,7 @@ class TestRefinedRecomputeModel(unittest.TestCase):
 
     @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute-pp only support on gpu")
     def test_qwen_refined_recompute(self):
+        paddle.set_device("gpu")
         from paddlenlp.transformers.qwen import QWenConfig, QWenModel
 
         llama_model = "__internal_testing__/tiny-random-qwen"
@@ -608,6 +611,7 @@ class TestRefinedRecomputeModel(unittest.TestCase):
 
     @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute-pp only support on gpu")
     def test_qwen2_refined_recompute(self):
+        paddle.set_device("gpu")
         from paddlenlp.transformers.qwen2 import Qwen2Config, Qwen2Model
 
         llama_model = "__internal_testing__/tiny-random-qwen2"
