@@ -14,8 +14,9 @@
 # limitations under the License.
 import importlib
 import io
-import json
 import os
+import json
+import inspect
 from collections import OrderedDict
 from typing import TYPE_CHECKING, Dict, Optional, Tuple, Union
 
@@ -460,7 +461,7 @@ class AutoTokenizer:
                 return tokenizer_class_fast.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
             else:
                 if tokenizer_class_py is not None:
-                    if isinstance(tokenizer_class_py, str):
+                    if inspect.isclass(tokenizer_class_py):
                         return tokenizer_class_py.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
                     else:
                         # Use the first tokenizer class in the list
