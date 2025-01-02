@@ -93,10 +93,8 @@ class LoRAAutoLinear(LoRALinear):
         if self.weight_dist_attr is not None:
             process_mesh = self.weight_dist_attr[0]
             placements = self.weight_dist_attr[1]
-
             if process_mesh is None or placements is None:
                 return
-
             mp_index = process_mesh.dim_names.index("mp")
             self.weight = dist.shard_tensor(self.weight, process_mesh, placements)
             if placements[mp_index] == dist.Shard(1):

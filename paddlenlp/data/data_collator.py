@@ -398,7 +398,6 @@ class DataCollatorForSeq2Seq:
                     feature["labels"] = np.concatenate([feature["labels"], remainder]).astype(np.int64)
                 else:
                     feature["labels"] = np.concatenate([remainder, feature["labels"]]).astype(np.int64)
-
         batch = self.tokenizer.pad(
             batch,
             padding=self.padding,
