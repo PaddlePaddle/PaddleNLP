@@ -436,25 +436,9 @@ def main():
         gen_args=gen_args,
         data_args=data_args,
     )
-<<<<<<< HEAD:llm/run_finetune.py
     trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
     trainer.set_optimizer_grouped_parameters(trainable_parameters)
 
-=======
-    # #NOTE(zhangwl):this may move to wrap
-    # trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
-    # trainer.set_optimizer_grouped_parameters(trainable_parameters)
-
-    # def forward_pre_hook(layer, input):
-    #     print(f"{layer} forward start")
-
-    # def forward_post_hook(layer, input, output):
-    #     print(f"{layer} forward done")
-
-    # for layer in trainer.model.sublayers():
-    #     layer.register_forward_pre_hook(forward_pre_hook)
-    #     layer.register_forward_post_hook(forward_post_hook)
->>>>>>> [AutoParallel]:auto parallel support lora model:llm/auto_parallel/run_finetune_auto.py
     # Train
     print(trainer.model)
     if training_args.do_train:
