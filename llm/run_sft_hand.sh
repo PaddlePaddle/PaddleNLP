@@ -73,10 +73,15 @@ python -u  -m paddle.distributed.launch \
     --recompute false \
     --save_total_limit 1 \
     --tensor_parallel_degree 2 \
+<<<<<<< HEAD:llm/run_sft_hand.sh
     --pipeline_parallel_degree 2 \
+=======
+    --pipeline_parallel_degree 1 \
+>>>>>>> update auto_lora_model:llm/auto_parallel/llama/llama_finetune_with_api.sh
     --sharding "stage1" \
     --zero_padding false \
     --unified_checkpoint false \
+    --flash_mask false \
     --use_flash_attention true \
     --sharding "stage1" \
     --auto_parallel_resume_form_hybrid_parallel true \
