@@ -94,6 +94,7 @@ class CommonParamInferenceTest(LLMTest, unittest.TestCase):
         AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
         global global_result
         model_tag = os.path.basename(self.model_name_or_path)
+
         if model_tag not in global_result:
             self.run_predictor({"inference_model": True, "block_attn": True, "max_length": 48})
             self.golden_result = self._read_result(os.path.join(self.output_dir, "predict.json"))
