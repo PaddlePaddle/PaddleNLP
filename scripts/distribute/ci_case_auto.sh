@@ -677,6 +677,10 @@ function llama_align_dygraph_dy2st_pir_auto_bs2_bf16_DP2-MP2-PP1-SP() {
 
     for to_static in "0" "1"; do
         for use_recompute in "1" "0"; do
+            if [ "$to_static" -eq "0" ] && [ "$use_recompute" -eq "1" ]; then
+                # The test for recompute only runs when `to_static = 1`.
+                continue
+            fi
             rm -rf $case_out_dir
             rm -rf $case_log_dir
             python -u -m paddle.distributed.launch \

@@ -279,6 +279,7 @@ python ./predict/reft_predictor.py \
 - `do_train`: 是否打开训练，默认为 False。
 - `do_eval`: 是否打开评估，默认为 False。
 - `recompute`: 重计算，暂支持 full 策略。开启后可降低显存以达到增大 batch size 的目的，默认为 False。
+- `refined_recompute`: 精细化重计算，通过精细化控制所需重计算的部分从而达到显存和性能之间的均衡，当前仅支持`llama`系列模型以及`qwen`系列模型，详细使用请参考[TrainingArguments 文档](https://paddlenlp.readthedocs.io/zh/latest/trainer.html)。
 - `tensor_parallel_degree`: 此参数 tensor_parallel_degree 表示将一层 transformer 结构的份数，该方法对通信开销较大, 建议 tensor_parallel_degree<=8, 尽量使用机器内部通信。默认为-1，表示不启用张量并行。
 - `pipeline_parallel_degree`: 表示划分流水线的大小.(假设该参数为4, 模型12层, 则每一个 pp stage 包含3层模型) 默认值-1, 表示不启用流水线并行。
 - `sharding_parallel_degree`: 表示分组参数切片的数据并行大小. 默认值1, 表示不启用分组参数切片的数据并行。

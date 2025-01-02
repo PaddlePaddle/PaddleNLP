@@ -293,6 +293,15 @@ class TrainingArguments:
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
+        refined_recompute (`str`, *optional*, defaults to `""`):
+            The refined recompute parameter is designed to optimize the balance between GPU memory usage and computational speed.
+            An example configuration could be: `attention_column_ln:-1,attention_row_ln:-1,flash_attn:-1,mlp_column_ln:5,mlp_row_ln:-1`.
+            The supported parameters for refining recompute are `attention_column_ln`, `attention_row_ln`, `flash_attn`, `mlp_column_ln`, and `mlp_row_ln`.
+            The associated number, `skip_num`, determines how many times to bypass recomputation for the specified operation.
+            A `skip_num` of `-1` indicates no recomputation across all stages, maximizing memory usage;
+            A `skip_num` of `0` enforces recomputation at every stage, minimizing memory usage.
+            You can also set `skip_num` to a value within the range [1, ..., num_layers]. If `skip_num` exceeds `num_layers`, it will behave as if set to `-1`.
+            If a parameter is omitted, it defaults to `xxx:0`."
         scale_loss (`float`,  *optional*, defaults to 32768):
             The value of initial scale_loss for fp16. (default: 32768)
         local_rank (`int`, *optional*, defaults to -1):
@@ -740,6 +749,19 @@ class TrainingArguments:
             "Only support for networks with transformer blocks."
         },
     )
+    refined_recompute: str = field(
+        default="",
+        metadata={
+            "help": "The refined recompute parameter is designed to optimize the balance between GPU memory usage and computational speed.\n"
+            "An example configuration could be: `attention_column_ln:-1,attention_row_ln:-1,flash_attn:-1,mlp_column_ln:5,mlp_row_ln:-1`.\n"
+            "The supported parameters for refining recompute are `attention_column_ln`, `attention_row_ln`, `flash_attn`, `mlp_column_ln`, and `mlp_row_ln`.\n"
+            "The associated number, `skip_num`, determines how many times to bypass recomputation for the specified operation.\n"
+            "A `skip_num` of `-1` indicates no recomputation across all stages, maximizing memory usage;\n"
+            "A `skip_num` of `0` enforces recomputation at every stage, minimizing memory usage.\n"
+            "You can also set `skip_num` to a value within the range [1, ..., num_layers]. If `skip_num` exceeds `num_layers`, it will behave as if set to `-1`.\n"
+            "If a parameter is omitted, it defaults to `xxx:0`."
+        },
+    )
 
     scale_loss: float = field(default=2**15, metadata={"help": "The value of initial scale_loss for fp16."})
 
@@ -851,6 +873,10 @@ class TrainingArguments:
         metadata={
             "help": "Select ordered_save_group_size to save checkpoint in ordered. if ordered_save_group_size=0, not used ordered save"
         },
+    )
+    metrics_output_path: Optional[str] = field(
+        default=None,
+        metadata={"help": "Where to save training metrics (None for skipping save)."},
     )
     skip_profile_timer: Optional[bool] = field(
         default=True,
@@ -1754,6 +1780,43 @@ class TrainingArguments:
             raise ValueError(
                 f"The local_ran: {self.local_rank} should be consistent with the world size: {paddle.distributed.get_world_size()}."
             )
+
+        # arse_refined_recompute string to dict
+        if self.refined_recompute in [None, ""]:
+            self.refined_recompute = dict()
+        else:
+            refined_recompute_dict = {
+                "mlp_row_ln": 0,
+                "attention_row_ln": 0,
+                "attention_column_ln": 0,
+                "mlp_column_ln": 0,
+                "flash_attn": 0,
+            }
+            ops = self.refined_recompute.split(",")
+            enable_rr = False
+            for op in ops:
+                op = op.strip()
+                if ":" not in op:
+                    raise ValueError("Illegal refined_recompute input, please check.")
+                op_name, skip_num = op.split(":")[0], int(op.split(":")[1])
+                if op_name not in refined_recompute_dict:
+                    raise ValueError(f"Refined recompute do not support {op_name}, please check.")
+                if (
+                    op_name in ["mlp_row_ln", "attention_row_ln", "attention_column_ln", "mlp_column_ln"]
+                    and self.tensor_parallel_degree <= 1
+                ):
+                    logger.warning(
+                        f"Refined recompute is only supported for the `{op_name}` operation when `tensor_parallel_degree` is greater than 1. \
+                            This refined recompute operation will be ignored."
+                    )
+                    continue
+
+                refined_recompute_dict[op_name] = skip_num
+                if skip_num != 0:
+                    enable_rr = True
+            if not enable_rr:
+                refined_recompute_dict = dict()
+            self.refined_recompute = refined_recompute_dict
 
     def __str__(self):
         self_as_dict = asdict(self)

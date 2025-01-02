@@ -61,7 +61,6 @@ from paddlenlp.transformers import (
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.transformers.refined_recompute import update_refined_recompute
 from paddlenlp.trl import DataConfig, ModelConfig, SFTConfig, SFTTrainer
 from paddlenlp.trl.llm_utils import (
     ZeroPaddingIterDatasetCallback,
@@ -154,10 +153,6 @@ def main():
     )
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
-    model_config.refined_recompute = update_refined_recompute(
-        training_args.refined_recompute,
-        model_args.lora,
-    )
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     # Config for model using dropout, such as GPT.

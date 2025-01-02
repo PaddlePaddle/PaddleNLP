@@ -29,6 +29,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed.fleet.recompute import recompute as original_recompute
 
+from paddlenlp.trainer.training_args import TrainingArguments
 from paddlenlp.transformers.refined_recompute import no_recompute as rr_no_recompute
 from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
 from paddlenlp.utils.import_utils import is_paddle_cuda_available
@@ -529,6 +530,7 @@ class BertRefinedRecomputeTest(unittest.TestCase):
 
     @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute-pp only support on gpu")
     def test_refined_recompute_pp(self):
+        paddle.set_device("gpu")
         raw_dtype = paddle.get_default_dtype()
         grad1, layer1 = self.pp_fwd_bwd(recompute=True, use_rr_recompute=False)
         grad2, layer2 = self.pp_fwd_bwd(recompute=True, use_rr_recompute=True)
@@ -557,3 +559,70 @@ class BertRefinedRecomputeTest(unittest.TestCase):
         del layer1, layer2, layer3
         paddle.device.cuda.empty_cache()
         paddle.set_default_dtype(raw_dtype)
+
+
+class TestRefinedRecomputeModel(unittest.TestCase):
+    def setUp(self):
+        self.args = TrainingArguments(
+            output_dir="./",
+            do_train=True,
+            max_steps=100,
+            tensor_parallel_degree=1,
+            pipeline_parallel_degree=1,
+            refined_recompute="attention_column_ln:1,attention_row_ln:2,flash_attn:-1,mlp_column_ln:2,mlp_row_ln:-1",
+        )
+
+    @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute-pp only support on gpu")
+    def test_llama_refined_recompute(self):
+        paddle.set_device("gpu")
+        from paddlenlp.transformers.llama import LlamaConfig, LlamaModel
+
+        llama_model = "__internal_testing__/tiny-random-llama"
+        config = LlamaConfig.from_pretrained(llama_model)
+        config.recompute = True
+        config.recompute_granularity = "full"
+        config.recompute_use_reentrant = False
+        config.sequence_parallel = False
+        config.use_flash_attention = True
+        config.refined_recompute = self.args.refined_recompute
+        model = LlamaModel.from_config(config=config, dtype="bfloat16")
+        input_ids = paddle.randint(0, 100, shape=[1, 1024], dtype="int64")
+        output = model(input_ids)
+        output[0].mean().backward()
+
+    @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute-pp only support on gpu")
+    def test_qwen_refined_recompute(self):
+        paddle.set_device("gpu")
+        from paddlenlp.transformers.qwen import QWenConfig, QWenModel
+
+        llama_model = "__internal_testing__/tiny-random-qwen"
+        config = QWenConfig.from_pretrained(llama_model)
+        config.recompute = True
+        config.recompute_granularity = "full"
+        config.recompute_use_reentrant = False
+        config.sequence_parallel = False
+        config.use_flash_attention = True
+        config.refined_recompute = self.args.refined_recompute
+        config.seq_length = 1024
+        model = QWenModel.from_config(config=config, dtype="bfloat16")
+        input_ids = paddle.randint(0, 100, shape=[1, 1024], dtype="int64")
+        output = model(input_ids)
+        output[0].mean().backward()
+
+    @unittest.skipIf(not is_paddle_cuda_available(), "refined-recompute-pp only support on gpu")
+    def test_qwen2_refined_recompute(self):
+        paddle.set_device("gpu")
+        from paddlenlp.transformers.qwen2 import Qwen2Config, Qwen2Model
+
+        llama_model = "__internal_testing__/tiny-random-qwen2"
+        config = Qwen2Config.from_pretrained(llama_model)
+        config.recompute = True
+        config.recompute_granularity = "full"
+        config.recompute_use_reentrant = False
+        config.sequence_parallel = False
+        config.use_flash_attention = True
+        config.refined_recompute = self.args.refined_recompute
+        model = Qwen2Model.from_config(config=config, dtype="bfloat16")
+        input_ids = paddle.randint(0, 100, shape=[1, 1024], dtype="int64")
+        output = model(input_ids)
+        output[0].mean().backward()
