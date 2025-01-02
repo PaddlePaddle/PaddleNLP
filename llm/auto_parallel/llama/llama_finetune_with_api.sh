@@ -88,7 +88,4 @@ python -u  -m paddle.distributed.launch \
     --fuse_attention_qkv true \
     --sharding "stage1" \
     --auto_parallel_resume_form_hybrid_parallel true \
-    --num_hidden_layers 2 \
-    # --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
-    # --tensor_parallel_config "enable_mp_async_allreduce" \
-    # --pipeline_parallel_config "enable_send_recv_overlap" \
+    --num_hidden_layers 2 
