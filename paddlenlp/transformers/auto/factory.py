@@ -87,7 +87,7 @@ class _LazyAutoMapping(OrderedDict):
                 except ImportError:
                     pass
             if module_name not in self._modules:
-                if any(["Tokenizer" in name for name in [model_type, attr]]):
+                if any(["Config" in name for name in [model_type, attr]]):
                     try:
                         self._modules[module_name] = importlib.import_module(
                             f".{module_name}.configuration", "paddlenlp.transformers"
