@@ -15,6 +15,7 @@ import copy
 import os
 
 import paddle
+import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.distributed import fleet
@@ -27,6 +28,7 @@ from paddlenlp.transformers import (
     parallel_matmul,
     sequence_parallel_sparse_mask_labels,
 )
+from paddlenlp.transformers.model_outputs import CausalLMOutputWithPast
 from paddlenlp.utils import infohub
 
 
@@ -49,12 +51,14 @@ class KTOCriterion(nn.Layer):
         self.use_infohub = use_infohub
         self.ignore_label = ignore_label
         # allgather kl in criterion
-        topo = fleet.get_hybrid_communicate_group()._topo
-        parallel_groups = topo.get_comm_list("pipe")
-        ranks = []
-        for group in parallel_groups:
-            ranks.append(group[-1])
-        self.comm_group = paddle.distributed.new_group(ranks=ranks)
+        self.comm_group = None
+        if dist.get_world_size() > 1:
+            topo = fleet.get_hybrid_communicate_group()._topo
+            parallel_groups = topo.get_comm_list("pipe")
+            ranks = []
+            for group in parallel_groups:
+                ranks.append(group[-1])
+            self.comm_group = paddle.distributed.new_group(ranks=ranks)
 
     def _nested_gather(self, tensors):
         """
@@ -77,12 +81,14 @@ class KTOCriterion(nn.Layer):
 
     def kto_logps(self, logits, response_labels, response_kl_labels, response_indexs):
         """KTO logprobs"""
+        use_fused_head_and_loss_fn = getattr(self.config, "use_fused_head_and_loss_fn", False)
+        use_sparse_head_and_loss_fn = getattr(self.config, "use_sparse_head_and_loss_fn", False)
         labels = response_labels + response_kl_labels
-        if self.config.use_fused_head_and_loss_fn:
+        if use_fused_head_and_loss_fn:
             hidden_states, weight, bias, transpose_y = logits
-        elif self.config.use_sparse_head_and_loss_fn:
+        elif use_sparse_head_and_loss_fn:
             hidden_states, weight, bias = logits
-        if self.config.use_sparse_head_and_loss_fn:
+        if use_sparse_head_and_loss_fn:
             if self.config.tensor_parallel_degree > 1 and self.config.sequence_parallel:
                 labels, sparse_tgt_idx = sequence_parallel_sparse_mask_labels(labels, self.ignore_label)
 
@@ -95,7 +101,7 @@ class KTOCriterion(nn.Layer):
 
                 hidden_states = hidden_states.reshape([-1, hidden_states.shape[-1]])
                 hidden_states = paddle.take_along_axis(hidden_states, sparse_tgt_idx.unsqueeze(-1), axis=0)
-        if self.config.use_fused_head_and_loss_fn:
+        if use_fused_head_and_loss_fn:
             per_token_logps = -fused_head_and_loss_fn(
                 hidden_states,
                 weight,
@@ -111,7 +117,7 @@ class KTOCriterion(nn.Layer):
                 return_token_loss=True,
                 ignore_index=self.ignore_label,
             )
-        elif self.config.use_sparse_head_and_loss_fn:
+        elif use_sparse_head_and_loss_fn:
             if bias is None:
                 logits = parallel_matmul(hidden_states, weight, self.config.tensor_parallel_output)
             else:
@@ -124,6 +130,10 @@ class KTOCriterion(nn.Layer):
             logits = logits.astype("float32")
             per_token_logps = -self.logprobs(logits, labels)
         else:
+            if isinstance(logits, tuple):
+                logits = logits[0]
+            elif isinstance(logits, CausalLMOutputWithPast):
+                logits = logits.logits
             logits = logits.astype("float32")
             if logits.shape[:-1] != labels.shape:
                 raise ValueError("Logits (batch and sequence length dim) and labels must have the same shape.")
@@ -132,7 +142,7 @@ class KTOCriterion(nn.Layer):
 
         if len(response_indexs.shape) == 3:
             response_indexs = response_indexs[0]
-        if self.config.use_sparse_head_and_loss_fn:
+        if use_sparse_head_and_loss_fn:
             chosen_logps_list = [
                 (per_token_logps[response_index[1] : response_index[2]]).sum()
                 for response_index in response_indexs
@@ -183,7 +193,8 @@ class KTOCriterion(nn.Layer):
     ):
         """KTO Loss"""
         kl = (policy_kl_logps - reference_kl_logps).mean().detach()
-        kl = self._nested_gather(paddle.tile(kl, repeat_times=[1, 1])).mean().clip(min=0)
+        if dist.get_world_size() > 1:
+            kl = self._nested_gather(paddle.tile(kl, repeat_times=[1, 1])).mean().clip(min=0)
         if policy_chosen_logps.shape[0] == 0 or reference_chosen_logps.shape[0] == 0:
             chosen_losses = paddle.zeros([0])
         else:

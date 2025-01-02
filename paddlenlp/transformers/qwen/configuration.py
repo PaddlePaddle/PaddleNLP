@@ -49,6 +49,7 @@ class QWenConfig(PretrainedConfig):
         long_sequence_strategy_name=None,
         long_sequence_init_args=None,
         use_long_sequence_strategies=False,
+        dpo_config=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -74,6 +75,7 @@ class QWenConfig(PretrainedConfig):
         self.long_sequence_strategy_name = long_sequence_strategy_name
         self.long_sequence_init_args = {} if long_sequence_init_args is None else long_sequence_init_args
         self.use_long_sequence_strategies = use_long_sequence_strategies
+        self.dpo_config = dpo_config
 
         super().__init__(
             pad_token_id=pad_token_id,

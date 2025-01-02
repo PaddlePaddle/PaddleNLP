@@ -22,6 +22,7 @@ from paddlenlp.transformers.refined_recompute import (
     create_skip_config_for_refined_recompute,
 )
 
+from ..dpo_criterion import DPOCriterion
 from .modeling import (
     QWenBlock,
     QWenConfig,
@@ -193,7 +194,7 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         PipelineLayer.__init__(
             self,
             layers=self.get_sequential_layers(),
-            loss_fn=QWenPretrainingCriterion(config),
+            loss_fn=self.get_loss_fn(config),
             topology=get_hcg().topology(),
             seg_method=seg_method,
             recompute_interval=recompute_interval,
@@ -208,3 +209,9 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.apply(self._init_weights)
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)
+
+    def get_loss_fn(self, config):
+        if config.dpo_config is not None:
+            return DPOCriterion(config, use_infohub=True)
+        else:
+            return QWenPretrainingCriterion(config)
