@@ -1062,7 +1062,7 @@ class LlamaForCausalLMNet(LlamaPretrainedModelNet):
                     f"{prefix}lm_head.weight": dist.ColWiseParallel(),
                 }
             },
-            "pp_config": {"split_spec": f"{prefix}llama.layers", "global_spec": "llama.global_layer"},
+            "pp_config": {"split_spec": f"{prefix}llama.layers", "global_spec": f"{prefix}llama.global_layer"},
         }
 
         return config
