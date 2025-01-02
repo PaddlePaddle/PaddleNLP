@@ -418,6 +418,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "When performing evaluation and predictions, only returns the loss."},
     )
+    use_lorapro: bool = field(
+        default=False,
+        metadata={"help": "When use lora-pro"},
+    )
 
     per_device_train_batch_size: int = field(default=8, metadata={"help": "Batch size per GPU core/CPU for training."})
     per_device_eval_batch_size: int = field(
