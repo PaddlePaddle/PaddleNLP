@@ -15,6 +15,7 @@
 from contextlib import nullcontext
 
 import paddle
+
 try:
     from paddle.base import core
 except:

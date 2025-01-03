@@ -5,7 +5,7 @@ torch>=1.5
 transformers
 fast_dataindex
 sacremoses
-pydantic==1.10.9
+pydantic
 modelscope
 hyperopt
 h5py
