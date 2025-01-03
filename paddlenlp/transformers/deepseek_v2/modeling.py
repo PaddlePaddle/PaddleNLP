@@ -68,6 +68,13 @@ from ..model_outputs import (
 from ..model_utils import PretrainedModel, register_base_model
 from .configuration import DeepseekV2Config
 
+__all__ = [
+    "DeepseekV2ForCausalLM",
+    "DeepseekV2ForSequenceClassification",
+    "DeepseekV2Model",
+    "DeepseekV2PretrainedModel",
+]
+
 
 def get_triangle_upper_mask(x, mask=None):
     if mask is not None:
@@ -1169,8 +1176,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             model_mappings.append([f"layers.{layer_index}.mlp.shared_experts.down_proj.weight", None, "transpose"])
 
         init_name_mappings(mappings=model_mappings)
-        # base-model prefix "Qwen2MoEModel"
-        if "DeepSeekV2Model" not in config.architectures:
+        if cls.base_model_class.__name__ not in config.architectures:
             for mapping in model_mappings:
                 mapping[0] = "model." + mapping[0]
                 mapping[1] = f"{cls.base_model_prefix}." + mapping[1]
@@ -1261,7 +1267,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                                 mean=0.0,
                                 std=self.config.initializer_range
                                 if hasattr(self.config, "initializer_range")
-                                else self.deepseek_v2.config.initializer_range,
+                                else self.config.initializer_range,
                                 shape=layer.weight.shape,
                             )
                         )
@@ -1271,7 +1277,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                             mean=0.0,
                             std=self.config.initializer_range
                             if hasattr(self.config, "initializer_range")
-                            else self.deepseek_v2.config.initializer_range,
+                            else self.config.initializer_range,
                             shape=layer.weight.shape,
                         )
                     )
@@ -1622,6 +1628,7 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
 
     def __init__(self, config: DeepseekV2Config):
         super().__init__(config)
+        self.config = config
         self.deepseek_v2 = DeepseekV2Model(config)
         self.vocab_size = config.vocab_size
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)

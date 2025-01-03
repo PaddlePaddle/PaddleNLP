@@ -56,22 +56,38 @@ else:
             ("blenderbot", "BlenderbotTokenizer"),
             (
                 "bloom",
-                ("BloomTokenizer", "BloomTokenizerFast" if is_tokenizers_available() else None),
+                (
+                    "BloomTokenizer",
+                    "BloomTokenizerFast" if is_tokenizers_available() else None,
+                ),
             ),
             ("clip", "CLIPTokenizer"),
             ("codegen", "CodeGenTokenizer"),
             ("convbert", "ConvBertTokenizer"),
             ("ctrl", "CTRLTokenizer"),
             ("distilbert", "DistilBertTokenizer"),
+            (
+                "deepseek_v2",
+                "DeepseekTokenizerFast" if is_tokenizers_available() else None,
+            ),
             ("electra", "ElectraTokenizer"),
             (
                 "ernie",
-                ("ErnieTokenizer", "ErnieTokenizerFast" if is_tokenizers_available() else None),
+                (
+                    "ErnieTokenizer",
+                    "ErnieTokenizerFast" if is_tokenizers_available() else None,
+                ),
             ),
             ("ernie_m", "ErnieMTokenizer"),
             ("fnet", "FNetTokenizer"),
             ("funnel", "FunnelTokenizer"),
-            ("gemma", ("GemmaTokenizer", "GemmaTokenizerFast" if is_tokenizers_available() else None)),
+            (
+                "gemma",
+                (
+                    "GemmaTokenizer",
+                    "GemmaTokenizerFast" if is_tokenizers_available() else None,
+                ),
+            ),
             ("jamba", "JambaTokenizer"),
             ("layoutlm", "LayoutLMTokenizer"),
             ("layoutlmv2", "LayoutLMv2Tokenizer"),
@@ -122,7 +138,10 @@ else:
             ("unimo", "UNIMOTokenizer"),
             (
                 "gpt",
-                (("GPTTokenizer", "GPTChineseTokenizer"), "GPTTokenizerFast" if is_tokenizers_available() else None),
+                (
+                    ("GPTTokenizer", "GPTChineseTokenizer"),
+                    "GPTTokenizerFast" if is_tokenizers_available() else None,
+                ),
             ),
             ("gau_alpha", "GAUAlphaTokenizer"),
             ("artist", "ArtistTokenizer"),
@@ -130,7 +149,13 @@ else:
             ("ernie_vil", "ErnieViLTokenizer"),
             ("glm", "GLMGPT2Tokenizer"),
             ("qwen", "QWenTokenizer"),
-            ("qwen2", ("Qwen2Tokenizer", "Qwen2TokenizerFast" if is_tokenizers_available() else None)),
+            (
+                "qwen2",
+                (
+                    "Qwen2Tokenizer",
+                    "Qwen2TokenizerFast" if is_tokenizers_available() else None,
+                ),
+            ),
             ("yuan", "YuanTokenizer"),
         ]
     )
@@ -156,7 +181,10 @@ def get_configurations():
     for class_name, values in TOKENIZER_MAPPING_NAMES.items():
         all_tokenizers = get_mapping_tokenizers(values, with_fast=False)
         for key in all_tokenizers:
-            import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
+            try:
+                import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
+            except ImportError:
+                import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.tokenizer_fast")
             tokenizer_name = getattr(import_class, key)
             name = tuple(tokenizer_name.pretrained_init_configuration.keys())
             MAPPING_NAMES[name] = tokenizer_name
@@ -481,7 +509,12 @@ class AutoTokenizer:
             "- or the correct path to a directory containing relevant tokenizer files.\n"
         )
 
-    def register(config_class, slow_tokenizer_class=None, fast_tokenizer_class=None, exist_ok=False):
+    def register(
+        config_class,
+        slow_tokenizer_class=None,
+        fast_tokenizer_class=None,
+        exist_ok=False,
+    ):
         """
         Register a new tokenizer in this mapping.
 
@@ -522,4 +555,8 @@ class AutoTokenizer:
             if fast_tokenizer_class is None:
                 fast_tokenizer_class = existing_fast
 
-        TOKENIZER_MAPPING.register(config_class, (slow_tokenizer_class, fast_tokenizer_class), exist_ok=exist_ok)
+        TOKENIZER_MAPPING.register(
+            config_class,
+            (slow_tokenizer_class, fast_tokenizer_class),
+            exist_ok=exist_ok,
+        )
