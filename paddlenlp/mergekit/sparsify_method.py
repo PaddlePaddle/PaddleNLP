@@ -39,16 +39,14 @@ class SparsifyMethod:
                 tensor /= self.merge_config.reserve_p
             return tensor
         elif self.merge_config.tensor_type == "pd":
-            mask = paddle.cast(
-                paddle.bernoulli(paddle.full(tensor.shape, self.merge_config.reserve_p, dtype=tensor.dtype)),
-                tensor.dtype,
-            )
+            mask = paddle.bernoulli(paddle.full(tensor.shape, self.merge_config.reserve_p, dtype=tensor.dtype))
+
             tensor *= mask
             if self.merge_config.rescale:
                 tensor /= self.merge_config.reserve_p
             return tensor
         else:
-            raise NotImplementedError("Unsupported tensor type.")
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
 
     def magprune(self, tensor):
         if self.merge_config.tensor_type == "np":
@@ -80,8 +78,8 @@ class SparsifyMethod:
             abs_tensor = paddle.abs(tensor)
             sorted_indices = paddle.argsort(-abs_tensor.flatten())
 
-            probs = paddle.zeros_like(sorted_indices, dtype=tensor.dtype)
-            probs = paddle.scatter(probs, sorted_indices, paddle.arange(tensor.numel(), dtype=tensor.dtype))
+            probs = paddle.zeros_like(sorted_indices, dtype="float32")
+            probs = paddle.scatter(probs, sorted_indices, paddle.arange(tensor.numel(), dtype="float32"))
             probs = probs.reshape(tensor.shape)
             probs = probs * self.merge_config.epsilon / tensor.numel()
             p_min = drop_p - self.merge_config.epsilon / 2
@@ -93,7 +91,7 @@ class SparsifyMethod:
                 tensor /= 1 - probs
             return tensor
         else:
-            raise NotImplementedError("Unsupported tensor type.")
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
 
     def trim(self, tensor):
         if self.merge_config.tensor_type == "np":
@@ -126,4 +124,4 @@ class SparsifyMethod:
                     tensor *= org_sum / new_sum
             return tensor
         else:
-            raise NotImplementedError("Unsupported tensor type.")
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")

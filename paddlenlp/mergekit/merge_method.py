@@ -31,7 +31,7 @@ class MergeMethod:
         elif self.merge_config.merge_type == "ties":
             return self.ties(tensor_list)
         else:
-            raise NotImplementedError("Unsupported tensor type.")
+            raise NotImplementedError(f"{self.merge_config.merge_type} is not supported yet.")
 
     def linear(self, tensor_list):
         """
@@ -54,7 +54,7 @@ class MergeMethod:
             weighted_sum = paddle.sum(stacked_tensors * weights, axis=0)
             return weighted_sum
         else:
-            raise NotImplementedError(f"Tensor type {self.merge_config.tensor_type} is not supported yet.")
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
 
     def slerp(self, tensor_list):
         """
@@ -123,7 +123,7 @@ class MergeMethod:
 
             return s0 * t0_copy + s1 * t1_copy
         else:
-            raise NotImplementedError("Unsupported tensor type.")
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
 
     def ties(self, tensor_list):
         if self.merge_config.tensor_type == "np":
@@ -138,7 +138,7 @@ class MergeMethod:
             elif self.merge_config.ties_elect_type == "count":
                 majority_sign = (np.sum(sign_tensor_list, axis=0) >= 0).astype(mask_dtype) * 2 - 1
             else:
-                raise NotImplementedError("Unsupported tensor type.")
+                raise NotImplementedError(f"ties_elect_type: {self.merge_config.ties_elect_type} is unknown.")
 
             # Merge
             mask_list = [sign_tensor == majority_sign for sign_tensor in sign_tensor_list]
@@ -167,7 +167,7 @@ class MergeMethod:
                 stacked_signs = paddle.sign(stacked_tensors).astype(mask_dtype)
                 majority_sign = (paddle.sum(stacked_signs, axis=0) >= 0).astype(mask_dtype) * 2 - 1
             else:
-                raise NotImplementedError("Unsupported tensor type.")
+                raise NotImplementedError(f"ties_elect_type: {self.merge_config.ties_elect_type} is unknown.")
 
             # Merge
             stacked_masks = (paddle.sign(weighted_tensors) == majority_sign).astype(mask_dtype)
@@ -182,7 +182,7 @@ class MergeMethod:
 
             return merge_tensor
         else:
-            raise NotImplementedError("Unsupported tensor type.")
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
 
     def normalize(self, t):
         """
@@ -199,4 +199,4 @@ class MergeMethod:
                 t = t / norm_t
             return t
         else:
-            raise NotImplementedError("Unsupported tensor type.")
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
