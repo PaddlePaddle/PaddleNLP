@@ -1905,6 +1905,24 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         return file_names + (added_tokens_file,)
 
+    def save_vocabulary(self, save_directory: str, filename_prefix: Optional[str] = None) -> Tuple[str]:
+        """
+        Save only the vocabulary of the tokenizer (vocabulary + added tokens).
+
+        This method won't save the configuration and special token mappings of the tokenizer. Use
+        [`~PreTrainedTokenizerFast._save_pretrained`] to save the whole state of the tokenizer.
+
+        Args:
+            save_directory (`str`):
+                The directory in which to save the vocabulary.
+            filename_prefix (`str`, *optional*):
+                An optional prefix to add to the named of the saved files.
+
+        Returns:
+            `Tuple(str)`: Paths to the files saved.
+        """
+        raise NotImplementedError
+
     def save_resources(self, save_directory):
         """
         Save tokenizer related resources to `resource_files_names` indicating
@@ -2995,8 +3013,9 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
     def prepare_for_model(
         self,
-        ids,
-        pair_ids=None,
+        ids: List[int],
+        pair_ids: Optional[List[int]] = None,
+        add_special_tokens: bool = True,
         padding: Union[bool, str, PaddingStrategy] = False,
         truncation: Union[bool, str, TruncationStrategy] = False,
         max_length: Optional[int] = None,
@@ -3007,20 +3026,20 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         return_position_ids=None,
         return_token_type_ids: Optional[bool] = None,
         return_attention_mask: Optional[bool] = None,
-        return_length=False,
-        return_overflowing_tokens=False,
-        return_special_tokens_mask=False,
-        return_offsets_mapping=False,
-        add_special_tokens=True,
+        return_overflowing_tokens: bool = False,
+        return_special_tokens_mask: bool = False,
+        return_offsets_mapping: bool = False,
+        return_length: bool = False,
         verbose: bool = True,
         prepend_batch_axis: bool = False,
-        **kwargs
+        **kwargs,
     ):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports sequence or sequence pair as input, and batch input
         is not allowed.
         """
+        # Backward compatibility for 'truncation_strategy', 'pad_to_max_length'
         padding_strategy, truncation_strategy, max_length, kwargs = self._get_padding_truncation_strategies(
             padding=padding,
             truncation=truncation,
@@ -3060,11 +3079,12 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         if return_position_ids is None:
             return_position_ids = "position_ids" in self.model_input_names
         encoded_inputs = {}
-        # Truncation: Handle max sequence length
+
+        # Compute the total size of the returned encodings
         total_len = len_ids + len_pair_ids + (self.num_special_tokens_to_add(pair=pair) if add_special_tokens else 0)
 
+        # Truncation: Handle max sequence length
         overflowing_tokens = []
-
         if truncation_strategy != TruncationStrategy.DO_NOT_TRUNCATE and max_length and total_len > max_length:
             ids, pair_ids, overflowing_tokens = self.truncate_sequences(
                 ids,
@@ -3073,6 +3093,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 truncation_strategy=truncation_strategy,
                 stride=stride,
             )
+
         if return_overflowing_tokens:
             encoded_inputs["overflowing_tokens"] = overflowing_tokens
             encoded_inputs["num_truncated_tokens"] = total_len - max_length
@@ -3503,6 +3524,33 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         **kwargs
     ) -> str:
         raise NotImplementedError
+
+    def decode_token(
+        self,
+        all_input_ids: List[int],
+        prefix_offset: int = 0,
+        read_offset: int = 0,
+    ) -> Tuple[str, int, int]:
+        """tokenizer decoding for the streaming generation use case. This method can be overrided for tokenizer that doesn't follow this API"""
+        # The prefix text is necessary only to defeat cleanup algorithms in the decode
+        # which decide to add a space or not depending on the surrounding ids.
+        prefix_text = self.decode(
+            all_input_ids[prefix_offset:read_offset], skip_special_tokens=False, clean_up_tokenization_spaces=False
+        )
+        new_text = self.decode(
+            all_input_ids[prefix_offset:], skip_special_tokens=False, clean_up_tokenization_spaces=False
+        )
+
+        if len(new_text) > len(prefix_text) and not prefix_text.endswith("�") and not new_text.endswith("�"):
+            # utf-8 char at the end means it's a potential unfinished byte sequence
+            # from byte fallback tokenization.
+            # If it's in the middle, it's probably a real invalid id generated
+            # by the model
+            prefix_index = new_text.index(prefix_text)
+            new_text = new_text[prefix_index + len(prefix_text) :]
+            return new_text, read_offset, len(all_input_ids)
+        else:
+            return "", prefix_offset, read_offset
 
     def get_special_tokens_mask(
         self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None, already_has_special_tokens: bool = False

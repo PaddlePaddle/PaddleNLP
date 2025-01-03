@@ -25,7 +25,7 @@ import re
 import unicodedata
 from collections import OrderedDict
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union, overload
 
 import numpy
 import numpy as np
@@ -36,16 +36,15 @@ from jinja2.exceptions import TemplateError, TemplateSyntaxError
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 from paddle.utils import try_import
 
-from paddlenlp.utils.env import CHAT_TEMPLATE_CONFIG_NAME
-from paddlenlp.utils.log import logger
-
 try:
     from functools import lru_cache
 except ImportError:
     from backports.functools_lru_cache import lru_cache
 
 from ..data.vocab import Vocab
+from ..utils.env import CHAT_TEMPLATE_CONFIG_NAME
 from ..utils.import_utils import is_tokenizers_available
+from ..utils.log import logger
 from .tokenizer_utils_base import (
     BatchEncoding,
     EncodedInput,
@@ -59,7 +58,7 @@ from .tokenizer_utils_base import (
     TextInputPair,
     TruncationStrategy,
 )
-from .utils import InitTrackerMeta, convert_to_dict_message, fn_args_to_dict
+from .utils import InitTrackerMeta, convert_to_dict_message
 
 if is_tokenizers_available():
     from tokenizers import AddedToken
@@ -77,221 +76,32 @@ __all__ = [
 ]
 
 
-def convert_to_unicode(text):
-    """
-    Converts `text` to Unicode (if it's not already), assuming utf-8 input.
-    Args:
-        text (str|bytes): Text to be converted to unicode.
-    Returns:
-        str: converted text.
-    """
-    if isinstance(text, str):
-        return text
-    elif isinstance(text, bytes):
-        return text.decode("utf-8", "ignore")
-    else:
-        raise ValueError("Unsupported string type: %s" % (type(text)))
-
-
-def whitespace_tokenize(text):
-    """
-    Runs basic whitespace cleaning and splitting on a peice of text.
-    Args:
-        text (str): Text to be tokenized.
-    Returns:
-        list(str): Token list.
-    """
-    text = text.strip()
-    if not text:
-        return []
-    tokens = text.split()
-    return tokens
-
-
-def _is_whitespace(char):
-    """
-    Checks whether `chars` is a whitespace character.
-    """
-    # \t, \n, and \r are technically contorl characters but we treat them
-    # as whitespace since they are generally considered as such.
-    if char == " " or char == "\t" or char == "\n" or char == "\r":
-        return True
-    cat = unicodedata.category(char)
-    if cat == "Zs":
-        return True
-    return False
-
-
-def _is_control(char):
-    """Checks whether `chars` is a control character."""
-    # These are technically control characters but we count them as whitespace
-    # characters.
-    if char == "\t" or char == "\n" or char == "\r":
-        return False
-    cat = unicodedata.category(char)
-    if cat.startswith("C"):
-        return True
-    return False
-
-
-def _is_punctuation(char):
-    """Checks whether `chars` is a punctuation character."""
-    cp = ord(char)
-    # We treat all non-letter/number ASCII as punctuation.
-    # Characters such as "^", "$", and "`" are not in the Unicode
-    # Punctuation class but we treat them as punctuation anyways, for
-    # consistency.
-    if (cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64) or (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126):
-        return True
-    cat = unicodedata.category(char)
-    if cat.startswith("P"):
-        return True
-    return False
-
-
-def _is_end_of_word(text):
-    """Checks whether the last character in text is one of a punctuation, control or whitespace character."""
-    last_char = text[-1]
-    return bool(_is_control(last_char) | _is_punctuation(last_char) | _is_whitespace(last_char))
-
-
-def _is_start_of_word(text):
-    """Checks whether the first character in text is one of a punctuation, control or whitespace character."""
-    first_char = text[0]
-    return bool(_is_control(first_char) | _is_punctuation(first_char) | _is_whitespace(first_char))
-
-
-def _insert_one_token_to_ordered_list(token_list: List[str], new_token: str):
-    """
-    Inserts one token to an ordered list if it does not already exist. Note: token_list must be sorted.
-    """
-    insertion_idx = bisect.bisect_left(token_list, new_token)
-    # Checks if new_token is already in the ordered token_list
-    if insertion_idx < len(token_list) and token_list[insertion_idx] == new_token:
-        # new_token is in token_list, don't add
-        return
-    else:
-        token_list.insert(insertion_idx, new_token)
-
-
-def is_chinese_char(cp):
-    """Checks whether CP is the codepoint of a CJK character."""
-    # This defines a "chinese character" as anything in the CJK Unicode block:
-    #     https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
-    #
-    # Note that the CJK Unicode block is NOT all Japanese and Korean characters,
-    # despite its name. The modern Korean Hangul alphabet is a different block,
-    # as is Japanese Hiragana and Katakana. Those alphabets are used to write
-    # space-separated words, so they are not treated specially and handled
-    # like the all of the other languages.
-    if (
-        (cp >= 0x4E00 and cp <= 0x9FFF)
-        or (cp >= 0x3400 and cp <= 0x4DBF)  #
-        or (cp >= 0x20000 and cp <= 0x2A6DF)  #
-        or (cp >= 0x2A700 and cp <= 0x2B73F)  #
-        or (cp >= 0x2B740 and cp <= 0x2B81F)  #
-        or (cp >= 0x2B820 and cp <= 0x2CEAF)  #
-        or (cp >= 0xF900 and cp <= 0xFAFF)
-        or (cp >= 0x2F800 and cp <= 0x2FA1F)  #
-    ):  #
-        return True
-
-    return False
-
-
-def _is_nonnormalized_char(char):
-    """Check whther `chars` is a non-normalized character."""
-    cp = ord(char)
-    if (
-        (0xFF00 <= cp <= 0xFFEF)
-        or (0xFE50 <= cp <= 0xFE6B)  # Halfwidth and Fullwidth Forms
-        or (0x3358 <= cp <= 0x33FF)  # Small Form Variants
-        or (0x249C <= cp <= 0x24E9)  # CJK Compatibility
-        or (0x3200 <= cp <= 0x32FF)  # Enclosed Alphanumerics: Ⓛ ⒰
-    ):  # Enclosed CJK Letters and Months
-        return True
-
-    return False
-
-
-def _is_nonnormalized_numeric(char):
-    """Check whether `chars` is a non-normalized numeric character."""
-    cp = ord(char)
-    if (
-        (0x2460 <= cp <= 0x249B)
-        or (0x24EA <= cp <= 0x24FF)  #
-        or (0x2776 <= cp <= 0x2793)  #
-        or (0x2160 <= cp <= 0x217F)  # Enclosed Alphanumerics
-    ):  # Number Forms
-        return True
-
-    return False
-
-
-def normalize_chars(text):
-    """
-    Normalize the text for multiligual and chinese models. Unicode range:
-    https://www.ling.upenn.edu/courses/Spring_2003/ling538/UnicodeRanges.html
-    """
-    output = []
-    for char in text:
-        if _is_nonnormalized_char(char):
-            for c in unicodedata.normalize("NFKC", char):
-                output.append(c)
-        elif _is_nonnormalized_numeric(char):
-            output.append(" ")
-            for c in str(int(unicodedata.numeric(char))):
-                output.append(c)
-            output.append(" ")
-        elif ord(char) == 0xF979:  # https://www.zhihu.com/question/20697984
-            output.append("凉")
-        else:
-            output.append(char)
-    return "".join(output)
-
-
-def _is_symbol(char):
-    """Check whether CP is the codepoint of a Symbol character."""
-    cp = ord(char)
-    if unicodedata.category(char).startswith("S") or (
-        cp in [0x00AD, 0x00B2, 0x00BA, 0x3007, 0x00B5, 0x00D8, 0x014B, 0x01B1]
-    ):
-        return True
-    return False
-
-
-def tokenize_special_chars(text):
-    """Adds whitespace around any special character."""
-    output = []
-    for char in text:
-        cp = ord(char)
-        if (
-            (0x3040 <= cp <= 0x30FF)
-            or (0x0370 <= cp <= 0x04FF)  # Japanese
-            or (0x0250 <= cp <= 0x02AF)  # Greek/Coptic & Cyrillic
-            or _is_symbol(char)  # IPA
-        ):
-            output.append(" ")
-            output.append(char)
-            output.append(" ")
-        else:
-            output.append(char)
-    return "".join(output)
-
-
 class Trie:
     """
     Trie in Python. Creates a Trie out of a list of words. The trie is used to split on `added_tokens` in one pass
     Loose reference https://en.wikipedia.org/wiki/Trie
     """
 
-    def __init__(self):
+    def __init__(self, *args):
         self.data = {}
+        self._tokens = set()
+        self._termination_char = ""
+        self.update(*args)
+
+    def update(self, *args):
+        """
+        Updates the Trie with new tokens provided as arguments.
+
+        Args:
+            *args: Variable number of words to be added to the Trie.
+        """
+        for token in tuple(*args):
+            self.add(token)
 
     def add(self, word: str):
         """
         Passes over every char (utf-8 char) on word and recursively adds it to the internal `data` trie representation.
-        The special key `""` is used to represent termination.
+        The special key `""` in `self._termination_char` is used to represent termination.
 
         This function is idempotent, adding twice the same word will leave the trie unchanged
 
@@ -311,11 +121,13 @@ class Trie:
         if not word:
             # Prevent empty string
             return
+
+        self._tokens.add(word)
         ref = self.data
         for char in word:
-            ref[char] = char in ref and ref[char] or {}
+            ref[char] = ref.setdefault(char, {})
             ref = ref[char]
-        ref[""] = 1
+        ref[self._termination_char] = 1
 
     def split(self, text: str) -> List[str]:
         """
@@ -423,7 +235,7 @@ class Trie:
                             next_char = text[lookahead_index]
                         # End lookahead
 
-                        # Storing and resetting
+                    # Storing and resetting
                     offsets.append(start)
                     offsets.append(end)
                     reset = True
@@ -492,6 +304,265 @@ class Trie:
             start = end
 
         return tokens
+
+
+class ExtensionsTrie(Trie):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+    def extensions(self, prefix: str):
+        """
+        Generates all extensions of a given prefix token in the Trie.
+
+        Example:
+
+        ```python
+        >>> trie = Trie()
+        >>> trie.add("apple")
+        >>> trie.add("app")
+        >>> trie.add("application")
+        >>> trie.extensions("app")
+        ['app', 'apple', 'application']
+        ```
+        """
+        prefix_node = self._get_node(prefix)
+        ret = self._collect_tokens(prefix_node)
+        return [prefix + token for token in ret]
+
+    def _get_node(self, token: str) -> dict:
+        """
+        Retrieves the node corresponding to the given token in the Trie.
+
+        Args:
+            token (str): The token for which the corresponding node needs to be retrieved.
+
+        Returns:
+            dict: The node in the Trie corresponding to the given token.
+        """
+        node = self.data
+        for char in token:
+            if char not in node:
+                break
+
+            node = node[char]
+        return node
+
+    def _collect_tokens(self, node: dict) -> list:
+        """
+        Generates all tokens in the Trie starting from a given node.
+
+        Args:
+            node (dict): The node in the Trie from which tokens need to be generated.
+
+        Returns:
+            list: List of tokens generated from the given node.
+        """
+        tokens = [self._termination_char] if self._termination_char in node else []
+        for token, subtrie_head in node.items():
+            if token != self._termination_char:
+                subtokens = self._collect_tokens(subtrie_head)
+                tokens.extend([token + subtoken for subtoken in subtokens])
+        return tokens
+
+
+def _is_whitespace(char):
+    """Checks whether `char` is a whitespace character."""
+    # \t, \n, and \r are technically control characters but we treat them
+    # as whitespace since they are generally considered as such.
+    if char == " " or char == "\t" or char == "\n" or char == "\r":
+        return True
+    cat = unicodedata.category(char)
+    if cat == "Zs":
+        return True
+    return False
+
+
+def _is_control(char):
+    """Checks whether `char` is a control character."""
+    # These are technically control characters but we count them as whitespace
+    # characters.
+    if char == "\t" or char == "\n" or char == "\r":
+        return False
+    cat = unicodedata.category(char)
+    if cat.startswith("C"):
+        return True
+    return False
+
+
+def _is_punctuation(char):
+    """Checks whether `char` is a punctuation character."""
+    cp = ord(char)
+    # We treat all non-letter/number ASCII as punctuation.
+    # Characters such as "^", "$", and "`" are not in the Unicode
+    # Punctuation class but we treat them as punctuation anyways, for
+    # consistency.
+    if (cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64) or (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126):
+        return True
+    cat = unicodedata.category(char)
+    if cat.startswith("P"):
+        return True
+    return False
+
+
+def _is_end_of_word(text):
+    """Checks whether the last character in text is one of a punctuation, control or whitespace character."""
+    last_char = text[-1]
+    return bool(_is_control(last_char) | _is_punctuation(last_char) | _is_whitespace(last_char))
+
+
+def _is_start_of_word(text):
+    """Checks whether the first character in text is one of a punctuation, control or whitespace character."""
+    first_char = text[0]
+    return bool(_is_control(first_char) | _is_punctuation(first_char) | _is_whitespace(first_char))
+
+
+def _insert_one_token_to_ordered_list(token_list: List[str], new_token: str):
+    """
+    Inserts one token to an ordered list if it does not already exist. Note: token_list must be sorted.
+    """
+    insertion_idx = bisect.bisect_left(token_list, new_token)
+    # Checks if new_token is already in the ordered token_list
+    if insertion_idx < len(token_list) and token_list[insertion_idx] == new_token:
+        # new_token is in token_list, don't add
+        return
+    else:
+        token_list.insert(insertion_idx, new_token)
+
+
+def convert_to_unicode(text):
+    """
+    Converts `text` to Unicode (if it's not already), assuming utf-8 input.
+    Args:
+        text (str|bytes): Text to be converted to unicode.
+    Returns:
+        str: converted text.
+    """
+    if isinstance(text, str):
+        return text
+    elif isinstance(text, bytes):
+        return text.decode("utf-8", "ignore")
+    else:
+        raise ValueError("Unsupported string type: %s" % (type(text)))
+
+
+def whitespace_tokenize(text):
+    """
+    Runs basic whitespace cleaning and splitting on a peice of text.
+    Args:
+        text (str): Text to be tokenized.
+    Returns:
+        list(str): Token list.
+    """
+    text = text.strip()
+    if not text:
+        return []
+    tokens = text.split()
+    return tokens
+
+
+def is_chinese_char(cp):
+    """Checks whether CP is the codepoint of a CJK character."""
+    # This defines a "chinese character" as anything in the CJK Unicode block:
+    #     https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
+    #
+    # Note that the CJK Unicode block is NOT all Japanese and Korean characters,
+    # despite its name. The modern Korean Hangul alphabet is a different block,
+    # as is Japanese Hiragana and Katakana. Those alphabets are used to write
+    # space-separated words, so they are not treated specially and handled
+    # like the all of the other languages.
+    if (
+        (cp >= 0x4E00 and cp <= 0x9FFF)
+        or (cp >= 0x3400 and cp <= 0x4DBF)  #
+        or (cp >= 0x20000 and cp <= 0x2A6DF)  #
+        or (cp >= 0x2A700 and cp <= 0x2B73F)  #
+        or (cp >= 0x2B740 and cp <= 0x2B81F)  #
+        or (cp >= 0x2B820 and cp <= 0x2CEAF)  #
+        or (cp >= 0xF900 and cp <= 0xFAFF)
+        or (cp >= 0x2F800 and cp <= 0x2FA1F)  #
+    ):  #
+        return True
+
+    return False
+
+
+def _is_nonnormalized_char(char):
+    """Check whther `chars` is a non-normalized character."""
+    cp = ord(char)
+    if (
+        (0xFF00 <= cp <= 0xFFEF)
+        or (0xFE50 <= cp <= 0xFE6B)  # Halfwidth and Fullwidth Forms
+        or (0x3358 <= cp <= 0x33FF)  # Small Form Variants
+        or (0x249C <= cp <= 0x24E9)  # CJK Compatibility
+        or (0x3200 <= cp <= 0x32FF)  # Enclosed Alphanumerics: Ⓛ ⒰
+    ):  # Enclosed CJK Letters and Months
+        return True
+
+    return False
+
+
+def _is_nonnormalized_numeric(char):
+    """Check whether `chars` is a non-normalized numeric character."""
+    cp = ord(char)
+    if (
+        (0x2460 <= cp <= 0x249B)
+        or (0x24EA <= cp <= 0x24FF)  #
+        or (0x2776 <= cp <= 0x2793)  #
+        or (0x2160 <= cp <= 0x217F)  # Enclosed Alphanumerics
+    ):  # Number Forms
+        return True
+
+    return False
+
+
+def normalize_chars(text):
+    """
+    Normalize the text for multiligual and chinese models. Unicode range:
+    https://www.ling.upenn.edu/courses/Spring_2003/ling538/UnicodeRanges.html
+    """
+    output = []
+    for char in text:
+        if _is_nonnormalized_char(char):
+            for c in unicodedata.normalize("NFKC", char):
+                output.append(c)
+        elif _is_nonnormalized_numeric(char):
+            output.append(" ")
+            for c in str(int(unicodedata.numeric(char))):
+                output.append(c)
+            output.append(" ")
+        elif ord(char) == 0xF979:  # https://www.zhihu.com/question/20697984
+            output.append("凉")
+        else:
+            output.append(char)
+    return "".join(output)
+
+
+def _is_symbol(char):
+    """Check whether CP is the codepoint of a Symbol character."""
+    cp = ord(char)
+    if unicodedata.category(char).startswith("S") or (
+        cp in [0x00AD, 0x00B2, 0x00BA, 0x3007, 0x00B5, 0x00D8, 0x014B, 0x01B1]
+    ):
+        return True
+    return False
+
+
+def tokenize_special_chars(text):
+    """Adds whitespace around any special character."""
+    output = []
+    for char in text:
+        cp = ord(char)
+        if (
+            (0x3040 <= cp <= 0x30FF)
+            or (0x0370 <= cp <= 0x04FF)  # Japanese
+            or (0x0250 <= cp <= 0x02AF)  # Greek/Coptic & Cyrillic
+            or _is_symbol(char)  # IPA
+        ):
+            output.append(" ")
+            output.append(char)
+            output.append(" ")
+        else:
+            output.append(char)
+    return "".join(output)
 
 
 def tokenize_chinese_chars(text):
@@ -885,7 +956,7 @@ class ChatTemplateMixin:
 @six.add_metaclass(InitTrackerMeta)
 class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
     """
-    Base class for all tokenizers.
+    Base class for all slow tokenizers.
 
     Inherits from [`~tokenizer_utils_base.PretrainedTokenizerBase`].
 
@@ -923,31 +994,38 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
     and expose special tokens initialization used as attributes.
     """
 
-    added_tokens_encoder: Dict[str, int] = {}
-    added_tokens_decoder: Dict[int, str] = {}
     unique_no_split_tokens: List[str] = []
     tokens_trie = Trie()
 
     _decode_use_source_tokenizer = False
 
-    def _pre_init(self, original_init, *args, **kwargs):
-        """
-        It would be hooked before `__init__` to add specials tokens (arguments of
-        `__init__` whose name ends with `_token`) as attributes of the tokenizer
-        instance.
-        """
-        init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
-        init_dict.pop("self", None)
-        super(PretrainedTokenizer, self).__init__(**init_dict)
-
-        self.added_tokens_decoder: Dict[int, AddedToken] = {}
-        self.added_tokens_decoder.update(kwargs.pop("added_tokens_decoder", {}))
-        self.added_tokens_encoder: Dict[str, int] = {k.content: v for v, k in self.added_tokens_decoder.items()}
-
-        self.unique_no_split_tokens: List[str] = []
+    def __init__(self, **kwargs):
+        # 1. Init the parent class
         self.tokens_trie = Trie()
 
+        # 2. init `_added_tokens_decoder` if child class did not
+        if not hasattr(self, "_added_tokens_decoder"):
+            self._added_tokens_decoder: Dict[int, AddedToken] = {}
+
+        # 3. if a `added_tokens_decoder` is passed, we are loading from a saved tokenizer, we overwrite
+        self._added_tokens_decoder.update(kwargs.pop("added_tokens_decoder", {}))
+        self._added_tokens_encoder: Dict[str, int] = {k.content: v for v, k in self._added_tokens_decoder.items()}
+
+        # 4 init the parent class
+        super(PretrainedTokenizer, self).__init__(**kwargs)
+
+        # 4. If some of the special tokens are not part of the vocab, we add them, at the end.
+        # the order of addition is the same as self.SPECIAL_TOKENS_ATTRIBUTES following `tokenizers`
+        self._add_tokens(
+            [token for token in self.all_special_tokens_extended if token not in self._added_tokens_encoder],
+            special_tokens=True,
+        )
+
         self._decode_use_source_tokenizer = False
+
+    @property
+    def is_fast(self) -> bool:
+        return False
 
     def _build_special_tokens_map_extended(self, **kwargs):
         for key, value in kwargs.items():
@@ -973,33 +1051,73 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         raise NotImplementedError
 
     @property
-    def is_fast(self) -> bool:
-        return False
-
-    def get_added_vocab(self) -> Dict[str, int]:
+    def added_tokens_encoder(self) -> Dict[str, int]:
         """
-        Returns the added tokens in the vocabulary as a dictionary of token to index.
+        Returns the sorted mapping from string to index. The added tokens encoder is cached for performance
+        optimization in `self._added_tokens_encoder` for the slow tokenizers.
+        """
+        return {k.content: v for v, k in sorted(self._added_tokens_decoder.items(), key=lambda item: item[0])}
+
+    @property
+    def added_tokens_decoder(self) -> Dict[int, AddedToken]:
+        """
+        Returns the added tokens in the vocabulary as a dictionary of index to AddedToken.
 
         Returns:
             `Dict[str, int]`: The added tokens.
         """
-        return self.added_tokens_encoder
+        return dict(sorted(self._added_tokens_decoder.items(), key=lambda item: item[0]))
+
+    @added_tokens_decoder.setter
+    def added_tokens_decoder(self, value: Dict[int, Union[AddedToken, str]]) -> Dict[int, AddedToken]:
+        # Always raise an error if string because users should define the behavior
+        for index, token in value.items():
+            if not isinstance(token, (str, AddedToken)) or not isinstance(index, int):
+                raise TypeError(
+                    f"The provided `added_tokens_decoder` has an element of type {index.__class__, token.__class__}, should be a dict of {int, Union[AddedToken, str]}"
+                )
+
+            self._added_tokens_decoder[index] = AddedToken(token) if isinstance(token, str) else token
+            self._added_tokens_encoder[str(token)] = index
+        self._update_total_vocab_size()
+
+    def get_added_vocab(self) -> Dict[str, int]:
+        """
+        Returns the added tokens in the vocabulary as a dictionary of token to index. Results might be different from
+        the fast call because for now we always add the tokens even if they are already in the vocabulary. This is
+        something we should change.
+
+        Returns:
+            `Dict[str, int]`: The added tokens.
+        """
+        return self._added_tokens_encoder
 
     def __len__(self):
         """
         Size of the full vocabulary with the added tokens.
         """
-        return self.vocab_size + len(self.added_tokens_encoder)
+        return self.total_vocab_size
+
+    def _update_total_vocab_size(self):
+        """
+        Update the size of the full vocabulary with the added tokens. Counts the `keys` and not the `values` because
+        otherwise if there is a hole in the vocab, we will add tokenizers at a wrong index. This operation is slow and
+        is only updated when adding tokens.
+        """
+        self.total_vocab_size = len(self.get_vocab())
 
     def _add_tokens(self, new_tokens: Union[List[str], List[AddedToken]], special_tokens: bool = False) -> int:
         """
         Add a list of new tokens to the tokenizer class. If the new tokens are not in the vocabulary, they are added to
-        it with indices starting from length of the current vocabulary.
+        it with indices starting from length of the current vocabulary. Special tokens are sometimes already in the
+        vocab which is why they have to be handled specifically.
 
         Args:
-            new_tokens (`List[str]`or `List[AddedToken]`):
-                Token(s) to add in vocabulary. A token is only added if it's not already in the vocabulary (tested by
-                checking if the tokenizer assign the index of the `unk_token` to them).
+            new_tokens (`List[str]`or `List[tokenizers.AddedToken]`):
+                Token(s) to add in vocabulary. A token is counted as added if it's not already in the vocabulary
+                (tested by checking if the tokenizer assign the index of the `unk_token` to them). If a token is part
+                of the vocabulary then we simply mark this token as an `AddedToken` which allows to control the
+                stripping and normalization of this token. This is NOT possible in `tokenizers`.
             special_tokens (`bool`, *optional*, defaults to `False`):
                 Whether or not the tokens should be added as special tokens.
 
@@ -1016,80 +1134,88 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         num_added_toks = tokenizer.add_tokens(["new_tok1", "my_new-tok2"])
         print("We have added", num_added_toks, "tokens")
         ```"""
-        new_tokens = [str(tok) for tok in new_tokens]
-
-        tokens_to_add = []
+        added_tokens = 0
+        if new_tokens is None:
+            return added_tokens
+        # TODO this is fairly slow to improve!
+        current_vocab = self.get_vocab().copy()
+        new_idx = len(current_vocab)  # only call this once, len gives the last index + 1
         for token in new_tokens:
-            if not isinstance(token, str):
+            if not isinstance(token, (str, AddedToken)):
                 raise TypeError(f"Token {token} is not a string but a {type(token)}.")
-            if not special_tokens and hasattr(self, "do_lower_case") and self.do_lower_case:
-                token = token.lower()
-            if (
-                token != self.unk_token
-                and self.convert_tokens_to_ids(token) == self.convert_tokens_to_ids(self.unk_token)
-                and token not in tokens_to_add
-                and token not in self.added_tokens_encoder.keys()
-            ):
-                tokens_to_add.append(token)
-                if self.verbose:
-                    logger.info(f"Adding {token} to the vocabulary")
-
-        added_tok_encoder = dict((tok, len(self) + i) for i, tok in enumerate(tokens_to_add))
-        added_tok_decoder = {v: k for k, v in added_tok_encoder.items()}
-        self.added_tokens_encoder.update(added_tok_encoder)
-        self.added_tokens_decoder.update(added_tok_decoder)
-
-        # Make sure we don't split on any special tokens (even they were already in the vocab before e.g. for Albert)
-        if special_tokens:
-            if len(new_tokens) == 1:
-                _insert_one_token_to_ordered_list(self.unique_no_split_tokens, new_tokens[0])
+            if str(token) == "":
+                continue
+            if isinstance(token, str):
+                if token in self._added_tokens_encoder:
+                    continue
+                else:
+                    # very important for fast and slow equivalence!
+                    is_special = token in self.all_special_tokens or special_tokens
+                    token = AddedToken(
+                        token, rstrip=False, lstrip=False, normalized=not is_special, special=is_special
+                    )
+            elif special_tokens:
+                # doing token.special=True changes the normalization! will fix in rust
+                # this is important and the only reason why the AddedTokens in each class are normalized by default
+                token.__setstate__({"special": True, "normalized": token.normalized})
+            if token in self._added_tokens_decoder:
+                continue
+            if not token.special and token.normalized and getattr(self, "do_lower_case", False):
+                # Normalize if requested
+                token.content = token.content.lower()
+            if token.content not in current_vocab:
+                token_index = new_idx + added_tokens
+                current_vocab[token.content] = token_index
+                added_tokens += 1
             else:
-                self.unique_no_split_tokens = sorted(set(self.unique_no_split_tokens).union(set(new_tokens)))
-        else:
-            # Or on the newly added tokens
-            if len(tokens_to_add) == 1:
-                _insert_one_token_to_ordered_list(self.unique_no_split_tokens, tokens_to_add[0])
-            else:
-                self.unique_no_split_tokens = sorted(set(self.unique_no_split_tokens).union(set(tokens_to_add)))
-        self._create_trie(self.unique_no_split_tokens)
+                token_index = current_vocab[token.content]
 
-        return len(tokens_to_add)
+            if token.special and str(token) not in self.all_special_tokens:
+                self._special_tokens_map["additional_special_tokens"].append(token)
+            # the setter automatically updates the reverse map
+            self._added_tokens_decoder[token_index] = token
+            self._added_tokens_encoder[token.content] = token_index
+            if self.verbose:
+                logger.info(f"Adding {token} to the vocabulary")
 
-    def _create_trie(self, unique_no_split_tokens):
-        trie = Trie()
+        self._update_trie()
+        self._update_total_vocab_size()
+        return added_tokens
+
+    def _update_trie(self, unique_no_split_tokens: Optional[str] = []):
+        for token in self._added_tokens_decoder.values():
+            if token not in self.tokens_trie._tokens:
+                self.tokens_trie.add(token.content)
         for token in unique_no_split_tokens:
-            if hasattr(self, "do_lower_case") and self.do_lower_case and token not in self.all_special_tokens:
-                trie.add(token.lower())
-            else:
-                trie.add(token)
-        self.tokens_trie = trie
+            if token not in self.tokens_trie._tokens:
+                self.tokens_trie.add(token)
 
-    def prepare_for_tokenization(self, text, is_split_into_words=False, **kwargs):
+    def num_special_tokens_to_add(self, pair: bool = False) -> int:
         """
-        Performs any necessary transformations before tokenization.
+        Returns the number of added tokens when encoding a sequence with special tokens.
 
-        This method should pop the arguments from kwargs and return the remaining `kwargs` as well. We test the
-        `kwargs` at the end of the encoding process to be sure all the arguments have been used.
+        <Tip>
+
+        This encodes a dummy input and checks the number of added tokens, and is therefore not efficient. Do not put
+        this inside your training loop.
+
+        </Tip>
 
         Args:
-            text (`str`):
-                The text to prepare.
-            is_split_into_words (`bool`, *optional*, defaults to `False`):
-                Whether or not the input is already pre-tokenized (e.g., split into words). If set to `True`, the
-                tokenizer assumes the input is already split into words (for instance, by splitting it on whitespace)
-                which it will tokenize. This is useful for NER or token classification.
-            kwargs:
-                Keyword arguments to use for the tokenization.
+            pair (`bool`, *optional*, defaults to `False`):
+                Whether the number of added tokens should be computed in the case of a sequence pair or a single
+                sequence.
 
         Returns:
-            `Tuple[str, Dict[str, Any]]`: The prepared text and the unused kwargs.
+            `int`: Number of special tokens added to sequences.
         """
-
-        return (text, kwargs)
+        token_ids_0 = []
+        token_ids_1 = []
+        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
 
     def tokenize(self, text: TextInput, **kwargs) -> List[str]:
         """
-        Converts a string in a sequence of tokens, using the tokenizer.
+        Converts a string into a sequence of tokens, using the tokenizer.
 
         Split in words for word-based vocabulary or sub-words for sub-word-based vocabularies
         (BPE/SentencePieces/WordPieces). Takes care of added tokens.
@@ -1103,21 +1229,20 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         Returns:
             `List[str]`: The list of tokens.
         """
-
         split_special_tokens = kwargs.pop("split_special_tokens", self.split_special_tokens)
-
-        # Simple mapping string => AddedToken for special tokens with specific tokenization behaviors
-        all_special_tokens_extended = dict(
-            (str(t), t) for t in self.all_special_tokens_extended if isinstance(t, AddedToken)
-        )
 
         text, kwargs = self.prepare_for_tokenization(text, **kwargs)
 
-        # TODO: should this be in the base class?
+        if kwargs:
+            logger.warning(f"Keyword arguments {kwargs} not recognized.")
+
         if hasattr(self, "do_lower_case") and self.do_lower_case:
-            # convert non-special tokens to lowercase
-            escaped_special_toks = [
-                re.escape(s_tok) for s_tok in (self.unique_no_split_tokens + self.all_special_tokens)
+            # convert non-special tokens to lowercase. Might be super slow as well?
+            escaped_special_toks = [re.escape(s_tok) for s_tok in (self.all_special_tokens)]
+            escaped_special_toks += [
+                re.escape(s_tok.content)
+                for s_tok in (self._added_tokens_decoder.values())
+                if not s_tok.special and s_tok.normalized
             ]
             pattern = r"(" + r"|".join(escaped_special_toks) + r")|" + r"(.+?)"
             text = re.sub(pattern, lambda m: m.groups()[0] or m.groups()[1].lower(), text)
@@ -1126,14 +1251,14 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             no_split_token = []
             tokens = [text]
         else:
-            no_split_token = set(self.unique_no_split_tokens)  # don't split on any of the added tokens
+            no_split_token = self._added_tokens_encoder.keys()  # don't split on any of the added tokens
             # "This is something<special_token_1>  else"
             tokens = self.tokens_trie.split(text)
 
         # ["This is something", "<special_token_1>", "  else"]
         for i, token in enumerate(tokens):
             if token in no_split_token:
-                tok_extended = all_special_tokens_extended.get(token, None)
+                tok_extended = self._added_tokens_decoder.get(self._added_tokens_encoder[token], None)
                 left = tokens[i - 1] if i > 0 else None
                 right = tokens[i + 1] if i < len(tokens) - 1 else None
                 if isinstance(tok_extended, AddedToken):
@@ -1144,12 +1269,17 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                     # Strip white spaces on the left
                     if tok_extended.lstrip and left:
                         tokens[i - 1] = left.rstrip()  # Opposite here
+                    if tok_extended.single_word and left and left[-1] != " ":
+                        tokens[i - 1] += token
+                        tokens[i] = ""
+                    elif tok_extended.single_word and right and right[0] != " ":
+                        tokens[i + 1] = token + tokens[i + 1]
+                        tokens[i] = ""
                 else:
-                    # We strip left and right by default
-                    if right:
-                        tokens[i + 1] = right.lstrip()
-                    if left:
-                        tokens[i - 1] = left.rstrip()
+                    raise ValueError(
+                        f"{tok_extended} cannot be tokenized because it was not properly added"
+                        f" to the tokenizer. This means that it is not an `AddedToken` but a {type(tok_extended)}"
+                    )
         # ["This is something", "<special_token_1>", "else"]
         tokenized_text = []
         for token in tokens:
@@ -1235,14 +1365,24 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
 
     def _tokenize(self, text, **kwargs):
         """
-        Converts a string in a sequence of tokens (string), using the tokenizer. Split in words for word-based
+        Converts a string into a sequence of tokens (string), using the tokenizer. Split in words for word-based
         vocabulary or sub-words for sub-word-based vocabularies (BPE/SentencePieces/WordPieces).
 
         Do NOT take care of added tokens.
         """
         raise NotImplementedError
 
-    def convert_tokens_to_ids(self, tokens):
+    def convert_tokens_to_ids(self, tokens: Union[str, List[str]]) -> Union[int, List[int]]:
+        """
+        Converts a token string (or a sequence of tokens) in a single integer id (or a sequence of ids), using the
+        vocabulary.
+
+        Args:
+            tokens (`str` or `List[str]`): One or several token(s) to convert to token id(s).
+
+        Returns:
+            `int` or `List[int]`: The token id or list of token ids.
+        """
         if tokens is None:
             return None
 
@@ -1252,58 +1392,18 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         ids = []
         for token in tokens:
             ids.append(self._convert_token_to_id_with_added_voc(token))
-
         return ids
 
     def _convert_token_to_id_with_added_voc(self, token):
         if token is None:
             return None
 
-        if token in self.added_tokens_encoder:
-            return self.added_tokens_encoder[token]
+        if token in self._added_tokens_encoder:
+            return self._added_tokens_encoder[token]
         return self._convert_token_to_id(token)
 
     def _convert_token_to_id(self, token):
-
-        return self.vocab.to_indices(token)
-
-    def convert_tokens_to_string(self, tokens):
-        """
-        Converts a sequence of tokens (list of string) to a single string by
-        using ``' '.join(tokens)`` .
-
-        Args:
-            tokens (list[str]): A sequence of tokens.
-
-        Returns:
-            str: Converted string.
-        """
-        return " ".join(tokens)
-
-    def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
-        if isinstance(ids, int):
-            if ids in self.added_tokens_decoder:
-                token = self.added_tokens_decoder[ids]
-                token = token.content if isinstance(token, AddedToken) else token
-                return token
-            else:
-                return self._convert_id_to_token(ids)
-        tokens = []
-        for index in ids:
-            index = int(index)
-            if skip_special_tokens and index in self.all_special_ids:
-                continue
-            if index in self.added_tokens_decoder:
-                token = self.added_tokens_decoder[index]
-                token = token.content if isinstance(token, AddedToken) else token
-                tokens.append(token)
-            else:
-                tokens.append(self._convert_id_to_token(index))
-        return tokens
-
-    def _convert_id_to_token(self, index):
-
-        return self.vocab.to_tokens(index)
+        raise NotImplementedError
 
     @staticmethod
     def load_vocabulary(filepath, unk_token=None, pad_token=None, bos_token=None, eos_token=None, **kwargs):
@@ -1355,48 +1455,6 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             for token in tokens:
                 f.write(token + "\n")
 
-    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
-        """
-        Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
-        special tokens using the tokenizer ``encode`` methods.
-
-        Args:
-            token_ids_0 (List[int]): List of ids of the first sequence.
-            token_ids_1 (List[int], optional): List of ids of the second sequence.
-            already_has_special_tokens (bool, optional): Whether or not the token list is already
-                formatted with special tokens for the model. Defaults to None.
-
-        Returns:
-            results (List[int]): The list of integers in the range [0, 1]:
-                1 for a special token, 0 for a sequence token.
-        """
-        if already_has_special_tokens:
-            if token_ids_1 is not None:
-                raise ValueError(
-                    "You should not supply a second sequence if the provided sequence of "
-                    "ids is already formatted with special tokens for the model."
-                )
-
-            return super().get_special_tokens_mask(
-                token_ids_0=token_ids_0, token_ids_1=token_ids_1, already_has_special_tokens=True
-            )
-        return [0] * ((len(token_ids_1) if token_ids_1 else 0) + len(token_ids_0))
-
-    def num_special_tokens_to_add(self, pair):
-        """
-        Returns the number of added tokens when encoding a sequence with special tokens.
-
-        Args:
-            pair (bool, optional):
-                Whether the number of added tokens should be computed in the case of a sequence pair or a single
-                sequence. Defaults to `False`.
-        Returns:
-            int: Number of special tokens added to sequences.
-        """
-        token_ids_0 = []
-        token_ids_1 = []
-        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
-
     def _encode_plus(
         self,
         text: Union[TextInput, PreTokenizedInput, EncodedInput],
@@ -1418,7 +1476,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         return_offsets_mapping: bool = False,
         return_length: bool = False,
         verbose: bool = True,
-        **kwargs
+        **kwargs,
     ) -> BatchEncoding:
         def get_input_ids(text):
             if isinstance(text, str):
@@ -1437,19 +1495,30 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             else:
                 if is_split_into_words:
                     raise ValueError(
-                        f"Input {text} is not valid. Should be a string or a list/tuple of strings when `is_split_into_words=True`."
+                        f"Input {text} is not valid. Should be a string or a list/tuple of strings when"
+                        " `is_split_into_words=True`."
                     )
                 else:
                     raise ValueError(
-                        f"Input {text} is not valid. Should be a string, a list/tuple of strings or a list/tuple of integers."
+                        f"Input {text} is not valid. Should be a string, a list/tuple of strings or a list/tuple of"
+                        " integers."
                     )
 
-        first_ids = get_input_ids(text)
-        second_ids = get_input_ids(text_pair) if text_pair is not None else None
+        # if return_offsets_mapping:
+        #     raise NotImplementedError(
+        #         "return_offset_mapping is not available when using Python tokenizers. "
+        #         "To use this feature, change your tokenizer to one deriving from "
+        #         "transformers.PreTrainedTokenizerFast. "
+        #         "More information on available tokenizers at "
+        #         "https://github.com/huggingface/transformers/pull/2674"
+        #     )
 
         if return_offsets_mapping:
             kwargs["text"] = text
             kwargs["text_pair"] = text_pair
+
+        first_ids = get_input_ids(text)
+        second_ids = get_input_ids(text_pair) if text_pair is not None else None
 
         return self.prepare_for_model(
             first_ids,
@@ -1502,7 +1571,8 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         return_offsets_mapping: bool = False,
         return_length: bool = False,
         verbose: bool = True,
-        **kwargs
+        split_special_tokens: bool = False,
+        **kwargs,
     ) -> BatchEncoding:
         def get_input_ids(text):
             if isinstance(text, str):
@@ -1522,6 +1592,13 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                 raise ValueError(
                     "Input is not valid. Should be a string, a list/tuple of strings or a list/tuple of integers."
                 )
+
+        # if return_offsets_mapping:
+        #     raise NotImplementedError(
+        #         "return_offset_mapping is not available when using Python tokenizers. "
+        #         "To use this feature, change your tokenizer to one deriving from "
+        #         "transformers.PreTrainedTokenizerFast."
+        #     )
 
         input_ids = []
         for ids_or_pair_ids in batch_text_or_text_pairs:
@@ -1571,10 +1648,13 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
             return_length=return_length,
             return_tensors=return_tensors,
             verbose=verbose,
+            split_special_tokens=split_special_tokens,
             **kwargs,
         )
-
-        return batch_outputs
+        if return_dict:
+            return BatchEncoding(batch_outputs)
+        else:
+            return batch_outputs
 
     def _batch_prepare_for_model(
         self,
@@ -1596,6 +1676,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         return_offsets_mapping: bool = False,
         return_length: bool = False,
         verbose: bool = True,
+        split_special_tokens: bool = False,
         **kwargs
     ) -> BatchEncoding:
         """
@@ -1709,6 +1790,7 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                     return_tensors=None,  # We convert the whole batch to tensors at the end
                     prepend_batch_axis=False,
                     verbose=verbose,
+                    split_special_tokens=split_special_tokens,
                     **kwargs,
                 )
                 for key, value in encoded_inputs.items():
@@ -1735,6 +1817,108 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
                     else:
                         batch_outputs_list[i][k] = v[i]
             return batch_outputs_list
+
+    def prepare_for_tokenization(
+        self, text: str, is_split_into_words: bool = False, **kwargs
+    ) -> Tuple[str, Dict[str, Any]]:
+        """
+        Performs any necessary transformations before tokenization.
+
+        This method should pop the arguments from kwargs and return the remaining `kwargs` as well. We test the
+        `kwargs` at the end of the encoding process to be sure all the arguments have been used.
+
+        Args:
+            text (`str`):
+                The text to prepare.
+            is_split_into_words (`bool`, *optional*, defaults to `False`):
+                Whether or not the input is already pre-tokenized (e.g., split into words). If set to `True`, the
+                tokenizer assumes the input is already split into words (for instance, by splitting it on whitespace)
+                which it will tokenize. This is useful for NER or token classification.
+            kwargs (`Dict[str, Any]`, *optional*):
+                Keyword arguments to use for the tokenization.
+
+        Returns:
+            `Tuple[str, Dict[str, Any]]`: The prepared text and the unused kwargs.
+        """
+        return (text, kwargs)
+
+    def get_special_tokens_mask(
+        self, token_ids_0: List, token_ids_1: Optional[List] = None, already_has_special_tokens: bool = False
+    ) -> List[int]:
+        """
+        Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
+        special tokens using the tokenizer `prepare_for_model` or `encode_plus` methods.
+
+        Args:
+            token_ids_0 (`List[int]`):
+                List of ids of the first sequence.
+            token_ids_1 (`List[int]`, *optional*):
+                List of ids of the second sequence.
+            already_has_special_tokens (`bool`, *optional*, defaults to `False`):
+                Whether or not the token list is already formatted with special tokens for the model.
+
+        Returns:
+            A list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
+        """
+        if already_has_special_tokens:
+            if token_ids_1 is not None:
+                raise ValueError(
+                    "You should not supply a second sequence if the provided sequence of "
+                    "ids is already formatted with special tokens for the model."
+                )
+
+            return super().get_special_tokens_mask(
+                token_ids_0=token_ids_0, token_ids_1=token_ids_1, already_has_special_tokens=True
+            )
+        return [0] * ((len(token_ids_1) if token_ids_1 else 0) + len(token_ids_0))
+
+    @overload
+    def convert_ids_to_tokens(self, ids: int, skip_special_tokens: bool = False) -> str:
+        ...
+
+    @overload
+    def convert_ids_to_tokens(self, ids: List[int], skip_special_tokens: bool = False) -> List[str]:
+        ...
+
+    def convert_ids_to_tokens(
+        self, ids: Union[int, List[int]], skip_special_tokens: bool = False
+    ) -> Union[str, List[str]]:
+        """
+        Converts a single index or a sequence of indices in a token or a sequence of tokens, using the vocabulary and
+        added tokens.
+
+        Args:
+            ids (`int` or `List[int]`):
+                The token id (or token ids) to convert to tokens.
+            skip_special_tokens (`bool`, *optional*, defaults to `False`):
+                Whether or not to remove special tokens in the decoding.
+
+        Returns:
+            `str` or `List[str]`: The decoded token(s).
+        """
+        if isinstance(ids, int):
+            if ids in self._added_tokens_decoder:
+                return self._added_tokens_decoder[ids].content
+            else:
+                return self._convert_id_to_token(ids)
+        tokens = []
+        for index in ids:
+            index = int(index)
+            if skip_special_tokens and index in self.all_special_ids:
+                continue
+            if index in self._added_tokens_decoder:
+                tokens.append(self._added_tokens_decoder[index].content)
+            else:
+                tokens.append(self._convert_id_to_token(index))
+        return tokens
+
+    # def _convert_id_to_token(self, index: int) -> str:
+    #     return self.vocab.to_tokens(index)
+    def _convert_id_to_token(self, index: int) -> str:
+        raise NotImplementedError
+
+    def convert_tokens_to_string(self, tokens: List[str]) -> str:
+        return " ".join(tokens)
 
     def _get_bert_like_offset_mapping(self, text: str):
         """
@@ -1909,28 +2093,37 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
 
     def _decode(
         self,
-        token_ids: List[int],
+        token_ids: Union[int, List[int]],
         skip_special_tokens: bool = False,
-        clean_up_tokenization_spaces: bool = True,
+        clean_up_tokenization_spaces: bool = None,
         spaces_between_special_tokens: bool = True,
-        **kwargs
+        **kwargs,
     ) -> str:
         if isinstance(token_ids, np.ndarray):
             token_ids = token_ids.tolist()
         self._decode_use_source_tokenizer = kwargs.pop("use_source_tokenizer", False)
-        filtered_tokens = self.convert_ids_to_tokens(token_ids, skip_special_tokens=skip_special_tokens)
 
+        filtered_tokens = self.convert_ids_to_tokens(token_ids, skip_special_tokens=skip_special_tokens)
+        # If given is a single id, prevents splitting the string in upcoming loop
+        if isinstance(filtered_tokens, str):
+            filtered_tokens = [filtered_tokens]
+
+        legacy_added_tokens = set(self._added_tokens_encoder.keys()) - set(self.all_special_tokens) | {
+            token for token in self.additional_special_tokens if self.convert_tokens_to_ids(token) >= self.vocab_size
+        }
         # To avoid mixing byte-level and unicode for byte-level BPT
         # we need to build string separately for added tokens and byte-level tokens
         # cf. https://github.com/huggingface/transformers/issues/1133
         sub_texts = []
         current_sub_text = []
         for token in filtered_tokens:
-            if skip_special_tokens and token in self.all_special_ids:
+            if skip_special_tokens and token in self.all_special_tokens:
                 continue
-            if token in self.added_tokens_encoder:
+            if token in legacy_added_tokens:
                 if current_sub_text:
-                    sub_texts.append(self.convert_tokens_to_string(current_sub_text))
+                    string = self.convert_tokens_to_string(current_sub_text)
+                    if len(string) > 0:
+                        sub_texts.append(string)
                     current_sub_text = []
                 sub_texts.append(token)
             else:
@@ -1943,38 +2136,16 @@ class PretrainedTokenizer(ChatTemplateMixin, PretrainedTokenizerBase):
         else:
             text = "".join(sub_texts)
 
+        clean_up_tokenization_spaces = (
+            clean_up_tokenization_spaces
+            if clean_up_tokenization_spaces is not None
+            else self.clean_up_tokenization_spaces
+        )
         if clean_up_tokenization_spaces:
             clean_text = self.clean_up_tokenization(text)
             return clean_text
         else:
             return text
-
-    def decode_token(
-        self,
-        all_input_ids: List[int],
-        prefix_offset: int = 0,
-        read_offset: int = 0,
-    ) -> Tuple[str, int, int]:
-        """tokenizer decoding for the streaming generation use case. This method can be overrided for tokenizer that doesn't follow this API"""
-        # The prefix text is necessary only to defeat cleanup algorithms in the decode
-        # which decide to add a space or not depending on the surrounding ids.
-        prefix_text = self.decode(
-            all_input_ids[prefix_offset:read_offset], skip_special_tokens=False, clean_up_tokenization_spaces=False
-        )
-        new_text = self.decode(
-            all_input_ids[prefix_offset:], skip_special_tokens=False, clean_up_tokenization_spaces=False
-        )
-
-        if len(new_text) > len(prefix_text) and not prefix_text.endswith("�") and not new_text.endswith("�"):
-            # utf-8 char at the end means it's a potential unfinished byte sequence
-            # from byte fallback tokenization.
-            # If it's in the middle, it's probably a real invalid id generated
-            # by the model
-            prefix_index = new_text.index(prefix_text)
-            new_text = new_text[prefix_index + len(prefix_text) :]
-            return new_text, read_offset, len(all_input_ids)
-        else:
-            return "", prefix_offset, read_offset
 
 
 class BPETokenizer(PretrainedTokenizer):

@@ -106,7 +106,10 @@ class TokenizerTesterMixin:
         return input_txt, input_txt
 
     def get_clean_sequence(self, tokenizer, with_prefix_space=False, max_length=20, min_length=5) -> Tuple[str, list]:
-        toks = [(i, tokenizer.decode([i], clean_up_tokenization_spaces=False)) for i in range(len(tokenizer))]
+        # the length of the tokenizer does not always represent the tokens that it can encode: what if there are holes?
+        toks = [
+            (i, tokenizer.decode([i], clean_up_tokenization_spaces=False)) for i in set(tokenizer.get_vocab().values())
+        ]
 
         # filter the english only character
         if self.only_english_character:
