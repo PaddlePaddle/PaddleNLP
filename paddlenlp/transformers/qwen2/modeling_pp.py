@@ -23,13 +23,13 @@ from paddle.distributed.fleet.meta_parallel import (
     PipelineLayer,
     SharedLayerDesc,
 )
+from paddle.distributed.fleet.recompute.recompute import recompute
 
-from paddlenlp.transformers.refined_recompute import (
-    create_skip_config_for_refined_recompute,
-    recompute,
-)
+from paddlenlp.transformers.refined_recompute import get_skip_recompute_ops
+from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
 
 from ...utils.tools import get_env_device
+from ..dpo_criterion import DPOCriterion
 from ..model_utils import PipelinePretrainedModel
 from .modeling import (
     Qwen2Config,
@@ -173,8 +173,9 @@ class Qwen2DecoderLayerPipe(Qwen2DecoderLayer):
             attn_mask_startend_row_indices, position_ids = None, attn_mask_startend_row_indices
 
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
+            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
             if attention_mask is not None or attn_mask_startend_row_indices is not None:
-                hidden_states = recompute(
+                hidden_states = recompute_fn(
                     super().forward,
                     hidden_states,
                     position_ids=position_ids,
@@ -184,7 +185,7 @@ class Qwen2DecoderLayerPipe(Qwen2DecoderLayer):
                 )
             else:
                 # for pretrain
-                hidden_states = recompute(
+                hidden_states = recompute_fn(
                     super().forward,
                     hidden_states,
                     position_ids=position_ids,
@@ -233,6 +234,7 @@ class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     _get_tensor_parallel_mappings = Qwen2PretrainedModel._get_tensor_parallel_mappings
     _init_weights = Qwen2PretrainedModel._init_weights
     _keys_to_ignore_on_load_unexpected = Qwen2PretrainedModel._keys_to_ignore_on_load_unexpected
+    _tied_weights_keys = ["lm_head.weight"]
 
     # DONOT Add base_model_prefix !!!!
 
@@ -300,8 +302,9 @@ class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             self.add_sequential_layer(
                 LayerDesc(
                     Qwen2DecoderLayerPipe,
-                    config=create_skip_config_for_refined_recompute(i, config),
+                    config=config,
                     layerwise_recompute=i not in self.no_recompute_layers,
+                    skip_recompute_ops=get_skip_recompute_ops(config, i),
                 ),
                 f"qwen2.layers.{i}",
             )
@@ -335,7 +338,7 @@ class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         PipelineLayer.__init__(
             self,
             layers=self.get_sequential_layers(),
-            loss_fn=Qwen2PretrainingCriterion(config),
+            loss_fn=self.get_loss_fn(config),
             topology=get_hcg().topology(),
             seg_method=seg_method,
             recompute_interval=recompute_interval,
@@ -350,3 +353,9 @@ class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.apply(self._init_weights)
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)
+
+    def get_loss_fn(self, config):
+        if config.dpo_config is not None:
+            return DPOCriterion(config, use_infohub=True)
+        else:
+            return Qwen2PretrainingCriterion(config)

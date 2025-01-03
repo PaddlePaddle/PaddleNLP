@@ -27,7 +27,7 @@ python -m pip install fast_dataindex
 # download data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
 wget https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
-
+rm -rf data
 mkdir data
 mv gpt_en_dataset_300m_ids.npy ./data
 mv gpt_en_dataset_300m_idx.npz ./data

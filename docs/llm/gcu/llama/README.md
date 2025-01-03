@@ -1,1 +1,1 @@
-../../../../llm/gcu/llama/README.md
+../../../../llm/devices/gcu/llama/README.md

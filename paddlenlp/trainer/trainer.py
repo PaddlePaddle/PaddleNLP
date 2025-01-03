@@ -111,7 +111,7 @@ from ..utils.env import (
     VERA_WEIGHTS_NAME,
 )
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
-from ..utils.log import logger
+from ..utils.log import MetricsDumper, logger
 from ..utils.tools import get_env_device
 from .argparser import strtobool
 from .integrations import get_reporting_integration_callbacks
@@ -398,6 +398,14 @@ class Trainer:
                 with open(signal_path, mode="w+") as f:
                     f.write("1")
 
+        self.metrics_dumper = None
+        if self.args.metrics_output_path is not None:
+            if not os.path.exists(self.args.metrics_output_path):
+                os.makedirs(self.args.metrics_output_path, exist_ok=True)
+            metrics_output_file = os.path.join(self.args.metrics_output_path, f"metrics_rank{dist.get_rank()}.json")
+            logger.info(f"create/append metrics dumper at {metrics_output_file}")
+            self.metrics_dumper = MetricsDumper(metrics_output_file)
+
         self._save_ckpt_func = _save_ckpt_func
         self._load_ckpt_func = dist.load_state_dict if self.args.enable_auto_parallel else paddle.load
 
@@ -623,6 +631,8 @@ class Trainer:
                         self.model,
                         resume_from_checkpoint,
                     )
+                    if isinstance(self.model, LoRAModel) and self.model.lora_config.loraga:
+                        self.model.reinit_base_model = True
                     logger.info(f"Loading model from {resume_from_checkpoint} using unified checkpoint.")
                     self.runtime_timer.stop()
                     return
@@ -635,6 +645,8 @@ class Trainer:
             or isinstance(self.model, ReFTModel)
         ):
             self._load_from_peft_checkpoint(resume_from_checkpoint)
+            if isinstance(self.model, LoRAModel) and self.model.lora_config.loraga:
+                self.model.reinit_base_model = True
             self.runtime_timer.stop()
             return
 
@@ -973,6 +985,7 @@ class Trainer:
         self.state.num_train_epochs = num_train_epochs
         self.state.is_local_process_zero = self.is_local_process_zero()
         self.state.is_world_process_zero = self.is_world_process_zero()
+        self.state.consumed_samples = 0
 
         self.control = self.callback_handler.on_train_begin(args, self.state, self.control)
 
@@ -1048,6 +1061,12 @@ class Trainer:
                         self._skip_steps_since_last_logged += 1
 
                         self.state.epoch = epoch + (step + 1) / steps_in_epoch
+                        self.state.consumed_samples = (
+                            self.state.global_step
+                            * args.per_device_train_batch_size
+                            * args.gradient_accumulation_steps
+                            * args.dataset_world_size
+                        )
 
                         if self.state.global_step == 1 and self.args.logging_first_step:
                             self.control.should_log = True
@@ -1122,6 +1141,9 @@ class Trainer:
                     if self.args.pipeline_parallel_degree <= 1 and self._enable_delay_scale_loss():
                         tr_loss /= self.args.gradient_accumulation_steps
 
+                    # assert if loss is invalid
+                    self._check_loss_valid(tr_loss)
+
                     self.timers and self.timers("forward-backward").stop()
                     # Maunally collect gradients
                     # Case 1: Use recompute and dp
@@ -1140,7 +1162,10 @@ class Trainer:
                         fused_allreduce_gradients_no_sync(list(model.parameters()), None)
 
                     # Pipeline parallel mode,  handle gradient reduce here to overlap
-                    enable_dp_comm_overlap = "enable_dp_comm_overlap" in args.pipeline_parallel_config
+                    enable_dp_comm_overlap = (
+                        self.args.pipeline_parallel_degree > 1
+                        and "enable_dp_comm_overlap" in args.pipeline_parallel_config
+                    )
 
                     enable_release_grads = False
                     if args.sharding_parallel_degree > 1:
@@ -1227,6 +1252,12 @@ class Trainer:
 
                     self.state.global_step += 1
                     self.state.epoch = epoch + (step + 1) / steps_in_epoch
+                    self.state.consumed_samples = (
+                        self.state.global_step
+                        * args.per_device_train_batch_size
+                        * args.gradient_accumulation_steps
+                        * args.dataset_world_size
+                    )
                     self.control = self.callback_handler.on_step_end(args, self.state, self.control)
                     self._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, inputs=inputs)
                     self._print_timer()
@@ -1317,7 +1348,10 @@ class Trainer:
 
         self.log(metrics)
 
-        self.control = self.callback_handler.on_train_end(args, self.state, self.control)
+        kwargs = {
+            "metrics_dumper": self.metrics_dumper,
+        }
+        self.control = self.callback_handler.on_train_end(args, self.state, self.control, **kwargs)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
 
@@ -1411,13 +1445,17 @@ class Trainer:
         if timer_info or paddle_timer_info:
             logger.info(f"[Profile global_step: {self.state.global_step}] {timer_info} {paddle_timer_info}")
 
-    def _get_item_from_loss(self, loss):
+    def _check_loss_valid(self, loss):
         assert isinstance(loss, paddle.Tensor) and loss._is_initialized()
         loss_value = loss.item()
         if not self.args.fp16:
             if not np.isfinite(loss_value).all():
                 err_msg = LOSS_NAN_ERROR if np.isnan(loss_value).any() else LOSS_INF_ERROR
                 raise ValueError(f"{err_msg}. Loss contains inf or nan values, its value is {loss_value}")
+
+    def _get_item_from_loss(self, loss):
+        assert isinstance(loss, paddle.Tensor) and loss._is_initialized()
+        loss_value = loss.item()
         return loss_value
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
@@ -1884,9 +1922,14 @@ class Trainer:
             if "hybrid_parallel_rng_state_tracker" in checkpoint_rng_state:
                 if self.args.tensor_parallel_degree <= 1:
                     checkpoint_rng_state["hybrid_parallel_rng_state_tracker"].pop("model_parallel_rng", None)
-                fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
-                    checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
-                )
+                try:
+                    fleet.meta_parallel.get_rng_state_tracker().set_states_tracker(
+                        checkpoint_rng_state["hybrid_parallel_rng_state_tracker"]
+                    )
+                except:
+                    logger.warning(
+                        "Hybrid paralell rng states change when training environment differs, so we dot not set state tracker here."
+                    )
             else:
                 logger.warning("Not found hybrid parallel RNG state.")
 
@@ -1911,6 +1954,11 @@ class Trainer:
             from paddle.optimizer import AdamW
 
             optimizer_cls = AdamW
+            optimizer_kwargs.update(adam_kwargs)
+        elif args.optim == OptimizerNames.ADAMW_MINI:
+            from ..utils import AdamWMini
+
+            optimizer_cls = AdamWMini
             optimizer_kwargs.update(adam_kwargs)
         else:
             raise ValueError(f"Trainer cannot instantiate unsupported optimizer: {args.optim}")
@@ -2527,7 +2575,10 @@ class Trainer:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
                         os.makedirs(signal_dir, exist_ok=True)
                         paddle.save(global_rank, os.path.join(signal_dir, f".optimizer_weight.done.{global_rank}"))
-                        if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
+                        if (
+                            "skip_save_model_weight" not in self.args.unified_checkpoint_config
+                            or "remove_master_weight" not in self.args.unified_checkpoint_config
+                        ):
                             paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
             if self.args.should_save or self.args.use_expert_parallel:
                 if not self.args.use_hybrid_parallel:
@@ -2564,7 +2615,10 @@ class Trainer:
                         global_rank = paddle.distributed.get_rank() if paddle.distributed.get_world_size() > 1 else -1
                         os.makedirs(signal_dir, exist_ok=True)
                         paddle.save(global_rank, os.path.join(signal_dir, f".optimizer_weight.done.{global_rank}"))
-                        if "skip_save_model_weight" not in self.args.unified_checkpoint_config:
+                        if (
+                            "skip_save_model_weight" not in self.args.unified_checkpoint_config
+                            or "remove_master_weight" not in self.args.unified_checkpoint_config
+                        ):
                             paddle.save(global_rank, os.path.join(signal_dir, f".master_weight.done.{global_rank}"))
 
         self.runtime_timer.stop()
@@ -2960,7 +3014,9 @@ class Trainer:
             paddle_pipeline_timers = None
         except AssertionError:
             paddle_pipeline_timers = None
-        kwargs.update(timer=self.timers, paddle_pipeline_timers=paddle_pipeline_timers)
+        kwargs.update(
+            timer=self.timers, paddle_pipeline_timers=paddle_pipeline_timers, metrics_dumper=self.metrics_dumper
+        )
 
         if self.state.epoch is not None:
             logs["progress_or_epoch"] = round(self.state.epoch, 4)

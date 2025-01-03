@@ -61,7 +61,6 @@ from paddlenlp.transformers import (
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.transformers.refined_recompute import update_refined_recompute
 from paddlenlp.trl import DataConfig, ModelConfig, SFTConfig, SFTTrainer
 from paddlenlp.trl.llm_utils import (
     ZeroPaddingIterDatasetCallback,
@@ -79,7 +78,18 @@ os.environ["USE_CASUAL_MASK"] = "False"
 flash_mask_support_list = [LlamaForCausalLM, LlamaForCausalLMPipe, Qwen2ForCausalLM, Qwen2ForCausalLMPipe]
 
 
+def paddlenlp_verison_check():
+    import paddlenlp
+    from paddlenlp.utils.tools import compare_version
+
+    if not compare_version(paddlenlp.__version__, "3.0.0.b2"):
+        raise ValueError(
+            "This scripts require paddlenlp >= 3.0.0b3, please reinstall: pip install paddlenlp >= 3.0.0b3 "
+        )
+
+
 def main():
+    paddlenlp_verison_check()
     parser = PdArgumentParser((GenerateArgument, ModelConfig, ReftArgument, DataConfig, SFTConfig))
     if len(sys.argv) >= 2 and sys.argv[1].endswith(".json"):
         gen_args, model_args, reft_args, data_args, training_args = parser.parse_json_file_and_cmd_lines()
@@ -143,10 +153,6 @@ def main():
     )
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
-    model_config.refined_recompute = update_refined_recompute(
-        training_args.refined_recompute,
-        model_args.lora,
-    )
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     # Config for model using dropout, such as GPT.
@@ -511,6 +517,7 @@ def create_peft_model(model_args, reft_args, training_args, dtype, model_config,
                 base_model_name_or_path=model_args.model_name_or_path,
                 use_quick_lora=model_args.use_quick_lora,
                 lora_use_mixer=model_args.lora_use_mixer,
+                use_mora=model_args.use_mora,
             )
             model = LoRAModel(model, lora_config)
         else:

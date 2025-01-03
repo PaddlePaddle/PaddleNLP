@@ -27,6 +27,7 @@ python -m pip install fast_dataindex
 # download data
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_ids.npy
 wget https://bj.bcebos.com/paddlenlp/models/transformers/llama/data/llama_openwebtext_100k_idx.npz
+rm -rf data
 mkdir data
 mv llama_openwebtext_100k_ids.npy ./data
 mv llama_openwebtext_100k_idx.npz ./data

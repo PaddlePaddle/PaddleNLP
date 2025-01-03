@@ -86,6 +86,7 @@ GPT_PRETRAINED_INIT_CONFIGURATION = {
         "eol_token_id": 198,
     },
     "gpt3-13B-en": {  # 13B
+        "architectures": ["GPTForCausalLM"],
         "vocab_size": 50304,
         "hidden_size": 5120,
         "num_hidden_layers": 40,

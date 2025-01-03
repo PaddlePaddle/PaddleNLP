@@ -275,7 +275,7 @@ class LlmMetaConfig:
             "",
             "refined_recompute, Choose from 'mlp_row_ln', 'mlp_column_ln', 'attention_row_ln', 'attention_column_ln', 'flash_attn']",
         ),
-        ("skip_recompute_ops", Optional[Dict[str, int]], None, "skip_recompute_ops"),
+        ("offload_recompute_inputs", bool, False, "offload_recompute_inputs"),
     ]
 
     @classmethod

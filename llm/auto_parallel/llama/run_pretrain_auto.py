@@ -41,12 +41,15 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLM3DAuto,
+    LlamaForCausalLMNet,
     LlamaPretrainingCriterion3DAuto,
+    LlamaPretrainingCriterionNet,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
     "llama": (LlamaConfig, LlamaForCausalLM3DAuto, LlamaPretrainingCriterion3DAuto),
+    "llama_network": (LlamaConfig, LlamaForCausalLMNet, LlamaPretrainingCriterionNet),
 }
 
 
@@ -99,6 +102,10 @@ class PreTrainingArguments(AutoTrainingArguments):
     autotuner_benchmark: bool = field(
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+    use_intermediate_api: bool = field(
+        default=False,
+        metadata={"help": "Weather to use auto_parallel intermediate api"},
     )
 
     def __post_init__(self):
@@ -544,6 +551,7 @@ def main():
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+    config.sharding_parallel_degree = training_args.sharding_parallel_degree
 
     if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
         pipeline = training_args.strategy.pipeline
@@ -563,10 +571,6 @@ def main():
     with paddle.LazyGuard():
         model = model_class.from_config(config, dtype="float32")
         criterion = criterion_class(config)
-
-    for param in model.parameters():
-        assert not param._is_initialized()
-        param.initialize()
 
     if training_args.recompute:
 
@@ -621,6 +625,7 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         optimizers=(None, lr_scheduler),
         tokenizer=tokenizer,
+        model_args=model_args,
     )
 
     checkpoint = None

@@ -194,6 +194,10 @@ def scaled_dot_product_attention(
         return (attn_output, attn_weights) if output_attentions else attn_output
 
 
+colwise_placements = [dist.Replicate(), dist.Shard(1)]
+rowise_placement = [dist.Replicate(), dist.Shard(0)]
+
+
 class LlamaRMSNormAuto(nn.Layer):
     def __init__(self, config, ipp):
         super().__init__()
@@ -240,28 +244,28 @@ class LlamaMLPAuto(nn.Layer):
             self.gate_up_fused_proj.weight = dist.shard_tensor(
                 self.gate_up_fused_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
         else:
             self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.gate_proj.weight = dist.shard_tensor(
                 self.gate_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
 
             self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
             self.up_proj.weight = dist.shard_tensor(
                 self.up_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
 
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
         self.down_proj.weight = dist.shard_tensor(
             self.down_proj.weight,
             get_mesh(self.ipp),
-            [dist.Replicate(), dist.Shard(0)],
+            rowise_placement,
         )
 
     def forward(self, x):
@@ -321,7 +325,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.qkv_proj.weight = dist.shard_tensor(
                 self.qkv_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
 
         else:
@@ -333,7 +337,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.q_proj.weight = dist.shard_tensor(
                 self.q_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
 
             self.k_proj = nn.Linear(
@@ -344,7 +348,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.k_proj.weight = dist.shard_tensor(
                 self.k_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
 
             self.v_proj = nn.Linear(
@@ -355,7 +359,7 @@ class LlamaAttentionAuto(nn.Layer):
             self.v_proj.weight = dist.shard_tensor(
                 self.v_proj.weight,
                 get_mesh(self.ipp),
-                [dist.Replicate(), dist.Shard(1)],
+                colwise_placements,
             )
 
         self.o_proj = nn.Linear(
@@ -366,7 +370,7 @@ class LlamaAttentionAuto(nn.Layer):
         self.o_proj.weight = dist.shard_tensor(
             self.o_proj.weight,
             get_mesh(self.ipp),
-            [dist.Replicate(), dist.Shard(0)],
+            rowise_placement,
         )
 
         if config.rope:
@@ -518,6 +522,7 @@ class LlamaAttentionAuto(nn.Layer):
         if (paddle_version != 0.0) and (paddle_version <= 2.6):
             key_states = repeat_kv(key_states, self.num_key_value_groups)
             value_states = repeat_kv(value_states, self.num_key_value_groups)
+
         attention_mask = (
             dist.reshard(attention_mask, get_mesh(self.ipp), [dist.Shard(0), dist.Replicate()])
             if attention_mask is not None
@@ -1033,6 +1038,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             if not is_pp_enable():
                 position_ids_input = position_ids
                 attention_mask_input = attention_mask
+                alibi_input = alibi
             else:
                 if position_ids is not None:
                     position_ids_input = dist.reshard(
@@ -1051,14 +1057,15 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                     if attention_mask is not None
                     else None
                 )
-                if alibi is not None:
-                    pp_mesh = get_mesh(ipp)
-                    alibi_place = [dist.Replicate() for _ in range(len(pp_mesh._shape))]
-                    alibi = dist.reshard(
+                alibi_input = (
+                    dist.reshard(
                         alibi,
-                        pp_mesh,
-                        alibi_place,
+                        get_mesh(ipp),
+                        [dist.Replicate(), dist.Replicate()],
                     )
+                    if alibi is not None
+                    else None
+                )
             if idx in self.next_pp_stage_indexes:
                 hidden_states = dist.reshard(
                     hidden_states,
@@ -1080,7 +1087,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                     output_attentions,
                     past_key_value,
                     use_cache,
-                    alibi=alibi,
+                    alibi_input,
                 )
             else:
                 layer_outputs = decoder_layer(
@@ -1090,7 +1097,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
                     output_attentions,
                     past_key_value,
                     use_cache,
-                    alibi=alibi,
+                    alibi_input,
                 )
 
             if type(layer_outputs) is tuple:
@@ -1176,7 +1183,7 @@ class LlamaLMHeadAuto(nn.Layer):
         self.weight = dist.shard_tensor(
             self.weight,
             get_mesh(-1),
-            [dist.Replicate(), dist.Shard(1)],
+            colwise_placements,
         )
 
     def forward(self, hidden_states, tensor_parallel_output=None):
@@ -1319,20 +1326,3 @@ class LlamaForCausalLM3DAuto(LlamaPretrainedModelAuto):
         logits = self.lm_head(hidden_states, tensor_parallel_output=tensor_parallel_output)
 
         return logits
-
-        # loss = None
-        # if labels is not None:
-        #     labels.stop_gradient = True
-        #     loss = self.criterion(logits, labels)
-
-        # if not return_dict:
-        #     output = (logits,) + outputs[1:]
-        #     return (loss,) + output if loss is not None else output
-
-        # return CausalLMOutputWithCrossAttentions(
-        #     loss=loss,
-        #     logits=logits,
-        #     past_key_values=outputs.past_key_values,
-        #     hidden_states=outputs.hidden_states,
-        #     attentions=outputs.attentions,
-        # )

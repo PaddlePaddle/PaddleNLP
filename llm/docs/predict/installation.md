@@ -16,6 +16,8 @@ cd PaddleNLP/csrc && python setup_cuda.py install
 cd PaddleNLP/csrc/xpu/src && sh cmake_build.sh
 #DCU设备安装自定义算子
 cd PaddleNLP/csrc && python setup_hip.py install
+#SDAA设备安装自定义算子
+cd PaddleNLP/csrc/sdaa && python setup_sdaa.py install
 ```
 
 到达运行目录，即可开始：

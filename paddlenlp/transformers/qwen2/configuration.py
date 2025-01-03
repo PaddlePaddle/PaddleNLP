@@ -116,6 +116,7 @@ class Qwen2Config(PretrainedConfig):
         attention_dropout=0.0,
         rope_scaling_factor=1.0,
         rope_scaling_type=None,
+        dpo_config=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -148,6 +149,7 @@ class Qwen2Config(PretrainedConfig):
         self.pad_token_id = pad_token_id
         self.bos_token_id = bos_token_id
         self.eos_token_id = eos_token_id
+        self.dpo_config = dpo_config
 
         super().__init__(
             pad_token_id=pad_token_id,

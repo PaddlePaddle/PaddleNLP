@@ -173,17 +173,17 @@ function _train(){
     N1C8) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
             --nnodes 1 --nproc_per_node 8 \
-            --log_dir mylog run_pretrain_auto.py \
+            --log_dir mylog run_pretrain_3D_auto.py \
             ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json"
         ;;
     N4C32) echo "Run with: device_num=${device_num} run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
-            --log_dir mylog run_pretrain_auto.py \
+            --log_dir mylog run_pretrain_3D_auto.py \
             ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json"
         ;;
     *) echo "Run with: device_num=${device_num}, run_mode=${run_mode}"
         train_cmd="python -u -m paddle.distributed.launch --gpus=0,1,2,3,4,5,6,7 \
-            --log_dir mylog run_pretrain_auto.py \
+            --log_dir mylog run_pretrain_3D_auto.py \
             ./pretrain_config_${MODEL_TYPE}/pretrain-${MODEL_TYPE}.json"
         ;;
     esac

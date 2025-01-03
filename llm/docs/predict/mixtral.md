@@ -45,8 +45,6 @@ python -m paddle.distributed.launch \
     --append_attn
 
 # 静态图推理
-# 需要设置下面的环境变量，否则会导致多卡推理阻塞
-export FLAGS_dynamic_static_unified_comm=false
 export DEVICES=0,1
 python -m paddle.distributed.launch \
     --gpus ${DEVICES} \
@@ -86,7 +84,6 @@ python -m paddle.distributed.launch \
     --append_attn
 
 # 静态图推理
-export FLAGS_dynamic_static_unified_comm=false
 export DEVICES=0,1
 python -m paddle.distributed.launch \
     --gpus ${DEVICES} \

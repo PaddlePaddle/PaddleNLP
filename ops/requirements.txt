@@ -1,0 +1,4 @@
+triton>=3.0.0
+paddlenlp>=3.0.0.b2
+einops>=0.6.1
+numpy

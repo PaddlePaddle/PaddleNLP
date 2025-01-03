@@ -246,8 +246,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
     # Install paddlenlp
     install_paddlenlp
     # Install external_ops
-    install_external_ops
-    
+    install_external_ops   
     case_num=1
     export FLAGS_install_deps=0
     export FLAGS_download_data=""

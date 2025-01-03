@@ -94,10 +94,6 @@ class KTOTrainer(Trainer):
 
         self.padding_value = padding_value
         self._stored_metrics = defaultdict(lambda: defaultdict(list))
-        if self.model.config.tensor_parallel_output and self.model.config.tensor_parallel_degree > 1:
-            self.logprobs = paddle.distributed.fleet.meta_parallel.ParallelCrossEntropy()
-        else:
-            self.logprobs = paddle.nn.CrossEntropyLoss(reduction="none")
         self.reset_dpo_infohub()
 
     def get_batch_metrics(self, ref_model, model, batch, train_eval="train"):
@@ -110,6 +106,8 @@ class KTOTrainer(Trainer):
             inputs["attention_mask"] = batch["attention_mask"]
         elif "attn_mask_start_row_indices" in batch:
             inputs["attn_mask_start_row_indices"] = batch["attn_mask_start_row_indices"]
+        elif "attn_mask_startend_row_indices" in batch:
+            inputs["attn_mask_startend_row_indices"] = batch["attn_mask_startend_row_indices"]
         else:
             raise ValueError("No attention mask found in batch.")
         labels = (
@@ -523,6 +521,7 @@ def prepare_pipeline_dpo_inputs_func(inputs):
         first_stage_keys = [
             "input_ids",
             "attn_mask_start_row_indices",
+            "attn_mask_startend_row_indices",
             "position_ids",
         ]
 

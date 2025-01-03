@@ -20,7 +20,6 @@ import inspect
 import queue
 import uuid
 import weakref
-from copy import deepcopy
 
 import paddle
 import paddle.autograd
@@ -44,7 +43,6 @@ from paddlenlp.transformers.linear_utils import (
     RowParallelLinear,
     RowSequenceParallelLinear,
 )
-from paddlenlp.utils.log import logger
 
 try:
     from paddle.base import core, framework
@@ -56,7 +54,7 @@ __all__ = [
     "no_recompute",
     "recompute",
     "get_global_rr_queue_dict",
-    "update_refined_recompute",
+    "get_skip_recompute_ops",
     "RRColumnSequenceParallelLinear",
     "RRRowSequenceParallelLinear",
     "RRColumnParallelLinear",
@@ -331,10 +329,7 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
     amp_white_list, amp_black_list = tracer._get_amp_op_list()
 
     class IntermediateHolder:
-        def __init__(self, name, shape, dtype) -> None:
-            self.name = name
-            self.shape = shape
-            self.dtype = dtype
+        pass
 
     storage = weakref.WeakKeyDictionary()
     holder_list = []
@@ -343,11 +338,11 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
 
     def pack(x):
         # [PACK] in no recompute context or input tensor no need recompute, return the input tensor directly
-        if x.persistable or (in_no_recompute_ctx() and not x.name.endswith(recompute_suffix)):
+        if x is not None and x.persistable or (in_no_recompute_ctx() and not x.name.endswith(recompute_suffix)):
             return share_buffer_to_tensor_or_param(x)
 
         # remove the recompute suffix
-        res = IntermediateHolder(x.name, x.shape, x.dtype)
+        res = IntermediateHolder()
         holder_list.append(weakref.ref(res))
         return res
 
@@ -360,7 +355,7 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
         if len(storage) == 0:
 
             def inner_pack(inner_x):
-                if inner_x.persistable:
+                if inner_x is not None and inner_x.persistable:
                     return
 
                 nonlocal unpack_counter
@@ -400,22 +395,13 @@ def _recompute_without_reentrant(function, preserve_rng_state=True, *args, **kwa
                     ):
                         with switch_recompute_id_ctx(recompute_id + "@second"):
                             with paddle.autograd.saved_tensors_hooks(inner_pack, inner_unpack):
-                                unused_outputs = function(*args, **kwargs)  # noqa: F841
+                                function(*args, **kwargs)
 
         if x not in storage:
             raise Exception(
                 "Not supported to retrieve a tensor saved by autograd multiple times that is no need to recompute."
             )
-        tensor = storage.pop(x)
-        assert x.shape == tensor.shape, (
-            f"The shape:{x.shape} of the tensor saved by autograd is not "
-            f"consistent with the original tensor shape:{tensor.shape}! "
-        )
-        assert x.dtype == tensor.dtype, (
-            f"The dtype:{x.dtype} of the tensor saved by autograd is not"
-            f"consistent with the original tensor dtype:{tensor.dtype}! "
-        )
-        return tensor
+        return storage.pop(x)
 
     with switch_recompute_id_ctx(recompute_id + "@first"):
         with paddle.autograd.saved_tensors_hooks(pack, unpack):
@@ -443,9 +429,21 @@ def recompute(function, *args, **kwargs):
     Returns:
         Output of function on args.
     """
+    # Hack to mix *args with **kwargs in a python 2.7-compliant way
     preserve = kwargs.pop("preserve_rng_state", True)
+
+    # whether to use reentrant method to implement recompute
     use_reentrant = kwargs.pop("use_reentrant", True)
+
+    if not paddle.in_dynamic_mode():
+        from paddle.distributed.auto_parallel.interface import (
+            recompute as static_auto_recompute,
+        )
+
+        return static_auto_recompute(function)(*args, **kwargs)
+
     if not use_reentrant:
+        _ = kwargs.pop("offload_indices", [])  # currently not support offload_indices
         if framework._dygraph_tracer()._has_grad:
             check_args = list(args)
             check_args.extend(list(kwargs.values()))
@@ -509,94 +507,56 @@ def get_pp_vp_split_layers(layer_num, pp_size, vp_size, skip_recompute_num=-1):
     return set(sum(no_recompute_layer_num, []))
 
 
-def create_skip_config_for_refined_recompute(layer_idx, config):
+def get_skip_recompute_ops(config, layer_idx):
     """
-    Creates a configuration for skipping recomputation based on the configuration file,
+    Creates a dictionary for skipping recomputation based on the configuration file,
     effective only at the specified layer index.
 
     Args:
-        layer_idx (int): The layer index used to check whether recomputation should be skipped.
         config (dict): The configuration file of the input model.
+        layer_idx (int): The layer index used to check whether recomputation should be skipped.
 
     Returns:
         dict: Returns an updated configuration file containing the following key-value pairs:
-            - skip_recompute_ops (dict): A dictionary with each operation's name and a boolean
-                                         indicating whether to skip recomputation, defaults to None.
+            - skip_recompute_ops (dict): A dictionary with each model layer's each operation's name
+                                         and a boolean indicating whether to skip recomputation, defaults to None.
             - If the refined_recompute key does not exist or recompute is set to False,
               the original configuration file is returned.
 
     """
-    if not config.recompute:
-        return config
-    skip_config = dict()
-    config = deepcopy(config)
+    skip_recompute_ops = dict()
+    if not config.recompute or not isinstance(config.refined_recompute, dict):
+        return skip_recompute_ops
 
     try:
         hcg = fleet.get_hybrid_communicate_group()
         pp_size = max(hcg.get_pipe_parallel_world_size(), 1)
     except:
         pp_size = 1
+    layer_num = config.num_layers if hasattr(config, "num_layers") else config.num_hidden_layers
+    if hasattr(config, "add_tail_layer") and config.add_tail_layer:
+        layer_num += 1
 
     for op_name, skip_num in config.refined_recompute.items():
         # is pp model
         if pp_size > 1:
             vp_size = max(config.virtual_pp_degree, 1)
-            layer_num = config.num_layers if hasattr(config, "num_layers") else config.num_hidden_layers
             no_recompute_layers = get_pp_vp_split_layers(layer_num, pp_size, vp_size, skip_num)
             if layer_idx in no_recompute_layers:
-                skip_config[op_name] = True
+                skip_recompute_ops[op_name] = True
             else:
-                skip_config[op_name] = False
+                skip_recompute_ops[op_name] = False
         else:
             if skip_num == 0:  # 0 means all recompute
-                skip_config[op_name] = False
+                skip_recompute_ops[op_name] = False
             elif skip_num < 0:  # < 0 means all skip recompute
-                skip_config[op_name] = True
+                skip_recompute_ops[op_name] = True
             else:
                 if layer_idx < skip_num:  # < the number of layers to skip recompute
-                    skip_config[op_name] = True
+                    skip_recompute_ops[op_name] = True
                 else:
-                    skip_config[op_name] = False
-    config.skip_recompute_ops = skip_config
-    return config
-
-
-def update_refined_recompute(rr, lora=False):
-    """update refined recompute dict."""
-    if rr == "":
-        return {}
-    else:
-
-        rr_res = {
-            "mlp_row_ln": 0,
-            "attention_row_ln": 0,
-            "attention_column_ln": 0,
-            "mlp_column_ln": 0,
-            "flash_attn": 0,
-        }
-        ops = rr.split(",")
-        enable_rr = False
-        for op in ops:
-            if ":" not in op:
-                raise ValueError("Illegal refined_recompute input, please check.")
-            op_name, skip_num = op.split(":")[0], int(op.split(":")[1])
-            if op_name not in rr_res:
-                raise ValueError(f"Refined recompute do not support {op_name}, please check.")
-
-            if op_name in ["mlp_row_ln", "attention_row_ln", "attention_column_ln", "mlp_column_ln"]:
-                if lora:
-                    logger.warning(
-                        "Currently, LoRA does not support refined recompute "
-                        f"for the `{op_name}` op. This refined recompute op will be ignored."
-                    )
-                    continue
-            rr_res[op_name] = skip_num
-            if skip_num != 0:
-                enable_rr = True
-
-        if not enable_rr:
-            rr_res = {}
-        return rr_res
+                    skip_recompute_ops[op_name] = False
+    return skip_recompute_ops
 
 
 class RRColumnParallelLinear(ColumnParallelLinear):
