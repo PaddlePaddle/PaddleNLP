@@ -691,7 +691,6 @@ class QWenModelAuto(QWenPretrainedModelAuto):
             attention_mask = paddle.where(attention_mask, zero, neg_inf)
             attention_mask = dist.shard_tensor(attention_mask, get_mesh(), [dist.Replicate(), dist.Replicate()])
         hidden_states = self.drop(hidden_states)
-        hidden_states = dist.reshard(hidden_states, get_mesh(), [dist.Shard(0), dist.Replicate()])
         output_shape = input_shape + [
             hidden_states.shape[-1],
         ]

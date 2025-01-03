@@ -100,6 +100,7 @@ function llama_case_list_auto() {
         llama_dygraph_auto_bs8_fp32_DP2-MP2
         llama_dygraph_auto_bs8_fp32_DP2-MP2-PP2
         llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+        llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
         llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2-VPP3_split_bw
         llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2
         llama_align_dygraph_dy2st_auto_bs2_bf16_DP2-MP1-PP1
@@ -111,6 +112,7 @@ function llama_case_list_auto() {
         llama_align_dy2st_fthenb_and_vpp_auto_bs2_fp32_DP1-MP1-PP4
         llama_align_dygraph_dy2st_pir_auto_pp_bs2_bf16_DP1-MP1-PP4
         llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2
+        llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate
         llama_dy2st_auto_bs2_bf16_DP2-MP1-PP1-CINN
     )
     if [ $1 = "prepare_case" ]; then
@@ -135,9 +137,11 @@ function llm_gpt_case_list_auto() {
         llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2
         llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2
         llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2
+        llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate
         llm_gpt_pir_auto_bs4_TP2
         llm_gpt_pir_auto_bs4_TP2_PP2
         llm_gpt_pir_auto_bs8_DP2_TP2_PP2
+        llm_gpt_pir_auto_bs8_DP2_TP2_PP2_intermediate
     )
     if [ $1 = "prepare_case" ]; then
         restore_func $fun_list  
@@ -458,7 +462,77 @@ function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
 }
+function llama_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
+    echo "=========== $FUNCNAME run begin ==========="
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
 
+    task_name="llama_auto_bs8_fp16_dp2mp2pp2_intermediate"
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+    rm -rf $case_out_dir
+    rm -rf $case_log_dir
+
+    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
+        --model_type "llama_network" \
+        --use_intermediate_api 1\
+        --model_name_or_path "facebook/llama-7b" \
+        --tokenizer_name_or_path "facebook/llama-7b" \
+        --input_dir "./data" \
+        --output_dir $case_out_dir \
+        --split 949,50,1 \
+        --max_seq_length 2048 \
+        --hidden_size 1024 \
+        --intermediate_size 3072 \
+        --num_hidden_layers 8 \
+        --num_attention_heads 32 \
+        --per_device_train_batch_size 1 \
+        --per_device_eval_batch_size 4 \
+        --gradient_accumulation_steps 4 \
+        --use_flash_attention 0 \
+        --use_fused_rms_norm 0 \
+        --fp16 1 \
+        --fp16_opt_level "O2" \
+        --amp_master_grad 1 \
+        --scale_loss 1024 \
+        --pipeline_parallel_degree 2 \
+        --tensor_parallel_degree 2 \
+        --sharding_parallel_degree 1 \
+        --learning_rate 0.0001 \
+        --min_learning_rate 0.00001 \
+        --max_steps 10 \
+        --save_steps 5000 \
+        --weight_decay 0.01 \
+        --warmup_ratio 0.01 \
+        --logging_steps 1 \
+        --dataloader_num_workers 1 \
+        --sharding "" \
+        --eval_steps 1000000 \
+        --disable_tqdm true \
+        --continue_training 0 \
+        --recompute 0 \
+        --do_train \
+        --do_eval \
+        --device "gpu" \
+        --data_impl "mmap" \
+        --enable_auto_parallel 1 \
+        --to_static 0 \
+        --max_grad_norm 1.0 \
+        >>${log_path}/$FUNCNAME 2>&1
+    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips=-1
+    mem=-1
+    echo "result: loss=$loss ips=$ips mem=$mem"
+    loss_base=9.35162258
+    if [ $IS_A100 -ne 0 ];then
+        loss_base=9.39368534
+    fi
+    ips_base=-1
+    mem_base=-1
+    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "=========== $FUNCNAME run  end ==========="
+}
 function llama_dy2st_auto_bs4_bf16_DP1-MP1-PP4-SD2() {
     # Only A100 support this case.
     echo IS_A100 is $IS_A100
@@ -1732,6 +1806,79 @@ function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2(){
         >>${log_path}/$FUNCNAME 2>&1
     echo "=========== $FUNCNAME run  end ==========="
 }
+function llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate(){
+    echo "=========== $FUNCNAME run begin ==========="
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_enable_pir_api=1
+
+    task_name="llama_baichuan_pir_auto_fuse_ffn_attention_qkv_DP2_MP2_PP2_intermediate"
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+    rm -rf $case_out_dir
+    rm -rf $case_log_dir
+
+    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" --log_dir $case_log_dir run_pretrain_auto.py \
+        --model_type "llama_network" \
+        --use_intermediate_api true \
+        --model_name_or_path "baichuan-inc/Baichuan2-13B-Base" \
+        --tokenizer_name_or_path "baichuan-inc/Baichuan2-13B-Base" \
+        --input_dir "./data" \
+        --output_dir $case_out_dir \
+        --split 949,50,1 \
+        --to_static true \
+        --pipeline_parallel_degree 2 \
+        --tensor_parallel_degree 2 \
+        --virtual_pp_degree 2\
+        --pipeline_schedule_mode "1F1B" \
+        --weight_decay 0.01 \
+        --warmup_ratio 0.01 \
+        --max_grad_norm 0.0 \
+        --learning_rate 3e-05 \
+        --min_learning_rate 3e-06 \
+        --max_steps 10 \
+        --logging_steps 1 \
+        --eval_steps 10000 \
+        --save_steps 1000 \
+        --continue_training 0 \
+        --do_train true \
+        --do_eval false \
+        --do_predict false \
+        --disable_tqdm true \
+        --save_total_limit 2 \
+        --device gpu \
+        --dataloader_num_workers 4 \
+        --distributed_dataloader 0 \
+        --enable_auto_parallel 1 \
+        --per_device_train_batch_size 1 \
+        --gradient_accumulation_steps 32 \
+        --per_device_eval_batch_size 1 \
+        --recompute false \
+        --recompute_use_reentrant true \
+        --recompute_granularity full \
+        --pp_recompute_interval 0 \
+        --bf16 true \
+        --fp16_opt_level "O2"  \
+        --amp_master_grad true \
+        --fuse_attention_ffn true \
+        --fuse_attention_qkv true \
+        --use_flash_attention false \
+        --use_fused_rope true \
+        --use_fused_rms_norm false \
+        --max_seq_length 4096 \
+        --sequence_parallel false \
+        --sharding "stage1" \
+        --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate " \
+        --sharding_parallel_config "enable_stage1_overlap" \
+        --tensor_parallel_config "enable_mp_async_allreduce" \
+        --pipeline_parallel_config "enable_send_recv_overlap" \
+        --auto_parallel_resume_form_hybrid_parallel true \
+        --num_hidden_layers 2 \
+        >>${log_path}/$FUNCNAME 2>&1
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
 function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
     echo "=========== $FUNCNAME run begin ==========="
     export PYTHONPATH=$root_path/:$PYTHONPATH
@@ -1792,11 +1939,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.59486389 # output of dropout is different after supporting spmd
+    loss_base=10.55848312 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.60063553 # after add dropout spmd
+        loss_base=10.55920792 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -1864,11 +2011,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2() {
     ips=-1
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
-    loss_base=10.58862114 # output of dropout is different after supporting spmd
+    loss_base=10.56786537 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.59354877 # after add dropout spmd
+        loss_base=10.57873726 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -1937,11 +2084,11 @@ function llm_gpt_dygraph_auto_bs8_fp32_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.59993172     # note: need to debug
-    loss_base=10.58122158 # output of dropout is different after supporting spmd
+    loss_base=10.57312012 # output of dropout is different after supporting spmd
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.58605194 # after add dropout spmd
+        loss_base=10.5769043 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2010,11 +2157,85 @@ function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2() {
     mem=-1
     echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
     # loss_base=10.58456802     # note: need to debug
-    loss_base=10.58163357
+    loss_base=10.57452488
     ips_base=-1
     mem_base=-1
     if [ $IS_A100 -ne 0 ];then
-        loss_base=10.58635044 # after add dropout spmd
+        loss_base=10.57843781 # after add dropout spmd
+    fi
+    check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
+    echo "=========== $FUNCNAME run  end ==========="
+}
+
+function llm_gpt_dygraph_auto_bs8_fp16_DP2-MP2-PP2_intermediate() {
+    echo "=========== $FUNCNAME run begin ==========="
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_cudnn_deterministic=1
+    export FLAGS_embedding_deterministic=1 
+
+    cd ${llm_gpt_case_path}
+    task_name="gpt3_auto_bs8_fp16_dp2mp2pp2_intermediate"
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+    rm -rf $case_log_dir
+    rm -rf $case_out_dir
+
+    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
+        --log_dir $case_log_dir \
+        run_pretrain_auto.py \
+        --model_name_or_path gpt2-medium-en \
+        --tokenizer_name_or_path gpt2-medium-en \
+        --input_dir "$gpt_data_path/data" \
+        --output_dir $case_out_dir  \
+        --split 949,50,1 \
+        --max_seq_length 1024 \
+        --per_device_train_batch_size 1 \
+        --per_device_eval_batch_size 1 \
+        --sharding "stage1" \
+        --tensor_parallel_degree 2 \
+        --pipeline_parallel_degree 2 \
+        --sequence_parallel 0 \
+        --fuse_attention_qkv 0 \
+        --use_flash_attention 0 \
+        --scale_loss 1024 \
+        --learning_rate 0.00001 \
+        --min_learning_rate 0.000005 \
+        --max_steps 10 \
+        --save_steps 50000 \
+        --weight_decay 0.01 \
+        --warmup_ratio 0.01 \
+        --max_grad_norm 1.0 \
+        --logging_steps 1\
+        --continue_training 0\
+        --dataloader_num_workers 1 \
+        --eval_steps 100000 \
+        --report_to "visualdl" \
+        --disable_tqdm true \
+        --recompute 0 \
+        --gradient_accumulation_steps 4 \
+        --do_train \
+        --do_eval \
+        --device "gpu" \
+        --model_type "gpt_network" \
+        --use_intermediate_api 1\
+        --enable_auto_parallel 1 \
+        --to_static 0 \
+        --fp16 1 \
+        --fp16_opt_level "O2" \
+        >>${log_path}/$FUNCNAME 2>&1
+    loss=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss: ' '{print $2}' | awk -F ',' '{print $1}'`
+    loss_md5=`cat $case_log_dir/workerlog.0 | grep 'global_step: 10' | awk -F 'loss_md5: ' '{print $2}' | awk -F ',' '{print $1}'`
+    ips=-1
+    mem=-1
+    echo "result: loss=$loss ips=$ips mem=$mem loss_md5=$loss_md5"
+    # loss_base=10.58456802     # note: need to debug
+    loss_base=10.566679
+    ips_base=-1
+    mem_base=-1
+    if [ $IS_A100 -ne 0 ];then
+        loss_base=10.56109619 # after add dropout spmd
     fi
     check_result $FUNCNAME ${loss_base} ${loss} ${ips_base} ${ips} ${mem_base} ${mem}
     echo "=========== $FUNCNAME run  end ==========="
@@ -2195,6 +2416,73 @@ function llm_gpt_pir_auto_bs8_DP2_TP2_PP2(){
         --do_eval \
         --device "gpu" \
         --model_type "gpt" \
+        --enable_auto_parallel 1 \
+        --to_static 1 \
+        --fp16 1 \
+        --fp16_opt_level "O2" \
+        --num_hidden_layers 2 \
+        --intermediate_size 1024 \
+        --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
+        --tensor_parallel_config "enable_mp_async_allreduce" \
+        --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
+        --pipeline_parallel_config "enable_send_recv_overlap enable_split_backward" \
+        >>${log_path}/$FUNCNAME 2>&1
+    echo "=========== $FUNCNAME run  end ==========="
+}
+function llm_gpt_pir_auto_bs8_DP2_TP2_PP2_intermediate(){
+    echo "=========== $FUNCNAME run begin ==========="
+    export PYTHONPATH=$root_path/:$PYTHONPATH
+    export FLAGS_call_stack_level=3
+    export NVIDIA_TF32_OVERRIDE=0
+    export FLAGS_enable_pir_api=1
+    cd ${llm_gpt_case_path}
+
+    task_name="gpt3_auto_bs8_dp2_tp2_pp2_intermediate"
+    case_out_dir="output/$task_name"
+    case_log_dir="output/$task_name""_log"
+    rm -rf $case_out_dir
+    rm -rf $case_log_dir
+
+    python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
+        --log_dir $case_log_dir \
+        run_pretrain_auto.py \
+        --model_name_or_path gpt3-13B-en \
+        --tokenizer_name_or_path gpt3-13B-en \
+        --input_dir "$gpt_data_path/data" \
+        --output_dir "output/$task_name" \
+        --split 949,50,1 \
+        --max_seq_length 1024 \
+        --per_device_train_batch_size 1 \
+        --per_device_eval_batch_size 1 \
+        --sharding "stage1" \
+        --tensor_parallel_degree 2 \
+        --pipeline_parallel_degree 2 \
+        --pipeline_schedule_mode "1F1B" \
+        --sequence_parallel 0 \
+        --fuse_attention_qkv 1 \
+        --use_flash_attention 0 \
+        --fused_linear_param_grad_add 1\
+        --scale_loss 1024 \
+        --learning_rate 0.00001 \
+        --min_learning_rate 0.000005 \
+        --max_steps 10 \
+        --save_steps 50000 \
+        --weight_decay 0.01 \
+        --warmup_ratio 0.01 \
+        --max_grad_norm 1.0 \
+        --logging_steps 1\
+        --continue_training 0\
+        --dataloader_num_workers 1 \
+        --eval_steps 100000 \
+        --report_to "visualdl" \
+        --disable_tqdm true \
+        --recompute 0 \
+        --gradient_accumulation_steps 4 \
+        --do_train \
+        --do_eval \
+        --device "gpu" \
+        --model_type "gpt_network" \
+        --use_intermediate_api 1 \
         --enable_auto_parallel 1 \
         --to_static 1 \
         --fp16 1 \

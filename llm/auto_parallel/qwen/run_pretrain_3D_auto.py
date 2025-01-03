@@ -40,12 +40,15 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     QWenConfig,
     QWenForCausalLM3DAuto,
+    QWenForCausalLMNet,
     QWenPretrainingCriterionAuto,
+    QWenPretrainingCriterionNet,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
     "qwen": (QWenConfig, QWenForCausalLM3DAuto, QWenPretrainingCriterionAuto),
+    "qwen_network": (QWenConfig, QWenForCausalLMNet, QWenPretrainingCriterionNet),
 }
 
 from paddlenlp.data.causal_dataset import (
@@ -105,6 +108,10 @@ class PreTrainingArguments(AutoTrainingArguments):
     lazy_init: bool = field(
         default=False,
         metadata={"help": "whether use lazy init for model parameters"},
+    )
+    use_intermediate_api: bool = field(
+        default=False,
+        metadata={"help": "Weather to use auto_parallel intermediate api"},
     )
 
     def __post_init__(self):
@@ -251,6 +258,8 @@ class ModelArguments:
         default=False,
         metadata={"help": "recompute_use_reentrant"},
     )
+    hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
+    attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
 
 
 def create_pretrained_dataset(
@@ -544,8 +553,9 @@ def main():
         if training_args.bf16:
             dtype = "bfloat16"
 
-    model = model_class.from_config(config, dtype=dtype)
-    criterion = criterion_class(config)
+    with paddle.LazyGuard():
+        model = model_class.from_config(config, dtype=dtype)
+        criterion = criterion_class(config)
 
     # load_model(model)
     # shard_model(model)
@@ -553,7 +563,11 @@ def main():
     # Create the learning_rate sheduler and optimizer
     if training_args.decay_steps is None:
         training_args.decay_steps = training_args.max_steps
-    warmup_steps = training_args.warmup_ratio * training_args.max_steps
+
+    if training_args.warmup_steps > 0:
+        warmup_steps = training_args.warmup_steps
+    else:
+        warmup_steps = training_args.warmup_ratio * training_args.max_steps
 
     lr_scheduler = None
     if training_args.lr_scheduler_type.value == "cosine":

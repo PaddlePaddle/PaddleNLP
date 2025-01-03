@@ -17,8 +17,6 @@ from __future__ import annotations
 
 import collections
 import contextlib
-import math
-from functools import partial
 
 import numpy as np
 import paddle
@@ -27,7 +25,6 @@ import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
-from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import try_import
@@ -39,7 +36,6 @@ try:
 except:
     pass
 
-from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import BaseModelOutputWithPastAndCrossAttentions
 from .configuration import GPT_PRETRAINED_INIT_CONFIGURATION, GPTConfig
@@ -54,22 +50,15 @@ except:
     FusedDropoutAdd = None
 
 __all__ = [
-    "GPTModelAuto",
-    "GPTPretrainedModelAuto",
-    "GPTPretrainingCriterionAuto",
-    "GPTLMHeadModelAuto",
-    "GPTForCausalLMAuto",
-    "GPTEmbeddingsAuto",
-    "GPTDecoderLayerAuto",
+    "GPTModelNet",
+    "GPTPretrainedModelNet",
+    "GPTPretrainingCriterionNet",
+    "GPTLMHeadModelNet",
+    "GPTForCausalLMNet",
+    "GPTEmbeddingsNet",
+    "GPTDecoderLayerNet",
     "GPTLayerNorm",
 ]
-
-
-def get_mesh(pp_idx=0):
-    mesh = fleet.auto.get_mesh()
-    if "pp" in mesh.dim_names:
-        mesh = mesh.get_mesh_with_dim("pp")[pp_idx]
-    return mesh
 
 
 def get_triangle_upper_mask(x, mask=None):
@@ -99,16 +88,12 @@ def fast_layer_norm(input, weight, bias, eps):
 
 
 class GPTLayerNorm(nn.LayerNorm):
-    def __init__(self, config, normalized_shape, ipp=-1, epsilon=1e-05, weight_attr=None, bias_attr=None, name=None):
+    def __init__(self, config, normalized_shape, epsilon=1e-05, weight_attr=None, bias_attr=None, name=None):
         super().__init__(
             normalized_shape=normalized_shape, epsilon=epsilon, weight_attr=weight_attr, bias_attr=bias_attr
         )
         self.config = config
-        self.ipp = ipp
         self._check_normalized_shape(self._normalized_shape)
-        self.weight = dist.shard_tensor(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
-        if self.bias is not None:
-            self.bias = dist.shard_tensor(self.bias, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
 
     def _check_normalized_shape(self, normalized_shape):
         if isinstance(normalized_shape, (list, tuple)):
@@ -150,7 +135,7 @@ def _expand_2d_mask(mask, dtype, tgt_length):
     return expanded_mask
 
 
-class MultiHeadAttentionAuto(nn.Layer):
+class MultiHeadAttentionNet(nn.Layer):
     """
     Attention mapps queries and a set of key-value pairs to outputs, and
     Multi-Head Attention performs multiple parallel attention to jointly attending
@@ -160,8 +145,8 @@ class MultiHeadAttentionAuto(nn.Layer):
 
     Cache = collections.namedtuple("Cache", ["k", "v"])
 
-    def __init__(self, config, ipp=None):
-        super(MultiHeadAttentionAuto, self).__init__()
+    def __init__(self, config):
+        super(MultiHeadAttentionNet, self).__init__()
 
         self.config = config
 
@@ -176,37 +161,15 @@ class MultiHeadAttentionAuto(nn.Layer):
         ), "hidden_size must be divisible by num_attention_heads"
 
         self.num_attention_heads = config.num_attention_heads  # default, without tensor parallel
-        self.ipp = ipp
 
         if self.config.fuse_attention_qkv:
             self.qkv_proj = nn.Linear(config.hidden_size, 3 * config.hidden_size, bias_attr=True)
-            self.qkv_proj.weight = dist.shard_tensor(
-                self.qkv_proj.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(1)]
-            )
-            self.qkv_proj.bias = dist.shard_tensor(
-                self.qkv_proj.bias, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)]
-            )
         else:
             self.q_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
             self.k_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
             self.v_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
-            self.q_proj.weight = dist.shard_tensor(
-                self.q_proj.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(1)]
-            )
-            self.k_proj.weight = dist.shard_tensor(
-                self.k_proj.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(1)]
-            )
-            self.v_proj.weight = dist.shard_tensor(
-                self.v_proj.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(1)]
-            )
 
         self.out_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
-        self.out_proj.weight = dist.shard_tensor(
-            self.out_proj.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)]
-        )
-        self.out_proj.bias = dist.shard_tensor(
-            self.out_proj.bias, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
-        )
 
     def _fuse_prepare_qkv(self, query, use_cache=False, past_key_value=None):
         if self.config.sequence_parallel:
@@ -299,7 +262,6 @@ class MultiHeadAttentionAuto(nn.Layer):
         if not paddle.is_compiled_with_cuda():
             attention_mask = get_triangle_upper_mask(product, attention_mask)
         if attention_mask is not None:
-            attention_mask = dist.reshard(attention_mask, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
             product = product + attention_mask.astype(product.dtype)
             weights = F.softmax(product)
         else:
@@ -350,9 +312,9 @@ class MultiHeadAttentionAuto(nn.Layer):
 
         has_gradient = (not q.stop_gradient) or (not k.stop_gradient) or (not v.stop_gradient)
         if self.enable_recompute and self.config.recompute_granularity == "core_attn" and has_gradient:
-            outputs = recompute(attention_func, q, k, v, attention_mask, output_attentions, use_reentrant=False)
+            outputs = recompute(attention_func, q, k, v, attention_mask, output_attentions, False)
         else:
-            outputs = attention_func(q, k, v, attention_mask=attention_mask, output_attentions=output_attentions)
+            outputs = attention_func(q, k, v, attention_mask, output_attentions)
 
         if output_attentions:
             out, weights = outputs
@@ -370,6 +332,7 @@ class MultiHeadAttentionAuto(nn.Layer):
         out = self.out_proj(out)
         # if sequence_parallel is true, out shape are [bs * seq_len / n, dim]
         # else their shape are [bs, seq_len, dim], n is mp parallelism.
+
         outs = [out]
         if output_attentions:
             outs.append(weights)
@@ -424,7 +387,7 @@ class TransformerDecoder(nn.Layer):
             attention_mask,
             use_cache,
             past_key_value,
-            use_reentrant=self.config.recompute_use_reentrant,
+            self.config.recompute_use_reentrant,
         )
         return hidden_states
 
@@ -451,13 +414,7 @@ class TransformerDecoder(nn.Layer):
         all_hidden_states = () if output_hidden_states else None
         next_decoder_cache = () if use_cache else None
 
-        pre_ipp = None
         for i, decoder_layer in enumerate(self.layers):
-            if decoder_layer.ipp is not None and pre_ipp != decoder_layer.ipp:
-                output = dist.reshard(output, get_mesh(decoder_layer.ipp), [dist.Shard(0), dist.Replicate()])
-                attention_mask = dist.reshard(
-                    attention_mask, get_mesh(decoder_layer.ipp), [dist.Replicate(), dist.Replicate()]
-                )
             has_gradient = not output.stop_gradient
             if self.enable_recompute and has_gradient and self.config.recompute_granularity == "full":
                 outputs = self.recompute_training(
@@ -471,10 +428,10 @@ class TransformerDecoder(nn.Layer):
             else:
                 outputs = decoder_layer(
                     output,
-                    attention_mask=attention_mask,
-                    use_cache=use_cache,
-                    past_key_value=past_key_values[i] if past_key_values is not None else None,
-                    output_attentions=output_attentions,
+                    attention_mask,
+                    use_cache,
+                    past_key_values[i] if past_key_values is not None else None,
+                    output_attentions,
                 )
 
             # outputs = hidden_states if both use_cache and output_attentions are False
@@ -483,7 +440,6 @@ class TransformerDecoder(nn.Layer):
             all_self_attentions = all_self_attentions + (outputs[1],) if output_attentions else None
             all_hidden_states = all_hidden_states + (output,) if output_hidden_states else None
             next_decoder_cache = next_decoder_cache + (outputs[-1],) if use_cache else None
-            pre_ipp = decoder_layer.ipp
 
         if self.norm is not None:
             output = self.norm(output)
@@ -505,17 +461,16 @@ class TransformerDecoder(nn.Layer):
         )
 
 
-class GPTDecoderLayerAuto(nn.Layer):
+class GPTDecoderLayerNet(nn.Layer):
     """
     The transformer decoder layer.
 
     It contains multiheadattention and some linear layers.
     """
 
-    def __init__(self, config: GPTConfig, ipp=None):
-        super(GPTDecoderLayerAuto, self).__init__()
+    def __init__(self, config: GPTConfig):
+        super(GPTDecoderLayerNet, self).__init__()
         self.config = config
-        self.ipp = ipp
 
         # Recompute defaults to False and is controlled by Trainer
         self.enable_recompute = False
@@ -523,18 +478,13 @@ class GPTDecoderLayerAuto(nn.Layer):
         if not FusedDropoutAdd:
             config.use_fused_dropout_add = False
 
-        self.self_attn = MultiHeadAttentionAuto(config, ipp)
+        self.self_attn = MultiHeadAttentionNet(config)
 
         self.linear1 = nn.Linear(config.hidden_size, config.intermediate_size, bias_attr=True)
         self.linear2 = nn.Linear(config.intermediate_size, config.hidden_size, bias_attr=True)
-
-        self.linear1.weight = dist.shard_tensor(self.linear1.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(1)])
-        self.linear1.bias = dist.shard_tensor(self.linear1.bias, get_mesh(ipp), [dist.Replicate(), dist.Shard(0)])
-        self.linear2.weight = dist.shard_tensor(self.linear2.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(0)])
-        self.linear2.bias = dist.shard_tensor(self.linear2.bias, get_mesh(ipp), [dist.Replicate(), dist.Replicate()])
         # fix : change nn.LayerNorm(config.hidden_size, epsilon=1e-5, bias_attr=True) to GPTLayerNorm()
-        self.norm1 = GPTLayerNorm(config, config.hidden_size, self.ipp, epsilon=1e-5, bias_attr=True)
-        self.norm2 = GPTLayerNorm(config, config.hidden_size, self.ipp, epsilon=1e-5, bias_attr=True)
+        self.norm1 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5, bias_attr=True)
+        self.norm2 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5, bias_attr=True)
 
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.norm1.weight)
@@ -614,6 +564,7 @@ class GPTDecoderLayerAuto(nn.Layer):
             if not self.config.use_fused_dropout_add:
                 l_1 = self.linear1(hidden_states)
                 act = self.activation(l_1, approximate=True)
+                # NOTE(align_mode)
                 l_2 = self.linear2(act)
                 hidden_states = residual + self.dropout2(l_2)
             else:
@@ -635,7 +586,7 @@ class GPTDecoderLayerAuto(nn.Layer):
         return tuple(v for v in temp_list if v is not None)
 
 
-class GPTEmbeddingsAuto(nn.Layer):
+class GPTEmbeddingsNet(nn.Layer):
     """
     Include embeddings from word and position embeddings.
     """
@@ -644,7 +595,7 @@ class GPTEmbeddingsAuto(nn.Layer):
         self,
         config,
     ):
-        super(GPTEmbeddingsAuto, self).__init__()
+        super(GPTEmbeddingsNet, self).__init__()
 
         self.config = config
 
@@ -656,12 +607,6 @@ class GPTEmbeddingsAuto(nn.Layer):
         self.position_embeddings = nn.Embedding(
             config.max_position_embeddings,
             config.hidden_size,
-        )
-        self.word_embeddings.weight = dist.shard_tensor(
-            self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Replicate()]
-        )
-        self.position_embeddings.weight = dist.shard_tensor(
-            self.position_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)]
         )
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
@@ -693,16 +638,16 @@ class GPTEmbeddingsAuto(nn.Layer):
             embeddings = paddle.reshape_(embeddings, [bs * seq_len, hidden_size])
             # [bs * seq_len / n, dim] (n is mp parallelism)
             # embeddings = ScatterOp.apply(embeddings)
-            embeddings = dist.reshard(embeddings, get_mesh(), [dist.Replicate(), dist.Shard(0)])
         # Use a ternary operator for a more concise assignment of current_seed
         current_seed = "local_seed" if self.config.sequence_parallel else "global_seed"
         # The 'with' block ensures the correct seed context is used
         with seed_guard_context(current_seed):
             embeddings = self.dropout(embeddings)
+            # NOTE(align_mode)
         return embeddings
 
 
-class GPTPretrainedModelAuto(PretrainedModel):
+class GPTPretrainedModelNet(PretrainedModel):
     """
     An abstract class for pretrained GPT models. It provides GPT related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
@@ -717,132 +662,9 @@ class GPTPretrainedModelAuto(PretrainedModel):
     config_class = GPTConfig
     pretrained_init_configuration = GPT_PRETRAINED_INIT_CONFIGURATION
 
-    @classmethod
-    def _get_tensor_parallel_mappings(cls, config, is_split=True):
-
-        from paddlenlp.transformers.conversion_utils import split_or_merge_func
-
-        fn = split_or_merge_func(
-            is_split=is_split,
-            tensor_parallel_degree=config.tensor_parallel_degree,
-            tensor_parallel_rank=config.tensor_parallel_rank,
-            num_attention_heads=config.num_attention_heads,
-        )
-
-        def get_tensor_parallel_split_mappings(num_layers):
-            final_actions = {}
-            base_actions = {
-                # Column Linear
-                "layers.0.linear1.weight": partial(fn, is_column=True),
-                "layers.0.linear1.bias": partial(fn, is_column=True),
-                # Row Linear
-                "word_embeddings.weight": partial(fn, is_column=False),
-                "layers.0.self_attn.out_proj.weight": partial(fn, is_column=False),
-                "layers.0.linear2.weight": partial(fn, is_column=False),
-            }
-
-            if config.fuse_attention_qkv:
-                base_actions["layers.0.self_attn.qkv_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.qkv_proj.bias"] = partial(fn, is_column=True)
-            else:
-                base_actions["layers.0.self_attn.q_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.k_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.v_proj.weight"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.q_proj.bias"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.k_proj.bias"] = partial(fn, is_column=True)
-                base_actions["layers.0.self_attn.v_proj.bias"] = partial(fn, is_column=True)
-
-            for key, action in base_actions.items():
-                if "layers.0." in key:
-                    for i in range(num_layers):
-                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
-                final_actions[key] = action
-
-            return final_actions
-
-        mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
-
-        return mappings
-
-    @classmethod
-    def _get_name_mappings(cls, config: GPTConfig) -> list[StateDictNameMapping]:
-        mappings: list[StateDictNameMapping] = []
-        model_mappings = [
-            ["wte.weight", "embeddings.word_embeddings.weight"],
-            ["wpe.weight", "embeddings.position_embeddings.weight"],
-            ["ln_f.weight", "decoder.norm.weight"],
-            ["ln_f.bias", "decoder.norm.bias"],
-        ]
-        for layer_index in range(config.num_hidden_layers):
-            layer_mappings = [
-                [f"h.{layer_index}.ln_1.weight", f"decoder.layers.{layer_index}.norm1.weight"],
-                [f"h.{layer_index}.ln_1.bias", f"decoder.layers.{layer_index}.norm1.bias"],
-                [f"h.{layer_index}.ln_2.weight", f"decoder.layers.{layer_index}.norm2.weight"],
-                [f"h.{layer_index}.ln_2.bias", f"decoder.layers.{layer_index}.norm2.bias"],
-                [f"h.{layer_index}.mlp.c_fc.weight", f"decoder.layers.{layer_index}.linear1.weight"],
-                [f"h.{layer_index}.mlp.c_fc.bias", f"decoder.layers.{layer_index}.linear1.bias"],
-                [f"h.{layer_index}.mlp.c_proj.weight", f"decoder.layers.{layer_index}.linear2.weight"],
-                [f"h.{layer_index}.mlp.c_proj.bias", f"decoder.layers.{layer_index}.linear2.bias"],
-                [f"h.{layer_index}.attn.c_proj.weight", f"decoder.layers.{layer_index}.self_attn.out_proj.weight"],
-                [f"h.{layer_index}.attn.c_proj.bias", f"decoder.layers.{layer_index}.self_attn.out_proj.bias"],
-                # attention
-                [
-                    f"h.{layer_index}.attn.c_attn.weight",
-                    f"decoder.layers.{layer_index}.self_attn.q_proj.weight",
-                    "split",
-                    0,
-                ],
-                [
-                    f"h.{layer_index}.attn.c_attn.bias",
-                    f"decoder.layers.{layer_index}.self_attn.q_proj.bias",
-                    "split",
-                    0,
-                ],
-                [
-                    f"h.{layer_index}.attn.c_attn.weight",
-                    f"decoder.layers.{layer_index}.self_attn.k_proj.weight",
-                    "split",
-                    1,
-                ],
-                [
-                    f"h.{layer_index}.attn.c_attn.bias",
-                    f"decoder.layers.{layer_index}.self_attn.k_proj.bias",
-                    "split",
-                    1,
-                ],
-                [
-                    f"h.{layer_index}.attn.c_attn.weight",
-                    f"decoder.layers.{layer_index}.self_attn.v_proj.weight",
-                    "split",
-                    2,
-                ],
-                [
-                    f"h.{layer_index}.attn.c_attn.bias",
-                    f"decoder.layers.{layer_index}.self_attn.v_proj.bias",
-                    "split",
-                    2,
-                ],
-            ]
-
-            model_mappings.extend(layer_mappings)
-        # downstream mappings
-        if "GPT2Model" not in config.architectures:
-            for mapping in model_mappings:
-                mapping[0] = "transformer." + mapping[0]
-                mapping[1] = "gpt." + mapping[1]
-        if "GPT2ForTokenClassification" in config.architectures:
-            model_mappings.extend([["classifier.weight", "classifier.weight", "transpose"]])
-        if "GPT2ForSequenceClassification" in config.architectures:
-            model_mappings.extend([["score.weight", "score.weight", "transpose"]])
-        if "GPT2LMHeadModel" in config.architectures:
-            model_mappings.append(["lm_head.weight", "lm_head.decoder.weight"])
-
-        mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
-        return mappings
-
 
 @register_base_model
-class GPTModelAuto(GPTPretrainedModelAuto):
+class GPTModelNet(GPTPretrainedModelNet):
     r"""
     The bare GPT Model transformer outputting raw hidden-states.
 
@@ -893,7 +715,7 @@ class GPTModelAuto(GPTPretrainedModelAuto):
 
             .. note::
                 A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`GPTPretrainedModelAuto._init_weights()` for how weights are initialized in `GPTModelAuto`.
+                See :meth:`GPTPretrainedModelNet._init_weights()` for how weights are initialized in `GPTModelNet`.
 
         pad_token_id(int, optional):
             The index of padding token in the token vocabulary.
@@ -902,7 +724,7 @@ class GPTModelAuto(GPTPretrainedModelAuto):
     """
 
     def __init__(self, config: GPTConfig):
-        super(GPTModelAuto, self).__init__(config)
+        super(GPTModelNet, self).__init__(config)
 
         self.config = config
 
@@ -911,33 +733,18 @@ class GPTModelAuto(GPTPretrainedModelAuto):
         self.bos_token_id = config.bos_token_id
         self.eol_token_id = config.eol_token_id
         self.vocab_size = config.vocab_size
-
-        self.bias = paddle.tril(
-            paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
-        )
-        self.bias = dist.shard_tensor(self.bias, get_mesh(), [dist.Replicate(), dist.Replicate()])
-        self.embeddings = GPTEmbeddingsAuto(config)
+        self.embeddings = GPTEmbeddingsNet(config)
 
         decoder_layers = nn.LayerList()
         for i in range(config.num_hidden_layers):
-            decoder_layers.append(GPTDecoderLayerAuto(config, self.get_layer_ipp(i)))
+            decoder_layers.append(GPTDecoderLayerNet(config))
 
         self.decoder = TransformerDecoder(
             config,
             decoder_layers,
         )
 
-    def get_layer_ipp(self, layer_index):
-        mesh = fleet.auto.get_mesh()
-        if "pp" not in mesh.dim_names:
-            return None
-        else:
-            pp_degree = mesh.get_dim_size("pp")
-            layer_per_stage = math.ceil(self.config.num_hidden_layers / pp_degree)
-            return layer_index // layer_per_stage
-
-    def get_last_layer_ipp(self):
-        return self.get_layer_ipp(self.config.num_hidden_layers - 1)
+        self.global_layer = GlobalNet(config)
 
     def get_input_embeddings(self):
         return self.embeddings.word_embeddings
@@ -957,11 +764,6 @@ class GPTModelAuto(GPTPretrainedModelAuto):
                         input_shape, past_key_values_length=past_key_values_length
                     )
                     # NOTE(zhaoyingli): infer spmd does not support [seq_len, seq_len] --> [batch, 1, seq_len, seq_len] in data_parallel
-                    combined_attention_mask = dist.shard_tensor(
-                        combined_attention_mask,
-                        get_mesh(),
-                        [dist.Replicate(), dist.Replicate()],
-                    )
                     expanded_attn_mask = expanded_attn_mask & combined_attention_mask
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
             elif len(attention_mask.shape) == 3:
@@ -988,7 +790,7 @@ class GPTModelAuto(GPTPretrainedModelAuto):
         return_dict=False,
     ):
         r"""
-        The GPTModelAuto forward method, overrides the `__call__()` special method.
+        The GPTModelNet forward method, overrides the `__call__()` special method.
 
         Args:
             input_ids (Tensor, optional):
@@ -1045,10 +847,10 @@ class GPTModelAuto(GPTPretrainedModelAuto):
             .. code-block::
 
                 import paddle
-                from paddlenlp.transformers import GPTModelAuto, GPTTokenizer
+                from paddlenlp.transformers import GPTModelNet, GPTTokenizer
 
                 tokenizer = GPTTokenizer.from_pretrained('gpt2-medium-en')
-                model = GPTModelAuto.from_pretrained('gpt2-medium-en')
+                model = GPTModelNet.from_pretrained('gpt2-medium-en')
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -1083,33 +885,19 @@ class GPTModelAuto(GPTPretrainedModelAuto):
             input_ids=input_ids, position_ids=position_ids, inputs_embeddings=inputs_embeds
         )
         # TODO, use registered buffer
-        length = input_shape[-1]
-        if past_key_values[0] is not None:
-            cache_length = past_key_values[0][0].shape[1]
-            length = length + cache_length
+        if self.config.use_flash_attention:
+            attention_mask = None
         else:
-            cache_length = 0
-
-        causal_mask = self.bias[:, :, cache_length:length, :length]
-        if attention_mask is not None:
-            if attention_mask.dtype != paddle.int64:
-                attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
-            if len(attention_mask.shape) == 2:
-                attention_mask = attention_mask[:, None, None, :]
-            attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
-        else:
-            attention_mask = (1.0 - causal_mask) * -1e4
-        # The tensor returned by triu not in static graph.
-        attention_mask.stop_gradient = True
+            attention_mask = self.global_layer(attention_mask, input_shape, past_key_values)
 
         outputs = self.decoder(
             embedding_output,
-            attention_mask=attention_mask,
-            use_cache=use_cache,
-            past_key_values=past_key_values,
-            output_hidden_states=output_hidden_states,
-            output_attentions=output_attentions,
-            return_dict=return_dict,
+            attention_mask,
+            use_cache,
+            past_key_values,
+            output_hidden_states,
+            output_attentions,
+            return_dict,
         )
 
         if output_hidden_states:
@@ -1123,13 +911,13 @@ class GPTModelAuto(GPTPretrainedModelAuto):
         return outputs
 
 
-class GPTPretrainingCriterionAuto(paddle.nn.Layer):
+class GPTPretrainingCriterionNet(paddle.nn.Layer):
     """
     Criterion for GPT. It calculates the final loss.
     """
 
     def __init__(self, config):
-        super(GPTPretrainingCriterionAuto, self).__init__()
+        super(GPTPretrainingCriterionNet, self).__init__()
         self.config = config
         self.loss_func = paddle.nn.CrossEntropyLoss(reduction="none", ignore_index=config.ignore_index)
 
@@ -1155,18 +943,27 @@ class GPTPretrainingCriterionAuto(paddle.nn.Layer):
         with paddle.amp.auto_cast(False):
             if len(prediction_scores.shape) < len(masked_lm_labels.unsqueeze(2).shape):
                 prediction_scores = paddle.unsqueeze_(prediction_scores, 0)
+
             masked_lm_loss = self.loss_func(prediction_scores.astype("float32"), masked_lm_labels.unsqueeze(2))
             masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
             loss = paddle.mean(masked_lm_loss)
+            # if loss_mask is None:
+            #     loss_mask = (masked_lm_loss > 0).astype("float32")
+            #     loss_mask = loss_mask.reshape([-1])
+            # print(" loss_mask ",loss_mask.shape,masked_lm_loss.reshape([-1]).shape)
+            # scale_loss = masked_lm_loss.reshape([-1]) * loss_mask
+            # print(" scale_loss ",scale_loss.shape)
+            # masked_lm_loss = paddle.sum(scale_loss)
+            # print(" masked_lm_loss ",masked_lm_loss.shape,loss_mask.shape)
+            # loss = masked_lm_loss / loss_mask.sum()
         return loss
 
 
-class GPTLMHeadAuto(nn.Layer):
-    def __init__(self, config: GPTConfig, embedding_weights=None, ipp=None):
-        super(GPTLMHeadAuto, self).__init__()
+class GPTLMHeadNet(nn.Layer):
+    def __init__(self, config: GPTConfig, embedding_weights=None):
+        super(GPTLMHeadNet, self).__init__()
         self.config = config
         self.transpose_y = True
-        self.ipp = ipp
 
         if embedding_weights is not None:
             self.transpose_y = True
@@ -1176,44 +973,36 @@ class GPTLMHeadAuto(nn.Layer):
                 shape=[config.vocab_size, config.hidden_size],
                 dtype=paddle.get_default_dtype(),
             )
-            self.weight = dist.shard_tensor(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)])
 
     def forward(self, hidden_states, tensor_parallel_output=None):
 
         if self.config.sequence_parallel:
-            hidden_states = dist.reshard(hidden_states, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
             hidden_states = paddle.reshape(hidden_states, [-1, self.config.seq_length, self.config.hidden_size])
-
-        if tensor_parallel_output is None:
-            tensor_parallel_output = self.config.tensor_parallel_output
-
-        y = dist.reshard(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)])
-        logits = paddle.matmul(hidden_states, y, transpose_y=self.transpose_y)
+        logits = paddle.matmul(hidden_states, self.weight, transpose_y=self.transpose_y)
         return logits
 
 
-class GPTForCausalLMAuto(GPTPretrainedModelAuto):
+class GPTForCausalLMNet(GPTPretrainedModelNet):
     """
     The GPT Model with a `language modeling` head on top.
 
     Args:
-        gpt (:class:`GPTModelAuto`):
-            An instance of :class:`GPTModelAuto`.
+        gpt (:class:`GPTModelNet`):
+            An instance of :class:`GPTModelNet`.
 
     """
 
     _tied_weights_keys = ["lm_head.weight", "lm_head.decoder.weight"]
+    _keys_to_ignore_on_save = [r"lm_head.weight", r"lm_head.decoder.weight"]
+    _keys_to_ignore_on_load_missing = [r"lm_head.weight", r"lm_head.decoder.weight"]
 
     def __init__(self, config: GPTConfig):
-        super(GPTForCausalLMAuto, self).__init__(config)
-        self.gpt = GPTModelAuto(config)
-        self.ipp = self.gpt.get_last_layer_ipp()
-        self.lm_head = GPTLMHeadAuto(
-            config, embedding_weights=self.gpt.embeddings.word_embeddings.weight, ipp=self.ipp
-        )
+        super(GPTForCausalLMNet, self).__init__(config)
+        self.gpt = GPTModelNet(config)
+        self.lm_head = GPTLMHeadNet(config, embedding_weights=self.gpt.embeddings.word_embeddings.weight)
 
         self.tie_weights()
-        self.criterion = GPTPretrainingCriterionAuto(config)
+        self.criterion = GPTPretrainingCriterionNet(config)
 
     def get_output_embeddings(self):
         return self.lm_head
@@ -1238,17 +1027,17 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
 
         Args:
             input_ids (Tensor, optional):
-                See :class:`GPTModelAuto`.
+                See :class:`GPTModelNet`.
             position_ids (Tensor, optional):
-                See :class:`GPTModelAuto`.
+                See :class:`GPTModelNet`.
             attention_mask (Tensor, optional):
-                See :class:`GPTModelAuto`.
+                See :class:`GPTModelNet`.
             inputs_embeds (Tensor, optional):
-                See :class:`GPTModelAuto`.
+                See :class:`GPTModelNet`.
             use_cache (bool, optional):
-                See :class:`GPTModelAuto`.
+                See :class:`GPTModelNet`.
             past_key_values (Tensor, optional):
-                See :class:`GPTModelAuto`.
+                See :class:`GPTModelNet`.
             labels (paddle.Tensor, optional):
                 A Tensor of shape `(batch_size, sequence_length)`.
                 Labels for language modeling. Note that the labels are shifted inside the model, i.e. you can set
@@ -1256,11 +1045,11 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
                 are ignored (masked), the loss is only computed for labels in `[0, ..., vocab_size]`
                 Defaults to None.
             output_attentions (bool, optional):
-                See :class:`GPTModelAuto`.
+                See :class:`GPTModelNet`.
             output_hidden_states (bool, optional):
-                See :class:`GPTModelAuto`.
+                See :class:`GPTModelNet`.
             return_dict (bool, optional):
-                See :class:`GPTModelAuto`.
+                See :class:`GPTModelNet`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
@@ -1290,6 +1079,7 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
         else:
             hidden_states = outputs[0]
         logits = self.lm_head(hidden_states)
+
         return logits
 
     def prepare_fast_entry(self, kwargs):
@@ -1342,5 +1132,61 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
             attention_mask = paddle.ones_like(input_ids, dtype="int64")
         return paddle.unsqueeze(attention_mask, axis=[1, 2])
 
+    def auto_dist_config(self, prefix=""):
+        if prefix != "":
+            assert prefix.endswith(".")
+        config = {
+            "mp_config": {
+                "parallelize_plan": {
+                    f"{prefix}gpt.embeddings.word_embeddings": dist.ColWiseParallel(),
+                    f"{prefix}gpt.embeddings.position_embeddings": dist.ColWiseParallel(),
+                    f"{prefix}gpt.decoder.layers.*.self_attn.qkv_proj": dist.ColWiseParallel(),
+                    f"{prefix}gpt.decoder.layers.*.self_attn.out_proj": dist.RowWiseParallel(),
+                    f"{prefix}gpt.decoder.layers.*.linear1": dist.ColWiseParallel(),
+                    f"{prefix}gpt.decoder.layers.*.linear2": dist.RowWiseParallel(),
+                    f"{prefix}lm_head.weight": dist.RowWiseParallel(),
+                }
+            },
+            "pp_config": {
+                "split_spec": f"{prefix}gpt.decoder.layers",
+                "global_spec": f"{prefix}gpt.global_layer",
+            },
+        }
 
-GPTLMHeadModelAuto = GPTForCausalLMAuto
+        return config
+
+
+class GlobalNet(nn.Layer):
+    def __init__(self, config) -> None:
+        super().__init__()
+        self.config = config
+
+    def forward(self, attention_mask, input_shape, past_key_values):
+        causal_mask = paddle.tril(
+            paddle.ones(
+                [1, 1, self.config.max_position_embeddings, self.config.max_position_embeddings], dtype="int64"
+            )
+        )
+        length = input_shape[-1]
+        if past_key_values[0] is not None:
+            cache_length = past_key_values[0][0].shape[1]
+            length = length + cache_length
+        else:
+            cache_length = 0
+
+        causal_mask = causal_mask[:, :, cache_length:length, :length]
+        if attention_mask is not None:
+            if attention_mask.dtype != paddle.int64:
+                attention_mask = paddle.cast(attention_mask, dtype=paddle.int64)
+            if len(attention_mask.shape) == 2:
+                attention_mask = attention_mask[:, None, None, :]
+            attention_mask = (1.0 - (attention_mask & causal_mask)) * -1e4
+        else:
+            attention_mask = (1.0 - causal_mask) * -1e4
+        # The tensor returned by triu not in static graph.
+        attention_mask.stop_gradient = True
+
+        return attention_mask
+
+
+GPTLMHeadModelNet = GPTForCausalLMNet
