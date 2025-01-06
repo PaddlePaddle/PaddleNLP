@@ -84,7 +84,7 @@ class MergeModel:
         if not all(file_type[1] is True for file_type in file_type_list) and not all(
             file_type[1] is False for file_type in file_type_list
         ):
-            raise ValueError("Merge for lora model and non-lora model is not supported yet.")
+            raise ValueError("Please ensure that all models should be same type.")
         if all(
             file_type[0] == "safetensors" or file_type[0] == "safetensors_without_index"
             for file_type in file_type_list
