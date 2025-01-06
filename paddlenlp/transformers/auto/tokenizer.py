@@ -171,7 +171,7 @@ CONFIG_TO_TYPE = {v: k for k, v in CONFIG_MAPPING_NAMES.items()}
 
 
 def tokenizer_class_from_name(class_name: str):
-    if class_name == "PretrainedTokenizerFast":
+    if class_name in ["PretrainedTokenizerFast", "PreTrainedTokenizerFast"]:
         return PretrainedTokenizerFast
 
     for module_name, tokenizers in TOKENIZER_MAPPING_NAMES.items():
@@ -309,6 +309,8 @@ class AutoTokenizer:
     pretrained weights/vocabulary.
     AutoTokenizer is a generic tokenizer class that will be instantiated as one of the
     base tokenizer classes when created with the AutoTokenizer.from_pretrained() classmethod.
+
+    This class cannot be instantiated directly using `__init__()` (throws an error).
     """
 
     _tokenizer_mapping = get_configurations()
@@ -338,7 +340,7 @@ class AutoTokenizer:
                 try:
                     if tokenizer_class is None:
                         tokenizer_class = getattr(import_class, init_class)
-                except:
+                except AttributeError:
                     raise ValueError(f"Tokenizer class {init_class} is not currently imported.")
                 return tokenizer_class
             else:

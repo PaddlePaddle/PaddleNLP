@@ -300,3 +300,11 @@ def import_module(module_name: str) -> Optional[Type]:
         return target_module
     except ModuleNotFoundError:
         return None
+
+
+# docstyle-ignore
+PROTOBUF_IMPORT_ERROR = """
+{0} requires the protobuf library but it was not found in your environment. Checkout the instructions on the
+installation page of its repo: https://github.com/protocolbuffers/protobuf/tree/master/python#installation and follow the ones
+that match your environment. Please note that you may need to restart your runtime after installation.
+"""

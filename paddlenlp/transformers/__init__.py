@@ -53,12 +53,14 @@ from .export import export_model
 # isort: split
 from .bert.modeling import *
 from .bert.tokenizer import *
+from .bert.tokenizer_fast import *
 from .bert.configuration import *
 
 # isort: split
 from .gpt import *
 from .roberta.modeling import *
 from .roberta.tokenizer import *
+from .roberta.tokenizer_fast import *
 from .roberta.configuration import *
 from .electra.modeling import *
 from .electra.tokenizer import *

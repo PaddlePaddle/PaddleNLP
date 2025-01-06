@@ -20,17 +20,30 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import unittest
+from collections import defaultdict
 from collections.abc import Mapping
 from contextlib import contextmanager
+from unittest.mock import patch
 
 import numpy as np
 import paddle
 import paddle.distributed.fleet as fleet
+import urllib3
 import yaml
 
 from paddlenlp.trainer.argparser import strtobool
-from paddlenlp.utils.import_utils import is_package_available, is_paddle_available
+from paddlenlp.utils.import_utils import (
+    is_package_available,
+    is_paddle_available,
+    is_tokenizers_available,
+)
+
+SMALL_MODEL_IDENTIFIER = "julien-c/bert-xsmall-dummy"
+DUMMY_UNKNOWN_IDENTIFIER = "julien-c/dummy-unknown"
+DUMMY_DIFF_TOKENIZER_IDENTIFIER = "julien-c/dummy-diff-tokenizer"
+# Used to test Auto{Config, Model, Tokenizer} model_type detection.
 
 __all__ = ["get_vocab_list", "stable_softmax", "cross_entropy"]
 
@@ -539,3 +552,65 @@ class GPUsTesting(unittest.TestCase):
 
         fleet.init(is_collective=True, strategy=strategy)
         fleet.get_hybrid_communicate_group()
+
+
+def require_tokenizers(test_case):
+    """
+    Decorator marking a test that requires 🤗 Tokenizers. These tests are skipped when 🤗 Tokenizers isn't installed.
+    """
+    return unittest.skipUnless(is_tokenizers_available(), "test requires tokenizers")(test_case)
+
+
+class RequestCounter:
+    """
+    Helper class that will count all requests made online.
+
+    Might not be robust if urllib3 changes its logging format but should be good enough for us.
+
+    Usage:
+    ```py
+    with RequestCounter() as counter:
+        _ = AutoTokenizer.from_pretrained("hf-internal-testing/tiny-random-bert")
+    assert counter["GET"] == 0
+    assert counter["HEAD"] == 1
+    assert counter.total_calls == 1
+    ```
+    """
+
+    def __enter__(self):
+        self._counter = defaultdict(int)
+        self._thread_id = threading.get_ident()
+        self._extra_info = []
+
+        def patched_with_thread_info(func):
+            def wrap(*args, **kwargs):
+                self._extra_info.append(threading.get_ident())
+                return func(*args, **kwargs)
+
+            return wrap
+
+        self.patcher = patch.object(
+            urllib3.connectionpool.log, "debug", side_effect=patched_with_thread_info(urllib3.connectionpool.log.debug)
+        )
+        self.mock = self.patcher.start()
+        return self
+
+    def __exit__(self, *args, **kwargs) -> None:
+        assert len(self.mock.call_args_list) == len(self._extra_info)
+
+        for thread_id, call in zip(self._extra_info, self.mock.call_args_list):
+            if thread_id != self._thread_id:
+                continue
+            log = call.args[0] % call.args[1:]
+            for method in ("HEAD", "GET", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH"):
+                if method in log:
+                    self._counter[method] += 1
+                    break
+        self.patcher.stop()
+
+    def __getitem__(self, key: str) -> int:
+        return self._counter[key]
+
+    @property
+    def total_calls(self) -> int:
+        return sum(self._counter.values())
