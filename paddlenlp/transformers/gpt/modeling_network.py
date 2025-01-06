@@ -29,6 +29,10 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.utils import recompute
 from paddle.utils import try_import
 
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        mark_as_sequence_parallel_parameter,
+    )
 except:
     pass
 
@@ -1140,7 +1144,6 @@ class GPTForCausalLMNet(GPTPretrainedModelNet):
                     f"{prefix}gpt.decoder.layers.*.self_attn.out_proj": dist.RowWiseParallel(),
                     f"{prefix}gpt.decoder.layers.*.linear1": dist.ColWiseParallel(),
                     f"{prefix}gpt.decoder.layers.*.linear2": dist.RowWiseParallel(),
-                    f"{prefix}lm_head.weight": dist.RowWiseParallel(),
                     f"{prefix}lm_head.weight": dist.RowWiseParallel(),
                 }
             },
