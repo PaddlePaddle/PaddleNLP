@@ -17,7 +17,7 @@ PaddleNLP 大模型推理提供压缩、推理、服务全流程体验 ：
 
 - 提供多种 PTQ 技术，提供 WAC（权重/激活/缓存）灵活可配的量化能力，支持 INT8、FP8、4Bit 量化能力
 
-- 支持多硬件大模型推理，包括[昆仑 XPU](../../xpu/llama/README.md)、[昇腾 NPU](../../npu/llama/README.md)、[海光 K100](../dcu_install.md)、[燧原 GCU](../../gcu/llama/README.md)、[X86 CPU](../cpu_install.md)等
+- 支持多硬件大模型推理，包括[昆仑 XPU](../../devices/xpu/llama/README.md)、[昇腾 NPU](../../devices/npu/llama/README.md)、[海光 K100](../dcu_install.md)、[燧原 GCU](../../devices/gcu/llama/README.md)、[X86 CPU](../cpu_install.md)等
 
 - 提供面向服务器场景的部署服务，支持连续批处理(continuous batching)、流式输出等功能，HTTP 协议的服务接口
 
@@ -192,11 +192,11 @@ python ./predict/predictor.py --model_name_or_path meta-llama/Llama-2-7b-chat --
 
 更多硬件大模型推理教程：
 
-- [昆仑 XPU](../../xpu/llama/README.md)
-- [昇腾 NPU](../../npu/llama/README.md)
+- [昆仑 XPU](../../devices/xpu/llama/README.md)
+- [昇腾 NPU](../../devices/npu/llama/README.md)
 - [海光 K100](../dcu_install.md)
-- [燧原 GCU](../../gcu/llama/README.md)
-- [太初 SDAA](../../sdaa/llama/README.md)
+- [燧原 GCU](../../devices/gcu/llama/README.md)
+- [太初 SDAA](../../devices/sdaa/llama/README.md)
 - [X86 CPU](../cpu_install.md)
 
 ## 致谢
