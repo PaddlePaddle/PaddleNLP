@@ -18,7 +18,8 @@ import paddle
 import paddle.distributed.fleet as fleet
 
 from paddlenlp.transformers import AutoModelForCausalLM, AutoTokenizer
-from tests.llm.testing_utils import LLMTest
+
+from .testing_utils import LLMTest
 
 
 class GpusInference(LLMTest, unittest.TestCase):
