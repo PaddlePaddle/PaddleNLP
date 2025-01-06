@@ -35,7 +35,7 @@ class MergeConfig:
         default="np", metadata={"help": "Tensor type to use for the merge. Choose np(CPU Only) or pd (CPU/GPU)"}
     )
     n_process: int = field(default=1, metadata={"help": "Number of processes to use for the merge."})
-    merge_preifx: str = field(default="model", metadata={"help": "Prefix name: model or master_weights"})
+    merge_prefix: str = field(default="model", metadata={"help": "Prefix name: model or master_weights"})
     merge_method: str = field(default="linear", metadata={"help": "The merge strategy."})
     merge_type: str = field(default="linear", metadata={"help": "The type of merge process."})
     sparsify_type: str = field(default=None, metadata={"help": "The type of sparsify process."})

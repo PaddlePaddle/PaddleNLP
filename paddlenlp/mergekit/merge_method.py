@@ -158,7 +158,7 @@ class MergeMethod:
             weight_list = self.merge_config.weight_list
             stacked_tensors = paddle.stack(tensor_list, axis=0)
             weights = paddle.to_tensor(weight_list, dtype=stacked_tensors.dtype)
-            weights = weights.reshape([-1] + [1] * (len(stacked_tensors.shape) - 1))  # 广播权重
+            weights = weights.reshape([-1] + [1] * (len(stacked_tensors.shape) - 1))
             weighted_tensors = stacked_tensors * weights
             # Elect majority sign
             if self.merge_config.ties_elect_type == "sum":
