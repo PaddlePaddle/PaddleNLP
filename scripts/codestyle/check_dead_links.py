@@ -110,14 +110,22 @@ def create_symlinks(root_dir, src_dir, tgt_dir, file_extension=".md"):
 
                 # If the target file already exists and is a symlink, delete it first
                 if os.path.exists(tgt_file_path) and os.path.islink(tgt_file_path):
-                    os.unlink(tgt_file_path)
+                    existing_link_target = os.readlink(tgt_file_path)
+                    if existing_link_target != relative_src_file_path:
+                        os.unlink(tgt_file_path)
+                        # Create the symlink
+                        os.symlink(relative_src_file_path, tgt_file_path)
+                        count += 1
 
-                # Create the symlink
-                os.symlink(relative_src_file_path, tgt_file_path)
+                elif not os.path.exists(tgt_file_path):
+                    os.symlink(relative_src_file_path, tgt_file_path)
+                    count += 1
+                else:
+                    print(f"File already exists: {tgt_file_path}. Please remove it from {tgt_dir} and try again.")
+                    sys.exit(1)
+
                 # Remove this processed file from the existing tgt files
                 existing_tgt_files.discard(os.path.relpath(tgt_file_path, tgt_dir))
-
-                count += 1
 
     # Check for remaining files in tgt (i.e., files that exist in tgt but not found in src)
     for file in existing_tgt_files:
