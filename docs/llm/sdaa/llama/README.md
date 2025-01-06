@@ -1,1 +1,1 @@
-../../../../llm/sdaa/llama/README.md
+../../../../llm/devices/sdaa/llama/README.md

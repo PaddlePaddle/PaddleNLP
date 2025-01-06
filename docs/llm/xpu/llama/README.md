@@ -1,1 +1,1 @@
-../../../../llm/xpu/llama/README.md
+../../../../llm/devices/xpu/llama/README.md

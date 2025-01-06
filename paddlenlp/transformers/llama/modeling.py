@@ -29,15 +29,16 @@ from paddle import Tensor, nn
 from paddle.autograd import PyLayer
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
+from paddle.distributed.fleet.recompute.recompute import recompute
 
 from paddlenlp.transformers.refined_recompute import (
     RRColumnParallelLinear,
     RRColumnSequenceParallelLinear,
     RRRowParallelLinear,
     RRRowSequenceParallelLinear,
-    create_skip_config_for_refined_recompute,
-    recompute,
+    get_skip_recompute_ops,
 )
+from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
 
 try:
     from paddle.incubate.nn.functional import fused_rotary_position_embedding
@@ -605,8 +606,11 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
 
 
 class LlamaMLP(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config, skip_recompute_ops=None):
         super().__init__()
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
+        self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
         self.tensor_parallel_degree = config.tensor_parallel_degree
@@ -618,9 +622,9 @@ class LlamaMLP(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                if skip_recompute_ops.get("mlp_column_ln", False):
                     ColumnParallelLinear = RRColumnSequenceParallelLinear
-                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                if skip_recompute_ops.get("mlp_row_ln", False):
                     RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
@@ -628,9 +632,9 @@ class LlamaMLP(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops.get("mlp_column_ln", False):
+                if skip_recompute_ops.get("mlp_column_ln", False):
                     ColumnParallelLinear = RRColumnParallelLinear
-                if config.skip_recompute_ops.get("mlp_row_ln", False):
+                if skip_recompute_ops.get("mlp_row_ln", False):
                     RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
@@ -682,9 +686,11 @@ class LlamaMLP(nn.Layer):
 class LlamaAttention(nn.Layer):
     """Multi-headed attention from 'Attention Is All You Need' paper"""
 
-    def __init__(self, config: LlamaConfig, layerwise_recompute: bool = False):
+    def __init__(self, config: LlamaConfig, layerwise_recompute: bool = False, skip_recompute_ops=None):
         super().__init__()
-
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
+        self.skip_recompute_ops = skip_recompute_ops
         self.config = config
         self.hidden_size = config.hidden_size
         self.num_heads = config.num_attention_heads
@@ -746,18 +752,18 @@ class LlamaAttention(nn.Layer):
 
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops.get("attention_column_ln", False):
+                if skip_recompute_ops.get("attention_column_ln", False):
                     ColumnParallelLinear = RRColumnSequenceParallelLinear
-                if config.skip_recompute_ops.get("attention_row_ln", False):
+                if skip_recompute_ops.get("attention_row_ln", False):
                     RowParallelLinear = RRRowSequenceParallelLinear
         else:
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
             # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
             if config.recompute and not config.recompute_use_reentrant:
-                if config.skip_recompute_ops.get("attention_column_ln", False):
+                if skip_recompute_ops.get("attention_column_ln", False):
                     ColumnParallelLinear = RRColumnParallelLinear
-                if config.skip_recompute_ops.get("attention_row_ln", False):
+                if skip_recompute_ops.get("attention_row_ln", False):
                     RowParallelLinear = RRRowParallelLinear
 
         if config.tensor_parallel_degree > 1:
@@ -859,11 +865,7 @@ class LlamaAttention(nn.Layer):
         self.attn_func = scaled_dot_product_attention
 
         # NOTE: refined_recompute is only supported when `recompute_use_reentrant=False`
-        if (
-            config.recompute
-            and not config.recompute_use_reentrant
-            and config.skip_recompute_ops.get("flash_attn", False)
-        ):
+        if config.recompute and not config.recompute_use_reentrant and skip_recompute_ops.get("flash_attn", False):
             self.attn_func = partial(scaled_dot_product_attention, skip_recompute=True)
 
     def _init_rope(self):
@@ -1113,7 +1115,8 @@ class LlamaAttention(nn.Layer):
             and has_gradient
             and self.recompute_granularity == "core_attn"
         ):
-            outputs = recompute(
+            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
+            outputs = recompute_fn(
                 self.attn_func,
                 query_states,
                 self.config,
@@ -1168,12 +1171,15 @@ class LlamaAttention(nn.Layer):
 
 
 class LlamaDecoderLayer(nn.Layer):
-    def __init__(self, config, layerwise_recompute: bool = False):
+    def __init__(self, config, layerwise_recompute: bool = False, skip_recompute_ops=None):
         super().__init__()
         self.config = config
+        if skip_recompute_ops is None:
+            skip_recompute_ops = {}
+        self.skip_recompute_ops = skip_recompute_ops
         self.hidden_size = config.hidden_size
-        self.self_attn = LlamaAttention(config, layerwise_recompute)
-        self.mlp = LlamaMLP(config)
+        self.self_attn = LlamaAttention(config, layerwise_recompute, skip_recompute_ops=skip_recompute_ops)
+        self.mlp = LlamaMLP(config, skip_recompute_ops=skip_recompute_ops)
         self.input_layernorm = LlamaRMSNorm(config)
         self.post_attention_layernorm = LlamaRMSNorm(config)
         self.sequence_parallel = config.sequence_parallel
@@ -1221,7 +1227,8 @@ class LlamaDecoderLayer(nn.Layer):
             and has_gradient
             and self.recompute_granularity == "full_attn"
         ):
-            outputs = recompute(
+            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
+            outputs = recompute_fn(
                 self.self_attn,
                 hidden_states,
                 position_ids,
@@ -1518,9 +1525,11 @@ class LlamaModel(LlamaPretrainedModel):
         self.layers = nn.LayerList(
             [
                 LlamaDecoderLayer(
-                    create_skip_config_for_refined_recompute(i, config), i not in self.no_recompute_layers
+                    config=config,
+                    layerwise_recompute=layer_idx not in self.no_recompute_layers,
+                    skip_recompute_ops=get_skip_recompute_ops(config, layer_idx),
                 )
-                for i in range(config.num_hidden_layers)
+                for layer_idx in range(config.num_hidden_layers)
             ]
         )
         self.norm = LlamaRMSNorm(config)
@@ -1627,7 +1636,8 @@ class LlamaModel(LlamaPretrainedModel):
 
             return custom_forward
 
-        hidden_states = recompute(
+        recompute_fn = rr_recompute if any(layer_module.skip_recompute_ops.values()) else recompute
+        hidden_states = recompute_fn(
             create_custom_forward(layer_module),
             hidden_states,
             position_ids,
