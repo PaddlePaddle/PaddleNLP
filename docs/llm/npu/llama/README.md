@@ -1,1 +1,0 @@
-../../../../llm/devices/npu/llama/README.md
