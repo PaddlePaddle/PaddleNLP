@@ -26,3 +26,9 @@ PaddleNLP 提供了多种环境变量，用于优化推理性能和资源使用�
 - `FLAGS_fraction_of_gpu_memory_to_use`：GPU 显存使用率，默认值为0.9。设置为0.9即可。
 
 - `FLAGS_gemm_use_half_precision_compute_type`：是否使用半精度浮点数计算，默认值为0。设置为0即可。
+
+**Append Attention 优化**
+
+- `FLAGS_cascade_attention_max_partition_size`：Append Attention decoder计算时对cache_kv进行分chunk的chunk大小，默认值根据batchsize设置，batchsize=1时设置为128，batchsize>1时设置为512。显式设置时不再区分batchsize。
+- `FLAGS_dec_block_shape_q`：Append Attention decoder计算时对q进行分块的分块大小，默认值为16。
+- `FLAGS_enc_block_shape_q`：Append Attention encoder计算时对q进行分块的分块大小，默认值为64。

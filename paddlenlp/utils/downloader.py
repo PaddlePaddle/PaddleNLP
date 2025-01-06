@@ -31,7 +31,9 @@ from huggingface_hub.utils import EntryNotFoundError
 from tqdm.auto import tqdm
 
 from .env import DOWNLOAD_SERVER, FAILED_STATUS, SUCCESS_STATUS
+from .fault_tolerance import PDC_DOWNLOAD_ERROR
 from .log import logger
+from .pdc_sdk import PDCErrorCode, PDCErrorMessageMap, pdc_tool
 
 __all__ = ["get_weights_path_from_url"]
 
@@ -469,3 +471,37 @@ def hf_file_exists(
         return True
     except EntryNotFoundError:
         return False
+
+
+def download_from_pdc(remote_path, local_path, timeout):
+    """Download from remote_path and place to a local_path through PaddleCloud. remote_path has to be uploaded through PaddleCloud as well.
+
+
+    Args:
+        remote_path (`str`):
+            remote path url for download
+        local_path (`str`):
+            local path to place downloaded object
+        timeout (`int`):
+            max wait time for download
+    """
+
+    try:
+        base_dir, _ = os.path.split(os.path.normpath(remote_path))
+        if not os.path.exists(base_dir) and base_dir != "":
+            os.makedirs(base_dir, exist_ok=True)
+    except Exception as e:
+        raise RuntimeError(f"{PDC_DOWNLOAD_ERROR}; Failed to parse checkpoint path, details: {e}")
+    start_time = time.time()
+    result = pdc_tool.pdc_download(remote_path, local_path, timeout)
+    end_time = time.time()
+    if result == PDCErrorCode.Success:
+        logger.info(f"Successfully downloaded object from PDC, total time cost: {end_time - start_time} seconds.")
+    elif result == PDCErrorCode.LocalPathExist:
+        logger.warning(
+            f"Skipping download object since file exists at local, total time cost: {end_time - start_time} seconds."
+        )
+    else:
+        raise RuntimeError(
+            f"{PDC_DOWNLOAD_ERROR}; Error occurred when trying to download object from PDC, remote_path: {remote_path}, local_path: {local_path}, timeout: {timeout}; error details: {PDCErrorMessageMap[result]}"
+        )

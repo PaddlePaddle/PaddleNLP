@@ -41,7 +41,6 @@ from paddlenlp.transformers import (
     register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.transformers.refined_recompute import update_refined_recompute
 from paddlenlp.trl import (
     KTOTrainer,
     calculate_effective_tokens,
@@ -108,17 +107,10 @@ def main():
     logger.info("Start to load model & tokenizer.")
     model_config = AutoConfig.from_pretrained(model_args.model_name_or_path, dtype=dtype)
     LlmMetaConfig.set_llm_config(model_config, training_args)
-    model_config.refined_recompute = update_refined_recompute(
-        training_args.refined_recompute,
-        kto_config.lora,
-    )
+
     if not kto_config.lora:
         ref_model_config = AutoConfig.from_pretrained(model_args.model_name_or_path, dtype=dtype)
         LlmMetaConfig.set_llm_config(ref_model_config, training_args)
-        ref_model_config.refined_recompute = update_refined_recompute(
-            training_args.refined_recompute,
-            kto_config.lora,
-        )
 
     if training_args.pipeline_parallel_degree > 1:
         model_class = AutoModelForCausalLMPipe
