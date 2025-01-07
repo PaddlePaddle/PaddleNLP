@@ -29,7 +29,6 @@ from paddlenlp.transformers import (
     Qwen2SentenceEmbedding,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.transformers.refined_recompute import update_refined_recompute
 from paddlenlp.trl import DataConfig, EmbeddingTrainer, ModelConfig, SFTConfig
 from paddlenlp.trl.llm_utils import compute_metrics, init_chat_template
 from paddlenlp.utils.log import logger
@@ -88,7 +87,6 @@ def main():
     assert isinstance(model_config, Qwen2Config), "Now only qwen2 supported"
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
-    model_config.refined_recompute = update_refined_recompute(training_args.refined_recompute)
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     # Config for model using dropout, such as GPT.

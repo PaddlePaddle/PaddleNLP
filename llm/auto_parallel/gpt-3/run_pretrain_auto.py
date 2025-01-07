@@ -38,13 +38,16 @@ from paddlenlp.transformers import (
     CosineAnnealingWithWarmupDecay,
     GPTConfig,
     GPTForCausalLMAuto,
+    GPTForCausalLMNet,
     GPTPretrainingCriterionAuto,
+    GPTPretrainingCriterionNet,
     LinearAnnealingWithWarmupDecay,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
     "gpt": (GPTConfig, GPTForCausalLMAuto, GPTPretrainingCriterionAuto),
+    "gpt_network": (GPTConfig, GPTForCausalLMNet, GPTPretrainingCriterionNet),
 }
 
 from paddlenlp.data.causal_dataset import (
@@ -80,9 +83,6 @@ class PreTrainingArguments(AutoTrainingArguments):
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
     sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
-    refined_ops_patterns: Optional[List[str]] = field(
-        default=None, metadata={"help": "The pattern of refined recompute."}
-    )
     virtual_pipeline_seg_method: str = field(
         default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of spliting pp layer for virtual pipeline."}
     )
@@ -90,6 +90,10 @@ class PreTrainingArguments(AutoTrainingArguments):
     autotuner_benchmark: bool = field(
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
+    )
+    use_intermediate_api: bool = field(
+        default=False,
+        metadata={"help": "Weather to use auto_parallel intermediate api"},
     )
 
     def __post_init__(self):
@@ -529,9 +533,9 @@ def main():
             dtype = "float16"
         if training_args.bf16:
             dtype = "bfloat16"
-
-    model = model_class.from_config(config, dtype=dtype)
-    criterion = criterion_class(config)
+    with paddle.LazyGuard():
+        model = model_class.from_config(config, dtype=dtype)
+        criterion = criterion_class(config)
     if training_args.recompute:
 
         def fn(layer):

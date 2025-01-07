@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 from dataclasses import dataclass, field
 
 from .trainer_utils import split_parallel_config
@@ -48,6 +48,8 @@ class AutoTrainingArguments(TrainingArguments):
         },
     )
 
+    refined_ops_patterns: str = field(default=None, metadata={"help": "The pattern of refined recompute."})
+
     def __post_init__(self):
         super().__post_init__()
         assert self.enable_auto_parallel
@@ -73,3 +75,14 @@ class AutoTrainingArguments(TrainingArguments):
         mp_configs = split_parallel_config(self.tensor_parallel_config)
         if "replace_with_parallel_cross_entropy" in mp_configs:
             self.strategy.mp_optimization.replace_with_parallel_cross_entropy = True
+
+        if self.recompute:
+            recompute = self.strategy.recompute
+            recompute.enable = True
+            recompute.refined_ops_patterns = []
+            if type(self.refined_ops_patterns) == str:
+                recompute.refined_ops_patterns = json.loads(self.refined_ops_patterns)
+            else:
+                recompute.refined_ops_patterns = (
+                    self.refined_ops_patterns if self.refined_ops_patterns is not None else []
+                )
