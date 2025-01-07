@@ -634,6 +634,13 @@ class MoEGate(nn.Layer):
             default_initializer=nn.initializer.Constant(1.0),
         )
 
+        if self.topk_method == "noaux_tc":
+            self.e_score_correction_bias = paddle.create_parameter(
+                shape=[self.n_routed_experts],
+                dtype=paddle.get_default_dtype(),
+                default_initializer=nn.initializer.Constant(0.0),
+            )
+
     def forward(self, hidden_states):
         bsz, seq_len, h = hidden_states.shape
         # compute gating score
@@ -644,17 +651,26 @@ class MoEGate(nn.Layer):
             )
 
         if self.scoring_func == "softmax":
-
             with paddle.amp.auto_cast(False):
                 scores = F.softmax(logits.astype("float32"), axis=-1)
+        elif self.scoring_func == "sigmoid":
+            with paddle.amp.auto_cast(False):
+                scores = F.sigmoid(logits.astype("float32"))
         else:
             raise NotImplementedError(f"insupportable scoring function for MoE gating: {self.scoring_func}")
 
         # select top-k experts
         if self.topk_method == "greedy":
             topk_weight, topk_idx = paddle.topk(scores, k=self.top_k, axis=-1, sorted=False)
-        elif self.topk_method == "group_limited_greedy":
-            group_scores = scores.reshape([bsz * seq_len, self.n_group, -1]).max(axis=-1).values  # [n, n_group]
+        elif self.topk_method in ["group_limited_greedy", "noaux_tc"]:
+            if self.topk_method == "group_limited_greedy":
+                group_scores = scores.reshape([bsz * seq_len, self.n_group, -1]).max(axis=-1).values  # [n, n_group]
+            elif self.topk_method == "noaux_tc":
+                assert not self.training
+                scores = scores.reshape([bsz * seq_len, -1]) + self.e_score_correction_bias.unsqueeze(0)
+                group_scores = (
+                    scores.reshape([bsz * seq_len, self.n_group, -1]).topk(2, axis=-1)[0].sum(axis=-1)
+                )  # [n, n_group]
             group_idx = paddle.topk(group_scores, k=self.topk_group, axis=-1, sorted=False)[1]  # [n, top_k_group]
             group_mask = paddle.zeros_like(group_scores)  # [n, n_group]
             group_mask.scatter_(1, group_idx, 1)  # [n, n_group]
@@ -665,6 +681,7 @@ class MoEGate(nn.Layer):
             )  # [n, e]
             tmp_scores = scores.masked_fill(~score_mask.bool(), 0.0)  # [n, e]
             topk_weight, topk_idx = paddle.topk(tmp_scores, k=self.top_k, axis=-1, sorted=False)
+            topk_weight = scores.gather(topk_idx, axis=1) if self.topk_method == "noaux_tc" else topk_weight
 
         # norm gate to sum 1
         if self.top_k > 1 and self.norm_topk_prob:
