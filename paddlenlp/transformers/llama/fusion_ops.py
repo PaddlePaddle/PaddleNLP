@@ -206,11 +206,14 @@ def fusion_flash_attention(
                 value_states,
                 None,
                 attention_mask,
+                [],
+                [],
                 0.0,
                 attention_mask is None,
                 True,
                 False,
                 npu_is_casual,
+                False,
             )[0]
         elif get_env_device() == "gcu":
             if config.context_parallel_degree > 1:
@@ -235,14 +238,11 @@ def fusion_flash_attention(
                 key_states,
                 value_states,
                 attention_mask,
-                scaling_factor,
                 0.0,
-                False,
                 attention_mask is None,
-                None,
+                scaling_factor,
                 False,
             )
-            attn_output = paddle.transpose(attn_output, [0, 2, 1, 3])
         else:
             if config.context_parallel_degree > 1:
                 attn_output = RingFlashAttention.apply(

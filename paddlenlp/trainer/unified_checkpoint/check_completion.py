@@ -186,6 +186,8 @@ def check_unified_optimizer(args, model, optimizer, resume_from_checkpoint, safe
             state_dict = get_expected_state_dict(model)
 
             for key in state_dict.keys():
+                if model._keys_to_ignore_on_load_missing is not None and key in model._keys_to_ignore_on_load_missing:
+                    continue
                 if sharding_group.nranks > 1:
                     static_name = struct2static_name_mappings.get(key, None)
                     param_rank = param2rank.get(static_name, None)

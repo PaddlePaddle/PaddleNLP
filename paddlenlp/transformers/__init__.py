@@ -273,6 +273,7 @@ from .chatglm.modeling import *
 from .chatglm.tokenizer import *
 from .chatglm_v2.configuration import *
 from .chatglm_v2.modeling import *
+from .chatglm_v2.modeling_pp import *
 from .chatglm_v2.tokenizer import *
 from .speecht5.configuration import *
 from .speecht5.modeling import *

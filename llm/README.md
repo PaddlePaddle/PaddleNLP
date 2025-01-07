@@ -13,23 +13,23 @@
 - **大模型无损量化**。大模型套件预先集成了 PaddleSlim LLM.PTQ 量化算法，以及业界广泛采用的 GPTQ 和 AWQ 的 W4量化方法，成功实现了对主流大模型的无损量化处理，显著加速了模型的推理速度。
 - **高性能推理**。大模型套件的高性能推理模块内置了动态插入和全环节算子融合的高级策略，这极大地提升了并行推理的速度。同时，该模块隐藏了底层技术细节，为用户提供了开箱即用的高性能并行推理功能。
 
+
 ## 🛠️ 支持模型列表 🛠️
 
-| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO | RLHF | Quantization | Torch convert |
-|----------------------------------------|----------|-----|------|---------------|-----|------|--------------|---------------|
-| [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅   | ✅    | ✅            | ✅             |
-| [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧   | 🚧           | ✅             |
-| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | ✅   | 🚧   | 🚧           | 🚧            |
-| [Mistral](./config/mistral)            | ❌        | ✅   | ✅    | ✅             | ✅   | 🚧   | 🚧           | ✅             |
-| [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅   | 🚧   | ✅            | ✅             |
-| [ChatGLM-6B](./config/chatglm)         | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ❌             |
-| [ChatGLM2/ChatGLM3](./config/chatglm2) | ❌        | ✅   | ✅    | ✅             | ✅   | 🚧   | ✅            | ✅             |
-| [Bloom](./config/bloom)                | ❌        | ✅   | ✅    | ✅             | 🚧  | 🚧   | ✅            | ✅             |
-| [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧  | 🚧   | 🚧           | ✅             |
-| [OPT](./config/opt)                    | 🚧       | ✅   | ✅    | 🚧            | 🚧  | 🚧   | 🚧           | ✅             |
-| [Gemma](./config/gemma)                | 🚧       | ✅   |🚧     | 🚧            | ✅  | 🚧   | 🚧           | 🚧             |
-| [Yuan](./config/yuan)                  | ✅       | ✅   |✅     | 🚧            | ✅  | 🚧   | 🚧           | 🚧             |
-
+| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO/KTO | RLHF | Mergekit | Quantization | Torch convert |
+|----------------------------------------|----------|-----|------|---------------|----------------|------|-------|--------------|---------------|
+| [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅             | ✅    | ✅    | ✅            | ✅             |
+| [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
+| [Mixtral](./config/mixtral)            | ✅        | ✅   | ✅    | ❌             | ✅             | 🚧   | ✅    | 🚧           | 🚧            |
+| [Mistral](./config/mistral)            | ✅         | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
+| [Baichuan/Baichuan2](./config/llama)   | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
+| [ChatGLM-6B](./config/chatglm)         | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ❌             |
+| [ChatGLM2/ChatGLM3](./config/chatglm2) | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | ✅            | ✅             |
+| [Bloom](./config/bloom)                | ✅        | ✅   | ✅    | ✅             | 🚧            | 🚧   | ✅    | ✅            | ✅             |
+| [GPT-3](./config/gpt-3)                | ✅        | ✅   | 🚧   | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
+| [OPT](./config/opt)                    | ✅       | ✅   | ✅    | 🚧            | 🚧            | 🚧   | ✅    | 🚧           | ✅             |
+| [Gemma](./config/gemma)                | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
+| [Yuan](./config/yuan)                  | ✅       | ✅   | ✅    | 🚧            | ✅            | 🚧   | ✅    | 🚧           | 🚧             |
 
 - ✅: Supported
 - 🚧: In Progress
@@ -50,7 +50,7 @@ PaddleNLP 将飞桨4D 并行策略加入到 Trainer API 中， 用户只需修�
      </font>
 </div>
 
-我们在此处提供了更详细的[预训练数据制作](./tools/preprocess)，[Pretrain 和自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/dataset.html)，[分布式策略支持情况](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-performance)，参见: [大模型预训练介绍](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html), [大模型权重列表](https://paddlenlp.readthedocs.io/zh/latest/llm/pretraining/index.html#model-weight)。
+我们在此处提供了更详细的[预训练数据制作](./tools/preprocess)，[Pretrain 和自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/llm/dataset.html)，[分布式策略支持情况](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-capability)，[性能测试报告文档](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-performance)，参见: [大模型预训练介绍](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html), [大模型权重列表](https://paddlenlp.readthedocs.io/zh/latest/llm/docs/pretrain.html#model-weight)。
 
 此项目支持了 LLaMA、GPT-3、BaiChuan、Qwen 和 Mixtral 等大模型的预训练。用户切换配置 config 文件，即可一键运行。
 
@@ -93,7 +93,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
 
 ### 2. 精调
 
-PaddleNLP 支持多个主流大模型的 SFT、LoRA、Prefix Tuning 等精调策略，提供统一、高效精调方案：
+PaddleNLP 支持多个主流大模型的 SFT、PEFT 等精调策略，提供统一、高效精调方案：
 
 - **统一训练入口**。飞桨大模型套件精调方案可适配业界主流大模型，用户只需修改配置文件，即能在单卡或多卡（支持4D 并行分布式策略）进行多种大模型精调。
 - **高效数据和分布式策略**。Zero Padding 零填充优化策略结合 FlashMask 策略有效提升模型训练效率。独创 PEFT 结合低比特和分布式并行策略，大幅降低大模型精调硬件门槛，支持单卡（A100 80G）百亿模型微调、单机（A100 80G * 8）千亿模型微调。
@@ -150,11 +150,11 @@ python  run_finetune.py ./config/llama/lora_argument.json
 python  run_finetune.py ./config/llama/pt_argument.json
 ```
 
-更多大模型精调分布式使用文档、训练细节和效果请参见[大模型精调教程](./docs/finetune.md)。
+除了 LoRA、Prefix Tuning 外，还支持 LoKr、VeRA、MoRA、ReFT、rsLoRA、LoRA+、PiSSA、MoSLoRA 等多种精调算法，更多大模型精调使用文档、训练细节和效果请参见[大模型精调教程](./docs/finetune.md)。
 
 ### 3. 对齐
 
-我们支持 DPO、RLHF 等偏好对齐策略。DPO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
+我们支持 DPO、KTO、RLHF 等偏好对齐策略。DPO、KTO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
 
 #### 3.1 DPO
 
@@ -183,7 +183,7 @@ python  run_finetune.py ./config/llama/pt_argument.json
 ...
 ```
 
-为了方便测试，我们也提供了广告生成数据集可以直接使用：
+为了方便测试，我们也提供了偏好数据集可以直接使用：
 
 ```bash
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
@@ -196,13 +196,80 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 # DPO 启动命令参考
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
+
+##### LoRA DPO
+
+```bash
+# DPO 启动命令参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
+```
 更多 DPO 技术细节和使用说明详见[DPO 文档](./docs/dpo.md)。
 
-#### 3.2 RLHF
+#### 3.2 KTO
+
+##### 数据准备
+
+我们支持的精调数据格式是每行包含一个字典的 json 文件，每个字典包含以下字段：
+
+- `src` : `str, List(str)`, 用户对话内容。
+- `tgt` : `str, List(str)`, 系统回复内容。
+- `response` : `str, List(str)`, 包含 resoinse 回复。
+- `sort` : `List(int)`, sort 值用于区分 response 属于 chosen 和 rejected（0是 rejected，1是 chosen）。
+
+样例数据：
+
+```text
+{
+    "src": ["In this task, you are given a second sentence. Your task is to generate the first sentence on the same topic but incoherent and inconsistent with the second sentence.\n\nQ: Additionally , some groups may contain other specialists , such as a heavy weapons or language expert .\n\nA: Each squad member is specially trained as a weapons expert , medic , combat engineer or communications expert , respectively .\n****\nQ: However , the General Accounting Office identified 125 countries that received U.S. training and assistance for their police forces during fiscal year 1990 at a cost of at least $117 million .\n\nA: No government agency is in charge of calculating the cost .\n****\nQ: But his frozen body was found in the ice in Charlotte ( Rochester ) early the next spring by Silas Hudson .\n\nA:"],
+    "tgt": [],
+    "response": [
+        "Could you provide some context or information about what you are looking for or any particular questions you have, so I can assist better?"],
+    "sort": [1]
+}
+...
+```
+
+为了方便测试，我们也提供了偏好数据集可以直接使用：
+
+```bash
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized_pointwise.tar.gz
+tar -zxvf ultrafeedback_binarized.tar.gz
+```
+
+##### 全参 KTO
+
+```bash
+# KTO 启动命令参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_argument.json
+```
+##### LoRA KTO
+
+```bash
+# KTO 启动命令参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_lora_argument.json
+```
+
+#### 3.3 RLHF
 
 飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF 文档](./docs/rlhf.md)。
 
-### 4. 量化
+### 4. 模型融合
+PadlleNLP 支持多种模型融合方法，包括**Linear、Slerp、Ties、DARE、DELLA**，并支持模型参数稀疏化方法与模型融合算法的灵活组合使用。
+```shell
+# 模型融合启动命令参考
+python mergekit.py \
+    --device cpu \
+    --tensor_type np \
+    --n_process 2 \
+    --merge_method linear \
+    --model_path_list ../checkpoints/model1 ../checkpoints/model \
+    --output_path ../checkpoints/model_merge
+
+```
+
+更多模型融合算法与细节详见[模型融合文档](./docs/mergekit.md)。
+
+### 5. 量化
 
 大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。量化算法包含：
 
@@ -242,7 +309,7 @@ python run_quantization.py ./config/llama/fp8_ptq_argument.json
 
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。
 
-### 5. 推理
+### 6. 推理
 
 PaddleNLP 提供高性能推理，内置动态插入和全环节算子融合策略，极大加快并行推理的速度，同时支持 FP16/BF16、WINT8、WINT4、A8W8、A8W8C8多种推理方式。
 
@@ -268,17 +335,20 @@ python ./predict/predictor.py --model_name_or_path ./inference --inference_model
 
 更多模型推理使用方法详见[大模型推理文档](./docs/predict/inference.md)。
 
-### 6. 服务化部署
+### 7. 服务化部署
 
-#### 6.1 环境准备
+#### 7.1 Flask & Gradio UI 服务化部署
+
+我们提供了一套基于动态图推理的简单易用 UI 服务化部署方法，用户可以快速部署服务化推理。
+
+环境准备
 
 - python >= 3.8
 - gradio
 - flask
 
-#### 6.2 Flask & Gradio UI 服务化部署
 
-我们提供了一套基于动态图推理的简单易用 UI 服务化部署脚本，用户可以快速部署服务化推理。
+服务化部署脚本
 
 ```shell
 python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_server.py \
@@ -294,7 +364,41 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_ser
 
 此外，如果想通过 API 脚本的方式跑推理，可参考：`./predict/request_flask_server.py` 文件。
 
-### 7. PyTorch 模型权重转换
+
+#### 7.2 大模型服务化部署工具
+
+该部署工具是基于英伟达Triton框架专为服务器场景的大模型服务化部署而设计。它提供了支持gRPC、HTTP协议的服务接口，以及流式Token输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。
+
+基于预编译镜像部署，本节以 Meta-Llama-3-8B-Instruct-A8W8C8 为例，更多模型请参考[LLaMA](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/qwen.md)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/mixtral.md), 更细致的模型推理、量化教程可以参考[大模型推理教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/inference.md)：
+
+```shell
+# 下载模型
+wget https://paddle-qa.bj.bcebos.com/inference_model/Meta-Llama-3-8B-Instruct-A8W8C8.tar
+mkdir Llama-3-8B-A8W8C8 && tar -xf Meta-Llama-3-8B-Instruct-A8W8C8.tar -C Llama-3-8B-A8W8C8
+
+# 挂载模型文件
+export MODEL_PATH=${PWD}/Llama-3-8B-A8W8C8
+
+docker run --gpus all --shm-size 5G --network=host --privileged --cap-add=SYS_PTRACE \
+-v ${MODEL_PATH}:/models/ \
+-dit registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cudnn9-v1.2 \
+bash -c 'export USE_CACHE_KV_INT8=1 && cd /opt/output/Serving && bash start_server.sh; exec bash'
+```
+
+等待服务启动成功（服务初次启动大概需要40s），可以通过以下命令测试：
+
+```shell
+curl 127.0.0.1:9965/v1/chat/completions \
+-H 'Content-Type: application/json' \
+-d '{"text": "hello, llm"}'
+```
+
+Note:
+1. 请保证 shm-size >= 5，不然可能会导致服务启动失败
+
+更多关于该部署工具的使用方法，请查看[服务化部署流程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/deploy_usage_tutorial.md)
+
+### 8. PyTorch 模型权重转换
 
 PaddleNLP 提供了可自动将 PyTorch 相关的权重转化为 Paddle 权重的接口，代码如下：
 

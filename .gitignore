@@ -132,3 +132,6 @@ output/
 
 # gen codes
 autogen/
+
+# cutlass kernel
+!csrc/gpu/cutlass_kernels/gemm/collective/builders

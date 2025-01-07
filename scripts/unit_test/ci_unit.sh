@@ -31,10 +31,13 @@ install_requirements() {
     python -m pip install -r tests/requirements.txt
     python -m pip install -r paddlenlp/experimental/autonlp/requirements.txt 
     python -m pip uninstall paddlepaddle paddlepaddle_gpu -y
+    python -m pip install pillow -y
     python -m pip install --no-cache-dir ${paddle}
+    python -c "import paddle;print('paddle')print(paddle.__version__);print(paddle.version.show())" >> ${log_path}/commit_info.txt
 
     python setup.py bdist_wheel > /dev/null
     python -m pip install  dist/p****.whl
+    python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
     cd csrc/
     python setup_cuda.py install
     cd ../

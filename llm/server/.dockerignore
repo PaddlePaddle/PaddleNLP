@@ -1,0 +1,11 @@
+README.md
+requirements-dev.txt
+pyproject.toml
+Makefile
+
+dockerfiles/
+docs/
+server/__pycache__
+server/http_server
+server/engine
+server/data

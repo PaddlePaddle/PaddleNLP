@@ -830,10 +830,8 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
                 )
         else:
             # Check whether the model use block attention
-            if predictor_args.block_attn and predictor_args.speculate_method is None:
+            if predictor_args.block_attn or predictor_args.speculate_method is not None:
                 attn_type = "Block"
-            elif predictor_args.speculate_method is not None:
-                attn_type = "Speculate"
             else:
                 attn_type = ""
             model_name = f"{config.architectures[0]}{attn_type}"
@@ -858,7 +856,9 @@ class AutoInferenceModelForCausalLM(_BaseAutoModelClass):
         )
 
         if predictor_args.mode == "dynamic":
-            return model_class.from_pretrained(predictor_args.model_name_or_path, config=config, dtype=dtype)
+            model = model_class.from_pretrained(predictor_args.model_name_or_path, config=config, dtype=dtype)
+            model.eval()
+            return model
 
         return model_class
 

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import IntervalStrategy
@@ -49,6 +49,19 @@ class SFTConfig(TrainingArguments):
         default="",
         metadata={"help": "Configs to unify hybrid parallel checkpoint.\n"},
     )
+    dataset_text_field: str = "text"
+    learning_rate: float = 2.0e-5
+    max_seq_length: int = field(
+        default=2048,
+        metadata={
+            "help": "The maximum length that model input tokens can have. When Zero Padding is set to True, it's also the maximum length for Zero Padding data stream"
+        },
+    )
+    dataset_num_proc: Optional[int] = None
+    dataset_batch_size: int = 1000
+    model_init_kwargs: Optional[dict[str, Any]] = None
+    dataset_kwargs: Optional[dict[str, Any]] = None
+    eval_packing: Optional[bool] = None
 
     def __post_init__(self):
         super().__post_init__()

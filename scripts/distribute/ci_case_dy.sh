@@ -64,8 +64,18 @@ function restore_func() {
         rm "functions.txt"
         echo "Deleted existing functions.txt"
     fi
+    if [ ! -f "${log_path}/blacklist.csv" ]; then
+        wget -P ${log_path}/ https://paddle-qa.bj.bcebos.com/Auto-Parallel/blacklist.csv --no-proxy || exit 101
+        echo "\033 ---- wget blacklist.csv \033"
+    fi
+    blacklist_file=${log_path}/blacklist.csv
+    mapfile -t blacklist < "$blacklist_file"
     for function in ${fun_list[@]};do
-        echo "$function" >> functions.txt
+        if [[ " ${blacklist[@]} " == *" ${function} "* ]]; then
+            echo "\033 ---- Function '$function' is blacklisted and will be skipped. \033"
+        else
+            echo "$function" >> functions.txt
+        fi
     done
 }
 
@@ -601,6 +611,10 @@ function before_hook_for_gpt() {
     else
         echo -e "\033[31m ---- Skip install requirements for GPT dygraph cases  \033[0m"
     fi
+    echo -e "\033[31m ---- Install ppfleetx/ops  \033[0m"
+    cd ppfleetx/ops && python setup_cuda.py install && cd ../..
+
+    unset http_proxy && unset https_proxy
     if [[ ! $FLAGS_download_data =~ "gpt" ]];then
         echo -e "\033[31m ---- download data for GPT dygraph cases  \033[0m"
         rm -rf data
@@ -616,8 +630,6 @@ function before_hook_for_gpt() {
     else
         echo -e "\033[31m ---- Skip download data for GPT dygraph cases \033[0m"
     fi
-    echo -e "\033[31m ---- Install ppfleetx/ops  \033[0m"
-    cd ppfleetx/ops && python setup_cuda.py install && cd ../..
 
     echo -e "\033[31m ---- download other data  \033[0m"
     rm -rf ckpt
@@ -646,9 +658,9 @@ function before_hook_for_gpt() {
         echo "wikitext-103 downloaded"
     else
         # download wikitext-103 for gpt eval
-        wget -O ${gpt_data_path}/wikitext-103-v1.zip https://s3.amazonaws.com/research.metamind.io/wikitext/wikitext-103-v1.zip
-        unzip -q ${gpt_data_path}/wikitext-103-v1.zip -d ${gpt_data_path}/
-        rm -rf ${gpt_data_path}/wikitext-103-v1.zip
+        wget -O ${gpt_data_path}/wikitext-103.zip https://paddlefleetx.bj.bcebos.com/data/wikitext-103.zip
+        unzip -q ${gpt_data_path}/wikitext-103.zip -d ${gpt_data_path}/
+        rm -rf ${gpt_data_path}/wikitext-103.zip
     fi
 
     rm -rf lambada_test.jsonl
@@ -698,6 +710,7 @@ function before_hook_for_llm_gpt() {
     export no_proxy=bcebos.com
     python -m pip install -r $root_path/requirements.txt
     python -m pip install -r $root_path/requirements-dev.txt
+    unset http_proxy && unset https_proxy
     if [[ ! $FLAGS_download_data =~ "llm_gpt" ]];then
         echo -e "\033[31m ---- Download llm GPT data  \033[0m"
         rm -rf data

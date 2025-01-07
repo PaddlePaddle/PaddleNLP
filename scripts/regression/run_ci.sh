@@ -35,6 +35,7 @@ target_lists_for_llm=(
     "paddlenlp/datasets"
     "paddlenlp/generation"
     "paddlenlp/peft"
+    "paddlenlp/mergekit"
     "paddlenlp/quantization"
     "paddlenlp/trainer"
     "paddlenlp/trl"
@@ -66,8 +67,9 @@ install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
     python -m pip install --user -r scripts/regression/requirements_ci.txt
     python -m pip uninstall paddlepaddle -y
-    python -m pip install --user ${paddle};
-    python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
+    python -m pip install pillow -y
+    python -m pip install --user ${paddle} --no-cache-dir;
+    python -c "import paddle;print('paddle');print(paddle.__version__);print(paddle.version.show())" >> ${log_path}/commit_info.txt
     python -c 'from visualdl import LogWriter'
 }
 ####################################
@@ -110,7 +112,7 @@ for line in `cat scripts/regression/model_list.txt`;do
 done
 cd ${nlp_dir}
 get_diff_TO_P0case(){
-for file_name in `git diff --numstat upstream/${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
+for file_name in `git diff --numstat ${AGILE_COMPILE_BRANCH} |awk '{print $NF}'`;do
     arr_file_name=(${file_name//// })
     dir1=${arr_file_name[0]}
     dir2=${arr_file_name[1]}
@@ -237,6 +239,7 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
         echo "instal_nlp_pr"
         python -m pip install  dist/p****.whl
     fi
+    python -c "import paddlenlp; print('paddlenlp commit:',paddlenlp.version.commit)" >> ${log_path}/commit_info.txt
     python -m pip list
     echo -e "\033[35m =======CI Check P0case========= \033[0m"
     echo -e "\033[35m ---- P0case_list length: ${#P0case_list[*]}, cases: ${P0case_list[*]} \033[0m"

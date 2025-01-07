@@ -35,6 +35,7 @@ from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import paddle
+import paddle.distributed as dist
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.io import IterableDataset
@@ -44,8 +45,10 @@ from paddlenlp.ops import Topology
 
 from ..trainer.argparser import strtobool
 from ..transformers.tokenizer_utils_base import BatchEncoding
+from ..utils.fault_tolerance import PDC_DOWNLOAD_ERROR
 from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
 from ..utils.log import logger
+from ..utils.pdc_sdk import PDCErrorCode, PDCErrorMessageMap, pdc_tool
 from .utils.helper import distributed_file
 
 __all__ = [
@@ -317,6 +320,7 @@ class OptimizerNames(ExplicitEnum):
 
     ADAMW = "adamw"
     ADAFACTOR = "adafactor"
+    ADAMW_MINI = "adamw_mini"
 
 
 class ShardingOption(ExplicitEnum):
@@ -1040,6 +1044,66 @@ class IterableDatasetShard(IterableDataset):
             return math.ceil(len(self.dataset) / (self.batch_size * self.num_processes)) * self.batch_size
 
 
+class LastBatchPaddingSampler(paddle.io.DistributedBatchSampler):
+    """The sampler which pads the first batch to the last batch"""
+
+    def __iter__(self):
+        local_batch_size = self.batch_size * self._acc_steps
+        num_samples = len(self.dataset)
+        indices = np.arange(num_samples).tolist()
+        global_eval_batch_size = self.batch_size * self.nranks
+        last_batch_size = num_samples % global_eval_batch_size
+
+        # Padding the first batch if the last batch is not full
+        if last_batch_size > 0:
+            padding_size = global_eval_batch_size - last_batch_size
+            # Select the first batch of indices for padding
+            if global_eval_batch_size <= len(indices):
+                first_batch_idx = indices[:global_eval_batch_size]
+            else:
+                first_batch_idx = indices.copy()
+            while padding_size > 0:
+                # Repeatedly pad the indices until the padding size is fulfilled
+                if padding_size > len(first_batch_idx):
+                    indices += first_batch_idx
+                    padding_size -= len(first_batch_idx)
+                else:
+                    indices += first_batch_idx[:padding_size]
+                    padding_size = 0
+
+        # Update the total number of indices
+        self.total_size = len(indices)
+        if self.shuffle:
+            np.random.RandomState(self.epoch).shuffle(indices)
+            self.epoch += 1
+
+        # subsample
+        def _get_indices_by_batch_size(indices):
+            subsampled_indices = []
+            # Iterate over the indices and extract batches that belong to the current device
+            for i in range(
+                self.local_rank * self.batch_size,
+                len(indices),
+                self.batch_size * self.nranks,
+            ):
+                subsampled_indices.extend(indices[i : i + self.batch_size])
+
+            return subsampled_indices
+
+        if self.nranks > 1:
+            indices = _get_indices_by_batch_size(indices)
+
+        _sample_iter = iter(indices)
+        batch_indices = []
+        for idx in _sample_iter:
+            batch_indices.append(idx)
+            if len(batch_indices) == local_batch_size:
+                yield batch_indices
+                batch_indices = []
+        # Ensure that there are no leftover indices after batching
+        assert len(batch_indices) == 0
+
+
 def find_batch_size(tensors):
     """
     Find the first dimension of a tensor in a nested list/tuple/dict of tensors.
@@ -1141,3 +1205,43 @@ def split_parallel_config(parallel_config):
     else:
         parallel_config = set(parallel_config.split(" "))
     return parallel_config
+
+
+def download_recovery_ckpt_from_pdc(recovery_checkpoint_path, timeout):
+    """Download checkpoint from PDC for resuming training after failover. Longjob envrionment is necessary.
+
+    Args:
+        recovery_checkpoint_path (`str`):
+            local path to load checkpoint for training recovery
+        timeout (`int`):
+            max wait time for download
+    """
+
+    try:
+        base_dir, download_dir = os.path.split(os.path.normpath(recovery_checkpoint_path))
+        if not os.path.exists(base_dir) and base_dir != "":
+            os.makedirs(base_dir, exist_ok=True)
+        download_step = int(_re_checkpoint.search(download_dir).groups()[0])
+    except Exception as e:
+        raise RuntimeError(f"{PDC_DOWNLOAD_ERROR}; Failed to parse checkpoint path, details: {e}")
+    start_time = time.time()
+    # TODO(@gexiao): temporary workaround for environment variable conflicts.
+    original_trainer_id = os.getenv("PADDLE_TRAINER_ID")
+    original_trainers_num = os.getenv("PADDLE_TRAINERS_NUM")
+    cards_per_node = int(os.getenv("PADDLE_LOCAL_SIZE", "8"))
+    os.environ["PADDLE_TRAINER_ID"] = str(dist.get_rank() // cards_per_node)
+    os.environ["PADDLE_TRAINERS_NUM"] = str(dist.get_world_size() // cards_per_node)
+    result = pdc_tool.pdc_download_checkpoint(download_step, timeout)
+    os.environ["PADDLE_TRAINER_ID"] = original_trainer_id
+    os.environ["PADDLE_TRAINERS_NUM"] = original_trainers_num
+    end_time = time.time()
+    if result == PDCErrorCode.Success:
+        logger.info(f"Successfully downloaded checkpoint from PDC, total time cost: {end_time - start_time} seconds.")
+    elif result == PDCErrorCode.LocalPathExist:
+        logger.warning(
+            f"Skipping download checkpoint since file exists at local, total time cost: {end_time - start_time} seconds."
+        )
+    else:
+        raise RuntimeError(
+            f"{PDC_DOWNLOAD_ERROR}; Error occurred when trying to download checkpoint from PDC, recovery_checkpoint_path: {recovery_checkpoint_path}, timeout: {timeout}; error details: {PDCErrorMessageMap[result]}"
+        )
