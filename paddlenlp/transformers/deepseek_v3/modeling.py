@@ -24,10 +24,10 @@ from __future__ import annotations
 from typing import List, Optional, Tuple, Union
 
 import paddle
-from paddle import nn
 
 from ..deepseek_v2.modeling import (
     DeepseekV2ForSequenceClassification,
+    DeepSeekV2LMHead,
     DeepseekV2Model,
     DeepseekV2PretrainedModel,
     DeepSeekV2PretrainingCriterion,
@@ -63,7 +63,7 @@ class DeepseekV3ForCausalLM(DeepseekV3PretrainedModel):
         super().__init__(config)
         self.deepseek_v3 = DeepseekV3Model(config)
         self.vocab_size = config.vocab_size
-        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias_attr=False)
+        self.lm_head = DeepSeekV2LMHead(config)
         self.criterion = DeepSeekV2PretrainingCriterion(config)
 
     def get_input_embeddings(self):
