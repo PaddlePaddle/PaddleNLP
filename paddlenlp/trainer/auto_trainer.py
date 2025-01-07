@@ -176,15 +176,11 @@ class AutoTrainer(Trainer):
             data_num = len(list(data.values()))
         elif isinstance(data, (list, tuple)):
             data_num = len(data)
+        assert data_num >= 2
         if self.args.pipeline_parallel_degree > 1:
-            if data_num == 2:
-                # Note(zhangwl):if data_num is 2, data must be [inputs,labels]
-                meshes.append(_get_mesh(self.args.pipeline_parallel_degree - 1))
-            elif data_num == 3:
-                # Note(zhangwl):if data_num is 2, data must be [inputs,labels,atttention_mask]
-                meshes.append(_get_mesh(self.args.pipeline_parallel_degree - 1))
+            for i in range(1, data_num):
                 meshes.append(_get_mesh(0))
-
+            meshes[-1] = _get_mesh(self.args.pipeline_parallel_degree - 1)
         return meshes
 
     def _wrap_for_dist_loader(self, train_dataloader):
