@@ -972,12 +972,6 @@ class DeepseekV2Attention(nn.Layer):
         k_nope, value_states = paddle.split(kv, [self.qk_nope_head_dim, self.v_head_dim], axis=-1)
         kv_seq_len = value_states.shape[1]
         if past_key_value is not None:
-            if self.layer_idx is None:
-                raise ValueError(
-                    f"The cache structure has changed since version v4.36. If you are using {self.__class__.__name__} "
-                    "for auto-regressive decoding with k/v caching, please make sure to initialize the attention class "
-                    "with a layer index."
-                )
             kv_seq_len += past_key_value[0].shape[-3]
         cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
         cos = cos[None, :, None, :]
@@ -1364,12 +1358,10 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
                 # For decoding phase in generation, seq_length = 1, we don't need to add causal mask
                 if input_shape[-1] > 1:
                     combined_attention_mask = _make_causal_mask(
-                        input_shape, past_key_values_length=past_key_values_length
+                        input_shape,
+                        past_key_values_length=past_key_values_length,
                     )
-                    if get_env_device() == "npu":
-                        expanded_attn_mask = expanded_attn_mask.astype("bool") & combined_attention_mask.astype("bool")
-                    else:
-                        expanded_attn_mask = expanded_attn_mask & combined_attention_mask
+                    expanded_attn_mask = expanded_attn_mask & combined_attention_mask
             # [bsz, seq_len, seq_len] -> [bsz, 1, seq_len, seq_len]
             elif len(attention_mask.shape) == 3:
                 expanded_attn_mask = attention_mask.unsqueeze(1).astype("bool")
@@ -1377,20 +1369,19 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
             else:
                 expanded_attn_mask = attention_mask
         else:
-            expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
+            expanded_attn_mask = _make_causal_mask(
+                input_shape,
+                past_key_values_length=past_key_values_length,
+            )
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
-        if get_env_device() == "npu":
+        if get_env_device() == "xpu":
             x = paddle.to_tensor(0.0, dtype="float32")
-            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float32")
-            expanded_attn_mask = expanded_attn_mask.astype("float32")
-            expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
-        elif get_env_device() in ["xpu", "gcu"]:
-            x = paddle.to_tensor(0.0, dtype=dtype)
-            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype=dtype)
-            expanded_attn_mask = expanded_attn_mask.astype(dtype)
-            expanded_attn_mask = paddle.where(expanded_attn_mask, x, y).astype(dtype)
+            y = paddle.to_tensor(-1.7005809656952787e38, dtype="float32")
+            expanded_attn_mask = paddle.where(expanded_attn_mask, x, y)
         else:
-            expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), 0.0, paddle.finfo(dtype).min).astype(
+                dtype
+            )
         return expanded_attn_mask
 
     @paddle.jit.not_to_static
@@ -1747,44 +1738,14 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
         )
 
     def prepare_inputs_for_generation(
-        self,
-        input_ids,
-        past_key_values=None,
-        attention_mask=None,
-        inputs_embeds=None,
-        **kwargs,
+        self, input_ids, use_cache=False, past_key_values=None, attention_mask=None, inputs_embeds=None, **kwargs
     ):
-        if past_key_values is not None:
-            cache_length = past_length = past_key_values[0][0].shape[2]
-            max_cache_length = None
-
-            # Keep only the unprocessed tokens:
-            # 1 - If the length of the attention_mask exceeds the length of input_ids, then we are in a setting where
-            # some of the inputs are exclusivelly passed as part of the cache (e.g. when passing input_embeds as
-            # input)
-            if attention_mask is not None and attention_mask.shape[1] > input_ids.shape[1]:
-                input_ids = input_ids[:, -(attention_mask.shape[1] - past_length) :]
-            # 2 - If the past_length is smaller than input_ids', then input_ids holds all input tokens. We can discard
-            # input_ids based on the past_length.
-            elif past_length < input_ids.shape[1]:
-                input_ids = input_ids[:, past_length:]
-            # 3 - Otherwise (past_length >= input_ids.shape[1]), let's assume input_ids only has unprocessed tokens.
-
-            # If we are about to go beyond the maximum cache length, we need to crop the input attention mask.
-            if (
-                max_cache_length is not None
-                and attention_mask is not None
-                and cache_length + input_ids.shape[1] > max_cache_length
-            ):
-                attention_mask = attention_mask[:, -max_cache_length:]
-
-        position_ids = kwargs.get("position_ids", None)
-        if attention_mask is not None and position_ids is None:
-            # create position_ids on the fly for batch generation
-            position_ids = attention_mask.long().cumsum(-1) - 1
-            position_ids.masked_fill_(attention_mask == 0, 1)
-            if past_key_values:
-                position_ids = position_ids[:, -input_ids.shape[1] :]
+        batch_size, seq_length = input_ids.shape
+        position_ids = kwargs.get("position_ids", paddle.arange(seq_length).expand((batch_size, seq_length)))
+        attention_mask = kwargs.get("attention_mask", None)
+        if past_key_values:
+            input_ids = input_ids[:, -1].unsqueeze(axis=-1)
+            position_ids = position_ids[:, -1].unsqueeze(-1)
 
         # if `inputs_embeds` are passed, we only want to use them in the 1st generation step
         if inputs_embeds is not None and past_key_values is None:
@@ -1796,7 +1757,7 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
             {
                 "position_ids": position_ids,
                 "past_key_values": past_key_values,
-                "use_cache": kwargs.get("use_cache"),
+                "use_cache": use_cache,
                 "attention_mask": attention_mask,
             }
         )
