@@ -254,7 +254,7 @@ python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/kto
 飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF 文档](./docs/rlhf.md)。
 
 ### 4. 模型融合
-PaddleNLP 支持多种模型融合方法，包括**Linear、Slerp、Ties、DARE、DELLA**，并支持模型参数稀疏化方法与模型融合算法的灵活组合使用。
+PadlleNLP 支持多种模型融合方法，包括**Linear、Slerp、Ties、DARE、DELLA**，并支持模型参数稀疏化方法与模型融合算法的灵活组合使用。
 ```shell
 # 模型融合启动命令参考
 python mergekit.py \
@@ -269,41 +269,7 @@ python mergekit.py \
 
 更多模型融合算法与细节详见[模型融合文档](./docs/mergekit.md)。
 
-### 5. 嵌入表示学习
-
-PaddleNLP 支持嵌入表示的对比学习，通过支持 Gradient Cache 策略(https://arxiv.org/abs/2101.06983)与 Inf-CL 技术(https://arxiv.org/html/2410.17243v1)，实现超大 Batch 训练。
-
-#### 5.1 数据准备
-
-我们支持的精调数据格式是每行包含一个字典的 json 文件，每个字典包含以下字段：
-
-- query : str，用户的 query 输入。
-- pos_passage : List(str)，表示与 query 匹配的正确输出(正样本)。
-- neg_passage : List(str)，表示与 query 不匹配的错误输出(负样本)。
-
-样例数据:
-```
-{"query": "美国土地面积多大？", "pos_passage": ["美国国土面积为937万平方公里"], "neg_passage": ["美国国土面积为9万平方公里"]}
-{"query": "美国土地面积多大？", "pos_passage": ["美国国土面积为937万平方公里"], "neg_passage": []}
-```
-为了方便测试，我们也提供了简单的示例数据集可以直接使用：
-```
-wget https://bj.bcebos.com/paddlenlp/datasets/examples/emb_data.tar
-tar -xvf emb_data.tar
-```
-
-训练命令示例如下:
-```
-# 嵌入表示学习训练命令参考
-python -m paddle.distributed.launch \
-    --gpus "0,1,2,3" \
-    run_embedding.py \
-    ./config/qwen/emb_argument.json
-
-```
-更多嵌入表示对比学习的算法与细节详见后续文档。
-
-### 6. 量化
+### 5. 量化
 
 大模型量化将16位、32位浮点数的模型参数或激活量化为4位或8位整数能够有效降低模型存储空间和计算资源需求，同时加速推理速度。量化算法包含：
 
@@ -343,7 +309,7 @@ python run_quantization.py ./config/llama/fp8_ptq_argument.json
 
 更多技术细节和模型量化使用详见[量化文档](./docs/quantization.md)。
 
-### 7. 推理
+### 6. 推理
 
 PaddleNLP 提供高性能推理，内置动态插入和全环节算子融合策略，极大加快并行推理的速度，同时支持 FP16/BF16、WINT8、WINT4、A8W8、A8W8C8多种推理方式。
 
@@ -369,9 +335,9 @@ python ./predict/predictor.py --model_name_or_path ./inference --inference_model
 
 更多模型推理使用方法详见[大模型推理文档](./docs/predict/inference.md)。
 
-### 8. 服务化部署
+### 7. 服务化部署
 
-#### 8.1 Flask & Gradio UI 服务化部署
+#### 7.1 Flask & Gradio UI 服务化部署
 
 我们提供了一套基于动态图推理的简单易用 UI 服务化部署方法，用户可以快速部署服务化推理。
 
@@ -399,7 +365,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_ser
 此外，如果想通过 API 脚本的方式跑推理，可参考：`./predict/request_flask_server.py` 文件。
 
 
-#### 8.2 大模型服务化部署工具
+#### 7.2 大模型服务化部署工具
 
 该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。
 
@@ -432,7 +398,7 @@ Note:
 
 更多关于该部署工具的使用方法，请查看[服务化部署流程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/deploy_usage_tutorial.md)
 
-### 9. PyTorch 模型权重转换
+### 8. PyTorch 模型权重转换
 
 PaddleNLP 提供了可自动将 PyTorch 相关的权重转化为 Paddle 权重的接口，代码如下：
 
