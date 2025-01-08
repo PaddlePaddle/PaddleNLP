@@ -316,4 +316,7 @@ from .xlm.tokenizer import *
 from .xlnet.configuration import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
+from .xlm_roberta.modeling import *
+from .xlm_roberta.tokenizer import *
+from .xlm_roberta.configuration import *
 from .yuan import *

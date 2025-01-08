@@ -91,10 +91,6 @@ class PreTrainingArguments(AutoTrainingArguments):
         default=False,
         metadata={"help": "Weather to run benchmark by autotuner. True for from_scratch and pad_max_length."},
     )
-    use_intermediate_api: bool = field(
-        default=False,
-        metadata={"help": "Weather to use auto_parallel intermediate api"},
-    )
 
     def __post_init__(self):
         super().__post_init__()
