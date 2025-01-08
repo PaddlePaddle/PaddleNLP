@@ -41,12 +41,15 @@ from paddlenlp.transformers import (
     LinearAnnealingWithWarmupDecay,
     LlamaConfig,
     LlamaForCausalLM3DAuto,
+    LlamaForCausalLMNet,
     LlamaPretrainingCriterion3DAuto,
+    LlamaPretrainingCriterionNet,
 )
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
     "llama": (LlamaConfig, LlamaForCausalLM3DAuto, LlamaPretrainingCriterion3DAuto),
+    "llama_network": (LlamaConfig, LlamaForCausalLMNet, LlamaPretrainingCriterionNet),
 }
 
 
@@ -89,9 +92,6 @@ class PreTrainingArguments(AutoTrainingArguments):
         default="1F1B", metadata={"help": "The pipeline schedule mode, support FThenB, 1F1B, VPP and Eager-1F1B."}
     )
     sr: Optional[int] = field(default=0, metadata={"help": "The count of chunks without recompute."})
-    refined_ops_patterns: Optional[List[str]] = field(
-        default=None, metadata={"help": "The pattern of refined recompute."}
-    )
     virtual_pipeline_seg_method: str = field(
         default="LlamaDecoderLayerAuto", metadata={"help": "The seg method of spliting pp layer for virtual pipeline."}
     )
@@ -544,6 +544,7 @@ def main():
     config.use_recompute = training_args.recompute
     config.tensor_parallel_degree = training_args.tensor_parallel_degree
     config.tensor_parallel_rank = training_args.tensor_parallel_rank
+    config.sharding_parallel_degree = training_args.sharding_parallel_degree
 
     if training_args.strategy.pipeline.enable and config.virtual_pp_degree > 1:
         pipeline = training_args.strategy.pipeline
@@ -563,10 +564,6 @@ def main():
     with paddle.LazyGuard():
         model = model_class.from_config(config, dtype="float32")
         criterion = criterion_class(config)
-
-    for param in model.parameters():
-        assert not param._is_initialized()
-        param.initialize()
 
     if training_args.recompute:
 
@@ -621,6 +618,7 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         optimizers=(None, lr_scheduler),
         tokenizer=tokenizer,
+        model_args=model_args,
     )
 
     checkpoint = None

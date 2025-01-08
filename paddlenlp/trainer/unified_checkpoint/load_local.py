@@ -282,16 +282,15 @@ def load_unified_optimizer_locally(args, model, optimizer, resume_from_checkpoin
         returned_optim_state_dict[key_name] = state_dict_optim.pop(key)
         returned_optim_state_dict[key_name].name = key_name
 
-        # master weight cast (only in remove_master_weight)
-        if has_master_weights and state_dict_master_weight[model_weight_key].dtype != paddle.float32:
-            state_dict_master_weight[model_weight_key] = paddle.cast(
-                state_dict_master_weight[model_weight_key], dtype=paddle.float32
-            )
-
     if has_master_weights:
         for key in list(state_dict_master_weight.keys()):
             static_name = struct2static_name_mappings[key]
             returned_optim_state_dict["master_weights"][static_name] = state_dict_master_weight.pop(key)
+            # master weight cast (only in remove_master_weight)
+            if returned_optim_state_dict["master_weights"][static_name].dtype != paddle.float32:
+                returned_optim_state_dict["master_weights"][static_name] = paddle.cast(
+                    returned_optim_state_dict["master_weights"][static_name], dtype=paddle.float32
+                )
             returned_optim_state_dict["master_weights"][static_name].name = "_".join([static_name, FP32_MASTER])
 
     return returned_optim_state_dict

@@ -99,6 +99,7 @@ else:
             ("squeezebert", "SqueezeBertTokenizer"),
             ("t5", "T5Tokenizer"),
             ("xlm", "XLMTokenizer"),
+            ("xlm_roberta", "XLMRobertaTokenizer"),
             ("xlnet", "XLNetTokenizer"),
             ("bert_japanese", "BertJapaneseTokenizer"),
             ("bigbird", "BigBirdTokenizer"),
