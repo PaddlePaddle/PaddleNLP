@@ -28,6 +28,7 @@ install_requirements() {
     python -m pip config --user set global.trusted-host pip.baidu-int.com
     python -m pip install -r requirements.txt
     python -m pip install -r requirements-dev.txt
+    python -m pip install tokenizers>=0.21,<0.22 # update tokenizers for transformers
     python -m pip install -r tests/requirements.txt
     python -m pip install -r paddlenlp/experimental/autonlp/requirements.txt 
     python -m pip uninstall paddlepaddle paddlepaddle_gpu -y
