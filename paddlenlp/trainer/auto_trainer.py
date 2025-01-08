@@ -31,6 +31,11 @@ from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatch
 from ..utils.log import logger
 from .argparser import strtobool
 from .auto_training_args import AutoTrainingArguments
+from paddlenlp.transformers.model_utils import PretrainedModel
+
+from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
+from ..utils.log import logger
+from .argparser import strtobool
 from .trainer import SCALER_NAME, SCHEDULER_NAME, TRAINER_STATE_NAME, TRAINING_ARGS_NAME
 from .trainer_callback import TrainerState
 from .trainer_utils import (  # set_hyrbid_parallel_seed,
@@ -85,19 +90,6 @@ class AutoTrainer(Trainer):
             if not param._is_initialized() and param._init_func is not None:
                 param.initialize()
         kwargs["model"] = model
-
-        trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]
-        self.set_optimizer_grouped_parameters(trainable_parameters)
-
-        assert kwargs["args"].max_seq_length is not None, "max_seq_length must be specified in auto_parallel"
-
-        if kwargs.get("data_collator", None) is None:
-            data_collator = DataCollatorForSeq2Seq(
-                max_length=kwargs["args"].max_seq_length,
-                max_label_length=kwargs["args"].max_seq_length,
-                padding="max_length",
-            )
-            kwargs["data_collator"] = data_collator
 
         super().__init__(*args, **kwargs)
         assert self.args.enable_auto_parallel
@@ -163,7 +155,7 @@ class AutoTrainer(Trainer):
     def _wrap_model(self, model, training=True):
         return model
 
-    def _get_meshes_for_loader(self, train_dataloader):
+    def _get_meshes_for_loader(self):
         def _get_mesh(pp_idx=0):
             return self.global_mesh.get_mesh_with_dim("pp")[pp_idx]
 
@@ -171,22 +163,14 @@ class AutoTrainer(Trainer):
         # error may occurs here.
         meshes = []
         meshes.append(_get_mesh(0))
-        data = next(train_dataloader())
-        if isinstance(data, dict):
-            data_num = len(list(data.values()))
-        elif isinstance(data, (list, tuple)):
-            data_num = len(data)
-        assert data_num >= 2
         if self.args.pipeline_parallel_degree > 1:
-            for i in range(1, data_num):
-                meshes.append(_get_mesh(0))
-            meshes[-1] = _get_mesh(self.args.pipeline_parallel_degree - 1)
+            meshes.append(_get_mesh(self.args.pipeline_parallel_degree - 1))
         return meshes
 
     def _wrap_for_dist_loader(self, train_dataloader):
         dist_loader = dist.shard_dataloader(
             dataloader=train_dataloader,
-            meshes=self._get_meshes_for_loader(train_dataloader),
+            meshes=self._get_meshes_for_loader(),
             shard_dims="dp",
         )
         return dist_loader
@@ -641,11 +625,9 @@ class AutoTrainer(Trainer):
         return loss
 
     def static_training(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
-        # NOTE(zhangwl):need support input attention_mask in static mode
-        input_data = list(inputs.values())
-        loss = model(*input_data)
-        # inputs = list(inputs.values())
-        # loss = model(*inputs)
+        input_ids, labels = tuple(inputs.values())
+        loss = model(input_ids, labels)
+
         if loss is not None and self.args.gradient_accumulation_steps > 1 and not self._enable_delay_scale_loss():
             loss = loss / self.args.gradient_accumulation_steps
 
@@ -702,7 +684,6 @@ class AutoTrainer(Trainer):
 
     def _maybe_log_save_evaluate(self, tr_loss, model, epoch, ignore_keys_for_eval, **kwargs):
         with _exec_mode_guard("dynamic"):
-            self.control.should_evaluate = False
             super()._maybe_log_save_evaluate(tr_loss, model, epoch, ignore_keys_for_eval, **kwargs)
 
     def _save_model(self):

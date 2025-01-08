@@ -47,7 +47,11 @@ python -u  -m paddle.distributed.launch \
     --log_dir  "log/$task_name""_log" \
     ../run_finetune_auto.py \
     --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
+<<<<<<< HEAD
     --dataset_name_or_path "../../finetune_data/data" \
+=======
+    --dataset_name_or_path "../fintune_data/data" \
+>>>>>>> [AutoParallel]:auto_sft rebase develop
     --output_dir "output/$task_name/" \
     --enable_auto_parallel true \
     --lora false \
@@ -80,7 +84,16 @@ python -u  -m paddle.distributed.launch \
     --recompute false \
     --save_total_limit 1 \
     --tensor_parallel_degree 2 \
+<<<<<<< HEAD
+<<<<<<<< HEAD:llm/auto_parallel/llama/llama_finetune_with_api.sh
     --pipeline_parallel_degree 2\
+========
+    --pipeline_parallel_degree 2 \
+    --sharding "stage1" \
+>>>>>>>> [AutoParallel]:auto_sft rebase develop:llm/run_sft_hand.sh
+=======
+    --pipeline_parallel_degree 2\
+>>>>>>> [AutoParallel]:auto_sft rebase develop
     --zero_padding false \
     --unified_checkpoint false \
     --flash_mask false \
@@ -88,4 +101,11 @@ python -u  -m paddle.distributed.launch \
     --fuse_attention_qkv true \
     --sharding "stage1" \
     --auto_parallel_resume_form_hybrid_parallel true \
+<<<<<<< HEAD
     --num_hidden_layers 2 
+=======
+    --num_hidden_layers 2 \
+    # --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
+    # --tensor_parallel_config "enable_mp_async_allreduce" \
+    # --pipeline_parallel_config "enable_send_recv_overlap" \
+>>>>>>> [AutoParallel]:auto_sft rebase develop
