@@ -47,7 +47,10 @@ class AutoTrainingArguments(TrainingArguments):
             "help": "Enable eliminate_transpose pass, which should replace transpose with reshape when sequence parallel is enabled."
         },
     )
-
+    use_intermediate_api: bool = field(
+        default=False,
+        metadata={"help": "Weather to use auto_parallel intermediate api"},
+    )
     refined_ops_patterns: str = field(default=None, metadata={"help": "The pattern of refined recompute."})
 
     def __post_init__(self):
