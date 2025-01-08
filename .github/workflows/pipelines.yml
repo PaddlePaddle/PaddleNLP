@@ -24,6 +24,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           make install
+          pip install tokenizers>=0.21,<0.22
           pip install -r tests/requirements.txt
       - name: run the command
         working-directory: ./slm/pipelines
