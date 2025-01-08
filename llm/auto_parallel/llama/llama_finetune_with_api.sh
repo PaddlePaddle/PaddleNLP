@@ -32,23 +32,30 @@ export FLAGS_embedding_deterministic=0
 # export FLAGS_max_inplace_grad_add=65536
 export FLAGS_enable_auto_parallel_align_mode=0
 
-task_name="llama_3.1_sft"
+task_name="llama_3.1_sft_auto"
 rm -rf output/$task_name/
 rm -rf "log/$task_name""_log"
 
 export SOT_LOG_LEVEL=4
-export PYTHONPATH=../:$PYTHONPATH
-
+# export PYTHONPATH=../:$PYTHONPATH
+export PYTHONPATH=../../../:$PYTHONPATH
 #ulimit -c unlimited
+to_static=true
 
 python -u  -m paddle.distributed.launch \
     --gpus "0,1,2,3,4,5,6,7" \
     --log_dir  "log/$task_name""_log" \
-    run_finetune.py \
+    ../run_finetune_auto.py \
     --model_name_or_path "meta-llama/Meta-Llama-3.1-8B-Instruct" \
-    --dataset_name_or_path "fintune_data/data" \
-    --output_dir "./checkpoints/llama_sft_ckpts" \
-    --per_device_train_batch_size 1 \
+    --dataset_name_or_path "../fintune_data/data" \
+    --output_dir "output/$task_name/" \
+    --enable_auto_parallel true \
+    --lora false \
+    --use_mora false \
+    --model_type "llama" \
+    --use_intermediate_api false \
+    --to_static $to_static \
+    --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 2 \
     --per_device_eval_batch_size 8 \
     --eval_accumulation_steps 16 \
@@ -73,15 +80,15 @@ python -u  -m paddle.distributed.launch \
     --recompute false \
     --save_total_limit 1 \
     --tensor_parallel_degree 2 \
-    --pipeline_parallel_degree 2 \
-    --sharding "stage1" \
+    --pipeline_parallel_degree 2\
     --zero_padding false \
     --unified_checkpoint false \
     --flash_mask false \
     --use_flash_attention true \
+    --fuse_attention_qkv true \
     --sharding "stage1" \
     --auto_parallel_resume_form_hybrid_parallel true \
-    --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
-    --tensor_parallel_config "enable_mp_async_allreduce" \
-    --pipeline_parallel_config "enable_sharding_comm_overlap enable_dp_comm_overlap enable_overlap_p2p_comm disable_p2p_cache_shape" \
-    # --num_hidden_layers 4 \
+    --num_hidden_layers 2 \
+    # --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
+    # --tensor_parallel_config "enable_mp_async_allreduce" \
+    # --pipeline_parallel_config "enable_send_recv_overlap" \
