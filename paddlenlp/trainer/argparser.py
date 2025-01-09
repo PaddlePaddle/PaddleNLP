@@ -27,7 +27,7 @@ from inspect import isclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, NewType, Optional, Tuple, Union, get_type_hints
 
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import OmegaConf, DictConfig, ListConfig
 
 from ..utils.log import logger
 
@@ -292,7 +292,7 @@ class PdArgumentParser(ArgumentParser):
         """
 
         def to_regular_dict(obj):
-            if isinstance(obj, DictConfig):
+            if isinstance(obj, (DictConfig, ListConfig)):
                 obj = OmegaConf.to_container(obj, resolve=True)
             if isinstance(obj, dict):
                 return {k: to_regular_dict(v) for k, v in obj.items()}
