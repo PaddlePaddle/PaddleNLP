@@ -27,7 +27,7 @@ from inspect import isclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, NewType, Optional, Tuple, Union, get_type_hints
 
-from omegaconf import OmegaConf, DictConfig, ListConfig
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from ..utils.log import logger
 
