@@ -673,6 +673,9 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether to enable sequence parallel."},
     )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False, metadata={"help": "Whether to use fuse sequence parallel allreduce."}
+    )
     sequence_parallel_config: str = field(
         default="",
         metadata={
