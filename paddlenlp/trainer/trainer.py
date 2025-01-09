@@ -110,6 +110,7 @@ from ..utils.env import (
     SAFE_WEIGHTS_INDEX_NAME,
     VERA_WEIGHTS_NAME,
 )
+from ..utils.fault_tolerance import LOSS_INF_ERROR, LOSS_NAN_ERROR
 from ..utils.import_utils import is_datasets_available, is_paddle_cuda_available
 from ..utils.log import MetricsDumper, logger
 from ..utils.tools import get_env_device
@@ -137,6 +138,7 @@ from .trainer_utils import (  # set_hyrbid_parallel_seed,
     ShardingOption,
     TrainerMemoryTracker,
     TrainOutput,
+    download_recovery_ckpt_from_pdc,
     find_batch_size,
     get_last_checkpoint,
     get_scheduler,
@@ -199,17 +201,6 @@ except:
         hack for paddlenlp develop branch.
         """
         return False
-
-
-try:
-    from paddle.framework.recall_error import LOSS_NAN_ERROR
-except ImportError:
-    LOSS_NAN_ERROR = "PaddleRecall error(102): LossNan"
-
-try:
-    from paddle.framework.recall_error import LOSS_INF_ERROR
-except ImportError:
-    LOSS_INF_ERROR = "PaddleRecall error(104): LossInf"
 
 
 __all__ = ["Trainer"]
@@ -755,6 +746,14 @@ class Trainer:
                         shutil.rmtree(resume_from_checkpoint)
                     os.makedirs(resume_from_checkpoint, exist_ok=True)
                     logger.info(f"Reset resume_from_checkpoint to temp directory : {resume_from_checkpoint}")
+
+        if resume_from_checkpoint is not None and self.args.pdc_download_ckpt:
+            if self.is_local_process_zero():
+                download_recovery_ckpt_from_pdc(resume_from_checkpoint, self.args.pdc_download_timeout)
+            if self.args.world_size > 1:
+                logger.info("Wait all processes finish downloading...")
+                paddle.distributed.barrier()
+            logger.info("All processes finished downloading from pdc")
 
         train_dataloader = self.get_train_dataloader()
 

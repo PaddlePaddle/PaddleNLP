@@ -1,1 +1,0 @@
-../../../../llm/devices/intel_hpu/llama/README.md

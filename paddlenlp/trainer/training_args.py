@@ -31,6 +31,7 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
+from ..utils.fault_tolerance import is_ft_env
 from ..utils.log import logger
 from .trainer_utils import (
     IntervalStrategy,
@@ -726,7 +727,8 @@ class TrainingArguments:
                 "disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.\n"
                 "enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap\n"
                 "enable_stage1_broadcast_overlap, overlap stage1 V1 broadcast with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap forward compute and no other sync could be called during the training for broadcast overlap.\n"
-                "enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap."
+                "enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap.\n"
+                "enable_stage1_tensor_fusion_blanced_save_load, convert unbalanced optimizer state to balanced state when using tensor fusion strategy, which may increase the memory occupation."
             )
         },
     )
@@ -952,6 +954,17 @@ class TrainingArguments:
     offload_optim: Optional[bool] = field(
         default=False,
         metadata={"help": "Offload optimizer after optimizer.step()"},
+    )
+    save_sharding_stage1_model_include_freeze_params: Optional[bool] = field(
+        default=False, metadata={"help": "Save Sharding Stage1 Model Exclude Freeze Params"}
+    )
+    pdc_download_ckpt: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Download checkpoint in paddlecloud longjob environment"},
+    )
+    pdc_download_timeout: Optional[int] = field(
+        default=300,
+        metadata={"help": "Timeout seconds for downloading checkpoint from remote cluster."},
     )
 
     def __post_init__(self):
@@ -1636,6 +1649,7 @@ class TrainingArguments:
                             "enable_stage1_overlap",
                             "enable_stage2_overlap",
                             "enable_release_grads",
+                            "enable_stage1_tensor_fusion_blanced_save_load",
                         ]:
                             raise ValueError(
                                 f"Found unknown pipeline mode config {x}, " f"accpet config is reduce_overlap."
@@ -1649,6 +1663,10 @@ class TrainingArguments:
 
                     if "enable_stage1_tensor_fusion" in sharding_parallel_config:
                         sharding.grad_bucket_size_numel = 210355872
+                        sharding.enable_stage1_tensor_fusion = True
+
+                    if "enable_stage1_tensor_fusion_blanced_save_load" in sharding_parallel_config:
+                        sharding.save_unbalanced_param = False
 
                     if "enable_release_grads" in sharding_parallel_config:
                         sharding.release_gradients = True
@@ -1662,15 +1680,6 @@ class TrainingArguments:
                 amp.init_loss_scaling = self.scale_loss
                 amp.custom_black_list = self.amp_custom_black_list if self.amp_custom_black_list is not None else []
                 amp.custom_white_list = self.amp_custom_white_list if self.amp_custom_white_list is not None else []
-
-            if self.recompute:
-                recompute = strategy.recompute
-                recompute.enable = True
-                recompute.sr = self.sr if self.sr is not None else 0
-                recompute.refined_ops_patterns = []
-                if self.refined_ops_patterns is not None:
-                    for pattern in self.refined_ops_patterns:
-                        recompute.refined_ops_patterns.append(eval(pattern))
 
             self.strategy = strategy
             if self.hybrid_parallel_topo_order == "pp_first":
@@ -1817,6 +1826,14 @@ class TrainingArguments:
             if not enable_rr:
                 refined_recompute_dict = dict()
             self.refined_recompute = refined_recompute_dict
+
+        # process fault tolerance settings
+        if not is_ft_env():
+            if self.pdc_download_ckpt:
+                logger.warning(
+                    "pdc_download_ckpt can only be set as true inside FT environment. Automatically disable it now."
+                )
+                self.pdc_download_ckpt = False
 
     def __str__(self):
         self_as_dict = asdict(self)
@@ -2189,7 +2206,7 @@ class TrainingArguments:
         """
         Serializes this instance to a JSON string.
         """
-        return json.dumps(self.to_dict(), indent=2)
+        return json.dumps(str(self.to_dict()), indent=2)
 
     def to_sanitized_dict(self) -> Dict[str, Any]:
         """

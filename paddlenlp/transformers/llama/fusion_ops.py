@@ -206,11 +206,14 @@ def fusion_flash_attention(
                 value_states,
                 None,
                 attention_mask,
+                [],
+                [],
                 0.0,
                 attention_mask is None,
                 True,
                 False,
                 npu_is_casual,
+                False,
             )[0]
         elif get_env_device() == "gcu":
             if config.context_parallel_degree > 1:

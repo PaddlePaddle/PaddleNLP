@@ -209,6 +209,9 @@ from .xlnet.configuration import *
 from .xlm.modeling import *
 from .xlm.tokenizer import *
 from .xlm.configuration import *
+from .xlm_roberta.modeling import *
+from .xlm_roberta.tokenizer import *
+from .xlm_roberta.configuration import *
 from .gau_alpha.modeling import *
 from .gau_alpha.tokenizer import *
 from .gau_alpha.configuration import *

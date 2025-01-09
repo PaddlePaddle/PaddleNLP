@@ -1,1 +1,0 @@
-../../../../llm/devices/gcu/llama/README.md

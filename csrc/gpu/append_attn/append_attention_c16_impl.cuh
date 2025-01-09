@@ -786,8 +786,6 @@ void MultiQueryAppendAttention(
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
-    const int max_partition_size,
-    const int encoder_max_partition_size,
     const int speculate_max_draft_token_num,
     const bool is_decoder,
     cudaStream_t &stream,
@@ -839,9 +837,9 @@ void MultiQueryAppendAttention(
     int sm_count;
     cudaDeviceGetAttribute(&sm_count, cudaDevAttrMultiProcessorCount, dev_id);
 
-    uint32_t chunk_size = static_cast<uint32_t>(max_partition_size);
+    uint32_t chunk_size = get_max_partition_size(bsz);
     if (!is_decoder) {
-      chunk_size = static_cast<uint32_t>(encoder_max_partition_size);
+      chunk_size = max_seq_len;
     }
     const int num_chunks = div_up(max_dec_len, chunk_size);
     dim3 grids(num_blocks_x_cpu, num_chunks, kv_num_heads);
@@ -1058,9 +1056,9 @@ void MultiQueryAppendAttention(
     int sm_count;
     cudaDeviceGetAttribute(&sm_count, cudaDevAttrMultiProcessorCount, dev_id);
 
-    uint32_t chunk_size = static_cast<uint32_t>(max_partition_size);
+    uint32_t chunk_size = get_max_partition_size(bsz);
     if (!is_decoder) {
-      chunk_size = static_cast<uint32_t>(encoder_max_partition_size);
+      chunk_size = max_seq_len;
     }
     const int num_chunks = div_up(max_dec_len, chunk_size);
 
@@ -1301,8 +1299,6 @@ void CascadeAppendAttentionC16Kernel(
     const float quant_max_bound,
     const float quant_min_bound,
     const float in_scale,
-    const int max_partition_size,
-    const int encoder_max_partition_size,
     const int speculate_max_draft_token_num,
     const bool causal,
     const bool is_decoder,
@@ -1363,8 +1359,6 @@ void CascadeAppendAttentionC16Kernel(
                                 quant_max_bound,
                                 quant_min_bound,
                                 in_scale,
-                                max_partition_size,
-                                encoder_max_partition_size,
                                 speculate_max_draft_token_num,
                                 is_decoder,
                                 stream,

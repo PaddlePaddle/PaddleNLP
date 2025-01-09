@@ -1,1 +1,0 @@
-../../../../llm/devices/sdaa/llama/README.md

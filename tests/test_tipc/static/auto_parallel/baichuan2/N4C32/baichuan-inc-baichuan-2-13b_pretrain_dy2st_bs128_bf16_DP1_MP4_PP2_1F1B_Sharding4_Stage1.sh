@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-param="model_item=baichuan-inc-baichuan-2-13b_pretrain "
+param="model_item=baichuan-inc-baichuan-2-13b_pretrain_dy2st "
 param+="run_mode=DP1_MP4_PP2_1F1B_Sharding4_Stage1 "
 param+="device_num=N4C32 "
 param+="global_batch_size=128 "

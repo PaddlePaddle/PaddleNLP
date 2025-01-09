@@ -34,7 +34,6 @@ from paddlenlp.utils.downloader import (
     get_path_from_url_with_filelock,
     url_file_exists,
 )
-from tests.testing_utils import GPUsTesting, require_gpu
 
 from .testing_utils import LLMTest, argv_context_guard, load_test_config
 
@@ -293,44 +292,6 @@ class BlockAttnPredictorTest(LLMTest, unittest.TestCase):
             full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
 
         self.assertGreaterEqual(count / len(result_0), 0.1)
-
-
-@parameterized_class(
-    ["model_name_or_path", "model_class"],
-    [
-        ["__internal_testing__/tiny-random-llama", LlamaForCausalLM],
-    ],
-)
-class GPUsPredictorTest(LLMTest, GPUsTesting, unittest.TestCase):
-    config_path: str = "./tests/fixtures/llm/predictor.yaml"
-    model_name_or_path: str = None
-    model_class = None
-
-    def setUp(self) -> None:
-        super().setUp()
-        self.model_class.from_pretrained(self.model_name_or_path, dtype="float16").save_pretrained(self.output_dir)
-        AutoTokenizer.from_pretrained(self.model_name_or_path).save_pretrained(self.output_dir)
-
-    @require_gpu(2)
-    def test_predictor(self):
-        self.init_dist_env()
-
-        self.run_predictor({"inference_model": True, "src_length": 512, "max_length": 48})
-        result_0 = self._read_result(os.path.join(self.output_dir, "predict.json"))
-        self.run_predictor({"inference_model": False, "src_length": 512, "max_length": 48})
-        result_1 = self._read_result(os.path.join(self.output_dir, "predict.json"))
-
-        # compare the generation result of inference & dygraph model
-        assert len(result_0) == len(result_1)
-
-        count, full_match = 0, 0
-        for inference_item, no_inference_item in zip(result_0, result_1):
-            min_length = min(len(inference_item), len(no_inference_item))
-            count += int(inference_item[: min_length // 2] == no_inference_item[: min_length // 2])
-            full_match += int(inference_item[:min_length] == no_inference_item[:min_length])
-
-        self.assertGreaterEqual(full_match / len(result_0), 0.25)
-        self.assertGreaterEqual(count / len(result_0), 0.4)
 
 
 class QWenVLTest(LLMTest, unittest.TestCase):
