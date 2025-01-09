@@ -335,7 +335,6 @@ class PdArgumentParser(ArgumentParser):
 
         args["resume_from_checkpoint"] = get_resume_checkpoint_path(args)
         args_for_json = to_regular_dict(args)
-
         json_filename = args_for_json.get("args_output_to_local")
         if json_filename:
             try:
