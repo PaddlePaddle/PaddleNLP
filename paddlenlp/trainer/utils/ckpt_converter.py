@@ -41,7 +41,13 @@ MODEL_STATE_FILE_MIN_SIZE = 512
 
 class CheckpointConverter:
     def __init__(
-        self, hybrid_parallel_ckpt_path, state_dict, parameter_to_structured_name, trainging_args=None, patch_dict=None
+        self,
+        hybrid_parallel_ckpt_path,
+        state_dict,
+        parameter_to_structured_name,
+        trainging_args=None,
+        patch_dict=None,
+        local_view_pattern: list | bool = None,
     ):
         self.use_dist = True if paddle.distributed.get_world_size() > 1 else False
         self.path = hybrid_parallel_ckpt_path
@@ -85,6 +91,17 @@ class CheckpointConverter:
                 self.auto_parallel_state_dict[self.patch_dict[k]] = self.auto_parallel_state_dict[k]
             for k in del_keys:
                 self.auto_parallel_state_dict.pop(k)
+        # solve the problem of inconsistent parameter names in moe automatic parallel mode.
+        if hasattr(trainging_args, "moe_group") and trainging_args.moe_group:
+            if local_view_pattern is False:
+                self.local_view_pattern_list = None
+            else:
+                if isinstance(local_view_pattern, list):
+                    self.local_view_pattern_list = local_view_pattern
+                else:
+                    self.local_view_pattern_list = ["experts"]
+        else:
+            self.local_view_pattern_list = None
 
         flags = [
             ["tp degree", self.tp_degree],
@@ -497,6 +514,46 @@ class CheckpointConverter:
             else:
                 return self.gen_metadata_for_tp_sharded_tensor()
 
+    def rename_local_view_state_dict(self, state_dict, file_name):
+        """
+        Rename the key for local views to the key for global views, and return the renamed `state_dict`.
+        """
+        if self.local_view_pattern_list is None:
+            return state_dict
+        # case 1: moe_group is mp_group
+        if self.tp_degree > 1 and self.sharding_degree <= 1:
+            (tp_rank, pp_rank, sharding_rank) = self.get_distribution_rank_from_file_name(file_name)
+            expert_name_old2new = {}
+            for pattern in self.local_view_pattern_list:
+                expert_pattern = rf"({pattern}\.)(\d+)"
+                # extract all experts IDs
+                expert_ids = set()
+                for state_name in state_dict.keys():
+                    res = re.search(expert_pattern, state_name)
+                    if res:
+                        expert_ids.add(int(res.group(2)))
+                expert_num = len(expert_ids)
+                # construct old name to new name mapping
+                for state_name in state_dict.keys():
+                    res = re.search(expert_pattern, state_name)
+                    if res:
+                        new_expert_id = int(res.group(2)) % expert_num + tp_rank * expert_num
+                        expert_name_old2new[state_name] = re.sub(
+                            expert_pattern, f"{res.group(1)}{new_expert_id}", state_name
+                        )
+            # rename state_dict
+            renamed_state_dict = {
+                expert_name_old2new[state_name]
+                if state_name in expert_name_old2new
+                else state_name: state_dict[state_name]
+                for state_name in state_dict.keys()
+            }
+
+            return renamed_state_dict
+        # TODO: add support for sharding
+        else:
+            return state_dict
+
     def load_state_dict_and_rename(self):
         """
         Parse the distributed information from the names of the checkpoint files and evenly parse out the distributed information for each weight/optimizer state
@@ -741,11 +798,10 @@ class CheckpointConverter:
                         model_state_file_name = self.get_model_state_file_from(file_name)
                         assert model_state_file_name is not None
                         model_state_keys = global_file_to_state_dict_keys_mapping[model_state_file_name]
-                        renamed_state_dict = self.rename_using_optimizer_state_order(model_state_keys, state_dict)
-                        self.get_sharded_tensor_infos(file, renamed_state_dict, cur_rank_sharded_tensor_infos)
-                        self.cur_rank_loaded_state_dict[file_name] = renamed_state_dict
-                    else:
-                        self.get_sharded_tensor_infos(file_name, state_dict, cur_rank_sharded_tensor_infos)
+                        state_dict = self.rename_using_optimizer_state_order(model_state_keys, state_dict)
+                    renamed_state_dict = self.rename_local_view_state_dict(state_dict, file_name)
+                    self.get_sharded_tensor_infos(file_name, renamed_state_dict, cur_rank_sharded_tensor_infos)
+                    self.cur_rank_loaded_state_dict[file_name] = renamed_state_dict
             else:
                 for file, state_dict in self.cur_rank_loaded_state_dict.items():
                     # The rule for renaming is to change the master_weights name in the optimizer state to the model weight name,
@@ -897,6 +953,9 @@ class CheckpointConverter:
             return None
 
         for key, value in state_dict.items():
+            # NOTE: Skip the parameters that are not initialized，which are not in the current rank.
+            if value is None or (isinstance(value, paddle.Tensor) and not value._is_initialized()):
+                continue
             if key in parameter_to_structured_name.values():
                 new_name = key
             else:
@@ -909,7 +968,9 @@ class CheckpointConverter:
     def rename_using_optimizer_state_order(self, model_state_keys, optimizer_state_dict):
         name_mapping = {}
         suffix_bucket = {}
-        assert len(optimizer_state_dict) % len(model_state_keys) == 0
+        # TODO: After adapting to sharding, remove the code below.
+        if self.is_sharding_stage3 or (self.sharding_degree > 1 and self.sharding_stage1_v == 2):
+            assert len(optimizer_state_dict) % len(model_state_keys) == 0
         for suffix in OPTIMIZER_STATE_NAME_SUFFIX:
             suffix_bucket[suffix] = []
         for opt_name, opt_value in optimizer_state_dict.items():
@@ -927,10 +988,27 @@ class CheckpointConverter:
         for suffix, old_names in suffix_bucket.items():
             if len(old_names) == 0:
                 continue
-            assert len(old_names) == len(model_state_keys)
-            for i in range(len(old_names)):
-                name_mapping[old_names[i]] = model_state_keys[i] + suffix
+            # TODO: After adapting to sharding, remove the code below.
+            if self.is_sharding_stage3 or (self.sharding_degree > 1 and self.sharding_stage1_v == 2):
+                assert len(old_names) == len(model_state_keys)
 
+            # NOTE: Handle the case where the number of master_weight elements is not equal to the number of model_state_keys.
+            if suffix != ".master_weight":
+                for i in range(len(old_names)):
+                    name_mapping[old_names[i]] = model_state_keys[i] + suffix
+            else:
+                for i in range(len(old_names)):
+                    param = old_names[i][:-14]
+                    index = -1
+                    for idx, opt_name in enumerate(suffix_bucket[".moment1"]):
+                        if param == opt_name[:-24]:
+                            index = idx
+                            break
+                    if index >= 0:
+                        name_mapping[old_names[i]] = model_state_keys[index] + suffix
+                    else:
+                        raise RuntimeError(f"Can't find {param} in optimizer state dict.")
+        # rename state dict
         renamed_state_dict = {}
         for k, v in optimizer_state_dict.items():
             renamed_state_dict[name_mapping[k]] = v

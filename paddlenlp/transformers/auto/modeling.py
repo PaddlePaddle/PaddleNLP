@@ -94,6 +94,7 @@ MAPPING_NAMES = OrderedDict(
         ("UNIMO", "unimo"),
         ("XLNet", "xlnet"),
         ("XLM", "xlm"),
+        ("XLMRoberta", "xlm_roberta"),
         ("GPT", "gpt"),
         ("GLM", "glm"),
         ("MT5", "mt5"),
