@@ -87,6 +87,12 @@ try:
     from ..quantization.quantization_linear import QuantizationLinear
 except:
     QuantizationLinear = None
+try:
+    from paddle.distributed.fleet.utils.sequence_parallel_utils import (
+        register_sequence_parallel_allreduce_hooks,
+    )
+except:
+    pass
 from ..transformers.context_parallel_utils import split_inputs_sequence_dim_load_balance
 from ..transformers.model_utils import (
     PretrainedModel,
@@ -427,6 +433,11 @@ class Trainer:
                 logger.warning(
                     "We do not support skip_save_model_weight in peft model when using unified checkpoint, remove this config."
                 )
+
+        if args.sequence_parallel:
+            register_sequence_parallel_allreduce_hooks(
+                self.model, args.gradient_accumulation_steps, args.fuse_sequence_parallel_allreduce
+            )
 
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False

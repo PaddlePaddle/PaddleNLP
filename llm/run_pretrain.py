@@ -41,7 +41,6 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
-    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig, llmmetaclass
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
@@ -491,11 +490,6 @@ def main():
             )
     else:
         model = model_class.from_config(config, dtype=dtype)
-
-    if training_args.sequence_parallel:
-        register_sequence_parallel_allreduce_hooks(
-            model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
-        )
 
     if training_args.recompute:
         model.recompute_enable()
