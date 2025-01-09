@@ -152,6 +152,9 @@ def main():
         quantization_config=quantization_config,
     )
 
+    if "Qwen2Moe" in str(model_config.architectures) and training_args.data_parallel_degree > 1:
+        training_args.use_expert_parallel = True
+
     LlmMetaConfig.set_llm_config(model_config, training_args)
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
