@@ -111,16 +111,8 @@ class SFTAutoTrainer(SFTTrainer):
 
         model = kwargs["model"]
         for param in model.parameters():
-            if not param._is_initialized():
-                try:
-                    param.initialize()
-                except Exception as e:
-                    # NOTE(zhangwl):maybe param is not initialized and param init_func is set in later.user need set_init_func before auto_trainer
-                    logger.warning(
-                        f"AutoTrainer requires all parameters to be initialized when auto_trainer init, but failed to initialize parameter {param.name} {param}.\n"
-                        + "Please check param init func.\n"
-                        + f"The original exception message is:\n{str(e)}"
-                    )
+            if not param._is_initialized() and param._init_func is not None:
+                param.initialize()
         kwargs["model"] = model
 
         trainable_parameters = [p for p in model.parameters() if not p.stop_gradient]

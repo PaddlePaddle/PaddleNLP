@@ -85,9 +85,9 @@ class LoRAAutoLinear(LoRALinear):
     def process_intermediate_api(self):
         if self.parallelize_plan is not None:
             if isinstance(self.parallelize_plan, dist.ColWiseParallel):
-                self._auto_dist_config["mp_config"]["parallelize_plan"] = {"lora_A": dist.ColWiseParallel()}
+                self._auto_dist_config["mp_config"]["parallelize_plan"] = {"lora_B": dist.ColWiseParallel()}
             elif isinstance(self.parallelize_plan, dist.RowWiseParallel):
-                self._auto_dist_config["mp_config"]["parallelize_plan"] = {"lora_B": dist.RowWiseParallel()}
+                self._auto_dist_config["mp_config"]["parallelize_plan"] = {"lora_A": dist.RowWiseParallel()}
 
     def process_base_api(self):
         if self.weight_dist_attr is not None:
@@ -99,10 +99,10 @@ class LoRAAutoLinear(LoRALinear):
             self.weight = dist.shard_tensor(self.weight, process_mesh, placements)
             if placements[mp_index] == dist.Shard(1):
                 # this layer is column_parallel linear
-                self.lora_A = dist.shard_tensor(self.lora_A, process_mesh, placements)
+                self.lora_B = dist.shard_tensor(self.lora_B, process_mesh, placements)
             elif placements[mp_index] == dist.Shard(0):
                 # this layer is Rowise_parallel linear
-                self.lora_B = dist.shard_tensor(self.lora_B, process_mesh, placements)
+                self.lora_A = dist.shard_tensor(self.lora_A, process_mesh, placements)
 
     def auto_dist_config(self, prefix=""):
         if prefix != "":
