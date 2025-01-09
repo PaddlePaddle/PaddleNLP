@@ -355,7 +355,7 @@ class LoRAModel(nn.Layer):
                         # Reinit base model
                         offset = init_loraA.cuda() @ init_loraB.cuda()
                         ori_weight = model_state_dict[base_name]
-                        model_state_dict[base_name].set_value(ori_weight - self.lora_config.scaling * offset)
+                        model_state_dict[base_name].set_value(ori_weight + self.lora_config.scaling * offset)
         del model_state_dict
         gc.collect()
         self.model.set_state_dict(state_dict)
@@ -690,7 +690,7 @@ class LoRAModel(nn.Layer):
                     if "lora_A" in name:
                         trainable_state_dict[name] = paddle.concat([weight, self.loraga_init_dict[name]], axis=1)
                     else:
-                        trainable_state_dict[name] = paddle.concat([weight, self.loraga_init_dict[name]], axis=0)
+                        trainable_state_dict[name] = paddle.concat([weight, -self.loraga_init_dict[name]], axis=0)
                 else:
                     trainable_state_dict[name] = weight
 
