@@ -298,7 +298,11 @@ class DPOTrainer(Trainer):
                         if response_index[0] in list(
                             range(i * per_device_train_batch_size, (i + 1) * per_device_train_batch_size)
                         ):
-                            response_index[0] -= i * per_device_train_batch_size
+                            paddle.scatter_(
+                                response_index,
+                                paddle.to_tensor(0),
+                                response_index[0] - i * per_device_train_batch_size,
+                            )
                             concatenated_inputs["response_indexs"][i].append(response_index)
                     concatenated_inputs["response_indexs"][i] = paddle.stack(concatenated_inputs["response_indexs"][i])
                     if model._layers.config.use_sparse_head_and_loss_fn:
