@@ -323,12 +323,18 @@ class LoRAModel(nn.Layer):
         model_state_dict = self.model.state_dict()
         if self.lora_config.loraga:
 
-            def process_split_and_assign(name, concat_tensor, axis, init_dict, state_dict):
+            def process_split_and_assign(name, concat_tensor, init_dict, state_dict):
+                if "lora_A" in name:
+                    axis = 1
+                else:
+                    axis = 0
                 if isinstance(concat_tensor, np.ndarray):
                     final_lora, init_lora = np.split(concat_tensor, 2, axis=axis)
                     init_lora = paddle.to_tensor(init_lora)
                 else:
                     final_lora, init_lora = paddle.split(concat_tensor, 2, axis=axis)
+                if "lora_B" in name:
+                    init_lora *= -1
                 init_dict[name] = init_lora
                 state_dict[name] = final_lora
                 return init_lora
@@ -337,13 +343,13 @@ class LoRAModel(nn.Layer):
                 if "lora_A" in name:
                     concat_lora_A = state_dict[name]
                     init_loraA = process_split_and_assign(
-                        name, concat_lora_A, axis=1, init_dict=self.loraga_init_dict, state_dict=state_dict
+                        name, concat_lora_A, init_dict=self.loraga_init_dict, state_dict=state_dict
                     )
 
                     loraB_name = name.replace("lora_A", "lora_B")
                     concat_lora_B = state_dict[loraB_name]
                     init_loraB = process_split_and_assign(
-                        loraB_name, concat_lora_B, axis=0, init_dict=self.loraga_init_dict, state_dict=state_dict
+                        loraB_name, concat_lora_B, init_dict=self.loraga_init_dict, state_dict=state_dict
                     )
 
                     base_name = name.replace("lora_A", "weight")
@@ -351,7 +357,7 @@ class LoRAModel(nn.Layer):
                         # Reinit base model
                         offset = init_loraA.cuda() @ init_loraB.cuda()
                         ori_weight = model_state_dict[base_name]
-                        model_state_dict[base_name].set_value(ori_weight + self.lora_config.scaling * offset)
+                        model_state_dict[base_name].set_value(ori_weight - self.lora_config.scaling * offset)
         del model_state_dict
         gc.collect()
         self.model.set_state_dict(state_dict)
