@@ -41,7 +41,6 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     LlamaForCausalLM,
     LlamaForCausalLMPipe,
-    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.trl import (
     DPOTrainer,
@@ -147,10 +146,6 @@ def main():
     if model_args.flash_mask and not any(isinstance(model, cls) for cls in flash_mask_support_list):
         raise NotImplementedError(f"{model.__class__} not support flash mask.")
 
-    if model_args.sequence_parallel:
-        register_sequence_parallel_allreduce_hooks(
-            model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
-        )
     if model_args.tokenizer_name_or_path is not None:
         tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
     else:

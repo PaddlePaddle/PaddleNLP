@@ -632,6 +632,13 @@ class TrainingArguments:
             )
         },
     )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "Whether to enable sequence parallel."},
+    )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False, metadata={"help": "Whether to use fuse sequence parallel allreduce."}
+    )
     sequence_parallel_config: str = field(
         default="",
         metadata={
@@ -1116,10 +1123,17 @@ class TrainingArguments:
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
                                 )
 
+                    enable_partial_send_recv = "disable_partial_send_recv" not in pipeline_parallel_config
+                    if self.sequence_parallel and enable_partial_send_recv:
+                        logger.warning(
+                            "When use pipeline parallel and sequence parallel simultaneously, we should turn off partial send recv."
+                        )
+                        enable_partial_send_recv = False
+
                     strategy.pipeline_configs = {
                         "accumulate_steps": self.gradient_accumulation_steps,
                         "micro_batch_size": self.per_device_train_batch_size,
-                        "enable_partial_send_recv": "disable_partial_send_recv" not in pipeline_parallel_config,
+                        "enable_partial_send_recv": enable_partial_send_recv,
                         "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
                         # "delay_scale_loss": True, Fix ME
                     }
