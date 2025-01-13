@@ -52,10 +52,10 @@ class MatryoshkaContrastiveLoss(nn.Layer):
         if len(self.embedding_matryoshka_dims) > 0:
             loss = 0.0
             for dim in self.embedding_matryoshka_dims:
-                reduced_q_reps = q_reps[:, :dim]
+                reduced_q_reps = q_reps[:, :dim].astype("float32")
                 reduced_q_reps = nn.functional.normalize(reduced_q_reps, axis=-1)
 
-                reduced_p_reps = p_reps[:, :dim]
+                reduced_p_reps = p_reps[:, :dim].astype("float32")
                 reduced_p_reps = nn.functional.normalize(reduced_p_reps, axis=-1)
 
                 dim_loss = self.loss_fn(reduced_q_reps, reduced_p_reps)
