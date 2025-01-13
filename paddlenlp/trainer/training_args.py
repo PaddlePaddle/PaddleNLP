@@ -31,6 +31,7 @@ import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
 
+from ..utils.fault_tolerance import is_ft_env
 from ..utils.log import logger
 from .trainer_utils import (
     IntervalStrategy,
@@ -284,7 +285,9 @@ class TrainingArguments:
             Some additional config it highly affect the useage of sharding parallel, we provide some option to config it.
             following config is support:
               enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation
+              enable_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation only used for semi auto mode.
               enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed
+              enable_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed only used for semi auto mode.
               enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap.
               enable_stage1_broadcast_overlap, overlap stage1 V1 broadcast with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap forward compute and no other sync could be called during the training for broadcast overlap.
               enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap.
@@ -293,6 +296,15 @@ class TrainingArguments:
         recompute (`bool`, *optional*, defaults to `False`):
             Recompute the forward pass to calculate gradients. Used for saving memory.
             Only support for networks with transformer blocks.
+        refined_recompute (`str`, *optional*, defaults to `""`):
+            The refined recompute parameter is designed to optimize the balance between GPU memory usage and computational speed.
+            An example configuration could be: `attention_column_ln:-1,attention_row_ln:-1,flash_attn:-1,mlp_column_ln:5,mlp_row_ln:-1`.
+            The supported parameters for refining recompute are `attention_column_ln`, `attention_row_ln`, `flash_attn`, `mlp_column_ln`, and `mlp_row_ln`.
+            The associated number, `skip_num`, determines how many times to bypass recomputation for the specified operation.
+            A `skip_num` of `-1` indicates no recomputation across all stages, maximizing memory usage;
+            A `skip_num` of `0` enforces recomputation at every stage, minimizing memory usage.
+            You can also set `skip_num` to a value within the range [1, ..., num_layers]. If `skip_num` exceeds `num_layers`, it will behave as if set to `-1`.
+            If a parameter is omitted, it defaults to `xxx:0`."
         scale_loss (`float`,  *optional*, defaults to 32768):
             The value of initial scale_loss for fp16. (default: 32768)
         local_rank (`int`, *optional*, defaults to -1):
@@ -659,6 +671,13 @@ class TrainingArguments:
             )
         },
     )
+    sequence_parallel: bool = field(
+        default=False,
+        metadata={"help": "Whether to enable sequence parallel."},
+    )
+    fuse_sequence_parallel_allreduce: bool = field(
+        default=False, metadata={"help": "Whether to use fuse sequence parallel allreduce."}
+    )
     sequence_parallel_config: str = field(
         default="",
         metadata={
@@ -713,11 +732,14 @@ class TrainingArguments:
                 "Some additional config it highly affect the useage of sharding parallel, we provide some option to config it."
                 "following config is support: \n"
                 "enable_stage1_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation\n"
+                "enable_tensor_fusion, fuse small tensors into big tensor chunks to accelerate communications, may increase memory occupation only used for semi auto mode.\n"
                 "enable_stage1_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed\n"
+                "enable_overlap, fuse small tensors into big tensor chunks to accelerate communications and do communication overlap with backward computation, may harm the backward speed only used for semi auto mode.\n"
                 "disable_stage1_reduce_avg, replace reduce_avg with original reduce_sum+scale in stage1, which can be used for accuracy verification.\n"
                 "enable_stage2_overlap, overlap stage2 NCCL communication with computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap and no other sync could be called during the training for broadcast overlap\n"
                 "enable_stage1_broadcast_overlap, overlap stage1 V1 broadcast with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for broadcast overlap forward compute and no other sync could be called during the training for broadcast overlap.\n"
-                "enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap."
+                "enable_stage1_allgather_overlap, overlap stage1 V2 allgather with next step forward computation. There are some constraints for the overlap, such as the logging_step should be bigger than 1 for allgather overlap forward compute and no other sync could be called during the training for allgather overlap.\n"
+                "enable_tensor_fusion_blanced_save_load, convert unbalanced optimizer state to balanced state when using tensor fusion strategy, which may increase the memory occupation."
             )
         },
     )
@@ -738,6 +760,19 @@ class TrainingArguments:
         metadata={
             "help": "Recompute the forward pass to calculate gradients. Used for saving memory. "
             "Only support for networks with transformer blocks."
+        },
+    )
+    refined_recompute: str = field(
+        default="",
+        metadata={
+            "help": "The refined recompute parameter is designed to optimize the balance between GPU memory usage and computational speed.\n"
+            "An example configuration could be: `attention_column_ln:-1,attention_row_ln:-1,flash_attn:-1,mlp_column_ln:5,mlp_row_ln:-1`.\n"
+            "The supported parameters for refining recompute are `attention_column_ln`, `attention_row_ln`, `flash_attn`, `mlp_column_ln`, and `mlp_row_ln`.\n"
+            "The associated number, `skip_num`, determines how many times to bypass recomputation for the specified operation.\n"
+            "A `skip_num` of `-1` indicates no recomputation across all stages, maximizing memory usage;\n"
+            "A `skip_num` of `0` enforces recomputation at every stage, minimizing memory usage.\n"
+            "You can also set `skip_num` to a value within the range [1, ..., num_layers]. If `skip_num` exceeds `num_layers`, it will behave as if set to `-1`.\n"
+            "If a parameter is omitted, it defaults to `xxx:0`."
         },
     )
 
@@ -852,6 +887,10 @@ class TrainingArguments:
             "help": "Select ordered_save_group_size to save checkpoint in ordered. if ordered_save_group_size=0, not used ordered save"
         },
     )
+    metrics_output_path: Optional[str] = field(
+        default=None,
+        metadata={"help": "Where to save training metrics (None for skipping save)."},
+    )
     skip_profile_timer: Optional[bool] = field(
         default=True,
         metadata={"help": "enable framework timer, will output timeline informatoin in logging and visualdl."},
@@ -926,6 +965,17 @@ class TrainingArguments:
     offload_optim: Optional[bool] = field(
         default=False,
         metadata={"help": "Offload optimizer after optimizer.step()"},
+    )
+    save_sharding_stage1_model_include_freeze_params: Optional[bool] = field(
+        default=False, metadata={"help": "Save Sharding Stage1 Model Exclude Freeze Params"}
+    )
+    pdc_download_ckpt: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Download checkpoint in paddlecloud longjob environment"},
+    )
+    pdc_download_timeout: Optional[int] = field(
+        default=300,
+        metadata={"help": "Timeout seconds for downloading checkpoint from remote cluster."},
     )
 
     def __post_init__(self):
@@ -1170,10 +1220,17 @@ class TrainingArguments:
                                     f"Found unknown pipeline mode config {x}, accpet config is disable_p2p_cache_shape, disable_partial_send_recv."
                                 )
 
+                    enable_partial_send_recv = "disable_partial_send_recv" not in pipeline_parallel_config
+                    if self.sequence_parallel and enable_partial_send_recv:
+                        logger.warning(
+                            "When use pipeline parallel and sequence parallel simultaneously, we should turn off partial send recv."
+                        )
+                        enable_partial_send_recv = False
+
                     strategy.pipeline_configs = {
                         "accumulate_steps": self.gradient_accumulation_steps,
                         "micro_batch_size": self.per_device_train_batch_size,
-                        "enable_partial_send_recv": "disable_partial_send_recv" not in pipeline_parallel_config,
+                        "enable_partial_send_recv": enable_partial_send_recv,
                         "p2p_cache_shape": False if "disable_p2p_cache_shape" in pipeline_parallel_config else True,
                         # "delay_scale_loss": True, Fix ME
                     }
@@ -1606,23 +1663,36 @@ class TrainingArguments:
                 for x in sharding_parallel_config:
                     if len(x) > 0:
                         if x not in [
-                            "enable_stage1_tensor_fusion",
-                            "enable_stage1_overlap",
-                            "enable_stage2_overlap",
+                            "enable_tensor_fusion",
+                            "enable_overlap",
                             "enable_release_grads",
+                            "enable_tensor_fusion_blanced_save_load",
                         ]:
+                            if x in ["enable_stage1_overlap", "enable_stage2_overlap"]:
+                                raise ValueError(
+                                    "enable_stage1_overlap and enable_stage2_overlap are not supported in "
+                                    "auto_parallel mode. Please use enable_overlap instead."
+                                )
+                            elif x == "enable_stage1_tensor_fusion":
+                                raise ValueError(
+                                    "enable_stage1_tensor_fusion is not supported in auto_parallel mode. "
+                                    "Please use enable_tensor_fusion instead."
+                                )
                             raise ValueError(
-                                f"Found unknown pipeline mode config {x}, " f"accpet config is reduce_overlap."
+                                f"Found unknown sharding mode config {x}, "
+                                f"accpet config is enable_tensor_fusion, "
+                                "enable_overlap, enable_release_grads, enable_tensor_fusion_blanced_save_load."
                             )
 
-                    if (
-                        "enable_stage1_overlap" in sharding_parallel_config
-                        or "enable_stage2_overlap" in sharding_parallel_config
-                    ):
+                    if "enable_overlap" in sharding_parallel_config:
                         sharding.enable_overlap = True
 
-                    if "enable_stage1_tensor_fusion" in sharding_parallel_config:
+                    if "enable_tensor_fusion" in sharding_parallel_config:
                         sharding.grad_bucket_size_numel = 210355872
+                        sharding.enable_tensor_fusion = True
+
+                    if "enable_tensor_fusion_blanced_save_load" in sharding_parallel_config:
+                        sharding.save_unbalanced_param = False
 
                     if "enable_release_grads" in sharding_parallel_config:
                         sharding.release_gradients = True
@@ -1636,15 +1706,6 @@ class TrainingArguments:
                 amp.init_loss_scaling = self.scale_loss
                 amp.custom_black_list = self.amp_custom_black_list if self.amp_custom_black_list is not None else []
                 amp.custom_white_list = self.amp_custom_white_list if self.amp_custom_white_list is not None else []
-
-            if self.recompute:
-                recompute = strategy.recompute
-                recompute.enable = True
-                recompute.sr = self.sr if self.sr is not None else 0
-                recompute.refined_ops_patterns = []
-                if self.refined_ops_patterns is not None:
-                    for pattern in self.refined_ops_patterns:
-                        recompute.refined_ops_patterns.append(eval(pattern))
 
             self.strategy = strategy
             if self.hybrid_parallel_topo_order == "pp_first":
@@ -1754,6 +1815,51 @@ class TrainingArguments:
             raise ValueError(
                 f"The local_ran: {self.local_rank} should be consistent with the world size: {paddle.distributed.get_world_size()}."
             )
+
+        # arse_refined_recompute string to dict
+        if self.refined_recompute in [None, ""]:
+            self.refined_recompute = dict()
+        else:
+            refined_recompute_dict = {
+                "mlp_row_ln": 0,
+                "attention_row_ln": 0,
+                "attention_column_ln": 0,
+                "mlp_column_ln": 0,
+                "flash_attn": 0,
+            }
+            ops = self.refined_recompute.split(",")
+            enable_rr = False
+            for op in ops:
+                op = op.strip()
+                if ":" not in op:
+                    raise ValueError("Illegal refined_recompute input, please check.")
+                op_name, skip_num = op.split(":")[0], int(op.split(":")[1])
+                if op_name not in refined_recompute_dict:
+                    raise ValueError(f"Refined recompute do not support {op_name}, please check.")
+                if (
+                    op_name in ["mlp_row_ln", "attention_row_ln", "attention_column_ln", "mlp_column_ln"]
+                    and self.tensor_parallel_degree <= 1
+                ):
+                    logger.warning(
+                        f"Refined recompute is only supported for the `{op_name}` operation when `tensor_parallel_degree` is greater than 1. \
+                            This refined recompute operation will be ignored."
+                    )
+                    continue
+
+                refined_recompute_dict[op_name] = skip_num
+                if skip_num != 0:
+                    enable_rr = True
+            if not enable_rr:
+                refined_recompute_dict = dict()
+            self.refined_recompute = refined_recompute_dict
+
+        # process fault tolerance settings
+        if not is_ft_env():
+            if self.pdc_download_ckpt:
+                logger.warning(
+                    "pdc_download_ckpt can only be set as true inside FT environment. Automatically disable it now."
+                )
+                self.pdc_download_ckpt = False
 
     def __str__(self):
         self_as_dict = asdict(self)
@@ -2126,7 +2232,7 @@ class TrainingArguments:
         """
         Serializes this instance to a JSON string.
         """
-        return json.dumps(self.to_dict(), indent=2)
+        return json.dumps(str(self.to_dict()), indent=2)
 
     def to_sanitized_dict(self) -> Dict[str, Any]:
         """

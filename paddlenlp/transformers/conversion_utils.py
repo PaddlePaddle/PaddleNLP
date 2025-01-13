@@ -1319,7 +1319,7 @@ class ConversionMixin:
             for x in state_keys_real:
                 if x.endswith(key):
                     state_keys_map[key] = x
-                    break
+                    # break # remove break for math A.key B.key ...
             if key not in state_keys_map:
                 if not ignore_error:
                     logger.debug(f"tensor parallel conversion: could not find name {key} in loaded state dict!")

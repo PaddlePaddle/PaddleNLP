@@ -41,10 +41,8 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     CosineAnnealingWithWarmupDecay,
     LinearAnnealingWithWarmupDecay,
-    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig, llmmetaclass
-from paddlenlp.transformers.refined_recompute import update_refined_recompute
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import get_env_device
@@ -406,9 +404,6 @@ def main():
     config = AutoConfig.from_pretrained(model_args.model_name_or_path)
     # set all llm config
     LlmMetaConfig.set_llm_config(config, training_args)
-    config.refined_recompute = update_refined_recompute(
-        training_args.refined_recompute,
-    )
     config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     config.seq_length = data_args.max_seq_length
@@ -495,11 +490,6 @@ def main():
             )
     else:
         model = model_class.from_config(config, dtype=dtype)
-
-    if training_args.sequence_parallel:
-        register_sequence_parallel_allreduce_hooks(
-            model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
-        )
 
     if training_args.recompute:
         model.recompute_enable()

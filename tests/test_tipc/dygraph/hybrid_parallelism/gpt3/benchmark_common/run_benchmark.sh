@@ -127,6 +127,8 @@ function _train(){
 
 export FLAGS_selected_gpus="0,1,2,3,4,5,6,7"
 export PYTHONPATH=$(dirname "$PWD"):$PYTHONPATH
+# benchmark框架中会默认设置CUDA_MODULE_LOADING=LAZY,影响case执行，修复框架问题后再移除该变量
+unset CUDA_MODULE_LOADING
 
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@

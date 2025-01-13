@@ -41,10 +41,7 @@ except:
 
 from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
-from ..model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
-    CausalLMOutputWithCrossAttentions,
-)
+from ..model_outputs import BaseModelOutputWithPastAndCrossAttentions
 from .configuration import GPT_PRETRAINED_INIT_CONFIGURATION, GPTConfig
 
 try:
@@ -102,12 +99,16 @@ def fast_layer_norm(input, weight, bias, eps):
 
 
 class GPTLayerNorm(nn.LayerNorm):
-    def __init__(self, config, normalized_shape, epsilon=1e-05, weight_attr=None, bias_attr=None, name=None):
+    def __init__(self, config, normalized_shape, ipp=-1, epsilon=1e-05, weight_attr=None, bias_attr=None, name=None):
         super().__init__(
             normalized_shape=normalized_shape, epsilon=epsilon, weight_attr=weight_attr, bias_attr=bias_attr
         )
         self.config = config
+        self.ipp = ipp
         self._check_normalized_shape(self._normalized_shape)
+        self.weight = dist.shard_tensor(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
+        if self.bias is not None:
+            self.bias = dist.shard_tensor(self.bias, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()])
 
     def _check_normalized_shape(self, normalized_shape):
         if isinstance(normalized_shape, (list, tuple)):
@@ -202,6 +203,9 @@ class MultiHeadAttentionAuto(nn.Layer):
         self.out_proj = nn.Linear(config.hidden_size, config.hidden_size, bias_attr=True)
         self.out_proj.weight = dist.shard_tensor(
             self.out_proj.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)]
+        )
+        self.out_proj.bias = dist.shard_tensor(
+            self.out_proj.bias, get_mesh(self.ipp), [dist.Replicate(), dist.Replicate()]
         )
 
     def _fuse_prepare_qkv(self, query, use_cache=False, past_key_value=None):
@@ -527,9 +531,10 @@ class GPTDecoderLayerAuto(nn.Layer):
         self.linear1.weight = dist.shard_tensor(self.linear1.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(1)])
         self.linear1.bias = dist.shard_tensor(self.linear1.bias, get_mesh(ipp), [dist.Replicate(), dist.Shard(0)])
         self.linear2.weight = dist.shard_tensor(self.linear2.weight, get_mesh(ipp), [dist.Replicate(), dist.Shard(0)])
+        self.linear2.bias = dist.shard_tensor(self.linear2.bias, get_mesh(ipp), [dist.Replicate(), dist.Replicate()])
         # fix : change nn.LayerNorm(config.hidden_size, epsilon=1e-5, bias_attr=True) to GPTLayerNorm()
-        self.norm1 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5, bias_attr=True)
-        self.norm2 = GPTLayerNorm(config, config.hidden_size, epsilon=1e-5, bias_attr=True)
+        self.norm1 = GPTLayerNorm(config, config.hidden_size, self.ipp, epsilon=1e-5, bias_attr=True)
+        self.norm2 = GPTLayerNorm(config, config.hidden_size, self.ipp, epsilon=1e-5, bias_attr=True)
 
         if config.sequence_parallel:
             mark_as_sequence_parallel_parameter(self.norm1.weight)
@@ -653,7 +658,7 @@ class GPTEmbeddingsAuto(nn.Layer):
             config.hidden_size,
         )
         self.word_embeddings.weight = dist.shard_tensor(
-            self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)]
+            self.word_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Replicate()]
         )
         self.position_embeddings.weight = dist.shard_tensor(
             self.position_embeddings.weight, get_mesh(), [dist.Replicate(), dist.Shard(1)]
@@ -1167,26 +1172,11 @@ class GPTLMHeadAuto(nn.Layer):
             self.transpose_y = True
             self.weight = embedding_weights
         else:
-            if config.tensor_parallel_degree > 1:
-                vocab_size = config.vocab_size // config.tensor_parallel_degree
-            else:
-                vocab_size = config.vocab_size
-
-            if vocab_size != config.vocab_size:
-                with get_rng_state_tracker().rng_state():
-                    self.weight = self.create_parameter(
-                        shape=[vocab_size, config.hidden_size],
-                        dtype=paddle.get_default_dtype(),
-                    )
-            else:
-                self.weight = self.create_parameter(
-                    shape=[vocab_size, config.hidden_size],
-                    dtype=paddle.get_default_dtype(),
-                )
-            # Must set distributed attr for Tensor Parallel !
-            self.weight.is_distributed = True if (vocab_size != config.vocab_size) else False
-            if self.weight.is_distributed:
-                self.weight.split_axis = 0
+            self.weight = self.create_parameter(
+                shape=[config.vocab_size, config.hidden_size],
+                dtype=paddle.get_default_dtype(),
+            )
+            self.weight = dist.shard_tensor(self.weight, get_mesh(self.ipp), [dist.Replicate(), dist.Shard(0)])
 
     def forward(self, hidden_states, tensor_parallel_output=None):
 
@@ -1300,23 +1290,7 @@ class GPTForCausalLMAuto(GPTPretrainedModelAuto):
         else:
             hidden_states = outputs[0]
         logits = self.lm_head(hidden_states)
-        loss = None
-        if labels is not None:
-            loss = self.criterion(logits, labels)
-
-        if not return_dict:
-            if isinstance(outputs, input_type):
-                return (loss, logits) if loss is not None else logits
-            outputs = (logits,) + outputs[1:]
-            return ((loss,) + outputs) if loss is not None else outputs
-        return CausalLMOutputWithCrossAttentions(
-            loss=loss,
-            logits=logits,
-            past_key_values=outputs.past_key_values,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-            cross_attentions=outputs.cross_attentions,
-        )
+        return logits
 
     def prepare_fast_entry(self, kwargs):
         from paddlenlp.ops import FasterGPT

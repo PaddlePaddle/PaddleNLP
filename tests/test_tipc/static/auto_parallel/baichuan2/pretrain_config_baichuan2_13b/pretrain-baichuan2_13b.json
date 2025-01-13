@@ -44,12 +44,12 @@
     "fused_linear": 1,
     "fused_linear_param_grad_add": 1,
     "use_fused_rope": true,
-    "use_fused_rms_norm": false,
+    "use_fused_rms_norm": true,
     "max_seq_length": 4096,
     "sequence_parallel": false,
     "sharding": "stage1",
-    "sharding_parallel_config": "enable_stage1_tensor_fusion enable_stage1_overlap",
-    "tensor_parallel_config": "enable_mp_async_allreduce",
+    "sharding_parallel_config": "enable_tensor_fusion enable_overlap",
+    "tensor_parallel_config": "enable_mp_async_allreduce replace_with_parallel_cross_entropy",
     "data_parallel_config": "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate",
     "pipeline_parallel_config": "enable_send_recv_overlap enable_split_backward"
 }

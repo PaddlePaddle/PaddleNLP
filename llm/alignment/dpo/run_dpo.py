@@ -42,8 +42,9 @@ from paddlenlp.transformers import (
     LlamaForCausalLM,
     LlamaForCausalLMPipe,
     Qwen2ForCausalLM,
-    register_sequence_parallel_allreduce_hooks,
+    Qwen2ForCausalLMPipe,
 )
+from paddlenlp.transformers.configuration_utils import LlmMetaConfig
 from paddlenlp.trl import (
     DPOTrainer,
     calculate_effective_tokens,
@@ -53,7 +54,7 @@ from paddlenlp.trl import (
 from paddlenlp.trl.llm_utils import get_lora_target_modules
 from paddlenlp.utils.log import logger
 
-flash_mask_support_list = [Qwen2ForCausalLM, LlamaForCausalLM, LlamaForCausalLMPipe]
+flash_mask_support_list = [Qwen2ForCausalLM, Qwen2ForCausalLMPipe, LlamaForCausalLM, LlamaForCausalLMPipe]
 
 
 def main():
@@ -74,7 +75,20 @@ def main():
     if dpo_config.loss_type in ["or", "simpo"] and not dpo_config.reference_free:
         dpo_config.reference_free = True
         logger.warning(f"{dpo_config.loss_type} loss_type only supports reference_free. Set reference_free to True.")
-
+    if training_args.pipeline_parallel_degree > 1:
+        assert (
+            hasattr(training_args, "pipeline_parallel_config")
+            and "enable_clear_every_step_cache" in training_args.pipeline_parallel_config
+        ), "Should set '--pipeline_parallel_config enable_clear_every_step_cache' in bash script for pp."
+    if training_args.sequence_parallel:
+        if training_args.pipeline_parallel_degree > 1:
+            assert (
+                hasattr(training_args, "pipeline_parallel_config")
+                and "disable_partial_send_recv" in training_args.pipeline_parallel_config
+            ), "Should set '--pipeline_parallel_config disable_partial_send_recv' in bash script for pp with sp."
+        if training_args.tensor_parallel_degree <= 1:
+            training_args.sequence_parallel = False
+            logger.info("Tensor_parallel_degree = 1. Set sequence_parallel to False.")
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
     training_args.print_config(dpo_config, "DPOConfig")
@@ -103,39 +117,35 @@ def main():
             dtype = "bfloat16"
 
     logger.info("Start to load model & tokenizer.")
-    model_kwargs = dict(
-        pretrained_model_name_or_path=model_args.model_name_or_path,
-        dtype=dtype,
-        tensor_parallel_degree=training_args.tensor_parallel_degree,
-        tensor_parallel_rank=training_args.tensor_parallel_rank,
-        recompute_granularity=model_args.recompute_granularity,
-        use_flash_attention=model_args.use_flash_attention,
-        tensor_parallel_output=model_args.tensor_parallel_output,
-    )
-    if training_args.pipeline_parallel_degree > 1:
-        raise ValueError("DPO does not support pipeline parallelism yet.")
+
+    model_config = AutoConfig.from_pretrained(model_args.model_name_or_path, dtype=dtype)
+    LlmMetaConfig.set_llm_config(model_config, training_args)
+
+    if not dpo_config.reference_free and not dpo_config.lora:
+        ref_model_config = AutoConfig.from_pretrained(model_args.model_name_or_path, dtype=dtype)
+        LlmMetaConfig.set_llm_config(ref_model_config, training_args)
+
     if training_args.pipeline_parallel_degree > 1:
         model_class = AutoModelForCausalLMPipe
+        model_config.dpo_config = dpo_config
     else:
         model_class = AutoModelForCausalLM
     if not training_args.autotuner_benchmark or model_args.weight_quantize_algo is not None:
-        model = model_class.from_pretrained(**model_kwargs)
+        model = model_class.from_pretrained(model_args.model_name_or_path, config=model_config)
         # for DPO save
-        model.config.dpo_config = None
         if not dpo_config.reference_free and not dpo_config.lora:
-            config = AutoConfig.from_pretrained(**model_kwargs)
-            ref_model = model_class.from_config(config, dtype=dtype)
+            ref_model = model_class.from_config(ref_model_config)
             ref_model.set_state_dict(model.state_dict())
         else:
             ref_model = None
     else:
-        config = AutoConfig.from_pretrained(**model_kwargs)
-        model = model_class.from_config(config, dtype=dtype)
+        model = model_class.from_config(model_config)
         if not dpo_config.reference_free and not dpo_config.lora:
-            ref_model = model_class.from_config(config, dtype=dtype)
+            ref_model = model_class.from_config(ref_model_config)
         else:
             ref_model = None
-
+    if training_args.pipeline_parallel_degree > 1:
+        model.config.dpo_config = None
     if model_args.flash_mask and not model.config.use_flash_attention:
         logger.warning("`flash_mask` must use with zero padding and flash attention.")
         model.config.use_flash_attention = True
@@ -143,10 +153,6 @@ def main():
     if model_args.flash_mask and not any(isinstance(model, cls) for cls in flash_mask_support_list):
         raise NotImplementedError(f"{model.__class__} not support flash mask.")
 
-    if model_args.sequence_parallel:
-        register_sequence_parallel_allreduce_hooks(
-            model, training_args.gradient_accumulation_steps, model_args.fuse_sequence_parallel_allreduce
-        )
     if model_args.tokenizer_name_or_path is not None:
         tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
     else:

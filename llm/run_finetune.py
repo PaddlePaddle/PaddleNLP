@@ -58,10 +58,8 @@ from paddlenlp.transformers import (
     LlamaTokenizer,
     Qwen2ForCausalLM,
     Qwen2ForCausalLMPipe,
-    register_sequence_parallel_allreduce_hooks,
 )
 from paddlenlp.transformers.configuration_utils import LlmMetaConfig
-from paddlenlp.transformers.refined_recompute import update_refined_recompute
 from paddlenlp.trl import DataConfig, ModelConfig, SFTConfig, SFTTrainer
 from paddlenlp.trl.llm_utils import (
     ZeroPaddingIterDatasetCallback,
@@ -154,10 +152,6 @@ def main():
     )
 
     LlmMetaConfig.set_llm_config(model_config, training_args)
-    model_config.refined_recompute = update_refined_recompute(
-        training_args.refined_recompute,
-        model_args.lora,
-    )
     model_config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     # Config for model using dropout, such as GPT.
@@ -236,10 +230,6 @@ def main():
         else:
             raise NotImplementedError("Only support neftune for model with get_input_embeddings")
 
-    if training_args.sequence_parallel:
-        register_sequence_parallel_allreduce_hooks(
-            model, training_args.gradient_accumulation_steps, training_args.fuse_sequence_parallel_allreduce
-        )
     # Load tokenizer & dataset
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, from_aistudio=model_args.from_aistudio)
     reft_layers = None

@@ -1,0 +1,31 @@
+FROM registry.baidubce.com/paddlepaddle/fastdeploy:llm-base-gcc12.3-cuda12.3-cudnn9-nccl2.15.5
+
+WORKDIR /opt/output/
+COPY ./server/ /opt/output/Serving/
+
+ENV LD_LIBRARY_PATH="/usr/local/cuda-12.3/compat/:$LD_LIBRARY_PATH"
+
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+RUN python3 -m pip install --pre paddlepaddle-gpu -i https://www.paddlepaddle.org.cn/packages/nightly/cu123/ \
+    && python3 -m pip install paddlenlp==3.0.0b0 \
+    && python3 -m pip install --no-cache-dir sentencepiece pycryptodome tritonclient[all]==2.41.1
+
+RUN git clone https://gitee.com/paddlepaddle/PaddleNLP.git && cd PaddleNLP/csrc \
+    && python3 setup_cuda.py build && python3 setup_cuda.py install --user \
+    && cp -r /opt/output/PaddleNLP/paddlenlp /usr/local/lib/python3.10/dist-packages/ \
+    && cp -r /root/.local/lib/python3.10/site-packages/* /usr/local/lib/python3.10/dist-packages/ \
+    && rm -rf /opt/output/PaddleNLP
+
+RUN python3 -m pip install -r /opt/output/Serving/requirements.txt && rm /opt/output/Serving/requirements.txt
+RUN mv Serving/server /usr/local/lib/python3.10/dist-packages/
+RUN mkdir -p /opt/output/Serving/llm_model/model/1 \
+    && mv /opt/output/Serving/config/config.pbtxt /opt/output/Serving/llm_model/model/ \
+    && rm -rf /opt/output/Serving/config/
+RUN echo "from server.triton_server import TritonPythonModel" >>/opt/output/Serving/llm_model/model/1/model.py
+
+RUN cd /opt/output/Serving/ \
+    && cp scripts/start_server.sh . && cp scripts/stop_server.sh . \
+    && rm -rf scripts
+
+ENV http_proxy=""
+ENV https_proxy=""

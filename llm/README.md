@@ -16,7 +16,7 @@
 
 ## 🛠️ 支持模型列表 🛠️
 
-| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO | RLHF | Mergekit | Quantization | Torch convert |
+| Model                                  | Pretrain | SFT | LoRA | Prefix Tuning | DPO/SimPO/ORPO/KTO | RLHF | Mergekit | Quantization | Torch convert |
 |----------------------------------------|----------|-----|------|---------------|----------------|------|-------|--------------|---------------|
 | [LLaMA](./config/llama)                | ✅        | ✅   | ✅    | ✅             | ✅             | ✅    | ✅    | ✅            | ✅             |
 | [Qwen](./config/qwen)                  | ✅        | ✅   | ✅    | ✅             | ✅             | 🚧   | ✅    | 🚧           | ✅             |
@@ -154,7 +154,7 @@ python  run_finetune.py ./config/llama/pt_argument.json
 
 ### 3. 对齐
 
-我们支持 DPO、RLHF 等偏好对齐策略。DPO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
+我们支持 DPO、KTO、RLHF 等偏好对齐策略。DPO、KTO 策略采用 zero_padding 策略，结合 FlashMask 策略，有效提升模型训练效率。
 
 #### 3.1 DPO
 
@@ -183,7 +183,7 @@ python  run_finetune.py ./config/llama/pt_argument.json
 ...
 ```
 
-为了方便测试，我们也提供了广告生成数据集可以直接使用：
+为了方便测试，我们也提供了偏好数据集可以直接使用：
 
 ```bash
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized.tar.gz
@@ -196,9 +196,60 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 # DPO 启动命令参考
 python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
+
+##### LoRA DPO
+
+```bash
+# DPO 启动命令参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
+```
 更多 DPO 技术细节和使用说明详见[DPO 文档](./docs/dpo.md)。
 
-#### 3.2 RLHF
+#### 3.2 KTO
+
+##### 数据准备
+
+我们支持的精调数据格式是每行包含一个字典的 json 文件，每个字典包含以下字段：
+
+- `src` : `str, List(str)`, 用户对话内容。
+- `tgt` : `str, List(str)`, 系统回复内容。
+- `response` : `str, List(str)`, 包含 resoinse 回复。
+- `sort` : `List(int)`, sort 值用于区分 response 属于 chosen 和 rejected（0是 rejected，1是 chosen）。
+
+样例数据：
+
+```text
+{
+    "src": ["In this task, you are given a second sentence. Your task is to generate the first sentence on the same topic but incoherent and inconsistent with the second sentence.\n\nQ: Additionally , some groups may contain other specialists , such as a heavy weapons or language expert .\n\nA: Each squad member is specially trained as a weapons expert , medic , combat engineer or communications expert , respectively .\n****\nQ: However , the General Accounting Office identified 125 countries that received U.S. training and assistance for their police forces during fiscal year 1990 at a cost of at least $117 million .\n\nA: No government agency is in charge of calculating the cost .\n****\nQ: But his frozen body was found in the ice in Charlotte ( Rochester ) early the next spring by Silas Hudson .\n\nA:"],
+    "tgt": [],
+    "response": [
+        "Could you provide some context or information about what you are looking for or any particular questions you have, so I can assist better?"],
+    "sort": [1]
+}
+...
+```
+
+为了方便测试，我们也提供了偏好数据集可以直接使用：
+
+```bash
+wget https://bj.bcebos.com/paddlenlp/datasets/examples/ultrafeedback_binarized_pointwise.tar.gz
+tar -zxvf ultrafeedback_binarized.tar.gz
+```
+
+##### 全参 KTO
+
+```bash
+# KTO 启动命令参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_argument.json
+```
+##### LoRA KTO
+
+```bash
+# KTO 启动命令参考
+python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_lora_argument.json
+```
+
+#### 3.3 RLHF
 
 飞桨大模型套件提供了提供了基于强化学习 PPO 算法对 LLM 进行人类偏好对齐的代码及完整使用示例，支持**3D 分布式并行训练以及 rollout 阶段使用预测优化进行生成加速**。详细使用教程详见[RLHF 文档](./docs/rlhf.md)。
 
@@ -286,15 +337,18 @@ python ./predict/predictor.py --model_name_or_path ./inference --inference_model
 
 ### 7. 服务化部署
 
-#### 7.1 环境准备
+#### 7.1 Flask & Gradio UI 服务化部署
+
+我们提供了一套基于动态图推理的简单易用 UI 服务化部署方法，用户可以快速部署服务化推理。
+
+环境准备
 
 - python >= 3.8
 - gradio
 - flask
 
-#### 7.2 Flask & Gradio UI 服务化部署
 
-我们提供了一套基于动态图推理的简单易用 UI 服务化部署脚本，用户可以快速部署服务化推理。
+服务化部署脚本
 
 ```shell
 python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_server.py \
@@ -309,6 +363,40 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_ser
 - 其他参数请参见[推理文档](./docs/predict/inference.md)中推理参数配置。
 
 此外，如果想通过 API 脚本的方式跑推理，可参考：`./predict/request_flask_server.py` 文件。
+
+
+#### 7.2 大模型服务化部署工具
+
+该部署工具是基于英伟达 Triton 框架专为服务器场景的大模型服务化部署而设计。它提供了支持 gRPC、HTTP 协议的服务接口，以及流式 Token 输出能力。底层推理引擎支持连续批处理、weight only int8、后训练量化（PTQ）等加速优化策略，为用户带来易用且高性能的部署体验。
+
+基于预编译镜像部署，本节以 Meta-Llama-3-8B-Instruct-A8W8C8 为例，更多模型请参考[LLaMA](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/llama.md)、[Qwen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/qwen.md)、[Mixtral](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/mixtral.md), 更细致的模型推理、量化教程可以参考[大模型推理教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/docs/predict/inference.md)：
+
+```shell
+# 下载模型
+wget https://paddle-qa.bj.bcebos.com/inference_model/Meta-Llama-3-8B-Instruct-A8W8C8.tar
+mkdir Llama-3-8B-A8W8C8 && tar -xf Meta-Llama-3-8B-Instruct-A8W8C8.tar -C Llama-3-8B-A8W8C8
+
+# 挂载模型文件
+export MODEL_PATH=${PWD}/Llama-3-8B-A8W8C8
+
+docker run --gpus all --shm-size 5G --network=host --privileged --cap-add=SYS_PTRACE \
+-v ${MODEL_PATH}:/models/ \
+-dit registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cudnn9-v1.2 \
+bash -c 'export USE_CACHE_KV_INT8=1 && cd /opt/output/Serving && bash start_server.sh; exec bash'
+```
+
+等待服务启动成功（服务初次启动大概需要40s），可以通过以下命令测试：
+
+```shell
+curl 127.0.0.1:9965/v1/chat/completions \
+-H 'Content-Type: application/json' \
+-d '{"text": "hello, llm"}'
+```
+
+Note:
+1. 请保证 shm-size >= 5，不然可能会导致服务启动失败
+
+更多关于该部署工具的使用方法，请查看[服务化部署流程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/llm/server/docs/deploy_usage_tutorial.md)
 
 ### 8. PyTorch 模型权重转换
 

@@ -18,10 +18,9 @@ import paddle.nn as nn
 from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer
 
 from paddlenlp.transformers.model_utils import PipelinePretrainedModel
-from paddlenlp.transformers.refined_recompute import (
-    create_skip_config_for_refined_recompute,
-)
+from paddlenlp.transformers.refined_recompute import get_skip_recompute_ops
 
+from ..dpo_criterion import DPOCriterion
 from .modeling import (
     QWenBlock,
     QWenConfig,
@@ -173,7 +172,11 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.add_sequential_layer(LayerDesc(QWenEmbeddingPipe, config=config), "qwen")
         for i in range(config.num_hidden_layers):
             self.add_sequential_layer(
-                LayerDesc(QWenBlockPipe, config=create_skip_config_for_refined_recompute(i, config)),
+                LayerDesc(
+                    QWenBlockPipe,
+                    config=config,
+                    skip_recompute_ops=get_skip_recompute_ops(config, i),
+                ),
                 f"qwen.h.{i}",
             )
         self.add_sequential_layer(LayerDesc(QWenRMSNormPipe, config=config), "qwen.ln_f")
@@ -193,7 +196,7 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         PipelineLayer.__init__(
             self,
             layers=self.get_sequential_layers(),
-            loss_fn=QWenPretrainingCriterion(config),
+            loss_fn=self.get_loss_fn(config),
             topology=get_hcg().topology(),
             seg_method=seg_method,
             recompute_interval=recompute_interval,
@@ -208,3 +211,9 @@ class QWenForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         self.apply(self._init_weights)
         # DON'T init PipelinePretrainedModel
         # PipelinePretrainedModel.__init__(self.super(), config=config)
+
+    def get_loss_fn(self, config):
+        if config.dpo_config is not None:
+            return DPOCriterion(config, use_infohub=True)
+        else:
+            return QWenPretrainingCriterion(config)
