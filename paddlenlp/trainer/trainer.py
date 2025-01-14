@@ -434,11 +434,6 @@ class Trainer:
                     "We do not support skip_save_model_weight in peft model when using unified checkpoint, remove this config."
                 )
 
-        if args.sequence_parallel:
-            register_sequence_parallel_allreduce_hooks(
-                self.model, args.gradient_accumulation_steps, args.fuse_sequence_parallel_allreduce
-            )
-
         self.do_grad_scaling = False
         self.enable_autocast_context_manager = False
         if args.fp16 or args.bf16:
@@ -2053,6 +2048,11 @@ class Trainer:
                 model = decorated
             else:
                 model, self.optimizer = decorated
+
+        if self.args.tensor_parallel_degree > 1 and self.args.sequence_parallel:
+            register_sequence_parallel_allreduce_hooks(
+                model, self.args.gradient_accumulation_steps, self.args.fuse_sequence_parallel_allreduce
+            )
 
         if self.args.world_size == 1:
             if self.args.amp_master_grad:
