@@ -160,6 +160,24 @@ class UnpicklerWrapperStage(pickle.Unpickler):
         return super().find_class(mod_name, name)
 
 
+class SafeUnpickler(pickle.Unpickler):
+    """
+    A safe unpickler that only allows loading of built-in basic data types.
+    """
+
+    def find_class(self, module, name):
+        """
+        Overrides the find_class method to only allow loading of built-in basic data types.
+
+        :param module: The module name.
+        :param name: The class name.
+        :return: The class if allowed, otherwise raises UnpicklingError.
+        """
+        if module == "builtins" and name in {"int", "float", "str", "tuple", "list", "dict", "set"}:
+            return super().find_class(module, name)
+        raise pickle.UnpicklingError(f"Unsafe object loading is prohibited: {module}.{name}")
+
+
 def _rebuild_tensor_stage(storage, storage_offset, size, stride, requires_grad, backward_hooks):
     # if a tensor has shape [M, N] and stride is [1, N], it's column-wise / fortran-style
     # if a tensor has shape [M, N] and stride is [M, 1], it's row-wise / C-style
