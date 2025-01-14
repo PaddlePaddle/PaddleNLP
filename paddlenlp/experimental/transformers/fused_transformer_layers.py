@@ -1051,6 +1051,7 @@ class FusedMultiTransformerBase(Layer):
                 kwargs.get("seq_lens_encoder", None),
                 kwargs.get("seq_lens_decoder", None),
                 max_enc_len_this_time,
+                max_dec_len_this_time,
                 kwargs.get("seq_lens_this_time", None),
                 kwargs.get("cum_offsets", None),
                 self.num_heads // self.kv_num_heads,

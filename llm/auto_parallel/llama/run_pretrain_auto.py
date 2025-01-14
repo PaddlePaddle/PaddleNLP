@@ -527,7 +527,9 @@ def main():
     config.recompute_granularity = model_args.recompute_granularity
     config.virtual_pp_degree = model_args.virtual_pp_degree
     config.sequence_parallel = training_args.sequence_parallel
+
     config.fuse_sequence_parallel_allreduce = training_args.fuse_sequence_parallel_allreduce
+
     config.use_fused_rope = model_args.use_fused_rope
     config.no_recompute_layers = model_args.no_recompute_layers
     config.pp_recompute_interval = model_args.pp_recompute_interval
@@ -600,7 +602,6 @@ def main():
         tokenizer,
         need_data=training_args.should_load_dataset,
     )
-
     trainer = PretrainingTrainer(
         model=model,
         criterion=criterion,
@@ -610,7 +611,6 @@ def main():
         eval_dataset=eval_dataset if training_args.do_eval else None,
         optimizers=(None, lr_scheduler),
         tokenizer=tokenizer,
-        model_args=model_args,
     )
 
     checkpoint = None

@@ -332,6 +332,11 @@ python ./predict/export_model.py --model_name_or_path meta-llama/Llama-2-7b-chat
 # step2: 静态图推理
 python ./predict/predictor.py --model_name_or_path ./inference --inference_model --dtype "float16" --mode "static"
 ```
+参数说明：
+1. **`--inference_model`** 参数表示使用高性能自定义算子推理，否则使用普通动态图推理(如果可以安装算子，建议打开此开关)。打开时，请前往[此处安装](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/csrc)高性能推理自定义算子，
+2. **`--mode`** 有两种模式可选 `dynamic`, `static`。分别表示动态图和静态图模式。静态图模型需要进行参数导出步骤，动态图不需要。具体可以参考上述命令执行。静态图情况下，导出和推理的参数`--inference_model`需要一致。
+3. 推理速度简要比较。`static+inference_model` > `dynamic+inference_model` >> `static w/o inference_model` > `dynamic w/o inference_mode`。推荐安装高性能算子，使用 `动态图+inference_model` 模式，方便快捷。
+
 
 更多模型推理使用方法详见[大模型推理文档](./docs/predict/inference.md)。
 

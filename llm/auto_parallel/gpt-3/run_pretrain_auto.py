@@ -224,7 +224,6 @@ class ModelArguments:
 
     hidden_dropout_prob: float = field(default=0.1, metadata={"help": "The hidden dropout prob."})
     attention_probs_dropout_prob: float = field(default=0.1, metadata={"help": "The attention hidden dropout prob."})
-
     use_fused_rope: Optional[bool] = field(
         default=False,
         metadata={"help": "Enable rope fusion or not."},
@@ -565,9 +564,6 @@ def main():
         tokenizer,
         need_data=training_args.should_load_dataset,
     )
-
-    # load_model_auto(model)
-    # model = shard_model(model)
 
     trainer = PretrainingTrainer(
         model=model,
