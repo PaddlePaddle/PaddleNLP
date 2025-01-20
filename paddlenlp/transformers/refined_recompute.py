@@ -27,9 +27,15 @@ from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel.parallel_layers.random import (
     get_rng_state_tracker,
 )
-from paddle.distributed.fleet.recompute.recompute import check_recompute_necessary
-from paddle.distributed.fleet.recompute.recompute import recompute as original_recompute
-from paddle.distributed.fleet.recompute.recompute import switch_rng_state_tracker
+
+try:
+    from paddle.distributed.fleet.recompute.recompute import check_recompute_necessary
+    from paddle.distributed.fleet.recompute.recompute import (
+        recompute as original_recompute,
+    )
+    from paddle.distributed.fleet.recompute.recompute import switch_rng_state_tracker
+except ImportError:
+    pass
 
 try:
     from paddle.distributed.fleet.utils import sequence_parallel_utils

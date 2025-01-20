@@ -13,22 +13,22 @@
 # limitations under the License.
 from __future__ import annotations
 
-import copy
+# import copy
 import inspect
 import os
 import re
 import warnings
-from contextlib import nullcontext
-from typing import Any, Optional
 
-import accelerate
-import torch
-from accelerate.hooks import add_hook_to_module, remove_hook_from_module
-from accelerate.utils import is_npu_available, is_xpu_available
+# from contextlib import nullcontext
+from typing import Optional  # Any
+
+# import accelerate
+import paddle
+
+# from accelerate.hooks import add_hook_to_module, remove_hook_from_module
+# from accelerate.utils import is_npu_available, is_xpu_available
 from huggingface_hub import file_exists
 from huggingface_hub.errors import EntryNotFoundError, HFValidationError
-from packaging import version
-from safetensors.torch import storage_ptr, storage_size
 
 from ..import_utils import is_auto_gptq_available, is_torch_tpu_available
 from .constants import (
@@ -50,11 +50,17 @@ from .constants import (
     starcoder_model_postprocess_past_key_value,
 )
 
-mlu_available = False
-if version.parse(accelerate.__version__) >= version.parse("0.29.0"):
-    from accelerate.utils import is_mlu_available
+# from packaging import version
 
-    mlu_available = is_mlu_available()
+
+# from safetensors.torch import storage_ptr, storage_size
+
+
+mlu_available = False
+# if version.parse(accelerate.__version__) >= version.parse("0.29.0"):
+#     from accelerate.utils import is_mlu_available
+
+#     mlu_available = is_mlu_available()
 
 
 __all__ = [
@@ -79,16 +85,16 @@ __all__ = [
 
 # Get current device name based on available devices
 def infer_device() -> str:
-    if torch.cuda.is_available():
-        return "cuda"
-    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return "mps"
-    elif mlu_available:
-        return "mlu"
-    elif is_xpu_available():
-        return "xpu"
-    elif is_npu_available():
-        return "npu"
+    if paddle.device.is_compiled_with_cuda():
+        return "gpu"
+    # elif hasattr(paddle.backends, "mps") and paddle.backends.mps.is_available():
+    #     return "mps"
+    # elif mlu_available:
+    #     return "mlu"
+    # elif is_xpu_available():
+    #     return "xpu"
+    # elif is_npu_available():
+    #     return "npu"
     return "cpu"
 
 
@@ -107,7 +113,7 @@ def prepare_model_for_kbit_training(model, use_gradient_checkpointing=True, grad
             If True, use gradient checkpointing to save memory at the expense of slower backward pass.
         gradient_checkpointing_kwargs (`dict`, *optional*, defaults to `None`):
             Keyword arguments to pass to the gradient checkpointing function, please refer to the documentation of
-            `torch.utils.checkpoint.checkpoint` for more details about the arguments that you can pass to that method.
+            `paddle.utils.checkpoint.checkpoint` for more details about the arguments that you can pass to that method.
             Note this is only available in the latest transformers versions (> 4.34.1).
     """
     loaded_in_kbit = getattr(model, "is_loaded_in_8bit", False) or getattr(model, "is_loaded_in_4bit", False)
@@ -134,9 +140,9 @@ def prepare_model_for_kbit_training(model, use_gradient_checkpointing=True, grad
         # cast all non INT8 parameters to fp32
         for param in model.parameters():
             if (
-                (param.dtype == torch.float16) or (param.dtype == torch.bfloat16)
+                (param.dtype == paddle.float16) or (param.dtype == paddle.bfloat16)
             ) and param.__class__.__name__ != "Params4bit":
-                param.data = param.data.to(torch.float32)
+                param.data = param.data.to(paddle.float32)
 
     if (
         loaded_in_kbit
@@ -180,12 +186,12 @@ def prepare_model_for_kbit_training(model, use_gradient_checkpointing=True, grad
 
 
 # copied from transformers.models.bart.modeling_bart
-def shift_tokens_right(input_ids: torch.Tensor, pad_token_id: int, decoder_start_token_id: int):
+def shift_tokens_right(input_ids: paddle.Tensor, pad_token_id: int, decoder_start_token_id: int):
     """
     Shift input ids one token to the right.
 
     Args:
-        input_ids (`torch.LongTensor` of shape `(batch_size, sequence_length)`): input ids
+        input_ids (`paddle.LongTensor` of shape `(batch_size, sequence_length)`): input ids
         pad_token_id (`int`): The id of the `padding` token.
         decoder_start_token_id (`int`): The id of the `start` token.
     """
@@ -201,204 +207,286 @@ def shift_tokens_right(input_ids: torch.Tensor, pad_token_id: int, decoder_start
     return shifted_input_ids
 
 
-class ModulesToSaveWrapper(torch.nn.Module):
-    def __init__(self, module_to_save, adapter_name):
-        super().__init__()
-        self.original_module = module_to_save
-        self.modules_to_save = torch.nn.ModuleDict({})
-        self._active_adapter = adapter_name
-        self._disable_adapters = False
-        self.update(adapter_name)
-        self.check_module()
+class ModulesToSaveWrapper(paddle.nn.Layer):
+    pass
 
-    def check_module(self):
-        """Perform some sanity checks on the module to ensure that it works"""
-        # Try to anticipate some modules that users could try to target that would not work.
-        # Note: It's not possible to check hasattr(module, "forward"), since that returns True for ModuleDict and
-        # ModuleList, even though their forward methods cannot be called
-        forbidden_classes = (torch.nn.ModuleDict, torch.nn.ModuleList, torch.nn.ParameterDict, torch.nn.ParameterList)
-        if isinstance(self.original_module, forbidden_classes):
-            cls_name = self.original_module.__class__
-            raise TypeError(f"modules_to_save cannot be applied to modules of type {cls_name}")
 
-        # local import to avoid circular import
-        from peft.tuners.tuners_utils import BaseTunerLayer
+# class ModulesToSaveWrapper(paddle.nn.Layer):
+#     def __init__(self, module_to_save, adapter_name):
+#         super().__init__()
+#         self.original_module = module_to_save
+#         self.modules_to_save = paddle.nn.LayerDict({})
+#         self._active_adapter = adapter_name
+#         self._disable_adapters = False
+#         self.update(adapter_name)
+#         self.check_module()
 
-        if isinstance(self.original_module, BaseTunerLayer):
-            # e.g. applying modules_to_save to a lora layer makes no sense
-            cls_name = self.original_module.__class__
-            raise TypeError(f"modules_to_save cannot be applied to modules of type {cls_name}")
+#     def check_module(self):
+#         """Perform some sanity checks on the module to ensure that it works"""
+#         # Try to anticipate some modules that users could try to target that would not work.
+#         # Note: It's not possible to check hasattr(module, "forward"), since that returns True for ModuleDict and
+#         # ModuleList, even though their forward methods cannot be called
+#         forbidden_classes = (
+#             paddle.nn.LayerDict,
+#             paddle.nn.LayerList,
+#             paddle.nn.ParameterDict,
+#             paddle.nn.ParameterList,
+#         )
+#         if isinstance(self.original_module, forbidden_classes):
+#             cls_name = self.original_module.__class__
+#             raise TypeError(f"modules_to_save cannot be applied to modules of type {cls_name}")
 
-    @property
-    def disable_adapters(self) -> bool:
-        # use a property to ensure that disable_adapters is not set directly, instead use the enable_adapters method
-        return self._disable_adapters
+#         # local import to avoid circular import
+#         from peft.tuners.tuners_utils import BaseTunerLayer
 
-    @property
-    def active_adapter(self) -> str:
-        # use a property to ensure that active_adapter is not set directly, instead use the set_adapter method
-        return self._active_adapter
+#         if isinstance(self.original_module, BaseTunerLayer):
+#             # e.g. applying modules_to_save to a lora layer makes no sense
+#             cls_name = self.original_module.__class__
+#             raise TypeError(f"modules_to_save cannot be applied to modules of type {cls_name}")
 
-    def __getattr__(self, name: str):
-        # Note: This whole method may seem overly complex at first but PyTorch messes with __getattr__ in a way that
-        # requires very careful handling to avoid infinite recursion.
-        try:
-            return super().__getattr__(name)
-        except AttributeError:
-            pass
+#     @property
+#     def disable_adapters(self) -> bool:
+#         # use a property to ensure that disable_adapters is not set directly, instead use the enable_adapters method
+#         return self._disable_adapters
 
-        if "_modules" not in self.__dict__:
-            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+#     @property
+#     def active_adapter(self) -> str:
+#         # use a property to ensure that active_adapter is not set directly, instead use the set_adapter method
+#         return self._active_adapter
 
-        # Could not find the attribute the PyTorch way. So let's check if it's an attribute on the
-        # original_module/modules_to_save.
-        modules = self.__dict__["_modules"]
-        if self.disable_adapters:
-            module = modules["original_module"]
-        elif self.active_adapter in modules["modules_to_save"]:
-            module = modules["modules_to_save"][self.active_adapter]
-        else:
-            # For some reason, there is no module corresponding to the active adapter; this should normally not be
-            # reached and exists as a failsafe (otherwise, a KeyError would be raised)
-            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
-        return getattr(module, name)
+#     def __getattr__(self, name: str):
+#         # Note: This whole method may seem overly complex at first but PyTorch messes with __getattr__ in a way that
+#         # requires very careful handling to avoid infinite recursion.
+#         try:
+#             return super().__getattr__(name)
+#         except AttributeError:
+#             pass
 
-    def update(self, adapter_name):
-        context_manager = nullcontext()
-        for _, param in self.original_module.named_parameters():
-            num_params = param.numel()
-            # if using DS Zero 3 and the weights are initialized empty
-            if num_params == 0 and hasattr(param, "ds_numel"):
-                import deepspeed
+#         if "_modules" not in self.__dict__:
+#             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
-                context_manager = deepspeed.zero.GatheredParameters(self.original_module.parameters(), modifier_rank=0)
-                break
-        with context_manager:
-            self.modules_to_save.update(torch.nn.ModuleDict({adapter_name: copy.deepcopy(self.original_module)}))
+#         # Could not find the attribute the PyTorch way. So let's check if it's an attribute on the
+#         # original_module/modules_to_save.
+#         modules = self.__dict__["_modules"]
+#         if self.disable_adapters:
+#             module = modules["original_module"]
+#         elif self.active_adapter in modules["modules_to_save"]:
+#             module = modules["modules_to_save"][self.active_adapter]
+#         else:
+#             # For some reason, there is no module corresponding to the active adapter; this should normally not be
+#             # reached and exists as a failsafe (otherwise, a KeyError would be raised)
+#             raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+#         return getattr(module, name)
 
-        if hasattr(self.modules_to_save[adapter_name], "_hf_hook"):
-            old_hook = self.modules_to_save[adapter_name]._hf_hook
-            new_hook = self._create_new_hook(old_hook)
-            remove_hook_from_module(self.modules_to_save[adapter_name])
-            add_hook_to_module(self.modules_to_save[adapter_name], new_hook)
+#     def update(self, adapter_name):
+#         context_manager = nullcontext()
+#         for _, param in self.original_module.named_parameters():
+#             num_params = param.numel()
+#             # if using DS Zero 3 and the weights are initialized empty
+#             if num_params == 0 and hasattr(param, "ds_numel"):
+#                 import deepspeed
 
-        self.original_module.requires_grad_(False)
-        if adapter_name == self.active_adapter:
-            self.modules_to_save[adapter_name].requires_grad_(True)
+#                 context_manager = deepspeed.zero.GatheredParameters(self.original_module.parameters(), modifier_rank=0)
+#                 break
+#         with context_manager:
+#             self.modules_to_save.update(paddle.nn.LayerDict({adapter_name: copy.deepcopy(self.original_module)}))
 
-    def _create_new_hook(self, old_hook):
-        r"""
-        Creates a new hook based on the old hook. Use it only if you know what you are doing !
-        """
-        old_hook_cls = getattr(accelerate.hooks, old_hook.__class__.__name__)
-        old_hook_attr = old_hook.__dict__
-        filtered_old_hook_attr = {}
-        old_hook_init_signature = inspect.signature(old_hook_cls.__init__)
-        for k in old_hook_attr.keys():
-            if k in old_hook_init_signature.parameters:
-                filtered_old_hook_attr[k] = old_hook_attr[k]
-        new_hook = old_hook_cls(**filtered_old_hook_attr)
-        return new_hook
+#         if hasattr(self.modules_to_save[adapter_name], "_hf_hook"):
+#             old_hook = self.modules_to_save[adapter_name]._hf_hook
+#             new_hook = self._create_new_hook(old_hook)
+#             remove_hook_from_module(self.modules_to_save[adapter_name])
+#             add_hook_to_module(self.modules_to_save[adapter_name], new_hook)
 
-    def _check_forward_args(self, x, *args, **kwargs):
-        """Check if the arguments are compatible with the configs and state of the model"""
-        adapter_names = kwargs.get("adapter_names", None)
-        if adapter_names is None:
-            return
+#         self.original_module.requires_grad_(False)
+#         if adapter_name == self.active_adapter:
+#             self.modules_to_save[adapter_name].requires_grad_(True)
 
-        if len(x) != len(adapter_names):
-            msg = (
-                "Length of `adapter_names` should be the same as the number of inputs, but got "
-                f"{len(adapter_names)} and {len(x)} respectively."
+#     def _create_new_hook(self, old_hook):
+#         r"""
+#         Creates a new hook based on the old hook. Use it only if you know what you are doing !
+#         """
+#         old_hook_cls = getattr(accelerate.hooks, old_hook.__class__.__name__)
+#         old_hook_attr = old_hook.__dict__
+#         filtered_old_hook_attr = {}
+#         old_hook_init_signature = inspect.signature(old_hook_cls.__init__)
+#         for k in old_hook_attr.keys():
+#             if k in old_hook_init_signature.parameters:
+#                 filtered_old_hook_attr[k] = old_hook_attr[k]
+#         new_hook = old_hook_cls(**filtered_old_hook_attr)
+#         return new_hook
+
+#     def _check_forward_args(self, x, *args, **kwargs):
+#         """Check if the arguments are compatible with the configs and state of the model"""
+#         adapter_names = kwargs.get("adapter_names", None)
+#         if adapter_names is None:
+#             return
+
+#         if len(x) != len(adapter_names):
+#             msg = (
+#                 "Length of `adapter_names` should be the same as the number of inputs, but got "
+#                 f"{len(adapter_names)} and {len(x)} respectively."
+#             )
+#             raise ValueError(msg)
+
+#     def _mixed_batch_forward(
+#         self, input: paddle.Tensor, *args: Any, adapter_names: list[str], **kwargs: Any
+#     ) -> paddle.Tensor:
+#         # This is a special method that handles the case when users pass the argument `adapter_names`. This is an
+#         # extra argument that allows mixing different adapters in the same batch at inference time.
+
+#         SUPPORTED_MODULES = (
+#             paddle.nn.Linear,
+#             paddle.nn.Embedding,
+#             paddle.nn.Conv1d,
+#             paddle.nn.Conv2d,
+#             paddle.nn.Conv3d,
+#         )
+
+#         module_names = ", ".join([module.__name__ for module in SUPPORTED_MODULES])
+
+#         if not isinstance(self.original_module, SUPPORTED_MODULES):
+#             raise TypeError(f"Mixed batching is only supported for the following modules: {module_names}.")
+
+#         unique_adapters = set(adapter_names)
+#         sub_batch_indices_list = []
+
+#         for adapter in unique_adapters:
+#             sub_batch_indices_list.append([index for index, item in enumerate(adapter_names) if item == adapter])
+
+#         results = [0 for _ in range(len(input))]
+
+#         for i, active_adapter in enumerate(unique_adapters):
+#             sub_batch = input[sub_batch_indices_list[i]]
+
+#             if active_adapter == "__base__":
+#                 output = self.original_module(sub_batch, *args, **kwargs)
+#             else:
+#                 output = self.modules_to_save[active_adapter](sub_batch, *args, **kwargs)
+
+#             for index, j in enumerate(sub_batch_indices_list[i]):
+#                 results[j] = output[index]
+
+#         return paddle.stack(results)
+
+#     def forward(self, x: paddle.Tensor, *args, **kwargs):
+#         self._check_forward_args(x, *args, **kwargs)
+#         adapter_names = kwargs.pop("adapter_names", None)
+
+#         if self.disable_adapters or (self.active_adapter not in self.modules_to_save):
+#             return self.original_module(x, *args, **kwargs)
+#         if adapter_names is None:
+#             return self.modules_to_save[self.active_adapter](x, *args, **kwargs)
+#         return self._mixed_batch_forward(x, *args, adapter_names=adapter_names, **kwargs)
+
+#     def enable_adapters(self, enabled: bool):
+#         """Toggle the enabling and disabling of adapters
+
+#         Takes care of setting the requires_grad flag for the adapter weights.
+
+#         Args:
+#             enabled (bool): True to enable adapters, False to disable adapters
+#         """
+#         if self._disable_adapters is not enabled:
+#             # already in the desired state, do nothing
+#             return
+
+#         if enabled:
+#             self.original_module.requires_grad_(False)
+#             self.modules_to_save[self.active_adapter].requires_grad_(True)
+#             self._disable_adapters = False
+#         else:
+#             self.original_module.requires_grad_(True)
+#             self.modules_to_save.requires_grad_(False)
+#             self._disable_adapters = True
+
+#     def set_adapter(self, adapter_name: str):
+#         """Set the active adapter
+
+#         Additionally, this function will set the specified adapter to trainable (i.e., requires_grad=True). If this is
+#         not desired, use the following code.
+
+#         ```py
+#         >>> for name, param in model_peft.named_parameters():
+#         ...     if ...:  # some check on name (ex. if 'lora' in name)
+#         ...         param.requires_grad = False
+#         ```
+
+#         Args:
+#             adapter_name (str): The name of the adapter to set as active
+#         """
+#         if adapter_name not in self.modules_to_save:
+#             raise ValueError(f"Adapter {adapter_name} not found in {self.modules_to_save.keys()}")
+
+#         self.modules_to_save[self.active_adapter].requires_grad_(False)
+#         self.modules_to_save[adapter_name].requires_grad_(True)
+#         self._active_adapter = adapter_name
+
+
+def get_submodule(self, target: str) -> "Layer":
+    """Return the submodule given by ``target`` if it exists, otherwise throw an error.
+
+    For example, let's say you have an ``nn.Layer`` ``A`` that
+    looks like this:
+
+    .. code-block:: text
+
+        A(
+            (net_b): Layer(
+                (net_c): Layer(
+                    (conv): Conv2d(16, 33, kernel_size=(3, 3), stride=(2, 2))
+                )
+                (linear): Linear(in_features=100, out_features=200, bias=True)
             )
-            raise ValueError(msg)
+        )
 
-    def _mixed_batch_forward(
-        self, input: torch.Tensor, *args: Any, adapter_names: list[str], **kwargs: Any
-    ) -> torch.Tensor:
-        # This is a special method that handles the case when users pass the argument `adapter_names`. This is an
-        # extra argument that allows mixing different adapters in the same batch at inference time.
+    (The diagram shows an ``nn.Layer`` ``A``. ``A`` has a nested
+    submodule ``net_b``, which itself has two submodules ``net_c``
+    and ``linear``. ``net_c`` then has a submodule ``conv``.)
 
-        SUPPORTED_MODULES = (torch.nn.Linear, torch.nn.Embedding, torch.nn.Conv1d, torch.nn.Conv2d, torch.nn.Conv3d)
+    To check whether or not we have the ``linear`` submodule, we
+    would call ``get_submodule("net_b.linear")``. To check whether
+    we have the ``conv`` submodule, we would call
+    ``get_submodule("net_b.net_c.conv")``.
 
-        module_names = ", ".join([module.__name__ for module in SUPPORTED_MODULES])
+    The runtime of ``get_submodule`` is bounded by the degree
+    of module nesting in ``target``. A query against
+    ``named_modules`` achieves the same result, but it is O(N) in
+    the number of transitive modules. So, for a simple check to see
+    if some submodule exists, ``get_submodule`` should always be
+    used.
 
-        if not isinstance(self.original_module, SUPPORTED_MODULES):
-            raise TypeError(f"Mixed batching is only supported for the following modules: {module_names}.")
+    Args:
+        target: The fully-qualified string name of the submodule
+            to look for. (See above example for how to specify a
+            fully-qualified string.)
 
-        unique_adapters = set(adapter_names)
-        sub_batch_indices_list = []
+    Returns:
+        torch.nn.Module: The submodule referenced by ``target``
 
-        for adapter in unique_adapters:
-            sub_batch_indices_list.append([index for index, item in enumerate(adapter_names) if item == adapter])
+    Raises:
+        AttributeError: If the target string references an invalid
+            path or resolves to something that is not an
+            ``nn.Module``
+    """
+    if target == "":
+        return self
 
-        results = [0 for _ in range(len(input))]
+    atoms: List[str] = target.split(".")
+    mod: paddle.nn.Layer = self
 
-        for i, active_adapter in enumerate(unique_adapters):
-            sub_batch = input[sub_batch_indices_list[i]]
+    for item in atoms:
+        if not hasattr(mod, item):
+            raise AttributeError(mod._get_name() + " has no " "attribute `" + item + "`")
 
-            if active_adapter == "__base__":
-                output = self.original_module(sub_batch, *args, **kwargs)
-            else:
-                output = self.modules_to_save[active_adapter](sub_batch, *args, **kwargs)
+        mod = getattr(mod, item)
 
-            for index, j in enumerate(sub_batch_indices_list[i]):
-                results[j] = output[index]
+        if not isinstance(mod, paddle.nn.Layer):
+            raise AttributeError("`" + item + "` is not " "an nn.Module")
 
-        return torch.stack(results)
+    return mod
 
-    def forward(self, x: torch.Tensor, *args, **kwargs):
-        self._check_forward_args(x, *args, **kwargs)
-        adapter_names = kwargs.pop("adapter_names", None)
 
-        if self.disable_adapters or (self.active_adapter not in self.modules_to_save):
-            return self.original_module(x, *args, **kwargs)
-        if adapter_names is None:
-            return self.modules_to_save[self.active_adapter](x, *args, **kwargs)
-        return self._mixed_batch_forward(x, *args, adapter_names=adapter_names, **kwargs)
-
-    def enable_adapters(self, enabled: bool):
-        """Toggle the enabling and disabling of adapters
-
-        Takes care of setting the requires_grad flag for the adapter weights.
-
-        Args:
-            enabled (bool): True to enable adapters, False to disable adapters
-        """
-        if self._disable_adapters is not enabled:
-            # already in the desired state, do nothing
-            return
-
-        if enabled:
-            self.original_module.requires_grad_(False)
-            self.modules_to_save[self.active_adapter].requires_grad_(True)
-            self._disable_adapters = False
-        else:
-            self.original_module.requires_grad_(True)
-            self.modules_to_save.requires_grad_(False)
-            self._disable_adapters = True
-
-    def set_adapter(self, adapter_name: str):
-        """Set the active adapter
-
-        Additionally, this function will set the specified adapter to trainable (i.e., requires_grad=True). If this is
-        not desired, use the following code.
-
-        ```py
-        >>> for name, param in model_peft.named_parameters():
-        ...     if ...:  # some check on name (ex. if 'lora' in name)
-        ...         param.requires_grad = False
-        ```
-
-        Args:
-            adapter_name (str): The name of the adapter to set as active
-        """
-        if adapter_name not in self.modules_to_save:
-            raise ValueError(f"Adapter {adapter_name} not found in {self.modules_to_save.keys()}")
-
-        self.modules_to_save[self.active_adapter].requires_grad_(False)
-        self.modules_to_save[adapter_name].requires_grad_(True)
-        self._active_adapter = adapter_name
+paddle.nn.Layer.get_submodule = get_submodule
 
 
 def _get_submodules(model, key):
@@ -442,7 +530,7 @@ def _set_adapter(model, adapter_name):
         adapter_name = adapter_name[0]
         return adapter_name
 
-    for module in model.modules():
+    for module in model.sublayers():
         if isinstance(module, ModulesToSaveWrapper):
             # only check the adapter_name if we actually encounter a ModulesToSaveWrapper, otherwise we don't care
             adapter_name = check_adapter_name(adapter_name)
@@ -513,7 +601,7 @@ def fsdp_auto_wrap_policy(model):
         get_module_class_from_name = FullyShardedDataParallelPlugin.get_module_class_from_name
     else:
         from accelerate.utils.dataclasses import get_module_class_from_name
-    from torch.distributed.fsdp.wrap import (
+    from paddle.distributed.fsdp.wrap import (
         _or_policy,
         lambda_auto_wrap_policy,
         transformer_auto_wrap_policy,
@@ -560,8 +648,8 @@ def transpose(weight, fan_in_fan_out):
     if not fan_in_fan_out:
         return weight
 
-    if isinstance(weight, torch.nn.Parameter):
-        return torch.nn.Parameter(weight.T)
+    if isinstance(weight, paddle.nn.Parameter):
+        return paddle.nn.Parameter(weight.T)
     return weight.T
 
 
@@ -577,7 +665,7 @@ def _is_valid_match(key: str, target_key: str):
     return False
 
 
-def _get_batch_size(input_ids: Optional[torch.Tensor], inputs_embeds: Optional[torch.Tensor]) -> int:
+def _get_batch_size(input_ids: Optional[paddle.Tensor], inputs_embeds: Optional[paddle.Tensor]) -> int:
     """Get the batch size based on either input_ids or input_embeds
 
     Raises an ValueError if both are None.
@@ -593,7 +681,7 @@ def _get_batch_size(input_ids: Optional[torch.Tensor], inputs_embeds: Optional[t
     return batch_size
 
 
-def get_quantization_config(model: torch.nn.Module, method: str):
+def get_quantization_config(model: paddle.nn.Layer, method: str):
     """
     Get the quantization config of the related quantization method
     """
@@ -636,7 +724,7 @@ def get_auto_gptq_quant_linear(gptq_quantization_config):
     return None
 
 
-def id_tensor_storage(tensor: torch.Tensor) -> tuple[torch.device, int, int]:
+def id_tensor_storage(tensor: paddle.Tensor) -> tuple[paddle.device, int, int]:
     """
     Unique identifier to a tensor storage. Multiple different tensors can share the same underlying storage. For
     example, "meta" tensors all share the same storage, and thus their identifier will all be equal. This identifier is
@@ -663,24 +751,24 @@ def id_tensor_storage(tensor: torch.Tensor) -> tuple[torch.device, int, int]:
 
 def cast_mixed_precision_params(model, dtype):
     """
-    Cast all non-trainable parameters of the model to the given `dtype`. The `dtype` can be `torch.float16` or
-    `torch.bfloat16` as per the mixed-precision training you are performing. The trainable parameters are cast to full
+    Cast all non-trainable parameters of the model to the given `dtype`. The `dtype` can be `paddle.float16` or
+    `paddle.bfloat16` as per the mixed-precision training you are performing. The trainable parameters are cast to full
     precision. This is meant to reduce the GPU memory usage when using PEFT methods by using half-precision dtype for
     non-trainable parameters. Having the trainable parameters in full-precision preserves training stability when using
     automatic mixed-precision training.
 
     Args:
-        model (`torch.nn.Module`):
+        model (`paddle.nn.Layer`):
             The model to cast the non-trainable parameters of.
-        dtype (`torch.dtype`):
-            The dtype to cast the non-trainable parameters to. The `dtype` can be `torch.float16` or
-    `torch.bfloat16` as per the mixed-precision training you are performing.
+        dtype (`paddle.dtype`):
+            The dtype to cast the non-trainable parameters to. The `dtype` can be `paddle.float16` or
+    `paddle.bfloat16` as per the mixed-precision training you are performing.
     """
     for p in model.parameters():
         if not p.requires_grad:
             p.data = p.to(dtype)
         else:
-            p.data = p.to(torch.float32)
+            p.data = p.to(paddle.float32)
 
 
 def str_to_bool(value: str) -> int:

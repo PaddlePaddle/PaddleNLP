@@ -18,30 +18,31 @@ from contextlib import contextmanager
 from typing import Literal
 
 import packaging.version
-import torch
-import transformers
+import paddle
+
+# import transformers
 
 
-@contextmanager
-def gather_params_ctx(param, modifier_rank: int = 0, fwd_module: torch.nn.Module = None):
-    """Call DeepSpeed GatheredParameters context manager if DeepSpeed is enabled, otherwise do nothing."""
-    if packaging.version.parse(transformers.__version__) >= packaging.version.parse("4.33.0"):
-        from transformers.integrations import is_deepspeed_zero3_enabled
-    else:
-        from transformers.deepspeed import is_deepspeed_zero3_enabled
+# @contextmanager
+# def gather_params_ctx(param, modifier_rank: int = 0, fwd_module: paddle.nn.Layer = None):
+#     """Call DeepSpeed GatheredParameters context manager if DeepSpeed is enabled, otherwise do nothing."""
+#     if packaging.version.parse(transformers.__version__) >= packaging.version.parse("4.33.0"):
+#         from transformers.integrations import is_deepspeed_zero3_enabled
+#     else:
+#         from transformers.deepspeed import is_deepspeed_zero3_enabled
 
-    if not is_deepspeed_zero3_enabled():
-        yield
-        return
+#     if not is_deepspeed_zero3_enabled():
+#         yield
+#         return
 
-    import deepspeed
+#     import deepspeed
 
-    with deepspeed.zero.GatheredParameters(param, modifier_rank=modifier_rank, fwd_module=fwd_module):
-        yield
-    return
+#     with deepspeed.zero.GatheredParameters(param, modifier_rank=modifier_rank, fwd_module=fwd_module):
+#         yield
+#     return
 
 
-def dequantize_module_weight(module: torch.nn.Module) -> torch.nn.Parameter:
+def dequantize_module_weight(module: paddle.nn.Layer) -> paddle.nn.Parameter:
     """
     Helper function to dequantize a quantized weight.
 
@@ -52,14 +53,14 @@ def dequantize_module_weight(module: torch.nn.Module) -> torch.nn.Parameter:
     if hasattr(module, "W_q"):  # For handling HQQ quantized weight
         weight = module.dequantize()
         return weight
-    elif type(module.weight).__module__.startswith("torchao."):
-        # check for torchao without requiring any torchao imports
+    elif type(module.weight).__module__.startswith("paddleao."):
+        # check for paddleao without requiring any paddleao imports
         weight = module.weight.dequantize()
         return weight
 
     weight = module.weight
-    if not isinstance(weight, torch.nn.Parameter):
-        if isinstance(weight, torch.Tensor):
+    if not isinstance(weight, paddle.nn.Parameter):
+        if isinstance(weight, paddle.Tensor):
             # this is an FSDP-specific edge case
             return weight  # type: ignore
         raise TypeError(f"Input weight should be of type nn.Parameter, got {type(weight)} instead")
@@ -70,7 +71,7 @@ def dequantize_module_weight(module: torch.nn.Module) -> torch.nn.Parameter:
 
     quant_state = getattr(module, "state", None)
     device = weight.device
-    is_cpu = device.type == torch.device("cpu").type
+    is_cpu = device.type == paddle.device("cpu").type
     weight = dequantize_bnb_weight(weight, state=quant_state)  # no-op if not bnb
     if is_cpu:
         # dequantize_bnb_weight for 8bit moves the device in-place, thus we need to move it back to CPU if necessary
@@ -78,7 +79,7 @@ def dequantize_module_weight(module: torch.nn.Module) -> torch.nn.Parameter:
     return weight
 
 
-def dequantize_bnb_weight(weight: torch.nn.Parameter, state=None):
+def dequantize_bnb_weight(weight: paddle.nn.Parameter, state=None):
     """Helper function to dequantize 4bit or 8bit bnb weights.
 
     Since dequantization is not supported on CPU, the weight will be temporarily moved to CUDA if necessary.
@@ -87,9 +88,9 @@ def dequantize_bnb_weight(weight: torch.nn.Parameter, state=None):
 
     # BNB requires CUDA weights
     device = weight.device
-    is_cpu = device.type == torch.device("cpu").type
+    is_cpu = device.type == paddle.device("cpu").type
     if is_cpu:
-        weight = weight.to(torch.device("cuda"))
+        weight = weight.to(paddle.device("cuda"))
 
     cls_name = weight.__class__.__name__
     if cls_name == "Params4bit":
@@ -113,7 +114,7 @@ def dequantize_bnb_weight(weight: torch.nn.Parameter, state=None):
     return dequantized
 
 
-def get_bnb_param_type(param: torch.nn.Parameter) -> Literal[False, "4bit", "8bit"]:
+def get_bnb_param_type(param: paddle.nn.Parameter) -> Literal[False, "4bit", "8bit"]:
     """Returns '4bit' or '8bit' if bitsandbytes parameter, else False"""
     if param.__class__.__name__ == "Params4bit":
         return "4bit"
@@ -158,10 +159,10 @@ def map_cache_to_layer_device_map(model, cache) -> None:
     """
     Ensure that the key and value cache of the model are on the same device as their corresponding layers.
     """
-    if not (isinstance(cache, transformers.Cache) and hasattr(model, "hf_device_map")):
+    if not (isinstance(cache, paddlenlp.transformers.Cache) and hasattr(model, "hf_device_map")):
         return
 
-    if isinstance(cache, transformers.EncoderDecoderCache):
+    if isinstance(cache, paddlenlp.transformers.EncoderDecoderCache):
         map_cache_to_layer_device_map(model, cache.self_attention_cache)
         return
 

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import math
-from typing import Optional
+from typing import Any, Optional
 
 import paddle
 import paddle.nn as nn
@@ -24,7 +24,7 @@ from paddle.distributed.fleet.meta_parallel import (
     RowParallelLinear,
 )
 
-from ...transformers import linear_utils
+from ....transformers import linear_utils
 
 ColumnSequenceParallelLinear = linear_utils.ColumnSequenceParallelLinear
 RowSequenceParallelLinear = linear_utils.RowSequenceParallelLinear
@@ -40,7 +40,11 @@ except:
     ReduceScatterOp = None
     mark_as_sequence_parallel_parameter = None
 
-from ...transformers.mc2_parallel_linear import (
+from paddlenlp.peft.tuners.tuners_utils import (
+    BaseTunerLayer,  # , check_adapters_to_merg
+)
+
+from ....transformers.mc2_parallel_linear import (
     MC2ColumnParallelCoreLinear,
     MC2ColumnSeqParallelCoreLinear,
     MC2RowParallelCoreLinear,
@@ -50,7 +54,454 @@ from .lora_quick_layers import quick_lora
 from .utils import rng_ctx
 
 
-class LoRALinear(nn.Linear):
+class LoraLayer(BaseTunerLayer):
+    # All names of layers that may contain (trainable) adapter weights
+    adapter_layer_names = ("lora_A", "lora_B", "lora_embedding_A", "lora_embedding_B")
+    # All names of other parameters that may contain adapter-related parameters
+    other_param_names = ("r", "lora_alpha", "scaling", "lora_dropout")
+
+    def __init__(self, base_layer: nn.Layer, ephemeral_gpu_offload: bool = False, **kwargs) -> None:
+        self.base_layer = base_layer
+        self.r = {}
+        self.lora_alpha = {}
+        self.scaling = {}
+        self.lora_dropout = nn.LayerDict({})
+        self.lora_A = nn.LayerDict({})
+        self.lora_B = nn.LayerDict({})
+        # For Embedding layer
+        self.lora_embedding_A = nn.ParameterDict({})
+        self.lora_embedding_B = nn.ParameterDict({})
+        # Mark the weight as unmerged
+        self._disable_adapters = False
+        self.merged_adapters = []
+        self.use_dora: dict[str, bool] = {}
+        self.lora_bias: dict[str, bool] = {}
+        self.lora_magnitude_vector = paddle.nn.LayerDict()  # for DoRA
+        self._caches: dict[str, Any] = {}
+        self.ephemeral_gpu_offload: bool = ephemeral_gpu_offload
+        self.kwargs = kwargs
+
+        base_layer = self.get_base_layer()
+        if isinstance(base_layer, nn.Linear):
+            in_features, out_features = base_layer.in_features, base_layer.out_features
+        elif isinstance(base_layer, nn.Conv2d):
+            in_features, out_features = base_layer.in_channels, base_layer.out_channels
+        elif isinstance(base_layer, nn.Conv3d):
+            in_features, out_features = base_layer.in_channels, base_layer.out_channels
+        elif isinstance(base_layer, nn.Embedding):
+            in_features, out_features = base_layer.num_embeddings, base_layer.embedding_dim
+        elif isinstance(base_layer, Conv1D):
+            in_features, out_features = (
+                base_layer.weight.ds_shape if hasattr(base_layer.weight, "ds_shape") else base_layer.weight.shape
+            )
+        elif hasattr(base_layer, "infeatures") and hasattr(base_layer, "outfeatures"):
+            # QuantLinear
+            in_features, out_features = base_layer.infeatures, base_layer.outfeatures
+        elif hasattr(base_layer, "input_size") and hasattr(base_layer, "output_size"):
+            # Megatron ColumnParallelLinear,RowParallelLinear
+            in_features, out_features = base_layer.input_size, base_layer.output_size
+        elif hasattr(base_layer, "codebooks") and base_layer.__class__.__name__ == "QuantizedLinear":
+            # AQLM QuantLinear
+            in_features, out_features = base_layer.in_features, base_layer.out_features
+        elif hasattr(base_layer, "w_bit") and base_layer.__class__.__name__ == "WQLinear_GEMM":
+            # Awq layers
+            in_features, out_features = base_layer.in_features, base_layer.out_features
+        elif base_layer.__class__.__name__ == "EetqLinear":
+            # Eetq layers
+            in_features, out_features = base_layer.in_features, base_layer.out_features
+        elif hasattr(base_layer, "W_q") and base_layer.__class__.__name__ == "HQQLinear":
+            # HQQ layers
+            in_features, out_features = base_layer.in_features, base_layer.out_features
+        else:
+            # possibly support user provided custom layer types using dynamic dispatch
+            if hasattr(base_layer, "in_features") and hasattr(base_layer, "out_features"):
+                in_features, out_features = base_layer.in_features, base_layer.out_features
+            else:
+                in_features, out_features = None, None
+            warnings.warn(
+                f"Unsupported layer type '{type(base_layer)}' encountered, proceed at your own risk.", UserWarning
+            )
+
+        self.in_features = in_features
+        self.out_features = out_features
+
+    def update_layer(
+        self,
+        adapter_name,
+        r,
+        lora_alpha,
+        lora_dropout,
+        init_lora_weights,
+        use_rslora,
+        use_dora: bool = False,
+        lora_bias: bool = False,
+    ):
+        # This code works for linear layers, override for other layer types
+        if r <= 0:
+            raise ValueError(f"`r` should be a positive integer value but the value passed is {r}")
+
+        self.r[adapter_name] = r
+        self.lora_alpha[adapter_name] = lora_alpha
+        if lora_dropout > 0.0:
+            lora_dropout_layer = nn.Dropout(p=lora_dropout)
+        else:
+            lora_dropout_layer = nn.Identity()
+
+        self.lora_dropout.update(nn.LayerDict({adapter_name: lora_dropout_layer}))
+        # Actual trainable parameters
+        self.lora_A[adapter_name] = nn.Linear(self.in_features, r, bias=False)
+        self.lora_B[adapter_name] = nn.Linear(r, self.out_features, bias=lora_bias)
+        self.lora_bias[adapter_name] = lora_bias
+
+        if use_rslora:
+            self.scaling[adapter_name] = lora_alpha / math.sqrt(r)
+        else:
+            self.scaling[adapter_name] = lora_alpha / r
+
+        # for inits that require access to the base weight, use gather_param_ctx so that the weight is gathered when using DeepSpeed
+        if isinstance(init_lora_weights, str) and init_lora_weights.startswith("pissa"):
+            with gather_params_ctx(self.get_base_layer().weight):
+                self.pissa_init(adapter_name, init_lora_weights)
+        elif isinstance(init_lora_weights, str) and init_lora_weights.startswith("corda"):
+            with gather_params_ctx(self.get_base_layer().weight):
+                self.corda_init(adapter_name, init_lora_weights)
+        elif isinstance(init_lora_weights, str) and init_lora_weights.lower() == "olora":
+            with gather_params_ctx(self.get_base_layer().weight):
+                self.olora_init(adapter_name)
+        elif init_lora_weights == "loftq":
+            with gather_params_ctx(self.get_base_layer().weight):
+                self.loftq_init(adapter_name)
+        elif init_lora_weights == "eva":
+            nn.init.zeros_(self.lora_B[adapter_name].weight)
+        elif init_lora_weights:
+            self.reset_lora_parameters(adapter_name, init_lora_weights)
+        # call this before dora_init
+        self._move_adapter_to_device_of_base_layer(adapter_name)
+
+        if use_dora:
+            self.dora_init(adapter_name)
+            self.use_dora[adapter_name] = True
+        else:
+            self.use_dora[adapter_name] = False
+
+        self.set_adapter(self.active_adapters)
+
+    def reset_lora_parameters(self, adapter_name, init_lora_weights):
+        if init_lora_weights is False:
+            return
+
+        if adapter_name in self.lora_A.keys():
+            if init_lora_weights is True:
+                # initialize A the same way as the default for nn.Linear and B to zero
+                # https://github.com/microsoft/LoRA/blob/a0a92e0f26c067cf94747bdbf1ce73793fa44d19/loralib/layers.py#L124
+                nn.init.kaiming_uniform_(self.lora_A[adapter_name].weight, a=math.sqrt(5))
+            elif init_lora_weights.lower() == "gaussian":
+                nn.init.normal_(self.lora_A[adapter_name].weight, std=1 / self.r[adapter_name])
+            else:
+                raise ValueError(f"Unknown initialization {init_lora_weights=}")
+            nn.init.zeros_(self.lora_B[adapter_name].weight)
+            if self.lora_bias[adapter_name]:
+                nn.init.zeros_(self.lora_B[adapter_name].bias)
+        if adapter_name in self.lora_embedding_A.keys():
+            # Initialize A to zeros and B the same way as the default for nn.Embedding, see:
+            # https://github.com/microsoft/LoRA/blob/4c0333854cb905966f8cc4e9a74068c1e507c7b7/loralib/layers.py#L59-L60
+            nn.init.zeros_(self.lora_embedding_A[adapter_name])
+            nn.init.normal_(self.lora_embedding_B[adapter_name])
+            if self.lora_bias[adapter_name]:
+                # embeddings are not supported at the moment, but still adding this for consistency
+                nn.init.zeros_(self.lora_embedding_B[adapter_name].bias)
+
+    def olora_init(self, adapter_name):
+        base_layer = self.get_base_layer()
+        orig_weight = base_layer.weight
+        bnb_param_type = get_bnb_param_type(orig_weight)
+        dtype = orig_weight.dtype
+
+        if bnb_param_type:
+            # check without importing bitsandbytes and robust to bnb_4bit_quant_storage=float*
+            weight_tensor = dequantize_module_weight(base_layer)
+        elif dtype in [paddle.float32, paddle.float16, paddle.bfloat16]:
+            weight_tensor = orig_weight
+        else:
+            raise TypeError(f"Unsupported data type for the base layer. Got {dtype}.")
+
+        scale_factor = self.scaling[adapter_name]
+        r = self.r[adapter_name]
+        weight_tensor = weight_tensor.to(paddle.float32)
+        Q, R = paddle.linalg.qr(weight_tensor.data)
+
+        Qr, Rr = Q[:, :r], R[:r]
+
+        self.lora_A[adapter_name].weight.data = Rr.contiguous()
+        self.lora_B[adapter_name].weight.data = Qr.contiguous()
+
+        weight_tensor.data -= scale_factor * self.lora_B[adapter_name].weight @ self.lora_A[adapter_name].weight
+        if bnb_param_type == "4bit":
+            weight_tensor = orig_weight.__class__(
+                weight_tensor,
+                quant_type=orig_weight.quant_type,
+                quant_storage=orig_weight.quant_storage,
+                compress_statistics=orig_weight.compress_statistics,
+                module=orig_weight.module,
+            ).to(orig_weight.device)
+            base_layer.weight = weight_tensor
+        elif bnb_param_type == "8bit":
+            weight_tensor = orig_weight.__class__(
+                weight_tensor,
+                requires_grad=orig_weight.requires_grad,
+                has_fp16_weights=orig_weight.has_fp16_weights,
+            ).to(orig_weight.device)
+            base_layer.weight = weight_tensor
+        else:
+            weight_tensor = weight_tensor.to(dtype)
+            base_layer.weight.data = weight_tensor
+
+    def pissa_init(self, adapter_name, init_lora_weights):
+        weight = self.get_base_layer().weight
+        dtype = weight.dtype
+        if dtype not in [paddle.float32, paddle.float16, paddle.bfloat16]:
+            raise TypeError(
+                "Please initialize PiSSA under float32, float16, or bfloat16. "
+                "Subsequently, re-quantize the residual model to help minimize quantization errors."
+            )
+        weight = transpose(weight.to(paddle.float32), self.fan_in_fan_out)
+        if init_lora_weights == "pissa":
+            # USV^T = W <-> VSU^T = W^T, where W^T = weight.data in R^{out_channel, in_channel},
+            V, S, Uh = paddle.linalg.svd(weight.data, full_matrices=False)
+            Vr = V[:, : self.r[adapter_name]]
+            Sr = S[: self.r[adapter_name]]
+            Sr /= self.scaling[adapter_name]
+            Uhr = Uh[: self.r[adapter_name]]
+        elif len(init_lora_weights.split("_niter_")) == 2:
+            Vr, Sr, Ur = svd_lowrank(
+                weight.data, self.r[adapter_name], niter=int(init_lora_weights.split("_niter_")[-1])
+            )
+            Sr /= self.scaling[adapter_name]
+            Uhr = Ur.t()
+        else:
+            raise ValueError(
+                f"init_lora_weights should be 'pissa' or 'pissa_niter_[number of iters]', got {init_lora_weights} instead."
+            )
+
+        lora_A = paddle.diag(paddle.sqrt(Sr)) @ Uhr
+        lora_B = Vr @ paddle.diag(paddle.sqrt(Sr))
+        self.lora_A[adapter_name].weight.data = lora_A
+        self.lora_B[adapter_name].weight.data = lora_B
+        weight = weight.data - self.scaling[adapter_name] * lora_B @ lora_A
+        weight = transpose(weight.to(dtype), self.fan_in_fan_out)
+        self.get_base_layer().weight.data = weight
+
+    def corda_init(self, adapter_name, init_lora_weights):
+        linear = self.get_base_layer()
+        weight = linear.weight
+        dtype = weight.dtype
+        if dtype not in [paddle.float32, paddle.float16, paddle.bfloat16]:
+            raise TypeError(
+                "Please initialize CorDA under float32, float16, or bfloat16. "
+                "Subsequently, re-quantize the residual model to help minimize quantization errors."
+            )
+        weight = weight.to(paddle.float32)
+        out_dim = weight.data.size(0)
+        in_dim = weight.data.size(1)
+
+        # Calculate WC from covariance matrix
+        if not hasattr(linear, "eigens"):
+            raise ValueError(
+                "`eigens` attribute not found for layer, please run `preprocess_corda` first. "
+                "More information can be found at examples/corda_finetuning/README.md."
+            )
+        eigens = linear.eigens
+        U = eigens.U_WC
+        S = eigens.S_WC
+        V = eigens.V_WC
+        r = self.r[adapter_name]
+
+        # nan or inf check
+        if paddle.isnan(S).any() or paddle.isinf(S).any():
+            raise ValueError(
+                "Invalid value found in matrix S. Please file an issue at https://github.com/huggingface/peft/issues."
+            )
+        if paddle.isnan(U).any() or paddle.isinf(U).any():
+            raise ValueError(
+                "Invalid value found in matrix U. Please file an issue at https://github.com/huggingface/peft/issues."
+            )
+        if paddle.isnan(V).any() or paddle.isinf(V).any():
+            raise ValueError(
+                "Invalid value found in matrix V. Please file an issue at https://github.com/huggingface/peft/issues."
+            )
+
+        # Sanity check
+        if U.size(0) != out_dim or U.size(1) != r:
+            raise ValueError(
+                f"Matrix U size mismatch: {U.size()} vs. ({out_dim}, {r}). Please make sure the `lora_config` and "
+                "`model` argument of `preprocess_corda` is consistent with `get_peft_model`. If you're using cache "
+                "in `preprocess_corda`, please make sure the cache is built with the same model and LoRA rank."
+            )
+        if S.size(0) != r:
+            raise ValueError(
+                f"Matrix S size mismatch: {S.size()} vs. ({r},). Please make sure the `lora_config` and `model` argument "
+                "of `preprocess_corda` is consistent with `get_peft_model`. If you're using cache in `preprocess_corda`, "
+                "please make sure the cache is built with the same model and LoRA rank."
+            )
+        if V.size(0) != in_dim or V.size(1) != r:
+            raise ValueError(
+                f"Matrix V size mismatch: {V.size()} vs. ({in_dim}, {r}). Please make sure the `lora_config` and "
+                "`model` argument of `preprocess_corda` is consistent with `get_peft_model`. If you're using cache "
+                "in `preprocess_corda`, please make sure the cache is built with the same model and LoRA rank."
+            )
+
+        # Apply alpha
+        S /= self.scaling[adapter_name]
+
+        # Init lora_A and lora_B weights
+        lora_A = V.t().mul(S.sqrt().view(-1, 1)).contiguous()
+        lora_B = U.mul(S.sqrt()).contiguous()
+        self.lora_A[adapter_name].weight.data = lora_A
+        self.lora_B[adapter_name].weight.data = lora_B
+        weight = weight.data - self.scaling[adapter_name] * lora_B @ lora_A
+        weight = weight.to(dtype)
+        self.get_base_layer().weight.data = weight
+
+    def loftq_init(self, adapter_name):
+        from peft.utils.loftq_utils import loftq_init
+
+        weight = self.get_base_layer().weight
+        kwargs = {
+            "num_bits": self.kwargs.get("loftq_bits", 4),
+            "reduced_rank": self.r[adapter_name],
+            "num_iter": self.kwargs.get("loftq_iter", 1),
+        }
+
+        qweight, lora_A, lora_B = loftq_init(weight, **kwargs)
+        if adapter_name in self.lora_A.keys():
+            # initialize A the same way as the default for nn.Linear and B to zero
+            self.lora_A[adapter_name].weight.data = lora_A
+            self.lora_B[adapter_name].weight.data = lora_B
+        if adapter_name in self.lora_embedding_A.keys():
+            # initialize a the same way as the default for nn.linear and b to zero
+            self.lora_embedding_A[adapter_name].weight.data = lora_A
+            self.lora_embedding_B[adapter_name].weight.data = lora_B
+        self.get_base_layer().weight.data = qweight
+
+    def dora_init(self, adapter_name: str) -> None:
+        if not self.lora_magnitude_vector:
+            # first dora layer being added, add lora_magnitude_vector to the list of learnable parameters
+            self.adapter_layer_names = self.adapter_layer_names[:] + ("lora_magnitude_vector",)
+
+        dora_layer = DoraLinearLayer(fan_in_fan_out=getattr(self, "fan_in_fan_out", False))
+        lora_A = self.lora_A[adapter_name].weight
+        lora_B = self.lora_B[adapter_name].weight
+        place_on_cpu = self.ephemeral_gpu_offload and (lora_A.device.type == "cpu" or lora_B.device.type == "cpu")
+        if self.ephemeral_gpu_offload:
+            if lora_A.device.type in ["cuda", "xpu"]:
+                lora_B = lora_B.to(lora_A.device)
+            else:
+                if lora_B.device.type not in ["cuda", "xpu"]:
+                    if is_xpu_available():
+                        lora_B = lora_B.to("xpu")
+                    else:
+                        lora_B = lora_B.to("cuda")
+                lora_A = lora_A.to(lora_B.device)
+        scaling = self.scaling[adapter_name]
+        dora_layer.update_layer(
+            base_layer=self.get_base_layer(), lora_A=lora_A, lora_B=lora_B, scaling=scaling, place_on_cpu=place_on_cpu
+        )
+        self.lora_magnitude_vector[adapter_name] = dora_layer
+
+    def _cache_store(self, key: str, value: Any) -> None:
+        self._caches[key] = value
+
+    def _cache_pop(self, key: str) -> Any:
+        value = self._caches.pop(key)
+        return value
+
+    def set_scale(self, adapter, scale):
+        if adapter not in self.scaling:
+            # Ignore the case where the adapter is not in the layer
+            return
+        self.scaling[adapter] = scale * self.lora_alpha[adapter] / self.r[adapter]
+
+    def scale_layer(self, scale: float) -> None:
+        if scale == 1:
+            return
+
+        for active_adapter in self.active_adapters:
+            if active_adapter not in self.lora_A.keys():
+                continue
+
+            self.scaling[active_adapter] *= scale
+
+    def unscale_layer(self, scale=None) -> None:
+        for active_adapter in self.active_adapters:
+            if active_adapter not in self.lora_A.keys():
+                continue
+
+            if scale is None:
+                self.scaling[active_adapter] = self.lora_alpha[active_adapter] / self.r[active_adapter]
+            else:
+                self.scaling[active_adapter] /= scale
+
+    def _check_forward_args(self, x, *args, **kwargs):
+        """Check if the arguments are compatible with the configs and state of the model"""
+        adapter_names = kwargs.get("adapter_names", None)
+        if adapter_names is None:
+            return
+
+        if len(x) != len(adapter_names):
+            msg = (
+                "Length of `adapter_names` should be the same as the number of inputs, but got "
+                f"{len(adapter_names)} and {len(x)} respectively."
+            )
+            raise ValueError(msg)
+
+        if self.merged:
+            # It is unclear what would be the right thing to do if users pass adapter_names and there are merged
+            # adapters. Therefore, it is better to raise an error in this case.
+            msg = "Cannot pass `adapter_names` when there are merged adapters, please call `unmerge_adapter` first."
+            raise ValueError(msg)
+
+        # DoRA is not supported (yet), check that it's not being used. Don't check "__base__", as this is the
+        # placeholder for the base model.
+        unique_adapters = {name for name in adapter_names if name != "__base__"}
+        for adapter_name in unique_adapters:
+            if self.use_dora.get(adapter_name, False):
+                msg = "Cannot pass `adapter_names` when DoRA is enabled."
+                raise ValueError(msg)
+
+    def _mixed_batch_forward(
+        self, x: paddle.Tensor, *args: Any, adapter_names: list[str], **kwargs: Any
+    ) -> paddle.Tensor:
+        # This is a special method that handles the case when users pass the argument `adapter_names`. This is an
+        # extra argument that allows mixing different adapters in the same batch at inference time.
+        result = self.base_layer(x, *args, **kwargs)
+        paddle_result_dtype = result.dtype
+
+        unique_adapters = set(adapter_names)
+        sub_batch_indices_list = []
+        for adapter in unique_adapters:
+            sub_batch_indices_list.append([index for index, item in enumerate(adapter_names) if item == adapter])
+
+        for i, active_adapter in enumerate(unique_adapters):
+            if active_adapter == "__base__":
+                continue
+            if active_adapter not in self.lora_A.keys():
+                continue
+
+            lora_A = self.lora_A[active_adapter]
+            lora_B = self.lora_B[active_adapter]
+            dropout = self.lora_dropout[active_adapter]
+            scaling = self.scaling[active_adapter]
+
+            # getting the sub-batch, passing it to LoRA layers and updating the corresponding indices of the linear
+            # layer output
+            sub_batch = x[sub_batch_indices_list[i]].to(lora_A.weight.dtype)
+            lora_output = lora_B(lora_A(dropout(sub_batch))) * scaling
+            result[sub_batch_indices_list[i]] += lora_output.to(paddle_result_dtype)
+
+        return result
+
+
+class LoRALinear(nn.Linear, LoraLayer):
     # LoRA implemented in a dense layer
     def __init__(
         self,
@@ -289,7 +740,7 @@ class LoRALinear(nn.Linear):
         return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
 
 
-class RowParallelLoRALinear(RowParallelLinear):
+class RowParallelLoRALinear(RowParallelLinear, LoraLayer):
     def __init__(
         self,
         in_features: int,
@@ -443,7 +894,7 @@ class RowParallelLoRALinear(RowParallelLinear):
         return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
 
 
-class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
+class RowSequenceParallelLoRALinear(RowSequenceParallelLinear, LoraLayer):
     def __init__(
         self,
         in_features: int,
@@ -554,7 +1005,7 @@ class RowSequenceParallelLoRALinear(RowSequenceParallelLinear):
         return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
 
 
-class ColumnParallelLoRALinear(ColumnParallelLinear):
+class ColumnParallelLoRALinear(ColumnParallelLinear, LoraLayer):
     def __init__(
         self,
         in_features: int,
@@ -690,7 +1141,7 @@ class ColumnParallelLoRALinear(ColumnParallelLinear):
         return f"in_features={self.weight.shape[0]}, out_features={self.weight.shape[1]}, rank={self.r}{name}"
 
 
-class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear):
+class ColumnSequenceParallelLoRALinear(ColumnSequenceParallelLinear, LoraLayer):
     def __init__(
         self,
         in_features: int,

@@ -19,9 +19,11 @@ from dataclasses import asdict, dataclass, field
 from typing import Dict, Optional, Union
 
 from huggingface_hub import hf_hub_download
-from transformers.utils import PushToHubMixin
 
 from .utils import CONFIG_NAME, PeftType, TaskType
+
+# from transformers.utils import PushToHubMixin
+
 
 # we expect at least these keys to be present in a PEFT adapter_config.json
 MIN_EXPECTED_CONFIG_KEYS = {"peft_type"}
@@ -43,7 +45,7 @@ def _check_and_remove_unused_kwargs(cls, kwargs):
 
 
 @dataclass
-class PeftConfigMixin(PushToHubMixin):
+class PeftConfigMixin:
     r"""
     This is the base configuration class for PEFT adapter models. It contains all the methods that are common to all
     PEFT adapter models. This class inherits from [`~transformers.utils.PushToHubMixin`] which contains the methods to
@@ -119,7 +121,7 @@ class PeftConfigMixin(PushToHubMixin):
                 Keyword arguments passed along to the configuration initialization.
         """
         # Avoid circular dependency .. TODO: fix this with a larger refactor
-        from peft.mapping import PEFT_TYPE_TO_CONFIG_MAPPING
+        from paddlenlp.peft.mapping import PEFT_TYPE_TO_CONFIG_MAPPING
 
         # TODO: this hack is needed to fix the following issue (on commit 702f937):
         # if someone saves a default config and loads it back with `PeftConfig` class it yields to

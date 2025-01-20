@@ -17,7 +17,7 @@ import os
 from dataclasses import asdict, dataclass, field
 from typing import Optional
 
-from ...utils.env import PREFIX_CONFIG_NAME
+from ....utils.env import PREFIX_CONFIG_NAME
 
 
 @dataclass

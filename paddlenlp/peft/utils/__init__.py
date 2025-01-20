@@ -13,7 +13,8 @@
 # limitations under the License.
 
 from .integrations import map_cache_to_layer_device_map
-from .loftq_utils import replace_lora_weights_loftq
+
+# from .loftq_utils import replace_lora_weights_loftq
 from .other import (
     CONFIG_NAME,
     INCLUDE_LINEAR_LAYERS_SHORTHAND,

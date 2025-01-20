@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .lokr_config import LoKrConfig
-from .lokr_layers import LoKrLinear
-from .lokr_model import LoKrModel
+from .config import LoKrConfig
+from .layers import LoKrLinear
+from .model import LoKrModel
 
 __all__ = ["LoKrConfig", "LoKrModel", "LoKrLinear"]

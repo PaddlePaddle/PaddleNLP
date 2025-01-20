@@ -24,6 +24,7 @@ import re
 import sys
 import tempfile
 import warnings
+from collections import namedtuple
 from contextlib import contextmanager
 from functools import partial
 from pathlib import Path
@@ -794,7 +795,6 @@ def load_sharded_checkpoint(model, folder, variant=None, strict=True, prefer_saf
         del state_dict
         gc.collect()
 
-    # Return the same thing as PaddlePaddle set_state_dict function.
     return missing_keys, unexpected_keys
 
 

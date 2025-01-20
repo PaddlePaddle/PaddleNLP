@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from operator import attrgetter
 
-import torch
+import paddle
 from peft.config import PeftConfig
 from peft.mapping import PEFT_TYPE_TO_CONFIG_MAPPING
 
@@ -39,9 +39,9 @@ def hotswap_adapter_from_state_dict(model, state_dict, adapter_name, parameter_p
     use `hotswap_adapter` instead.
 
     Args:
-        model (`nn.Module`):
+        model (`nn.Layer`):
             The model with the loaded adapter.
-        state_dict (`dict[str, torch.Tensor]`):
+        state_dict (`dict[str, paddle.Tensor]`):
             The state dict of the new adapter, which needs to be compatible (targeting same modules etc.).
         adapter_name (`str`):
             The name of the adapter that should be hot-swapped, e.g. `"default"`. The name will remain the same after
@@ -86,14 +86,14 @@ def hotswap_adapter_from_state_dict(model, state_dict, adapter_name, parameter_p
 
     # actual swapping
     for key, new_val in state_dict.items():
-        # no need to account for potential _orig_mod in key here, as torch handles that
+        # no need to account for potential _orig_mod in key here, as paddle handles that
         old_val = attrgetter(key)(model)
         if is_compiled:
             # Compiled models don't work with swap_tensors because there are weakrefs for the tensor. It is unclear if
             # this workaround could not cause trouble but the tests indicate that it works.
             old_val.data = new_val.data
         else:
-            torch.utils.swap_tensors(old_val, new_val)
+            paddle.utils.swap_tensors(old_val, new_val)
 
 
 def _check_hotswap_configs_compatible(config0: PeftConfig, config1: PeftConfig) -> None:
@@ -134,7 +134,7 @@ def _check_hotswap_configs_compatible(config0: PeftConfig, config1: PeftConfig) 
             raise ValueError(f"Configs are incompatible: for {key}, {val0} != {val1}")
 
 
-def hotswap_adapter(model, model_name_or_path, adapter_name, torch_device=None, **kwargs):
+def hotswap_adapter(model, model_name_or_path, adapter_name, paddle_device=None, **kwargs):
     """Substitute old adapter data with new adapter data, keeping the rest the same.
 
     As of now, only LoRA is supported.
@@ -148,7 +148,7 @@ def hotswap_adapter(model, model_name_or_path, adapter_name, torch_device=None, 
     Example:
 
     ```py
-    >>> import torch
+    >>> import paddle
     >>> from transformers import AutoModelForCausalLM
     >>> from peft import PeftModel
     >>> from peft.utils.hotswap import hotswap_adapter
@@ -160,13 +160,13 @@ def hotswap_adapter(model, model_name_or_path, adapter_name, torch_device=None, 
 
     >>> # load lora 0
     >>> model = PeftModel.from_pretrained(model, "path-adapter-0")
-    >>> model = torch.compile(model)  # optionally compile the model
-    >>> with torch.inference_mode():
+    >>> model = paddle.compile(model)  # optionally compile the model
+    >>> with paddle.inference_mode():
     ...     output_adapter_0 = model(inputs)
 
     >>> # replace the "default" lora adapter with the new one
-    >>> hotswap_adapter(model, "path-adapter-1", adapter_name="default", torch_device=device)
-    >>> with torch.inference_mode():
+    >>> hotswap_adapter(model, "path-adapter-1", adapter_name="default", paddle_device=device)
+    >>> with paddle.inference_mode():
     ...     output_adapter_1 = model(inputs).logits
     ```
 
@@ -177,14 +177,14 @@ def hotswap_adapter(model, model_name_or_path, adapter_name, torch_device=None, 
             The name or path of the model to load the new adapter from.
         adapter_name (`str`):
             The name of the adapter to swap, e.g. `"default"`. The name will stay the same after swapping.
-        torch_device: (`str`, *optional*, defaults to None):
+        paddle_device: (`str`, *optional*, defaults to None):
             The device to load the new adapter onto.
         **kwargs (`optional`):
             Additional keyword arguments used for loading the config and weights.
 
     """
-    if torch_device is None:
-        torch_device = infer_device()
+    if paddle_device is None:
+        paddle_device = infer_device()
 
     ############################
     # LOAD CONFIG AND VALIDATE #
@@ -204,7 +204,7 @@ def hotswap_adapter(model, model_name_or_path, adapter_name, torch_device=None, 
     # config keys that could affect the model output besides what is determined by the state_dict
     _check_hotswap_configs_compatible(model.active_peft_config, config)
 
-    state_dict = load_peft_weights(model_name_or_path, device=torch_device, **kwargs)
+    state_dict = load_peft_weights(model_name_or_path, device=paddle_device, **kwargs)
 
     ###########################
     # LOAD & REMAP STATE_DICT #

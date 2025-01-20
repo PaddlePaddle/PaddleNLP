@@ -32,21 +32,21 @@ from paddle.distributed.fleet.meta_parallel import (
     RowParallelLinear,
 )
 
-from ...transformers import linear_utils
-from ...transformers.conversion_utils import ConversionMixin
-from ...transformers.model_utils import (
+from ....transformers import linear_utils
+from ....transformers.conversion_utils import ConversionMixin
+from ....transformers.model_utils import (
     PretrainedModel,
     _add_variant,
     _load_state_dict_into_model,
     dtype_guard,
     load_state_dict,
 )
-from ...transformers.utils import get_checkpoint_shard_files, weight_name_suffix
-from ...utils.distributed import distributed_allgather, distributed_gather
-from ...utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
-from ...utils.log import logger
-from ...utils.tools import get_env_device
-from .lora_config import LoRAConfig
+from ....transformers.utils import get_checkpoint_shard_files, weight_name_suffix
+from ....utils.distributed import distributed_allgather, distributed_gather
+from ....utils.env import LORA_WEIGHTS_NAME, SAFE_PEFT_WEIGHTS_INDEX_NAME
+from ....utils.log import logger
+from ....utils.tools import get_env_device
+from .config import LoRAConfig
 
 
 def get_lora_layers():
@@ -67,11 +67,11 @@ def get_lora_layers():
                 XPURowSequenceParallelLoRALinear as RowSequenceParallelLoRALinear,
             )
 
-            from .lora_layers import LoRAConv2D
+            from .layers import LoRAConv2D
         else:
             raise ImportError  # Force to use the fallback if not XPU
     except ImportError:
-        from .lora_layers import (
+        from .layers import (
             ColumnParallelLoRALinear,
             ColumnSequenceParallelLoRALinear,
             LoRAConv2D,

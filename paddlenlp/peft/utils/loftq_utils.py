@@ -21,13 +21,14 @@ import logging
 import os
 from typing import Callable, Optional, Union
 
-import torch
+import paddle
 from huggingface_hub import snapshot_download
 from huggingface_hub.errors import HFValidationError, LocalEntryNotFoundError
-from peft.import_utils import is_bnb_4bit_available, is_bnb_available
 from safetensors import SafetensorError, safe_open
-from transformers.utils import cached_file
-from transformers.utils.hub import get_checkpoint_shard_files
+
+from paddlenlp.peft.import_utils import is_bnb_4bit_available, is_bnb_available
+from paddlenlp.transformers.utils import cached_file
+from paddlenlp.transformers.utils.hub import get_checkpoint_shard_files
 
 
 class NFQuantizer:
@@ -50,12 +51,12 @@ class NFQuantizer:
     def create_uniform_map(symmetric=False, num_bits=4):
         if symmetric:
             # print("symmetric uniform quantization")
-            negative = torch.linspace(-1, 0, 2 ** (num_bits - 1))
-            positive = torch.linspace(0, 1, 2 ** (num_bits - 1))
-            table = torch.cat([negative, positive[1:]])
+            negative = paddle.linspace(-1, 0, 2 ** (num_bits - 1))
+            positive = paddle.linspace(0, 1, 2 ** (num_bits - 1))
+            table = paddle.concat([negative, positive[1:]])
         else:
             # print("asymmetric uniform quantization")
-            table = torch.linspace(-1, 1, 2**num_bits)
+            table = paddle.linspace(-1, 1, 2**num_bits)
         return table
 
     @staticmethod
@@ -67,37 +68,37 @@ class NFQuantizer:
 
         variations = 2**num_bits
         if symmetric:
-            v = norm.ppf(torch.linspace(1 - offset, offset, variations + 1)).tolist()
+            v = norm.ppf(paddle.linspace(1 - offset, offset, variations + 1)).tolist()
             values = []
             for index in range(len(v) - 1):
                 values.append(0.5 * v[index] + 0.5 * v[index + 1])
             v = values
         else:
             # one more positive value, this is an asymmetric type
-            v1 = norm.ppf(torch.linspace(offset, 0.5, variations // 2 + 1)[:-1]).tolist()
+            v1 = norm.ppf(paddle.linspace(offset, 0.5, variations // 2 + 1)[:-1]).tolist()
             v2 = [0]
-            v3 = (-norm.ppf(torch.linspace(offset, 0.5, variations // 2)[:-1])).tolist()
+            v3 = (-norm.ppf(paddle.linspace(offset, 0.5, variations // 2)[:-1])).tolist()
             v = v1 + v2 + v3
 
-        values = torch.Tensor(v)
+        values = paddle.Tensor(v)
         values = values.sort().values
         values /= values.max()
         return values
 
     def quantize_tensor(self, weight):
-        max_abs = torch.abs(weight).max()
+        max_abs = paddle.abs(weight).max()
         weight_normed = weight / max_abs
 
         weight_normed_expanded = weight_normed.unsqueeze(-1)
 
         # Reshape L to have the same number of dimensions as X_expanded
-        L_reshaped = torch.tensor(self.norm_lookup_table).reshape(1, -1)
+        L_reshaped = paddle.tensor(self.norm_lookup_table).reshape(1, -1)
 
         # Calculate the absolute difference between X_expanded and L_reshaped
-        abs_diff = torch.abs(weight_normed_expanded - L_reshaped)
+        abs_diff = paddle.abs(weight_normed_expanded - L_reshaped)
 
         # Find the index of the minimum absolute difference for each element
-        qweight = torch.argmin(abs_diff, dim=-1)
+        qweight = paddle.argmin(abs_diff, dim=-1)
         return qweight, max_abs
 
     def dequantize_tensor(self, qweight, max_abs):
@@ -136,12 +137,12 @@ class NFQuantizer:
         weight_divabs = weight_divabs.unsqueeze(-1)  # (L, B, 1)
         L_reshaped = self.norm_lookup_table.reshape(1, -1)  # (1, 2**K)
 
-        abs_diff = torch.abs(weight_divabs - L_reshaped)  # (L, B, 2**K)
-        qweight = torch.argmin(abs_diff, dim=-1)  # (L, B)
+        abs_diff = paddle.abs(weight_divabs - L_reshaped)  # (L, B, 2**K)
+        qweight = paddle.argmin(abs_diff, dim=-1)  # (L, B)
 
         # Pack multiple k-bit into uint8
         qweight = qweight.reshape(-1, 8 // self.num_bits)
-        qweight_pack = torch.zeros((M * N // 8 * self.num_bits, 1), dtype=torch.uint8, device=device)
+        qweight_pack = paddle.zeros((M * N // 8 * self.num_bits, 1), dtype=paddle.uint8, device=device)
 
         # data format example:
         # [1, 0, 3, 2] or [01, 00, 11, 10]  -> [10110001], LIFO
@@ -154,10 +155,10 @@ class NFQuantizer:
     def dequantize_block(self, qweight, weight_max, weight_shape):
         # unpack weight
         device = qweight.device
-        weight = torch.zeros((qweight.shape[0], 8 // self.num_bits), dtype=torch.float32, device=device)
+        weight = paddle.zeros((qweight.shape[0], 8 // self.num_bits), dtype=paddle.float32, device=device)
         for i in range(8 // self.num_bits):
-            lookup_table_idx = qweight.to(torch.long) % 2**self.num_bits  # get the most right 2 bits
-            lookup_table_idx = lookup_table_idx.to(torch.long)
+            lookup_table_idx = qweight.to(paddle.long) % 2**self.num_bits  # get the most right 2 bits
+            lookup_table_idx = lookup_table_idx.to(paddle.long)
             weight[:, i] = self.norm_lookup_table[lookup_table_idx].squeeze()
             qweight = qweight >> self.num_bits  # right shift 2 bits of the original data
 
@@ -177,16 +178,16 @@ def _low_rank_decomposition(weight, reduced_rank=32):
         raise ValueError(f"Only support 2D matrix, but your input has {matrix_dimension} dimensions.")
 
     # Use SVD to decompose a matrix, default full_matrices is False to save parameters
-    U, S, Vh = torch.linalg.svd(weight, full_matrices=False)
+    U, S, Vh = paddle.linalg.svd(weight, full_matrices=False)
 
-    L = U @ (torch.sqrt(torch.diag(S)[:, 0:reduced_rank]))
-    R = torch.sqrt(torch.diag(S)[0:reduced_rank, :]) @ Vh
+    L = U @ (paddle.sqrt(paddle.diag(S)[:, 0:reduced_rank]))
+    R = paddle.sqrt(paddle.diag(S)[0:reduced_rank, :]) @ Vh
 
     return {"L": L, "R": R, "U": U, "S": S, "Vh": Vh, "reduced_rank": reduced_rank}
 
 
-@torch.no_grad()
-def loftq_init(weight: Union[torch.Tensor, torch.nn.Parameter], num_bits: int, reduced_rank: int, num_iter=1):
+@paddle.no_grad()
+def loftq_init(weight: Union[paddle.Tensor, paddle.nn.Parameter], num_bits: int, reduced_rank: int, num_iter=1):
     if is_bnb_available():
         import bitsandbytes as bnb
     else:
@@ -211,10 +212,10 @@ def loftq_init(weight: Union[torch.Tensor, torch.nn.Parameter], num_bits: int, r
     else:
         compute_device = "cuda"
 
-    weight = weight.to(device=compute_device, dtype=torch.float32)
+    weight = weight.to(device=compute_device, dtype=paddle.float32)
     res = weight.clone()
     for i in range(num_iter):
-        torch.cuda.empty_cache()
+        paddle.cuda.empty_cache()
         # Quantization
         if num_bits == 4 and is_bnb_4bit_available():
             qweight = bnb.nn.Params4bit(
@@ -230,14 +231,14 @@ def loftq_init(weight: Union[torch.Tensor, torch.nn.Parameter], num_bits: int, r
         # Decompose the residual by SVD
         output = _low_rank_decomposition(res, reduced_rank=reduced_rank)
         L, R, reduced_rank = output["L"], output["R"], output["reduced_rank"]
-        res = weight - torch.mm(L, R)
+        res = weight - paddle.mm(L, R)
 
     lora_A, lora_B = R, L
 
     return dequantized_weight.to(device=device, dtype=dtype), lora_A, lora_B
 
 
-@torch.no_grad()
+@paddle.no_grad()
 def _loftq_init_new(qweight, weight, num_bits: int, reduced_rank: int):
     import bitsandbytes as bnb
 
@@ -249,9 +250,9 @@ def _loftq_init_new(qweight, weight, num_bits: int, reduced_rank: int):
     compute_device = "cuda"
     dequantized_weight = bnb.functional.dequantize_4bit(qweight.data, qweight.quant_state)
 
-    weight = weight.to(device=compute_device, dtype=torch.float32)
+    weight = weight.to(device=compute_device, dtype=paddle.float32)
     residual = weight - dequantized_weight
-    torch.cuda.empty_cache()
+    paddle.cuda.empty_cache()
     # Decompose the residualidual by SVD
     output = _low_rank_decomposition(residual, reduced_rank=reduced_rank)
     L, R, reduced_rank = output["L"], output["R"], output["reduced_rank"]
@@ -327,12 +328,12 @@ class _SafetensorLoader:
         return tensor
 
 
-@torch.no_grad()
+@paddle.no_grad()
 def replace_lora_weights_loftq(
     peft_model,
     model_path: Optional[str] = None,
     adapter_name: str = "default",
-    callback: Optional[Callable[[torch.nn.Module, str], bool]] = None,
+    callback: Optional[Callable[[paddle.nn.Layer, str], bool]] = None,
 ):
     """
     Replace the LoRA weights of a model quantized with bitsandbytes, using the LoftQ technique.

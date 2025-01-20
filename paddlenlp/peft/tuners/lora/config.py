@@ -18,12 +18,13 @@ import os
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional, Union
 
-from ...utils.env import LORA_CONFIG_NAME
-from ...utils.log import logger
+from ....utils.env import LORA_CONFIG_NAME
+from ....utils.log import logger
+from ...config import PeftConfig
 
 
 @dataclass
-class LoRAConfig:
+class LoRAConfig(PeftConfig):
     """
     This is the configuration class to store the configuration of a [`LoRAModel`].
     Args:

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .layer_utils import ParameterDict
 from .vera_config import VeRAConfig
 from .vera_layers import VeRALinear
 from .vera_model import VeRAModel

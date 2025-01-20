@@ -24,22 +24,22 @@ import paddle
 import paddle.nn as nn
 from paddle.distributed import fleet
 
-from ...prompt.prompt_utils import signature
-from ...transformers.model_utils import (
+from ....prompt.prompt_utils import signature
+from ....transformers.model_utils import (
     _add_variant,
     _load_state_dict_into_model,
     dtype_guard,
     load_state_dict,
 )
-from ...transformers.utils import get_checkpoint_shard_files
-from ...utils.distributed import distributed_gather
-from ...utils.env import (
+from ....transformers.utils import get_checkpoint_shard_files
+from ....utils.distributed import distributed_gather
+from ....utils.env import (
     PAST_KEY_VALUES_FILE_NAME,
     PREFIX_WEIGHTS_NAME,
     SAFE_PEFT_WEIGHTS_INDEX_NAME,
 )
-from ...utils.log import logger
-from .prefix_config import PrefixConfig
+from ....utils.log import logger
+from .config import PrefixConfig
 
 
 class PrefixModelForCausalLM(paddle.nn.Layer):

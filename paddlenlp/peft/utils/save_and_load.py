@@ -18,11 +18,11 @@ import warnings
 from typing import Optional
 
 import huggingface_hub
-import torch
+import paddle
 from huggingface_hub import file_exists, hf_hub_download
 from huggingface_hub.errors import EntryNotFoundError, LocalEntryNotFoundError
 from packaging import version
-from safetensors.torch import load_file as safe_load_file
+from safetensors.paddle import load_file as safe_load_file
 
 from .constants import PEFT_TYPE_TO_PREFIX_MAPPING
 from .other import (
@@ -37,7 +37,7 @@ from .peft_types import PeftType
 
 def has_valid_embedding_base_layer(layer):
     """Check if the layer has an embedding base layer"""
-    return hasattr(layer, "base_layer") and isinstance(layer.base_layer, (torch.nn.Linear, torch.nn.Embedding))
+    return hasattr(layer, "base_layer") and isinstance(layer.base_layer, (paddle.nn.Linear, paddle.nn.Embedding))
 
 
 def get_embedding_layer_name(model, layer, is_embedding_in_target_modules):
@@ -55,14 +55,14 @@ def get_peft_model_state_dict(
     Get the state dict of the Peft model.
 
     Args:
-        model ([`PeftModel`]): The Peft model. When using torch.nn.DistributedDataParallel, DeepSpeed or FSDP,
+        model ([`PeftModel`]): The Peft model. When using paddle.nn.DistributedDataParallel, DeepSpeed or FSDP,
             the model should be the underlying model/unwrapped model (i.e. model.module).
         state_dict (`dict`, *optional*, defaults to `None`):
             The state dict of the model. If not provided, the state dict of the passed model will be used.
         adapter_name (`str`, *optional*, defaults to `"default"`):
             The name of the adapter whose state dict should be returned.
         unwrap_compiled (`bool`, *optional*, defaults to `False`):
-            Whether to unwrap the model if torch.compile was used.
+            Whether to unwrap the model if paddle.compile was used.
         save_embedding_layers (`Union[bool, str]`, , *optional*, defaults to `auto`):
             If `True`, save the embedding layers in addition to adapter weights. If `auto`, checks the common embedding
             layers `peft.utils.other.EMBEDDING_LAYER_NAMES` in config's `target_modules` when available. Based on it
@@ -189,20 +189,20 @@ def get_peft_model_state_dict(
         to_return = {}
         # choose the most efficient dtype for indices
         if config.num_vectors < 2**8:
-            indices_dtype = torch.uint8
+            indices_dtype = paddle.uint8
         elif config.num_vectors < 2**15:
-            indices_dtype = torch.int16
+            indices_dtype = paddle.int16
         elif config.num_vectors < 2**31:
-            indices_dtype = torch.int32
+            indices_dtype = paddle.int32
         else:
-            indices_dtype = torch.int64
+            indices_dtype = paddle.int64
         if config.save_only_topk_weights:
             # in save_only_topk_weights mode, we save topk_indices and topk_weights for parameter efficiency
             for k in state_dict:
                 if "vblora_logits" in k:
                     logits, indices = state_dict[k].topk(config.topk)
                     to_return.update({k + "_topk_indices": indices.to(dtype=indices_dtype)})
-                    to_return.update({k + "_topk_weights": torch.softmax(logits, dim=-1)[:, :, :-1].contiguous()})
+                    to_return.update({k + "_topk_weights": paddle.softmax(logits, dim=-1)[:, :, :-1].contiguous()})
         else:
             to_return = {k: state_dict[k] for k in state_dict if "vblora_logits" in k}
         to_return["base_model.vblora_vector_bank." + adapter_name] = state_dict[
@@ -280,8 +280,8 @@ def get_peft_model_state_dict(
 
 
 def _find_mismatched_keys(
-    model: torch.nn.Module, peft_model_state_dict: dict[str, torch.Tensor], ignore_mismatched_sizes: bool = False
-) -> tuple[dict[str, torch.Tensor], list[tuple[str, tuple[int, ...], tuple[int, ...]]]]:
+    model: paddle.nn.Module, peft_model_state_dict: dict[str, paddle.Tensor], ignore_mismatched_sizes: bool = False
+) -> tuple[dict[str, paddle.Tensor], list[tuple[str, tuple[int, ...], tuple[int, ...]]]]:
     if not ignore_mismatched_sizes:
         return peft_model_state_dict, []
 
@@ -308,8 +308,8 @@ def _find_mismatched_keys(
 
 
 def _insert_adapter_name_into_state_dict(
-    state_dict: dict[str, torch.Tensor], adapter_name: str, parameter_prefix: str
-) -> dict[str, torch.Tensor]:
+    state_dict: dict[str, paddle.Tensor], adapter_name: str, parameter_prefix: str
+) -> dict[str, paddle.Tensor]:
     """Utility function to remap the state_dict keys to fit the PEFT model by inserting the adapter name."""
     peft_model_state_dict = {}
     for key, val in state_dict.items():
@@ -374,16 +374,16 @@ def set_peft_model_state_dict(
                 # note that topk_indices and topk_weights serve as an efficient representation of the logits
                 # so we need to recover the logits from the topk_indices and topk_weights
                 if "_topk_indices" in k:
-                    v = state_dict[k].to(torch.long)
+                    v = state_dict[k].to(paddle.long)
                     original_key = k.replace("_topk_indices", "")
                     # find the corresponding topk_weights from the state_dict
                     topk_weights = state_dict[k.replace("_topk_indices", "_topk_weights")]
                     # as we only save the first k-1 topk_weights, here we recover the last one
-                    topk_weights = torch.cat([topk_weights, 1 - topk_weights.sum(-1, keepdim=True)], dim=-1)
+                    topk_weights = paddle.concat([topk_weights, 1 - topk_weights.sum(-1, keepdim=True)], dim=-1)
                     # convert the weights to logits
-                    topk_logits = torch.log(topk_weights)
+                    topk_logits = paddle.log(topk_weights)
                     matrix = (
-                        torch.zeros([*(topk_logits.shape[:-1]), num_vectors])
+                        paddle.zeros([*(topk_logits.shape[:-1]), num_vectors])
                         .fill_(float("-inf"))
                         .to(topk_logits.device)
                         .scatter(-1, v, topk_logits)
@@ -441,22 +441,26 @@ def set_peft_model_state_dict(
     peft_model_state_dict, mismatched_keys = _find_mismatched_keys(
         model, peft_model_state_dict, ignore_mismatched_sizes=ignore_mismatched_sizes
     )
+    # from paddlenlp.transformers.model_utils import load_sharded_checkpoint
     if low_cpu_mem_usage:
-        load_result = model.load_state_dict(peft_model_state_dict, strict=False, assign=True)
+        load_result = model.load_state_dict(peft_model_state_dict, strict=False)  # , assign=True)
+        # load_result = load_sharded_checkpoint(model, state_dict=peft_model_state_dict,  strict=False, return_tuple=False)
         # ensure that the correct device is set
         for module in model.modules():
             if hasattr(module, "_move_adapter_to_device_of_base_layer"):
                 module._move_adapter_to_device_of_base_layer(adapter_name)
     else:
         load_result = model.load_state_dict(peft_model_state_dict, strict=False)
+        # load_result = load_sharded_checkpoint(model, state_dict=peft_model_state_dict,  strict=False, return_tuple=False)
+        # load_sharded_checkpoint()
 
     if config.is_prompt_learning:
-        model.prompt_encoder[adapter_name].embedding.load_state_dict(
-            {"weight": peft_model_state_dict["prompt_embeddings"]}, strict=True
+        model.prompt_encoder[adapter_name].embedding.set_state_dict(
+            {"weight": peft_model_state_dict["prompt_embeddings"]}  # , strict=True
         )
 
     if config.peft_type == PeftType.MULTITASK_PROMPT_TUNING:
-        model.prompt_encoder[adapter_name].load_state_dict(peft_model_state_dict, strict=False)
+        model.prompt_encoder[adapter_name].set_state_dict(peft_model_state_dict)  # , strict=False)
 
     if mismatched_keys:
         # see https://github.com/huggingface/transformers/blob/09f9f566de83eef1f13ee83b5a1bbeebde5c80c1/src/transformers/modeling_utils.py#L4039
@@ -471,19 +475,20 @@ def set_peft_model_state_dict(
             f"and are being ignored because you passed `ignore_mismatched_sizes=True`: {mismatched_warning}."
         )
         warnings.warn(msg)
+    print(load_result)
     return load_result
 
 
-def torch_load(*args, weights_only=True, **kwargs):
-    """Call torch.load and handle weights_only.
+def paddle_load(*args, weights_only=True, **kwargs):
+    """Call paddle.load and handle weights_only.
 
     Defaults to weights_only=True to anticipate upcoming switch on the PyTorch side.
 
     """
     # TODO: weights_only was added in 1.13, remove if 1.12 no longer needs to be supported
-    if version.parse(torch.__version__) < version.parse("1.13"):
-        return torch.load(*args, **kwargs)
-    return torch.load(*args, weights_only=weights_only, **kwargs)
+    if version.parse(paddle.__version__) < version.parse("1.13"):
+        return paddle.load(*args, **kwargs)
+    return paddle.load(*args, weights_only=weights_only, **kwargs)
 
 
 def load_peft_weights(model_id: str, device: Optional[str] = None, **hf_hub_download_kwargs) -> dict:
@@ -565,11 +570,10 @@ def load_peft_weights(model_id: str, device: Optional[str] = None, **hf_hub_down
                 )
 
     if use_safetensors:
-        if hasattr(torch.backends, "mps") and (device == torch.device("mps")):
-            adapters_weights = safe_load_file(filename, device="cpu")
-        else:
-            adapters_weights = safe_load_file(filename, device=device)
+        from ..tuners.tuners_utils import place_to_str
+
+        adapters_weights = safe_load_file(filename, device=place_to_str(device))
     else:
-        adapters_weights = torch_load(filename, map_location=torch.device(device))
+        adapters_weights = paddle_load(filename, map_location=paddle.device(device))
 
     return adapters_weights

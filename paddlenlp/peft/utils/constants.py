@@ -12,15 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch
-from transformers import BloomPreTrainedModel
+import paddle
+
+from paddlenlp.transformers.bloom.modeling import BloomPreTrainedModel
 
 from .peft_types import PeftType
 
 
 # needed for prefix-tuning of bloom model
 def bloom_model_postprocess_past_key_value(past_key_values):
-    past_key_values = torch.cat(past_key_values)
+    past_key_values = paddle.concat(past_key_values)
     total_layers, batch_size, num_attention_heads, num_virtual_tokens, head_dim = past_key_values.shape
     keys = past_key_values[: total_layers // 2]
     keys = keys.transpose(2, 3).reshape(

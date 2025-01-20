@@ -17,8 +17,9 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING, Any, Optional
 
-import torch
-from peft.tuners.xlora.model import XLoraModel
+import paddle
+
+from paddlenlp.peft.tuners.xlora.model import XLoraModel
 
 from .config import PeftConfig
 from .mixed_model import PeftMixedModel
@@ -31,42 +32,13 @@ from .peft_model import (
     PeftModelForSequenceClassification,
     PeftModelForTokenClassification,
 )
-from .tuners import (
-    AdaLoraConfig,
-    AdaLoraModel,
-    AdaptionPromptConfig,
-    BOFTConfig,
-    BOFTModel,
-    BoneConfig,
-    BoneModel,
-    CPTConfig,
-    CPTEmbedding,
-    FourierFTConfig,
-    FourierFTModel,
-    HRAConfig,
-    HRAModel,
-    IA3Config,
-    IA3Model,
-    LNTuningConfig,
-    LNTuningModel,
-    LoHaConfig,
-    LoHaModel,
+from .tuners import (  # AdaLoraConfig,; AdaLoraModel,; AdaptionPromptConfig,; BOFTConfig,; BOFTModel,; BoneConfig,; BoneModel,; CPTConfig,; CPTEmbedding,; FourierFTConfig,; FourierFTModel,; HRAConfig,; HRAModel,; IA3Config,; IA3Model,; LNTuningConfig,; LNTuningModel,; LoHaConfig,; LoHaModel,; MultitaskPromptTuningConfig,; OFTConfig,; OFTModel,; PolyConfig,; PolyModel,; PrefixTuningConfig,; PromptEncoderConfig,; PromptTuningConfig,; VBLoRAConfig,; VBLoRAModel,
     LoKrConfig,
     LoKrModel,
-    LoraConfig,
-    LoraModel,
-    MultitaskPromptTuningConfig,
-    OFTConfig,
-    OFTModel,
-    PolyConfig,
-    PolyModel,
-    PrefixTuningConfig,
-    PromptEncoderConfig,
-    PromptTuningConfig,
-    VBLoRAConfig,
-    VBLoRAModel,
-    VeraConfig,
-    VeraModel,
+    LoRAConfig,
+    LoRAModel,
+    VeRAConfig,
+    VeRAModel,
     XLoraConfig,
 )
 from .tuners.tuners_utils import BaseTuner
@@ -74,7 +46,7 @@ from .utils import _prepare_prompt_learning_config
 from .utils.constants import PEFT_TYPE_TO_PREFIX_MAPPING
 
 if TYPE_CHECKING:
-    from transformers import PreTrainedModel
+    from paddlenlp.transformers import PretrainedModel
 
 
 MODEL_TYPE_TO_PEFT_MODEL_MAPPING: dict[str, type[PeftModel]] = {
@@ -87,47 +59,47 @@ MODEL_TYPE_TO_PEFT_MODEL_MAPPING: dict[str, type[PeftModel]] = {
 }
 
 PEFT_TYPE_TO_CONFIG_MAPPING: dict[str, type[PeftConfig]] = {
-    "ADAPTION_PROMPT": AdaptionPromptConfig,
-    "PROMPT_TUNING": PromptTuningConfig,
-    "PREFIX_TUNING": PrefixTuningConfig,
-    "P_TUNING": PromptEncoderConfig,
-    "LORA": LoraConfig,
-    "LOHA": LoHaConfig,
-    "LORAPLUS": LoraConfig,
+    # "ADAPTION_PROMPT": AdaptionPromptConfig,
+    # "PROMPT_TUNING": PromptTuningConfig,
+    # "PREFIX_TUNING": PrefixTuningConfig,
+    # "P_TUNING": PromptEncoderConfig,
+    "LORA": LoRAConfig,
+    # "LOHA": LoHaConfig,
+    "LORAPLUS": LoRAConfig,
     "LOKR": LoKrConfig,
-    "ADALORA": AdaLoraConfig,
-    "BOFT": BOFTConfig,
-    "IA3": IA3Config,
-    "MULTITASK_PROMPT_TUNING": MultitaskPromptTuningConfig,
-    "OFT": OFTConfig,
-    "POLY": PolyConfig,
-    "LN_TUNING": LNTuningConfig,
-    "VERA": VeraConfig,
-    "FOURIERFT": FourierFTConfig,
+    # "ADALORA": AdaLoraConfig,
+    # "BOFT": BOFTConfig,
+    # "IA3": IA3Config,
+    # "MULTITASK_PROMPT_TUNING": MultitaskPromptTuningConfig,
+    # "OFT": OFTConfig,
+    # "POLY": PolyConfig,
+    # "LN_TUNING": LNTuningConfig,
+    "VERA": VeRAConfig,
+    # "FOURIERFT": FourierFTConfig,
     "XLORA": XLoraConfig,
-    "HRA": HRAConfig,
-    "VBLORA": VBLoRAConfig,
-    "CPT": CPTConfig,
-    "BONE": BoneConfig,
+    # "HRA": HRAConfig,
+    # "VBLORA": VBLoRAConfig,
+    # "CPT": CPTConfig,
+    # "BONE": BoneConfig,
 }
 
 PEFT_TYPE_TO_TUNER_MAPPING: dict[str, type[BaseTuner]] = {
-    "LORA": LoraModel,
-    "LOHA": LoHaModel,
+    "LORA": LoRAModel,
+    # "LOHA": LoHaModel,
     "LOKR": LoKrModel,
-    "ADALORA": AdaLoraModel,
-    "BOFT": BOFTModel,
-    "IA3": IA3Model,
-    "OFT": OFTModel,
-    "POLY": PolyModel,
-    "LN_TUNING": LNTuningModel,
-    "VERA": VeraModel,
-    "FOURIERFT": FourierFTModel,
-    "XLORA": XLoraModel,
-    "HRA": HRAModel,
-    "VBLORA": VBLoRAModel,
-    "CPT": CPTEmbedding,
-    "BONE": BoneModel,
+    # "ADALORA": AdaLoraModel,
+    # "BOFT": BOFTModel,
+    # "IA3": IA3Model,
+    # "OFT": OFTModel,
+    # "POLY": PolyModel,
+    # "LN_TUNING": LNTuningModel,
+    "VERA": VeRAModel,
+    # "FOURIERFT": FourierFTModel,
+    # "XLORA": XModel,
+    # "HRA": HRAModel,
+    # "VBLORA": VBLoRAModel,
+    # "CPT": CPTEmbedding,
+    # "BONE": BoneModel,
 }
 
 
@@ -143,7 +115,7 @@ def get_peft_config(config_dict: dict[str, Any]) -> PeftConfig:
 
 
 def get_peft_model(
-    model: PreTrainedModel,
+    model: PretrainedModel,
     peft_config: PeftConfig,
     adapter_name: str = "default",
     mixed: bool = False,
@@ -155,7 +127,7 @@ def get_peft_model(
     Returns a Peft model object from a model and a config.
 
     Args:
-        model ([`transformers.PreTrainedModel`]):
+        model ([`transformers.PretrainedModel`]):
             Model to be wrapped.
         peft_config ([`PeftConfig`]):
             Configuration object containing the parameters of the Peft model.
@@ -235,8 +207,8 @@ def get_peft_model(
 
 
 def inject_adapter_in_model(
-    peft_config: PeftConfig, model: torch.nn.Module, adapter_name: str = "default", low_cpu_mem_usage: bool = False
-) -> torch.nn.Module:
+    peft_config: PeftConfig, model: paddle.nn.Layer, adapter_name: str = "default", low_cpu_mem_usage: bool = False
+) -> paddle.nn.Layer:
     r"""
     A simple API to create and inject adapter in-place into a model. Currently the API does not support prompt learning
     methods and adaption prompt. Make sure to have the correct `target_names` set in the `peft_config` object. The API
@@ -245,7 +217,7 @@ def inject_adapter_in_model(
     Args:
         peft_config (`PeftConfig`):
             Configuration object containing the parameters of the Peft model.
-        model (`torch.nn.Module`):
+        model (`paddle.nn.Layer`):
             The input model where the adapter will be injected.
         adapter_name (`str`, `optional`, defaults to `"default"`):
             The name of the adapter to be injected, if not provided, the default adapter name is used ("default").

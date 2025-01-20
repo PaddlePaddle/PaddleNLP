@@ -81,7 +81,13 @@ from ..data import (
     default_data_collator,
     init_dataloader_comm_group,
 )
-from ..peft import LoKrModel, LoRAModel, PrefixModelForCausalLM, ReFTModel, VeRAModel
+from ..peft.tuners import (
+    LoKrModel,
+    LoRAModel,
+    PrefixModelForCausalLM,
+    ReFTModel,
+    VeRAModel,
+)
 
 try:
     from ..quantization.quantization_linear import QuantizationLinear

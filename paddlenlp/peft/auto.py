@@ -18,11 +18,10 @@ import importlib
 import os
 from typing import Optional
 
-from transformers import (
+from paddlenlp.transformers import (  # AutoModelForSeq2SeqLM,
     AutoModel,
     AutoModelForCausalLM,
     AutoModelForQuestionAnswering,
-    AutoModelForSeq2SeqLM,
     AutoModelForSequenceClassification,
     AutoModelForTokenClassification,
     AutoTokenizer,
@@ -147,9 +146,9 @@ class AutoPeftModelForCausalLM(_BaseAutoPeftModel):
     _target_peft_class = PeftModelForCausalLM
 
 
-class AutoPeftModelForSeq2SeqLM(_BaseAutoPeftModel):
-    _target_class = AutoModelForSeq2SeqLM
-    _target_peft_class = PeftModelForSeq2SeqLM
+# class AutoPeftModelForSeq2SeqLM(_BaseAutoPeftModel):
+#     _target_class = AutoModelForSeq2SeqLM
+#     _target_peft_class = PeftModelForSeq2SeqLM
 
 
 class AutoPeftModelForSequenceClassification(_BaseAutoPeftModel):

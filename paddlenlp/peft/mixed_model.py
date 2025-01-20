@@ -18,33 +18,40 @@ import os
 from contextlib import contextmanager
 from typing import Any, Optional, Union
 
-import torch
-from accelerate.hooks import remove_hook_from_submodules
-from peft.utils.constants import DUMMY_MODEL_CONFIG
-from torch import nn
-from transformers.utils import PushToHubMixin
+import paddle
+
+# from accelerate.hooks import remove_hook_from_submodules
+from paddle import nn
+
+from paddlenlp.peft.utils.constants import DUMMY_MODEL_CONFIG
 
 from .config import PeftConfig
 from .peft_model import PeftModel
-from .tuners import AdaLoraModel, IA3Model, LoHaModel, LoKrModel, LoraModel, MixedModel
-from .tuners.mixed import COMPATIBLE_TUNER_TYPES
+
+# from .tuners import AdaLoraModel, IA3Model, LoHaModel, LoKrModel, LoraModel, MixedModel
+from .tuners import LoKrModel, LoRAModel
+
+# from .tuners.mixed import COMPATIBLE_TUNER_TYPES
 from .utils import PeftType, _set_adapter, _set_trainable
 
+# from paddlenlp.transformers.utils import PushToHubMixin
+
+
 PEFT_TYPE_TO_MODEL_MAPPING = {
-    PeftType.LORA: LoraModel,
-    PeftType.LOHA: LoHaModel,
+    PeftType.LORA: LoRAModel,
+    # PeftType.LOHA: LoHaModel,
     PeftType.LOKR: LoKrModel,
-    PeftType.ADALORA: AdaLoraModel,
-    PeftType.IA3: IA3Model,
+    # PeftType.ADALORA: AdaLoraModel,
+    # PeftType.IA3: IA3Model,
 }
 
 
-def _prepare_model_for_gradient_checkpointing(model: nn.Module) -> None:
+def _prepare_model_for_gradient_checkpointing(model: nn.Layer) -> None:
     r"""
     Prepares the model for gradient checkpointing if necessary
     """
     # Note: same as PeftModel._prepare_model_for_gradient_checkpointing
-    if not getattr(model, "is_gradient_checkpointing", True):
+    if not getattr(model, "enable_recompute", True):
         return model
 
     if not (
@@ -70,7 +77,7 @@ def _check_config_compatible(peft_config: PeftConfig) -> None:
         )
 
 
-class PeftMixedModel(PushToHubMixin, torch.nn.Module):
+class PeftMixedModel(paddle.nn.Layer):
     """
     PeftMixedModel for loading mixing different types of adapters for inference.
 
@@ -95,7 +102,7 @@ class PeftMixedModel(PushToHubMixin, torch.nn.Module):
     ```
 
     Args:
-        model (`torch.nn.Module`):
+        model (`paddle.nn.Layer`):
             The model to be tuned.
         config (`PeftConfig`):
             The config of the model to be tuned. The adapter type must be compatible.
@@ -105,7 +112,7 @@ class PeftMixedModel(PushToHubMixin, torch.nn.Module):
             Create empty adapter weights on meta device. Useful to speed up the loading process.
     """
 
-    def __init__(self, model: nn.Module, peft_config: PeftConfig, adapter_name: str = "default") -> None:
+    def __init__(self, model: nn.Layer, peft_config: PeftConfig, adapter_name: str = "default") -> None:
         super().__init__()
         _check_config_compatible(peft_config)
         _prepare_model_for_gradient_checkpointing(model)
@@ -181,7 +188,7 @@ class PeftMixedModel(PushToHubMixin, torch.nn.Module):
     def __getattr__(self, name: str):
         """Forward missing attributes to the wrapped module."""
         try:
-            return super().__getattr__(name)  # defer to nn.Module's logic
+            return super().__getattr__(name)  # defer to nn.Layer's logic
         except AttributeError:
             if name == "base_model":  # see #1892: prevent infinite recursion if class is not initialized
                 raise
@@ -359,7 +366,7 @@ class PeftMixedModel(PushToHubMixin, torch.nn.Module):
             is_trainable (`bool`, *optional*, defaults to `False`):
                 Whether the adapter should be trainable or not. If `False`, the adapter will be frozen and can only be
                 used for inference.
-            torch_device (`str`, *optional*, defaults to None):
+            paddle_device (`str`, *optional*, defaults to None):
                 The device to load the adapter on. If `None`, the device will be inferred.
             autocast_adapter_dtype (`bool`, *optional*, defaults to `True`):
                 Whether to autocast the adapter dtype. Defaults to `True`. Right now, this will only cast adapter
@@ -394,7 +401,7 @@ class PeftMixedModel(PushToHubMixin, torch.nn.Module):
     @classmethod
     def from_pretrained(
         cls,
-        model: nn.Module,
+        model: nn.Layer,
         model_id: str | os.PathLike,
         adapter_name: str = "default",
         is_trainable: bool = False,
@@ -407,7 +414,7 @@ class PeftMixedModel(PushToHubMixin, torch.nn.Module):
         Note that the passed `model` may be modified inplace.
 
         Args:
-            model (`nn.Module`):
+            model (`nn.Layer`):
                 The model to be adapted.
             model_id (`str` or `os.PathLike`):
                 The name of the PEFT configuration to use. Can be either:

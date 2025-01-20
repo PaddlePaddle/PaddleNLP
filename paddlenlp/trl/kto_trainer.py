@@ -32,9 +32,9 @@ def disable_dropout_in_model(model: paddle.nn.Layer) -> None:
 
 
 try:
-    from paddlenlp.peft.lora.lora_model import AVAILABLE_LAYERS
+    from paddlenlp.peft.tuners.lora.model import AVAILABLE_LAYERS
 except:
-    from paddlenlp.peft.lora.lora_model import AVALIABLE_LAYERS
+    from paddlenlp.peft.tuners.lora.model import AVALIABLE_LAYERS
 
     AVAILABLE_LAYERS = AVALIABLE_LAYERS
 
