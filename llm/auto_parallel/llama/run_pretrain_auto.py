@@ -58,6 +58,7 @@ from paddlenlp.data.causal_dataset import (
     check_data_split,
     print_rank_0,
 )
+from paddlenlp.utils.tools import get_env_device
 from paddlenlp.trainer.utils.doc import add_start_docstrings
 
 
@@ -544,6 +545,15 @@ def main():
         pipeline = training_args.strategy.pipeline
         pipeline.vpp_degree = config.virtual_pp_degree
         pipeline.vpp_seg_method = training_args.virtual_pipeline_seg_method
+    if get_env_device() == "xpu" and training_args.gradient_accumulation_steps > 1:
+        try:
+            from paddle_xpu.layers.nn.linear import LinearConfig  # noqa: F401
+
+            LinearConfig.enable_accumulate_steps_opt()
+            LinearConfig.set_accumulate_steps(training_args.gradient_accumulation_steps)
+        except ImportError:
+            # It's OK, not use accumulate_steps optimization
+            pass
 
     print("Final pre-training config:", config)
 

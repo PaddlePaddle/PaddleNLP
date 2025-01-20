@@ -52,6 +52,7 @@ from paddlenlp.transformers.model_outputs import (
     CausalLMOutputWithCrossAttentions,
 )
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+from paddlenlp.utils.tools import get_env_device
 
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
@@ -308,7 +309,7 @@ class LlamaAttentionAuto(nn.Layer):
         self.ipp = ipp
 
         self.use_fused_rope = config.use_fused_rope
-        if self.use_fused_rope:
+        if self.use_fused_rope and get_env_device() not in ["npu", "mlu", "xpu", "gcu", "intel_hpu"]:
             if "gpu" not in paddle.device.get_device() or fused_rotary_position_embedding is None:
                 warnings.warn(
                     "Enable fuse rope in the config, but fuse rope is not available. "
@@ -935,7 +936,22 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
         else:
             expanded_attn_mask = _make_causal_mask(input_shape, past_key_values_length=past_key_values_length)
         # Convert bool attention_mask to float attention mask, which will be added to attention_scores later
-        expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min).astype(dtype)
+        if get_env_device() in ["npu", "mlu", "intel_hpu"]:
+            x = paddle.to_tensor(0.0, dtype="float32")
+            y = paddle.to_tensor(paddle.finfo(dtype).min, dtype="float32")
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), x, y).astype(dtype)
+        elif get_env_device() == "xpu":
+            x = paddle.to_tensor(0.0, dtype="float32")
+            y = paddle.to_tensor(-1.7005809656952787e38, dtype="float32")
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), x, y)
+        elif get_env_device() == "gcu":
+            min_val = paddle.finfo(dtype).min
+            x = paddle.to_tensor(0.0, dtype=dtype)
+            y = paddle.to_tensor(min_val, dtype=dtype)
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), x, y).astype(dtype)
+        else:
+            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), 0.0, paddle.finfo(dtype).min)
+            expanded_attn_mask = expanded_attn_mask.astype(dtype)
         return expanded_attn_mask
 
     def forward(

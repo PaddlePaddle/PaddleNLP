@@ -1,0 +1,87 @@
+#!/bin/bash
+cd llm
+task_name_or_path="llama2-13b-4k"
+
+#export XPUAPI_DEBUG=0x1
+#export XPURT_DISPATCH_MODE=PROFILING
+export XBLAS_FC_HBM_VERSION=40
+
+# PaddlePaddle
+export FLAGS_use_stride_kernel="0"
+export XPU_PADDLE_L3_SIZE=98566144 # 94 MB
+export XPU_CDNN_CLUSTER_PARALLEL=1
+export XPU_CDNN_CLUSTER_PARALLEL_STREAM_NUMBER=2
+
+# PDC
+unset PADDLE_ELASTIC_JOB_ID
+unset PADDLE_TRAINER_ENDPOINTS
+unset DISTRIBUTED_TRAINER_ENDPOINTS
+unset FLAGS_START_PORT
+unset PADDLE_ELASTIC_TIMEOUT
+unset PADDLE_TRAINERS_NUM
+
+# BKCL
+# export BKCL_DEBUG=1
+# Multi-computer RDMA
+#export BKCL_ENABLE_XDR=1
+#export BKCL_RDMA_FORCE_TREE=1
+#export BKCL_TREE_THRESHOLD=0
+#export BKCL_RDMA_NICS=xgbe1,xgbe1,xgbe2,xgbe2,xgbe3,xgbe3,xgbe4,xgbe4
+#export BKCL_SOCKET_IFNAME=xgbe0
+#export BKCL_FORCE_L3_RDMA=0
+echo "bkcl version:"
+strings ${bkcl_location}/libbkcl.so | grep COM
+
+export CUDA_DEVICE_MAX_CONNECTIONS=8
+
+timestamp=$(date +%Y%m%d%H%M%S)
+echo $timestamp
+PYTHONPATH=../:$PYTHONPATH  \
+python -u  -m paddle.distributed.launch \
+    --xpus "0,1,2,3,4,5,6,7" \
+    --log_dir "output/$task_name_or_path/$timestamp""_log" \
+    run_pretrain.py \
+    --model_name_or_path "meta-llama/Llama-2-13b" \
+    --tokenizer_name_or_path "meta-llama/Llama-2-13b" \
+    --input_dir "./data" \
+    --output_dir "output/$task_name_or_path/$timestamp" \
+    --split 949,50,1 \
+    --max_seq_length 4096 \
+    --per_device_train_batch_size 1 \
+    --per_device_eval_batch_size 1 \
+    --use_flash_attention 1 \
+    --use_fused_rope 1 \
+    --fuse_attention_ffn 1 \
+    --fuse_attention_qkv 1 \
+    --use_fused_rms_norm 1 \
+    --num_hidden_layers 40 \
+    --bf16 \
+    --fp16_opt_level "O2"  \
+    --scale_loss 1024 \
+    --learning_rate 0.00003 \
+    --min_learning_rate 0.000005 \
+    --lr_scheduler_type "cosine" \
+    --max_steps 100000 \
+    --save_steps 100000 \
+    --weight_decay 0.01 \
+    --warmup_ratio 0.01 \
+    --max_grad_norm 1.0 \
+    --logging_steps 1 \
+    --sequence_parallel 0 \
+    --dataloader_num_workers 4 \
+    --pipeline_parallel_degree 2 \
+    --pipeline_parallel_config "disable_partial_send_recv" \
+    --tensor_parallel_degree 2 \
+    --tensor_parallel_config "enable_mp_async_allreduce,enable_mp_skip_c_identity" \
+    --gradient_accumulation_steps 32 \
+    --sharding "stage1" \
+    --sharding_parallel_config "split_param" \
+    --eval_steps 1000 \
+    --report_to "visualdl" \
+    --disable_tqdm true \
+    --continue_training 0 \
+    --recompute 0 \
+    --do_train \
+    --seed 1026 \
+    --device "xpu" \
+    --amp_master_grad true

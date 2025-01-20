@@ -1632,13 +1632,12 @@ class TrainingArguments:
                             "enable_mp_async_allreduce",  # allreduce_matmul_grad_overlapping in auto_parallel
                             "enable_delay_scale_loss",
                             "replace_with_c_embedding",
-                            # "enable_mp_skip_c_identity",
                             # "enable_mp_fused_linear_param_grad_add",
                             "replace_with_parallel_cross_entropy",
                         ]:
                             raise ValueError(
                                 f"Found unknown tensor parallell config {x}, "
-                                f"accept config is enable_mp_async_allreduce, replace_with_c_embedding, enable_mp_skip_c_identity and enable_mp_fused_linear_param_grad_add"
+                                f"accept config is enable_mp_async_allreduce, replace_with_c_embedding, and enable_mp_fused_linear_param_grad_add"
                             )
                 try:
                     if "enable_mp_async_allreduce" in mp_config:
