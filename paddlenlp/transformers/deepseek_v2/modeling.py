@@ -1262,6 +1262,18 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                         final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
                 final_actions[key] = action
 
+            # for MTP (eagle) parameters for inference
+            base_actions.pop("embed_tokens.weight")
+            base_actions.pop("lm_head.weight")
+            base_actions["layers.0.embed_tokens.weight"] = partial(fn, is_column=False)
+            base_actions["layers.0.eh_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.shared_head.head.weight"] = partial(fn, is_column=True)
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    final_actions[key.replace("layers.0.", f"layers.{config.num_hidden_layers}.")] = action
+                else:
+                    final_actions[key] = action
+
             return final_actions
 
         mappings = get_tensor_parallel_split_mappings(config.num_hidden_layers)
