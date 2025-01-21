@@ -978,6 +978,14 @@ class TrainingArguments:
         default=300,
         metadata={"help": "Timeout seconds for downloading checkpoint from remote cluster."},
     )
+    count_trained_tokens: bool = field(
+        default=False,
+        metadata={"help": "Whether to count trained tokens."},
+    )
+    pad_token_id: int = field(
+        default=0,
+        metadata={"help": "The id of the padding token."},
+    )
 
     def __post_init__(self):
         if in_auto_parallel_align_mode():
