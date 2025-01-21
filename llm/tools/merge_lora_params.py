@@ -78,7 +78,7 @@ def weight_process(name, quant_config, lora_config, state_dict, device):
         raise ValueError(f"quant_config.weight_quantize_algo {quant_config.weight_quantize_algo} is not supported.")
 
 
-def get_mixer(mixer, mixer_num, index = 0):
+def get_mixer(mixer, mixer_num, index=0):
     if index == mixer_num - 1:
         return mixer[index]
     else:
@@ -121,12 +121,6 @@ def lora_process(name, layer, lora_config, state_dict, device, lora_state_dict=N
         if lora_use_mixer:
             for key in mixer.keys():
                 mixer[key] = mixer[key].to(target_device)
-                
-    if not lora_config.rslora:
-        scaling = lora_config.lora_alpha / lora_config.r
-    else:
-        scaling = lora_config.lora_alpha / math.sqrt(lora_config.r)
-
 
     if device == "cpu" and weight.dtype.name == "BF16":
         weight = weight.astype("float32")
@@ -135,7 +129,7 @@ def lora_process(name, layer, lora_config, state_dict, device, lora_state_dict=N
             lora_B = lora_B.astype("float32")
 
         if lora_use_mixer:
-            for key in mixer.keys(): 
+            for key in mixer.keys():
                 mixer[key] = mixer[key].astype(lora_config.dtype)
             delta_weight = layer.get_delta_weight(lora_A, lora_B, get_mixer(mixer, mixer_num))
         elif use_mora:

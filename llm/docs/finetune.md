@@ -94,7 +94,7 @@ python  -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7"  run_finetune.
 3. 可以通过设置`weight_quantize_algo`将主干模型量化低比特，例如'weight_only_int4','weight_only_int8'，'nf4'或'fp4'。具体参考精调参数介绍
 4. 设置`use_flash_attention`为 True 使用 FlashAttention。在 FlashAttention 打开的基础上设置`flash_mask`为 True 使用 FlashMask。
 5. LoRA API 支持4D 并行策略，可以通过控制`tensor_parallel_degree`、`pipeline_parallel_degree`、 `sharding`、`sharding_parallel_degree`调整并行训练策略，可拓展至**单机 LoRA 微调千亿模型**。
-6. 可配置`rslora`、`lora_plus_scale`、`pissa`、`lora_use_mixer`、`use_mora`等参数，使用 rsLoRA、LoRa+、PiSSA、MosLoRA（暂不支持张量模型并行）、MoRA（暂不支持张量模型并行） 等算法。
+6. 可配置`rslora`、`lora_plus_scale`、`pissa`、`lora_use_mixer`、`mixer_num`、`use_mora`等参数，使用 rsLoRA、LoRa+、PiSSA、MosLoRA（暂不支持张量模型并行）、LinChain（暂不支持张量模型并行）、MoRA（暂不支持张量模型并行） 等算法。
 
 为了后续的**压缩**和**静态图推理**方便，我们提供 LoRA 参数合并脚本，可以将 LoRA 参数合并到主干模型并保存相应的权重。
 ```

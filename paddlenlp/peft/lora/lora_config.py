@@ -94,7 +94,12 @@ class LoRAConfig:
         default=False,
         metadata={"help": "Whether to use mos lora."},
     )
-    mixer_num: int = field(default=1, metadata={"help": "Num of mixer matrices."})
+    mixer_num: int = field(
+        default=1,
+        metadata={
+            "help": "Num of mixer matrices. Mixer matrices will be added between the LoRA_A and LoRA_B matrices, as referenced in the paper https://arxiv.org/abs/2411.00039."
+        },
+    )
 
     def __post_init__(self):
         if self.use_quick_lora and self.lora_dropout > 0:
