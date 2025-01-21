@@ -73,19 +73,30 @@ mkdir data
 mv llama_openwebtext_100k.bin ./data
 mv llama_openwebtext_100k.idx ./data
 ```
+单卡训练:
+```shell
+# 16G 显存可训练
+python -u run_pretrain.py ./config/qwen/pretrain_argument_0p5b.json
+```
+- 该配置16G 显存可训练，可以开启 use_flash_attention,use_fused_rms_norm,recompute 进一步省显存
+- 如果上述配置无法开启，或显存依然不够，可以开启`offload_optim`,此时显存约为11G  `python -u run_pretrain.py ./config/qwen/pretrain_argument_0p5b.json  --offload_optim  1`
 
+高性能、多卡、多机训练:
 ```shell
 # 编译自定义算子，可选
 cd ../slm/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 
-# 模型预训练参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json
+# 多卡模型预训练参考:
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json
+# 多机训练参考: 占用45G显存左右
+python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7"  --master=127.0.0.1:8090 --nnodes=2  run_pretrain.py ./config/llama/pretrain_argument.json
 ```
+- 更详细的分布式启动命令请参考[这里](https://www.paddlepaddle.org.cn/documentation/docs/zh/2.6/api/paddle/distributed/launch_cn.html#launch)。
 
 注意：
 
 1. 建议使用 paddle develop 版本训练，需要安装`pip install fast_dataindex visualdl==2.5.3`等相关缺失 whl 包
-2. `use_flash_attention` 需要在 A100机器开启，建议使用 cuda11.8环境。
+2. `use_flash_attention` 需要在 A100 以上机器开启，建议使用 cuda11.8以上环境。
 3. `use_fused_rms_norm` 需要安装自定义算子。如果安装后仍然找不到算子，需要额外设置 PYTHONPATH
 4. `continue_training` 表示从现有的预训练模型加载训练。7b 模型初始 loss 大概为2.xx, 随机初始化模型 loss 从11.x 左右下降。
 5. 多机训练时，若各机器使用的训练数据文件位置相同（例如挂载共享硬盘情况），请指定`--share_folder true`使全局0号卡制作缓存数据。否则默认各台机器的0号卡独立制作缓存数据，
@@ -125,6 +136,7 @@ PaddleNLP 支持多个主流大模型的 SFT、PEFT 等精调策略，提供统�
 为了方便测试，我们也提供了[tatsu-lab/alpaca](https://huggingface.co/datasets/tatsu-lab/alpaca)demo 数据集可以直接使用：
 
 ```shell
+# 在 PaddleNLP/llm 目录执行
 wget https://bj.bcebos.com/paddlenlp/datasets/examples/alpaca_demo.gz
 tar -xvf alpaca_demo.gz
 ```
@@ -133,7 +145,7 @@ tar -xvf alpaca_demo.gz
 
 ```bash
 # SFT 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_finetune.py ./config/llama/sft_argument.json
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_finetune.py ./config/llama/sft_argument.json
 ```
 
 #### 2.3 LoRA
@@ -194,14 +206,14 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 
 ```bash
 # DPO 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
 ```
 
 ##### LoRA DPO
 
 ```bash
 # DPO 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
 ```
 更多 DPO 技术细节和使用说明详见[DPO 文档](./docs/dpo.md)。
 
@@ -240,13 +252,13 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 
 ```bash
 # KTO 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_argument.json
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_argument.json
 ```
 ##### LoRA KTO
 
 ```bash
 # KTO 启动命令参考
-python -u  -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_lora_argument.json
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/kto/run_kto.py ./config/llama/kto_lora_argument.json
 ```
 
 #### 3.3 RLHF
@@ -356,7 +368,7 @@ python ./predict/predictor.py --model_name_or_path ./inference --inference_model
 服务化部署脚本
 
 ```shell
-python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" ./predict/flask_server.py \
+python -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./predict/flask_server.py \
     --model_name_or_path meta-llama/Llama-2-7b-chat \
     --port 8010 \
     --flask_port 8011 \
@@ -384,7 +396,7 @@ mkdir Llama-3-8B-A8W8C8 && tar -xf Meta-Llama-3-8B-Instruct-A8W8C8.tar -C Llama-
 # 挂载模型文件
 export MODEL_PATH=${PWD}/Llama-3-8B-A8W8C8
 
-docker run --gpus all --shm-size 5G --network=host --privileged --cap-add=SYS_PTRACE \
+docker run --devices all --shm-size 5G --network=host --privileged --cap-add=SYS_PTRACE \
 -v ${MODEL_PATH}:/models/ \
 -dit registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cudnn9-v1.2 \
 bash -c 'export USE_CACHE_KV_INT8=1 && cd /opt/output/Serving && bash start_server.sh; exec bash'

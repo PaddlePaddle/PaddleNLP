@@ -788,7 +788,9 @@ class ChatTemplateMixin:
             ans.append(ans_roundi)
 
         non_learnable_parts = self._extract_non_learnable_parts(origin_msg, ans)
-        assert len(non_learnable_parts) == len(ans)
+        assert len(non_learnable_parts) == len(
+            ans
+        ), f"Get non_learnable_parts len: {len(non_learnable_parts)}, but ans len: {len(ans)}."
 
         conversation_ids = []
         for i in range(len(non_learnable_parts)):
