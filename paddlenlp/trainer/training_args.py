@@ -1004,10 +1004,6 @@ class TrainingArguments:
         default=300,
         metadata={"help": "Timeout seconds for downloading checkpoint from remote cluster."},
     )
-    pdc_use_flash_device: Optional[bool] = field(
-        default=False,
-        metadata={"help": "Use flash device for storage of checkpoints and other usages"},
-    )
     flash_save_steps: Optional[int] = field(
         default=0,
         metadata={"help": "Save checkpoints on flash device every this many steps. Default is 0 which disables it"},
@@ -1895,11 +1891,7 @@ class TrainingArguments:
         # process fault tolerance settings
         if is_ft_env():
             pdc_flash_checkpoint_init_step = os.getenv("PDC_FC_INIT_STEP")
-            if (
-                self.pdc_use_flash_device
-                and pdc_flash_checkpoint_init_step is not None
-                and int(pdc_flash_checkpoint_init_step) > 0
-            ):
+            if pdc_flash_checkpoint_init_step is not None and int(pdc_flash_checkpoint_init_step) > 0:
                 self.resume_from_checkpoint = os.path.join(
                     FLASH_DEVICE, f"{PREFIX_CHECKPOINT_DIR}-{pdc_flash_checkpoint_init_step}"
                 )
@@ -1908,7 +1900,7 @@ class TrainingArguments:
                 )
             if self.flash_save_steps > 0:
                 assert (
-                    self.pdc_use_flash_device and self.enable_flash_save_mode
+                    self.enable_flash_save_mode
                 ), "flash_save_steps should only be set in flash save mode with flash device mounted."
         else:
             if self.pdc_download_ckpt:
