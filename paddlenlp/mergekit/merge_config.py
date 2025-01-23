@@ -17,10 +17,7 @@ import os
 from dataclasses import asdict, dataclass, field
 from typing import List, Optional
 
-import paddle
-
 from paddlenlp.utils.env import MERGE_CONFIG_NAME
-from paddlenlp.utils.log import logger
 
 
 @dataclass
@@ -30,7 +27,6 @@ class MergeConfig:
     """
 
     # Common parameters
-    device: str = field(default="cpu", metadata={"help": "Device to use for the merge.ex cpu、 gpu、low_gpu_mem"})
     tensor_type: str = field(
         default="np", metadata={"help": "Tensor type to use for the merge. Choose np(CPU Only) or pd (CPU/GPU)"}
     )
@@ -47,6 +43,8 @@ class MergeConfig:
     )
     base_model_path: str = field(default=None, metadata={"help": "Base model name or path."})
     output_path: str = field(default=None, metadata={"help": "Base model name or path."})
+    lora_merge: bool = field(default=False, metadata={"help": "Use LoRA merge."})
+
     # merge parameters
     weight_list: Optional[List[float]] = field(
         default=None, metadata={"help": "Relative (or absolute if normalize=False) weighting of a given tensor"}
@@ -75,9 +73,6 @@ class MergeConfig:
             os.makedirs(self.output_path, exist_ok=True)
         if self.tensor_type not in ["np", "pd"]:
             raise ValueError(f"Unsupported tensor type: {self.tensor_type}. Support 'np' and 'pd' only.")
-        if self.device == "gpu" and self.tensor_type == "np":
-            logger.warning("np only support cpu device, but got gpu. Setting `device` to `cpu`.")
-            self.device = "cpu"
 
         elif self.merge_method not in ["linear", "ties", "slerp", "della_linear", "della", "dare_linear", "dare_ties"]:
             raise ValueError(
@@ -100,7 +95,6 @@ class MergeConfig:
                 raise ValueError(
                     f"Error: reserve_p +- epsilon/2 must be in the range (0, 1). reserve_p + epsilon/2 = {self.reserve_p + self.epsilon / 2 }, reserve_p - epsilon/2 = {self.reserve_p - self.epsilon / 2 }"
                 )
-        paddle.set_device(self.device)
 
     @property
     def __dict__(self):

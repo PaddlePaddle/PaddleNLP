@@ -48,11 +48,10 @@ class MergeMethod:
             tensor_output = sum(weight * tensor for weight, tensor in zip(weight_list, tensor_list))
             return tensor_output
         elif self.merge_config.tensor_type == "pd":
-            weighted_sum = paddle.zeros_like(tensor_list[0])
+            tensor_output = paddle.zeros_like(tensor_list[0])
             for i, tensor in enumerate(tensor_list):
-                weight = weight_list[i]
-                weighted_sum += tensor * weight
-            return weighted_sum
+                tensor_output += tensor * weight_list[i]
+            return tensor_output
         else:
             raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
 

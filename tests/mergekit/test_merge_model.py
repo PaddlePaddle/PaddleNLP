@@ -20,12 +20,11 @@ from parameterized import parameterized
 
 from paddlenlp.mergekit import MergeConfig, MergeModel
 from paddlenlp.transformers import AutoModel
-from tests.testing_utils import require_gpu
 
 
 class TestMergeModel(unittest.TestCase):
     @parameterized.expand([("slerp",), ("della",), ("dare_linear",), ("ties",)])
-    def test_merge_model(self, merge_method):
+    def test_merge_model_np(self, merge_method):
         with TemporaryDirectory() as tempdir:
             model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert", dtype="bfloat16")
             pd_path = os.path.join(tempdir, "pd_model")
@@ -68,20 +67,8 @@ class TestMergeModel(unittest.TestCase):
             mergekit = MergeModel(merge_config)
             mergekit.merge_model()
 
-            # test safetensor only with pd
-            merge_config = MergeConfig(
-                merge_method=merge_method,
-                model_path_list=[safe_path, safe_path],
-                output_path=tempdir,
-                n_process=2,
-                tensor_type="pd",
-            )
-            mergekit = MergeModel(merge_config)
-            mergekit.merge_model()
-
     @parameterized.expand([("slerp",), ("della",), ("dare_linear",), ("ties",)])
-    @require_gpu(2)
-    def test_merge_model_gpu(self, merge_method):
+    def test_merge_model_pd(self, merge_method):
         with TemporaryDirectory() as tempdir:
             model = AutoModel.from_pretrained("__internal_testing__/tiny-random-bert", dtype="bfloat16")
             pd_path = os.path.join(tempdir, "pd_model")
@@ -89,13 +76,41 @@ class TestMergeModel(unittest.TestCase):
             safe_path = os.path.join(tempdir, "safe_model")
             model.save_pretrained(safe_path, safe_serialization="safetensors")
 
-            # test safetensor only with pd and gpu
+            # test mix
+            merge_config = MergeConfig(
+                merge_method=merge_method, model_path_list=[safe_path, pd_path], output_path=tempdir, tensor_type="pd"
+            )
+            mergekit = MergeModel(merge_config)
+            mergekit.merge_model()
+
+            # test mix with base model
+            merge_config = MergeConfig(
+                merge_method=merge_method,
+                model_path_list=[safe_path, pd_path],
+                output_path=tempdir,
+                base_model_path=safe_path,
+                tensor_type="pd",
+            )
+            mergekit = MergeModel(merge_config)
+            mergekit.merge_model()
+
+            # test safetensor only
             merge_config = MergeConfig(
                 merge_method=merge_method,
                 model_path_list=[safe_path, safe_path],
                 output_path=tempdir,
-                device="gpu",
                 tensor_type="pd",
+            )
+            mergekit = MergeModel(merge_config)
+            mergekit.merge_model()
+
+            # test safetensor only with base model
+            merge_config = MergeConfig(
+                merge_method=merge_method,
+                model_path_list=[safe_path, safe_path],
+                output_path=tempdir,
+                tensor_type="pd",
+                base_model_path=safe_path,
             )
             mergekit = MergeModel(merge_config)
             mergekit.merge_model()
