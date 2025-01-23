@@ -165,7 +165,7 @@ class MergeMethod:
                     majority_sign += tensor.sign()
                 else:
                     raise NotImplementedError(f"ties_elect_type: {self.merge_config.ties_elect_type} is unknown.")
-            majority_sign = majority_sign.astype(mask_dtype) * 2 - 1
+            majority_sign = (majority_sign >= 0).astype(mask_dtype) * 2 - 1
 
             # Merge
             merge_tensor = paddle.zeros_like(tensor_list[0])
@@ -173,11 +173,13 @@ class MergeMethod:
                 divisor = paddle.zeros_like(tensor_list[0])
             for i, tensor in enumerate(tensor_list):
                 if self.merge_config.normalize:
-                    mask = (tensor.sign() == majority_sign) * self.merge_config.weight_list[i]
+                    mask = (tensor.sign() == majority_sign).astype(mask_dtype) * self.merge_config.weight_list[i]
                     divisor += mask
                     merge_tensor += mask * tensor
                 else:
-                    merge_tensor += (tensor.sign() == majority_sign) * tensor * self.merge_config.weight_list[i]
+                    merge_tensor += (
+                        (tensor.sign() == majority_sign).astype(mask_dtype) * tensor * self.merge_config.weight_list[i]
+                    )
 
             # Normalize
             if self.merge_config.normalize:

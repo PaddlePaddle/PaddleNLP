@@ -107,7 +107,7 @@ class SparsifyMethod:
         elif self.merge_config.tensor_type == "pd":
             abs_tensor = paddle.abs(tensor)
             threshold = paddle.quantile(abs_tensor, 1 - self.merge_config.reserve_p)
-            tensor = paddle.where(abs_tensor < 0.5, tensor, paddle.zeros_like(tensor))
+            tensor = paddle.where(abs_tensor < threshold, paddle.zeros_like(tensor), tensor)
             if self.merge_config.rescale:
                 org_sum = paddle.sum(abs_tensor)
                 new_sum = paddle.sum(paddle.abs(tensor))
