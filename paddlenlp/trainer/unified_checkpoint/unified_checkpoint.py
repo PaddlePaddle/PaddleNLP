@@ -344,7 +344,9 @@ class UnifiedCheckpointHandler:
             return
 
         if is_sharding_split_param_mode(self.args):
-            optim_state_dict, master_weights = gather_splited_param_for_optimizer(optimizer)
+            optim_state_dict, master_weights = gather_splited_param_for_optimizer(
+                optimizer, self.args.ckpt_quant_stage if "quant_reach_limit" not in infohub else "O0"
+            )
         else:
             optim_state_dict = nested_copy(optimizer.state_dict())
             master_weights = None
