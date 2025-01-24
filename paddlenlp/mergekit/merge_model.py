@@ -104,9 +104,6 @@ class MergeModel:
         else:
             self.merge_mix_model(file_type_list)
 
-    def merge_lora_model(self):
-        pass
-
     def merge_mix_model(self, file_type_list):
         # Load model state dict
         state_dict_list = []
@@ -120,11 +117,20 @@ class MergeModel:
 
         # Merge state dict
         merge_state_dict = {}
-        total_size = 0
-        weight_map = {}
+        index = {"metadata": {"total_size": 0}, "weight_map": {}}
         key_list = list(state_dict_list[0].keys())
         model_num = len(state_dict_list)
-        for key in key_list:
+        i = dist.get_rank()
+        positions = divide_positions(len(key_list), dist.get_world_size())
+        local_keys = key_list[positions[i] : positions[i + 1]]
+        for ii in range(len(positions) - 1):
+            shard_file = f"{self.merge_config.merge_prefix}-{ii+1:05d}-of-{dist.get_world_size():05d}.safetensors"
+            for key in key_list[positions[ii] : positions[ii + 1]]:
+                index["weight_map"][key] = shard_file
+                index["metadata"]["total_size"] += (
+                    np.prod(state_dict_list[0][key].shape) * self.numpy_dtype_map[str(state_dict_list[0][key].dtype)]
+                )
+        for key in local_keys:
             # Tensor preprocess
             is_bf16 = False
             tensor_list = []
@@ -157,19 +163,16 @@ class MergeModel:
             elif self.merge_config.tensor_type == "pd":
                 merge_state_dict[key] = merge_state_dict[key].astype(tensor_dtype).numpy()
 
-            total_size += np.prod(merge_state_dict[key].shape) * self.numpy_dtype_map[str(merge_state_dict[key].dtype)]
-            weight_map[key] = f"{self.merge_config.merge_prefix}-00001-of-00001.safetensors"
-
         # Save safetensor file
         save_file(
             merge_state_dict,
             os.path.join(
-                self.merge_config.output_path, f"{self.merge_config.merge_prefix}-00001-of-00001.safetensors"
+                self.merge_config.output_path,
+                f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{dist.get_world_size():05d}.safetensors",
             ),
             metadata={"format": "np"},
         )
         # Save safe index file
-        index = {"metadata": {"total_size": int(total_size)}, "weight_map": weight_map}
         save_index_file = os.path.join(self.merge_config.output_path, self.safe_index_name())
         with open(save_index_file, "w", encoding="utf-8") as f:
             f.write(json.dumps(index, indent=2) + "\n")
@@ -194,7 +197,8 @@ class MergeModel:
                     state_dict[k] = f.get_tensor(k)
         elif file_type == "pdparams":
             state_dict = np.load(os.path.join(model_path, self.weight_name()), allow_pickle=True)
-            state_dict.pop("StructuredToParameterName@@")
+            if "StructuredToParameterName@@" in state_dict.keys():
+                state_dict.pop("StructuredToParameterName@@")
         else:
             raise ValueError(f"Unsupported file_type: {file_type}")
         return state_dict
@@ -215,7 +219,7 @@ class MergeModel:
 
         # Load index
         index_list = []
-        model_path_list = self.merge_config.model_path_list
+        model_path_list = self.merge_config.model_path_list.copy()
         if self.merge_config.base_model_path is not None:
             model_path_list += [self.merge_config.base_model_path]
 
@@ -334,7 +338,6 @@ class MergeModel:
     ):
         merge_state_dict = {}
         for k in key_list:
-            print(k)
             tensor_list = []
             for i, model_path in enumerate(self.merge_config.model_path_list):
                 with fast_safe_open(os.path.join(model_path, index_list[i]["weight_map"][k]), framework="np") as w:
@@ -345,7 +348,6 @@ class MergeModel:
                     # Using float32 to reduce precision loss
                     tensor = tensor.astype("float32")
                     tensor_list.append(tensor)
-            print("1", len(tensor_list), len(self.merge_config.weight_list), len(self.merge_config.model_path_list))
             if self.merge_config.base_model_path is not None:
                 with fast_safe_open(
                     os.path.join(self.merge_config.base_model_path, index_list[-1]["weight_map"][k]),
@@ -354,7 +356,6 @@ class MergeModel:
                     base_tensor = w.get_tensor(k)
                     base_tensor = paddle.Tensor(base_tensor, zero_copy=True).astype("float32")
                 tensor_list = [tensor - base_tensor for tensor in tensor_list]
-            print("2", len(tensor_list), len(self.merge_config.weight_list))
             merge_tensor = self.merge_method.merge(tensor_list)
 
             if self.merge_config.base_model_path is not None:
@@ -405,3 +406,10 @@ class MergeModel:
             return SAFE_WEIGHTS_INDEX_NAME
         else:
             return SAFE_MASTER_WEIGHTS_INDEX_NAME
+
+    def merge_mix_lora_model(self):
+        # divide_positions lora写一个map映射
+        #  pdparams: 1.cpu 单线程 2.gpu 一整个加载进来多卡计算搞一下
+        # safetensors: 1.cpu 多线程 2.gpu 分片加载进来多卡计算搞一下
+        pass
+        # cpu
