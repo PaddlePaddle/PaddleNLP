@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Dict, Union
+
 import paddle
 import paddle.distributed as dist
 from paddle.distributed import fleet
@@ -22,6 +24,9 @@ try:
     )
 except:
     pass
+
+import paddle.nn as nn
+from paddle import framework
 
 from paddlenlp.peft import LoRAModel
 from paddlenlp.peft.lora.lora_layers import (
@@ -53,6 +58,7 @@ class LoRAGATrainer(Trainer):
         logger.info(f"Initialization iterations for LoraGA: {loraga_init_iters}")
         self.loraga_init_iters = loraga_init_iters
         self.gradient_offload = gradient_offload
+        self.args.gradient_accumulation_steps = 1
 
     def estimate_gradient(self, model: PretrainedModel):
         """
@@ -101,9 +107,6 @@ class LoRAGATrainer(Trainer):
         in_sep_parallel_mode = self.args.sep_parallel_degree > 1
         in_cp_parallel_mode = self.args.context_parallel_degree > 1
 
-        if in_pipeline_parallel_mode:
-            raise ValueError("LoRA-GA do not supported pipeline parallel currently.")
-
         # Multi-gpu training
         if self.args.world_size > 1 and (not self.args.use_hybrid_parallel):
             # MOE use DDP to broadcaset parameters.
@@ -120,8 +123,18 @@ class LoRAGATrainer(Trainer):
                 ddp_kwargs["find_unused_parameters"] = True
             model = paddle.DataParallel(model, **ddp_kwargs)
 
-        # sharding
-        if in_sharding_parallel_mode:
+        # Pipeline mode
+        if in_pipeline_parallel_mode:
+            prepare_pipeline_inputs_func = (
+                model._prepare_pipeline_inputs_func if hasattr(model, "_prepare_pipeline_inputs_func") else None
+            )
+            if isinstance(model, LoRAModel):
+                model = model.model
+            model = fleet.distributed_model(model)
+            model._prepare_pipeline_inputs_func = prepare_pipeline_inputs_func
+
+        # No pipeline mode, sharding only
+        if not in_pipeline_parallel_mode and in_sharding_parallel_mode:
             # Sharded DDP!
             if self.args.tensor_parallel_degree > 1:
                 hcg = fleet.get_hybrid_communicate_group()
@@ -132,10 +145,79 @@ class LoRAGATrainer(Trainer):
             if ShardingOption.SHARD_OP in self.args.sharding:
                 model = fleet.distributed_model(model)
 
-        if not in_sharding_parallel_mode and (in_tensor_parallel_mode or in_sep_parallel_mode or in_cp_parallel_mode):
+        # pure tesnor parallel mode, no pipeline_parallel, no sharding.
+        if (
+            not in_pipeline_parallel_mode
+            and not in_sharding_parallel_mode
+            and (in_tensor_parallel_mode or in_sep_parallel_mode or in_cp_parallel_mode)
+        ):
             model = fleet.distributed_model(model)
 
         return model
+
+    def training_pipeline_step(self, model: nn.Layer, inputs: Dict[str, Union[paddle.Tensor, Any]]) -> paddle.Tensor:
+        """
+        Perform a training step on a batch of inputs.
+
+        Subclass and override to inject custom behavior.
+
+        Args:
+            model (`nn.Layer`):
+                The model to train.
+            inputs (`Dict[str, Union[paddle.Tensor, Any]]`):
+                The inputs and targets of the model.
+
+                The dictionary will be unpacked before being fed to the model. Most models expect the targets under the
+                argument `labels`. Check your model's documentation for all accepted arguments.
+
+        Return:
+            `paddle.Tensor`: The tensor with training loss on this batch.
+        """
+        # accumulation data
+        if not hasattr(self, "_pp_data_buffer"):
+            self._pp_data_buffer = []
+        self._pp_data_buffer.append(inputs)
+        if len(self._pp_data_buffer) != self.args.gradient_accumulation_steps:
+            return paddle.zeros([])
+
+        # for v in self._pp_data_buffer[0].values():
+        #     assert isinstance(v, paddle.Tensor), f"Only support tensor as pipeline mode input, got type {type(v)}"
+
+        inputs = model._prepare_pipeline_inputs_func(self._pp_data_buffer)
+        self._pp_data_buffer = []
+
+        model.train()
+        # hack pipeline-layers
+        # since the pipeline layer will check input is valid every iter.
+        # in same case,  for example, batch size warmup, we need dynamic change gradient_accumulation_steps to implement.
+        config_backup = model.micro_batch_size, model.accumulate_steps
+        model.micro_batch_size = self.args.per_device_train_batch_size
+        model.accumulate_steps = self.args.gradient_accumulation_steps
+
+        if model._dp_comm_overlap or model._sharding_comm_overlap:
+            for _, buffers in model._chunk_2_comm_buffers.items():
+                for buffer in buffers:
+                    buffer._acc_steps = self.args.gradient_accumulation_steps
+
+        # reset the virtual pp rank for each run
+        model.set_virtual_pipeline_rank(0)
+        assert framework._dygraph_tracer()._has_grad, "Please enable the generation of gradients."
+
+        if model.is_pipeline_first_stage(ignore_virtual=True) or model.is_pipeline_last_stage(ignore_virtual=True):
+            assert inputs is not None, "For the first and the last stage, the data must be set."
+        else:
+            inputs = None
+        model._layers.train()
+
+        model.optimizer = None  # we do not use `PipelineParallel` to handler optimizer step
+        model.lr_scheduler = None
+
+        with self.autocast_smart_context_manager():
+            loss = model.forward_backward_pipeline(inputs, self.scaler if self.do_grad_scaling else None)
+
+        model.micro_batch_size, model.accumulate_steps = config_backup
+
+        return loss.detach()
 
 
 def get_module_gradient(
@@ -147,6 +229,7 @@ def get_module_gradient(
     sharding_degree,
     dp_degree,
     local_rank,
+    pp_to_single_mapping,
 ):
     """
     Gather modules gradient in tensor parallel mode.
@@ -180,7 +263,12 @@ def get_module_gradient(
 
     if tp_degree > 1:
         # remove prefix and suffix in name
-        model_split_key = local_grad_name.split(base_model_prefix)[-1].rsplit(rank_suffix, 1)[0]
+        if pp_to_single_mapping is not None:
+            model_split_key = pp_to_single_mapping[".".join(grad_name.split(".")[1:]) + ".weight"]
+            model_split_key = model_split_key.split(base_model_prefix)[-1]
+        else:
+            model_split_key = local_grad_name.split(base_model_prefix)[-1].rsplit(rank_suffix, 1)[0]
+
         if model_split_key in base_model_split_mappings:
             merge_func = base_model_split_mappings[model_split_key]
             output_tensors = []
@@ -221,17 +309,20 @@ def loraga_svd_reinit(
     Returns:
         None: Updates the model's weights and LoRA adapter weights in place.
     """
-    tensor_parallel_degree = training_args.tensor_parallel_degree
-    in_tensor_parallel_mode = tensor_parallel_degree > 1
-    lora_split_mapping = None
-    base_model_split_mappings = None
+    in_tensor_parallel_mode = training_args.tensor_parallel_degree > 1
+    in_pipleline_parallel_mode = training_args.pipeline_parallel_degree > 1
+
+    lora_split_mapping, base_model_split_mappings, pp_to_single_mapping = None, None, None
+
     if in_tensor_parallel_mode:
         base_model_split_mappings = model.model._get_tensor_parallel_mappings(config=model.config, is_split=False)
-
-    base_model_prefix = unwrap_model(model).base_model_prefix + "."
-    if in_tensor_parallel_mode:
         lora_split_mapping = model._get_tensor_parallel_mappings(model.config)
+
+    if in_pipleline_parallel_mode:
+        pp_to_single_mapping = model._pp_to_single_mapping
+
     loraga_init_dict = {}
+    base_model_prefix = unwrap_model(model).base_model_prefix + "."
     for name, module in model.named_sublayers():
         if isinstance(
             module,
@@ -253,6 +344,7 @@ def loraga_svd_reinit(
                 training_args.sharding_parallel_degree,
                 training_args.data_parallel_degree,
                 training_args.local_rank,
+                pp_to_single_mapping,
             )
             # perform SVD to reinit base model weight and lora adapter weight
             loraga_svd_module(
@@ -262,6 +354,7 @@ def loraga_svd_reinit(
                 stable_gamma,
                 loraga_init_dict,
                 in_tensor_parallel_mode,
+                pp_to_single_mapping,
                 lora_split_mapping,
                 **kwargs,
             )
@@ -276,14 +369,19 @@ def loraga_svd_module(
     stable_gamma,
     loraga_init_dict,
     in_tensor_parallel_mode=False,
+    pp_to_single_mapping=None,
     lora_split_mapping=None,
     **kwargs
 ):
     with paddle.no_grad():
         lora_r = module.r
-
-        loraA_name = ".".join(name.split(".")[1:]) + ".lora_A"
-        loraB_name = ".".join(name.split(".")[1:]) + ".lora_B"
+        if pp_to_single_mapping is not None:
+            name = pp_to_single_mapping[".".join(name.split(".")[1:]) + ".weight"]
+            loraA_name = name.replace("weight", "lora_A")
+            loraB_name = name.replace("weight", "lora_B")
+        else:
+            loraA_name = ".".join(name.split(".")[1:]) + ".lora_A"
+            loraB_name = ".".join(name.split(".")[1:]) + ".lora_B"
         # Perform SVD to gradients
         U, S, V = paddle.linalg.svd_lowrank(grads.astype("float32"), q=4 * lora_r, niter=4)
 
