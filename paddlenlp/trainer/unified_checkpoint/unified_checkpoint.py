@@ -516,6 +516,15 @@ def unified_checkpoint_into_shards(
 
     config_to_save = copy.deepcopy(model_to_save.config)
 
+    if args.use_expert_parallel:
+        # ignore saving `no_sync=False` tensors when using expert_parallel under dp_rank > 0.
+        hcg = fleet.get_hybrid_communicate_group()
+        dp_group = hcg.get_data_parallel_group()
+        dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
+        for key in list(state_dict.keys()):
+            if dp_rank > 0 and not getattr(state_dict[key], "no_sync", False):
+                state_dict.pop(key)
+
     if config_to_save.tensor_parallel_degree > 1:
         if isinstance(model_to_save, LoRAModel) or isinstance(model_to_save, PrefixModelForCausalLM):
             tp_actions = model_to_save._get_tensor_parallel_convert_actions(
@@ -622,8 +631,25 @@ def unified_optimizer_into_shards(
         filter_master_keys = filter_params(model, master_weights, args, is_optimizer=True)
     filter_optim_keys = filter_params(model, optim_state_dict, args, is_optimizer=True)
 
-    tp_group = fleet.get_hybrid_communicate_group().get_model_parallel_group()
+    hcg = fleet.get_hybrid_communicate_group()
+    tp_group = hcg.get_model_parallel_group()
+    dp_group = hcg.get_data_parallel_group()
     tp_size = tp_group.nranks
+    dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
+
+    no_sync_kname = []
+    if args.use_expert_parallel:
+        for k, v in state_dict.items():
+            if getattr(state_dict[k], "no_sync", False):
+                no_sync_kname.append(k)
+        for key in list(optim_state_dict.keys()):
+            model_key = key.split("/")[0]
+            if dp_rank > 0 and model_key not in no_sync_kname:
+                optim_state_dict.pop(key)
+        if master_weights is not None:
+            for key in list(master_weights.keys()):
+                if dp_rank > 0 and key not in no_sync_kname:
+                    master_weights.pop(key)
 
     if tp_size > 1:
         # get tp_actions
@@ -643,7 +669,6 @@ def unified_optimizer_into_shards(
             optim_state_dict,
             tp_actions,
             filter_optim_keys,
-            state_dict if args.use_expert_parallel else None,
         )
         paddle.device.cuda.empty_cache()
 
@@ -653,7 +678,6 @@ def unified_optimizer_into_shards(
                 master_weights,
                 tp_actions,
                 filter_master_keys,
-                state_dict if args.use_expert_parallel else None,
             )
             paddle.device.cuda.empty_cache()
 
