@@ -86,7 +86,6 @@ class LoRAGATrainer(Trainer):
         ):
             for batch in dataloader:
                 iters += 1
-                # Pipeline parallel not supported currently
                 self.training_step(model, batch)
 
                 if iters == self.loraga_init_iters:
