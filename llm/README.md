@@ -37,6 +37,11 @@
 
 ## 🚀 快速开始 🚀
 
+开始之前，您可以安装先 PaddleNLP 最新 develop 版本:
+```shell
+pip install --pre --upgrade paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+```
+
 ### 1. 预训练
 
 PaddleNLP 将飞桨4D 并行策略加入到 Trainer API 中， 用户只需修改 Trainer 配置即可使用不同的分布式策略。目前大模型套件提供[LLaMA/LLaMA2/LLaMA3](./config/llama)、[GPT-3](./config/gpt-3)、[Qwen](./config/qwen)、[Baichuan/Baichuan2](./config/baichuan)、[Mixtral](./config/mixtral) 等模型预训练功能，更多模型支持持续更新中。
@@ -89,7 +94,7 @@ cd ../slm/model_zoo/gpt-3/external_ops/ && python3 setup.py install && cd -
 # 多卡模型预训练参考:
 python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_pretrain.py ./config/llama/pretrain_argument.json
 # 多机训练参考: 占用45G显存左右
-python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7"  --master=127.0.0.1:8090 --nnodes=2  run_pretrain.py ./config/llama/pretrain_argument.json
+python -u -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7"  --master=192.168.1.1:8090 --nnodes=2  run_pretrain.py ./config/llama/pretrain_argument.json
 ```
 - 更详细的分布式启动命令请参考[这里](https://www.paddlepaddle.org.cn/documentation/docs/zh/2.6/api/paddle/distributed/launch_cn.html#launch)。
 
@@ -143,23 +148,38 @@ tar -xvf alpaca_demo.gz
 
 #### 2.2 全参精调：SFT
 
+单卡
 ```bash
-# SFT 启动命令参考
-python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_finetune.py ./config/llama/sft_argument.json
+# 需要12G显存左右
+python -u run_finetune.py ./config/qwen/sft_argument_0p5b.json
+# 单卡性能最佳实践，16G显存，可以参考打开开关。
+# ./config/qwen/sft_argument_0p5b_best.json
+```
+
+多卡
+```bash
+# SFT 启动命令参考，需要45G显存左右
+python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" run_finetune.py ./config/qwen/sft_argument.json
 ```
 
 #### 2.3 LoRA
 
+LoRA 启动命令参考
 ```bash
-# LoRA 启动命令参考
-python  run_finetune.py ./config/llama/lora_argument.json
+# 需要9G左右显存
+python run_finetune.py ./config/qwen/lora_argument_0p5b.json
+# 需要29G左右显存
+python run_finetune.py ./config/qwen/lora_argument.json
 ```
 
 #### 2.4 Prefix Tuning
 
+Prefix Tuning 启动命令参考
 ```bash
-# Prefix Tuning 启动命令参考
-python  run_finetune.py ./config/llama/pt_argument.json
+# 需要10G左右显存
+python run_finetune.py ./config/qwen/pt_argument_0p5b.json
+# 需要30G左右显存
+python run_finetune.py ./config/qwen/pt_argument.json
 ```
 
 除了 LoRA、Prefix Tuning 外，还支持 LoKr、VeRA、MoRA、ReFT、rsLoRA、LoRA+、PiSSA、MoSLoRA 等多种精调算法，更多大模型精调使用文档、训练细节和效果请参见[大模型精调教程](./docs/finetune.md)。
@@ -204,9 +224,13 @@ tar -zxvf ultrafeedback_binarized.tar.gz
 
 ##### 全参 DPO
 
+
 ```bash
-# DPO 启动命令参考
+# DPO 启动命令参考, 8卡训练， 需要大概40G显存
 python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_argument.json
+
+# 单卡训练，大概需要54G显存
+python -u  ./alignment/dpo/run_dpo.py ./config/qwen/dpo_argument_0p5b.json
 ```
 
 ##### LoRA DPO
@@ -216,6 +240,10 @@ python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/
 python -u  -m paddle.distributed.launch --devices "0,1,2,3,4,5,6,7" ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
 ```
 更多 DPO 技术细节和使用说明详见[DPO 文档](./docs/dpo.md)。
+```bash
+# 需要52G左右显存
+python -u  ./alignment/dpo/run_dpo.py ./config/llama/dpo_lora_argument.json
+```
 
 #### 3.2 KTO
 
@@ -396,7 +424,7 @@ mkdir Llama-3-8B-A8W8C8 && tar -xf Meta-Llama-3-8B-Instruct-A8W8C8.tar -C Llama-
 # 挂载模型文件
 export MODEL_PATH=${PWD}/Llama-3-8B-A8W8C8
 
-docker run --devices all --shm-size 5G --network=host --privileged --cap-add=SYS_PTRACE \
+docker run --gpus all --shm-size 5G --network=host --privileged --cap-add=SYS_PTRACE \
 -v ${MODEL_PATH}:/models/ \
 -dit registry.baidubce.com/paddlepaddle/fastdeploy:llm-serving-cuda123-cudnn9-v1.2 \
 bash -c 'export USE_CACHE_KV_INT8=1 && cd /opt/output/Serving && bash start_server.sh; exec bash'
