@@ -1159,7 +1159,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             ["norm.weight"],
         ]
         # last one layer contains MTP (eagle) parameters for inference
-        for layer_index in range(config.num_hidden_layers + 1):
+        for layer_index in range(config.num_hidden_layers + config.num_nextn_predict_layers):
             layer_mappings = [
                 [f"layers.{layer_index}.self_attn.q_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.q_a_proj.weight", None, "transpose"],
@@ -1192,7 +1192,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             model_mappings.append([f"layers.{layer_index}.mlp.shared_experts.down_proj.weight", None, "transpose"])
 
             # MTP (eagle) parameters for inference
-            if layer_index == config.num_hidden_layers:
+            if layer_index >= config.num_hidden_layers:
                 model_mappings.append([f"layers.{layer_index}.embed_tokens.weight"])
                 model_mappings.append([f"layers.{layer_index}.enorm.weight"])
                 model_mappings.append([f"layers.{layer_index}.hnorm.weight"])
@@ -1270,7 +1270,10 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             base_actions["layers.0.shared_head.head.weight"] = partial(fn, is_column=True)
             for key, action in base_actions.items():
                 if "layers.0." in key:
-                    final_actions[key.replace("layers.0.", f"layers.{config.num_hidden_layers}.")] = action
+                    for i in range(
+                        config.num_hidden_layers, config.num_hidden_layers + config.num_nextn_predict_layers
+                    ):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
                 else:
                     final_actions[key] = action
 
