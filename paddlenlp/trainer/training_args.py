@@ -880,6 +880,10 @@ class TrainingArguments:
         default=0,
         metadata={"help": "The coefficient of EMA parameters in flash save mode. if set to 0, skip EMA process"},
     )
+    flash_ema_interval: Optional[int] = field(
+        default=1,
+        metadata={"help": "Interval between updating EMA parameters."},
+    )
     save_tokenizer: Optional[bool] = field(
         default=True,
         metadata={"help": "Save tokenizer to output_dir."},
