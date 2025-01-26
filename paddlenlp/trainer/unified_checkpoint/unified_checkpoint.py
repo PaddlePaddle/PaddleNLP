@@ -637,8 +637,8 @@ def unified_optimizer_into_shards(
     tp_size = tp_group.nranks
     dp_rank = dp_group.rank if dp_group.nranks > 1 else 0
 
-    no_sync_kname = []
     if args.use_expert_parallel:
+        no_sync_kname = []
         for k, v in state_dict.items():
             if getattr(state_dict[k], "no_sync", False):
                 no_sync_kname.append(k)
