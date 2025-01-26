@@ -69,6 +69,8 @@ from ..model_utils import PretrainedModel, register_base_model
 from .configuration import DeepseekV2Config
 
 __all__ = [
+    "DeepseekV2LMHead",
+    "DeepseekV2PretrainingCriterion",
     "DeepseekV2ForCausalLM",
     "DeepseekV2ForSequenceClassification",
     "DeepseekV2Model",
@@ -1569,14 +1571,14 @@ class DeepseekV2Model(DeepseekV2PretrainedModel):
         )
 
 
-class DeepSeekV2PretrainingCriterion(nn.Layer):
+class DeepseekV2PretrainingCriterion(nn.Layer):
     """
     Criterion for Mixtral.
     It calculates the final loss.
     """
 
     def __init__(self, config: DeepseekV2Config):
-        super(DeepSeekV2PretrainingCriterion, self).__init__()
+        super(DeepseekV2PretrainingCriterion, self).__init__()
         self.ignore_index = getattr(config, "ignore_index", -100)
         self.config = config
         self.enable_parallel_cross_entropy = config.tensor_parallel_degree > 1 and config.tensor_parallel_output
@@ -1604,7 +1606,7 @@ class DeepSeekV2PretrainingCriterion(nn.Layer):
         return loss
 
 
-class DeepSeekV2LMHead(nn.Layer):
+class DeepseekV2LMHead(nn.Layer):
     def __init__(self, config: DeepseekV2Config):
         super().__init__()
 
@@ -1643,8 +1645,8 @@ class DeepseekV2ForCausalLM(DeepseekV2PretrainedModel):
         self.config = config
         self.deepseek_v2 = DeepseekV2Model(config)
         self.vocab_size = config.vocab_size
-        self.lm_head = DeepSeekV2LMHead(config)
-        self.criterion = DeepSeekV2PretrainingCriterion(config)
+        self.lm_head = DeepseekV2LMHead(config)
+        self.criterion = DeepseekV2PretrainingCriterion(config)
 
     def get_input_embeddings(self):
         return self.deepseek_v2.embed_tokens

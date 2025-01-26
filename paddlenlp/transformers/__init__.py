@@ -143,11 +143,8 @@ from .deberta.tokenizer import *
 from .deberta_v2.configuration import *
 from .deberta_v2.modeling import *
 from .deberta_v2.tokenizer import *
-from .deepseek_v2.configuration import *
-from .deepseek_v2.modeling import *
-from .deepseek_v2.tokenizer_fast import *
-from .deepseek_v3.configuration import *
-from .deepseek_v3.modeling import *
+from .deepseek_v2 import *
+from .deepseek_v3 import *
 from .distilbert.configuration import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
