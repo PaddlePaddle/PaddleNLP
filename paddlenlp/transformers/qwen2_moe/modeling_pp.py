@@ -25,11 +25,7 @@ from paddle.distributed.fleet.meta_parallel import (
 )
 from paddle.distributed.fleet.recompute.recompute import recompute
 
-from paddlenlp.transformers.refined_recompute import get_skip_recompute_ops
-from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
-
 from ...utils.tools import get_env_device
-from ..dpo_criterion import DPOCriterion
 from ..model_utils import PipelinePretrainedModel
 from .modeling import (
     Qwen2MoeConfig,
@@ -42,7 +38,7 @@ from .modeling import (
 )
 
 __all__ = [
-    "Qwen2ForCausalLMPipe",
+    "Qwen2MoeForCausalLMPipe",
 ]
 
 
@@ -173,9 +169,8 @@ class Qwen2MoeDecoderLayerPipe(Qwen2MoeDecoderLayer):
             attn_mask_startend_row_indices, position_ids = None, attn_mask_startend_row_indices
 
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
-            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
             if attention_mask is not None or attn_mask_startend_row_indices is not None:
-                hidden_states = recompute_fn(
+                hidden_states = recompute(
                     super().forward,
                     hidden_states,
                     position_ids=position_ids,
@@ -185,7 +180,7 @@ class Qwen2MoeDecoderLayerPipe(Qwen2MoeDecoderLayer):
                 )
             else:
                 # for pretrain
-                hidden_states = recompute_fn(
+                hidden_states = recompute(
                     super().forward,
                     hidden_states,
                     position_ids=position_ids,
@@ -215,14 +210,14 @@ class Qwen2MoeRMSNormPipe(nn.Layer):
 
 class Qwen2MoeLMHeadPipe(Qwen2MoeLMHead):
     def __init__(self, config, transpose_y=False):
-        super(Qwen2MoeLMHeadPipe, self).__init__(config, transpose_y=transpose_y)
+        super(Qwen2MoeLMHeadPipe, self).__init__(config)
 
     @property
     def embedding_weight(self):
         return get_attr(self, "weight")
 
 
-class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
+class Qwen2MoeForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
     """QWenForPretraining adapted for pipeline parallelism.
 
     The largest change is flattening the QWenModel class so we can express it as a
@@ -306,9 +301,8 @@ class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                     Qwen2MoeDecoderLayerPipe,
                     config=config,
                     layerwise_recompute=i not in self.no_recompute_layers,
-                    skip_recompute_ops=get_skip_recompute_ops(config, i),
                 ),
-                f"qwen2.layers.{i}",
+                f"qwen2_moe.layers.{i}",
             )
         self.add_sequential_layer(LayerDesc(Qwen2MoeRMSNormPipe, config=config), "qwen2_moe")
 
@@ -333,7 +327,7 @@ class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
             ), "pp recompute interval should smaller than num layers of each pp chunk"
             recompute_interval = self.config.pp_recompute_interval
 
-        seg_method = "layer:Qwen2DecoderLayer"
+        seg_method = "layer:Qwen2MoeDecoderLayer"
         if config.num_hidden_layers % get_hcg().topology().get_dim_size("pipe") != 0:
             seg_method = "uniform"
 
@@ -357,7 +351,4 @@ class Qwen2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         # PipelinePretrainedModel.__init__(self.super(), config=config)
 
     def get_loss_fn(self, config):
-        if config.dpo_config is not None:
-            return DPOCriterion(config, use_infohub=True)
-        else:
-            return Qwen2MoePretrainingCriterion(config)
+        return Qwen2MoePretrainingCriterion(config)
