@@ -1,6 +1,21 @@
 #!/bin/bash
+
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 cd llm
-task_name_or_path="llama2-13b-4k"
+task_name_or_path="llama2-13b-auto"
 
 #export XPUAPI_DEBUG=0x1
 #export XPURT_DISPATCH_MODE=PROFILING
@@ -34,19 +49,23 @@ strings ${bkcl_location}/libbkcl.so | grep COM
 
 export CUDA_DEVICE_MAX_CONNECTIONS=8
 
-export GLOG_v=10
+#PYTHONPATH
+export PYTHONPATH=../../../:$PYTHONPATH
 
-timestamp=$(date +%Y%m%d%H%M%S)
-echo $timestamp
+# for debug
+#export GLOG_v=6
+#export FLAGS_call_stack_level=2
+
+rm -rf output/$task_name_or_path
 PYTHONPATH=../:$PYTHONPATH  \
 python -u  -m paddle.distributed.launch \
     --xpus "0,1,2,3,4,5,6,7" \
-    --log_dir "output/$task_name_or_path/$timestamp""_log" \
-    auto_parallel/llama/run_pretrain_auto.py \
+    --log_dir "output/$task_name_or_path/" \
+    run_pretrain_auto.py \
     --model_name_or_path "meta-llama/Llama-2-13b" \
     --tokenizer_name_or_path "meta-llama/Llama-2-13b" \
     --input_dir "./data" \
-    --output_dir "output/$task_name_or_path/$timestamp" \
+    --output_dir "output/$task_name_or_path" \
     --split 949,50,1 \
     --max_seq_length 4096 \
     --per_device_train_batch_size 1 \
@@ -55,8 +74,8 @@ python -u  -m paddle.distributed.launch \
     --use_fused_rope 1 \
     --fuse_attention_ffn 1 \
     --fuse_attention_qkv 1 \
-    --use_fused_rms_norm 1 \
-    --num_hidden_layers 40 \
+    --use_fused_rms_norm 0 \
+    --num_hidden_layers 4 \
     --bf16 \
     --fp16_opt_level "O2"  \
     --amp_master_grad true \
@@ -64,7 +83,7 @@ python -u  -m paddle.distributed.launch \
     --learning_rate 0.00003 \
     --min_learning_rate 0.000005 \
     --lr_scheduler_type "cosine" \
-    --max_steps 100000 \
+    --max_steps 10 \
     --save_steps 100000 \
     --weight_decay 0.01 \
     --warmup_ratio 0.01 \
@@ -72,10 +91,9 @@ python -u  -m paddle.distributed.launch \
     --logging_steps 1 \
     --sequence_parallel 0 \
     --dataloader_num_workers 4 \
-    --pipeline_parallel_degree 2 \
-    --tensor_parallel_degree 2 \
+    --pipeline_parallel_degree 1 \
+    --tensor_parallel_degree 1 \
     --gradient_accumulation_steps 32 \
-    --sharding "stage1" \
     --eval_steps 1000 \
     --report_to "visualdl" \
     --disable_tqdm true \
