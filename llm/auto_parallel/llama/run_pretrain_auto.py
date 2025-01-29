@@ -58,8 +58,8 @@ from paddlenlp.data.causal_dataset import (
     check_data_split,
     print_rank_0,
 )
-from paddlenlp.utils.tools import get_env_device
 from paddlenlp.trainer.utils.doc import add_start_docstrings
+from paddlenlp.utils.tools import get_env_device
 
 
 @dataclass
@@ -172,6 +172,11 @@ class ModelArguments:
     )
     tokenizer_name_or_path: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
+    )
+
+    use_fast_layer_norm: bool = field(
+        default=False,
+        metadata={"help": "GPT3 model, use fast layernorm"},
     )
 
     config_name: Optional[str] = field(
@@ -496,6 +501,8 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name_or_path)
 
     config = config_class.from_pretrained(model_args.model_name_or_path)
+
+    config.use_fast_layer_norm = model_args.use_fast_layer_norm
 
     config.seq_length = data_args.max_seq_length
     # There are some technique extend RotaryEmbedding context. so don't change max_position_embeddings

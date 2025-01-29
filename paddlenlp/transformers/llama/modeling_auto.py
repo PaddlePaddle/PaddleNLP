@@ -54,6 +54,7 @@ from paddlenlp.transformers.model_outputs import (
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 from paddlenlp.utils.tools import get_env_device
 
+from . import fusion_ops
 from .configuration import (
     LLAMA_PRETRAINED_INIT_CONFIGURATION,
     LLAMA_PRETRAINED_RESOURCE_FILES_MAP,
@@ -70,7 +71,6 @@ from .modeling import (
     build_alibi_tensor,
     get_triangle_upper_mask,
     repeat_kv,
-    rms_norm_fused,
 )
 
 try:
@@ -195,10 +195,6 @@ def scaled_dot_product_attention(
         return (attn_output, attn_weights) if output_attentions else attn_output
 
 
-colwise_placements = [dist.Replicate(), dist.Shard(1)]
-rowise_placement = [dist.Replicate(), dist.Shard(0)]
-
-
 class LlamaRMSNormAuto(nn.Layer):
     def __init__(self, config, ipp):
         super().__init__()
@@ -219,7 +215,9 @@ class LlamaRMSNormAuto(nn.Layer):
 
     def forward(self, hidden_states):
         if self.config.use_fused_rms_norm:
-            return rms_norm_fused(hidden_states, self.weight, self.variance_epsilon)
+            return fusion_ops.fusion_rms_norm(
+                hidden_states, self.weight, self.variance_epsilon, self.config.use_fast_layer_norm
+            )
 
         with paddle.amp.auto_cast(False):
             variance = hidden_states.astype("float32").pow(2).mean(-1, keepdim=True)
@@ -239,6 +237,16 @@ class LlamaMLPAuto(nn.Layer):
         self.fuse_attention_ffn = config.fuse_attention_ffn
         self.ipp = ipp
         self.config = config
+        colwise_placements = (
+            [dist.Replicate(), dist.Shard(1)]
+            if self.config.tensor_parallel_degree > 1
+            else [dist.Replicate(), dist.Replicate()]
+        )
+        rowise_placement = (
+            [dist.Replicate(), dist.Shard(0)]
+            if self.config.tensor_parallel_degree > 1
+            else [dist.Replicate(), dist.Replicate()]
+        )
 
         if config.fuse_attention_ffn and not enable_fuse_ffn_qkv_pass():
             self.gate_up_fused_proj = nn.Linear(self.hidden_size, self.intermediate_size * 2, bias_attr=False)
@@ -307,6 +315,17 @@ class LlamaAttentionAuto(nn.Layer):
         self.layerwise_recompute = layerwise_recompute
         self.recompute_granularity = config.recompute_granularity
         self.ipp = ipp
+
+        colwise_placements = (
+            [dist.Replicate(), dist.Shard(1)]
+            if self.config.tensor_parallel_degree > 1
+            else [dist.Replicate(), dist.Replicate()]
+        )
+        rowise_placement = (
+            [dist.Replicate(), dist.Shard(0)]
+            if self.config.tensor_parallel_degree > 1
+            else [dist.Replicate(), dist.Replicate()]
+        )
 
         self.use_fused_rope = config.use_fused_rope
         if self.use_fused_rope and get_env_device() not in ["npu", "mlu", "xpu", "gcu", "intel_hpu"]:
@@ -1182,8 +1201,14 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                     masked_lm_labels.unsqueeze(2),
                 )
 
-            masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
-            loss = paddle.mean(masked_lm_loss)
+            # Hack for XPU that doesn't support Allgather yet.
+            if get_env_device() == "xpu":
+                # masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
+                loss = paddle.mean(masked_lm_loss, axis=-1)
+            else:
+                masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
+                loss = paddle.mean(masked_lm_loss, axis=-1)
+
         return loss
 
 
@@ -1191,6 +1216,11 @@ class LlamaLMHeadAuto(nn.Layer):
     def __init__(self, config: LlamaConfig):
         super(LlamaLMHeadAuto, self).__init__()
         self.config = config
+        colwise_placements = (
+            [dist.Replicate(), dist.Shard(1)]
+            if self.config.tensor_parallel_degree > 1
+            else [dist.Replicate(), dist.Replicate()]
+        )
         vocab_size = config.vocab_size
         self.weight = self.create_parameter(
             shape=[config.hidden_size, vocab_size],
