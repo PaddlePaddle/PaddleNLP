@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cd llm
 task_name_or_path="llama2-13b-auto"
 
 #export XPUAPI_DEBUG=0x1
