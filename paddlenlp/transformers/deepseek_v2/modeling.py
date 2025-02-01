@@ -575,7 +575,7 @@ def apply_rotary_pos_emb(q, k, cos, sin, position_ids):
 
 
 class DeepseekV2MLP(nn.Layer):
-    def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None):
+    def __init__(self, config: DeepseekV2Config, hidden_size=None, intermediate_size=None, is_moe=False):
         super().__init__()
         self.config = config
         self.hidden_size = config.hidden_size if hidden_size is None else hidden_size
@@ -588,7 +588,7 @@ class DeepseekV2MLP(nn.Layer):
             ColumnParallelLinear = linear_utils.ColumnParallelLinear
             RowParallelLinear = linear_utils.RowParallelLinear
 
-        if config.tensor_parallel_degree > 1:
+        if config.tensor_parallel_degree > 1 and not is_moe:
             self.gate_proj = ColumnParallelLinear(
                 self.hidden_size,
                 self.intermediate_size,
@@ -712,7 +712,7 @@ class DeepseekV2MoE(MoELayer):
         self.alpha = config.aux_loss_alpha
         if config.n_shared_experts is not None:
             intermediate_size = config.moe_intermediate_size * config.n_shared_experts
-            self.shared_experts = DeepseekV2MLP(config=config, intermediate_size=intermediate_size)
+            self.shared_experts = DeepseekV2MLP(config=config, intermediate_size=intermediate_size, is_moe=True)
 
     def forward(self, hidden_states):
         final_hidden_states, l_aux, l_zloss = super().forward(hidden_states)
@@ -1110,7 +1110,8 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             ["embed_tokens.weight"],
             ["norm.weight"],
         ]
-        for layer_index in range(config.num_hidden_layers):
+        # last one layer contains MTP (eagle) parameters for inference
+        for layer_index in range(config.num_hidden_layers + config.num_nextn_predict_layers):
             layer_mappings = [
                 [f"layers.{layer_index}.self_attn.q_proj.weight", None, "transpose"],
                 [f"layers.{layer_index}.self_attn.q_a_proj.weight", None, "transpose"],
@@ -1130,6 +1131,7 @@ class DeepseekV2PretrainedModel(PretrainedModel):
 
             # MoE parameters
             model_mappings.append([f"layers.{layer_index}.mlp.gate.weight", None, "transpose"])
+            model_mappings.append([f"layers.{layer_index}.mlp.gate.e_score_correction_bias"])
             for expert_idx in range(config.n_routed_experts):
                 expert_mappings = [
                     [f"layers.{layer_index}.mlp.experts.{expert_idx}.gate_proj.weight", None, "transpose"],
@@ -1140,6 +1142,15 @@ class DeepseekV2PretrainedModel(PretrainedModel):
             model_mappings.append([f"layers.{layer_index}.mlp.shared_experts.gate_proj.weight", None, "transpose"])
             model_mappings.append([f"layers.{layer_index}.mlp.shared_experts.up_proj.weight", None, "transpose"])
             model_mappings.append([f"layers.{layer_index}.mlp.shared_experts.down_proj.weight", None, "transpose"])
+
+            # MTP (eagle) parameters for inference
+            if layer_index >= config.num_hidden_layers:
+                model_mappings.append([f"layers.{layer_index}.embed_tokens.weight"])
+                model_mappings.append([f"layers.{layer_index}.enorm.weight"])
+                model_mappings.append([f"layers.{layer_index}.hnorm.weight"])
+                model_mappings.append([f"layers.{layer_index}.eh_proj.weight", None, "transpose"])
+                model_mappings.append([f"layers.{layer_index}.shared_head.norm.weight"])
+                model_mappings.append([f"layers.{layer_index}.shared_head.head.weight", None, "transpose"])
 
         init_name_mappings(mappings=model_mappings)
         if cls.base_model_class.__name__ not in config.architectures:
@@ -1202,6 +1213,21 @@ class DeepseekV2PretrainedModel(PretrainedModel):
                     for i in range(num_layers):
                         final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
                 final_actions[key] = action
+
+            # for MTP (eagle) parameters for inference
+            base_actions.pop("embed_tokens.weight")
+            base_actions.pop("lm_head.weight")
+            base_actions["layers.0.embed_tokens.weight"] = partial(fn, is_column=False)
+            base_actions["layers.0.eh_proj.weight"] = partial(fn, is_column=True)
+            base_actions["layers.0.shared_head.head.weight"] = partial(fn, is_column=True)
+            for key, action in base_actions.items():
+                if "layers.0." in key:
+                    for i in range(
+                        config.num_hidden_layers, config.num_hidden_layers + config.num_nextn_predict_layers
+                    ):
+                        final_actions[key.replace("layers.0.", f"layers.{i}.")] = action
+                else:
+                    final_actions[key] = action
 
             return final_actions
 

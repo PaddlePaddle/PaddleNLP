@@ -1311,15 +1311,15 @@ class ConversionMixin:
     def _resolve_prefix_keys(state_keys_base, state_keys_real, ignore_error=False):
         # state_keys_map base to real
         state_keys_map = {}
-
-        state_keys_base = set(state_keys_base)
+        # sorted by length，match from long to short for A.key B.key ...
+        state_keys_base = sorted(state_keys_base, key=lambda x: len(x), reverse=True)
         state_keys_real = set(state_keys_real)
 
         for key in state_keys_base:
             for x in state_keys_real:
                 if x.endswith(key):
                     state_keys_map[key] = x
-                    # break # remove break for math A.key B.key ...
+                    break
             if key not in state_keys_map:
                 if not ignore_error:
                     logger.debug(f"tensor parallel conversion: could not find name {key} in loaded state dict!")
