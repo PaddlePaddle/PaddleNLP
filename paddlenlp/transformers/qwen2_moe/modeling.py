@@ -793,7 +793,7 @@ class Qwen2MoeSparseMoEBlock(MoELayer):
             config,
             moe_num_experts=config.num_experts,
             expert_class=Qwen2MoeMLP,
-            expert_kwargs=config,
+            expert_kwargs={"config": config},
             gate=gate,
             capacity=2.0,
         )

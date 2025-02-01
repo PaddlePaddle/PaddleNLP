@@ -34,9 +34,12 @@ from paddlenlp.trainer.trainer_utils import IterableDatasetShard
 from paddlenlp.transformers import (
     AutoTokenizer,
     ChatGLMv2Tokenizer,
+    DeepseekV2ForCausalLMPipe,
+    DeepseekV3ForCausalLMPipe,
     LlamaForCausalLMPipe,
     PretrainedConfig,
     Qwen2ForCausalLMPipe,
+    Qwen2MoeForCausalLMPipe,
 )
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 from paddlenlp.utils.log import logger
@@ -210,7 +213,7 @@ def get_lora_target_modules(model):
             ".*w2.*",
             ".*w3.*",
         ]
-    elif model.base_model_prefix == "qwen2_moe":
+    elif model.base_model_prefix == "qwen2_moe" or isinstance(model, Qwen2MoeForCausalLMPipe):
         target_modules = [
             ".*q_proj.*",
             ".*k_proj.*",
@@ -220,6 +223,21 @@ def get_lora_target_modules(model):
             ".*gate_proj.*",
             ".*up_proj.*",
             ".*down_proj.*",
+        ]
+    elif model.base_model_prefix in ["deepseek_v2", "deepseek_v3"] or isinstance(
+        model, (DeepseekV2ForCausalLMPipe, DeepseekV3ForCausalLMPipe)
+    ):
+        target_modules = [
+            ".*q_proj.*",
+            ".*q_a_proj.*",
+            ".*q_b_proj.*",
+            ".*kv_a_proj_with_mqa.*",
+            ".*kv_b_proj.*",
+            ".*kv_b_proj.*",
+            ".*o_proj.*",
+            ".*mlp.gate_proj.*",
+            ".*mlp.up_proj.*",
+            ".*mlp.down_proj.*",
         ]
     elif model.base_model_prefix == "yuan":
         target_modules = [

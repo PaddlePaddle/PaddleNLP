@@ -25,11 +25,7 @@ from paddle.distributed.fleet.meta_parallel import (
 )
 from paddle.distributed.fleet.recompute.recompute import recompute
 
-from paddlenlp.transformers.refined_recompute import get_skip_recompute_ops
-from paddlenlp.transformers.refined_recompute import recompute as rr_recompute
-
 from ...utils.tools import get_env_device
-from ..dpo_criterion import DPOCriterion
 from ..model_utils import PipelinePretrainedModel
 from .modeling import (
     DeepseekV2Config,
@@ -171,9 +167,8 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
             attn_mask_startend_row_indices, position_ids = None, attn_mask_startend_row_indices
 
         if self.enable_recompute and self.config.recompute_granularity == "full" and has_gradient:
-            recompute_fn = rr_recompute if any(self.skip_recompute_ops.values()) else recompute
             if attention_mask is not None or attn_mask_startend_row_indices is not None:
-                hidden_states = recompute_fn(
+                hidden_states = recompute(
                     super().forward,
                     hidden_states,
                     position_ids=position_ids,
@@ -183,7 +178,7 @@ class DeepseekV2DecoderLayerPipe(DeepseekV2DecoderLayer):
                 )
             else:
                 # for pretrain
-                hidden_states = recompute_fn(
+                hidden_states = recompute(
                     super().forward,
                     hidden_states,
                     position_ids=position_ids,
@@ -212,8 +207,8 @@ class DeepseekV2RMSNormPipe(nn.Layer):
 
 
 class DeepseekV2LMHeadPipe(DeepseekV2LMHead):
-    def __init__(self, config, transpose_y=False):
-        super(DeepseekV2LMHeadPipe, self).__init__(config, transpose_y=transpose_y)
+    def __init__(self, config):
+        super(DeepseekV2LMHeadPipe, self).__init__(config)
 
     @property
     def embedding_weight(self):
@@ -305,8 +300,8 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
                 LayerDesc(
                     DeepseekV2DecoderLayerPipe,
                     config=config,
+                    layer_idx=i,
                     layerwise_recompute=i not in self.no_recompute_layers,
-                    skip_recompute_ops=get_skip_recompute_ops(config, i),
                 ),
                 f"{self._base_model.base_model_prefix}.layers.{i}",
             )
@@ -357,7 +352,4 @@ class DeepseekV2ForCausalLMPipe(PipelinePretrainedModel, PipelineLayer):
         # PipelinePretrainedModel.__init__(self.super(), config=config)
 
     def get_loss_fn(self, config):
-        if config.dpo_config is not None:
-            return DPOCriterion(config, use_infohub=True)
-        else:
-            return DeepseekV2PretrainingCriterion(config)
+        return DeepseekV2PretrainingCriterion(config)
