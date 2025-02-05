@@ -1207,7 +1207,7 @@ class LlamaPretrainingCriterion3DAuto(paddle.nn.Layer):
                 loss = paddle.mean(masked_lm_loss, axis=-1)
             else:
                 masked_lm_loss = paddle.masked_select(masked_lm_loss, masked_lm_loss > 0).astype("float32")
-                loss = paddle.mean(masked_lm_loss, axis=-1)
+                loss = paddle.mean(masked_lm_loss)
 
         return loss
 
