@@ -597,7 +597,7 @@ def get_model_max_position_embeddings(config: PretrainedConfig) -> Optional[int]
 
 
 def read_res(model_name_or_path: str, tensor_queue: mp.Queue, result_queue: mp.Queue, done_event: mp.Event):
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side="left", use_fast=True)
 
     paddle.device.set_device("cpu")
     paddle.disable_static()

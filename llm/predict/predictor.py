@@ -1335,7 +1335,7 @@ def create_predictor(
     predictor_args: PredictorArgument,
     model_args: ModelArgument,
 ):
-    tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path, padding_side="left")
+    tokenizer = AutoTokenizer.from_pretrained(predictor_args.model_name_or_path, padding_side="left", use_fast=True)
     # init chat_template for tokenizer
     llm_utils.init_chat_template(tokenizer, predictor_args.model_name_or_path, predictor_args.chat_template)
 

@@ -34,7 +34,7 @@ from ..deepseek_v2.modeling import (
 )
 from ..model_outputs import CausalLMOutputWithPast
 from ..model_utils import register_base_model
-from .configuration import DeepseekV2Config
+from .configuration import DeepseekV3Config
 
 __all__ = [
     "DeepseekV3ForCausalLM",
@@ -45,21 +45,21 @@ __all__ = [
 
 
 class DeepseekV3PretrainedModel(DeepseekV2PretrainedModel):
-    config_class = DeepseekV2Config
+    config_class = DeepseekV3Config
     base_model_prefix = "deepseek_v3"
     _no_split_modules = ["DeepseekV2DecoderLayer"]
 
 
 @register_base_model
 class DeepseekV3Model(DeepseekV2Model):
-    def __init__(self, config: DeepseekV2Config):
+    def __init__(self, config: DeepseekV3Config):
         super().__init__(config)
 
 
 class DeepseekV3ForCausalLM(DeepseekV3PretrainedModel):
     _tied_weights_keys = ["lm_head.weight"]
 
-    def __init__(self, config: DeepseekV2Config):
+    def __init__(self, config: DeepseekV3Config):
         super().__init__(config)
         self.deepseek_v3 = DeepseekV3Model(config)
         self.vocab_size = config.vocab_size

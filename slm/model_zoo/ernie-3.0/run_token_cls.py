@@ -19,7 +19,7 @@ from functools import partial
 import numpy as np
 import paddle
 import paddle.nn as nn
-from datasets import load_metric
+from evaluate import load as load_metric
 from utils import DataArguments, ModelArguments, load_config, token_convert_example
 
 import paddlenlp
