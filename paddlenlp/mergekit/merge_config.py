@@ -42,8 +42,8 @@ class MergeConfig:
         default=None, metadata={"help": "Merge model name or path string.(split by ',')"}
     )
     base_model_path: str = field(default=None, metadata={"help": "Base model name or path."})
-    output_path: str = field(default=None, metadata={"help": "Base model name or path."})
-    lora_merge: bool = field(default=False, metadata={"help": "Use LoRA merge."})
+    output_path: str = field(default=None, metadata={"help": "Output model name or path."})
+    lora_model_path: str = field(default=None, metadata={"help": "LoRA model name or path."})
 
     # merge parameters
     weight_list: Optional[List[float]] = field(
@@ -73,28 +73,30 @@ class MergeConfig:
             os.makedirs(self.output_path, exist_ok=True)
         if self.tensor_type not in ["np", "pd"]:
             raise ValueError(f"Unsupported tensor type: {self.tensor_type}. Support 'np' and 'pd' only.")
-
-        elif self.merge_method not in ["linear", "ties", "slerp", "della_linear", "della", "dare_linear", "dare_ties"]:
-            raise ValueError(
-                f"Unsupported merge strategy: {self.merge_method}. Please choose one from ['linear', 'slerp']."
-            )
-        if self.model_path_str is not None:
-            self.model_path_list = self.model_path_str.split(",")
-        if self.model_path_list is not None:
-            if not isinstance(self.model_path_list, list) or len(self.model_path_list) < 2:
-                raise ValueError(f"Please specify the model_path_list at least two. But got {self.model_path_list}")
-            if self.weight_list is None:
-                self.weight_list = [1.0] * len(self.model_path_list)
-                self.normalize = True
-            if len(self.model_path_list) != len(self.weight_list):
-                raise ValueError("The length of model_path_list and weight_list must be the same.")
-        if self.reserve_p < 0 or self.reserve_p > 1:
-            raise ValueError("reserve_p must be between 0 and 1.")
-        if "della" in self.merge_method or self.sparsify_type == "magprune":
-            if self.reserve_p <= self.epsilon / 2 or self.reserve_p >= (1 - self.epsilon):
+        if self.lora_model_path is not None and self.base_model_path is None:
+            raise ValueError("Please specify the base_model_path when using LoRA merge.")
+        if self.lora_model_path is None: 
+            if self.merge_method not in ["linear", "ties", "slerp", "della_linear", "della", "dare_linear", "dare_ties"]:
                 raise ValueError(
-                    f"Error: reserve_p +- epsilon/2 must be in the range (0, 1). reserve_p + epsilon/2 = {self.reserve_p + self.epsilon / 2 }, reserve_p - epsilon/2 = {self.reserve_p - self.epsilon / 2 }"
+                    f"Unsupported merge strategy: {self.merge_method}. Please choose one from ['linear', 'slerp']."
                 )
+            if self.model_path_str is not None:
+                self.model_path_list = self.model_path_str.split(",")
+            if self.model_path_list is not None:
+                if not isinstance(self.model_path_list, list) or len(self.model_path_list) < 2:
+                    raise ValueError(f"Please specify the model_path_list at least two. But got {self.model_path_list}")
+                if self.weight_list is None:
+                    self.weight_list = [1.0] * len(self.model_path_list)
+                    self.normalize = True
+                if len(self.model_path_list) != len(self.weight_list):
+                    raise ValueError("The length of model_path_list and weight_list must be the same.")
+            if self.reserve_p < 0 or self.reserve_p > 1:
+                raise ValueError("reserve_p must be between 0 and 1.")
+            if "della" in self.merge_method or self.sparsify_type == "magprune":
+                if self.reserve_p <= self.epsilon / 2 or self.reserve_p >= (1 - self.epsilon):
+                    raise ValueError(
+                        f"Error: reserve_p +- epsilon/2 must be in the range (0, 1). reserve_p + epsilon/2 = {self.reserve_p + self.epsilon / 2 }, reserve_p - epsilon/2 = {self.reserve_p - self.epsilon / 2 }"
+                    )
 
     @property
     def __dict__(self):

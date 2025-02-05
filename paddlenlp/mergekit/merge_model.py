@@ -30,6 +30,8 @@ from paddlenlp.utils.env import (
     SAFE_MASTER_WEIGHTS_NAME,
     SAFE_WEIGHTS_INDEX_NAME,
     SAFE_WEIGHTS_NAME,
+    LORA_WEIGHTS_NAME,
+    SAFE_PEFT_WEIGHTS_INDEX_NAME
 )
 from paddlenlp.utils.safetensors import fast_safe_open
 
@@ -78,7 +80,7 @@ class MergeModel:
         self.merge_method = MergeMethod(merge_config, sparsify_method)
 
     def merge_model(self):
-        if self.merge_config.lora_merge:
+        if self.lora_model_path is not None:
             self.merge_lora_model()
         else:
             if self.merge_config.tensor_type == "np" and not self.is_cpu:
@@ -368,7 +370,7 @@ class MergeModel:
             metadata={"format": "np"},
         )
 
-    def check_model_path(self, model_path):
+    def check_model_path(self, model_path, lora_merge=False):
         if os.path.exists(os.path.join(model_path, self.safe_index_name())):
             with open(os.path.join(model_path, self.safe_index_name()), "r", encoding="utf-8") as f:
                 index = json.load(f)
@@ -386,6 +388,25 @@ class MergeModel:
         else:
             raise ValueError(
                 f"Please check path {model_path} is correct. Support safetensors and pdparams only in complete parameter format (not TP or PP format) only."
+            )
+        return file_type
+    
+    def check_lora_model_path(self, model_path):
+        if os.path.exists(os.path.join(model_path, SAFE_PEFT_WEIGHTS_INDEX_NAME)):
+            with open(os.path.exists(os.path.join(model_path, SAFE_PEFT_WEIGHTS_INDEX_NAME)), "r", encoding="utf-8") as f:
+                index = json.load(f)
+                safe_file_list = list(set(index["weight_map"][k] for k in index["weight_map"]))
+                for i in range(len(safe_file_list)):
+                    if os.path.exists(os.path.join(model_path, safe_file_list[i])):
+                        continue
+                    else:
+                        ValueError(f"Not found {os.path.join(model_path, safe_file_list[i])}.")
+            file_type = "safetensors"
+        elif os.path.exists(os.path.join(model_path, LORA_WEIGHTS_NAME)):
+            file_type = "pdparams"
+        else:
+            raise ValueError(
+                f"Please check lora path {model_path} is correct. Support safetensors and pdparams only in complete parameter format (not TP or PP format) only."
             )
         return file_type
 
@@ -406,6 +427,181 @@ class MergeModel:
             return SAFE_WEIGHTS_INDEX_NAME
         else:
             return SAFE_MASTER_WEIGHTS_INDEX_NAME
+
+    def merge_lora_model(self):
+        # Check model file type
+        file_type_list = []
+        file_type_list.append(self.check_lora_model_path(self.merge_config.lora_model_path))
+        file_type_list.append(self.check_model_path(self.merge_config.base_model_path))
+        # Merge model (distinguish between safetensors and pdparams)
+        if all(file_type == "safetensors" or file_type == "safetensors_without_index" for file_type in file_type_list):
+            self.merge_safetensor_lora_model(file_type_list)
+        else:
+            self.merge_mix_lora_model(file_type_list)
+
+    def shard_lora_merge_np(
+        self,
+        key_list,
+        lora_index,
+        base_index,
+        shard_file,
+    ):
+        merge_state_dict = {}
+        for k in key_list:
+            if k in lora_index["weight_map"].keys():
+                with fast_safe_open(os.path.join(self.merge_config.lora_model_path, lora_index["weight_map"][k]), framework="np",) as w:
+                    tensor = w.get_tensor(k)
+            else:
+                with fast_safe_open(os.path.join(self.merge_config.base_model_path, base_index["weight_map"][k]), framework="np",) as w:
+                    tensor = w.get_tensor(k)
+            if k.replace("weight", "lora_A") in lora_index["weight_map"].keys():
+                lora_A_key = k.replace("weight", "lora_A")
+                lora_B_key = k.replace("weight", "lora_B")
+                with fast_safe_open(os.path.join(self.merge_config.lora_model_path, lora_index["weight_map"][lora_A_key]), framework="np",) as w:
+                    lora_A_tensor = w.get_tensor(lora_A_key)
+                with fast_safe_open(os.path.join(self.merge_config.lora_model_path, lora_index["weight_map"][lora_B_key]), framework="np",) as w:
+                    lora_B_tensor = w.get_tensor(lora_B_key)
+
+
+            if base_tensor.dtype == np.uint16:
+                base_tensor = paddle.Tensor(base_tensor, zero_copy=True).astype("float32").numpy()
+
+
+            with fast_safe_open(os.path.join(model_path, index_list[i]["weight_map"][k]), framework="np") as w:
+                tensor = w.get_tensor(k)
+                dtype = tensor.dtype
+                # dtype==bfloat16: numpy(uint16) -> paddle(bfloat16) -> paddle(float32) -> numpy(float32)
+                if tensor.dtype == np.uint16:
+                    tensor = paddle.Tensor(tensor, zero_copy=True).astype("float32").numpy()
+                tensor_list.append(tensor)
+            if self.merge_config.base_model_path is not None:
+                with fast_safe_open(
+                    os.path.join(self.merge_config.base_model_path, index_list[-1]["weight_map"][k]),
+                    framework="np",
+                ) as w:
+                    base_tensor = w.get_tensor(k)
+                    if base_tensor.dtype == np.uint16:
+                        base_tensor = paddle.Tensor(base_tensor, zero_copy=True).astype("float32").numpy()
+
+            merge_state_dict[k] = self.merge_method.merge(tensor_list)
+            if self.merge_config.base_model_path is not None:
+                merge_state_dict[k] += base_tensor
+            # dtype==bfloat16: numpy(float32) -> paddle(float32) -> paddle(bfloat16) -> numpy(uint16)
+            if dtype == np.uint16:
+                merge_state_dict[k] = paddle.Tensor(merge_state_dict[k], zero_copy=True).astype("bfloat16").numpy()
+
+        save_file(
+            merge_state_dict,
+            os.path.join(self.merge_config.output_path, shard_file),
+            metadata={"format": "np"},
+        )
+
+    def shard_lora_merge_pd(
+        self,
+        key_list,
+        lora_index,
+        base_index,
+        shard_file,
+    ):
+        merge_state_dict = {}
+        for k in key_list:
+            tensor_list = []
+            for i, model_path in enumerate(self.merge_config.model_path_list):
+                with fast_safe_open(os.path.join(model_path, index_list[i]["weight_map"][k]), framework="np") as w:
+                    tensor = w.get_tensor(k)
+                    tensor = paddle.Tensor(tensor, zero_copy=True)
+                    if i == 0:
+                        tensor_dtype = tensor.dtype
+                    # Using float32 to reduce precision loss
+                    tensor = tensor.astype("float32")
+                    tensor_list.append(tensor)
+            if self.merge_config.base_model_path is not None:
+                with fast_safe_open(
+                    os.path.join(self.merge_config.base_model_path, index_list[-1]["weight_map"][k]),
+                    framework="np",
+                ) as w:
+                    base_tensor = w.get_tensor(k)
+                    base_tensor = paddle.Tensor(base_tensor, zero_copy=True).astype("float32")
+                tensor_list = [tensor - base_tensor for tensor in tensor_list]
+            merge_tensor = self.merge_method.merge(tensor_list)
+
+            if self.merge_config.base_model_path is not None:
+                merge_tensor += base_tensor
+            merge_state_dict[k] = merge_tensor.astype(tensor_dtype).numpy()
+
+        save_file(
+            merge_state_dict,
+            os.path.join(self.merge_config.output_path, shard_file),
+            metadata={"format": "np"},
+        )
+
+    def merge_safetensor_lora_model(self, file_type_list):
+
+        # Load index
+        with open(os.path.join(self.merge_config.lora_model_path, SAFE_PEFT_WEIGHTS_INDEX_NAME), "r", encoding="utf-8") as f:
+            lora_index = json.load(f)
+        with open(os.path.join(self.merge_config.base_model_path, self.safe_index_name()), "r", encoding="utf-8") as f:
+            base_index = json.load(f)
+        for key in lora_index["weight_map"].keys():
+            if "lora_A" in key:
+                if key.replace("lora_A", "lora_B") not in lora_index["weight_map"].keys():
+                    raise ValueError(f"{key} is not paired with {key.replace('lora_A', 'lora_B')}")
+                if key.replace("lora_A", "weight") not in base_index["weight_map"].keys():
+                    raise ValueError(f"{key.replace("lora_A", "weight")} does not exist in base model." )
+
+        # Initialize new index
+        index = {}
+        index["metadata"] = base_index["metadata"]
+        index["metadata"]["total_size"] = int(index["metadata"]["total_size"])
+        index["weight_map"] = {}
+
+        key_list = list(base_index["weight_map"].keys())
+
+        if not self.is_cpu:
+            i = dist.get_rank()
+            positions = divide_positions(len(key_list), dist.get_world_size())
+            local_keys = key_list[positions[i] : positions[i + 1]]
+            shard_file = f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{dist.get_world_size():05d}.safetensors"
+            if self.merge_config.tensor_type == "np":
+                self.shard_lora_merge_np(local_keys, lora_index, base_index, shard_file)
+            else:
+                self.shard_lora_merge_pd(local_keys, lora_index, base_index, shard_file)
+
+            for i in range(len(positions) - 1):
+                shard_file = f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{dist.get_world_size():05d}.safetensors"
+                for k in key_list[positions[i] : positions[i + 1]]:
+                    index["weight_map"][k] = shard_file
+        else:
+            positions = divide_positions(len(key_list), self.merge_config.n_process)
+            threads = []
+            for i in range(len(positions) - 1):
+                shard_file = (
+                    f"{self.merge_config.merge_prefix}-{i+1:05d}-of-{self.merge_config.n_process:05d}.safetensors"
+                )
+                t = Process(
+                    target=self.shard_lora_merge_np if self.merge_config.tensor_type == "np" else self.shard_lora_merge_pd,
+                    args=(
+                        key_list[positions[i] : positions[i + 1]],  # key_list
+                        lora_index,  # lora index
+                        base_index,  # base index
+                        shard_file,  # shard_file name
+                    ),
+                )
+                threads.append(t)
+                for k in key_list[positions[i] : positions[i + 1]]:
+                    index["weight_map"][k] = shard_file
+
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+        # Save safe index file
+        if paddle.distributed.get_rank():
+            save_index_file = os.path.join(self.merge_config.output_path, self.safe_index_name())
+            with open(save_index_file, "w", encoding="utf-8") as f:
+                f.write(json.dumps(index, indent=2) + "\n")
+            self.merge_config.save_pretrained(self.merge_config.output_path)
 
     def merge_mix_lora_model(self):
         # divide_positions lora写一个map映射
