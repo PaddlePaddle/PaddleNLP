@@ -597,7 +597,8 @@ class ShardingIO:
         for k, v in model.state_dict().items():
             structure_name_mapping[k] = v.name
             is_distributed = getattr(v, "is_distributed", False)
-            param_meta[k] = (v.shape, int(v.dtype), is_distributed)
+            no_sync = getattr(v, "no_sync", False)
+            param_meta[k] = (v.shape, int(v.dtype), is_distributed, no_sync)
 
         sharding_metas = {}
         sharding_meta = {}

@@ -877,7 +877,7 @@ class TrainingArguments:
         },
     )
     flash_save_ema_coef: Optional[float] = field(
-        default=0,
+        default=None,
         metadata={"help": "The coefficient of EMA parameters in flash save mode. if set to 0, skip EMA process"},
     )
     flash_ema_interval: Optional[int] = field(

@@ -705,6 +705,7 @@ class Trainer:
                 worker_num=self.args.flash_workers_num,
                 pipeline_hooks_capacity=pipeline_hooks_capacity,
                 capacity_usage=self.args.flash_pipeline_hooks_capacity_usage,
+                use_expert_parallel=self.args.use_expert_parallel,
                 ema_coef=self.args.flash_save_ema_coef,
             )
             for i in range(unwrapped_model.forward_pipeline_parallel_hook_capacity):
@@ -721,6 +722,7 @@ class Trainer:
                 worker_num=self.args.flash_workers_num,
                 pipeline_hooks_capacity=pipeline_hooks_capacity,
                 capacity_usage=self.args.flash_pipeline_hooks_capacity_usage,
+                use_expert_parallel=self.args.use_expert_parallel,
                 ema_coef=self.args.flash_save_ema_coef,
             )
         _callback = FlashCheckpointCallback(
