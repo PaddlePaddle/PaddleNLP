@@ -969,7 +969,7 @@ class LlamaModelAuto(LlamaPretrainedModelAuto):
             y = paddle.to_tensor(min_val, dtype=dtype)
             expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), x, y).astype(dtype)
         else:
-            expanded_attn_mask = paddle.where(expanded_attn_mask.cast("bool"), 0.0, paddle.finfo(dtype).min)
+            expanded_attn_mask = paddle.where(expanded_attn_mask, 0.0, paddle.finfo(dtype).min)
             expanded_attn_mask = expanded_attn_mask.astype(dtype)
         return expanded_attn_mask
 
