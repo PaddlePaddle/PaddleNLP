@@ -219,7 +219,11 @@ class BasePredictor:
     def _preprocess(self, source):
         if self.tokenizer.chat_template is not None:
             source = [source] if isinstance(source, str) else source
-            source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
+            # source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
+            # source = [self.tokenizer.apply_chat_template(sentence, tokenize=False) for sentence in source]
+            source = self.tokenizer.apply_chat_template(source, tokenize=False)
+
+        print(source)
 
         tokenized_source = self.tokenizer(
             source,

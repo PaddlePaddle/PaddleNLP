@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from __future__ import annotations
 
 import json
@@ -44,14 +45,13 @@ def find_free_ports(port_l, port_u):
             try:
                 s.bind(("", port))
                 return port
-            except:
+            except Exception:
                 return -1
 
     for port in range(port_l, port_u):
-        port = __free_port(port)
-        if port != -1:
-            return port
-
+        free = __free_port(port)
+        if free != -1:
+            return free
     return -1
 
 
@@ -66,7 +66,6 @@ class ServerArgument:
 
 class PredictorServer:
     def __init__(self, args: ServerArgument, predictor: BasePredictor):
-
         self.predictor = predictor
         self.args = args
         scan_l, scan_u = (
@@ -76,7 +75,6 @@ class PredictorServer:
         self.total_max_length = predictor.config.src_length + predictor.config.max_length
 
         if self.predictor.tensor_parallel_rank == 0:
-            # fetch port info
             self.port = find_free_ports(scan_l, scan_u)
             self.peer_ports = {}
             while True and self.predictor.tensor_parallel_degree > 1:
@@ -84,22 +82,20 @@ class PredictorServer:
                     with FileLock(FILE_LOCK), open(PORT_FILE, "r") as f:
                         cnt = 1
                         for line in f:
-                            data = json.loads(line)
-                            self.peer_ports[data["rank"]] = data["port"]
+                            port_data = json.loads(line)
+                            self.peer_ports[port_data["rank"]] = port_data["port"]
                             cnt += 1
-
                     if cnt == predictor.tensor_parallel_degree:
                         break
                     else:
                         print("waiting for port reach", cnt)
                 sleep(1)
         else:
-            # save port info
             self.port = find_free_ports(scan_l, scan_u)
             data = {"rank": predictor.tensor_parallel_rank, "port": self.port}
             with FileLock(FILE_LOCK), open(PORT_FILE, "a") as f:
                 f.write(json.dumps(data) + "\n")
-            print("rank: ", predictor.tensor_parallel_rank, " port info saving done.")
+            print("rank:", predictor.tensor_parallel_rank, " port info saving done.")
 
     def predict(self, input_texts: str | list[str]):
         return self.predictor.stream_predict(input_texts)
@@ -107,97 +103,140 @@ class PredictorServer:
     def broadcast_msg(self, data):
         for _, peer_port in self.peer_ports.items():
             if peer_port != self.port:
-                _ = requests.post(f"http://0.0.0.0:{peer_port}/api/chat", json=data)
+                _ = requests.post(f"http://0.0.0.0:{peer_port}/v1/chat/completions", json=data)
 
     def start_flask_server(self):
         from flask import Flask, request, stream_with_context
 
         app = Flask(__name__)
 
-        @app.post("/api/chat")
+        @app.post("/v1/chat/completions")
         def _server():
             data = request.get_json()
             logger.info(f"Request: {json.dumps(data, indent=2, ensure_ascii=False)}")
 
+            # 如果请求中包含 "messages"，则按照 OpenAI 标准格式处理
+            if "messages" in data:
+                messages = data["messages"]
+                if not messages:
+                    return json.dumps({"error": "Empty messages"}), 400
+                # 假设最后一条消息来自用户，将其作为当前对话的输入(query)
+                if messages[-1].get("role") == "user":
+                    query = messages[-1].get("content", "")
+                    history = []
+                    if len(messages) > 1:
+                        temp = []
+                        for msg in messages[:-1]:
+                            if msg.get("role") in ["user", "assistant"]:
+                                temp.append(msg.get("content", ""))
+                        # 如果数量为奇数，则忽略最早的一条，以保证交替格式
+                        if len(temp) % 2 != 0:
+                            temp = temp[1:]
+                        history = temp
+                else:
+                    query = ""
+                    history = [msg.get("content", "") for msg in messages if msg.get("role") in ["user", "assistant"]]
+                data["context"] = query
+                data["history"] = history
+            else:
+                # 向后兼容处理
+                data["context"] = data.get("context", "")
+                data["history"] = data.get("history", "")
+
+            # 如果当前 rank 为 0，则向其它进程广播请求数据
             if self.predictor.tensor_parallel_rank == 0:
                 self.broadcast_msg(data)
 
             def streaming(data):
-                query = data.pop("context", "")
-                history = data.pop("history", "")
+                # 移除无用的 extra_info 字段
                 data.pop("extra_info", None)
-
-                # build chat template
-                if self.predictor.tokenizer.chat_template is not None:
-                    if not history:
-                        history = []
-                    # also support history data
-                    elif isinstance(history, str):
+                query = data.pop("context", "")
+                history = data.pop("history", [])
+                if isinstance(history, str):
+                    try:
                         history = json.loads(history)
+                    except Exception:
+                        history = [history]
 
-                    assert len(history) % 2 == 0
-                    chat_query = []
+                # 如果模型支持 chat_template，则转换为消息格式处理
+                if self.predictor.tokenizer.chat_template is not None:
+                    messages = []
+                    # 将历史对话转换为交替格式（用户与助手成对出现）
                     for idx in range(0, len(history), 2):
-                        if isinstance(history[idx], str):
-                            chat_query.append([history[idx], history[idx + 1]])
-                        elif isinstance(history[idx], dict):
-                            chat_query.append([history[idx]["utterance"], history[idx + 1]["utterance"]])
-                        else:
-                            raise ValueError(
-                                "history data should be list[str] or list[dict], eg: ['sentence-1', 'sentece-2', ...], or "
-                                "[{'utterance': 'sentence-1'}, {'utterance': 'sentence-2'}, ...]"
+                        user_msg = history[idx] if isinstance(history[idx], str) else history[idx].get("utterance", "")
+                        messages.append({"role": "user", "content": user_msg})
+                        if idx + 1 < len(history):
+                            assistant_msg = (
+                                history[idx + 1]
+                                if isinstance(history[idx + 1], str)
+                                else history[idx + 1].get("utterance", "")
                             )
-
-                    # the input of predictor should be batched.
-                    # batched query: [ [[user, bot], [user, bot], ..., [user]]  ]
-                    query = [chat_query + [[query]]]
+                            messages.append({"role": "assistant", "content": assistant_msg})
+                    # 将当前查询作为新的用户输入追加到消息列表中
+                    messages.append({"role": "user", "content": query})
+                    query = messages
+                # 否则保持原有 context/history 格式
 
                 generation_args = data
-                self.predictor.config.max_length = generation_args["max_length"]
+                self.predictor.config.max_length = generation_args.get("max_length", self.predictor.config.max_length)
                 if "src_length" in generation_args:
                     self.predictor.config.src_length = generation_args["src_length"]
 
                 if self.predictor.config.src_length + self.predictor.config.max_length > self.total_max_length:
                     output = {
                         "error_code": 1,
-                        "error_msg": f"The sum of src_length<{self.predictor.config.src_length}> and "
-                        f"max_length<{self.predictor.config.max_length}> should be smaller than or equal to "
-                        f"the max-total-length<{self.total_max_length}>",
+                        "error_msg": (
+                            f"The sum of src_length<{self.predictor.config.src_length}> and max_length<{self.predictor.config.max_length}> "
+                            f"should be smaller than or equal to the max-total-length<{self.total_max_length}>"
+                        ),
                     }
                     yield json.dumps(output, ensure_ascii=False) + "\n"
                     return
 
-                self.predictor.config.top_p = generation_args["top_p"]
-                self.predictor.config.temperature = generation_args["temperature"]
-                self.predictor.config.top_k = generation_args["top_k"]
-                self.predictor.config.repetition_penalty = generation_args["repetition_penalty"]
+                self.predictor.config.top_p = generation_args.get("top_p", self.predictor.config.top_p)
+                self.predictor.config.temperature = generation_args.get(
+                    "temperature", self.predictor.config.temperature
+                )
+                self.predictor.config.top_k = generation_args.get("top_k", self.predictor.config.top_k)
+                self.predictor.config.repetition_penalty = generation_args.get(
+                    "repetition_penalty", self.predictor.config.repetition_penalty
+                )
 
                 for key, value in generation_args.items():
                     setattr(self.args, key, value)
 
                 streamer = self.predict(query)
+                # 流式返回生成结果，构造 OpenAI 标准响应格式
                 if self.predictor.tensor_parallel_rank == 0:
                     for new_text in streamer:
                         if not new_text:
                             continue
-
-                        output = {
-                            "error_code": 0,
-                            "error_msg": "Success",
-                            "result": {"response": {"role": "bot", "utterance": new_text}},
+                        response_body = {
+                            "id": self.args.model_name_or_path,
+                            "object": "chat.completion",
+                            "created": int(sleep(0) or 0),
+                            "model": generation_args.get("model", "custom-model"),
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "message": {
+                                        "role": "assistant",
+                                        "content": new_text,
+                                    },
+                                    "finish_reason": "stop",
+                                }
+                            ],
                         }
-                        yield json.dumps(output, ensure_ascii=False) + "\n"
+                        yield json.dumps(response_body, ensure_ascii=False) + "\n"
                 else:
                     return "done"
 
             return app.response_class(stream_with_context(streaming(data)))
 
-        # set single thread to do prediction
-        # refer to: https://github.com/pallets/flask/blob/main/src/flask/app.py#L605
+        # 启动 Flask 服务（单线程预测）
         app.run(host="0.0.0.0", port=self.port, threaded=False)
 
     def start_ui_service(self, args, predictor_args):
-        # do not support start ui service in one command
         from multiprocessing import Process
 
         from gradio_ui import main
@@ -208,17 +247,16 @@ class PredictorServer:
 
 
 if __name__ == "__main__":
-
     parser = PdArgumentParser((PredictorArgument, ModelArgument, ServerArgument))
     predictor_args, model_args, server_args = parser.parse_args_into_dataclasses()
-    # check port
+    server_args.model_name_or_path = predictor_args.model_name_or_path
+
     if server_args.base_port is not None:
         logger.warning("`--base_port` is deprecated, please use `--flask_port` instead after 2023.12.30.")
-
         if server_args.flask_port is None:
             server_args.flask_port = server_args.base_port
         else:
-            logger.warning("`--base_port` and `--flask_port` are both set, `--base_port` will be ignored.")
+            logger.warning("Both `--base_port` and `--flask_port` are set; `--base_port` will be ignored.")
 
     log_dir = os.getenv("PADDLE_LOG_DIR", "./")
     PORT_FILE = os.path.join(log_dir, PORT_FILE)
@@ -226,10 +264,10 @@ if __name__ == "__main__":
         os.remove(PORT_FILE)
 
     predictor = create_predictor(predictor_args, model_args)
-
-    server = PredictorServer(server_args, predictor)
-
+    server = PredictorServer(
+        server_args,
+        predictor,
+    )
     if server.predictor.tensor_parallel_rank == 0:
         server.start_ui_service(server_args, asdict(predictor.config))
-
     server.start_flask_server()
