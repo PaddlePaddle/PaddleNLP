@@ -92,7 +92,7 @@ python -u  -m paddle.distributed.launch \
     --sharding "stage2" \
     --pipeline_parallel_config "enable_send_recv_overlap" \
     --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
-    --sharding_parallel_config "enable_stage2_overlap" \
+    --sharding_parallel_config "enable_overlap" \
     --tensor_parallel_config "enable_mp_async_allreduce" \
     --to_static 1 \
     --amp_custom_black_list "reduce_sum" "c_softmax_with_cross_entropy" \

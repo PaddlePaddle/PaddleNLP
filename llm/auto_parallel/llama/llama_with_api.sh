@@ -78,7 +78,7 @@ python -u  -m paddle.distributed.launch \
     --max_seq_length 4096 \
     --sequence_parallel true \
     --sharding "stage1" \
-    --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
+    --sharding_parallel_config "enable_tensor_fusion enable_overlap" \
     --tensor_parallel_config "enable_mp_async_allreduce" \
     --model_type "llama_network" \
     --ignore_load_lr_and_optim true \

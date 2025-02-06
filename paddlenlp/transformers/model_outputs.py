@@ -662,6 +662,10 @@ class BaseModelOutputWithPastAndCrossAttentions(ModelOutput):
 
             Attentions weights of the decoder's cross-attention layer, after the attention softmax, used to compute the
             weighted average in the cross-attention heads.
+        cum_offsets (`tuple(paddle.Tensor)`, *optional*, needed when `return_full_hidden_states=True`:
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, 1)`.
+
+            Offset of the current batch.
     """
 
     last_hidden_state: paddle.Tensor = None
@@ -669,6 +673,7 @@ class BaseModelOutputWithPastAndCrossAttentions(ModelOutput):
     hidden_states: Optional[Tuple[paddle.Tensor]] = None
     attentions: Optional[Tuple[paddle.Tensor]] = None
     cross_attentions: Optional[Tuple[paddle.Tensor]] = None
+    cum_offsets: Optional[Tuple[paddle.Tensor]] = None
 
 
 @dataclass

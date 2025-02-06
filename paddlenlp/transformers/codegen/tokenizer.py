@@ -14,7 +14,8 @@
 # limitations under the License.
 
 from paddle.utils import try_import
-from .. import GPTTokenizer
+
+from ..gpt.tokenizer import GPTTokenizer
 
 __all__ = ["CodeGenTokenizer"]
 

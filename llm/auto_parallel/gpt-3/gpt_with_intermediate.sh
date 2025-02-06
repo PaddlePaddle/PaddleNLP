@@ -98,7 +98,7 @@ python -u -m paddle.distributed.launch \
     --amp_master_grad true \
     --attention_probs_dropout_prob 0.1 \
     --hidden_dropout_prob 0.1 \
-    --sharding_parallel_config "enable_stage1_tensor_fusion enable_stage1_overlap" \
+    --sharding_parallel_config "enable_tensor_fusion enable_overlap" \
     --tensor_parallel_config "enable_mp_async_allreduce" \
     --data_parallel_config "enable_allreduce_avg_in_gradinent_scale gradient_sync_after_accumulate" \
     --pipeline_parallel_config "enable_send_recv_overlap enable_split_backward" \

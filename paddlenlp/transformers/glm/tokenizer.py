@@ -23,7 +23,8 @@ import sentencepiece as spm
 from scipy.linalg import block_diag
 
 from ...utils.log import logger
-from .. import BertTokenizer, GPTTokenizer
+from ..bert.tokenizer import BertTokenizer
+from ..gpt.tokenizer import GPTTokenizer
 from ..tokenizer_utils import PretrainedTokenizer
 from ..tokenizer_utils_base import BatchEncoding
 

@@ -143,6 +143,9 @@ class DataProcessor(BaseDataProcessor):
             request["eos_token_ids"] = []
         request["eos_token_ids"].extend(get_eos_token_id(self.tokenizer, self.config.generation_config))
 
+        if "stop_seqs" not in request or (isinstance(request["stop_seqs"], (list, tuple)) and len(request["stop_seqs"]) == 0):
+            self.update_stop_seq(request)
+
         if "input_ids" not in request or \
             (isinstance(request["input_ids"], (list, tuple)) and len(request["input_ids"]) == 0):
             if "text" in request:
@@ -282,7 +285,7 @@ class DataProcessor(BaseDataProcessor):
         """
         if self.config.use_hf_tokenizer:
             from transformers import AutoTokenizer
-            return AutoTokenizer.from_pretrained(self.config.model_dir, use_fast=False, vocab_file=os.path.join(self.config.model_dir, "sentencepiece.bpe.model"))
+            return AutoTokenizer.from_pretrained(self.config.model_dir, use_fast=False)
         else:
             from paddlenlp.transformers import AutoTokenizer
             return AutoTokenizer.from_pretrained(self.config.model_dir)
@@ -334,3 +337,43 @@ class DataProcessor(BaseDataProcessor):
         if isinstance(self.tokenizer, (LlamaTokenizer, Llama3Tokenizer)) and not self.tokenizer.pad_token_id:
             return self.tokenizer.eos_token
         return self.tokenizer.pad_token_id
+
+    def pad_batch_data(self, insts, pad_id=0, return_seq_len=False, return_array=True, pad_style="right"):
+        """Pad the instances to the max sequence length in batch."""
+        if len(insts) == 0:
+            padded_insts = np.array([[]], dtype=np.int64) if return_array else [[]]
+            if return_seq_len:
+                seq_len = np.array([], dtype=np.int64) if return_array else []
+                return padded_insts, seq_len
+            return padded_insts
+
+        max_len = max(map(len, insts))
+        if pad_style == "left":
+            padded_insts = [[pad_id] * (max_len - len(inst)) + list(inst) for inst in insts]
+        else:
+            padded_insts = [list(inst) + [pad_id] * (max_len - len(inst)) for inst in insts]
+        if return_array:
+            padded_insts = np.array(padded_insts, dtype=np.int64).reshape([-1, max_len])
+
+        if return_seq_len:
+            seq_len = [len(inst) for inst in insts]
+            if return_array:
+                seq_len = np.array(seq_len, dtype=np.int64).reshape(-1, 1)
+            return padded_insts, seq_len
+        return padded_insts
+
+    def update_stop_seq(self, request):
+        """
+        Update stop sequences from request.
+        """
+        stop_seqs =  []
+        for seq in request.get("stop_sequences", []):
+            if seq != self.tokenizer.eos_token_id:
+                stop_seqs.append(self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(seq)))
+        request["stop_seqs"], request["stop_seqs_len"] = self.pad_batch_data(
+            stop_seqs,
+            pad_id=-1,
+            return_seq_len=True,
+            return_array=False
+        )
+        data_processor_logger.debug(f"processed request: {request['stop_seqs'], request['stop_seqs_len']}")

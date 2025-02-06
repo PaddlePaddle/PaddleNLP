@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import numpy as np
+import paddle
 
 
 class SparsifyMethod:
@@ -37,8 +38,15 @@ class SparsifyMethod:
             if self.merge_config.rescale:
                 tensor /= self.merge_config.reserve_p
             return tensor
+        elif self.merge_config.tensor_type == "pd":
+            mask = paddle.bernoulli(paddle.full(tensor.shape, self.merge_config.reserve_p, dtype=tensor.dtype))
+
+            tensor *= mask
+            if self.merge_config.rescale:
+                tensor /= self.merge_config.reserve_p
+            return tensor
         else:
-            raise NotImplementedError("Paddle Tensor is not supported yet.")
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
 
     def magprune(self, tensor):
         if self.merge_config.tensor_type == "np":
@@ -63,8 +71,27 @@ class SparsifyMethod:
             if self.merge_config.rescale:
                 tensor /= 1 - probs
             return tensor
+        elif self.merge_config.tensor_type == "pd":
+            if paddle.all(tensor == 0):
+                return tensor
+            drop_p = 1 - self.merge_config.reserve_p
+            abs_tensor = paddle.abs(tensor)
+            sorted_indices = paddle.argsort(-abs_tensor.flatten())
+
+            probs = paddle.zeros_like(sorted_indices, dtype="float32")
+            probs = paddle.scatter(probs, sorted_indices, paddle.arange(tensor.numel(), dtype="float32"))
+            probs = probs.reshape(tensor.shape)
+            probs = probs * self.merge_config.epsilon / tensor.numel()
+            p_min = drop_p - self.merge_config.epsilon / 2
+            probs += p_min
+
+            mask = paddle.cast(paddle.bernoulli(1 - probs), tensor.dtype)
+            tensor *= mask
+            if self.merge_config.rescale:
+                tensor /= 1 - probs
+            return tensor
         else:
-            raise NotImplementedError("Paddle Tensor is not supported yet.")
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
 
     def trim(self, tensor):
         if self.merge_config.tensor_type == "np":
@@ -83,5 +110,18 @@ class SparsifyMethod:
             else:
                 tensor[abs_tensor < threshold] = 0
             return tensor.reshape(shape)
+        elif self.merge_config.tensor_type == "pd":
+            shape = tensor.shape
+            org_sum = paddle.sum(paddle.abs(tensor))
+            abs_tensor = paddle.abs(tensor)
+            threshold = paddle.quantile(abs_tensor, 1 - self.merge_config.reserve_p)
+            mask = paddle.cast(abs_tensor >= threshold, tensor.dtype)
+            tensor = tensor * mask
+
+            if self.merge_config.rescale:
+                new_sum = paddle.sum(paddle.abs(tensor))
+                if org_sum >= 1e-8 and new_sum >= 1e-8:
+                    tensor *= org_sum / new_sum
+            return tensor
         else:
-            raise NotImplementedError("Paddle Tensor is not supported yet.")
+            raise ValueError(f"Unkonwn tensor type {self.merge_config.tensor_type}")
