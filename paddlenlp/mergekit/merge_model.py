@@ -63,7 +63,7 @@ class MergeModel:
     def reset_merge_model(self, merge_config=None, merge_param_dict=None):
         self.is_cpu = "cpu" in paddle.device.get_device()
         if not self.is_cpu:
-            if dist.get_world_size() > 1 and paddle.distributed.is_initialized():
+            if dist.get_world_size() > 1 and not paddle.distributed.is_initialized():
                 dist.init_parallel_env()
         if merge_config is not None:
             self.merge_config = merge_config
@@ -94,16 +94,19 @@ class MergeModel:
             else:
                 self.mergekit()
         self.copy_file()
+
         paddle.device.cuda.empty_cache()
         gc.collect()
+        if dist.get_world_size() > 1:
+            dist.barrier()
 
     def copy_file(self):
         if self.merge_config.copy_file_list is not None:
+            if self.merge_config.base_model_path is not None:
+                src_path = self.merge_config.base_model_path
+            else:
+                src_path = self.merge_config.model_path_list[0]
             for file in self.merge_config.copy_file_list:
-                if self.merge_config.base_model_path is None:
-                    src_path = self.merge_config.base_model_path
-                else:
-                    src_path = self.merge_config.model_path_list[0]
                 src_file = os.path.join(src_path, file)
                 dst_file = os.path.join(self.merge_config.output_path, file)
                 if os.path.isfile(src_file):
@@ -139,7 +142,7 @@ class MergeModel:
         # Merge state dict
         merge_state_dict = {}
         index = {"metadata": {"total_size": 0}, "weight_map": {}}
-        key_list = list(state_dict_list[0].keys())
+        key_list = sorted(list(state_dict_list[0].keys()))
         model_num = len(state_dict_list)
         i = dist.get_rank()
         positions = divide_positions(len(key_list), dist.get_world_size())
@@ -274,7 +277,7 @@ class MergeModel:
         index["metadata"]["total_size"] = int(index["metadata"]["total_size"])
         index["weight_map"] = {}
 
-        key_list = list(index_list[0]["weight_map"].keys())
+        key_list = sorted(list(index_list[0]["weight_map"].keys()))
 
         if not self.is_cpu:
             i = dist.get_rank()
@@ -422,9 +425,7 @@ class MergeModel:
 
     def check_lora_model_path(self, model_path):
         if os.path.exists(os.path.join(model_path, SAFE_PEFT_WEIGHTS_INDEX_NAME)):
-            with open(
-                os.path.exists(os.path.join(model_path, SAFE_PEFT_WEIGHTS_INDEX_NAME)), "r", encoding="utf-8"
-            ) as f:
+            with open(os.path.join(model_path, SAFE_PEFT_WEIGHTS_INDEX_NAME), "r", encoding="utf-8") as f:
                 index = json.load(f)
                 safe_file_list = list(set(index["weight_map"][k] for k in index["weight_map"]))
                 for i in range(len(safe_file_list)):
@@ -476,6 +477,8 @@ class MergeModel:
         lora_state_dict = None
         if lora_index is None:
             lora_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, "lora_pdparams")
+        else:
+            lora_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, "lora_safetensors")
 
         if not lora_config.rslora:
             scaling = lora_config.lora_alpha / lora_config.r
@@ -516,6 +519,9 @@ class MergeModel:
 
                 if lora_A_tensor is not None:
                     is_bf16 = tensor.dtype == np.uint16
+                    tensor = paddle.Tensor(tensor, zero_copy=True)
+                    lora_A_tensor = paddle.Tensor(lora_A_tensor, zero_copy=True)
+                    lora_B_tensor = paddle.Tensor(lora_B_tensor, zero_copy=True)
                     if self.is_cpu and is_bf16:
                         tensor = tensor.astype("float32")
                         lora_A_tensor = lora_A_tensor.astype("float32")
@@ -557,7 +563,7 @@ class MergeModel:
         index["weight_map"] = {}
 
         # LoRA Merge
-        key_list = list(base_index["weight_map"].keys())
+        key_list = sorted(list(base_index["weight_map"].keys()))
         if not self.is_cpu:
             i = dist.get_rank()
             positions = divide_positions(len(key_list), dist.get_world_size())
@@ -605,7 +611,7 @@ class MergeModel:
     def merge_pdparams_lora_model(self, file_type_list):
         # Load & check state dict
         lora_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, file_type_list[0])
-        base_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, file_type_list[0])
+        base_state_dict = self.get_model_state_dict(self.merge_config.base_model_path, file_type_list[1])
         for key in lora_state_dict.keys():
             if "lora_A" in key:
                 if key.replace("lora_A", "lora_B") not in lora_state_dict.keys():
@@ -623,13 +629,13 @@ class MergeModel:
         # Create index
         merge_state_dict = {}
         index = {"metadata": {"total_size": 0}, "weight_map": {}}
-        key_list = list(base_state_dict.keys())
+        key_list = sorted(list(base_state_dict.keys()))
         positions = divide_positions(len(key_list), dist.get_world_size())
         for ii in range(len(positions) - 1):
             shard_file = f"{self.merge_config.merge_prefix}-{ii+1:05d}-of-{dist.get_world_size():05d}.safetensors"
             for key in key_list[positions[ii] : positions[ii + 1]]:
                 index["weight_map"][key] = shard_file
-                index["metadata"]["total_size"] += (
+                index["metadata"]["total_size"] += int(
                     np.prod(base_state_dict[key].shape) * self.numpy_dtype_map[str(base_state_dict[key].dtype)]
                 )
 
@@ -646,10 +652,10 @@ class MergeModel:
                 if lora_A_key in lora_state_dict.keys():
                     lora_A_tensor = lora_state_dict[lora_A_key]
                     lora_B_tensor = lora_state_dict[lora_B_key]
+                    is_bf16 = tensor.dtype == np.uint16
                     tensor = paddle.Tensor(tensor, zero_copy=True)
                     lora_A_tensor = paddle.Tensor(lora_A_tensor, zero_copy=True)
                     lora_B_tensor = paddle.Tensor(lora_B_tensor, zero_copy=True)
-                    is_bf16 = tensor.dtype == np.uint16
                     if self.is_cpu and is_bf16:
                         tensor = tensor.astype("float32")
                         lora_A_tensor = lora_A_tensor.astype("float32")
