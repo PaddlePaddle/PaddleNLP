@@ -14,7 +14,7 @@
 import json
 from dataclasses import dataclass, field
 
-from .trainer_utils import split_parallel_config
+from .trainer_utils import ShardingOption, split_parallel_config
 from .training_args import TrainingArguments
 from .utils import add_start_docstrings
 
@@ -52,6 +52,29 @@ class AutoTrainingArguments(TrainingArguments):
         metadata={"help": "Weather to use auto_parallel intermediate api"},
     )
     refined_ops_patterns: str = field(default=None, metadata={"help": "The pattern of refined recompute."})
+    load_model_with_sharding_tensor_fusion: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "When using sharding stage1, enabling tensor fusion, and setting `load_model_with_sharding_tensor_fusion` to `True`, "
+                "the model is loaded with unbalanced weights, meaning that the model weights are stored in an unbalanced format to avoid "
+                "additional memory overhead. If set to `False`, the model will be loaded with balanced weights, which may increase memory "
+                "consumption. This setting is only available in auto parallel to_static mode."
+            )
+        },
+    )
+    save_model_with_sharding_tensor_fusion: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "When using sharding stage1 and enabling tensor fusion, setting `save_model_with_sharding_tensor_fusion` to `True` "
+                "saves the model with unbalanced weights, which helps avoid additional memory consumption. Setting it to `False` "
+                "saves the model with balanced weights, which may increase memory usage but ensures uniform parameter distribution. "
+                "This option allows flexibility in choosing the save format based on memory requirements. "
+                "This setting is only available in auto parallel to_static mode."
+            )
+        },
+    )
 
     def __post_init__(self):
         super().__post_init__()
@@ -89,3 +112,13 @@ class AutoTrainingArguments(TrainingArguments):
                 recompute.refined_ops_patterns = (
                     self.refined_ops_patterns if self.refined_ops_patterns is not None else []
                 )
+
+    @property
+    def should_load_model_with_tensor_fusion(self):
+        return (
+            self.enable_auto_parallel
+            and self.to_static
+            and ShardingOption.SHARD_OP in self.sharding
+            and self.sharding_parallel_degree > 1
+            and "enable_tensor_fusion" in self.sharding_parallel_config
+        )
