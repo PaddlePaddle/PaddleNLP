@@ -52,7 +52,7 @@
                   schema= ['时间', '选手', '赛事名称'],
                   schema_lang="zh",
                   batch_size=1,
-                  model='uie-llm-0.5b')
+                  model='paddlenlp/PP-UIE-0.5B')
     pprint(ie("2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！")) # Better print results using pprint
     # 输出
     [{'时间': [{'text': '2月8日上午'}],
@@ -100,10 +100,10 @@
 
   | 模型 |  结构  | 语言 |
   | :---: | :--------: | :--------: |
-  | `uie-llm-0.5b` (默认)| 24-layers, 896-hidden, 14-heads | 中、英文 |
-  | `uie-llm-1.5b` | 28-layers, 1536-hidden, 12-heads | 中、英文 |
-  | `uie-llm-7b` | 28-layers, 3584-hidden, 28-heads | 中、英文 |
-  | `uie-llm-14b` | 48-layers, 5120-hidden, 40-heads | 中、英文 |
+  | `paddlenlp/PP-UIE-0.5B` (默认)| 24-layers, 896-hidden, 14-heads | 中、英文 |
+  | `paddlenlp/PP-UIE-1.5B` | 28-layers, 1536-hidden, 12-heads | 中、英文 |
+  | `paddlenlp/PP-UIE-7B` | 28-layers, 3584-hidden, 28-heads | 中、英文 |
+  | `paddlenlp/PP-UIE-14B` | 48-layers, 5120-hidden, 40-heads | 中、英文 |
 
 <a name="更多配置"></a>
 
@@ -116,14 +116,14 @@
                   schema = {'竞赛名称': ['主办方', '承办方', '已举办次数']},
                   schema_lang="zh",
                   batch_size=1,
-                  model='uie-llm-0.5b',
+                  model='paddlenlp/PP-UIE-0.5B',
                   precision='float16')
 ```
 
 * `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
 * `schema_lang`：设置 schema 的语言，默认为`zh`, 可选有`zh`和`en`。因为中英 schema 的构造有所不同，因此需要指定 schema 的语言。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `model`：选择任务使用的模型，默认为`uie-llm-0.5b`，可选有`uie-llm-0.5b`, `uie-llm-1.5b`, `uie-llm-7b`, `uie-llm-14b`。
+* `model`：选择任务使用的模型，默认为`paddlenlp/PP-UIE-0.5B`，可选有`paddlenlp/PP-UIE-0.5B`, `paddlenlp/PP-UIE-1.5B`, `paddlenlp/PP-UIE-7B`, `paddlenlp/PP-UIE-14B`。
 * `precision`：选择模型精度，默认为`float16`，可选有`float16`、`bfloat16`和`float32`和。如果选择`float16`，在 GPU 硬件环境下，请先确保机器正确安装 NVIDIA 相关驱动和基础软件，**确保 CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保 GPU 设备的 CUDA 计算能力（CUDA Compute Capability）大于7.0，典型的设备包括 V100、T4、A10、A100、GTX 20系列和30系列显卡等。如果选择`bfloat16`，能有效加速处理大模型和批量数据，尤其与混合精度结合使用时性能表现更优。但需确保硬件和软件环境支持该精度。支持 `bfloat16`的硬件包括 NVIDIA A100 和 H100 GPU，同时需要确保使用 CUDA>=11.2、cuDNN>=8.1.1 等软件环境。更多关于 CUDA Compute Capability 和精度支持情况请参考 NVIDIA 文档：[GPU 硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 
 
@@ -135,7 +135,7 @@ from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.generation import GenerationConfig
 from paddlenlp.trl import llm_utils
 
-model_id = "paddlenlp/LLM-UIE-0114"
+model_id = "paddlenlp/PP-UIE-0.5B"
 
 model = AutoModelForCausalLM.from_pretrained(model_id, use_flash_attention=False)
 model.eval()
@@ -376,7 +376,7 @@ python predict/predictor.py \
 
 >>> schema = ['出发地', '目的地', '费用', '时间']
 # 设定抽取目标和定制化模型权重路径
->>> my_ie = Taskflow("information_extraction", schema=schema, model='uie-llm-0.5b',precision = "float16", task_path='./checkpoints/ie_ckpts')
+>>> my_ie = Taskflow("information_extraction", schema=schema, model='paddlenlp/PP-UIE-0.5B',precision = "float16", task_path='./checkpoints/ie_ckpts')
 >>> pprint(my_ie("城市内交通费7月5日金额114广州至佛山"))
 [{'出发地': [{'text': '广州'}],
   '时间': [{'text': '7月5日'}],
@@ -390,7 +390,7 @@ python predict/predictor.py \
 
 #### 3.5 实验指标
 
-<!-- 我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
+我们在互联网、医疗、金融三大垂类自建测试集上进行了实验：
 
 <table>
 <tr><th row_span='2'><th colspan='2'>金融<th colspan='2'>医疗<th colspan='2'>互联网
@@ -404,4 +404,4 @@ python predict/predictor.py \
 <tr><td>uie-m-base (12L768H)<td>38.46<td>74.31<td>63.37<td>87.32<td>76.27<td>80.13
 </table>
 
-0-shot 表示无训练数据直接通过 ```paddlenlp.Taskflow```进行预测，5-shot 表示每个类别包含5条标注数据进行模型微调。**实验表明 UIE 在垂类场景可以通过少量数据（few-shot）进一步提升效果**。 -->
+0-shot 表示无训练数据直接通过模型进行预测，5-shot 表示预测时使用五个数据样例作为提示。**实验表明 UIE 在垂类场景可以通过少量数据（few-shot）进一步提升效果**。

@@ -137,7 +137,7 @@ class UIELLMTask(Task):
         super().__init__(task=task, model=model, **kwargs)
         self._dtype = kwargs.get("dtype", "float16")
         self.kwargs["generation_task"] = task
-        self._tgt_length = kwargs.get("tgt_length", 20)
+        self._tgt_length = kwargs.get("tgt_length", 50)
         # Token max length
         self._max_seq_length = kwargs.get("max_seq_length", 512)
         self._top_k = kwargs.get("top_k", 1)
@@ -167,7 +167,7 @@ class UIELLMTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = AutoModelForCausalLM.from_pretrained(self._task_path, dtype=self._infer_precision)
+        model_instance = AutoModelForCausalLM.from_pretrained(model, dtype=self._infer_precision)
         self._model = model_instance
         self._model.eval()
 
@@ -175,7 +175,7 @@ class UIELLMTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
+        self._tokenizer = AutoTokenizer.from_pretrained(model)
 
     def _batchify(self, data, batch_size):
         """
@@ -231,7 +231,6 @@ class UIELLMTask(Task):
         inputs = [self._prompt.format(sentence=dic["text"], prompt=dic["prompt"]) for dic in inputs]
         batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 1
         batches = self._batchify(inputs, batch_size)
-        print(batches)
         examples = []
         for input_text in batches:
             if self._tokenizer.chat_template is not None:
@@ -275,7 +274,7 @@ class UIELLMTask(Task):
         for x in results:
             res = self._tokenizer.decode(x.numpy().tolist(), skip_special_tokens=True)
             res = res.strip("\n")
-            end_idx = res.find("\n**回答结束**\n\n")
+            end_idx = res.find("\n**回答结束**")
             if end_idx != -1:
                 res = res[:end_idx]
             out_list.append([{"text": res}])

@@ -323,25 +323,25 @@ TASKS = {
     },
     "information_extraction": {
         "models": {
-            "uie-llm-0.5b": {
+            "paddlenlp/PP-UIE-0.5B": {
                 "task_class": UIELLMTask,
                 "hidden_size": 896,
-                "task_flag": "information_extraction-uie-llm-0.5b",
+                "task_flag": "information_extraction-pp-uie-0.5b",
             },
-            "uie-llm-1.5b": {
+            "paddlenlp/PP-UIE-1.5B": {
                 "task_class": UIELLMTask,
                 "hidden_size": 1536,
-                "task_flag": "information_extraction-uie-llm-1.5b",
+                "task_flag": "information_extraction-pp-uie-1.5b",
             },
-            "uie-llm-7b": {
+            "paddlenlp/PP-UIE-7B": {
                 "task_class": UIELLMTask,
                 "hidden_size": 3584,
-                "task_flag": "information_extraction-uie-llm-7b",
+                "task_flag": "information_extraction-pp-uie-7b",
             },
-            "uie-llm-14b": {
+            "paddlenlp/PP-UIE-14B": {
                 "task_class": UIELLMTask,
                 "hidden_size": 5120,
-                "task_flag": "information_extraction-uie-llm-14b",
+                "task_flag": "information_extraction-pp-uie-14b",
             },
             "uie-base": {
                 "task_class": UIETask,
@@ -745,10 +745,10 @@ TASKS = {
 }
 
 support_schema_list = [
-    "uie-llm-0.5b",
-    "uie-llm-1.5b",
-    "uie-llm-7b",
-    "uie-llm-14b",
+    "paddlenlp/PP-UIE-0.5B",
+    "paddlenlp/PP-UIE-1.5B",
+    "paddlenlp/PP-UIE-7B",
+    "paddlenlp/PP-UIE-14B",
     "uie-base",
     "uie-medium",
     "uie-mini",
@@ -781,8 +781,6 @@ support_schema_list = [
 ]
 
 support_argument_list = [
-    "uie-llm-1.5b",
-    "uie-llm-0.5b",
     "dalle-mini",
     "dalle-mega",
     "dalle-mega-v16",
@@ -794,6 +792,10 @@ support_argument_list = [
     "openai/disco-diffusion-clip-rn50",
     "openai/disco-diffusion-clip-rn101",
     "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh",
+    "paddlenlp/PP-UIE-0.5B",
+    "paddlenlp/PP-UIE-1.5B",
+    "paddlenlp/PP-UIE-7B",
+    "paddlenlp/PP-UIE-14B",
     "uie-base",
     "uie-medium",
     "uie-mini",

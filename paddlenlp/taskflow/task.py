@@ -55,7 +55,12 @@ class Task(metaclass=abc.ABCMeta):
         self._param_updated = False
 
         self._num_threads = self.kwargs["num_threads"] if "num_threads" in self.kwargs else math.ceil(cpu_count() / 2)
-        if self.task == "uie-llm-0.5b" or self.task == "uie-llm-1.5b":
+        if (
+            self.task == "paddlenlp/PP-UIE-0.5B"
+            or self.task == "paddlenlp/PP-UIE-1.5B"
+            or self.task == "paddlenlp/PP-UIE-7B"
+            or self.task == "paddlenlp/PP-UIE-14B"
+        ):
             self._infer_precision = self.kwargs["precision"] if "precision" in self.kwargs else "float16"
         else:
             self._infer_precision = self.kwargs["precision"] if "precision" in self.kwargs else "fp32"
