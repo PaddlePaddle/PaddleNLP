@@ -30,5 +30,6 @@
   "pipeline_parallel_degree": 1,
   "intokens": false,
   "zero_padding": false,
-  "use_flash_attention": false
+  "use_flash_attention": false,
+  "pipeline_parallel_config": "disable_batch_p2p_comm"
 }
