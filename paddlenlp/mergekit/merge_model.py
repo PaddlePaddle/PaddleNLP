@@ -236,16 +236,19 @@ class MergeModel:
             raise ValueError(f"Unsupported file_type: {file_type}")
         return state_dict
 
-    def create_safetensor_index(self, model_path):
-        weight_map = {}
-        total_size = 0
-
-        with safe_open(os.path.join(model_path, self.safe_weight_name()), framework="numpy") as f:
-            for key in f.keys():
-                tensor = f.get_tensor(key)
-                total_size += np.prod(tensor.shape) * self.numpy_dtype_map[str(tensor.dtype)]
-                weight_map[key] = self.safe_weight_name()
-        index = {"metadata": {"total_size": total_size}, "weight_map": weight_map}
+    def get_safetensor_index(self, model_path, file_type):
+        if file_type == "safetensors":
+            with open(os.path.join(model_path, self.safe_index_name()), "r", encoding="utf-8") as f:
+                index = json.load(f)
+        elif file_type == "safetensors_without_index":
+            weight_map = {}
+            total_size = 0
+            with safe_open(os.path.join(model_path, self.safe_weight_name()), framework="numpy") as f:
+                for key in f.keys():
+                    tensor = f.get_tensor(key)
+                    total_size += np.prod(tensor.shape) * self.numpy_dtype_map[str(tensor.dtype)]
+                    weight_map[key] = self.safe_weight_name()
+            index = {"metadata": {"total_size": total_size}, "weight_map": weight_map}
         return index
 
     def merge_safetensor_model(self, file_type_list):
@@ -257,12 +260,7 @@ class MergeModel:
             model_path_list += [self.merge_config.base_model_path]
 
         for model_path, file_type in zip(model_path_list, file_type_list):
-            if file_type == "safetensors":
-                with open(os.path.join(model_path, self.safe_index_name()), "r", encoding="utf-8") as f:
-                    index_list.append(json.load(f))
-            else:
-                index = self.create_safetensor_index(model_path)
-                index_list.append(index)
+            index_list.append(self.get_safetensor_index(model_path, file_type))
 
         # Check index
         if not all(index_list[0]["metadata"]["total_size"] == index["metadata"]["total_size"] for index in index_list):
@@ -467,13 +465,14 @@ class MergeModel:
         file_type_list.append(self.check_lora_model_path(self.merge_config.lora_model_path))
         file_type_list.append(self.check_model_path(self.merge_config.base_model_path))
         # Merge model (distinguish between safetensors and pdparams)
-        if file_type_list[-1] == "safetensors" or file_type_list[-1] == "safetensors_without_index":
+        if "safetensors" in file_type_list[-1]:
             self.merge_safetensor_lora_model(file_type_list)
         else:
             self.merge_pdparams_lora_model(file_type_list)
 
     def shard_lora_merge(self, key_list, lora_index, base_index, shard_file, lora_config):
         merge_state_dict = {}
+        # Load lora state_dict for pdparams case
         lora_state_dict = None
         if lora_index is None:
             lora_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, "lora_pdparams")
@@ -500,8 +499,10 @@ class MergeModel:
                     tensor = w.get_tensor(k)
             if "weight" in k:
                 lora_A_key, lora_B_key = k.replace("weight", "lora_A"), k.replace("weight", "lora_B")
-                lora_A_tensor, lora_B_tensor = None, None
-                if lora_index is not None and lora_A_key in lora_index["weight_map"].keys():
+                lora_A_tensor = None
+                if lora_state_dict is not None and lora_A_key in lora_state_dict.keys():
+                    lora_A_tensor, lora_B_tensor = lora_state_dict[lora_A_key], lora_state_dict[lora_B_key]
+                elif lora_index is not None and lora_A_key in lora_index["weight_map"].keys():
                     with fast_safe_open(
                         os.path.join(self.merge_config.lora_model_path, lora_index["weight_map"][lora_A_key]),
                         framework="np",
@@ -512,8 +513,6 @@ class MergeModel:
                         framework="np",
                     ) as w:
                         lora_B_tensor = w.get_tensor(lora_B_key)
-                elif lora_state_dict is not None and lora_A_key in lora_state_dict.keys():
-                    lora_A_tensor, lora_B_tensor = lora_state_dict[lora_A_key], lora_state_dict[lora_B_key]
 
                 if lora_A_tensor is not None:
                     is_bf16 = tensor.dtype == np.uint16
@@ -535,8 +534,7 @@ class MergeModel:
 
     def merge_safetensor_lora_model(self, file_type_list):
         # Load index
-        with open(os.path.join(self.merge_config.base_model_path, self.safe_index_name()), "r", encoding="utf-8") as f:
-            base_index = json.load(f)
+        base_index = self.get_safetensor_index(self.merge_config.base_model_path, file_type_list[-1])
         if file_type_list[0] == "lora_safetensors":
             with open(
                 os.path.join(self.merge_config.lora_model_path, SAFE_PEFT_WEIGHTS_INDEX_NAME), "r", encoding="utf-8"
@@ -605,23 +603,28 @@ class MergeModel:
             self.merge_config.save_pretrained(self.merge_config.output_path)
 
     def merge_pdparams_lora_model(self, file_type_list):
-        # Load model state dict
+        # Load & check state dict
         lora_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, file_type_list[0])
         base_state_dict = self.get_model_state_dict(self.merge_config.lora_model_path, file_type_list[0])
+        for key in lora_state_dict.keys():
+            if "lora_A" in key:
+                if key.replace("lora_A", "lora_B") not in lora_state_dict.keys():
+                    raise ValueError(f"{key} is not paired with {key.replace('lora_A', 'lora_B')}")
+                if key.replace("lora_A", "weight") not in base_state_dict.keys():
+                    raise ValueError(f'{key.replace("lora_A", "weight")} does not exist in base model.')
+
+        # Load lora config
         lora_config = LoRAConfig.from_pretrained(self.merge_config.lora_model_path)
         if not lora_config.rslora:
             scaling = lora_config.lora_alpha / lora_config.r
         else:
             scaling = lora_config.lora_alpha / math.sqrt(lora_config.r)
 
-        # Merge state dict
+        # Create index
         merge_state_dict = {}
         index = {"metadata": {"total_size": 0}, "weight_map": {}}
         key_list = list(base_state_dict.keys())
-
-        i = dist.get_rank()
         positions = divide_positions(len(key_list), dist.get_world_size())
-        local_keys = key_list[positions[i] : positions[i + 1]]
         for ii in range(len(positions) - 1):
             shard_file = f"{self.merge_config.merge_prefix}-{ii+1:05d}-of-{dist.get_world_size():05d}.safetensors"
             for key in key_list[positions[ii] : positions[ii + 1]]:
@@ -629,6 +632,10 @@ class MergeModel:
                 index["metadata"]["total_size"] += (
                     np.prod(base_state_dict[key].shape) * self.numpy_dtype_map[str(base_state_dict[key].dtype)]
                 )
+
+        # Merge state dict
+        i = dist.get_rank()
+        local_keys = key_list[positions[i] : positions[i + 1]]
         for k in local_keys:
             if k in lora_state_dict.keys():
                 tensor = lora_state_dict[k]
