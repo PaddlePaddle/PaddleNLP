@@ -44,7 +44,9 @@ class MergeConfig:
     base_model_path: str = field(default=None, metadata={"help": "Base model name or path."})
     output_path: str = field(default=None, metadata={"help": "Output model name or path."})
     lora_model_path: str = field(default=None, metadata={"help": "LoRA model name or path."})
-
+    copy_file_list: Optional[List[str]] = field(
+        default=None, metadata={"help": "Copy file list from base model path or first model path."}
+    )
     # merge parameters
     weight_list: Optional[List[float]] = field(
         default=None, metadata={"help": "Relative (or absolute if normalize=False) weighting of a given tensor"}
@@ -73,10 +75,21 @@ class MergeConfig:
             os.makedirs(self.output_path, exist_ok=True)
         if self.tensor_type not in ["np", "pd"]:
             raise ValueError(f"Unsupported tensor type: {self.tensor_type}. Support 'np' and 'pd' only.")
-        if self.lora_model_path is not None and self.base_model_path is None:
-            raise ValueError("Please specify the base_model_path when using LoRA merge.")
-        if self.lora_model_path is None: 
-            if self.merge_method not in ["linear", "ties", "slerp", "della_linear", "della", "dare_linear", "dare_ties"]:
+        if self.lora_model_path is not None:
+            if self.base_model_path is None:
+                raise ValueError("Please specify the base_model_path when using LoRA merge.")
+            self.tensor_type = "pd"
+
+        if self.lora_model_path is None:
+            if self.merge_method not in [
+                "linear",
+                "ties",
+                "slerp",
+                "della_linear",
+                "della",
+                "dare_linear",
+                "dare_ties",
+            ]:
                 raise ValueError(
                     f"Unsupported merge strategy: {self.merge_method}. Please choose one from ['linear', 'slerp']."
                 )
@@ -84,7 +97,9 @@ class MergeConfig:
                 self.model_path_list = self.model_path_str.split(",")
             if self.model_path_list is not None:
                 if not isinstance(self.model_path_list, list) or len(self.model_path_list) < 2:
-                    raise ValueError(f"Please specify the model_path_list at least two. But got {self.model_path_list}")
+                    raise ValueError(
+                        f"Please specify the model_path_list at least two. But got {self.model_path_list}"
+                    )
                 if self.weight_list is None:
                     self.weight_list = [1.0] * len(self.model_path_list)
                     self.normalize = True
