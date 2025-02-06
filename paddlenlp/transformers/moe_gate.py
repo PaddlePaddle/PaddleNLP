@@ -317,7 +317,7 @@ class PretrainedMoEGate(nn.Layer, MoEGateMixin):
         )  # [n, e]
         tmp_scores = scores * score_mask  # [n, e]
         topk_weight, topk_idx = paddle.topk(tmp_scores, k=k, axis=-1, sorted=False)
-        topk_weight = scores.gather(topk_idx, axis=1)
+        topk_weight = scores.gather(topk_idx, axis=1) if not self.training else topk_weight
 
         return topk_weight, topk_idx
 
